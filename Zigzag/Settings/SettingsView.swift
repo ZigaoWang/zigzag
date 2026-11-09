@@ -1411,7 +1411,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let rw = resetAll.fittingWidth, rh = Tokens.Page.controlHeight
             resetAll.frame = NSRect(x: pad + contentWidth - rw, y: y, width: rw, height: rh)
             documentView.addSubview(resetAll)
-            let hint = Label(String(localized: "Click a shortcut to change it. To find one, type its name or keys in Find a setting.",
+            let hint = Label(String(localized: "Click a shortcut to change or remove it. To find one, type its name or keys in Find a setting.",
                                     comment: "Hint at the top of Settings › Shortcuts. “Find a setting” is the search field's placeholder."),
                              font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
             hint.lineBreakMode = .byTruncatingTail
@@ -1873,8 +1873,11 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     private let field = ColorView(color: .clear)
     private let fieldLabel = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     private let resetButton = IconButton(symbol: "arrow.uturn.backward", size: .compact, toolTip: String(localized: "Back to Zigzag’s Shortcut", comment: "Tooltip of the button that puts a changed shortcut back, in Settings › Shortcuts."))
+    /// An × beside the keys while the pointer is on the row or you're typing new ones: the command keeps no shortcut,
+    /// for one that gets in a page's way. Delete does the same while typing.
+    private let removeButton = IconButton(symbol: "xmark", size: .compact, toolTip: String(localized: "Remove Shortcut", comment: "Tooltip of the × beside a shortcut in Settings › Shortcuts: the command is left with no keys."))
     private var monitor: Any?
-    private var isRecording = false { didSet { refresh() } }
+    private var isRecording = false { didSet { refresh(); refreshRemove() } }
     /// Called after the keys change, so the list can redraw rows that lost theirs.
     var onChange: (() -> Void)?
     private static weak var recording: ShortcutRow?
@@ -1890,6 +1893,12 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         resetButton.onClick = { [weak self] _ in
             guard let self, let item = self.item else { return }
             Shortcuts.reset(item)
+            self.onChange?()
+        }
+        removeButton.onClick = { [weak self] _ in
+            guard let self, let item = self.item else { return }
+            self.stopRecording()
+            Shortcuts.set(Shortcuts.Combo.none, for: item)
             self.onChange?()
         }
     }
@@ -1926,6 +1935,9 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         addSubview(field)
         resetButton.isHidden = !(item.map(Shortcuts.isCustom) ?? false)
         addSubview(resetButton)
+        removeButton.setAccessibilityLabel(String(localized: "Remove Shortcut", comment: "Tooltip of the × beside a shortcut in Settings › Shortcuts: the command is left with no keys."))
+        addSubview(removeButton)
+        refreshRemove()
         setAccessibilityRole(item == nil ? .staticText : .button)
         let name = title.stringValue, shortcut = keys.joined(separator: " ")
         setAccessibilityLabel(keys.isEmpty
@@ -1968,6 +1980,11 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
             field.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: w, height: h)
             fieldLabel.frame = NSRect(x: 0, y: (h - fieldLabel.lineHeight) / 2, width: w, height: fieldLabel.lineHeight)
         }
+        if !removeButton.isHidden {
+            let b = removeButton.frame.width
+            x -= b + Tokens.Space.x2
+            removeButton.frame.origin = NSPoint(x: x, y: (bounds.height - b) / 2)
+        }
         if !resetButton.isHidden {
             let b = resetButton.frame.width
             x -= b + Tokens.Space.x2
@@ -1983,7 +2000,17 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         }
     }
 
-    override func stateDidChange(animated: Bool) { refresh() }
+    override func stateDidChange(animated: Bool) {
+        refresh()
+        refreshRemove()
+    }
+
+    private func refreshRemove() {
+        let shown = item != nil && !caps.isEmpty && (isHovered || isRecording)
+        guard removeButton.isHidden == shown else { return }
+        removeButton.isHidden = !shown
+        needsLayout = true
+    }
 
     private func refresh() {
         let editable = item != nil

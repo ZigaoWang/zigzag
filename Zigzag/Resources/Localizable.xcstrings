@@ -3349,13 +3349,13 @@
         }
       }
     },
-    "Click a shortcut to change it. To find one, type its name or keys in Find a setting." : {
+    "Click a shortcut to change or remove it. To find one, type its name or keys in Find a setting." : {
       "comment" : "Hint at the top of Settings › Shortcuts. “Find a setting” is the search field's placeholder.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "点按快捷键即可更改。要查找某个快捷键，请在“查找设置”中键入它的名称或按键。"
+            "value" : "点按快捷键即可更改或移除。要查找某个快捷键，请在“查找设置”中键入它的名称或按键。"
           }
         }
       }
@@ -8997,6 +8997,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从历史记录中移除这段浏览"
+          }
+        }
+      }
+    },
+    "Remove Shortcut" : {
+      "comment" : "Tooltip of the × beside a shortcut in Settings › Shortcuts: the command is left with no keys.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除快捷键"
           }
         }
       }
