@@ -3079,6 +3079,17 @@
         }
       }
     },
+    "Chooses the space the page opens in" : {
+      "comment" : "VoiceOver hint of the space in Zigzag Mini's top strip.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择此页要在哪个空间中打开"
+          }
+        }
+      }
+    },
     "Clay" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor. A pale warm brown.",
       "localizations" : {
@@ -7612,6 +7623,17 @@
         }
       }
     },
+    "Open in %@" : {
+      "comment" : "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 %@ 中打开"
+          }
+        }
+      }
+    },
     "Open in New Tab" : {
       "comment" : "Button in the toast when Zigzag blocks a page's pop-up: opens it as a tab instead.",
       "localizations" : {
@@ -7630,17 +7652,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在分屏浏览中打开"
-          }
-        }
-      }
-    },
-    "Open in Zigzag" : {
-      "comment" : "File menu item in place of Open File… while Zigzag Mini is in front: moves its page into a browser window as a tab.\nTooltip of the button in a mini window's top strip that moves its page into a Zigzag window as a tab.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Zigzag 中打开"
           }
         }
       }
@@ -10818,6 +10829,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "页面源代码"
+          }
+        }
+      }
+    },
+    "Space" : {
+      "comment" : "VoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空间"
           }
         }
       }
