@@ -52,7 +52,8 @@ struct AddressTests {
 
     @Test func oldStateWithThePinnedFieldStillDecodes() throws {
         let json = Data(#"{"version":"1.0","enabled":true,"pinned":true}"#.utf8)
-        #expect(try JSONDecoder().decode(ExtensionStore.State.self, from: json).version == "1.0")
+        #expect(try JSONDecoder().decode(ExtensionStore.Package.self, from: json).version == "1.0")
+        #expect(try JSONDecoder().decode(ExtensionInstalls.State.self, from: json).enabled)
     }
 
     /// Text and button room is the field less the text's insets and, on http, the mark's 16pt.

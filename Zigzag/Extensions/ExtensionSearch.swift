@@ -75,12 +75,12 @@ struct ExtensionSearchProvider: Equatable {
 
     /// The engine an extension gives, while it's installed and on.
     static func provider(for id: String) -> ExtensionSearchProvider? {
-        guard ExtensionStore.isEnabled(id), let manifest = ExtensionStore.manifest(for: id) else { return nil }
+        guard Profiles.shared.default.installs.isEnabled(id), let manifest = ExtensionStore.manifest(for: id) else { return nil }
         return ExtensionSearchProvider(manifest: manifest, extensionID: id)
     }
 
     /// Every engine extensions give now, for Settings.
-    static var available: [ExtensionSearchProvider] { ExtensionStore.installedIDs.sorted().compactMap(provider(for:)) }
+    static var available: [ExtensionSearchProvider] { Profiles.shared.default.installs.installedIDs.sorted().compactMap(provider(for:)) }
 
     /// The extension engine you search with, if it's still there.
     static var chosen: ExtensionSearchProvider? {

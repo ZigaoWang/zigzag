@@ -260,7 +260,7 @@ enum DebugBridge {
         if name == "pindrag" { controller.sidebar.address.debugPinDrag(arg); return }
         if name == "pindump" { controller.sidebar.address.debugDump(to: arg); return }
         // pintoggle <extension id>: pins or unpins it, as the pin on its tile in Site Controls does.
-        if name == "pintoggle" { ExtensionStore.togglePin(arg); return }
+        if name == "pintoggle" { controller.tabManager.profile.installs.togglePin(arg); return }
         if name == "pinhover" { SitePanel.shown?.debugHover(arg); return }
         if name.hasPrefix("mp") { runMiniPlayer(name, arg, in: controller); return }
         NSApp.activate()
@@ -1013,14 +1013,14 @@ enum DebugBridge {
         case "storeadd": WebStoreOffer.debugAdd()
         case "sheetcancel": ExtensionSheet.debugCancel()
         case "sheetconfirm": ExtensionSheet.debugConfirm()
-        case "addextnow": Task { _ = await ExtensionStore.install(arg) }
-        case "rmext": ExtensionStore.uninstall(arg)
+        case "addextnow": Task { _ = await ExtensionStore.install(arg, in: controller.tabManager.profile) }
+        case "rmext": ExtensionStore.uninstall(arg, from: controller.tabManager.profile)
         case "extupdate": Task { await ExtensionStore.updateIfNewer(arg) }
         case "extreinstall":
             // Removes and freshly installs an extension, as a new user would get it.
             if #available(macOS 15.4, *) {
-                ExtensionStore.uninstall(arg)
-                Task { let r = await ExtensionStore.install(arg); debugLog("extreinstall \(arg) \(r)") }
+                ExtensionStore.uninstall(arg, from: controller.tabManager.profile)
+                Task { let r = await ExtensionStore.install(arg, in: controller.tabManager.profile); debugLog("extreinstall \(arg) \(r)") }
             }
         case "extclickpanel":
             // As if clicked in the site panel.
@@ -1034,12 +1034,12 @@ enum DebugBridge {
                 debugLog("extclick \(item.label) attention=\(item.attention != nil)")
                 ExtensionHost.shared.performAction(item, tab: controller.tabManager.selectedTab, in: controller)
             } else { debugLog("extclick: no action for \(arg)") }
-        case "loadunpacked": Task { _ = await ExtensionStore.loadUnpacked(URL(fileURLWithPath: arg, isDirectory: true)) }
+        case "loadunpacked": Task { _ = await ExtensionStore.loadUnpacked(URL(fileURLWithPath: arg, isDirectory: true), in: controller.tabManager.profile) }
         case "extaccess":
             // extaccess <id> <all|click|sites> [site,site]
             let f = arg.split(separator: " ").map(String.init)
-            if f.count >= 2, let access = ExtensionStore.SiteAccess(rawValue: f[1]) {
-                ExtensionStore.setSiteAccess(f[0], access, sites: f.count > 2 ? f[2].split(separator: ",").map(String.init) : nil)
+            if f.count >= 2, let access = ExtensionInstalls.SiteAccess(rawValue: f[1]) {
+                controller.tabManager.profile.installs.setSiteAccess(f[0], access, sites: f.count > 2 ? f[2].split(separator: ",").map(String.init) : nil)
             }
         case "extoffsite":
             // extoffsite <site> on|off
@@ -1058,8 +1058,8 @@ enum DebugBridge {
                 ExtensionHost.shared.performAction(item, tab: controller.tabManager.selectedTab, in: controller)
             }
         case "extapprove": Task { await ExtensionStore.approvePendingUpdate(arg) }
-        case "extoff": ExtensionStore.setEnabled(arg, false)
-        case "exton": ExtensionStore.setEnabled(arg, true)
+        case "extoff": controller.tabManager.profile.installs.setEnabled(arg, false)
+        case "exton": controller.tabManager.profile.installs.setEnabled(arg, true)
         case "settingsid":
             // Settings is a tab now: its window is the browser window it's in.
             if let w = controller.window { try? "\(w.windowNumber)".write(toFile: arg, atomically: true, encoding: .utf8) }
@@ -1333,9 +1333,9 @@ enum DebugBridge {
     @available(macOS 15.4, *)
     static func extensionTest(_ id: String, page: URL, in controller: BrowserWindowController) async {
         var report: [String: Any] = ["id": id]
-        let had = ExtensionStore.state(id) != nil
+        let had = controller.tabManager.profile.installs.state(id) != nil
         let started = Date()
-        if !had { report["install"] = String(describing: await ExtensionStore.install(id)).prefix(160) }
+        if !had { report["install"] = String(describing: await ExtensionStore.install(id, in: controller.tabManager.profile)).prefix(160) }
         report["installSeconds"] = Int(Date().timeIntervalSince(started))
         for _ in 0..<60 {
             if ExtensionHost.shared.contexts.contains(where: { $0.uniqueIdentifier == id }) { break }
@@ -1373,7 +1373,7 @@ enum DebugBridge {
         }
         debugLog("exttest " + ((try? String(data: JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]), encoding: .utf8)) ?? "?") ?? "?")
         while controller.tabManager.currentTabs.count > tabsBefore, let last = controller.tabManager.selectedTab { controller.tabManager.close(last) }
-        if !had { ExtensionStore.uninstall(id) }
+        if !had { ExtensionStore.uninstall(id, from: controller.tabManager.profile) }
     }
 
     static func cpuTime(_ pid: Int32) -> Double { ProcessCPU.seconds(pid) }

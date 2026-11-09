@@ -1043,6 +1043,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         return image
     }
 
+    /// The profile whose extensions it shows: the one of the window it's in.
+    private var profile: Profile { browser?.tabManager.profile ?? Profiles.shared.default }
+
     /// The browser window it's in, for what it opens there (History, the Chrome Web Store).
     private var browser: BrowserWindowController? {
         (window?.windowController as? BrowserWindowController) ?? WindowManager.shared.keyController ?? WindowManager.shared.controllers.first
@@ -1056,7 +1059,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         defer { if pane == .extensions || isSearching { layoutDocument() } }
         guard #available(macOS 15.4, *) else { return }
         loadUnpackedButton.isHidden = !ExtensionStore.developerMode
-        let installed = ExtensionHost.shared.installed.sorted {
+        let installed = profile.extensions.installed.sorted {
             ($0.value.displayName ?? $0.key).localizedCaseInsensitiveCompare($1.value.displayName ?? $1.key) == .orderedAscending
         }
         if installed.isEmpty {
@@ -1096,10 +1099,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         let remove = IconButton(symbol: "trash", size: .compact,
                                 toolTip: String(localized: "Remove from Zigzag", comment: "Tooltip of the trash button on an extension's row in Settings › Extensions."))
-        remove.onClick = { [weak self] _ in if let self { ConfirmSheet.removeExtension(id: id, name: ext.displayName, in: self) } }
+        remove.onClick = { [weak self] _ in if let self { ConfirmSheet.removeExtension(id: id, name: ext.displayName, from: self.profile, in: self) } }
         controls.append(remove)
-        let toggle = Toggle(isOn: ExtensionStore.isEnabled(id))
-        toggle.onChange = { on in ExtensionStore.setEnabled(id, on) }
+        let installs = profile.installs
+        let toggle = Toggle(isOn: installs.isEnabled(id))
+        toggle.onChange = { on in installs.setEnabled(id, on) }
         controls.append(toggle)
         let stack = NSStackView(views: controls)
         stack.spacing = Tokens.Space.x2
@@ -1136,10 +1140,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         panel.prompt = String(localized: "Load", comment: "Button of the panel that loads an unpacked extension from a folder.")
         panel.message = String(localized: "Choose the folder that contains the extension’s manifest.json.",
                                comment: "Message of the panel that loads an unpacked extension. manifest.json is a file name.")
+        let profile = profile
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             Task { @MainActor in
-                if await ExtensionStore.loadUnpacked(url) == nil, let host = self {
+                if await ExtensionStore.loadUnpacked(url, in: profile) == nil, let host = self {
                     ConfirmSheet.notice(in: host, title: String(localized: "Couldn’t load this extension", comment: "Title of the notice when an unpacked extension can't load."),
                                         message: String(localized: "That folder needs a manifest.json that Zigzag can read. Choose the folder that holds it.",
                                                         comment: "Message of the notice when an unpacked extension can't load. manifest.json is a file name."))
@@ -1170,7 +1175,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         passwordsWindowGroup.removeAllRows()
         saveToggle.isOn = PasswordCapture.offersToSave
         fillToggle.isOn = Autofill.isOn
-        let manager = PasswordManagers.active
+        let manager = PasswordManagers.active(in: profile)
         let managerNote = manager.map {
             String(localized: "Off while \($0) handles passwords. Turn on to use both.",
                    comment: "Under a password setting in Settings › Passwords, while a password manager extension (its name, like 1Password) is on.")
@@ -1493,7 +1498,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var contentHeight: CGFloat = 0
 
     private var hasExtensions: Bool {
-        if #available(macOS 15.4, *) { return !ExtensionHost.shared.installed.isEmpty }
+        if #available(macOS 15.4, *) { return !profile.extensions.installed.isEmpty }
         return false
     }
 

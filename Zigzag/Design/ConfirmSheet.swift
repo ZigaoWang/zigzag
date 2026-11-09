@@ -147,13 +147,13 @@ final class ConfirmSheet: NSView {
 
     /// Removing an extension deletes its data too, and can't be undone, so it asks first, from Settings and from the
     /// extension's own menu alike.
-    static func removeExtension(id: String, name: String?, in host: NSView) {
+    static func removeExtension(id: String, name: String?, from profile: Profile, in host: NSView) {
         let title = name.map { name in String(localized: "Remove \(name)?", comment: "Title of the sheet that asks before removing an extension. The placeholder is the extension's name.") }
             ?? String(localized: "Remove this extension?", comment: "Title of the sheet that asks before removing an extension without a name.")
         show(in: host, title: title,
              message: String(localized: "Its settings and data on this Mac are deleted too. You can add it again from the Chrome Web Store.", comment: "Message of the sheet that asks before removing an extension."),
              confirmTitle: String(localized: "Remove", comment: "Button of the sheet that asks before removing an extension."), destructive: true) { confirmed in
-            if confirmed { ExtensionStore.uninstall(id) }
+            if confirmed { ExtensionStore.uninstall(id, from: profile) }
         }
     }
 

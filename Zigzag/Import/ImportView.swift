@@ -221,13 +221,13 @@ final class ImportView: NSView {
     /// Every browser's extensions Zigzag doesn't have, once each: got ready one by one, asked about once, then added
     /// one at a time.
     private func importExtensions() async {
-        let found = ChromiumExtensions.toAdd(summaries.flatMap(\.foundExtensions), installed: Set(ExtensionStore.installedIDs))
+        let found = ChromiumExtensions.toAdd(summaries.flatMap(\.foundExtensions), installed: Set(Profiles.shared.default.installs.installedIDs))
         for index in summaries.indices { summaries[index].foundExtensions = [] }
         guard !found.isEmpty else { return }
         rowList.addSubview(extensionsRow)
         extensionsRow.state = .preparing(0, of: found.count)
         needsLayout = true
-        let steps = ExtensionImport.store
+        let steps = ExtensionImport.store(in: Profiles.shared.default)
         let prepared = await ExtensionImport.prepare(found, with: steps) { [weak self] index in
             self?.extensionsRow.state = .preparing(index, of: found.count)
         }

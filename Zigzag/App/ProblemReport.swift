@@ -88,12 +88,13 @@ enum ProblemReport {
         lines.append("Reduce motion \(Tokens.Motion.reduceMotion ? "on" : "off")")
 
         lines += ["", "Extensions"]
-        let ids = ExtensionStore.installedIDs
+        let profile = Profiles.shared.default
+        let ids = profile.installs.installedIDs
         if ids.isEmpty { lines.append("None") }
         for id in ids {
-            let name = ExtensionHost.shared.context(for: id)?.webExtension.displayName ?? id
-            let version = ExtensionStore.state(id)?.version ?? "?"
-            lines.append("\(name) \(version), \(ExtensionStore.isEnabled(id) ? "on" : "off")")
+            let name = profile.extensions.context(for: id)?.webExtension.displayName ?? id
+            let version = ExtensionStore.package(id)?.version ?? "?"
+            lines.append("\(name) \(version), \(profile.installs.isEnabled(id) ? "on" : "off")")
         }
 
         return lines.joined(separator: "\n") + "\n"

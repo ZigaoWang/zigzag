@@ -329,13 +329,14 @@ enum PasswordManagers {
         "pejdijmoenmkgeppbflobdenhhabjlaj",  // iCloud Passwords
     ]
 
-    static var isActive: Bool { active != nil }
+    /// Whether any profile has one: until you choose otherwise, Zigzag then leaves saving and filling to it.
+    static var isActive: Bool { Profiles.shared.all.contains { active(in: $0) != nil } }
 
     /// The installed, turned-on password manager's name.
-    static var active: String? {
+    static func active(in profile: Profile) -> String? {
         guard #available(macOS 15.4, *) else { return nil }
         // "1Password – Password Manager" reads as "1Password".
-        let name = ExtensionHost.shared.contexts.first { extensionIDs.contains($0.uniqueIdentifier) }?.webExtension.displayName
+        let name = profile.extensions.contexts.first { extensionIDs.contains($0.uniqueIdentifier) }?.webExtension.displayName
         return name.map { full in
             let cut = [" –", " -", ":"].compactMap { full.range(of: $0)?.lowerBound }.min() ?? full.endIndex
             return String(full[..<cut]).trimmingCharacters(in: .whitespaces)

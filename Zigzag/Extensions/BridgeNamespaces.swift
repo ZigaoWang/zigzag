@@ -217,7 +217,7 @@ final class BridgeRuntime: BridgeNamespace {
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         guard fn == "isNewInstall" else { throw BridgeError.unsupported(Self.name, fn) }
-        return ExtensionStore.newlyInstalled.remove(extensionID) != nil
+        return host.profile.installs.newlyInstalled.remove(extensionID) != nil
     }
 }
 
@@ -1071,7 +1071,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         guard !controller.tabManager.isPrivate, !tab.isPrivate, let webView = tab.webView, let url = webView.url ?? tab.url,
               let context = host.context(for: extensionID) else { throw BridgeError("Cannot capture a tab here") }
         guard Self.siteAllows(url, offSites: ExtensionStore.extensionsOffSites,
-                              hasAccess: context.hasAccess(to: url, in: tab), allSites: ExtensionStore.siteAccess(extensionID) == .all) else {
+                              hasAccess: context.hasAccess(to: url, in: tab), allSites: host.profile.installs.siteAccess(extensionID) == .all) else {
             throw BridgeError("Extension manifest must request permission to access this host.")
         }
     }

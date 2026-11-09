@@ -86,8 +86,8 @@ final class ExtensionHost: NSObject {
     /// Loads every installed extension that's turned on, and reads the rest for Settings. Safe to call again:
     /// what's already loaded stays as it is.
     func loadInstalled() async {
-        for id in ExtensionStore.installedIDs {
-            if ExtensionStore.isEnabled(id) {
+        for id in profile.installs.installedIDs {
+            if profile.installs.isEnabled(id) {
                 await load(id)
             } else if installed[id] == nil, let dir = ExtensionStore.packageDirectory(for: id),
                       let ext = try? await WKWebExtension(resourceBaseURL: dir) {
@@ -316,7 +316,7 @@ final class ExtensionHost: NSObject {
     /// Grants what the person approved. Until the install sheet exists, installing approves what the
     /// extension asks for; that approval is recorded once and restored from then on.
     private func restoreGrants(for context: WKWebExtensionContext, extension ext: WKWebExtension) {
-        let state = ExtensionStore.state(context.uniqueIdentifier)
+        let state = profile.installs.state(context.uniqueIdentifier)
         let permissions = state?.grantedPermissions.map { Set($0.map(WKWebExtension.Permission.init(rawValue:))) } ?? ext.requestedPermissions
         let patterns = state?.grantedMatchPatterns.map { Set($0.compactMap { try? WKWebExtension.MatchPattern(string: $0) }) } ?? ext.allRequestedMatchPatterns
         for permission in permissions { context.setPermissionStatus(.grantedExplicitly, for: permission) }
@@ -343,15 +343,15 @@ final class ExtensionHost: NSObject {
     /// clicked the extension on, or only sites they listed. Sites where extensions are off are denied to all.
     private func applySiteAccess(to context: WKWebExtensionContext) {
         let id = context.uniqueIdentifier
-        let approved = (ExtensionStore.state(id)?.grantedMatchPatterns ?? []).compactMap { try? WKWebExtension.MatchPattern(string: $0) }
-        let access = ExtensionStore.siteAccess(id)
+        let approved = (profile.installs.state(id)?.grantedMatchPatterns ?? []).compactMap { try? WKWebExtension.MatchPattern(string: $0) }
+        let access = profile.installs.siteAccess(id)
         // Forget earlier decisions first (clearing one pattern can clear an overlapping one), then make the current ones.
         for pattern in context.grantedPermissionMatchPatterns.keys { context.setPermissionStatus(.unknown, for: pattern) }
         for pattern in context.deniedPermissionMatchPatterns.keys { context.setPermissionStatus(.unknown, for: pattern) }
         if access == .all {
             for pattern in approved { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
         } else {
-            for site in ExtensionStore.accessSites(id) {
+            for site in profile.installs.accessSites(id) {
                 for pattern in Self.patterns(for: site) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
             }
         }
@@ -368,12 +368,12 @@ final class ExtensionHost: NSObject {
     fileprivate func saveGrants(of context: WKWebExtensionContext) {
         let permissions = context.grantedPermissions.keys.map(\.rawValue).sorted()
         // Per-site grants come from site access, not approval; only an "all sites" extension's grants are its approvals.
-        guard ExtensionStore.siteAccess(context.uniqueIdentifier) == .all || ExtensionStore.state(context.uniqueIdentifier)?.grantedMatchPatterns == nil else {
-            ExtensionStore.update(context.uniqueIdentifier) { $0.grantedPermissions = permissions }
+        guard profile.installs.siteAccess(context.uniqueIdentifier) == .all || profile.installs.state(context.uniqueIdentifier)?.grantedMatchPatterns == nil else {
+            profile.installs.update(context.uniqueIdentifier) { $0.grantedPermissions = permissions }
             return
         }
         let patterns = context.grantedPermissionMatchPatterns.keys.map(\.string).sorted()
-        ExtensionStore.update(context.uniqueIdentifier) {
+        profile.installs.update(context.uniqueIdentifier) {
             $0.grantedPermissions = permissions
             $0.grantedMatchPatterns = patterns
         }
@@ -409,7 +409,7 @@ final class ExtensionHost: NSObject {
     /// The extensions with a button in the address, left to right. Only their icons are drawn.
     func pinnedActions(for tab: Tab?) -> [ActionItem] {
         guard tab?.isPrivate != true else { return [] }
-        return ExtensionStore.pins.shown(among: Set(contexts.map(\.uniqueIdentifier))).compactMap { id in
+        return profile.installs.pins.shown(among: Set(contexts.map(\.uniqueIdentifier))).compactMap { id in
             context(for: id).flatMap { actionItem($0, for: tab) }
         }
     }
@@ -519,9 +519,9 @@ final class ExtensionHost: NSObject {
                        action: open, duration: 6, in: controller)
         }
         // "When you click it": clicking gives it this site from now on.
-        if ExtensionStore.siteAccess(item.id) == .click, let site = ContentBlocker.site(of: tab?.url),
-           !ExtensionStore.accessSites(item.id).contains(site) {
-            ExtensionStore.setSiteAccess(item.id, .click, sites: ExtensionStore.accessSites(item.id) + [site])
+        if profile.installs.siteAccess(item.id) == .click, let site = ContentBlocker.site(of: tab?.url),
+           !profile.installs.accessSites(item.id).contains(site) {
+            profile.installs.setSiteAccess(item.id, .click, sites: profile.installs.accessSites(item.id) + [site])
             tab?.reload()
         }
         // A click always does something: if the extension has no popup at all and opens no page, its options page

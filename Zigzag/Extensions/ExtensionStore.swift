@@ -46,7 +46,8 @@ struct ExtensionPins: Equatable {
 
 /// Where extensions live and what the person decided about them. Packages come from the Chrome Web Store,
 /// the same files Chrome users get, verified and never edited: each version sits in its own folder exactly as
-/// it was downloaded. What's ours (on or off, granted permissions, which version is current) is kept beside it.
+/// it was downloaded. Which version is current is kept beside it. A package is shared: what each profile decided
+/// about the extension (on or off, what it's allowed) is that profile's own (ExtensionInstalls).
 ///
 ///     Extensions/<id>/state.json
 ///     Extensions/<id>/versions/<version>/   ← the package, untouched
@@ -61,87 +62,80 @@ enum ExtensionStore {
     static var root: URL { Paths.directory("Extensions") }
     static func folder(for id: String) -> URL { root.appendingPathComponent(id, isDirectory: true) }
     private static func versionsFolder(for id: String) -> URL { folder(for: id).appendingPathComponent("versions", isDirectory: true) }
-    private static func stateFile(for id: String) -> URL { folder(for: id).appendingPathComponent("state.json") }
+    static func stateFile(for id: String) -> URL { folder(for: id).appendingPathComponent("state.json") }
 
-    // MARK: State
+    // MARK: Packages
 
-    /// What we remember about one installed extension.
-    struct State: Codable {
+    /// What we remember about an extension's package, the same for every profile.
+    struct Package: Codable {
         var version: String
-        var enabled = true
-        /// Permissions and site patterns the person approved. Nil until the first load records them.
-        var grantedPermissions: [String]?
-        var grantedMatchPatterns: [String]?
         /// A downloaded update that asks for more than the current version, waiting for the person's approval.
         var pendingVersion: String?
         /// For an unpacked extension: the folder it's read from.
         var unpackedPath: String?
-        /// Where it may read and change pages. Nil means the default: everywhere it was approved for.
-        var siteAccess: SiteAccess?
-        /// For `.sites`: the sites it may use ("github.com"), and for `.click`, the ones clicked on so far.
-        var accessSites: [String]?
+
+        fileprivate static let keys = ["version", "pendingVersion", "unpackedPath"]
     }
 
-    enum SiteAccess: String, Codable {
-        /// Every site it was approved for.
-        case all
-        /// Only a site where the person clicked its button.
-        case click
-        /// Only the sites the person listed.
-        case sites
-    }
+    static func package(_ id: String) -> Package? { read(Package.self, from: stateFile(for: id)) }
 
-    static func state(_ id: String) -> State? {
-        guard let data = try? Data(contentsOf: stateFile(for: id)) else { return nil }
-        return try? JSONDecoder().decode(State.self, from: data)
-    }
-
-    static func save(_ state: State, for id: String) {
-        guard let data = try? JSONEncoder().encode(state) else { return }
+    static func save(_ package: Package, for id: String) {
         try? FileManager.default.createDirectory(at: folder(for: id), withIntermediateDirectories: true)
-        try? data.write(to: stateFile(for: id), options: .atomic)
+        write(package, keys: Package.keys, to: stateFile(for: id))
     }
 
-    static func update(_ id: String, _ change: (inout State) -> Void) {
-        guard var current = state(id) else { return }
+    static func update(_ id: String, _ change: (inout Package) -> Void) {
+        guard var current = package(id) else { return }
         change(&current)
         save(current, for: id)
     }
 
+    /// Takes a record's keys out of the file, leaving its others.
+    static func remove(keys: [String], from file: URL) {
+        guard var all = (try? Data(contentsOf: file)).flatMap({ try? JSONSerialization.jsonObject(with: $0) }) as? [String: Any] else { return }
+        for key in keys { all[key] = nil }
+        guard let out = try? JSONSerialization.data(withJSONObject: all, options: [.sortedKeys]) else { return }
+        try? out.write(to: file, options: .atomic)
+    }
+
+    static func read<Record: Decodable>(_ type: Record.Type, from file: URL) -> Record? {
+        guard let data = try? Data(contentsOf: file) else { return nil }
+        return try? JSONDecoder().decode(type, from: data)
+    }
+
+    /// Writes a record's own keys and leaves the file's others as they are: the package's record and the first
+    /// profile's answers share one file, and neither writer knows the other's keys.
+    static func write<Record: Encodable>(_ record: Record, keys: [String], to file: URL) {
+        guard let data = try? JSONEncoder().encode(record),
+              let fields = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        var all = ((try? Data(contentsOf: file)).flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+        for key in keys { all[key] = fields[key] }
+        guard let out = try? JSONSerialization.data(withJSONObject: all, options: [.sortedKeys]) else { return }
+        try? out.write(to: file, options: .atomic)
+    }
+
     /// The untouched package for a version (the current one unless named).
     static func packageDirectory(for id: String, version: String? = nil) -> URL? {
-        guard let state = state(id) else { return nil }
-        if let path = state.unpackedPath {
+        guard let package = package(id) else { return nil }
+        if let path = package.unpackedPath {
             let dir = URL(fileURLWithPath: path, isDirectory: true)
             return FileManager.default.fileExists(atPath: dir.appendingPathComponent("manifest.json").path) ? dir : nil
         }
-        let dir = versionsFolder(for: id).appendingPathComponent(version ?? state.version, isDirectory: true)
+        let dir = versionsFolder(for: id).appendingPathComponent(version ?? package.version, isDirectory: true)
         return FileManager.default.fileExists(atPath: dir.appendingPathComponent("manifest.json").path) ? dir : nil
     }
 
-    static var installedIDs: [String] {
+    /// Every extension whose package can be read, whichever profiles have it.
+    static var packageIDs: [String] {
         let items = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
         return items.filter { packageDirectory(for: $0) != nil }.sorted()
     }
 
-    static func isInstalled(_ id: String) -> Bool { packageDirectory(for: id) != nil }
-    /// Whether we still keep this extension, even if its package can't be read right now (an unpacked folder on a
-    /// drive that isn't connected).
-    static func hasRecord(_ id: String) -> Bool { state(id) != nil }
-    static func isEnabled(_ id: String) -> Bool { state(id)?.enabled ?? false }
-    static func isUnpacked(_ id: String) -> Bool { state(id)?.unpackedPath != nil }
-    static func needsApproval(_ id: String) -> Bool { state(id)?.pendingVersion != nil }
-    static func siteAccess(_ id: String) -> SiteAccess { state(id)?.siteAccess ?? .all }
-    static func accessSites(_ id: String) -> [String] { state(id)?.accessSites ?? [] }
+    static func isUnpacked(_ id: String) -> Bool { package(id)?.unpackedPath != nil }
+    static func needsApproval(_ id: String) -> Bool { package(id)?.pendingVersion != nil }
 
-    static func setSiteAccess(_ id: String, _ access: SiteAccess, sites: [String]? = nil) {
-        guard #available(macOS 15.4, *) else { return }
-        update(id) {
-            $0.siteAccess = access
-            if let sites { $0.accessSites = sites } else if access == .all { $0.accessSites = nil }
-        }
-        ExtensionHost.shared.applySiteAccess(id)
-    }
+    /// The profiles that have this extension.
+    static func profiles(with id: String) -> [Profile] { Profiles.shared.all.filter { $0.installs.hasRecord(id) } }
 
     /// Sites where every extension is off, whatever its own access says.
     private static let offSitesKey = "ExtensionsOffSites"
@@ -150,44 +144,10 @@ enum ExtensionStore {
         set {
             UserDefaults.standard.set(Array(newValue).sorted(), forKey: offSitesKey)
             guard #available(macOS 15.4, *) else { return }
-            for id in installedIDs { ExtensionHost.shared.applySiteAccess(id) }
+            for profile in Profiles.shared.all {
+                for id in profile.installs.installedIDs { profile.extensions.applySiteAccess(id) }
+            }
         }
-    }
-
-    // MARK: Pins
-
-    private static let pinsKey = "ExtensionsPinned"
-
-    /// The extensions pinned to the address, in every window.
-    static var pins: ExtensionPins {
-        get { ExtensionPins(ids: UserDefaults.standard.stringArray(forKey: pinsKey) ?? []) }
-        set { UserDefaults.standard.set(newValue.ids, forKey: pinsKey) }
-    }
-
-    /// Whether this extension can be pinned now: there's a free slot, counting only those that are on.
-    static func canPin(_ id: String) -> Bool {
-        guard #available(macOS 15.4, *) else { return false }
-        return !pins.contains(id) && pins.canPin(loaded: Set(ExtensionHost.shared.contexts.map(\.uniqueIdentifier)))
-    }
-
-    /// Pins it, if there's a free slot, or unpins it: decided from what's true now, whoever asks.
-    static func togglePin(_ id: String) {
-        if pins.contains(id) {
-            changePins(pins.unpinning(id))
-        } else if canPin(id) {
-            changePins(pins.pinning(id))
-        }
-    }
-
-    /// The showing pins dropped into a new order.
-    static func reorderPins(visible: [String]) {
-        changePins(pins.reordered(visible: visible))
-    }
-
-    private static func changePins(_ new: ExtensionPins) {
-        guard #available(macOS 15.4, *), new != pins else { return }
-        pins = new
-        ExtensionHost.shared.changed.send()
     }
 
     /// Removing an extension is remembered, so 1Password's automatic setup doesn't bring it back.
@@ -195,9 +155,6 @@ enum ExtensionStore {
         get { Set(UserDefaults.standard.stringArray(forKey: removedKey) ?? []) }
         set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: removedKey) }
     }
-
-    /// Installed since Zigzag started, until the extension's background has heard so (BridgeRuntime).
-    static var newlyInstalled: Set<String> = []
 
     /// Shows "Load Unpacked…" in Settings.
     static var developerMode: Bool {
@@ -265,12 +222,13 @@ enum ExtensionStore {
         // An extension engine whose extension went while Zigzag was closed: the one you had before.
         ExtensionSearchProvider.reconcile()
         // An extension's proxy applies from the first page on, not from when its background has started again.
-        ExtensionHost.shared.bridge.proxy.restore()
+        let profile = Profiles.shared.default
+        profile.extensions.bridge.proxy.restore()
         Task {
             await migrateLegacyInstalls()
             // An extension that went while Zigzag was closed takes its pin with it.
-            pins = pins.keeping(hasRecord)
-            await ExtensionHost.shared.loadInstalled()
+            profile.installs.pins = profile.installs.pins.keeping(profile.installs.hasRecord)
+            await profile.extensions.loadInstalled()
             await checkForUpdatesIfDue()
         }
     }
@@ -337,25 +295,29 @@ enum ExtensionStore {
         return .success(PreparedInstall(id: id, version: package.version, folder: package.folder, extensionInfo: ext, report: report))
     }
 
-    /// Installs a prepared package and loads it. Returns its name.
+    /// Installs a prepared package in a profile and loads it there. Returns its name.
     @available(macOS 15.4, *)
-    static func finishInstall(_ prepared: PreparedInstall) async -> Result<String, InstallError> {
+    static func finishInstall(_ prepared: PreparedInstall, in profile: Profile) async -> Result<String, InstallError> {
         let id = prepared.id
-        let isNew = state(id) == nil
+        let installs = profile.installs
+        let isNew = !installs.hasRecord(id)
         guard store((prepared.folder, prepared.version), for: id) else { return .failure(.unpack) }
-        var next = state(id) ?? State(version: prepared.version)
-        next.version = prepared.version
-        next.pendingVersion = nil
-        next.unpackedPath = nil
+        save(Package(version: prepared.version), for: id)
+        var next = installs.state(id) ?? ExtensionInstalls.State()
         // Approved just now, from what the sheet showed.
         next.grantedPermissions = nil
         next.grantedMatchPatterns = nil
-        save(next, for: id)
+        installs.save(next, for: id)
         removedIDs.remove(id)
         removeVersions(of: id, keeping: [prepared.version])
-        if isNew { newlyInstalled.insert(id) }
-        ExtensionHost.shared.unload(id)
-        let context = await ExtensionHost.shared.load(id)
+        if isNew { installs.newlyInstalled.insert(id) }
+        // A new version of the package is every profile's: each one running it starts again on it.
+        var context: WKWebExtensionContext?
+        for other in profiles(with: id) where other === profile || other.installs.isEnabled(id) {
+            other.extensions.unload(id)
+            let loaded = await other.extensions.load(id)
+            if other === profile { context = loaded }
+        }
         return .success(context?.webExtension.displayName ?? prepared.extensionInfo.displayName ?? id)
     }
 
@@ -365,10 +327,10 @@ enum ExtensionStore {
     }
 
     /// Downloads, verifies and loads an extension you picked (in onboarding).
-    static func install(_ id: String) async -> Result<String, InstallError> {
+    static func install(_ id: String, in profile: Profile) async -> Result<String, InstallError> {
         guard #available(macOS 15.4, *) else { return .failure(.download) }
         switch await prepareInstall(id) {
-        case .success(let prepared): return await finishInstall(prepared)
+        case .success(let prepared): return await finishInstall(prepared, in: profile)
         case .failure(let error): return .failure(error)
         }
     }
@@ -376,7 +338,7 @@ enum ExtensionStore {
     /// What a held-back update would add, for the approval sheet.
     @available(macOS 15.4, *)
     static func pendingUpdateReport(_ id: String) async -> (extension: WKWebExtension, report: ExtensionReport)? {
-        guard let pending = state(id)?.pendingVersion, let new = packageDirectory(for: id, version: pending),
+        guard let pending = package(id)?.pendingVersion, let new = packageDirectory(for: id, version: pending),
               let old = packageDirectory(for: id), let newManifest = manifest(in: new), let oldManifest = manifest(in: old),
               let ext = try? await WKWebExtension(resourceBaseURL: new) else { return nil }
         return (ext, ExtensionReport(newIn: ext, manifest: newManifest, comparedTo: oldManifest, id: id))
@@ -384,22 +346,26 @@ enum ExtensionStore {
 
     /// Loads an extension from a folder on disk, for testing one you're building. Its ID comes from the
     /// folder's path, the way Chrome does it, so reloading the same folder keeps its data.
-    static func loadUnpacked(_ url: URL) async -> String? {
+    static func loadUnpacked(_ url: URL, in profile: Profile) async -> String? {
         guard #available(macOS 15.4, *),
               FileManager.default.fileExists(atPath: url.appendingPathComponent("manifest.json").path) else { return nil }
         let id = CRXPackage.extensionID(Array(SHA256.hash(data: Data(url.standardizedFileURL.path.utf8)).prefix(16)))
-        if state(id) == nil { newlyInstalled.insert(id) }
-        save(State(version: manifestVersion(in: url) ?? "0", unpackedPath: url.standardizedFileURL.path), for: id)
+        if !profile.installs.hasRecord(id) { profile.installs.newlyInstalled.insert(id) }
+        save(Package(version: manifestVersion(in: url) ?? "0", unpackedPath: url.standardizedFileURL.path), for: id)
+        // Loaded again from its folder, it starts as a new install would: on, with what it asks for approved afresh.
+        profile.installs.save(ExtensionInstalls.State(), for: id)
         removedIDs.remove(id)
-        let context = await ExtensionHost.shared.load(id)
+        let context = await profile.extensions.load(id)
         return context?.webExtension.displayName
     }
 
-    /// Re-reads an unpacked extension's files.
+    /// Re-reads an unpacked extension's files, in every profile running it.
     static func reloadUnpacked(_ id: String) async {
         guard #available(macOS 15.4, *), isUnpacked(id) else { return }
-        ExtensionHost.shared.unload(id)
-        await ExtensionHost.shared.load(id)
+        for profile in profiles(with: id) where profile.installs.isEnabled(id) {
+            profile.extensions.unload(id)
+            await profile.extensions.load(id)
+        }
     }
 
     /// Fetches, verifies and unpacks a package into a fresh temporary folder.
@@ -500,32 +466,12 @@ enum ExtensionStore {
     /// What the extension asked for in its own manifest (the package's, not the loaded copy's, which adds native
     /// messaging for Zigzag's bridge). Read once per version.
     static func declaredPermissions(_ id: String) -> (required: Set<String>, optional: Set<String>) {
-        let version = state(id)?.version ?? ""
+        let version = package(id)?.version ?? ""
         if let cached = declaredCache[id], cached.version == version { return (cached.required, cached.optional) }
         let manifest = manifest(for: id) ?? [:]
         let required = Set(manifest["permissions"] as? [String] ?? []), optional = Set(manifest["optional_permissions"] as? [String] ?? [])
         declaredCache[id] = (version, required, optional)
         return (required, optional)
-    }
-
-    /// Whether an extension that's on asked for a permission, required or optional.
-    static func someEnabledExtensionDeclares(_ permission: String) -> Bool {
-        installedIDs.contains { id in
-            guard isEnabled(id) else { return false }
-            let declared = declaredPermissions(id)
-            return declared.required.contains(permission) || declared.optional.contains(permission)
-        }
-    }
-
-    /// The sites each enabled extension lets message it (`externally_connectable.matches`), never every site.
-    static func externallyConnectablePatterns() -> [String: [String]] {
-        var byExtension: [String: [String]] = [:]
-        for id in installedIDs where isEnabled(id) {
-            let matches = ((manifest(for: id)?["externally_connectable"] as? [String: Any])?["matches"] as? [String]) ?? []
-            let narrow = matches.filter { $0 != "<all_urls>" && !$0.hasPrefix("*://*/") && !$0.hasPrefix("https://*/") && !$0.hasPrefix("http://*/") }
-            if !narrow.isEmpty { byExtension[id] = narrow.sorted() }
-        }
-        return byExtension
     }
 
     private static var declaredCache: [String: (version: String, required: Set<String>, optional: Set<String>)] = [:]
@@ -554,19 +500,19 @@ enum ExtensionStore {
         let last = UserDefaults.standard.object(forKey: lastUpdateKey) as? Date ?? .distantPast
         guard force || Date().timeIntervalSince(last) > 24 * 3600 else { return }
         UserDefaults.standard.set(Date(), forKey: lastUpdateKey)
-        for id in installedIDs where !isUnpacked(id) { await updateIfNewer(id) }
+        for id in packageIDs where !isUnpacked(id) { await updateIfNewer(id) }
     }
 
     /// Asks the store for the latest version only; downloads it when it's newer. An update that asks for
     /// nothing new replaces the running version; one that asks for more waits for approval.
     static func updateIfNewer(_ id: String) async {
-        guard #available(macOS 15.4, *), let current = state(id), let latest = await latestVersion(of: id, current: current.version),
+        guard #available(macOS 15.4, *), let current = package(id), let latest = await latestVersion(of: id, current: current.version),
               isVersion(latest, newerThan: current.version), latest != current.pendingVersion else { return }
         guard case .success(let package) = await download(id), store(package, for: id),
               let old = packageDirectory(for: id), let new = packageDirectory(for: id, version: package.version) else { return }
         if asksForMore(new, than: old) {
             update(id) { $0.pendingVersion = package.version }
-            ExtensionHost.shared.changed.send()
+            ExtensionCenter.changed.send()
             return
         }
         await switchVersion(of: id, to: package.version)
@@ -574,27 +520,37 @@ enum ExtensionStore {
 
     /// Approves a held-back update: its new permissions are granted and it replaces the running version.
     static func approvePendingUpdate(_ id: String) async {
-        guard let pending = state(id)?.pendingVersion else { return }
-        update(id) {
-            $0.pendingVersion = nil
-            // Re-recorded from the new version's request on load.
-            $0.grantedPermissions = nil
-            $0.grantedMatchPatterns = nil
+        guard let pending = package(id)?.pendingVersion else { return }
+        update(id) { $0.pendingVersion = nil }
+        for profile in profiles(with: id) {
+            profile.installs.update(id) {
+                // Re-recorded from the new version's request on load.
+                $0.grantedPermissions = nil
+                $0.grantedMatchPatterns = nil
+            }
         }
         await switchVersion(of: id, to: pending)
     }
 
     /// Makes a version current and reloads the extension with it, going back to the old one if it won't load.
     private static func switchVersion(of id: String, to version: String) async {
-        guard #available(macOS 15.4, *), let previous = state(id)?.version else { return }
+        guard #available(macOS 15.4, *), let previous = package(id)?.version else { return }
         update(id) { $0.version = version; $0.pendingVersion = nil }
-        guard isEnabled(id) else { removeVersions(of: id, keeping: [version]); return }
-        ExtensionHost.shared.unload(id)
-        if await ExtensionHost.shared.load(id) != nil {
+        // Every profile running it moves to the new version together; if one can't load it, all go back.
+        let running = profiles(with: id).filter { $0.installs.isEnabled(id) }
+        var loadedEverywhere = true
+        for profile in running {
+            profile.extensions.unload(id)
+            if await profile.extensions.load(id) == nil { loadedEverywhere = false; break }
+        }
+        if loadedEverywhere {
             removeVersions(of: id, keeping: [version])
         } else {
             update(id) { $0.version = previous }
-            await ExtensionHost.shared.load(id)
+            for profile in running {
+                profile.extensions.unload(id)
+                await profile.extensions.load(id)
+            }
         }
         // A version that no longer gives a search engine gives back the one you had.
         ExtensionSearchProvider.reconcile()
@@ -638,32 +594,25 @@ enum ExtensionStore {
 
     // MARK: Removing
 
-    /// Takes the extension out of Zigzag and deletes its files and everything it stored.
-    static func uninstall(_ id: String) {
+    /// Takes the extension out of a profile and deletes everything it stored there. Its files go once no profile
+    /// has it.
+    static func uninstall(_ id: String, from profile: Profile) {
         guard #available(macOS 15.4, *) else { return }
         let unpacked = isUnpacked(id)
-        pins = pins.unpinning(id)
-        ExtensionHost.shared.unload(id)
-        ExtensionHost.shared.removeData(for: id)
-        // An unpacked extension's own folder belongs to its developer; only our record of it goes.
-        try? FileManager.default.removeItem(at: folder(for: id))
-        if !unpacked { removedIDs.insert(id) }
-        ExtensionHost.shared.forget(id)
+        profile.installs.unpin(id)
+        profile.extensions.unload(id)
+        profile.extensions.removeData(for: id)
+        if profiles(with: id).allSatisfy({ $0 === profile }) {
+            // An unpacked extension's own folder belongs to its developer; only our record of it goes.
+            try? FileManager.default.removeItem(at: folder(for: id))
+            if !unpacked { removedIDs.insert(id) }
+        } else {
+            profile.installs.remove(id)
+        }
+        profile.extensions.forget(id)
         // Only now is it gone from disk: removing a password manager brings back the passkey fallback.
         Passkeys.refresh()
         ExtensionSearchProvider.reconcile()
-    }
-
-    static func setEnabled(_ id: String, _ enabled: Bool) {
-        guard #available(macOS 15.4, *), isEnabled(id) != enabled else { return }
-        update(id) { $0.enabled = enabled }
-        if enabled {
-            Task { await ExtensionHost.shared.load(id) }
-        } else {
-            // Its search engine goes with it, if it was yours.
-            ExtensionSearchProvider.reconcile()
-            ExtensionHost.shared.unload(id)
-        }
     }
 
     // MARK: Older installs
@@ -674,17 +623,19 @@ enum ExtensionStore {
         let disabled = Set(UserDefaults.standard.stringArray(forKey: "DisabledExtensions") ?? [])
         for id in (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? [] where isExtensionID(id) {
             let legacy = folder(for: id)
-            guard state(id) == nil, FileManager.default.fileExists(atPath: legacy.appendingPathComponent("manifest.json").path) else { continue }
+            guard package(id) == nil, FileManager.default.fileExists(atPath: legacy.appendingPathComponent("manifest.json").path) else { continue }
             let moved = root.appendingPathComponent(".legacy-\(id)-\(UUID().uuidString)")
             guard (try? FileManager.default.moveItem(at: legacy, to: moved)) != nil else { continue }
             if case .success(let package) = await download(id), store(package, for: id) {
                 try? FileManager.default.removeItem(at: moved)
-                save(State(version: package.version, enabled: !disabled.contains(id)), for: id)
+                save(Package(version: package.version), for: id)
+                Profiles.shared.default.installs.save(ExtensionInstalls.State(enabled: !disabled.contains(id)), for: id)
             } else if let version = manifestVersion(in: moved) {
                 undoLegacyPatch(in: moved)
                 try? FileManager.default.createDirectory(at: versionsFolder(for: id), withIntermediateDirectories: true)
                 try? FileManager.default.moveItem(at: moved, to: versionsFolder(for: id).appendingPathComponent(version))
-                save(State(version: version, enabled: !disabled.contains(id)), for: id)
+                save(Package(version: version), for: id)
+                Profiles.shared.default.installs.save(ExtensionInstalls.State(enabled: !disabled.contains(id)), for: id)
             } else {
                 try? FileManager.default.moveItem(at: moved, to: legacy)
             }
@@ -1169,7 +1120,7 @@ extension ExtensionStore {
     /// background prelude gets a sibling folder of hard links to the same files, plus a manifest that runs
     /// the prelude first. The package keeps its exact bytes either way.
     static func loadDirectory(for id: String) -> URL? {
-        guard let package = packageDirectory(for: id), let state = state(id) else { return nil }
+        guard let package = packageDirectory(for: id), let state = self.package(id) else { return nil }
         let shim = ExtensionShims.shim(for: id)
         let prelude = shim?.backgroundPrelude
         let patches = shim?.patches ?? []
@@ -1198,7 +1149,7 @@ extension ExtensionStore {
     /// The loaded copy's folder, where Zigzag may add files of its own (user scripts' code). Nil when WebKit loads the
     /// package itself, which is never written to.
     static func overlayDirectory(for id: String) -> URL? {
-        guard let state = state(id) else { return nil }
+        guard let state = package(id) else { return nil }
         let overlay = overlayFolder(for: id, version: state.version)
         return FileManager.default.fileExists(atPath: overlay.appendingPathComponent("zigzag-profile.txt").path) ? overlay : nil
     }

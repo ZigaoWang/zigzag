@@ -15,22 +15,25 @@ enum Passkeys {
     }()
 
     /// Every page's scripts this has been asked about, so turning a password manager on or off reaches them.
-    private static let controllers = NSHashTable<WKUserContentController>.weakObjects()
+    private static let controllers = NSMapTable<WKUserContentController, Profile>.weakToWeakObjects()
 
-    /// `isPrivate`: private windows have no extensions, so no password manager to hand passkeys to.
-    static func attach(to configuration: WKWebViewConfiguration, isPrivate: Bool) {
+    /// `isPrivate`: private windows have no extensions, so no password manager to hand passkeys to. Otherwise it's
+    /// the page's own profile that has one or not.
+    static func attach(to configuration: WKWebViewConfiguration, isPrivate: Bool, profile: Profile) {
         guard !available else { return }
         let controller = configuration.userContentController
         if isPrivate { install(in: controller); return }
-        controllers.add(controller)
-        if !passwordManagerOn { install(in: controller) }
+        controllers.setObject(profile, forKey: controller)
+        if !passwordManagerOn(in: profile) { install(in: controller) }
     }
 
     /// Puts the shim in or takes it out after a password manager is turned on or off. Pages see it from their next load.
     static func refresh() {
         guard !available else { return }
-        let wanted = !passwordManagerOn
-        for controller in controllers.allObjects where has(controller) != wanted {
+        for controller in controllers.keyEnumerator().allObjects.compactMap({ $0 as? WKUserContentController }) {
+            guard let profile = controllers.object(forKey: controller) else { continue }
+            let wanted = !passwordManagerOn(in: profile)
+            guard has(controller) != wanted else { continue }
             if wanted {
                 install(in: controller)
             } else {
@@ -43,9 +46,9 @@ enum Passkeys {
 
     /// Read from what's installed and turned on rather than what's loaded, so pages restored at launch, before
     /// extensions finish loading, already get it right.
-    private static var passwordManagerOn: Bool {
+    private static func passwordManagerOn(in profile: Profile) -> Bool {
         guard #available(macOS 15.4, *) else { return false }
-        return PasswordManagers.extensionIDs.contains { ExtensionStore.isEnabled($0) && ExtensionStore.isInstalled($0) }
+        return PasswordManagers.extensionIDs.contains { profile.installs.isEnabled($0) && profile.installs.isInstalled($0) }
     }
 
     private static func has(_ controller: WKUserContentController) -> Bool {

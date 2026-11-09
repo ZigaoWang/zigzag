@@ -61,10 +61,10 @@ enum ExtensionImport {
     }
 
     /// Zigzag's own install path: the same download, signature check, package checks and loading as adding one
-    /// from the store's page.
-    static var store: Steps<ExtensionStore.PreparedInstall> {
+    /// from the store's page. `profile`: the one they're added to.
+    static func store(in profile: Profile) -> Steps<ExtensionStore.PreparedInstall> {
         Steps(prepare: { await ExtensionStore.prepareInstall($0) },
-              finish: { await ExtensionStore.finishInstall($0) },
+              finish: { await ExtensionStore.finishInstall($0, in: profile) },
               discard: { ExtensionStore.discard($0) })
     }
 }
