@@ -666,6 +666,10 @@ final class Tab: NSObject {
 extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
         let userInitiated = PopupNotice.isUserInitiated(navigationAction)
+        // Zigzag's own load counts for the main frame's next decision only, whatever comes of it (a download, an
+        // app's link): never for a later one the page starts.
+        let ownLoad = navigationAction.targetFrame?.isMainFrame == true && ownLoadPending
+        if navigationAction.targetFrame?.isMainFrame == true { ownLoadPending = false }
         if navigationAction.shouldPerformDownload {
             // A download link you click saves. One a script starts on its own saves too (an export that's ready),
             // but not a stream of them: another within half a minute is refused.
@@ -700,7 +704,7 @@ extension Tab: WKNavigationDelegate {
         }
         // Zigzag's own pages (Settings, History) open from Zigzag or from one another, never because a website
         // sent the tab there: a page could time it so your next click lands on a switch.
-        if url.scheme?.lowercased() == HistoryPage.scheme, !ownLoadPending, navigationAction.navigationType != .backForward,
+        if url.scheme?.lowercased() == HistoryPage.scheme, !ownLoad, navigationAction.navigationType != .backForward,
            navigationAction.sourceFrame.securityOrigin.protocol != HistoryPage.scheme {
             return (.cancel, preferences)
         }
@@ -751,8 +755,7 @@ extension Tab: WKNavigationDelegate {
             // going there: a link opened elsewhere leaves this page's blocking as it was.
             if !showsExtensionPage { ContentBlocker.apply(to: webView, for: url) }
             // Back, Forward and Reload go to pages you've had; anything else the page started waits to show.
-            addressWaitsForCommit = openedByPage || (!ownLoadPending && ![.backForward, .reload].contains(navigationAction.navigationType))
-            ownLoadPending = false
+            addressWaitsForCommit = openedByPage || (!ownLoad && ![.backForward, .reload].contains(navigationAction.navigationType))
         }
         return (.allow, preferences)
     }
