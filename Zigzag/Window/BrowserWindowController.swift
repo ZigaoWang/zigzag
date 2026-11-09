@@ -101,10 +101,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
         sidebar.address.captureButton.onClick = { [weak self] _ in
-            guard let self, let tab = self.tabManager.selectedTab, let host = tab.url?.host() else { return }
+            guard let self, let tab = self.tabManager.selectedTab, let origin = SiteOrigin.of(tab.url) else { return }
             MenuPanel.show([
                 .item(.init(title: String(localized: "Stop Camera and Microphone", comment: "Menu item of the address bar's camera button: stops the page using the camera and microphone."), symbol: "stop.circle") { tab.stopCapture() }),
-                .item(.init(title: String(localized: "Ask Again Next Time", comment: "Menu item of the address bar's camera button: forgets the site's camera and microphone answer."), symbol: "arrow.counterclockwise") { SitePermissions.forget(host: host) }),
+                .item(.init(title: String(localized: "Ask Again Next Time", comment: "Menu item of the address bar's camera button: forgets the site's camera and microphone answer."), symbol: "arrow.counterclockwise") { SitePermissions.forget(origin: origin) }),
             ], from: self.sidebar.address.captureButton)
         }
         sidebar.nowPlaying.onClick = { [weak self] _ in

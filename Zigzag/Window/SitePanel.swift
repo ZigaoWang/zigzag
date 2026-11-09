@@ -19,6 +19,8 @@ final class SitePanel: FloatingPanelView {
     private let tab: Tab
     private let url: URL
     private let site: String
+    /// The page's origin, which its camera, location, notification and pop-up answers are kept under.
+    private let origin: String?
     private let isBlank: Bool
     /// The panel is about one page: when it goes to another site (a sign-in redirect), the panel goes too.
     private var pageToken: SignalToken?
@@ -54,11 +56,17 @@ final class SitePanel: FloatingPanelView {
         self.tab = tab
         self.url = url ?? URL(string: "about:blank")!
         site = url.map { ContentBlocker.site(of: $0) ?? $0.host() ?? $0.absoluteString } ?? String(localized: "New Tab", comment: "Name the site panel shows for a new tab with no page.")
+        let origin = SiteOrigin.of(url)
+        self.origin = origin
         super.init(frame: .zero)
         radius = Tokens.Radius.panel
         icon.image = tab.favicon
-        // In the app's voice, as a page names itself; a site's name keeps its own spelling.
-        siteName.attributedStringValue = Tokens.Font.voiceText(site, size: 20)
+        // In the app's voice, as a page names itself; a site's name keeps its own spelling. Plain http or a port of
+        // its own is named in full, as its answers are its own: localhost:3000 never reads like localhost:3001.
+        let web = ["http", "https"].contains(url?.scheme?.lowercased() ?? "")
+        let full = origin.map(SiteOrigin.label).flatMap { $0.contains(":") ? $0 : nil }
+        let named = web ? full ?? site : site
+        siteName.attributedStringValue = Tokens.Font.voiceText(named, size: 20)
         let page = self.url
         let secure = page.scheme == "https" && (tab.webView?.hasOnlySecureContent ?? true)
         if page.scheme == "webkit-extension" {
@@ -77,7 +85,7 @@ final class SitePanel: FloatingPanelView {
         let shownSite = site
         pageToken = tab.changed.observe { [weak self, weak tab] change in
             guard change == .url, let self, let now = tab?.url else { return }
-            if (ContentBlocker.site(of: now) ?? now.host() ?? now.absoluteString) != shownSite { self.close() }
+            if (ContentBlocker.site(of: now) ?? now.host() ?? now.absoluteString) != shownSite || SiteOrigin.of(now) != origin { self.close() }
         }
         moreButton.onClick = { [weak self] _ in self?.showMoreMenu() }
         moreButton.isHidden = !canClear
@@ -286,39 +294,41 @@ final class SitePanel: FloatingPanelView {
                 if on, self?.tab.isTranslated == false { self?.controller?.translatePage() }
             })
         }
-        let host = url.host() ?? site
-        // Calls (Meet, Zoom, Teams) ask for both at once and are kept as one answer; that counts here too.
-        let media = [WKMediaCaptureType.camera, .microphone, .cameraAndMicrophone].compactMap { SitePermissions.decision(host: host, type: $0) }
-        if !media.isEmpty {
-            let allowed = media.allSatisfy { $0 }
-            rows.append(.value(String(localized: "Camera and microphone", comment: "Row in the site panel's This Site group."), allowed ? Self.allowed : Self.blocked, action: Self.askAgain) { [weak self] in
-                SitePermissions.forget(host: host)
-                self?.rebuildRows()
-            })
-        }
-        if let allowed = SitePermissions.location(host: host) {
-            rows.append(.value(String(localized: "Location", comment: "Row in the site panel's This Site group."), allowed ? Self.allowed : Self.blocked, action: Self.askAgain) { [weak self] in
-                SitePermissions.forgetLocation(host: host)
-                self?.rebuildRows()
-            })
-        }
-        // Once answered, the answer; asked and not answered (the question went before you got to it), off until
-        // you turn it on here.
-        let answer = SitePermissions.notifications(host: host.lowercased())
-        if !tab.isPrivate, answer != nil || WebNotifications.shared.hasAsked(host: host) {
-            var decided = answer != nil
-            let unanswered = String(localized: "Not allowed yet", comment: "Under Notifications in the site panel's This Site group: the site asked to send notifications, and no one answered yet.")
-            rows.append(.toggle(String(localized: "Notifications", comment: "Row in the site panel's This Site group."), on: answer ?? false,
-                                status: { $0 ? Self.allowed : (decided ? Self.blocked : unanswered) }) { on in
-                decided = true
-                SitePermissions.setNotifications(on, host: host.lowercased())
-                if !on { WebNotifications.shared.removeAll(host: host.lowercased()) }
-            })
-        }
-        if !tab.isPrivate, SitePermissions.popups(host: host.lowercased()) {
-            rows.append(.toggle(String(localized: "Pop-ups", comment: "Row in the site panel's This Site group."), on: true, status: { $0 ? Self.allowed : Self.blocked }) { on in
-                SitePermissions.setPopups(on ? true : nil, host: host.lowercased())
-            })
+        // Answers are the page's origin's: another port or scheme on the same host has its own.
+        if let origin {
+            // Calls (Meet, Zoom, Teams) ask for both at once and are kept as one answer; that counts here too.
+            let media = [WKMediaCaptureType.camera, .microphone, .cameraAndMicrophone].compactMap { SitePermissions.decision(origin: origin, type: $0) }
+            if !media.isEmpty {
+                let allowed = media.allSatisfy { $0 }
+                rows.append(.value(String(localized: "Camera and microphone", comment: "Row in the site panel's This Site group."), allowed ? Self.allowed : Self.blocked, action: Self.askAgain) { [weak self] in
+                    SitePermissions.forget(origin: origin)
+                    self?.rebuildRows()
+                })
+            }
+            if let allowed = SitePermissions.location(origin: origin) {
+                rows.append(.value(String(localized: "Location", comment: "Row in the site panel's This Site group."), allowed ? Self.allowed : Self.blocked, action: Self.askAgain) { [weak self] in
+                    SitePermissions.forgetLocation(origin: origin)
+                    self?.rebuildRows()
+                })
+            }
+            // Once answered, the answer; asked and not answered (the question went before you got to it), off until
+            // you turn it on here.
+            let answer = SitePermissions.notifications(origin: origin)
+            if !tab.isPrivate, answer != nil || WebNotifications.shared.hasAsked(origin: origin) {
+                var decided = answer != nil
+                let unanswered = String(localized: "Not allowed yet", comment: "Under Notifications in the site panel's This Site group: the site asked to send notifications, and no one answered yet.")
+                rows.append(.toggle(String(localized: "Notifications", comment: "Row in the site panel's This Site group."), on: answer ?? false,
+                                    status: { $0 ? Self.allowed : (decided ? Self.blocked : unanswered) }) { on in
+                    decided = true
+                    SitePermissions.setNotifications(on, origin: origin)
+                    if !on { WebNotifications.shared.removeAll(origin: origin) }
+                })
+            }
+            if !tab.isPrivate, SitePermissions.popups(origin: origin) {
+                rows.append(.toggle(String(localized: "Pop-ups", comment: "Row in the site panel's This Site group."), on: true, status: { $0 ? Self.allowed : Self.blocked }) { on in
+                    SitePermissions.setPopups(on ? true : nil, origin: origin)
+                })
+            }
         }
         // The page's zoom as it is: in a private window that's its own, which isn't saved for the site.
         let zoom = tab.webView?.pageZoom ?? ZoomLevels.zoom(for: url)

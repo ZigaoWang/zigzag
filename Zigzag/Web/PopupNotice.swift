@@ -57,8 +57,8 @@ final class PopupNotice: NSObject, WKScriptMessageHandler {
     /// click. Anything else returns nothing, and the page's own script reports it blocked.
     static func allows(_ action: WKNavigationAction, from page: URL?, isPrivate: Bool) -> Bool {
         if isUserInitiated(action) { return true }
-        guard !isPrivate, let host = page?.host()?.lowercased(), !host.isEmpty else { return false }
-        return SitePermissions.popups(host: host)
+        guard !isPrivate, let origin = SiteOrigin.of(page) else { return false }
+        return SitePermissions.popups(origin: origin)
     }
 
     /// WebKit's own record of whether a click or a key started it (not public API, but long-standing); without
@@ -76,17 +76,18 @@ final class PopupNotice: NSObject, WKScriptMessageHandler {
     /// real one. A private window remembers nothing about a site, so there it offers to open this one in a tab.
     /// Site Controls takes it back.
     static func blocked(_ url: URL?, from page: URL?, opener: Tab?, in controller: BrowserWindowController) {
-        let host = page?.host()?.lowercased() ?? ""
+        // Kept per origin: allowing http://localhost:3000 doesn't allow http://localhost:3001.
+        let origin = SiteOrigin.of(page)
         let isPrivate = controller.tabManager.isPrivate
-        let allowed = !host.isEmpty && !isPrivate && SitePermissions.popups(host: host)
-        Diagnostics.note(allowed ? "Pop-up opened as a tab" : "Pop-up blocked", site: host, isPrivate: isPrivate)
-        if !host.isEmpty, !isPrivate, SitePermissions.popups(host: host) {
+        let allowed = !isPrivate && origin.map { SitePermissions.popups(origin: $0) } == true
+        Diagnostics.note(allowed ? "Pop-up opened as a tab" : "Pop-up blocked", site: origin.map(SiteOrigin.label) ?? "", isPrivate: isPrivate)
+        if allowed {
             if let url { controller.open(url, disposition: .foregroundTab, opener: opener, allowSwitch: false) }
             return
         }
-        if !host.isEmpty, !isPrivate {
+        if let origin, !isPrivate {
             Toast.show(String(localized: "Pop-up blocked", comment: "Toast when Zigzag blocks a page's pop-up window."), symbol: "macwindow.badge.plus", action: (String(localized: "Always Allow", comment: "Button in the toast when Zigzag blocks a page's pop-up: allows the site's pop-ups from now on."), { [weak controller] in
-                SitePermissions.setPopups(true, host: host)
+                SitePermissions.setPopups(true, origin: origin)
                 guard let controller else { return }
                 Toast.show(String(localized: "Pop-ups allowed. Click the button again.", comment: "Toast after allowing a site's pop-ups."), symbol: "macwindow.badge.plus", duration: 4, in: controller)
             }), duration: 6, in: controller)

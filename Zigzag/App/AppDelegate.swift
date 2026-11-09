@@ -19,6 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let info = Bundle.main.infoDictionary
             ProfileBackup.backUpIfUpdated(build: info?["CFBundleVersion"] as? String ?? "", version: info?["CFBundleShortVersionString"] as? String ?? "")
             ProfileBackup.restoreIfAsked()
+            // Site permissions kept by host alone become per origin before any page can ask.
+            SitePermissions.migrateHostOnlyAnswers()
         }
         NSApp.mainMenu = MainMenu.build()
         Shortcuts.apply()

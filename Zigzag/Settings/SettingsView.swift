@@ -1684,11 +1684,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
 
         // Then each site, with what was chosen for it, and a way to forget just that one.
-        let sites = SitePermissions.sites.union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites).union(ZoomLevels.all.keys)
+        // Permissions are kept per origin and named by its label: an https site on its own port by its host, so it
+        // shares a row with the host's other choices, and anything else in full (http://localhost:3000).
+        let origins = Dictionary(SitePermissions.sites.map { (SiteOrigin.label($0), $0) }, uniquingKeysWith: { a, _ in a })
+        let sites = Set(origins.keys).union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites).union(ZoomLevels.all.keys)
         var listed = 0, more = 0
         for site in sites.sorted() {
             var said: [String] = []
-            let choices = SitePermissions.choices(host: site)
+            let origin = origins[site]
+            let choices = origin.map { SitePermissions.choices(origin: $0) } ?? [:]
             for kind in ["camera", "microphone", "cameraAndMicrophone", "location", "notifications", "popups"] {
                 if let allowed = choices[kind], let choice = Self.siteChoice(kind, allowed: allowed) { said.append(choice) }
             }
@@ -1712,8 +1716,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             listed += 1
             let forget = PillButton(title: String(localized: "Forget", comment: "Button on a site's row in Settings › Privacy › Sites: forgets the choices made for it."))
             forget.onClick = { [weak self] _ in
-                SitePermissions.forgetEverything(host: site)
-                WebNotifications.shared.removeAll(host: site)
+                if let origin {
+                    SitePermissions.forgetEverything(origin: origin)
+                    WebNotifications.shared.removeAll(origin: origin)
+                }
                 ContentBlocker.allowedSites.remove(site)
                 var off = ExtensionStore.extensionsOffSites
                 off.remove(site)
@@ -1724,7 +1730,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             let line = said.joined(separator: String(localized: "site-choices.separator", defaultValue: ", ",
                                                      comment: "Between the choices made for a site in Settings › Privacy › Sites, like “camera allowed, zoom 125%”."))
-            let siteURL = URL(string: "https://\(site)")
+            let siteURL = URL(string: origin ?? "https://\(site)")
             let favicon = siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
             let sentence = line.prefix(1).localizedUppercase + line.dropFirst()
             sitesGroup.add(FormRow(title: site,

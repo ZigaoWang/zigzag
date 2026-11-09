@@ -15,7 +15,7 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
     /// What a delivered notification belongs to, so a click finds its tab and tells the page.
     private struct Entry {
         let tabID: UUID
-        let host: String
+        let origin: String
         let id: String
         weak var webView: WKWebView?
         let frame: WKFrameInfo
@@ -52,25 +52,25 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         guard message.name == Self.messageName, let body = message.body as? [String: Any], let kind = body["kind"] as? String,
               let webView = message.webView as? BrowserWebView, let tab = webView.owner else { return (nil, nil) }
         // Secure pages only, and frames only on the page's own site: an ad in a frame never gets to ask.
-        guard let host = Self.host(of: message.frameInfo, in: webView) else { return (kind == "show" ? false : "denied", nil) }
+        guard let origin = Self.origin(of: message.frameInfo, in: webView) else { return (kind == "show" ? false : "denied", nil) }
         switch kind {
         case "state":
-            return (permission(host: host, tab: tab), nil)
+            return (permission(origin: origin, tab: tab), nil)
         case "request":
-            if !tab.isPrivate { asked.insert(host) }
-            let state = permission(host: host, tab: tab)
+            if !tab.isPrivate { asked.insert(origin) }
+            let state = permission(origin: origin, tab: tab)
             // Only right after a click or key: the page's own word for it isn't enough, as a script can say anything.
             let clicked = body["gesture"] as? Bool == true && Date().timeIntervalSince(UndoClock.lastPageInput) < 5
-            guard state == "default", clicked, !putOff.contains("\(tab.id)|\(host)") else { return (state, nil) }
-            let answer = await SitePermissions.requestNotifications(host: host, window: tab.host?.hostWindow, isPrivate: tab.isPrivate, tab: tab)
-            if answer == nil { putOff.insert("\(tab.id)|\(host)") }
+            guard state == "default", clicked, !putOff.contains("\(tab.id)|\(origin)") else { return (state, nil) }
+            let answer = await SitePermissions.requestNotifications(origin: origin, window: tab.host?.hostWindow, isPrivate: tab.isPrivate, tab: tab)
+            if answer == nil { putOff.insert("\(tab.id)|\(origin)") }
             // A private window asks, so the page isn't left waiting, but it still never shows one.
             return (answer.map { $0 && !tab.isPrivate ? "granted" : "denied" } ?? "default", nil)
         case "show":
-            guard permission(host: host, tab: tab) == "granted", let id = body["id"] as? String, let title = body["title"] as? String else { return (false, nil) }
+            guard permission(origin: origin, tab: tab) == "granted", let id = body["id"] as? String, let title = body["title"] as? String else { return (false, nil) }
             let shown = await show(id: id, title: title, body: body["body"] as? String ?? "", tag: body["tag"] as? String ?? "",
                                    icon: (body["icon"] as? String).flatMap { URL(string: $0) }, silent: body["silent"] as? Bool == true,
-                                   host: host, tab: tab, webView: webView, frame: message.frameInfo)
+                                   origin: origin, tab: tab, webView: webView, frame: message.frameInfo)
             return (shown, nil)
         case "close":
             if let id = body["id"] as? String, let key = entries.first(where: { $0.value.id == id && $0.value.tabID == tab.id })?.key {
@@ -83,29 +83,27 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
     }
 
     /// Whether the site asked to show notifications this session.
-    func hasAsked(host: String) -> Bool { asked.contains(host.lowercased()) }
+    func hasAsked(origin: String) -> Bool { asked.contains(origin) }
 
-    private func permission(host: String, tab: Tab) -> String {
+    private func permission(origin: String, tab: Tab) -> String {
         if tab.isPrivate { return "denied" }
-        return SitePermissions.notifications(host: host).map { $0 ? "granted" : "denied" } ?? "default"
+        return SitePermissions.notifications(origin: origin).map { $0 ? "granted" : "denied" } ?? "default"
     }
 
-    /// The frame's host when it may use notifications: https (or http on this Mac), the page itself or a frame
+    /// The frame's origin when it may use notifications: https (or http on this Mac), the page itself or a frame
     /// from the same origin.
-    private static func host(of frame: WKFrameInfo, in webView: WKWebView) -> String? {
-        let origin = frame.securityOrigin, host = origin.host.lowercased()
-        let local = ["localhost", "127.0.0.1", "::1"].contains(host)
-        guard !host.isEmpty, origin.protocol == "https" || (origin.protocol == "http" && local) else { return nil }
-        if frame.isMainFrame { return host }
-        guard let page = webView.url, page.scheme == origin.protocol, page.host()?.lowercased() == host else { return nil }
-        let standard = origin.protocol == "https" ? 443 : 80
-        return (page.port ?? standard) == (origin.port == 0 ? standard : origin.port) ? host : nil
+    private static func origin(of frame: WKFrameInfo, in webView: WKWebView) -> String? {
+        let security = frame.securityOrigin, host = security.host.lowercased()
+        let local = ["localhost", "127.0.0.1", "::1", "[::1]"].contains(host)
+        guard security.protocol == "https" || (security.protocol == "http" && local), let origin = SiteOrigin.of(security) else { return nil }
+        if frame.isMainFrame { return origin }
+        return SiteOrigin.of(webView.url) == origin ? origin : nil
     }
 
     // MARK: Showing
 
     private func show(id: String, title: String, body: String, tag: String, icon: URL?, silent: Bool,
-                      host: String, tab: Tab, webView: WKWebView, frame: WKFrameInfo) async -> Bool {
+                      origin: String, tab: Tab, webView: WKWebView, frame: WKFrameInfo) async -> Bool {
         guard !AppDelegate.isHostingTests else { return false }
         // The tab you're looking at already shows what it would say, as in Safari.
         if NSApp.isActive, let controller = WindowManager.shared.keyController, controller.window?.isKeyWindow == true,
@@ -115,15 +113,15 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         guard await authorize() else { return false }
         let content = UNMutableNotificationContent()
         content.title = String(title.prefix(200))
-        content.subtitle = host
+        content.subtitle = SiteOrigin.label(origin)
         content.body = String(body.prefix(1000))
-        content.threadIdentifier = host
+        content.threadIdentifier = origin
         content.categoryIdentifier = Self.category
         content.sound = silent ? nil : .default
         if let attachment = await attachment(icon: icon, fallback: tab.favicon) { content.attachments = [attachment] }
         // The same tag in the same tab replaces the one before it.
         let key = "\(tab.id.uuidString)|" + (tag.isEmpty ? "id:\(id)" : "tag:\(tag)")
-        entries[key] = Entry(tabID: tab.id, host: host, id: id, webView: webView, frame: frame, posted: Date())
+        entries[key] = Entry(tabID: tab.id, origin: origin, id: id, webView: webView, frame: frame, posted: Date())
         trim()
         do {
             try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: content, trigger: nil))
@@ -219,8 +217,8 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
     }
 
     /// Notifications from a site you've just turned off go too.
-    func removeAll(host: String) {
-        remove(entries.filter { $0.value.host == host }.map(\.key))
+    func removeAll(origin: String) {
+        remove(entries.filter { $0.value.origin == origin }.map(\.key))
     }
 
     private func trim() {
@@ -286,8 +284,9 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
       let sameSite = window === window.top;
       if (!sameSite) { try { sameSite = window.top.location.origin === location.origin; } catch (e) {} }
       const usable = sameSite && (location.protocol === 'https:' || (location.protocol === 'http:' && local));
-      const host = location.hostname.toLowerCase();
-      let permission = !usable || isPrivate ? 'denied' : (host in decisions ? (decisions[host] ? 'granted' : 'denied') : 'default');
+      // Answers are kept per origin (scheme, host and port), as location.origin spells it.
+      const origin = location.origin;
+      let permission = !usable || isPrivate ? 'denied' : (origin in decisions ? (decisions[origin] ? 'granted' : 'denied') : 'default');
       // A question only follows a click or a key: a page can't ask the moment it opens.
       let lastGesture = 0;
       for (const type of ['pointerdown', 'keydown', 'click']) window.addEventListener(type, (e) => { if (e.isTrusted) lastGesture = Date.now(); }, true);

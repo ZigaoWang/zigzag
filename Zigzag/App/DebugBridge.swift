@@ -79,10 +79,10 @@ enum DebugBridge {
             // miniask notifications: the question a page's Notification.requestPermission() asks, without the click
             // it needs first.
             let browser = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first
-            guard let tab = mini?.tab ?? browser?.tabManager.selectedTab, let host = tab.url?.host() else { break }
+            guard let tab = mini?.tab ?? browser?.tabManager.selectedTab, let origin = SiteOrigin.of(tab.url) else { break }
             let window = mini?.window ?? browser?.window
             Task {
-                let answer = await SitePermissions.requestNotifications(host: host, window: window, isPrivate: tab.isPrivate, tab: tab)
+                let answer = await SitePermissions.requestNotifications(origin: origin, window: window, isPrivate: tab.isPrivate, tab: tab)
                 debugLog("miniask \(arg): \(answer.map { $0 ? "allowed" : "not allowed" } ?? "put off")")
             }
         case "minianswer":

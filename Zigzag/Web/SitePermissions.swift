@@ -1,161 +1,196 @@
 import AppKit
 import WebKit
 
-/// Camera, microphone, location and notification decisions, remembered per site. Asked once, in a sheet, never as
-/// a surprise popup.
+/// A site as permissions know it: its origin, scheme://host[:port], the way the web itself tells sites apart.
+/// http://localhost:62699 and http://localhost:62700 are two sites, and so are http:// and https:// of one host,
+/// so an answer given to one never carries over to the other. The host is lowercased (an IPv6 one in brackets), and
+/// the port left out only when it's the scheme's own (443 for https, 80 for http). Pages without a host (file:,
+/// data:, about:) have no origin to keep an answer under: they're asked every time.
+enum SiteOrigin {
+    static func make(scheme: String, host: String, port: Int?) -> String? {
+        let scheme = scheme.lowercased()
+        var host = host.lowercased()
+        if host.hasPrefix("["), host.hasSuffix("]") { host = String(host.dropFirst().dropLast()) }
+        guard !scheme.isEmpty, !host.isEmpty, !host.contains("|"), !host.contains("/"), !host.contains("[") else { return nil }
+        if host.contains(":") { host = "[\(host)]" }
+        let standard = scheme == "https" ? 443 : scheme == "http" ? 80 : nil
+        guard let port, port > 0, port != standard else { return "\(scheme)://\(host)" }
+        return "\(scheme)://\(host):\(port)"
+    }
+
+    /// The origin of a page's address. A blob: address belongs to the page that made it.
+    static func of(_ url: URL?) -> String? {
+        guard let url, let scheme = url.scheme?.lowercased() else { return nil }
+        if scheme == "blob" {
+            return URL(string: String(url.absoluteString.dropFirst("blob:".count))).flatMap { $0.scheme?.lowercased() == "blob" ? nil : of($0) }
+        }
+        guard let host = url.host(percentEncoded: false) else { return nil }
+        return make(scheme: scheme, host: host, port: url.port)
+    }
+
+    /// The origin WebKit says asked: the frame's own, which for a frame from elsewhere isn't the page's. WebKit
+    /// gives port 0 for the scheme's own.
+    static func of(_ origin: WKSecurityOrigin) -> String? {
+        make(scheme: origin.protocol, host: origin.host, port: origin.port == 0 ? nil : origin.port)
+    }
+
+    /// How a site is named to you: its host for https on its own port, as always, and otherwise with whatever
+    /// sets it apart, so two sites never read the same ("localhost:8443", "http://localhost:62700").
+    static func label(_ origin: String) -> String {
+        origin.hasPrefix("https://") ? String(origin.dropFirst("https://".count)) : origin
+    }
+
+    /// The origin a label from `label(_:)` stands for.
+    static func origin(fromLabel label: String) -> String {
+        label.contains("://") ? label : "https://" + label
+    }
+}
+
+/// Camera, microphone, location, notification, pop-up and open-an-app decisions, remembered per origin (see
+/// `SiteOrigin`), stored as "origin|kind". Asked once, in a sheet, never as a surprise popup.
 enum SitePermissions {
     private static let key = "SitePermissions"
+    /// Where the answers are kept; tests use their own.
+    static var defaults: UserDefaults = .standard
 
-    private static func storageKey(host: String, type: WKMediaCaptureType) -> String {
-        let kind: String
+    private static var all: [String: Bool] {
+        get { defaults.dictionary(forKey: key) as? [String: Bool] ?? [:] }
+        set { defaults.set(newValue, forKey: key) }
+    }
+
+    private static func kind(_ type: WKMediaCaptureType) -> String {
         switch type {
-        case .camera: kind = "camera"
-        case .microphone: kind = "microphone"
-        default: kind = "cameraAndMicrophone"
+        case .camera: "camera"
+        case .microphone: "microphone"
+        default: "cameraAndMicrophone"
         }
-        return "\(host)|\(kind)"
     }
 
-    static func decision(host: String, type: WKMediaCaptureType) -> Bool? {
-        let all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-        return all[storageKey(host: host, type: type)]
+    /// Answers kept before were under the host alone, so one given to http://localhost:62699 also let in
+    /// http://localhost:62700 and https://localhost. Which origin was actually asked can't be known now, so every
+    /// Allow (camera, microphone, location, notifications, pop-ups, apps to open) is dropped and the site asks
+    /// again. A Don't Allow can't let anything in, so it's kept, for https on the host's own port only: that's the
+    /// site it almost always was, and any other just asks. Runs at launch; a key with no "://" is an old one, so
+    /// running again finds nothing to do. Nothing but this one entry is touched.
+    static func migrateHostOnlyAnswers() {
+        let before = all
+        guard before.keys.contains(where: { !$0.contains("://") }) else { return }
+        var after: [String: Bool] = [:]
+        for (k, v) in before where k.contains("://") { after[k] = v }
+        let denials: Set<String> = ["camera", "microphone", "cameraAndMicrophone", "location", "notifications"]
+        for (k, v) in before where !k.contains("://") && !v {
+            let parts = k.split(separator: "|", maxSplits: 1).map(String.init)
+            guard parts.count == 2, denials.contains(parts[1]),
+                  let origin = SiteOrigin.make(scheme: "https", host: parts[0], port: nil) else { continue }
+            let migrated = "\(origin)|\(parts[1])"
+            if after[migrated] == nil { after[migrated] = false }
+        }
+        all = after
     }
 
-    static func remember(_ allowed: Bool, host: String, type: WKMediaCaptureType) {
-        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-        all[storageKey(host: host, type: type)] = allowed
-        UserDefaults.standard.set(all, forKey: key)
-    }
+    static func decision(origin: String, type: WKMediaCaptureType) -> Bool? { all["\(origin)|\(kind(type))"] }
+
+    static func remember(_ allowed: Bool, origin: String, type: WKMediaCaptureType) { all["\(origin)|\(kind(type))"] = allowed }
 
     /// Every remembered answer for one site: kind ("camera", "location", "notifications"…) to allowed or not.
-    static func choices(host: String) -> [String: Bool] {
-        let all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
+    static func choices(origin: String) -> [String: Bool] {
         var found: [String: Bool] = [:]
-        for (k, v) in all where k.hasPrefix(host + "|") { found[String(k.dropFirst(host.count + 1))] = v }
+        for (k, v) in all where k.hasPrefix(origin + "|") { found[String(k.dropFirst(origin.count + 1))] = v }
         return found
     }
 
     /// Forgets everything about a site, notifications included.
-    static func forgetEverything(host: String) {
-        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-        for k in all.keys where k.hasPrefix(host + "|") { all[k] = nil }
-        UserDefaults.standard.set(all, forKey: key)
+    static func forgetEverything(origin: String) {
+        var now = all
+        for k in now.keys where k.hasPrefix(origin + "|") { now[k] = nil }
+        all = now
     }
 
-    /// Sites with a remembered choice of any kind.
+    /// Sites (origins) with a remembered choice of any kind.
     static var sites: Set<String> {
-        let all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-        return Set(all.keys.compactMap { $0.split(separator: "|").first.map(String.init) })
+        Set(all.keys.compactMap { $0.split(separator: "|").first.map(String.init) })
     }
 
-    static func forgetAll() { UserDefaults.standard.removeObject(forKey: key) }
+    static func forgetAll() { defaults.removeObject(forKey: key) }
 
     /// A site's answer about your location, if it ever asked.
-    static func location(host: String) -> Bool? {
-        (UserDefaults.standard.dictionary(forKey: key) as? [String: Bool])?["\(host)|location"]
-    }
+    static func location(origin: String) -> Bool? { all["\(origin)|location"] }
 
-    static func forgetLocation(host: String) {
-        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-        all["\(host)|location"] = nil
-        UserDefaults.standard.set(all, forKey: key)
-    }
+    static func forgetLocation(origin: String) { all["\(origin)|location"] = nil }
 
     /// "Ask again" for the camera and microphone only: location, notifications and apps to open each have their own
     /// row, and stay as they are.
-    static func forget(host: String) {
-        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-        for kind in ["camera", "microphone", "cameraAndMicrophone"] { all["\(host)|\(kind)"] = nil }
-        UserDefaults.standard.set(all, forKey: key)
+    static func forget(origin: String) {
+        var now = all
+        for kind in ["camera", "microphone", "cameraAndMicrophone"] { now["\(origin)|\(kind)"] = nil }
+        all = now
     }
 
     /// Notifications: nil until the site has asked and you've answered.
-    static func notifications(host: String) -> Bool? {
-        let all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-        return all["\(host)|notifications"]
-    }
+    static func notifications(origin: String) -> Bool? { all["\(origin)|notifications"] }
+
+    static func setNotifications(_ allowed: Bool?, origin: String) { all["\(origin)|notifications"] = allowed }
 
     /// Whether a site may open links for another app (zoommtg:, wemeet:) without asking: yes once you've said Open.
-    static func opensApp(host: String, scheme: String) -> Bool {
-        (UserDefaults.standard.dictionary(forKey: key) as? [String: Bool])?["\(host)|app:\(scheme)"] == true
-    }
+    static func opensApp(origin: String, scheme: String) -> Bool { all["\(origin)|app:\(scheme)"] == true }
 
-    static func allowOpeningApp(host: String, scheme: String) {
-        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-        all["\(host)|app:\(scheme)"] = true
-        UserDefaults.standard.set(all, forKey: key)
-    }
-
-    static func setNotifications(_ allowed: Bool?, host: String) {
-        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-        all["\(host)|notifications"] = allowed
-        UserDefaults.standard.set(all, forKey: key)
-    }
+    static func allowOpeningApp(origin: String, scheme: String) { all["\(origin)|app:\(scheme)"] = true }
 
     /// Pop-ups a site opens on its own: allowed once you've said Always Allow, blocked (nil) otherwise.
-    static func popups(host: String) -> Bool {
-        (UserDefaults.standard.dictionary(forKey: key) as? [String: Bool])?["\(host)|popups"] == true
-    }
+    static func popups(origin: String) -> Bool { all["\(origin)|popups"] == true }
 
-    static func setPopups(_ allowed: Bool?, host: String) {
-        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-        all["\(host)|popups"] = allowed
-        UserDefaults.standard.set(all, forKey: key)
-    }
+    static func setPopups(_ allowed: Bool?, origin: String) { all["\(origin)|popups"] = allowed }
 
-    /// Every site's notification choice, for the page script: it knows the answer before the page asks.
+    /// Every site's notification choice by origin, for the page script: it knows the answer before the page asks.
     static var notificationDecisions: [String: Bool] {
-        let all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
         var out: [String: Bool] = [:]
         for (k, v) in all where k.hasSuffix("|notifications") { out[String(k.dropLast("|notifications".count))] = v }
         return out
     }
 
+    /// What a question names the site as: its label, or "This page" for one with no origin.
+    static func askerName(_ origin: String?) -> String {
+        origin.map(SiteOrigin.label) ?? String(localized: "This page", comment: "Stands for the site in a question when the page has no host.")
+    }
+
     /// Asked like the camera. A private window never remembers the answer, and never shows notifications anyway.
-    static func requestNotifications(host: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool? {
-        if let known = notifications(host: host) { return known }
+    static func requestNotifications(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool? {
+        if let known = notifications(origin: origin) { return known }
         guard let controller = WindowManager.shared.promptHost(for: window) else { return nil }
-        let answer = await PermissionPrompt.ask(host: host, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
+        let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
                                                 title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
-                                                answered: { notifications(host: host).map { $0 ? .allow : .deny } })
+                                                answered: { notifications(origin: origin).map { $0 ? .allow : .deny } })
         switch answer {
         case .allow, .deny:
-            if !isPrivate { setNotifications(answer == .allow, host: host) }
+            if !isPrivate { setNotifications(answer == .allow, origin: origin) }
             return answer == .allow
         case .notNow:
             return nil
         }
     }
 
-    /// Location, asked and remembered the same way as the camera.
-    static func requestLocation(origin: WKSecurityOrigin, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> WKPermissionDecision {
-        let host = origin.host
-        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-        if let known = all["\(host)|location"] { return known ? .grant : .deny }
+    /// Location, asked and remembered the same way as the camera. A page with no origin to keep it under (file:)
+    /// is asked every time.
+    static func requestLocation(origin securityOrigin: WKSecurityOrigin, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> WKPermissionDecision {
+        let origin = SiteOrigin.of(securityOrigin)
+        if let origin, let known = location(origin: origin) { return known ? .grant : .deny }
         guard let controller = WindowManager.shared.promptHost(for: window) else { return .deny }
-        let answer = await PermissionPrompt.ask(host: host, what: "your location", symbol: "location.fill", in: controller, tab: tab,
+        let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: "your location", symbol: "location.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
-                                                answered: {
-                                                    let now = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-                                                    return now["\(host)|location"].map { $0 ? .allow : .deny }
-                                                })
+                                                answered: { origin.flatMap { location(origin: $0) }.map { $0 ? .allow : .deny } })
         switch answer {
         case .allow, .deny:
-            if !isPrivate {
-                all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-                all["\(host)|location"] = answer == .allow
-                UserDefaults.standard.set(all, forKey: key)
-            }
+            if !isPrivate, let origin { all["\(origin)|location"] = answer == .allow }
             return answer == .allow ? .grant : .deny
         case .notNow:
             return .deny
         }
     }
 
-    static func request(origin: WKSecurityOrigin, type: WKMediaCaptureType, window: NSWindow?, isPrivate: Bool,
+    static func request(origin securityOrigin: WKSecurityOrigin, type: WKMediaCaptureType, window: NSWindow?, isPrivate: Bool,
                         tab: Tab? = nil) async -> WKPermissionDecision {
-        let host = origin.host
-        if let known = decision(host: host, type: type) { return known ? .grant : .deny }
+        let origin = SiteOrigin.of(securityOrigin)
+        if let origin, let known = decision(origin: origin, type: type) { return known ? .grant : .deny }
         let what: String, title: String
         switch type {
         case .camera: (what, title) = ("your camera", String(localized: "Use your camera", comment: "A site's permission question, without its question mark."))
@@ -166,16 +201,16 @@ enum SitePermissions {
             // Nowhere to ask (a sign-in popup): say no this time, without remembering it.
             return .deny
         }
-        let answer = await PermissionPrompt.ask(host: host, what: what, symbol: type == .microphone ? "mic.fill" : "video.fill",
+        let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: what, symbol: type == .microphone ? "mic.fill" : "video.fill",
                                                 in: controller, tab: tab, title: title,
-                                                answered: { decision(host: host, type: type).map { $0 ? .allow : .deny } })
+                                                answered: { origin.flatMap { decision(origin: $0, type: type) }.map { $0 ? .allow : .deny } })
         // Only a clicked answer is remembered; Esc, or the window closing, is "not now".
         switch answer {
         case .allow:
-            if !isPrivate { remember(true, host: host, type: type) }
+            if !isPrivate, let origin { remember(true, origin: origin, type: type) }
             return .grant
         case .deny:
-            if !isPrivate { remember(false, host: host, type: type) }
+            if !isPrivate, let origin { remember(false, origin: origin, type: type) }
             return .deny
         case .notNow:
             return .deny
@@ -197,6 +232,9 @@ final class PermissionPrompt: FloatingPanelView {
     private let closeButton = IconButton(symbol: "xmark", toolTip: String(localized: "Not Now", comment: "Tooltip of the × on a site's permission question."))
     /// The site that asked: when the tab goes elsewhere, the question no longer applies.
     private var askingHost = ""
+    /// The origin that asked, when there is one: the question goes once the tab is on another origin, even one
+    /// on the same host.
+    private var askingOrigin: String?
     /// When it came up. Allow takes no click for the first half second, so a page can't ask just as you click
     /// (a "click fast" game) and catch that click on Allow.
     private var shownAt = Date.distantFuture
@@ -242,7 +280,8 @@ final class PermissionPrompt: FloatingPanelView {
     /// one Allow, changed later in the site panel. `icon` stands in for the symbol (an app's icon).
     /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
     /// `tab` is the tab whose page asked; without one, it's the tab in front when the question comes up.
-    static func ask(host: String, what: String, symbol: String, icon: NSImage? = nil,
+    /// `host` is how the site is named in the question; `origin`, when given, is the site it's for (`SiteOrigin`).
+    static func ask(host: String, origin: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil, allowTitle: String = String(localized: "Allow", comment: "Button on a site's permission question."),
                     denyTitle: String = String(localized: "Don’t Allow", comment: "Button on a site's permission question."), answered: @escaping () -> Answer? = { nil }) async -> Answer {
         let key = ObjectIdentifier(controller)
@@ -251,7 +290,7 @@ final class PermissionPrompt: FloatingPanelView {
             _ = await before?.value
             if let known = answered() { return known }
             return await show(host: host, request: title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English."), symbol: symbol, icon: icon, allowTitle: allowTitle,
-                              denyTitle: denyTitle, in: controller, tab: tab)
+                              denyTitle: denyTitle, origin: origin, in: controller, tab: tab)
         }
         queue[key] = task
         let answer = await task.value
@@ -262,7 +301,7 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, allowTitle: String,
-                             denyTitle: String, in controller: PromptHost, tab: Tab?) async -> Answer {
+                             denyTitle: String, origin: String?, in controller: PromptHost, tab: Tab?) async -> Answer {
         // Never under What's New, where it couldn't be seen: it waits until the notes close.
         await withCheckedContinuation { continuation in
             WhatsNewSheet.afterClosing(in: controller.window) { continuation.resume() }
@@ -278,6 +317,7 @@ final class PermissionPrompt: FloatingPanelView {
             prompt.request.stringValue = String(localized: "\(request)?", comment: "A site's permission question: the request, then a question mark, like “Use your camera?”.")
             prompt.asker.stringValue = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
             prompt.askingHost = host
+            prompt.askingOrigin = origin
             if let icon {
                 prompt.picture.image = icon
                 prompt.badge.isHidden = true
@@ -314,8 +354,12 @@ final class PermissionPrompt: FloatingPanelView {
             prompt.tabsToken = controller.observePromptTabs { [weak prompt] in prompt?.followTab() }
             // The tab went to another site: this question was that site's, so it's put off.
             prompt.urlToken = asking?.changed.observe { [weak prompt, weak asking] change in
-                guard change == .url, let prompt, let now = asking?.url?.host() else { return }
-                if now != prompt.askingHost { prompt.finish(.notNow) }
+                guard change == .url, let prompt, let url = asking?.url else { return }
+                if let origin = prompt.askingOrigin {
+                    if SiteOrigin.of(url) != origin { prompt.finish(.notNow) }
+                } else if let now = url.host(), now != prompt.askingHost {
+                    prompt.finish(.notNow)
+                }
             }
             // A click anywhere else, outside it and the address it hangs from, puts it off too.
             prompt.clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak prompt, weak controller] event in

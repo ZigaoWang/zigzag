@@ -88,8 +88,8 @@ final class Tab: NSObject {
     }
     /// From a site you've let send notifications: kept awake and out of the archive, so they keep coming.
     var notifiesUser: Bool {
-        guard !isPrivate, let host = url?.host()?.lowercased() else { return false }
-        return SitePermissions.notifications(host: host) == true
+        guard !isPrivate, let origin = SiteOrigin.of(url) else { return false }
+        return SitePermissions.notifications(origin: origin) == true
     }
     /// The tab that opened this one, so closing it can return there.
     weak var opener: Tab? { didSet { opener?.openedHere.add(self) } }
@@ -988,7 +988,8 @@ extension Tab: WKUIDelegate {
                 decisionHandler(0)
                 return
             }
-            let answer = await PermissionPrompt.ask(host: origin.host, what: "your screen", symbol: "rectangle.on.rectangle",
+            let site = SiteOrigin.of(origin)
+            let answer = await PermissionPrompt.ask(host: SitePermissions.askerName(site), origin: site, what: "your screen", symbol: "rectangle.on.rectangle",
                                                     in: controller, tab: self,
                                                     title: String(localized: "Share your screen", comment: "Title of the prompt when a site asks to share the screen."))
             decisionHandler(answer == .allow ? 1 : 0)

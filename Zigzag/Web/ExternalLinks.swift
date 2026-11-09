@@ -49,11 +49,14 @@ enum ExternalLinks {
         // Answers are kept for secure pages only: one given to https://zoom.us never opens Zoom for http://zoom.us.
         let canRemember = !foreign && webView.url?.scheme?.lowercased() == "https"
         let host = foreign ? askerHost : pageHost
-        let key = "\(host)|\(scheme)"
+        // Kept per origin, so an answer for https://zoom.us is not one for https://zoom.us:8443.
+        let origin = foreign ? asker.flatMap { SiteOrigin.of($0) } : SiteOrigin.of(webView.url)
+        let key = "\(origin ?? host)|\(scheme)"
+        let remembered = { canRemember && origin.map { SitePermissions.opensApp(origin: $0, scheme: scheme) } == true }
         // Mail, phone and FaceTime open at once for a link you clicked in the page in front; from anywhere else
         // (a hidden frame, a background tab, a script) they ask like any other app.
         let clickedHere = isClick && isMainFrame && webView.window != nil
-        if clickedHere && everyday.contains(scheme) || canRemember && !host.isEmpty && SitePermissions.opensApp(host: host, scheme: scheme) {
+        if clickedHere && everyday.contains(scheme) || remembered() {
             NSWorkspace.shared.open(url)
             return
         }
@@ -63,22 +66,22 @@ enum ExternalLinks {
         // Private windows, popups included, never remember the answer.
         let isPrivate = !webView.configuration.websiteDataStore.isPersistent
         // Nothing to keep the answer under (a private window, or a page with no host): Open is for this time only.
-        let saves = !isPrivate && !host.isEmpty && canRemember
+        let saves = !isPrivate && origin != nil && canRemember
         let tab = (webView as? BrowserWebView)?.owner
         asking.insert(key)
         // Asked from a popup: its browser window comes forward, so the question isn't hidden behind the popup.
         if popup != nil { controller.window?.makeKeyAndOrderFront(nil) }
         Task { @MainActor in
-            let answer = await PermissionPrompt.ask(host: host.isEmpty ? String(localized: "This page", comment: "Stands for the site in a question when the page has no host.") : host, what: name, symbol: "arrow.up.forward.app",
+            let answer = await PermissionPrompt.ask(host: SitePermissions.askerName(origin), origin: origin, what: name, symbol: "arrow.up.forward.app",
                                                     icon: NSWorkspace.shared.icon(forFile: app.path), in: controller,
                                                     tab: tab, title: String(localized: "Open \(name)", comment: "A page's question to open an app, without its question mark. The placeholder is the app's name, like “zoom.us”."),
                                                     allowTitle: String(localized: "Open", comment: "Button on a page's question to open an app."),
                                                     denyTitle: String(localized: "Don’t Open", comment: "Button on a page's question to open an app."),
-                                                    answered: { canRemember && !host.isEmpty && SitePermissions.opensApp(host: host, scheme: scheme) ? .allow : nil })
+                                                    answered: { remembered() ? .allow : nil })
             asking.remove(key)
             switch answer {
             case .allow:
-                if saves { SitePermissions.allowOpeningApp(host: host, scheme: scheme) }
+                if saves, let origin { SitePermissions.allowOpeningApp(origin: origin, scheme: scheme) }
                 NSWorkspace.shared.open(url)
             case .deny:
                 declined.insert(key)
