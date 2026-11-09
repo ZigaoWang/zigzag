@@ -606,6 +606,22 @@ final class SidebarView: NSView {
             let shortcut = "⌃\(i + 1)"
             dot.toolTip = i < 9 ? String(localized: "\(space.name) (\(shortcut))", comment: "A button's tooltip: its name, then its keyboard shortcut in parentheses, like “Reload (⌘R)”.") : space.name
             dot.setAccessibilityLabel(String(localized: "Space \(space.name)", comment: "Accessibility label of a space's button at the bottom of the sidebar. The placeholder is the space's name."))
+            // VoiceOver moves a space as a drag does, one place at a time.
+            let id = space.id, count = dots.count
+            var actions: [NSAccessibilityCustomAction] = []
+            if i > 0 {
+                actions.append(NSAccessibilityCustomAction(name: String(localized: "Move Left", comment: "VoiceOver action on a space's button at the bottom of the sidebar: moves the space one place to the left.")) { [weak self] in
+                    MainActor.assumeIsolated { self?.onMoveSpace?(id, i - 1) }
+                    return true
+                })
+            }
+            if i < count - 1 {
+                actions.append(NSAccessibilityCustomAction(name: String(localized: "Move Right", comment: "VoiceOver action on a space's button at the bottom of the sidebar: moves the space one place to the right.")) { [weak self] in
+                    MainActor.assumeIsolated { self?.onMoveSpace?(id, i + 1) }
+                    return true
+                })
+            }
+            dot.setAccessibilityCustomActions(isPrivate ? nil : actions)
         }
         // A single space needs no switcher, and a private window switches nothing.
         dots.forEach { $0.isHidden = isPrivate || dots.count < 2 }

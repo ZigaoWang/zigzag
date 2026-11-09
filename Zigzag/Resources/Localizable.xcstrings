@@ -6286,6 +6286,17 @@
         }
       }
     },
+    "Move Left" : {
+      "comment" : "VoiceOver action on a space's button at the bottom of the sidebar: moves the space one place to the left.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向左移动"
+          }
+        }
+      }
+    },
     "Move Out of Folder" : {
       "comment" : "Item in a folder's context menu in the sidebar. Moves the folder up a level, out of the folder it's in.",
       "localizations" : {
@@ -6304,6 +6315,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "移动已固定标签页"
+          }
+        }
+      }
+    },
+    "Move Right" : {
+      "comment" : "VoiceOver action on a space's button at the bottom of the sidebar: moves the space one place to the right.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向右移动"
           }
         }
       }
