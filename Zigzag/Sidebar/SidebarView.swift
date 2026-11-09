@@ -108,6 +108,12 @@ final class AddressView: InteractiveView {
 
     /// The pins as they are now, left to right.
     func setPins(_ pins: [Pin], animated: Bool) {
+        // Mid-drag, what a button says still changes at once; which buttons there are waits for the drop.
+        if pinDrag != nil {
+            for pin in pins { if let entry = pinEntries.first(where: { $0.pin.id == pin.id }) { update(entry, to: pin) } }
+            pendingPins = (pins, animated)
+            return
+        }
         let kept = Set(pins.map(\.id))
         for gone in pinEntries where !kept.contains(gone.pin.id) { takeAway(gone.button, animated: animated, removing: true) }
         let existing = Dictionary(uniqueKeysWithValues: pinEntries.map { ($0.pin.id, $0) })
@@ -125,6 +131,7 @@ final class AddressView: InteractiveView {
         let entry = PinEntry(pin: pin, button: button)
         button.onClick = { [weak entry, weak button] _ in if let entry, let button { entry.pin.action(button) } }
         button.onRightClick = { [weak entry] _ in entry?.pin.menu() }
+        button.dragsHorizontally = true
         // The size of the field's own glyphs, so a row of them reads as one set.
         button.imageSide = Tokens.Sidebar.addressGlyph
         addSubview(button)
@@ -135,7 +142,8 @@ final class AddressView: InteractiveView {
         entry.pin = pin
         let button = entry.button
         button.image = pin.image
-        button.isSelected = pin.isActive
+        // Carried, it keeps the card it was picked up with, whatever its popup does.
+        if pinDrag?.entry !== entry { button.isSelected = pin.isActive }
         button.toolTip = pin.needsAttention ? String(localized: "\(pin.label): needs attention", comment: "Tooltip of an extension's button in the site panel when the extension asks for attention. The name is the extension's.") : pin.label
         // VoiceOver reads the extension's name, then what its badge says.
         button.setAccessibilityLabel(pin.label)
@@ -156,10 +164,182 @@ final class AddressView: InteractiveView {
     /// How many of `count` pins can show when `otherButtons` share the end of a field with `room` for text and
     /// buttons: the site's name keeps its minimum, and every button takes its width and a gap.
     static func pinsThatFit(count: Int, otherButtons: Int, room: CGFloat) -> Int {
-        let step = buttonSide + 2
-        let spare = room - Tokens.Sidebar.addressMinText - CGFloat(otherButtons) * step
-        return max(0, min(count, Int(floor(spare / step))))
+        let spare = room - Tokens.Sidebar.addressMinText - CGFloat(otherButtons) * pinStep
+        return max(0, min(count, Int(floor(spare / pinStep))))
     }
+
+    /// From one button in the field to the next.
+    private static let pinStep = buttonSide + 2
+
+    /// The place a pin carried from `from` is over after moving `dx` along `count` pins: it takes a neighbor's place
+    /// once it's halfway there.
+    static func pinSlot(from: Int, dx: CGFloat, count: Int) -> Int {
+        min(max(from + Int((dx / pinStep).rounded()), 0), count - 1)
+    }
+
+    // MARK: Reordering pins
+
+    /// The showing pins in the order they were dropped in.
+    var onPinsReordered: (([String]) -> Void)?
+    /// A pinned button was picked up.
+    var onPinDragBegan: (() -> Void)?
+
+    /// A pin being carried along the field: the showing pins when it was picked up, their places, and the one it's over.
+    private struct PinDrag {
+        let entry: PinEntry
+        let order: [PinEntry]
+        let from: Int
+        /// Each place's frame, left to right.
+        let places: [NSRect]
+        let startX: CGFloat
+        var to: Int
+        var dx: CGFloat = 0
+    }
+    private var pinDrag: PinDrag?
+    private var pendingPins: (pins: [Pin], animated: Bool)?
+
+    private var showingEntries: [PinEntry] { Array(pinEntries.suffix(visiblePinIDs.count)) }
+
+    private func dragPin(_ entry: PinEntry, event: NSEvent) -> Bool {
+        guard let window, beginPinDrag(entry.pin.id, atX: event.locationInWindow.x) else { return false }
+        if let current = NSApp.currentEvent, current.type == .leftMouseDragged { movePinDrag(toX: current.locationInWindow.x) }
+        let released = CarriedCopy.track(in: window) { self.movePinDrag(toX: $0.locationInWindow.x) }
+        endPinDrag(drop: released != nil)
+        return true
+    }
+
+    /// Picks up a showing pin, with the pointer at `x` in the window.
+    @discardableResult
+    func beginPinDrag(_ id: String, atX x: CGFloat) -> Bool {
+        let order = showingEntries
+        guard pinDrag == nil, order.count > 1, let from = order.firstIndex(where: { $0.pin.id == id }) else { return false }
+        let entry = order[from]
+        onPinDragBegan?()
+        pinDrag = PinDrag(entry: entry, order: order, from: from, places: order.map(\.button.frame), startX: x, to: from)
+        lift(entry.button)
+        return true
+    }
+
+    /// The carried button follows the pointer sideways, only within the pins, and a neighbor it passes the middle of
+    /// glides into the place it left.
+    func movePinDrag(toX x: CGFloat) {
+        guard var drag = pinDrag else { return }
+        let step = Self.pinStep
+        drag.dx = min(max(x - drag.startX, -CGFloat(drag.from) * step), CGFloat(drag.order.count - 1 - drag.from) * step)
+        let to = Self.pinSlot(from: drag.from, dx: drag.dx, count: drag.order.count)
+        let moved = to != drag.to
+        drag.to = to
+        pinDrag = drag
+        if let layer = drag.entry.button.layer {
+            Tokens.Motion.withoutAnimation { layer.transform = carriedTransform(of: layer, dx: drag.dx) }
+        }
+        guard moved else { return }
+        for (index, entry) in drag.order.enumerated() where entry !== drag.entry {
+            let shift = drag.from < index && index <= to ? -1 : to <= index && index < drag.from ? 1 : 0
+            Tokens.Motion.glide(entry.button, to: drag.places[index + shift], timing: Tokens.Motion.easeOut)
+        }
+    }
+
+    /// Lets go: dropped (`drop`) the pin takes the place it's over; called off, everything goes back.
+    func endPinDrag(drop: Bool) {
+        guard let drag = pinDrag else { return }
+        pinDrag = nil
+        let to = drop ? drag.to : drag.from
+        var order = drag.order
+        order.remove(at: drag.from)
+        order.insert(drag.entry, at: to)
+        let instant = Tokens.Motion.isFromKey
+        for (index, entry) in order.enumerated() where entry !== drag.entry {
+            if instant {
+                Tokens.Motion.withoutAnimation { entry.button.frame = drag.places[index] }
+            } else {
+                Tokens.Motion.glide(entry.button, to: drag.places[index], timing: Tokens.Motion.easeOut)
+            }
+        }
+        settle(drag, at: drag.places[to], instant: instant)
+        pinEntries = pinEntries.dropLast(order.count) + order
+        let dropped = order.map(\.pin.id)
+        // What waited for the drop lands now, in the dropped order, whatever the store goes on to say.
+        if let pending = pendingPins {
+            pendingPins = nil
+            let ids = ExtensionPins(ids: pending.pins.map(\.id)).reordered(visible: dropped).ids
+            setPins(ids.compactMap { id in pending.pins.first { $0.id == id } }, animated: pending.animated)
+        }
+        if to != drag.from { onPinsReordered?(dropped) }
+        reflow(animated: true)
+    }
+
+    private func carriedTransform(of layer: CALayer, dx: CGFloat) -> CATransform3D {
+        CATransform3DConcat(Tokens.Motion.scale(Tokens.Motion.dragLift, of: layer), CATransform3DMakeTranslation(dx, 0, 0))
+    }
+
+    /// Picked up: above its neighbors, a touch bigger, on the shared lifted card.
+    private func lift(_ button: IconButton) {
+        addSubview(button, positioned: .above, relativeTo: nil)
+        button.selectsAsCard = true
+        button.isSelected = true
+        guard let layer = button.layer else { return }
+        // Picking it up ended the press: its spring back would pull against the lift.
+        layer.removeAnimation(forKey: "press")
+        let lifted = carriedTransform(of: layer, dx: 0)
+        Tokens.Motion.withoutAnimation { layer.transform = lifted }
+        guard !Tokens.Motion.reduceMotion else { return }
+        Tokens.Motion.animateTransform(of: layer, from: CATransform3DIdentity, to: lifted, duration: Tokens.Motion.pressIn, forKey: "lift")
+    }
+
+    /// Set down in its place, shrinking back on the way from wherever the pointer left it.
+    private func settle(_ drag: PinDrag, at place: NSRect, instant: Bool) {
+        let button = drag.entry.button
+        // In this order: only the card's look takes the shadow away.
+        button.isSelected = false
+        button.selectsAsCard = false
+        button.isSelected = drag.entry.pin.isActive
+        guard let layer = button.layer else { button.frame = place; return }
+        let origin = drag.places[drag.from].minX + drag.dx
+        let carried = CATransform3DConcat(Tokens.Motion.scale(Tokens.Motion.dragLift, of: layer), CATransform3DMakeTranslation(origin - place.minX, 0, 0))
+        layer.removeAnimation(forKey: "lift")
+        Tokens.Motion.withoutAnimation {
+            layer.transform = CATransform3DIdentity
+            button.frame = place
+        }
+        guard !instant, !Tokens.Motion.reduceMotion else { return }
+        Tokens.Motion.animateTransform(of: layer, from: carried, to: CATransform3DIdentity, duration: Tokens.Motion.standard, forKey: "glide", fillsBackwards: true)
+    }
+
+    /// Moves a showing pin one place, as a drag does: Move Left and Move Right, by menu or VoiceOver.
+    func movePin(_ id: String, by offset: Int) {
+        var order = visiblePinIDs
+        guard let from = order.firstIndex(of: id), order.indices.contains(from + offset) else { return }
+        order.swapAt(from, from + offset)
+        onPinsReordered?(order)
+    }
+
+    /// Named for VoiceOver, as the space dots are.
+    private func updatePinControls(_ showing: [PinEntry]) {
+        for entry in pinEntries { entry.button.onDragStart = nil; entry.button.setAccessibilityCustomActions(nil) }
+        guard showing.count > 1 else { return }
+        for (index, entry) in showing.enumerated() {
+            entry.button.onDragStart = { [weak self, weak entry] event in
+                guard let self, let entry else { return false }
+                return self.dragPin(entry, event: event)
+            }
+            let id = entry.pin.id
+            var actions: [NSAccessibilityCustomAction] = []
+            if index > 0 { actions.append(moveAction(id, by: -1)) }
+            if index < showing.count - 1 { actions.append(moveAction(id, by: 1)) }
+            entry.button.setAccessibilityCustomActions(actions)
+        }
+    }
+
+    private func moveAction(_ id: String, by offset: Int) -> NSAccessibilityCustomAction {
+        NSAccessibilityCustomAction(name: offset < 0 ? Self.moveLeftTitle : Self.moveRightTitle) { [weak self] in
+            MainActor.assumeIsolated { self?.movePin(id, by: offset) }
+            return true
+        }
+    }
+
+    static let moveLeftTitle = String(localized: "Move Left", comment: "VoiceOver action on a space's button at the bottom of the sidebar: moves the space one place to the left.")
+    static let moveRightTitle = String(localized: "Move Right", comment: "VoiceOver action on a space's button at the bottom of the sidebar: moves the space one place to the right.")
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -261,7 +441,8 @@ final class AddressView: InteractiveView {
     /// Works out what fits and puts everything in its place. The one place the field is laid out, so a button and the
     /// text beside it never disagree; when nothing changed it does nothing, as it runs throughout a page load.
     private func reflow(animated requested: Bool) {
-        guard bounds.width > 0 else { return }
+        // While a pin is carried the places are held still; the drop catches up.
+        guard bounds.width > 0, pinDrag == nil else { return }
         let animated = requested && window != nil && !Tokens.Motion.isFromKey
         let side = AddressView.buttonSide, inset = (bounds.height - side) / 2
         // The host sits clear of the field's rounded edge, as far in as the buttons are from its right end, so the
@@ -287,9 +468,10 @@ final class AddressView: InteractiveView {
         // The one furthest from Site Controls gives way first.
         let showing = pinEntries.suffix(fit)
         for entry in pinEntries.dropLast(fit) { takeAway(entry.button, animated: animated, removing: false) }
-        let movesPins = visiblePinIDs != showing.map(\.pin.id)
+        let showingChanged = visiblePinIDs != showing.map(\.pin.id)
         visiblePinIDs = showing.map(\.pin.id)
         let pinFramesBefore = showing.map(\.button.frame)
+        if showingChanged { updatePinControls(Array(showing)) }
 
         let trailing = others + showing.map(\.button) + [siteControlsButton]
         var right = bounds.width - inset
@@ -303,7 +485,7 @@ final class AddressView: InteractiveView {
             place(button, at: frame, animated: animated)
             right = frame.minX - 2
         }
-        if movesPins || pinFramesBefore != showing.map(\.button.frame) { onPinsMoved?() }
+        if showingChanged || pinFramesBefore != showing.map(\.button.frame) { onPinsMoved?() }
 
         let h = ceil(label.intrinsicContentSize.height)
         let labelFrame = NSRect(x: x - Label.inset, y: (bounds.height - h) / 2, width: right - Tokens.Space.x1 - x + Label.inset * 2, height: h)

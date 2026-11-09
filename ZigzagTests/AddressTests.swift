@@ -105,6 +105,46 @@ struct AddressTests {
         #expect(address.pinButton(for: "a")?.isHidden == true)
     }
 
+    @Test(arguments: [(1, 13.0, 1), (1, 14.0, 2), (1, -14.0, 0), (0, -100.0, 0), (2, 100.0, 2), (0, 56.0, 2)])
+    func aCarriedPinTakesAPlaceOnceHalfwayThere(from: Int, dx: Double, slot: Int) {
+        #expect(AddressView.pinSlot(from: from, dx: dx, count: 3) == slot)
+    }
+
+    @Test func whileAPinIsCarriedContentChangesAndStructureWaits() {
+        let address = field()
+        address.setPins([pin("a"), pin("b")], animated: false)
+        let button = address.pinButton(for: "a")
+        #expect(address.beginPinDrag("b", atX: 100))
+        address.setPins([pin("b", badge: "3")], animated: false)
+        #expect(address.pinButton(for: "a") === button)
+        #expect(address.pinButton(for: "b")?.subviews.compactMap { $0 as? BadgeView }.first?.text == "3")
+        address.endPinDrag(drop: false)
+        #expect(address.pinButton(for: "a") == nil)
+    }
+
+    @Test func droppingAPinReportsTheNewOrder() {
+        let address = field()
+        address.setPins([pin("a"), pin("b")], animated: false)
+        var order: [String]?
+        address.onPinsReordered = { order = $0 }
+        address.beginPinDrag("a", atX: 100)
+        address.movePinDrag(toX: 130)
+        address.endPinDrag(drop: true)
+        #expect(order == ["b", "a"])
+    }
+
+    @Test func callingOffADragChangesNothing() {
+        let address = field()
+        address.setPins([pin("a"), pin("b")], animated: false)
+        var order: [String]?
+        address.onPinsReordered = { order = $0 }
+        address.beginPinDrag("a", atX: 100)
+        address.movePinDrag(toX: 130)
+        address.endPinDrag(drop: false)
+        #expect(order == nil)
+        #expect(address.visiblePinIDs == ["a", "b"])
+    }
+
     @Test func keepingDropsOnlyWhatIsNoLongerKept() {
         #expect(ExtensionPins(ids: ["a", "b", "c"]).keeping { $0 != "b" }.ids == ["a", "c"])
     }
@@ -116,6 +156,38 @@ struct AddressTests {
         #expect(button?.superview === address)
         address.setPins([pin("b"), pin("c")], animated: false)
         #expect(button?.superview == nil)
+    }
+
+    @Test func aPinRemovedDuringADragGoesEvenIfTheStoreSaysNothing() {
+        let address = field()
+        address.setPins([pin("a"), pin("b")], animated: false)
+        address.beginPinDrag("a", atX: 100)
+        address.movePinDrag(toX: 130)
+        address.setPins([pin("a")], animated: false)
+        address.endPinDrag(drop: true)
+        #expect(address.pinButton(for: "b") == nil)
+        #expect(address.visiblePinIDs == ["a"])
+    }
+
+    @Test func aDropWithPendingChangesKeepsTheDroppedOrder() {
+        let address = field()
+        address.setPins([pin("a"), pin("b"), pin("c")], animated: false)
+        address.beginPinDrag("a", atX: 100)
+        address.movePinDrag(toX: 130)
+        address.setPins([pin("a"), pin("b", badge: "2"), pin("c")], animated: false)
+        address.endPinDrag(drop: true)
+        #expect(address.visiblePinIDs == ["b", "a", "c"])
+    }
+
+    @Test func pinControlsAreOnlyRebuiltWhenWhatShowsChanges() {
+        let address = field()
+        address.setPins([pin("a"), pin("b")], animated: false)
+        let action = address.pinButton(for: "a")?.accessibilityCustomActions()?.first
+        #expect(action != nil)
+        address.layout()
+        #expect(address.pinButton(for: "a")?.accessibilityCustomActions()?.first === action)
+        address.setPins([pin("b"), pin("a")], animated: false)
+        #expect(address.pinButton(for: "a")?.accessibilityCustomActions()?.first !== action)
     }
 
     @Test func searches() {
