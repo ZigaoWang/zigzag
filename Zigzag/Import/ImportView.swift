@@ -44,6 +44,19 @@ final class ImportView: NSView {
     /// What Sign-ins means, in a line, while it's offered.
     private let signInsNote = NSTextField(wrappingLabelWithString: String(localized: "Sign-ins keep you signed in to your sites, so you don’t have to sign in again. They come from this Mac and stay on it.",
                                                                               comment: "Note under the choices in the Import window, explaining Sign-ins."))
+    /// The note's lines: what Sign-ins are, and, with Firefox or Safari chosen too, that extensions come only from
+    /// Chrome and its kin.
+    private static let signInsText = String(localized: "Sign-ins keep you signed in to your sites, so you don’t have to sign in again. They come from this Mac and stay on it.",
+                                            comment: "Note under the choices in the Import window, explaining Sign-ins.")
+    private static let extensionsText = String(localized: "Extensions come from Chrome and browsers built on it. Firefox and Safari get theirs from stores of their own.",
+                                               comment: "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari.")
+    /// The extensions coming over, under the browsers, once there are any.
+    private let extensionsRow = ImportExtensionsRow()
+    /// The one question before they're added, in place of the list while it's asked.
+    private var review: ImportExtensionsReview?
+    private var reviewAnswer: CheckedContinuation<Bool, Never>?
+    private var importTask: Task<Void, Never>?
+    private var extensionFailures: [ExtensionImport.Failure] = []
     private let emptyNote = NSTextField(wrappingLabelWithString: String(localized: "No other browsers with data were found on this Mac. You can still bring passwords from a CSV export.",
                                                                             comment: "Import window, when no other browser was found."))
 
@@ -87,7 +100,8 @@ final class ImportView: NSView {
                                (.bookmarks, String(localized: "Bookmarks", comment: "Choice in the Import window: bring bookmarks over.")),
                                (.history, String(localized: "History", comment: "Choice in the Import window: bring browsing history over.")),
                                (.tabs, String(localized: "Spaces and Tabs", comment: "Choice in the Import window: bring Arc's spaces and tabs over.")),
-                               (.signIns, String(localized: "Sign-ins", comment: "Choice in the Import window: bring over the sites you're signed in to."))] {
+                               (.signIns, String(localized: "Sign-ins", comment: "Choice in the Import window: bring over the sites you're signed in to.")),
+                               (.extensions, String(localized: "Extensions", comment: "Choice in the Import window: bring extensions over from the Chrome Web Store."))] {
             let box = ChoicePill(title: name)
             box.tint = Brand.Theme.brand.accent
             box.onChange = { [weak self] _ in self?.choicesChanged() }
@@ -100,7 +114,7 @@ final class ImportView: NSView {
         showPasswords.onClick = { _ in PasswordsWindowController.show() }
         addSubview(showPasswords)
         primary.onClick = { [weak self] _ in self?.primaryAction() }
-        secondary.onClick = { [weak self] _ in self?.onClose?() }
+        secondary.onClick = { [weak self] _ in self?.secondaryAction() }
         reloadSources()
     }
 
@@ -114,7 +128,7 @@ final class ImportView: NSView {
         // The browser you use first and on; the rest start off so nothing comes over by surprise.
         sources = found.filter { suggested.contains($0.id) } + found.filter { !suggested.contains($0.id) }
         rows = sources.map { source in
-            let row = SourceRow(source: source)
+            let row = SourceRow(source: source, countsExtensions: presentation == .window)
             row.isChosen = suggested.contains(source.id)
             row.onToggle = { [weak self] in self?.choicesChanged() }
             rowList.addSubview(row)
@@ -130,6 +144,11 @@ final class ImportView: NSView {
         // Safari's stay behind (they need Full Disk Access), so Sign-ins shows only for a browser that has them.
         let anySignIns = rows.contains { $0.isChosen && $0.source.offers.contains(.signIns) }
         choiceButtons.first { $0.0 == .signIns }?.1.isHidden = !anySignIns
+        // Only in their own window: the welcome has a step of its own for extensions.
+        let extensionsPill = choiceButtons.first { $0.0 == .extensions }?.1
+        extensionsPill?.isHidden = presentation != .window || !rows.contains { $0.isChosen && $0.source.offers.contains(.extensions) }
+        let otherStores = extensionsPill.map { !$0.isHidden && $0.isOn } == true && rows.contains { $0.isChosen && !$0.source.offers.contains(.extensions) }
+        signInsNote.stringValue = [anySignIns ? Self.signInsText : nil, otherStores ? Self.extensionsText : nil].compactMap { $0 }.joined(separator: " ")
         primary.isEnabled = stage != .choose || (rows.contains(where: \.isChosen) && !chosenData.isEmpty)
         needsLayout = true
     }
@@ -141,9 +160,14 @@ final class ImportView: NSView {
     private func primaryAction() {
         switch stage {
         case .choose: startImport(rows.filter(\.isChosen))
-        case .importing: break
+        case .importing: if review != nil { answerReview(true) }
         case .done: onClose?()
         }
+    }
+
+    /// Not Now, or Don't Add while the extensions are asked about.
+    private func secondaryAction() {
+        if review != nil { answerReview(false) } else { onClose?() }
     }
 
     // MARK: Importing
@@ -178,16 +202,113 @@ final class ImportView: NSView {
         rows.filter { !$0.isChosen }.forEach { $0.isHidden = true }
         chosen.forEach { $0.state = .waiting }
         needsLayout = true
-        Task { @MainActor in
+        importTask = Task { @MainActor in
             for row in chosen { await run(row, data) }
+            if data.contains(.extensions) { await importExtensions() }
+            guard !Task.isCancelled else { return }
             finish()
         }
+    }
+
+    /// The window is going: an extension half-way stops there, and any downloaded but not added are thrown away.
+    func stop() {
+        importTask?.cancel()
+        answerReview(false)
+    }
+
+    /// Every browser's extensions Zigzag doesn't have, once each: got ready one by one, asked about once, then added
+    /// one at a time.
+    private func importExtensions() async {
+        let found = ChromiumExtensions.toAdd(summaries.flatMap(\.foundExtensions), installed: Set(ExtensionStore.installedIDs))
+        for index in summaries.indices { summaries[index].foundExtensions = [] }
+        guard !found.isEmpty else { return }
+        rowList.addSubview(extensionsRow)
+        extensionsRow.state = .preparing(0, of: found.count)
+        needsLayout = true
+        let steps = ExtensionImport.store
+        let prepared = await ExtensionImport.prepare(found, with: steps) { [weak self] index in
+            self?.extensionsRow.state = .preparing(index, of: found.count)
+        }
+        guard !Task.isCancelled else {
+            prepared.ready.forEach { steps.discard($0.1) }
+            return
+        }
+        var added: [(ChromiumExtensions.Found, String)] = []
+        var failed = prepared.failed
+        var declined = false
+        if !prepared.ready.isEmpty {
+            if await askToAdd(prepared.ready), !Task.isCancelled {
+                let installed = await ExtensionImport.install(prepared.ready, with: steps) { [weak self] index, item in
+                    // By the name it gives itself, as the question showed it.
+                    let name = prepared.ready[index].1.extensionInfo.displayName ?? item.name
+                    self?.extensionsRow.state = .adding(name, index, of: prepared.ready.count)
+                }
+                added = installed.added
+                failed += installed.failed
+            } else {
+                prepared.ready.forEach { steps.discard($0.1) }
+                declined = true
+            }
+        }
+        guard !Task.isCancelled else { return }
+        extensionFailures = failed
+        extensionsRow.state = .finished(added: added.map(\.1), failed: failed, declined: declined)
+        // Each browser's line counts what came from it.
+        for (item, _) in added {
+            guard let index = summaries.firstIndex(where: { $0.source == item.source }) else { continue }
+            summaries[index].extensions += 1
+        }
+        for row in rows {
+            if case .done = row.state, let summary = summaries.first(where: { $0.source == row.source.name }) { row.state = .done(summary) }
+        }
+        needsLayout = true
+    }
+
+    /// Asks once, in the window, before any extension is added.
+    private func askToAdd(_ ready: [(ChromiumExtensions.Found, ExtensionStore.PreparedInstall)]) async -> Bool {
+        let review = ImportExtensionsReview(ready)
+        self.review = review
+        rows.forEach { $0.isHidden = true }
+        extensionsRow.isHidden = true
+        rowList.addSubview(review)
+        let names = Set(ready.map(\.0.source)).sorted()
+        title.stringValue = ready.count == 1 ? String(localized: "Add 1 extension?", comment: "Title of the Import window when asking before adding the one extension found.")
+                                             : String(localized: "Add \(ready.count) extensions?", comment: "Title of the Import window when asking before adding the extensions found: how many.")
+        subtitle.stringValue = String(localized: "The ones you use in \(Words.list(names)), each downloaded from the Chrome Web Store and checked as if you added it here. You can turn any of them off in Settings › Extensions.",
+                                      comment: "Import window, when asking before adding the extensions found. The placeholder is a browser's name, like Chrome, or a list of them.")
+        primary.title = ready.count == 1 ? String(localized: "Add Extension", comment: "Button that adds the extension, in the sheet that asks first.")
+                                         : String(localized: "Add \(ready.count) Extensions", comment: "Button in the Import window that adds the extensions found: how many.")
+        primary.isEnabled = true
+        secondary.title = String(localized: "Don’t Add", comment: "Button in the Import window: leave the extensions found behind.")
+        secondary.isHidden = false
+        needsLayout = true
+        fitWindow()
+        let answer = await withCheckedContinuation { reviewAnswer = $0 }
+        review.removeFromSuperview()
+        self.review = nil
+        rows.forEach { $0.isHidden = !$0.isChosen }
+        extensionsRow.isHidden = false
+        title.stringValue = String(localized: "Bringing it over…", comment: "Title of the Import window while importing.")
+        subtitle.stringValue = ""
+        primary.title = String(localized: "Importing…", comment: "Main button in the Import window while importing.")
+        primary.isEnabled = false
+        secondary.isHidden = true
+        needsLayout = true
+        return answer
+    }
+
+    private func answerReview(_ add: Bool) {
+        let answer = reviewAnswer
+        reviewAnswer = nil
+        answer?.resume(returning: add)
     }
 
     private func run(_ row: SourceRow, _ data: ImportCoordinator.Choice, primaryPassword: String = "") async {
         row.state = .working
         let choice = data.intersection(row.source.offers)
-        let summary = await ImportCoordinator.run(row.source, choice, primaryPassword: primaryPassword)
+        var summary = await ImportCoordinator.run(row.source, choice, primaryPassword: primaryPassword)
+        // Trying again brings the rest; what came the first time still counts.
+        summary.extensions += summaries.first { $0.source == summary.source }?.extensions ?? 0
         summaries.removeAll { $0.source == summary.source }
         summaries.append(summary)
         row.state = .done(summary)
@@ -202,7 +323,8 @@ final class ImportView: NSView {
         stage = .done
         let passwords = summaries.map { $0.passwords + $0.updatedPasswords }.reduce(0, +)
         let signedIn = summaries.map(\.signedInSites).reduce(0, +)
-        let problems = summaries.contains { !$0.problems.isEmpty }
+        let fixable = summaries.contains { !$0.problems.isEmpty }
+        let problems = fixable || !extensionFailures.isEmpty
         let broughtAny = summaries.contains(where: \.broughtAny)
         // Only "all set" when it is: with a problem, the title says how far it got and the rows below say why.
         title.stringValue = presentation == .welcome ? ""
@@ -212,6 +334,7 @@ final class ImportView: NSView {
         // In the welcome window the brand panel already says where everything went; here only the count and the
         // next step remain.
         subtitle.stringValue = presentation == .welcome ? ""
+            : problems && !fixable ? String(localized: "What couldn’t come over is below.", comment: "Import window when some extensions couldn't be added, which the list below explains.")
             : problems ? (broughtAny ? String(localized: "What stopped the rest is below, with a way to fix it.",
                                               comment: "Import window when some things came over and others hit a problem, which the rows below explain.")
                                      : String(localized: "What stopped it is below, with a way to fix it.", comment: "Import window when nothing came over because of a problem."))
@@ -220,6 +343,10 @@ final class ImportView: NSView {
                      comment: "Import window when the import is done. Zigzag › Passwords is the menu item's path; Keychain and iCloud Keychain are Apple's names.")
             : signedIn > 0 ? String(localized: "You’re signed in to your sites here too, and everything else is in your sidebar. You can bring more over anytime from Settings.",
                                     comment: "Import window when the import is done and sign-ins came over.")
+            // Extensions are by the address, not in the sidebar.
+            : summaries.allSatisfy({ $0.bookmarks + $0.history + $0.spaces == 0 }) && summaries.contains(where: { $0.extensions > 0 })
+            ? String(localized: "Find your extensions in site controls, by the address. You can bring more over anytime from Settings.",
+                     comment: "Import window when the import is done and only extensions came over. Site controls is the panel by the address.")
             : String(localized: "Everything that came over is in your sidebar. You can bring more over anytime from Settings.", comment: "Import window when the import is done.")
         // Rows that hit a problem stay, with their fix; the ones that went fine give way to the summary.
         if presentation == .welcome {
@@ -231,7 +358,7 @@ final class ImportView: NSView {
         // The finished moment: the lit surface, the count, and the ribbon writing itself across it.
         if hero.superview == nil { addSubview(hero) }
         banner.isHidden = true
-        hero.showSuccess(summaries)
+        hero.showSuccess(summaries, somethingFailed: problems)
         primary.title = presentation == .welcome ? String(localized: "Start Browsing", comment: "Last button of the welcome window, after importing.")
                                                   : String(localized: "Done", comment: "Button that closes the Import window when the import is done.")
         fitWindow()
@@ -276,6 +403,7 @@ final class ImportView: NSView {
     }
 
     func debugImport() { primaryAction() }
+    func debugNotNow() { secondaryAction() }
     #endif
 
     private func fix(_ fix: ImportProblem.Fix, for row: SourceRow, data: ImportCoordinator.Choice, primaryPassword: String) {
@@ -287,6 +415,8 @@ final class ImportView: NSView {
             primary.isEnabled = false
             var scope = data
             if case .done(let summary) = row.state { scope = ImportCoordinator.Choice.retrying(summary.problems, else: data) }
+            // Extensions are asked about once, for every browser together: never again from one row's Try Again.
+            scope.remove(.extensions)
             Task { @MainActor in
                 await run(row, scope, primaryPassword: primaryPassword)
                 finish()
@@ -344,11 +474,14 @@ final class ImportView: NSView {
             y += height + gap
         }
         let subtitleHeight = ceil(subtitle.sizeThatFits(NSSize(width: width, height: 200)).height)
-        let visibleRows = rows.filter { !$0.isHidden }
+        var items: [any ImportListItem] = rows
+        items.append(extensionsRow)
+        if let review { items.append(review) }
+        let visibleRows = items.filter { !$0.isHidden && $0.superview === rowList }
         let rowHeights: [CGFloat] = visibleRows.map { $0.preferredHeight(for: width) }
         let rowsHeight: CGFloat = rowHeights.reduce(0, +) + CGFloat(max(0, visibleRows.count - 1)) * Tokens.Space.x2
         let showsChoices = stage == .choose && !sources.isEmpty
-        let signInsShown = showsChoices && choiceButtons.contains { $0.0 == .signIns && !$0.1.isHidden }
+        let signInsShown = showsChoices && !signInsNote.stringValue.isEmpty
         let noteHeight: CGFloat = signInsShown ? Tokens.Space.x2 + ceil(signInsNote.sizeThatFits(NSSize(width: width, height: 200)).height) : 0
         // The choices wrap onto a second line when they don't fit one (Arc's Spaces and Tabs with Sign-ins).
         var pillLines = 1, used: CGFloat = 0
@@ -439,7 +572,7 @@ final class ImportView: NSView {
 }
 
 /// One browser (or a chosen file): its real icon, its name, and as the import runs, what came over.
-private final class SourceRow: InteractiveView {
+private final class SourceRow: InteractiveView, ImportListItem {
     enum State { case idle, waiting, working, done(ImportCoordinator.Summary) }
 
     let source: ImportCoordinator.Source
@@ -466,7 +599,7 @@ private final class SourceRow: InteractiveView {
     /// What the browser holds, filled in once counted.
     private var preview = String(localized: "Looking…", comment: "Under a browser's name in the Import window while counting what it holds.") { didSet { refresh() } }
 
-    init(source: ImportCoordinator.Source) {
+    init(source: ImportCoordinator.Source, countsExtensions: Bool = false) {
         self.source = source
         name = Label(source.name, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
@@ -491,7 +624,7 @@ private final class SourceRow: InteractiveView {
         refresh()
         Task { @MainActor [weak self] in
             guard let self else { return }
-            self.preview = await ImportCoordinator.preview(source)
+            self.preview = await ImportCoordinator.preview(source, extensions: countsExtensions)
         }
     }
 
@@ -696,7 +829,10 @@ final class ImportWindowController: NSWindowController, NSWindowDelegate {
     /// it comes forward as it is.
     static func startsOver(_ stage: ImportView.Stage?) -> Bool { stage == .done }
 
-    func windowWillClose(_ notification: Notification) { Self.shared = nil }
+    func windowWillClose(_ notification: Notification) {
+        (window?.contentView as? ImportView)?.stop()
+        Self.shared = nil
+    }
 }
 
 /// The brand moment above the import: the wordmark on the lit surface on first launch, and the count of what
@@ -754,13 +890,15 @@ private final class ImportHero: NSView {
         count.attributedStringValue = Brand.display(text, size: size, color: theme.tint)
     }
 
-    func showSuccess(_ summaries: [ImportCoordinator.Summary]) {
+    /// `somethingFailed`: a browser's problem, or an extension that couldn't be added.
+    func showSuccess(_ summaries: [ImportCoordinator.Summary], somethingFailed: Bool) {
         applyTheme()
         let passwords = summaries.map { $0.passwords + $0.updatedPasswords }.reduce(0, +)
         let bookmarks = summaries.map(\.bookmarks).reduce(0, +)
         let spaces = summaries.map(\.spaces).reduce(0, +)
         let history = summaries.map(\.history).reduce(0, +)
         let signedIn = summaries.map(\.signedInSites).reduce(0, +)
+        let extensions = summaries.map(\.extensions).reduce(0, +)
         // The biggest thing that came over leads, its number large and what it counts under it; the rest follow in a line.
         let kinds: [(n: Int, unit: (Int) -> String, phrase: (Int) -> String)] = [
             (passwords, { $0 == 1 ? String(localized: "import.lead.passwords.one", defaultValue: "password",
@@ -788,6 +926,11 @@ private final class ImportHero: NSView {
                                : String(localized: "import.lead.pages-of-history", defaultValue: "pages of history",
                                         comment: "Under the big number when an import finishes, so without the number. Several, never 1.") },
              { String(localized: "\($0) pages of history", comment: "Item in the list of what came over, in the Import window.") }),
+            (extensions, { $0 == 1 ? String(localized: "import.lead.extensions.one", defaultValue: "extension",
+                                            comment: "Under the big number when an import finishes, which is 1, so without the number.")
+                                  : String(localized: "import.lead.extensions", defaultValue: "extensions",
+                                           comment: "Under the big number when an import finishes, so without the number. Several, never 1.") },
+             { String(localized: "\($0) extensions", comment: "Item in a list of what a browser holds or what came over, in the Import window.") }),
         ]
         var lead: (Int, String)?
         var rest: [String] = []
@@ -808,7 +951,7 @@ private final class ImportHero: NSView {
             caption.stringValue = lead.1
             detail.stringValue = rest.isEmpty ? "" : String(localized: "Plus \(Words.list(rest)).", comment: "Under the big number when an import finishes: the rest of what came over, like “Plus 86 bookmarks and 3 spaces.”")
             setCount(lead.0.formatted(), size: Tokens.Welcome.countSize)
-        } else if summaries.contains(where: { !$0.problems.isEmpty }) {
+        } else if somethingFailed || summaries.contains(where: { !$0.problems.isEmpty }) {
             // Never a cheerful "all set" over a failure: say nothing came; the window's own lines say why.
             setCount(String(localized: "Not yet", comment: "Shown large when an import finishes and nothing came over because of a problem."), size: 44)
             caption.stringValue = String(localized: "Nothing came over", comment: "Under “Not yet” when an import finishes with a problem.")

@@ -636,6 +636,8 @@ enum DebugBridge {
                 }
             }
         case "importgo": (ImportWindowController.shared?.window?.contentView as? ImportView)?.debugImport()
+        // The Import window's Not Now, or Don't Add while it asks about extensions.
+        case "importnotnow": (ImportWindowController.shared?.window?.contentView as? ImportView)?.debugNotNow()
         case "onboardgo": (WelcomeWindowController.shared?.window?.contentView as? OnboardingView)?.debugNext()
         case "windowof":
             // windowof <title> <path>: as windowid, for Zigzag's window with that title (Import, Welcome to Zigzag).

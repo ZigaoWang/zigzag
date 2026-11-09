@@ -30,7 +30,8 @@ enum ImportCoordinator {
         /// What can come over from it.
         var offers: Choice {
             switch kind {
-            case .chromium(let browser): browser.name == "Arc" ? [.passwords, .bookmarks, .history, .tabs, .signIns] : [.passwords, .bookmarks, .history, .signIns]
+            // Only Chrome and its kin share a store with Zigzag: Firefox's and Safari's extensions come from their own.
+            case .chromium(let browser): browser.name == "Arc" ? [.passwords, .bookmarks, .history, .tabs, .signIns, .extensions] : [.passwords, .bookmarks, .history, .signIns, .extensions]
             case .firefox: [.passwords, .bookmarks, .history, .signIns]
             // Safari's cookies sit behind Full Disk Access, and a file holds none: nothing to offer.
             case .safari: [.passwords, .bookmarks, .history]
@@ -48,6 +49,8 @@ enum ImportCoordinator {
         static let tabs = Choice(rawValue: 8)
         /// The sites you're signed in to there, so you stay signed in here.
         static let signIns = Choice(rawValue: 16)
+        /// Its extensions from the Chrome Web Store, added here from the store after one question.
+        static let extensions = Choice(rawValue: 32)
 
         /// What trying again after these problems should run: just the parts that failed, or everything.
         static func retrying(_ problems: [ImportProblem], else all: Choice) -> Choice {
@@ -193,8 +196,10 @@ enum ImportCoordinator {
     /// Whether a preview says macOS has to allow reading the browser first.
     static func asksPermission(_ preview: String) -> Bool { preview == needsPermission || preview == safariNeedsPermission }
 
-    static func preview(_ source: Source) async -> String {
+    /// `extensions`: count the extensions it has that Zigzag doesn't, where they're offered.
+    static func preview(_ source: Source, extensions: Bool = false) async -> String {
         let kind = source.kind
+        let installed: Set<String>? = extensions ? Set(ExtensionStore.installedIDs) : nil
         return await Task.detached(priority: .utility) { () -> String in
             let spaces = String(localized: "spaces", comment: "Item in the short list of what a browser holds, in the Import window: Arc's spaces.")
             let history = String(localized: "history", comment: "Item in the short list of what a browser holds, in the Import window: its browsing history.")
@@ -209,10 +214,12 @@ enum ImportCoordinator {
                     return Self.needsPermission
                 }
                 let counts = ChromiumImporter.counts(browser)
+                let newExtensions = installed.map { ChromiumExtensions.toAdd(ChromiumExtensions.found(in: browser, source: ""), installed: $0).count } ?? 0
                 // Short enough for one line in the list: Arc's spaces first, then what's counted.
                 let parts = [browser.name == "Arc" ? spaces : nil, passwords(counts.passwords),
                              bookmarks(counts.bookmarks), counts.history > 0 ? history : nil,
-                             SignInImporter.hasAny(chromium: profiles) ? signIns : nil].compactMap { $0 }
+                             SignInImporter.hasAny(chromium: profiles) ? signIns : nil,
+                             newExtensions > 0 ? String(localized: "\(newExtensions) extensions", comment: "Item in a list of what a browser holds or what came over, in the Import window.") : nil].compactMap { $0 }
                 return parts.isEmpty ? String(localized: "Nothing to bring over", comment: "Under a browser's name in the Import window's list.") : Self.sentence(parts)
             case .firefox(let browser):
                 let counts = FirefoxImporter.counts(browser)
@@ -240,12 +247,16 @@ enum ImportCoordinator {
         var spaces = 0
         /// Sites whose sign-ins came over.
         var signedInSites = 0
+        /// Extensions added from the Chrome Web Store.
+        var extensions = 0
+        /// Its extensions Zigzag doesn't have yet, waiting for the one question before any is added.
+        var foundExtensions: [ChromiumExtensions.Found] = []
         var problems: [ImportProblem] = []
         /// Worth saying, with nothing to fix: the import still went fine.
         var notes: [String] = []
 
         /// Something came over: anything counted above.
-        var broughtAny: Bool { passwords + updatedPasswords + bookmarks + history + spaces + signedInSites > 0 }
+        var broughtAny: Bool { passwords + updatedPasswords + bookmarks + history + spaces + signedInSites + extensions > 0 }
 
         /// "Imported 214 passwords and 86 bookmarks from Arc."
         var sentence: String {
@@ -254,9 +265,13 @@ enum ImportCoordinator {
             if bookmarks > 0 { parts.append(String(localized: "\(bookmarks) bookmarks", comment: "Item in a list of what a browser holds or what came over, in the Import window.")) }
             if spaces > 0 { parts.append(String(localized: "\(spaces) spaces", comment: "Item in the list of what came over, in the Import window.")) }
             if history > 0 { parts.append(String(localized: "\(history) pages of history", comment: "Item in the list of what came over, in the Import window.")) }
+            if extensions > 0 { parts.append(String(localized: "\(extensions) extensions", comment: "Item in a list of what a browser holds or what came over, in the Import window.")) }
             var sentences: [String] = []
             if parts.isEmpty {
-                sentences.append(signedInSites > 0
+                sentences.append(!foundExtensions.isEmpty
+                    ? String(localized: "Found \(foundExtensions.count) extensions to add from \(source).",
+                             comment: "Import window, before the extensions found are added: how many, then a browser's name, like Chrome.")
+                    : signedInSites > 0
                     ? String(localized: "Brought over sign-ins for \(signedInSites) sites from \(source).",
                              comment: "Import window, when only sign-ins came over: how many sites, then a browser's name, like Chrome.")
                     : updatedPasswords > 0
@@ -309,6 +324,13 @@ enum ImportCoordinator {
                 }
             }
             arcReading = reading.intersection([.passwords, .cookies])
+        }
+
+        if choice.contains(.extensions), case .chromium(let browser) = source.kind {
+            let installed = Set(ExtensionStore.installedIDs), name = source.name
+            summary.foundExtensions = await Task.detached(priority: .userInitiated) {
+                ChromiumExtensions.toAdd(ChromiumExtensions.found(in: browser, source: name), installed: installed)
+            }.value
         }
 
         let kind = source.kind

@@ -870,6 +870,41 @@
         }
       }
     },
+    "%lld extensions" : {
+      "comment" : "Item in a list of what a browser holds or what came over, in the Import window.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld extension"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld extensions"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个扩展"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld features won’t work here" : {
       "comment" : "Under an extension's name in Settings › Extensions.",
       "localizations" : {
@@ -1669,6 +1704,28 @@
         }
       }
     },
+    "Add %lld Extensions" : {
+      "comment" : "Button in the Import window that adds the extensions found: how many.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加 %lld 个扩展"
+          }
+        }
+      }
+    },
+    "Add %lld extensions?" : {
+      "comment" : "Title of the Import window when asking before adding the extensions found: how many.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加 %lld 个扩展？"
+          }
+        }
+      }
+    },
     "Add %lld to Favorites" : {
       "comment" : "Menu item for several picked sidebar rows",
       "localizations" : {
@@ -1698,6 +1755,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "将 %lld 项添加到新文件夹"
+          }
+        }
+      }
+    },
+    "Add 1 extension?" : {
+      "comment" : "Title of the Import window when asking before adding the one extension found.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加 1 个扩展？"
           }
         }
       }
@@ -1812,6 +1880,17 @@
         }
       }
     },
+    "Added %@." : {
+      "comment" : "Import window, under Extensions once they're added: their names, like “Dark Reader and Grammarly”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已添加 %@。"
+          }
+        }
+      }
+    },
     "Added to Favorites" : {
       "comment" : "Toast after the tab is added to Favorites.",
       "localizations" : {
@@ -1841,6 +1920,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在添加"
+          }
+        }
+      }
+    },
+    "Adding %@, %lld of %lld…" : {
+      "comment" : "Import window, under Extensions while they're added one at a time: the extension's name, which one, then how many.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Adding %1$@, %2$lld of %3$lld…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在添加 %1$@，第 %2$lld 个，共 %3$lld 个…"
           }
         }
       }
@@ -3942,6 +4038,17 @@
         }
       }
     },
+    "Couldn’t add these:" : {
+      "comment" : "Import window, under Extensions, before the ones that couldn't be added, each on its own line with why.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以下扩展未能添加："
+          }
+        }
+      }
+    },
     "Couldn’t delete it. Try again." : {
       "comment" : "Toast in the Passwords window when a login couldn't be deleted.",
       "localizations" : {
@@ -4371,6 +4478,17 @@
         }
       }
     },
+    "Didn’t add any extensions." : {
+      "comment" : "Import window, under Extensions after choosing Don’t Add.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有添加任何扩展。"
+          }
+        }
+      }
+    },
     "Didn’t finish" : {
       "comment" : "Under a download's name in the downloads panel: the download failed.",
       "localizations" : {
@@ -4422,6 +4540,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "完成"
+          }
+        }
+      }
+    },
+    "Don’t Add" : {
+      "comment" : "Button in the Import window: leave the extensions found behind.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不添加"
           }
         }
       }
@@ -4954,12 +5083,23 @@
       }
     },
     "Extensions" : {
-      "comment" : "A section of Settings.\nHeading in the site panel, in the welcome window’s picture of Zigzag.\nRow in the site panel's This Site group.\nSection label over the extensions' buttons in the site panel.",
+      "comment" : "A section of Settings.\nChoice in the Import window: bring extensions over from the Chrome Web Store.\nHeading in the site panel, in the welcome window’s picture of Zigzag.\nRow in the site panel's This Site group.\nSection label over the extensions' buttons in the site panel.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "扩展"
+          }
+        }
+      }
+    },
+    "Extensions come from Chrome and browsers built on it. Firefox and Safari get theirs from stores of their own." : {
+      "comment" : "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扩展只能从 Chrome 及基于它的浏览器导入。Firefox 和 Safari 的扩展来自它们各自的商店。"
           }
         }
       }
@@ -5096,6 +5236,17 @@
         }
       }
     },
+    "Find your extensions in site controls, by the address. You can bring more over anytime from Settings." : {
+      "comment" : "Import window when the import is done and only extensions came over. Site controls is the panel by the address.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的扩展在地址旁的网站控制中。你随时可以从设置中导入更多内容。"
+          }
+        }
+      }
+    },
     "Find…" : {
       "comment" : "Edit › Find menu item.",
       "localizations" : {
@@ -5180,6 +5331,61 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "前进"
+          }
+        }
+      }
+    },
+    "Found %lld extensions to add from %@." : {
+      "comment" : "Import window, before the extensions found are added: how many, then a browser's name, like Chrome.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Found %#@extensions@ to add from %2$@."
+          },
+          "substitutions" : {
+            "extensions" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg extension"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg extensions"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 %2$@ 中找到 %#@extensions@可以添加。"
+          },
+          "substitutions" : {
+            "extensions" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg 个扩展"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -5279,6 +5485,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "开始使用"
+          }
+        }
+      }
+    },
+    "Getting %lld of %lld ready…" : {
+      "comment" : "Import window, under Extensions while each is downloaded and checked before you're asked: which one, then how many.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Getting %1$lld of %2$lld ready…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备第 %1$lld 个，共 %2$lld 个…"
           }
         }
       }
@@ -11593,6 +11816,17 @@
         }
       }
     },
+    "The ones you use in %@, each downloaded from the Chrome Web Store and checked as if you added it here. You can turn any of them off in Settings › Extensions." : {
+      "comment" : "Import window, when asking before adding the extensions found. The placeholder is a browser's name, like Chrome, or a list of them.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这些是你在 %@ 中使用的扩展，每个都从 Chrome 网上应用店下载，并像你在这里亲自添加时一样经过检查。你可以随时在“设置 › 扩展”中关闭其中任何一个。"
+          }
+        }
+      }
+    },
     "The page belongs to an extension that has been removed or turned off. Turn it back on in Settings › Extensions, or close this tab." : {
       "comment" : "Message on the page Zigzag shows when a page can't load.",
       "localizations" : {
@@ -12106,6 +12340,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今天…"
+          }
+        }
+      }
+    },
+    "Together they’ll be able to" : {
+      "comment" : "Import window, heading over what the extensions about to be added can do, all of them together.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它们合起来将能够"
           }
         }
       }
@@ -13040,6 +13285,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "欢迎使用 Zigzag"
+          }
+        }
+      }
+    },
+    "What couldn’t come over is below." : {
+      "comment" : "Import window when some extensions couldn't be added, which the list below explains.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能导入的内容列在下方。"
           }
         }
       }
@@ -14078,6 +14334,24 @@
         }
       }
     },
+    "import.extension-failure" : {
+      "comment" : "Import window, one extension that couldn't be added: its name, then why, like “Not in the Chrome Web Store any more.”",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@：%2$@"
+          }
+        }
+      }
+    },
     "import.lead.bookmarks" : {
       "comment" : "Under the big number when an import finishes, so without the number. Several, never 1.",
       "extractionState" : "extracted_with_value",
@@ -14110,6 +14384,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "个书签"
+          }
+        }
+      }
+    },
+    "import.lead.extensions" : {
+      "comment" : "Under the big number when an import finishes, so without the number. Several, never 1.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "extensions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个扩展"
+          }
+        }
+      }
+    },
+    "import.lead.extensions.one" : {
+      "comment" : "Under the big number when an import finishes, which is 1, so without the number.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "extension"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个扩展"
           }
         }
       }
