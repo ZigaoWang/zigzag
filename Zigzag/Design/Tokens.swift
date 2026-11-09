@@ -579,6 +579,18 @@ enum Tokens {
             return CATransform3DConcat(CATransform3DMakeScale(k, k, 1), CATransform3DMakeTranslation(px * (1 - k), py * (1 - k), 0))
         }
 
+        /// Runs a layer's transform from one value to another, eased out. The layer's own value is the caller's to set.
+        static func animateTransform(of layer: CALayer, from: CATransform3D, to: CATransform3D, duration: TimeInterval,
+                                     forKey key: String, fillsBackwards: Bool = false) {
+            let animation = CABasicAnimation(keyPath: "transform")
+            animation.fromValue = NSValue(caTransform3D: from)
+            animation.toValue = NSValue(caTransform3D: to)
+            animation.duration = duration * debugSlowdown
+            animation.timingFunction = easeOut
+            if fillsBackwards { animation.fillMode = .backwards }
+            layer.add(animation, forKey: key)
+        }
+
         // MARK: Showing up and going
 
         /// Where something comes from as it shows up, and goes back to as it leaves.
