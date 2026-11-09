@@ -171,6 +171,8 @@ enum ExtensionStore {
                 where name.hasPrefix("ServiceWorkerRegistrations-") && name.hasSuffix(".sqlite3") {
                     var db: OpaquePointer?
                     var cleared = sqlite3_open_v2(folder.appendingPathComponent(name).path, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK
+                    // WebKit from the last launch may still be letting go of the file: a moment's wait, not a skip.
+                    sqlite3_busy_timeout(db, 2000)
                     cleared = cleared && sqlite3_exec(db, "DELETE FROM Records WHERE scriptURL LIKE 'webkit-extension://%'", nil, nil, nil) == SQLITE_OK
                     if !cleared { ExtensionLog.write("couldn't forget service workers in \(name): \(String(cString: sqlite3_errmsg(db)))") }
                     sqlite3_close(db)
