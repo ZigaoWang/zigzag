@@ -115,7 +115,8 @@ final class PeekController {
         guard let controller else { return nil }
         // A new peek replaces the old one rather than stacking.
         if let existing = tab { existing.close() }
-        let spaceID = controller.tabManager.currentSpaceID
+        // With a configuration from the page that opened it, it's in that page's profile, so in its space.
+        let spaceID = (configuration != nil ? opener?.spaceID : nil) ?? controller.tabManager.currentSpaceID
         let tab = Tab(url: url, spaceID: spaceID, configuration: configuration)
         // A peek in a private window is private too: its own store, nothing written down.
         tab.privateStore = controller.tabManager.privateStore

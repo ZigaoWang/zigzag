@@ -35,6 +35,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             SitePermissions.migrateHostOnlyAnswers()
             // Extensions' service worker backgrounds start afresh, as in Chrome, before WebKit reads their registrations.
             ExtensionStore.forgetServiceWorkerRegistrations()
+            // In every profile's store, each before WebKit has opened it.
+            for profile in Library.shared.profiles where !profile.isDefault {
+                ExtensionStore.forgetServiceWorkerRegistrations(in: ExtensionStore.websiteData(ofStore: profile.id))
+            }
+            Library.shared.pruneProfileAssignments()
         }
         NSApp.mainMenu = MainMenu.build()
         Shortcuts.apply()

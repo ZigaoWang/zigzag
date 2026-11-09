@@ -18,8 +18,18 @@ final class Profile {
     }
     /// What it decided about its extensions: which it has, on or off, what each is allowed.
     private(set) lazy var installs = ExtensionInstalls(profile: self)
-    /// Its extensions, made the first time something asks for them.
-    private(set) lazy var extensions = ExtensionHost(profile: self)
+    private var host: ExtensionHost?
+    /// Its extensions, brought up the first time something in the profile needs them: a profile you haven't opened
+    /// since Zigzag started runs none. The first profile's start with the app (ExtensionStore.setUpIfNeeded).
+    var extensions: ExtensionHost {
+        if let host { return host }
+        let made = ExtensionHost(profile: self)
+        host = made
+        if !isDefault { made.start() }
+        return made
+    }
+    /// Its extensions if they've been brought up, without bringing them up.
+    var startedExtensions: ExtensionHost? { host }
 
     init(id: UUID, store: WKWebsiteDataStore) {
         self.id = id
@@ -28,15 +38,33 @@ final class Profile {
     }
 }
 
-/// The profiles there are. Today that's one, which holds what Zigzag has always kept.
+/// The profiles there are, as the library lists them (Profiles.json), each with the one object that holds its store
+/// and extensions for as long as Zigzag runs.
 final class Profiles {
     static let shared = Profiles()
 
+    /// The first profile, which holds what Zigzag kept before there were profiles.
     let `default` = Profile(id: Profile.defaultID, store: .default())
-    var all: [Profile] { [`default`] }
+    private var others: [UUID: Profile] = [:]
+
+    /// Every profile, the first one first.
+    var all: [Profile] { Library.shared.profiles.map { profile($0.id) } }
+
+    /// The profile with this ID. One that's gone, or was never there, is the first profile.
+    func profile(_ id: UUID) -> Profile {
+        guard id != Profile.defaultID, Library.shared.directory.profile(id) != nil else { return `default` }
+        if let known = others[id] { return known }
+        // WebKit keeps a store for each identifier, made the first time it's asked for.
+        let made = Profile(id: id, store: WKWebsiteDataStore(forIdentifier: id))
+        others[id] = made
+        return made
+    }
+
+    /// The profile a space is on.
+    func profile(forSpace id: UUID) -> Profile { profile(Library.shared.profileID(ofSpace: id)) }
 
     /// The profile a page was made in. None for a private page, whose store is its window's own.
-    func profile(of webView: WKWebView) -> Profile? {
-        all.first { $0.store === webView.configuration.websiteDataStore }
-    }
+    func profile(of webView: WKWebView) -> Profile? { profile(ofStore: webView.configuration.websiteDataStore) }
+
+    func profile(ofStore store: WKWebsiteDataStore) -> Profile? { all.first { $0.store === store } }
 }

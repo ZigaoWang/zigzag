@@ -313,6 +313,34 @@ enum DebugBridge {
         case "lowmemory": MemoryPressure.shared.warned(critical: arg == "critical")
         case "sleepidle": controller.tabManager.sleepIdleTabs()
         case "space": controller.tabManager.switchSpace(by: Int(arg) ?? 1)
+        case "newprofile":
+            // newprofile <name>
+            Library.shared.addProfile(name: arg)
+        case "spaceprofile":
+            // spaceprofile [name]: puts the space you're in on that profile; with no name, on the first.
+            let id = Library.shared.profiles.first { $0.name == arg }?.id ?? Profile.defaultID
+            Library.shared.setProfile(id, forSpace: controller.tabManager.currentSpaceID)
+        case "profiles":
+            // profiles <path>: each profile with its spaces and extensions, and for each tab in this window the
+            // profile its page is in and the store that page uses (JSON).
+            let library = Library.shared
+            let profiles = library.profiles.map { info -> [String: Any] in
+                let profile = Profiles.shared.profile(info.id)
+                return ["id": info.id.uuidString, "name": info.name ?? "", "first": info.isDefault,
+                        "spaces": library.spaces(in: info.id).map(\.name),
+                        "extensionsUp": profile.isDefault || profile.startedExtensions != nil,
+                        "loaded": (profile.isDefault ? profile.extensions : profile.startedExtensions)?.contexts.map(\.uniqueIdentifier).sorted() ?? [],
+                        "installed": profile.installs.installedIDs]
+            }
+            let tabs = controller.tabManager.allTabs.map { tab -> [String: Any] in
+                let store = tab.webView?.configuration.websiteDataStore
+                return ["title": tab.displayTitle, "space": library.space(tab.spaceID)?.name ?? "", "profile": library.directory.profile(tab.profile.id)?.name ?? "",
+                        "store": store == nil ? "no page" : store?.identifier?.uuidString ?? (store?.isPersistent == true ? "default" : "private"),
+                        "told": tab.toldTo.map { library.directory.profile($0.profile.id)?.name ?? "" } ?? "no one"]
+            }
+            let json: [String: Any] = ["profiles": profiles, "tabs": tabs, "many": library.hasManyProfiles,
+                                       "current": controller.tabManager.currentSpace.name, "selected": controller.tabManager.selectedTab?.displayTitle ?? ""]
+            if let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "newspace":
             let space = Library.shared.addSpace(name: arg.isEmpty ? nil : arg)
             controller.tabManager.switchToSpace(space.id)

@@ -11,7 +11,11 @@ enum ExtensionCenter {
     /// Some profile's extension popup opened or closed.
     static let popupsChanged = Signal<Void>()
 
-    private static var hosts: [ExtensionHost] { Profiles.shared.all.map(\.extensions) }
+    /// The extensions that are up: the first profile's, and those of each profile used since Zigzag started. A
+    /// profile's that come up later are told of the windows already open as they load.
+    private static var hosts: [ExtensionHost] {
+        Profiles.shared.all.compactMap { $0.isDefault ? $0.extensions : $0.startedExtensions }
+    }
 
     /// The extension an extension's own page belongs to, to name the page and give it its icon. Any profile that has
     /// it loaded will do: the same address is the same extension in each.
@@ -22,8 +26,19 @@ enum ExtensionCenter {
 
     // MARK: Tabs
 
-    static func tabOpened(_ tab: Tab) { tab.extensionHost?.tabOpened(tab) }
-    static func tabClosed(_ tab: Tab, windowClosing: Bool = false) { tab.extensionHost?.tabClosed(tab, windowClosing: windowClosing) }
+    /// A tab is told to its profile's extensions once, and its closing to the extensions that were told of it: a
+    /// tab that changes profile closes for one set and opens for the other.
+    static func tabOpened(_ tab: Tab) {
+        guard let host = tab.extensionHost, tab.toldTo !== host else { return }
+        tab.toldTo?.tabClosed(tab)
+        tab.toldTo = host
+        host.tabOpened(tab)
+    }
+
+    static func tabClosed(_ tab: Tab, windowClosing: Bool = false) {
+        tab.toldTo?.tabClosed(tab, windowClosing: windowClosing)
+        tab.toldTo = nil
+    }
     static func tabActivated(_ tab: Tab, previous: Tab?) { tab.extensionHost?.tabActivated(tab, previous: previous) }
     static func tabChanged(_ tab: Tab, _ change: Tab.Change) { tab.extensionHost?.tabChanged(tab, change) }
 
@@ -39,7 +54,11 @@ enum ExtensionCenter {
     static func popupFocused(_ popup: PopupWindowController) { host(of: popup)?.popupFocused(popup) }
     static func popupClosed(_ popup: PopupWindowController) { host(of: popup)?.popupClosed(popup) }
 
-    static func miniOpened(_ mini: MiniWindowController) { mini.tab.extensionHost?.miniOpened(mini) }
+    static func miniOpened(_ mini: MiniWindowController) {
+        guard let host = mini.tab.extensionHost else { return }
+        mini.tab.toldTo = host
+        host.miniOpened(mini)
+    }
     static func miniFocused(_ mini: MiniWindowController) { mini.tab.extensionHost?.miniFocused(mini) }
     static func miniClosed(_ mini: MiniWindowController) { mini.tab.extensionHost?.miniClosed(mini) }
 

@@ -83,13 +83,46 @@ final class Tab: NSObject {
     var privateStore: WKWebsiteDataStore?
     var isPrivate: Bool { privateStore != nil }
 
-    /// Moves it to another space.
+    /// Moves it to another space. On another profile, its page moves with it.
     func setSpace(_ id: UUID) {
         spaceID = id
+        settleProfile()
     }
 
-    /// The profile its page is made in. There is one today.
-    var profile: Profile { Profiles.shared.default }
+    /// Makes sure its page is in its space's profile, rebuilding it there if the space changed profile or the tab
+    /// changed space. A private tab's page is in its window's own store, whatever the space.
+    func settleProfile() {
+        guard !isPrivate else { return }
+        let wanted = Profiles.shared.profile(forSpace: spaceID)
+        if wanted !== profile { rehome(to: wanted) }
+    }
+
+    /// Rebuilds the page in another profile: that profile's sign-ins and extensions, the same back and forward
+    /// list. What the page held that wasn't saved (a form half filled in) is lost, as on a reload.
+    private func rehome(to new: Profile) {
+        let wasLive = webView != nil
+        let wasTold = toldTo != nil
+        if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(self) }
+        if let webView {
+            pendingInteractionState = webView.interactionState as? Data
+            webView.pauseAllMediaPlayback(completionHandler: nil)
+            tearDown(webView)
+        }
+        // A configuration WebKit handed over belongs to the profile of the page that asked for it.
+        pendingConfiguration = nil
+        profile = new
+        if #available(macOS 15.4, *), wasTold {
+            ExtensionCenter.tabOpened(self)
+            if (host as? BrowserWindowController)?.tabManager.selectedTab === self { ExtensionCenter.tabActivated(self, previous: nil) }
+        }
+        if wasLive { ensureWebView() }
+        changed.send(.webView)
+    }
+
+    /// The profile its page is made in: its space's. `settleProfile` moves the page when the two come apart.
+    private(set) var profile: Profile
+    /// The extensions that have been told this tab is open (ExtensionCenter).
+    weak var toldTo: ExtensionHost?
     /// Its profile's extensions. None for a private tab: as in Chrome, extensions stay out of private browsing.
     @available(macOS 15.4, *)
     var extensionHost: ExtensionHost? { isPrivate ? nil : profile.extensions }
@@ -149,6 +182,8 @@ final class Tab: NSObject {
         self.url = configuration == nil ? url : nil
         self.title = title ?? (SettingsPage.isSettings(self.url) ? String(localized: "Settings", comment: "The name of the tab showing Zigzag's Settings.") : self.url?.host() ?? String(localized: "New Tab", comment: "The name of a tab with no page yet."))
         self.spaceID = spaceID
+        // A page WebKit made for another page's new window is in that page's profile, whatever space it lands in.
+        self.profile = configuration.flatMap { Profiles.shared.profile(ofStore: $0.websiteDataStore) } ?? Profiles.shared.profile(forSpace: spaceID)
         self.pendingConfiguration = configuration
         self.pendingInteractionState = interactionState
         self.lastActivated = lastActivated
