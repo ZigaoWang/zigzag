@@ -758,7 +758,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                 control: quitToggle))
         // Zigzag Mini: what it is and how to open it, then where links from other apps go.
         miniGroup.add(FormRow(title: String(localized: "New Zigzag Mini", comment: "A row in Settings › General, under Zigzag Mini, showing its keyboard shortcut. Zigzag Mini is a name, kept in Latin letters."),
-                              detail: String(localized: "A small window for a quick look at a page. Move it into your browser window when you want to keep it.", comment: "Explanation under “New Zigzag Mini” in Settings › General: what Zigzag Mini is."),
+                              detail: String(localized: "A small window for a quick look at a page. Esc closes it, and ⌘O moves it into your browser window to keep it.", comment: "Explanation under “New Zigzag Mini” in Settings › General: what Zigzag Mini is."),
                               control: miniKeys))
         miniToggle.onChange = { on in MiniWindowController.opensExternalLinks = on }
         miniGroup.add(FormRow(title: String(localized: "Open links from other apps in Zigzag Mini", comment: "A setting in Settings › General, under Zigzag Mini."),

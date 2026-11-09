@@ -221,10 +221,32 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         commandBar.show(mode: .editCurrent)
     }
 
-    /// Esc: the command bar takes its own Esc while it's up. On the page it stops a page that's loading, and otherwise
-    /// does nothing: a page you were reading never closes on a stray key.
-    override func cancelOperation(_ sender: Any?) {
-        if tab.isLoading { tab.stopLoading() }
+    /// Esc puts Zigzag Mini away, as it does Spotlight or Quick Look: it's there for a quick look. Only an Esc the page
+    /// left alone gets here (a site closing its own dialog keeps the window), the command bar takes its own, and in a
+    /// field you're typing in the first Esc only leaves the field, so a half-written reply never goes on a stray key.
+    override func keyDown(with event: NSEvent) {
+        guard event.keyCode == 53, event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty else {
+            super.keyDown(with: event)
+            return
+        }
+        escape()
+    }
+
+    override func cancelOperation(_ sender: Any?) { escape() }
+
+    private func escape() {
+        guard !isLeaving, !commandBar.isVisible else { return }
+        guard let webView = tab.webView, let focused = window?.firstResponder as? NSView, focused.isDescendant(of: webView) else {
+            window?.performClose(nil)
+            return
+        }
+        let leaveField = "(() => { const e = document.activeElement; const typing = !!e && (e.isContentEditable || /^(input|textarea|select)$/i.test(e.tagName)); if (typing) e.blur(); return typing; })()"
+        webView.evaluateJavaScript(leaveField) { [weak self] result, _ in
+            MainActor.assumeIsolated {
+                guard (result as? Bool) != true else { return }
+                self?.window?.performClose(nil)
+            }
+        }
     }
 
     #if DEBUG

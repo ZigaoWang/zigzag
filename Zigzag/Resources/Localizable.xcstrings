@@ -1548,13 +1548,13 @@
         }
       }
     },
-    "A small window for a quick look at a page. Move it into your browser window when you want to keep it." : {
+    "A small window for a quick look at a page. Esc closes it, and ⌘O moves it into your browser window to keep it." : {
       "comment" : "Explanation under “New Zigzag Mini” in Settings › General: what Zigzag Mini is.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "用一个小窗口快速看一眼页面。想留下时，把它移到浏览器窗口中。"
+            "value" : "用一个小窗口快速看一眼页面。按 Esc 关闭，按 ⌘O 移到浏览器窗口中留下。"
           }
         }
       }
