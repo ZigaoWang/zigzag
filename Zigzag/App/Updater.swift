@@ -63,10 +63,10 @@ private final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
     }
 }
 
-/// Copies of your profile from before each update: spaces, pins, favorites, open tabs and history. The last three
+/// Copies of your data from before each update: spaces, pins, favorites, open tabs and history. The last three
 /// are kept. Logins, cookies and passwords live with macOS and WebKit, outside any update's reach, so they're not
 /// part of it.
-nonisolated enum ProfileBackup {
+nonisolated enum UpdateBackup {
     private static let files = ["Library.json", "Session.json", "Downloads.json", "History.sqlite", "History.sqlite-wal", "History.sqlite-shm"]
     private static let kept = 3
     private static let restoreMarker = "Restore"
@@ -118,13 +118,13 @@ nonisolated enum ProfileBackup {
         return formatter
     }()
 
-    /// At launch, before anything reads the profile: the first run of a new build backs up what the last one left,
+    /// At launch, before anything reads your data: the first run of a new build backs up what the last one left,
     /// named for the version it came from. Sparkle installs most updates quietly on quit, so this is the one moment
     /// every update passes through.
     static func backUpIfUpdated(build: String, version: String, defaults: UserDefaults = .standard, root: URL = Paths.support) {
         let lastBuild = defaults.string(forKey: lastBuildKey)
         guard lastBuild != build else { return }
-        // A first run has no profile yet; one from before builds were recorded is backed up all the same.
+        // A first run has no data yet; one from before builds were recorded is backed up all the same.
         if lastBuild != nil || FileManager.default.fileExists(atPath: root.appendingPathComponent("Library.json").path) {
             make(from: defaults.string(forKey: lastVersionKey), in: root)
         }
@@ -153,7 +153,7 @@ nonisolated enum ProfileBackup {
         return target
     }
 
-    /// Puts the newest backup back the next time Zigzag starts, before anything reads the profile, then restarts
+    /// Puts the newest backup back the next time Zigzag starts, before anything reads your data, then restarts
     /// Zigzag so that's now.
     @MainActor static func restoreLatestAndRelaunch() {
         guard let latest else { return }
@@ -175,7 +175,7 @@ nonisolated enum ProfileBackup {
         NSApp.terminate(nil)
     }
 
-    /// At launch: if a restore was asked for, the backup's files replace the profile's. What's there now is
+    /// At launch: if a restore was asked for, the backup's files replace the ones in use. What's there now is
     /// backed up first, and nothing live goes until its replacement is in place.
     static func restoreIfAsked(root: URL = Paths.support) {
         let manager = FileManager.default

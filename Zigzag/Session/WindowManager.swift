@@ -76,7 +76,7 @@ final class WindowManager {
     static var needsOnboarding: Bool {
         guard !Library.shared.importedFromArc, !UserDefaults.standard.bool(forKey: "ImportOfferDismissed"),
               !UserDefaults.standard.bool(forKey: "ArcOfferDismissed") else { return false }
-        // Preferences reset (a cleaner app, a migration that moved the profile but not them) while the profile is
+        // Preferences reset (a cleaner app, a migration that moved the data but not them) while the data is
         // full: that's someone who has used Zigzag, and welcoming them would save an empty window over their tabs.
         if hasBeenUsed {
             UserDefaults.standard.set(true, forKey: "ImportOfferDismissed")
