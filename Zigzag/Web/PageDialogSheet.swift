@@ -211,6 +211,21 @@ final class PageDialogSheet: NSView {
         }
     }
 
+    #if DEBUG
+    /// For the debug bridge: each dialog showing, its title and fields, a secure field only as its length.
+    static func debugState() -> [[String: Any]] {
+        open.compactMap(\.sheet).filter { $0.superview != nil }.map { sheet in
+            ["title": sheet.header.title.stringValue, "fields": sheet.inputs.map { $0.field is NSSecureTextField ? "\($0.stringValue.count) characters" : $0.stringValue },
+             "savedButton": sheet.saved.superview != nil, "savedMenu": sheet.savedMenu != nil]
+        }
+    }
+
+    /// Opens the saved passwords' menu on the sign-in sheet showing.
+    static func debugShowSaved() {
+        open.compactMap(\.sheet).first { $0.savedMenu == nil && $0.saved.superview != nil }?.toggleSavedMenu()
+    }
+    #endif
+
     /// The page closed (its tab, or a new process): its dialogs answer "cancel" and go.
     static func cancel(for page: WKWebView) {
         for box in open where box.sheet?.page === page { box.sheet?.finish(.cancelled) }

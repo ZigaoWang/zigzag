@@ -788,6 +788,23 @@ enum DebugBridge {
                 for credential in samples { try? await PasswordStore.shared.delete(credential.id) }
                 debugLog("pwclear removed \(samples.count)")
             }
+        case "pwadd":
+            // pwadd <site> <username> <password>: one fake login, as for a local test site. Only on a test vault.
+            let f = arg.split(separator: " ").map(String.init)
+            guard PasswordStore.isTestVault, f.count == 3, let origin = Origin(URL(string: f[0])) else { debugLog("pwadd refused"); break }
+            Task {
+                _ = try? await PasswordStore.shared.save(origin: origin, username: f[1], password: SecretString(f[2]))
+                debugLog("pwadd done")
+            }
+        case "dialogstate":
+            // dialogstate <path>: the page dialogs showing, with what's in their fields (a password only as its length).
+            if let data = try? JSONSerialization.data(withJSONObject: PageDialogSheet.debugState(), options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: arg)) }
+        case "dialogsaved": PageDialogSheet.debugShowSaved()
+        case "windowshot":
+            // windowshot <path>: the window's own drawing, as a PNG; web content may be blank.
+            guard let view = controller.window?.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }
+            view.cacheDisplay(in: view.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: arg))
         case "about": AboutWindowController.show()
         case "acknowledgements": AcknowledgementsWindowController.show()
         case "exttest":
