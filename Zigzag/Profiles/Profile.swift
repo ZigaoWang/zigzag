@@ -12,6 +12,10 @@ final class Profile {
     /// Cookies and everything else websites keep. One object for as long as Zigzag runs: certificate exceptions,
     /// sign-in prompts and downloads tell stores apart by which object they are.
     let store: WKWebsiteDataStore
+    /// Where its own files are kept. The first profile's are where Zigzag's have always been.
+    var folder: URL {
+        isDefault ? Paths.support : Paths.directory("Profiles").appendingPathComponent(id.uuidString, isDirectory: true)
+    }
     /// What it decided about its extensions: which it has, on or off, what each is allowed.
     private(set) lazy var installs = ExtensionInstalls(profile: self)
     /// Its extensions, made the first time something asks for them.
