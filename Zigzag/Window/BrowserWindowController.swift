@@ -1307,7 +1307,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let docked = root.sidebarVisible
         let sliding = isSliding
         // The picture shows only mid-slide, and only when the sidebar is (or is becoming) visible.
-        sidebar.showTrafficLightsPicture(sliding ? trafficLightsPicture : nil)
+        // Not in full screen: the lights live in the title bar that comes down with the menu bar there, so a picture of
+        // them on the sliding sidebar would only flash and vanish.
+        let fullScreen = window.styleMask.contains(.fullScreen)
+        sidebar.showTrafficLightsPicture(sliding && !fullScreen ? trafficLightsPicture : nil)
         window.trafficLightsHidden = sliding || !(docked || floating)
         let container = root.sidebarContainer.frame
         let lightHeight = window.trafficLightHeight
