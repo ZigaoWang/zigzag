@@ -309,7 +309,10 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         (() => {
           let e = document.activeElement;
           while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
-          if (e && (e.isContentEditable || /^(input|textarea|select|iframe)$/i.test(e.tagName))) return 'typing';
+          // Only a field with something in it: many sites put the cursor in their empty search box on load.
+          if (e && e.isContentEditable && e.textContent.trim()) return 'typing';
+          if (e && /^(input|textarea)$/i.test(e.tagName) && e.value) return 'typing';
+          if (e && /^iframe$/i.test(e.tagName)) return 'typing';
           return document.querySelector('dialog[open], [aria-modal="true"]') ? 'dialog' : '';
         })()
         """
