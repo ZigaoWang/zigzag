@@ -18,6 +18,7 @@ final class Profile {
     init(id: UUID, store: WKWebsiteDataStore) {
         self.id = id
         self.store = store
+        WebKitSetup.allowCrossSiteCookies(in: store)
     }
 }
 
