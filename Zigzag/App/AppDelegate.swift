@@ -21,6 +21,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ProfileBackup.restoreIfAsked()
             // Site permissions kept by host alone become per origin before any page can ask.
             SitePermissions.migrateHostOnlyAnswers()
+            // Extensions' service worker backgrounds start afresh, as in Chrome, before WebKit reads their registrations.
+            ExtensionStore.forgetServiceWorkerRegistrations()
         }
         NSApp.mainMenu = MainMenu.build()
         Shortcuts.apply()

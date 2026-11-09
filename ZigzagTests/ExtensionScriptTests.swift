@@ -1,4 +1,6 @@
+import Foundation
 import JavaScriptCore
+import SQLite3
 import Testing
 @testable import Zigzag
 
@@ -353,5 +355,47 @@ struct ExtensionScriptTests {
 
     private static func quoted(_ text: String) -> String {
         String(data: try! JSONSerialization.data(withJSONObject: [text]), encoding: .utf8)!.dropFirst().dropLast().description
+    }
+}
+
+/// At launch extensions' service worker registrations go, so their backgrounds start afresh; sites' stay.
+struct ServiceWorkerRegistrationTests {
+    private func registrations(at file: URL, _ scripts: [String]?) {
+        var db: OpaquePointer?
+        sqlite3_open(file.path, &db)
+        if let scripts {
+            sqlite3_exec(db, "CREATE TABLE Records(key TEXT, scriptURL TEXT)", nil, nil, nil)
+            for (i, script) in scripts.enumerated() { sqlite3_exec(db, "INSERT INTO Records VALUES('\(i)', '\(script)')", nil, nil, nil) }
+        } else {
+            sqlite3_exec(db, "CREATE TABLE Other(x TEXT)", nil, nil, nil)
+        }
+        sqlite3_close(db)
+    }
+
+    private func scripts(at file: URL) -> [String] {
+        var db: OpaquePointer?, statement: OpaquePointer?
+        sqlite3_open(file.path, &db)
+        defer { sqlite3_finalize(statement); sqlite3_close(db) }
+        sqlite3_prepare_v2(db, "SELECT scriptURL FROM Records ORDER BY key", -1, &statement, nil)
+        var found: [String] = []
+        while sqlite3_step(statement) == SQLITE_ROW { found.append(String(cString: sqlite3_column_text(statement, 0))) }
+        return found
+    }
+
+    @Test func extensionsRegistrationsGoAndSitesStay() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let folder = root.appendingPathComponent("partition/origin/ServiceWorkers", isDirectory: true)
+        let other = root.appendingPathComponent("partition/changed/ServiceWorkers", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        let file = folder.appendingPathComponent("ServiceWorkerRegistrations-8.sqlite3")
+        registrations(at: file, ["webkit-extension://aeblfdkhhhdcdjpifhhbdiojplfjncoa/zigzag-entry.js", "https://example.com/sw.js"])
+        // A layout WebKit changed: no Records table, left as it is.
+        registrations(at: other.appendingPathComponent("ServiceWorkerRegistrations-9.sqlite3"), nil)
+
+        ExtensionStore.forgetServiceWorkerRegistrations(in: root)
+
+        #expect(scripts(at: file) == ["https://example.com/sw.js"])
     }
 }
