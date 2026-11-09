@@ -285,6 +285,7 @@ enum DebugBridge {
                 controller.sidebar.list.refreshRows()
             }
         case "edgedrag": controller.root.debugEdgeDrag(arg)
+        case "spacedrag": controller.sidebar.debugSpaceDrag(arg)
         case "sidebarwidth":
             // sidebarwidth <points>: as a drag of the sidebar's edge would leave it, within its narrowest and widest.
             if let n = Double(arg) {

@@ -744,6 +744,29 @@ final class SidebarView: NSView {
         spaceDropBar.isHidden = false
     }
 
+    #if DEBUG
+    /// spacedrag begin <i> | move <x> [y] (window points, top-left; y defaults to the bar's middle) | drop | cancel:
+    /// the drag a pointer would make, through the same steps.
+    func debugSpaceDrag(_ arg: String) {
+        guard let window else { return }
+        let f = arg.split(separator: " ").map(String.init)
+        let barMiddle = bottomBar.convert(NSPoint(x: 0, y: bottomBar.bounds.midY), to: nil).y
+        switch f.first {
+        case "begin":
+            guard let i = f.dropFirst().first.flatMap({ Int($0) }), dots.indices.contains(i) else { return }
+            let dot = dots[i]
+            _ = beginSpaceDrag(dot, at: window.convertPoint(toScreen: dot.convert(NSPoint(x: dot.bounds.midX, y: dot.bounds.midY), to: nil)))
+        case "move":
+            guard f.count >= 2, let x = Double(f[1]) else { return }
+            let y = f.count >= 3 ? Double(f[2]).map { window.frame.height - $0 } ?? barMiddle : barMiddle
+            moveSpaceDrag(to: window.convertPoint(toScreen: NSPoint(x: x, y: y)))
+        case "drop": endSpaceDrag(drop: true)
+        case "cancel": endSpaceDrag(drop: false)
+        default: break
+        }
+    }
+    #endif
+
     func dot(for spaceID: UUID) -> NSView? { dots.first { $0.spaceID == spaceID } }
 
     #if DEBUG
