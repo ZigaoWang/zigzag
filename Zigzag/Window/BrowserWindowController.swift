@@ -1318,7 +1318,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let y = (docked ? 0 : container.minY) + sidebar.trafficLightCenterY - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating, let image = window.trafficLightsImage() { trafficLightsPicture = image }
-        sidebar.trafficLightsWidth = window.styleMask.contains(.fullScreen) ? 0 : window.trafficLightsWidth
+        sidebar.trafficLightsWidth = fullScreen ? 0 : window.trafficLightsWidth
         sidebar.sidebarButton.toolTip = Shortcuts.tooltip(docked ? String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows.")
                                                                   : String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."),
                                                            for: #selector(toggleBrowserSidebar(_:)))
