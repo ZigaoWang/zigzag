@@ -44,7 +44,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         let opener = WindowManager.shared.controllers.first { $0.window === parent }?.tabManager.selectedTab?.url?.host()
         Diagnostics.note("Pop-up opened", site: opener, isPrivate: controller.isPrivate)
         controller.showWindow(nil)
-        if #available(macOS 15.4, *), !controller.isPrivate { ExtensionHost.shared.popupOpened(controller) }
+        if #available(macOS 15.4, *), !controller.isPrivate { ExtensionCenter.popupOpened(controller) }
         return controller.webView
     }
 
@@ -60,7 +60,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         Self.open.insert(controller)
         controller.webView.load(URLRequest(url: url))
         controller.showWindow(nil)
-        ExtensionHost.shared.popupOpened(controller)
+        ExtensionCenter.popupOpened(controller)
         return controller
     }
 
@@ -87,7 +87,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         window.commandHandler = { [weak self] event in
             guard #available(macOS 15.4, *), let self, !self.isPrivate,
                   !event.modifierFlags.intersection([.command, .control, .option]).isEmpty else { return false }
-            return ExtensionHost.shared.performCommand(for: event)
+            return ExtensionCenter.performCommand(for: event)
         }
         // A private window's popup shares its private session: it ends with that window, never outliving it.
         if !configuration.websiteDataStore.isPersistent, let parent {
@@ -152,11 +152,11 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     private func tellExtensions(_ change: WKWebExtension.TabChangedProperties) {
         guard #available(macOS 15.4, *), !isPrivate, Self.open.contains(self) else { return }
-        ExtensionHost.shared.popupChanged(self, change)
+        ExtensionCenter.popupChanged(self, change)
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
-        if #available(macOS 15.4, *), !isPrivate { ExtensionHost.shared.popupFocused(self) }
+        if #available(macOS 15.4, *), !isPrivate { ExtensionCenter.popupFocused(self) }
     }
 
     /// The address of the page on screen: never one only on its way, which a page could start and never finish.
@@ -179,7 +179,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         webView.stopLoading()
         if let parentObserver { NotificationCenter.default.removeObserver(parentObserver) }
         parentObserver = nil
-        if #available(macOS 15.4, *), !isPrivate, Self.open.contains(self) { ExtensionHost.shared.popupClosed(self) }
+        if #available(macOS 15.4, *), !isPrivate, Self.open.contains(self) { ExtensionCenter.popupClosed(self) }
         Self.open.remove(self)
     }
 

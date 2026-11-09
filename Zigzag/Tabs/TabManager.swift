@@ -208,7 +208,7 @@ final class TabManager {
         tab.parentID = place.parent
         tabsBySpace[space, default: []].insert(tab, at: place.index)
         if opener == nil, !select, Self.newTabPlace == .next, space == currentSpaceID { placedBeside = PlacedBeside(anchor: selectedTab, last: tab) } else { placedBeside = nil }
-        if #available(macOS 15.4, *) { ExtensionHost.shared.tabOpened(tab) }
+        if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
         // Opened in front from a page in split view: it takes that page's pane, so the split stays on screen and
         // the page it came from waits in the list. A pinned split keeps its pages; the new tab shows on its own.
         if select, let opener, opener.bookmarkID == nil, opener.spaceID == space, let index = splits.firstIndex(where: { $0.left == opener.id || $0.right == opener.id }) {
@@ -234,7 +234,7 @@ final class TabManager {
         tabsBySpace[tab.spaceID]?.remove(at: index)
         recentTabIDs.removeAll { $0 == tab.id }
         tabTokens[tab.id] = nil
-        if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
+        if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
         changed.send(.structure)
         if wasSelected { selectAfterClosing(tab, index: index) }
     }
@@ -247,7 +247,7 @@ final class TabManager {
         bookmarkTabs[bookmarkID] = nil
         recentTabIDs.removeAll { $0 == tab.id }
         tabTokens[tab.id] = nil
-        if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
+        if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
         changed.send(.structure)
         if wasSelected { selectAfterClosing(tab, index: 0) }
         return tab
@@ -257,7 +257,7 @@ final class TabManager {
     func insertBookmarkTab(_ tab: Tab, bookmarkID: UUID) {
         tab.spaceID = currentSpaceID
         adoptBookmarkTab(tab, bookmarkID: bookmarkID)
-        if #available(macOS 15.4, *) { ExtensionHost.shared.tabOpened(tab) }
+        if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
     }
 
     /// Adds a tab that already has a page (a promoted peek) to the top of the list and shows it.
@@ -271,7 +271,7 @@ final class TabManager {
         tab.parentID = TabTree.parentForInsertion(at: at, in: treeNodes(in: currentSpaceID))
         list.insert(tab, at: at)
         tabsBySpace[currentSpaceID] = list
-        if #available(macOS 15.4, *) { ExtensionHost.shared.tabOpened(tab) }
+        if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
         changed.send(.structure)
         select(tab)
     }
@@ -332,7 +332,7 @@ final class TabManager {
         tab.ensureWebView()
         tab.reloadIfItStopped()
         tab.shown()
-        if #available(macOS 15.4, *), previous !== tab { ExtensionHost.shared.tabActivated(tab, previous: previous) }
+        if #available(macOS 15.4, *), previous !== tab { ExtensionCenter.tabActivated(tab, previous: previous) }
         changed.send(.selection)
     }
 
@@ -814,7 +814,7 @@ final class TabManager {
         splits.removeAll { $0.left == tab.id || $0.right == tab.id }
         // Closing one half of a split shows the other half.
         if selectedTab === tab, let partnerTab {
-            if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
+            if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
             closeKeepingSelection(tab, split: pair)
             select(partnerTab)
             return
@@ -822,7 +822,7 @@ final class TabManager {
         let wasSelected = selectedTab === tab
         // The half of a split that wasn't focused: the pane it was in goes too, though the selection stays.
         defer { if pair != nil, !wasSelected { changed.send(.selection) } }
-        if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
+        if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
         if let bookmarkID = tab.bookmarkID {
             // Closing a pinned page closes it, wherever it had got to: one ⌘W, never two. The pin stays, and
             // opens fresh at its own address next time.
@@ -1411,7 +1411,7 @@ final class TabManager {
             tabsBySpace[tab.spaceID] = list
             recentTabIDs.removeAll { $0 == tab.id }
             tabTokens[tab.id] = nil
-            if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
+            if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
             tab.close()
         }
         changed.send(.structure)

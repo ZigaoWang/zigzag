@@ -614,7 +614,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             self?.refreshCustomSearch()
         }
         if #available(macOS 15.4, *) {
-            extensionsToken = ExtensionHost.shared.changed.observe { [weak self] in
+            extensionsToken = ExtensionCenter.changed.observe { [weak self] in
                 guard let self, self.window != nil else { return }
                 self.reloadExtensions()
                 // One turned on or off may give a search engine, or take yours with it.

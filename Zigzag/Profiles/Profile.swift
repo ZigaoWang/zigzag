@@ -28,4 +28,9 @@ final class Profiles {
 
     let `default` = Profile(id: Profile.defaultID, store: .default())
     var all: [Profile] { [`default`] }
+
+    /// The profile a page was made in. None for a private page, whose store is its window's own.
+    func profile(of webView: WKWebView) -> Profile? {
+        all.first { $0.store === webView.configuration.websiteDataStore }
+    }
 }

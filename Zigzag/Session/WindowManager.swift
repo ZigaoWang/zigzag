@@ -66,7 +66,7 @@ final class WindowManager {
 
     func windowBecameKey(_ controller: BrowserWindowController) {
         lastKey = controller
-        if #available(macOS 15.4, *) { ExtensionHost.shared.windowFocused(controller) }
+        if #available(macOS 15.4, *) { ExtensionCenter.windowFocused(controller) }
     }
 
     // MARK: Creating
@@ -141,7 +141,7 @@ final class WindowManager {
         controller.onClose = { [weak self] closed in self?.windowClosed(closed) }
         controller.onStateChange = { [weak self] in self?.scheduleSave() }
         controllers.append(controller)
-        if #available(macOS 15.4, *) { ExtensionHost.shared.windowOpened(controller) }
+        if #available(macOS 15.4, *) { ExtensionCenter.windowOpened(controller) }
         return controller
     }
 
@@ -159,7 +159,7 @@ final class WindowManager {
         }
         controllers.removeAll { $0 === controller }
         if lastKey === controller { lastKey = nil }
-        if #available(macOS 15.4, *) { ExtensionHost.shared.windowClosed(controller) }
+        if #available(macOS 15.4, *) { ExtensionCenter.windowClosed(controller) }
         controller.tabManager.invalidate()
         if controller.tabManager.isPrivate, !controllers.contains(where: { $0.tabManager.isPrivate }) { DownloadManager.shared.forgetPrivate() }
         if !controllers.isEmpty { scheduleSave() }

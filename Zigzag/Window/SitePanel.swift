@@ -281,7 +281,7 @@ final class SitePanel: FloatingPanelView {
             wireHoverPin(entry.tile, entry.pin, id: entry.id)
         }
         refreshHoverPins()
-        extensionsToken = ExtensionHost.shared.changed.observe { [weak self] in self?.refreshHoverPins() }
+        extensionsToken = ExtensionCenter.changed.observe { [weak self] in self?.refreshHoverPins() }
     }
 
     private func wireHoverPin(_ tile: PanelTile, _ pin: HoverPin, id: String) {
