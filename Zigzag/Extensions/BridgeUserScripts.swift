@@ -138,7 +138,7 @@ final class BridgeUserScripts: BridgeNamespace {
 
     /// The content script WebKit gets for a user script: its files, written now if they aren't there yet.
     private func contentScript(for script: [String: Any], extensionID: String) throws -> [String: Any] {
-        guard let folder = filesFolder(for: extensionID), let root = ExtensionStore.overlayDirectory(for: extensionID) else {
+        guard let folder = filesFolder(for: extensionID), let root = host.profile.installs.overlayDirectory(for: extensionID) else {
             throw BridgeError("User scripts can't be kept for this extension")
         }
         let includeGlobs = script["includeGlobs"] as? [String] ?? [], excludeGlobs = script["excludeGlobs"] as? [String] ?? []
@@ -211,7 +211,7 @@ final class BridgeUserScripts: BridgeNamespace {
     }
 
     private func filesFolder(for extensionID: String) -> URL? {
-        ExtensionStore.overlayDirectory(for: extensionID)?.appendingPathComponent(Self.folderName, isDirectory: true)
+        host.profile.installs.overlayDirectory(for: extensionID)?.appendingPathComponent(Self.folderName, isDirectory: true)
     }
 
     /// Every registered script's files are there (written again if the loaded copy was made anew), and files no
@@ -228,14 +228,14 @@ final class BridgeUserScripts: BridgeNamespace {
 
     // MARK: Registry
 
-    private static func registryFile(for extensionID: String) -> URL {
-        ExtensionStore.folder(for: extensionID).appendingPathComponent("UserScripts.json")
+    private func registryFile(for extensionID: String) -> URL {
+        host.profile.installs.folder(for: extensionID).appendingPathComponent("UserScripts.json")
     }
 
     private func registry(for extensionID: String) -> Registry {
         if let known = registries[extensionID] { return known }
         var registry = Registry()
-        if let data = try? Data(contentsOf: Self.registryFile(for: extensionID)),
+        if let data = try? Data(contentsOf: registryFile(for: extensionID)),
            let saved = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             registry.scripts = saved["scripts"] as? [[String: Any]] ?? []
             registry.worlds = saved["worlds"] as? [[String: Any]] ?? []
@@ -248,7 +248,7 @@ final class BridgeUserScripts: BridgeNamespace {
         registries[extensionID] = registry
         let saved: [String: Any] = ["scripts": registry.scripts, "worlds": registry.worlds]
         guard let data = try? JSONSerialization.data(withJSONObject: saved) else { return }
-        try? data.write(to: Self.registryFile(for: extensionID), options: .atomic)
+        try? data.write(to: registryFile(for: extensionID), options: .atomic)
     }
 }
 

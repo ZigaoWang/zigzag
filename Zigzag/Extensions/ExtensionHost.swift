@@ -277,7 +277,7 @@ final class ExtensionHost: NSObject {
     @discardableResult
     func load(_ id: String) async -> WKWebExtensionContext? {
         if let existing = context(for: id) { return existing }
-        guard let directory = ExtensionStore.loadDirectory(for: id) else { return nil }
+        guard let directory = profile.installs.loadDirectory(for: id) else { return nil }
         do {
             let ext = try await WKWebExtension(resourceBaseURL: directory)
             installed[id] = ext

@@ -79,11 +79,11 @@ final class BridgeProxy: BridgeNamespace {
 
     /// The extension whose setting applies: of those that set one, the one installed last.
     private var holder: String? {
-        settings.keys.max { Self.installed($0) < Self.installed($1) || (Self.installed($0) == Self.installed($1) && $0 < $1) }
+        settings.keys.max { installed($0) < installed($1) || (installed($0) == installed($1) && $0 < $1) }
     }
 
-    private static func installed(_ id: String) -> Date {
-        (try? ExtensionStore.folder(for: id).resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast
+    private func installed(_ id: String) -> Date {
+        (try? host.profile.installs.folder(for: id).resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast
     }
 
     /// Chrome's answer to settings.get: what applies now, and whether it's this extension's to change.
@@ -93,7 +93,7 @@ final class BridgeProxy: BridgeNamespace {
         }
         if holder == extensionID { return ["value": value, "levelOfControl": "controlled_by_this_extension"] }
         // One installed later wins, as in Chrome; one installed earlier can't take it over.
-        let level = Self.installed(extensionID) > Self.installed(holder) ? "controllable_by_this_extension" : "controlled_by_other_extensions"
+        let level = installed(extensionID) > installed(holder) ? "controllable_by_this_extension" : "controlled_by_other_extensions"
         return ["value": value, "levelOfControl": level]
     }
 
@@ -168,11 +168,11 @@ final class BridgeProxy: BridgeNamespace {
 
     // MARK: Keeping
 
-    private static func file(for id: String) -> URL { ExtensionStore.folder(for: id).appendingPathComponent("proxy.json") }
+    private func file(for id: String) -> URL { host.profile.installs.folder(for: id).appendingPathComponent("proxy.json") }
 
     private func save(_ value: [String: Any], for id: String) {
         guard let data = try? JSONSerialization.data(withJSONObject: value) else { return }
-        try? data.write(to: Self.file(for: id), options: .atomic)
+        try? data.write(to: file(for: id), options: .atomic)
     }
 
     /// A kept setting, if it's one WebKit can still follow (a file cut short, or from a build that took more, isn't).
@@ -182,7 +182,7 @@ final class BridgeProxy: BridgeNamespace {
     }
 
     private func forget(_ id: String) {
-        try? FileManager.default.removeItem(at: Self.file(for: id))
+        try? FileManager.default.removeItem(at: file(for: id))
         credentials[id] = nil
         asking = asking.filter { $0.value.extensionID != id }
         guard settings.removeValue(forKey: id) != nil else { return }
@@ -192,7 +192,7 @@ final class BridgeProxy: BridgeNamespace {
     /// At launch, before any page loads: the settings of extensions still installed and on, as they left them.
     func restore() {
         for id in host.profile.installs.installedIDs where host.profile.installs.isEnabled(id) && ExtensionStore.declaredPermissions(id).required.contains(Self.permission) {
-            guard let data = try? Data(contentsOf: Self.file(for: id)), let value = Self.setting(from: data) else { continue }
+            guard let data = try? Data(contentsOf: file(for: id)), let value = Self.setting(from: data) else { continue }
             settings[id] = value
         }
         if !settings.isEmpty { apply() }

@@ -602,12 +602,12 @@ enum ExtensionStore {
         profile.installs.unpin(id)
         profile.extensions.unload(id)
         profile.extensions.removeData(for: id)
-        if profiles(with: id).allSatisfy({ $0 === profile }) {
+        let wasTheLast = profiles(with: id).allSatisfy { $0 === profile }
+        profile.installs.remove(id)
+        if wasTheLast {
             // An unpacked extension's own folder belongs to its developer; only our record of it goes.
             try? FileManager.default.removeItem(at: folder(for: id))
             if !unpacked { removedIDs.insert(id) }
-        } else {
-            profile.installs.remove(id)
         }
         profile.extensions.forget(id)
         // Only now is it gone from disk: removing a password manager brings back the passkey fallback.
@@ -1119,13 +1119,15 @@ extension ExtensionStore {
     /// The folder WebKit loads. Usually the untouched package itself. An extension whose shim needs a
     /// background prelude gets a sibling folder of hard links to the same files, plus a manifest that runs
     /// the prelude first. The package keeps its exact bytes either way.
-    static func loadDirectory(for id: String) -> URL? {
+    /// `folder`: where the profile loading it keeps this extension's own files. Each profile has its loaded copy
+    /// there, since Zigzag writes into it (user scripts' code) for that profile alone.
+    static func loadDirectory(for id: String, copyIn folder: URL) -> URL? {
         guard let package = packageDirectory(for: id), let state = self.package(id) else { return nil }
         let shim = ExtensionShims.shim(for: id)
         let prelude = shim?.backgroundPrelude
         let patches = shim?.patches ?? []
         guard prelude != nil || !patches.isEmpty else { return package }
-        let overlay = overlayFolder(for: id, version: state.version)
+        let overlay = overlayFolder(in: folder, version: state.version)
         // What this overlay was made from: rebuilt whenever the prelude, a patch or the language fill changes.
         let signature = (prelude ?? "") + patches.map { $0.file + $0.find + $0.replace }.joined() + languageFill
         let marker = overlay.appendingPathComponent("zigzag-profile.txt")
@@ -1148,14 +1150,14 @@ extension ExtensionStore {
 
     /// The loaded copy's folder, where Zigzag may add files of its own (user scripts' code). Nil when WebKit loads the
     /// package itself, which is never written to.
-    static func overlayDirectory(for id: String) -> URL? {
+    static func overlayDirectory(for id: String, copyIn folder: URL) -> URL? {
         guard let state = package(id) else { return nil }
-        let overlay = overlayFolder(for: id, version: state.version)
+        let overlay = overlayFolder(in: folder, version: state.version)
         return FileManager.default.fileExists(atPath: overlay.appendingPathComponent("zigzag-profile.txt").path) ? overlay : nil
     }
 
-    private static func overlayFolder(for id: String, version: String) -> URL {
-        folder(for: id).appendingPathComponent("loaded", isDirectory: true).appendingPathComponent(version, isDirectory: true)
+    private static func overlayFolder(in folder: URL, version: String) -> URL {
+        folder.appendingPathComponent("loaded", isDirectory: true).appendingPathComponent(version, isDirectory: true)
     }
 
     /// JavaScript that Chrome runs and this WebKit doesn't yet: explicit resource management's Symbol.dispose and

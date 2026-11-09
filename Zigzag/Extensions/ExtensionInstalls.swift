@@ -33,18 +33,38 @@ final class ExtensionInstalls {
         case sites
     }
 
-    /// The first profile's answers have always been kept beside the package's own record, in one file.
-    private func stateFile(for id: String) -> URL { ExtensionStore.stateFile(for: id) }
+    /// Where the profile keeps what's its own about an extension: its answers, the copy WebKit loads, and what the
+    /// extension set through Zigzag (a proxy, user scripts). The first profile's have always been in the package's
+    /// own folder; another profile's are in the profile's.
+    func folder(for id: String) -> URL {
+        guard !profile.isDefault else { return ExtensionStore.folder(for: id) }
+        return profile.folder.appendingPathComponent("Extensions", isDirectory: true).appendingPathComponent(id, isDirectory: true)
+    }
+
+    private func stateFile(for id: String) -> URL { folder(for: id).appendingPathComponent("state.json") }
+
+    /// The folder WebKit loads this extension from, in this profile.
+    func loadDirectory(for id: String) -> URL? { ExtensionStore.loadDirectory(for: id, copyIn: folder(for: id)) }
+
+    /// This profile's loaded copy, where Zigzag may add files of its own; nil when WebKit loads the package itself.
+    func overlayDirectory(for id: String) -> URL? { ExtensionStore.overlayDirectory(for: id, copyIn: folder(for: id)) }
 
     func state(_ id: String) -> State? { ExtensionStore.read(State.self, from: stateFile(for: id)) }
 
     func save(_ state: State, for id: String) {
+        try? FileManager.default.createDirectory(at: folder(for: id), withIntermediateDirectories: true)
         ExtensionStore.write(state, keys: State.keys, to: stateFile(for: id))
     }
 
     /// The profile no longer has it. Its package stays for the profiles that do.
     func remove(_ id: String) {
-        ExtensionStore.remove(keys: State.keys, from: stateFile(for: id))
+        if profile.isDefault {
+            // Its file is the package's too.
+            ExtensionStore.remove(keys: State.keys, from: stateFile(for: id))
+            for name in ["loaded", "proxy.json", "UserScripts.json"] { try? FileManager.default.removeItem(at: folder(for: id).appendingPathComponent(name)) }
+        } else {
+            try? FileManager.default.removeItem(at: folder(for: id))
+        }
     }
 
     func update(_ id: String, _ change: (inout State) -> Void) {
