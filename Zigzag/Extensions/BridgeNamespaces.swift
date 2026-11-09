@@ -1119,7 +1119,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
 
     /// Says where you're looking that the extension can't hear this tab, and why, instead of it seeming broken.
     private func tellUnreachable(_ extensionID: String, in controller: BrowserWindowController) {
-        Toast.show(String(localized: "\(ExtensionHost.shared.displayName(for: extensionID)) can’t hear this tab. Streamed sound, as on YouTube, can’t reach extensions in Zigzag yet.", comment: "Toast when an extension asks to hear a tab whose sound Zigzag can't hand it on its own. The placeholder is the extension's name. YouTube is a product name."),
+        Toast.show(String(localized: "\(host.displayName(for: extensionID)) can’t hear this tab. Streamed sound, as on YouTube, can’t reach extensions in Zigzag yet.", comment: "Toast when an extension asks to hear a tab whose sound Zigzag can't hand it on its own. The placeholder is the extension's name. YouTube is a product name."),
                    symbol: "waveform.slash", duration: 5, in: controller)
     }
 
