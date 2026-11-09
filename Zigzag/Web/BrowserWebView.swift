@@ -182,7 +182,8 @@ final class BrowserWebView: WKWebView {
 // MARK: - Picture in picture
 
 /// WebKit floats a page's main playing video through a method it doesn't publish; Safari's own button uses it.
-/// Every use checks it's there first, so if it goes away the page's own button (PageScripts) still works.
+/// Every use checks it's there first, so if it goes away the page's own button still works (WebKitSetup turns the
+/// page-facing Picture in Picture on).
 extension WKWebView {
     private static let canToggle = NSSelectorFromString("_canTogglePictureInPicture")
     private static let isActive = NSSelectorFromString("_isPictureInPictureActive")
