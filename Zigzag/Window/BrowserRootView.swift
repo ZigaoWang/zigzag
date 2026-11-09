@@ -689,7 +689,7 @@ final class BrowserRootView: SpaceFrameView {
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
         let point = convert(event.locationInWindow, from: nil)
-        if point.x <= Tokens.Metric.edgeRevealWidth { reveal(true) }
+        if point.x <= Tokens.Metric.edgeRevealWidth { pointerAtEdge() }
     }
 
     /// Crossing the left edge opens the sidebar, however fast: a quick flick out of the window
@@ -697,13 +697,30 @@ final class BrowserRootView: SpaceFrameView {
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
         let point = convert(event.locationInWindow, from: nil)
-        if point.x <= Tokens.Metric.edgeRevealWidth, point.y >= bounds.minY, point.y <= bounds.maxY { reveal(true) }
+        if point.x <= Tokens.Metric.edgeRevealWidth, point.y >= bounds.minY, point.y <= bounds.maxY { pointerAtEdge() }
     }
 
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
         let point = convert(event.locationInWindow, from: nil)
-        if point.x <= Tokens.Metric.edgeRevealWidth { reveal(true) }
+        if point.x <= Tokens.Metric.edgeRevealWidth { pointerAtEdge() }
+    }
+
+    /// A breath before it opens, so touching the edge and coming straight back to the page (a web app's own list
+    /// along that side) leaves it be. Still at the edge, or gone out past it, it opens.
+    private static let edgeGrace: TimeInterval = 0.1
+    private var edgeTimer: Timer?
+
+    private func pointerAtEdge() {
+        guard edgeTimer == nil, !sidebarVisible, !sidebarRevealed else { return }
+        edgeTimer = Timer.scheduledTimer(withTimeInterval: Self.edgeGrace, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, let window = self.window else { return }
+                self.edgeTimer = nil
+                let point = self.convert(window.mouseLocationOutsideOfEventStream, from: nil)
+                if point.x <= Tokens.Metric.edgeRevealWidth, point.y >= self.bounds.minY, point.y <= self.bounds.maxY { self.reveal(true) }
+            }
+        }
     }
 
     private var pointerTimer: Timer?
