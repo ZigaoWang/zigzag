@@ -92,6 +92,20 @@ struct SecurityFixesTests {
         #expect(Tab.mayOpenInNewWebView(URL(string: "about:blank")))
         #expect(Tab.mayOpenInNewWebView(nil))
     }
+
+    @Test func aTabAPageOpenedShowsNoAddressUntilItsPageArrives() throws {
+        // WebKit makes the web view and loads the page's address itself: nothing is named until that page commits,
+        // as the page that opened it can write into it meanwhile.
+        let requested = try #require(URL(string: "https://www.google.com/generate_204"))
+        let opened = Tab(url: requested, spaceID: UUID(), configuration: WKWebViewConfiguration())
+        #expect(opened.url == nil)
+        #expect(opened.displayTitle != "www.google.com")
+        // Zigzag's own tab for an address shows it at once, as it always has.
+        #expect(Tab(url: requested, spaceID: UUID()).url == requested)
+        // Settings asked for that way never shows.
+        let settings = Tab(url: URL(string: "zigzag://settings/privacy"), spaceID: UUID(), configuration: WKWebViewConfiguration())
+        #expect(settings.url == nil && settings.settingsView == nil)
+    }
 }
 
 /// Site permissions are kept per origin (scheme, host and port), never per host: an answer given to

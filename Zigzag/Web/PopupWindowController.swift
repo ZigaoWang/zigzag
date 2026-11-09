@@ -195,7 +195,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         // browser would; only another sized window.open() is a popup of its own.
         let sized = windowFeatures.width != nil || windowFeatures.height != nil || windowFeatures.toolbarsVisibility?.boolValue == false
         if !sized, let controller = WindowManager.shared.controllers.first(where: { $0.window === parentWindow }) {
-            let tab = controller.tabManager.newTab(url: navigationAction.request.url, configuration: configuration)
+            let tab = controller.tabManager.newTab(url: nil, configuration: configuration)
             controller.window?.makeKeyAndOrderFront(nil)
             return tab.ensureWebView()
         }

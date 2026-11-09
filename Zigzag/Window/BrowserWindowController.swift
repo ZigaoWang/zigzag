@@ -1497,7 +1497,7 @@ extension BrowserWindowController: TabHost {
                 WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: tabManager.isPrivate || pending == .privateWindow)
                 return nil
             }
-            let newTab = tabManager.newTab(url: action.request.url, select: false, configuration: configuration, opener: tab)
+            let newTab = tabManager.newTab(url: nil, select: false, configuration: configuration, opener: tab)
             return newTab.ensureWebView()
         }
         // Peeked pages open their links in the card itself.
@@ -1518,7 +1518,7 @@ extension BrowserWindowController: TabHost {
         }
         let flags = action.modifierFlags
         let background = flags.contains(.command) && !flags.contains(.shift)
-        let newTab = tabManager.newTab(url: action.request.url, select: !background, configuration: configuration, opener: tab)
+        let newTab = tabManager.newTab(url: nil, select: !background, configuration: configuration, opener: tab)
         return newTab.ensureWebView()
     }
 

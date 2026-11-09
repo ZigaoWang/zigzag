@@ -127,15 +127,17 @@ final class Tab: NSObject {
     init(id: UUID = UUID(), url: URL?, title: String? = nil, spaceID: UUID, configuration: WKWebViewConfiguration? = nil,
          interactionState: Data? = nil, lastActivated: Date = Date(), createdAt: Date = Date()) {
         self.id = id
-        self.url = url
-        self.title = title ?? (SettingsPage.isSettings(url) ? String(localized: "Settings", comment: "The name of the tab showing Zigzag's Settings.") : url?.host() ?? String(localized: "New Tab", comment: "The name of a tab with no page yet."))
+        // A web view WebKit made for a page's new window shows no address until its first page arrives: the page
+        // that opened it can write into it while a load that never finishes would name another site over it.
+        self.url = configuration == nil ? url : nil
+        self.title = title ?? (SettingsPage.isSettings(self.url) ? String(localized: "Settings", comment: "The name of the tab showing Zigzag's Settings.") : self.url?.host() ?? String(localized: "New Tab", comment: "The name of a tab with no page yet."))
         self.spaceID = spaceID
         self.pendingConfiguration = configuration
         self.pendingInteractionState = interactionState
         self.lastActivated = lastActivated
         self.createdAt = createdAt
         super.init()
-        if let url { favicon = FaviconStore.shared.cachedIcon(for: url) }
+        if let url = self.url { favicon = FaviconStore.shared.cachedIcon(for: url) }
         snapshot = SnapshotStore.load(id)
         if #available(macOS 15.4, *) {
             extensionToken = changed.observe { [weak self] change in
@@ -194,6 +196,7 @@ final class Tab: NSObject {
             }
         }
         showsExtensionPage = extensionConfiguration != nil
+        openedByPage = fromWebKit
         if Self.isExtensionPage(url) { ExtensionPageErrors.attach(to: configuration) }
 
         let webView = BrowserWebView(frame: NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize), configuration: configuration)
@@ -298,13 +301,18 @@ final class Tab: NSObject {
     // MARK: Navigation
 
     func load(_ url: URL) {
-        self.url = url
-        changed.send(.url)
         // Extension pages and websites need differently set up web views; crossing over swaps it.
         if let webView, Self.isExtensionPage(url) != showsExtensionPage {
+            self.url = url
+            changed.send(.url)
             tearDown(webView)
             ensureWebView()
             return
+        }
+        // The page that opened this tab can still write into the one showing: the address waits for the new page.
+        if webView == nil || !openedByPage {
+            self.url = url
+            changed.send(.url)
         }
         let webView = ensureWebView()
         loadOwn(url, in: webView)
@@ -325,6 +333,9 @@ final class Tab: NSObject {
     private var showsExtensionPage = false
     /// A navigation the page started is on its way: its address waits until it commits (see followAddress).
     private var addressWaitsForCommit = false
+    /// Its web view was made by WebKit for a page's new window, so that page (its opener) can script it: every
+    /// address it goes to waits until it commits, Zigzag's own loads too.
+    private var openedByPage = false
     /// Zigzag itself is loading this tab (the address bar, a link from elsewhere): its address shows at once.
     private var ownLoadPending = false
     /// When the page last started a download without a click, and when a frame in it was last clicked into.
@@ -550,7 +561,8 @@ final class Tab: NSObject {
                 MainActor.assumeIsolated {
                     // A page sending the tab somewhere: the address stays on the page you see until the new one
                     // arrives, so a navigation that never completes can't show another site's name over this page.
-                    guard let self, !(self.addressWaitsForCommit && wv.isLoading) else { return }
+                    // In a tab its opener can script, Zigzag's own load waits too: WebKit names it before it starts.
+                    guard let self, !(self.addressWaitsForCommit && wv.isLoading), !(self.openedByPage && self.ownLoadPending) else { return }
                     self.followAddress(of: wv)
                 }
             },
@@ -739,7 +751,7 @@ extension Tab: WKNavigationDelegate {
             // going there: a link opened elsewhere leaves this page's blocking as it was.
             if !showsExtensionPage { ContentBlocker.apply(to: webView, for: url) }
             // Back, Forward and Reload go to pages you've had; anything else the page started waits to show.
-            addressWaitsForCommit = !ownLoadPending && ![.backForward, .reload].contains(navigationAction.navigationType)
+            addressWaitsForCommit = openedByPage || (!ownLoadPending && ![.backForward, .reload].contains(navigationAction.navigationType))
             ownLoadPending = false
         }
         return (.allow, preferences)
