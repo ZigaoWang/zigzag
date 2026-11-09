@@ -527,7 +527,7 @@ class FloatingPanelView: NSView {
     var replacesExtensionPopup: Bool { false }
 
     func present(always: Bool = false, arrival: Arrival = .pop) {
-        if replacesExtensionPopup, #available(macOS 15.4, *) { ExtensionHost.shared.closeActionPopup() }
+        if replacesExtensionPopup, #available(macOS 15.4, *) { ExtensionHost.shared.closePopups(in: window) }
         layoutSubtreeIfNeeded()
         recede(true)
         // Shown again while it was leaving: everything the exit left behind goes, so it never stays shrunk or

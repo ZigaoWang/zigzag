@@ -48,6 +48,7 @@ final class ExtensionHost: NSObject {
         super.init()
         controller.delegate = self
         watchGestures()
+        watchPopupVisibility()
     }
 
     // MARK: Loading
@@ -74,16 +75,53 @@ final class ExtensionHost: NSObject {
     /// Stops an extension: its buttons, scripts and background page go away.
     /// Whether an extension's popup is showing now (some APIs act while it's open, as in Chrome).
     func isPopupShown(for id: String) -> Bool {
-        openPopups[id]?.popover.isShown == true
+        openPopups.values.contains { $0.extensionID == id && $0.popover.isShown }
     }
 
     /// The page of the popup an extension is showing, if it is.
-    func shownPopupPage(for id: String) -> String? { isPopupShown(for: id) ? openPopups[id]?.page : nil }
+    func shownPopupPage(for id: String) -> String? {
+        openPopups.values.first { $0.extensionID == id && $0.popover.isShown }?.page
+    }
 
-    /// Closes the extension popup showing, when another of Zigzag's panels opens in its place.
-    func closeActionPopup() {
-        guard let id = lastAction?.webExtensionContext?.uniqueIdentifier, isPopupShown(for: id) else { return }
-        lastAction?.closePopup()
+    /// Whether you can see an extension's popup in this window: its pinned button there shows as active.
+    func isPopupOnScreen(_ id: String, in window: NSWindow?) -> Bool {
+        openPopups.values.contains { $0.extensionID == id && $0.window === window && $0.isOnScreen }
+    }
+
+    /// Closes the extension popups showing in a window, when another of Zigzag's panels opens in their place or a
+    /// pinned button is picked up.
+    func closePopups(in window: NSWindow?) {
+        close(openPopups.values.filter { $0.window === window })
+    }
+
+    private func closePopups(for id: String) {
+        close(openPopups.values.filter { $0.extensionID == id })
+    }
+
+    private func close(_ popups: [OpenPopup]) {
+        for popup in popups where popup.popover.isShown {
+            if let action = popup.action { action.closePopup() } else { popup.popover.close() }
+        }
+    }
+
+    /// A popup you can see keeps the slid-out sidebar it opened from out until it closes.
+    func holdsSidebar(in window: NSWindow?) -> Bool {
+        openPopups.values.contains { $0.window === window && $0.isOnScreen }
+    }
+
+    /// Whether an extension's popup in this window closed since this press began: pressing elsewhere in a window
+    /// closes a popup before the click lands, and that click shouldn't open it again. Asking the clock of the event
+    /// itself, it holds whichever order the close and the press arrive in.
+    func popupClosed(_ id: String, in window: NSWindow?, since press: NSEvent) -> Bool {
+        (popupClosedAt[PopupPlace(id, window)] ?? -1) >= press.timestamp
+    }
+
+    /// Popups opened from pinned buttons follow them when the field changes.
+    func repositionPinPopups(of controller: BrowserWindowController) {
+        for popup in openPopups.values where popup.fromPin && popup.window === controller.window && popup.popover.isShown {
+            let anchor = controller.popupAnchor(forPin: popup.extensionID)
+            if anchor.view === controller.sidebar.address { popup.popover.positioningRect = anchor.rect }
+        }
     }
 
     /// When each extension's button was last clicked.
@@ -114,6 +152,17 @@ final class ExtensionHost: NSObject {
 
     /// A click or key in one of an extension's own pages (its popup, its window, its side panel, its options) is
     /// you using it. A page's script can't make these.
+    /// A popup hidden or back in sight neither opens nor closes, but its button should show it.
+    private func watchPopupVisibility() {
+        popupOcclusionObserver = NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: nil, queue: .main) { [weak self] note in
+            nonisolated(unsafe) let window = note.object as? NSWindow
+            MainActor.assumeIsolated {
+                guard let self, self.openPopups.values.contains(where: { $0.popover.contentViewController?.view.window === window }) else { return }
+                self.popupsChanged.send()
+            }
+        }
+    }
+
     private func watchGestures() {
         gestureMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             if let self, let id = self.extensionPage(under: event) { self.use.touched(id) }
@@ -333,38 +382,71 @@ final class ExtensionHost: NSObject {
         return all
     }
 
-    private weak var actionAnchor: NSView?
-    /// The spot on it the popup points at (a corner of the page when the sidebar is hidden).
-    private var actionAnchorRect: NSRect?
+    /// A click waiting for WebKit to ask for the popup: which window it belongs to, and whether a pinned button
+    /// opened it. WebKit also asks by itself, when a page does, and then there's no request. WebKit may never ask, so
+    /// a request only counts while its window is still the one you're in.
+    private struct PopupRequest {
+        let extensionID: String
+        let fromPin: Bool
+        weak var controller: BrowserWindowController?
+    }
+    private var popupRequest: PopupRequest?
     private static var toldAboutVerification = false
     private var popupShownAt: Date?
     static let log = Logger(subsystem: "wang.zigao.zigzag", category: "extensions")
     weak var lastAction: WKWebExtension.Action?
-    /// The popup each extension is showing, and its page. Kept here rather than asked of WebKit: asking an action
-    /// for its popup makes WebKit build one (a hidden page that runs) when there isn't one.
-    private var openPopups: [String: (popover: NSPopover, page: String?)] = [:]
+    /// A popup showing. Kept here rather than asked of WebKit: asking an action for its popup makes WebKit build one
+    /// (a hidden page that runs) when there isn't one.
+    private struct OpenPopup {
+        let extensionID: String
+        weak var action: WKWebExtension.Action?
+        let popover: NSPopover
+        let page: String?
+        /// The window it opened from; the popover's own view is in a window of its own.
+        weak var window: NSWindow?
+        let fromPin: Bool
+
+        /// Open and in sight: `popover.isShown` stays true for a popup another window or a prompt has hidden.
+        var isOnScreen: Bool {
+            guard popover.isShown, let own = popover.contentViewController?.view.window else { return false }
+            return own.isVisible && own.occlusionState.contains(.visible)
+        }
+
+        /// Whether it's this tab's popup. One with no tab of its own is the extension's shared one.
+        func belongs(to tab: Tab?) -> Bool {
+            guard let owner = action?.associatedTab else { return true }
+            return owner === tab
+        }
+    }
+    /// Which extension's popup, in which window.
+    private struct PopupPlace: Hashable {
+        let extensionID: String
+        let window: ObjectIdentifier?
+        init(_ extensionID: String, _ window: NSWindow?) {
+            self.extensionID = extensionID
+            self.window = window.map(ObjectIdentifier.init)
+        }
+    }
+    /// One for each popover: an extension can have one showing per tab.
+    private var openPopups: [ObjectIdentifier: OpenPopup] = [:]
+    /// When a popup last started closing in each place, on the clock events use.
+    private var popupClosedAt: [PopupPlace: TimeInterval] = [:]
+    private var popupOcclusionObserver: NSObjectProtocol?
+    /// A popup opened or closed.
+    let popupsChanged = Signal<Void>()
     /// Watches each open popup closing, to end what it started (endCapturesWhenClosed).
-    private var popupCloseObservers: [ObjectIdentifier: NSObjectProtocol] = [:]
+    private var popupCloseObservers: [ObjectIdentifier: [NSObjectProtocol]] = [:]
     /// Extensions whose popup opened a window of their own before the popup was even shown (Sound Booster).
     private var popupReplacedByWindow: [String: Date] = [:]
 
-    func performAction(_ item: ActionItem, tab: Tab?, anchor: NSView) {
+    /// The extension's button pressed, from Site Controls or (`fromPin`) its pinned button in the address.
+    func performAction(_ item: ActionItem, tab: Tab?, in controller: BrowserWindowController, fromPin: Bool = false) {
         // Never handed a private tab, nor given its site.
         guard tab?.isPrivate != true else { return }
-        var anchor = anchor
-        var anchorRect = anchor.bounds
-        // From the site panel: the panel steps aside and the popup opens from the address bar, where it stays put.
-        var inPanel: NSView? = anchor.superview
-        while let view = inPanel, !(view is SitePanel) { inPanel = view.superview }
-        if let panel = inPanel as? SitePanel, let controller = WindowManager.shared.controllers.first(where: { $0.window === anchor.window }) {
-            panel.close()
-            (anchor, anchorRect) = controller.addressAnchor
-        }
-        actionAnchor = anchor
-        actionAnchorRect = anchorRect
+        popupRequest = nil
         // Its own popup always opens; if it still needs a step only you can do (1Password trusting Zigzag), a
         // short note says so, with the way there.
-        if let attention = item.attention, let controller = WindowManager.shared.controllers.first(where: { $0.window === anchor.window }) {
+        if let attention = item.attention {
             let open: (title: String, run: () -> Void)? = attention.appBundleID.map { id in
                 (attention.buttonTitle, {
                     if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
@@ -389,26 +471,30 @@ final class ExtensionHost: NSObject {
         let hasPopup = context.action(for: tab)?.presentsPopup ?? false
         ExtensionLog.write("click \(context.webExtension.displayName ?? "?") popup=\(hasPopup)")
         // Its popup already open: the click closes it, as in Chrome. One open but out of sight (hidden when another
-        // window or a prompt came up) would leave every click doing nothing: it's closed and opened again.
-        if hasPopup, let open = openPopups[item.id], open.popover.isShown, let action = context.action(for: tab) {
-            let window = open.popover.contentViewController?.view.window
+        // window or a prompt came up) would leave every click doing nothing: it's closed and opened again. So is
+        // another tab's, left up after switching: this press is for the tab you're on.
+        if hasPopup, let open = openPopups.values.first(where: { $0.extensionID == item.id && $0.window === controller.window && $0.popover.isShown }) {
             // Either way that opening is over: on screen the click closes it; out of sight a new one replaces it.
             if let page = open.page {
                 let capture = ExtensionBridge.shared.tabCapture
                 capture.popupClosed(item.id, page: page, opening: capture.currentOpening(item.id))
             }
-            if window?.isVisible == true, window?.occlusionState.contains(.visible) == true {
-                action.closePopup()
-                return
+            if open.isOnScreen {
+                close([open])
+                if open.belongs(to: tab) { return }
             }
         }
+        // From Site Controls or anywhere else in the window, what was open steps aside for what's opening.
+        controller.closeFloatingPanels()
         actionClicks[item.id] = Date()
         noteInvocation(item.id, tab: tab)
         // Its side panel, when that's what its button opens.
-        let controller = WindowManager.shared.controllers.first { $0.window === anchor.window } ?? WindowManager.shared.keyController
         if ExtensionBridge.shared.sidePanel.handleClick(item.id, hasPopup: hasPopup, in: controller) { return }
         // A new opening of its popup starts here: its page runs (and may capture the tab) before it's shown.
-        if hasPopup { _ = ExtensionBridge.shared.tabCapture.popupOpened(item.id) }
+        if hasPopup {
+            _ = ExtensionBridge.shared.tabCapture.popupOpened(item.id)
+            popupRequest = PopupRequest(extensionID: item.id, fromPin: fromPin, controller: controller)
+        }
         context.performAction(for: tab)
         if hasPopup {
             // WebKit keeps its own note that the popup is up, and won't ask to show it again until that's cleared: a
@@ -653,7 +739,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             if configuration.shouldBeFocused == false {
                 WindowManager.shared.keyController?.window?.makeKeyAndOrderFront(nil)
             } else if isPopupShown(for: extensionContext.uniqueIdentifier) {
-                closeActionPopup()
+                closePopups(for: extensionContext.uniqueIdentifier)
             } else if Date().timeIntervalSince(lastActionClick(extensionContext.uniqueIdentifier)) < 3 {
                 popupReplacedByWindow[extensionContext.uniqueIdentifier] = Date()
             }
@@ -752,6 +838,9 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
                                 for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         lastAction = action
         popupShownAt = Date()
+        // Answering the click that asked for it, or (no request) a page asking by itself.
+        let request = popupRequest?.extensionID == context.uniqueIdentifier ? popupRequest : nil
+        if request != nil { popupRequest = nil }
         ExtensionLog.write("popup \(context.webExtension.displayName ?? "?") has=\(action.popupPopover != nil)")
         guard let popover = action.popupPopover else { completionHandler(nil); return }
         if let replaced = popupReplacedByWindow.removeValue(forKey: context.uniqueIdentifier), Date().timeIntervalSince(replaced) < 3 {
@@ -762,47 +851,54 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         // Asked for from a sign-in popup (1Password's "Unlock" in a field there, or its shortcut): it opens over that
         // popup. From the window behind, it would be out of sight and close at the first click back in the popup.
         if let popup = (action.associatedTab as? PopupTab)?.popup ?? PopupWindowController.key, popup.window?.isVisible == true {
-            endCapturesWhenClosed(popover, action: action, extensionID: context.uniqueIdentifier)
+            endCapturesWhenClosed(popover, action: action, extensionID: context.uniqueIdentifier, window: popup.window, fromPin: false)
             popup.showExtensionPopover(popover)
+            popupsChanged.send()
             completionHandler(nil)
             return
         }
-        // Asked by the page (1Password's "Unlock" button) rather than a click: the button pressed last may be
-        // gone with its panel, so the popup comes from the address bar instead of not at all.
-        let pressed = actionAnchor.flatMap { $0.window != nil ? $0 : nil }
+        // Asked by the page (1Password's "Unlock" button) rather than a click, it comes from the address bar of the
+        // window you're in.
         let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first
-        let fallback = controller?.addressAnchor
-        let rect = pressed != nil ? (actionAnchorRect ?? pressed!.bounds) : (fallback?.rect ?? .zero)
-        guard let anchor = pressed ?? fallback?.view, anchor.window != nil else {
+        let fromPin = request?.fromPin == true && request?.controller === controller
+        guard let place = controller?.popupAnchor(forPin: fromPin ? context.uniqueIdentifier : nil), place.view.window != nil else {
             completionHandler(NSError(domain: "Zigzag", code: 2, userInfo: [NSLocalizedDescriptionKey: "No window to show the popup in"]))
             return
         }
-        if pressed == nil { controller?.closeFloatingPanels() }
+        // A popup takes the place of an open panel, as a panel takes a popup's.
+        controller?.closeFloatingPanels()
         popover.behavior = .semitransient
-        endCapturesWhenClosed(popover, action: action, extensionID: context.uniqueIdentifier)
-        popover.show(relativeTo: rect, of: anchor, preferredEdge: .maxY)
+        endCapturesWhenClosed(popover, action: action, extensionID: context.uniqueIdentifier, window: place.view.window, fromPin: fromPin)
+        popover.show(relativeTo: place.rect, of: place.view, preferredEdge: .maxY)
+        popupsChanged.send()
         completionHandler(nil)
     }
 
     /// However a popup closes (a click elsewhere, its button, the page itself), a tab capture it made ends with it,
     /// as in Chrome, where closing the popup ends its page.
-    private func endCapturesWhenClosed(_ popover: NSPopover, action: WKWebExtension.Action, extensionID: String) {
+    private func endCapturesWhenClosed(_ popover: NSPopover, action: WKWebExtension.Action, extensionID: String, window: NSWindow?, fromPin: Bool) {
         let key = ObjectIdentifier(popover)
-        if let old = popupCloseObservers.removeValue(forKey: key) { NotificationCenter.default.removeObserver(old) }
+        popupCloseObservers.removeValue(forKey: key)?.forEach(NotificationCenter.default.removeObserver)
         // Read now, while WebKit is showing it: asked for after it closes, WebKit would make a new popup page to answer.
         let page = action.popupWebView?.url?.path
-        openPopups[extensionID] = (popover, page)
+        openPopups[key] = OpenPopup(extensionID: extensionID, action: action, popover: popover, page: page, window: window, fromPin: fromPin)
         let opening = ExtensionBridge.shared.tabCapture.currentOpening(extensionID)
-        popupCloseObservers[key] = NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self, weak popover] _ in
+        let place = PopupPlace(extensionID, window)
+        let closing = NotificationCenter.default.addObserver(forName: NSPopover.willCloseNotification, object: popover, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.popupClosedAt[place] = ProcessInfo.processInfo.systemUptime }
+        }
+        let closed = NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self, weak popover] _ in
             MainActor.assumeIsolated {
                 // WebKit shows the same popover again for a new opening; a late notice for the last one is passed over.
                 guard popover?.isShown != true else { return }
-                if let observer = self?.popupCloseObservers.removeValue(forKey: key) { NotificationCenter.default.removeObserver(observer) }
-                if self?.openPopups[extensionID]?.popover === popover { self?.openPopups[extensionID] = nil }
+                self?.popupCloseObservers.removeValue(forKey: key)?.forEach(NotificationCenter.default.removeObserver)
+                self?.openPopups[key] = nil
+                self?.popupsChanged.send()
                 guard let page else { return }
                 ExtensionBridge.shared.tabCapture.popupClosed(extensionID, page: page, opening: opening)
             }
         }
+        popupCloseObservers[key] = [closing, closed]
     }
 
     // MARK: Native messaging (the extension talking to the 1Password app)

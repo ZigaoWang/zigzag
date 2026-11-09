@@ -240,9 +240,9 @@ final class SitePanel: FloatingPanelView {
             // Attention first: the badge takes its look from it.
             tile.isAttention = item.attention != nil
             tile.badge = item.attention != nil ? "!" : item.badge
-            tile.onClick = { [weak self, weak tile] _ in
-                guard let self, let tile else { return }
-                ExtensionHost.shared.performAction(item, tab: self.tab, anchor: tile)
+            tile.onClick = { [weak self] _ in
+                guard let self, let controller = self.controller else { return }
+                ExtensionHost.shared.performAction(item, tab: self.tab, in: controller)
             }
             tile.onRightClick = { [weak self] _ in self?.controller?.extensionMenu(for: item.context) }
             addSubview(tile)

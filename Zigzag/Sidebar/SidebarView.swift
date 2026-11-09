@@ -101,6 +101,9 @@ final class AddressView: InteractiveView {
     /// The pins showing now, left to right. Those that don't fit wait in Site Controls.
     private(set) var visiblePinIDs: [String] = []
 
+    /// Pinned buttons moved, or some started or stopped showing.
+    var onPinsMoved: (() -> Void)?
+
     func pinButton(for id: String) -> IconButton? { pinEntries.first { $0.pin.id == id }?.button }
 
     /// The pins as they are now, left to right.
@@ -284,7 +287,9 @@ final class AddressView: InteractiveView {
         // The one furthest from Site Controls gives way first.
         let showing = pinEntries.suffix(fit)
         for entry in pinEntries.dropLast(fit) { takeAway(entry.button, animated: animated, removing: false) }
+        let movesPins = visiblePinIDs != showing.map(\.pin.id)
         visiblePinIDs = showing.map(\.pin.id)
+        let pinFramesBefore = showing.map(\.button.frame)
 
         let trailing = others + showing.map(\.button) + [siteControlsButton]
         var right = bounds.width - inset
@@ -298,6 +303,7 @@ final class AddressView: InteractiveView {
             place(button, at: frame, animated: animated)
             right = frame.minX - 2
         }
+        if movesPins || pinFramesBefore != showing.map(\.button.frame) { onPinsMoved?() }
 
         let h = ceil(label.intrinsicContentSize.height)
         let labelFrame = NSRect(x: x - Label.inset, y: (bounds.height - h) / 2, width: right - Tokens.Space.x1 - x + Label.inset * 2, height: h)
