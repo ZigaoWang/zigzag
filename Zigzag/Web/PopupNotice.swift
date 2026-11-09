@@ -4,61 +4,67 @@ import WebKit
 /// Pop-ups a page opens on its own, without a click, are blocked, as in every browser. Rather than failing in silence
 /// (a payment or a sign-in that just doesn't appear), Zigzag says so and offers to allow them.
 @MainActor
-final class PopupNotice: NSObject, WKScriptMessageHandler {
-    static let shared = PopupNotice()
-    private static let messageName = "zigzagPopupBlocked"
-    private static let marker = "/* zigzag popups */"
+enum PopupNotice {
+    /// Nothing to add to the page. A blocked pop-up used to be reported by a script in the page's own world, which
+    /// the page could post to as often as it liked; now it's seen where WebKit asks for the window (`allows`),
+    /// which only a real window.open() reaches. Still called as a web view is set up.
+    static func attach(to configuration: WKWebViewConfiguration) {}
 
-    /// Only the page itself reports, not frames in it: blocked pop-ups from ads stay quietly blocked.
-    static func attach(to configuration: WKWebViewConfiguration) {
-        let controller = configuration.userContentController
-        guard !controller.userScripts.contains(where: { $0.source.hasPrefix(marker) }) else { return }
-        controller.addUserScript(WKUserScript(source: marker + "\n" + shim, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))
-        controller.add(shared, contentWorld: .page, name: messageName)
+    /// When each window last said a site's pop-up was blocked: once every few seconds is enough, so a page that
+    /// opens window after window can't keep the toast coming up under the pointer.
+    private static var lastNotice: [String: Date] = [:]
+    static let noticeInterval: TimeInterval = 10
+
+    /// Whether to say so now for `key` (a window and a site); if so, it's noted that it did.
+    static func shouldNotice(_ key: String, now: Date = Date()) -> Bool {
+        lastNotice = lastNotice.filter { now.timeIntervalSince($0.value) < noticeInterval }
+        guard lastNotice[key] == nil else { return false }
+        lastNotice[key] = now
+        return true
     }
 
-    private static let shim = """
-    (() => {
-      const open = window.open;
-      let last = 0;
-      window.open = function (url, ...rest) {
-        const opened = open.call(window, url, ...rest);
-        // Reported with no address too: pages often open an empty window, then send it where it goes.
-        if (!opened && Date.now() - last > 1500) {
-          last = Date.now();
-          try { window.webkit.messageHandlers.\(messageName).postMessage(url ? String(new URL(url, location.href)) : ''); } catch (_) {}
-        }
-        return opened;
-      };
-    })();
-    """
+    /// Whether a blocked pop-up is one to say anything about, and the address to offer: a web page's, or none
+    /// (pages often open an empty window, then send it where it goes). Anything else (javascript:, data:) stays
+    /// quietly blocked.
+    static func offered(_ url: URL?) -> (say: Bool, url: URL?) {
+        guard let url, !url.absoluteString.isEmpty, url.absoluteString != "about:blank" else { return (true, nil) }
+        return ["http", "https"].contains(url.scheme?.lowercased() ?? "") ? (true, url) : (false, nil)
+    }
 
-    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.frameInfo.isMainFrame, let text = message.body as? String else { return }
-        let url = URL(string: text).flatMap { ["http", "https"].contains($0.scheme?.lowercased() ?? "") ? $0 : nil }
-        guard url != nil || text.isEmpty else { return }
-        // From a sign-in popup's own page: said in the browser window behind it, the one that opened it.
-        if let popup = PopupWindowController.all.first(where: { $0.webView === message.webView }) {
-            guard let browser = popup.parentWindow?.windowController as? BrowserWindowController else { return }
-            Self.blocked(url, from: popup.webView.url, opener: nil, in: browser)
-            return
+    /// Only the page itself reports, not frames in it: blocked pop-ups from ads stay quietly blocked.
+    private static func report(_ action: WKNavigationAction, from page: URL?) {
+        let source: WKFrameInfo? = action.sourceFrame
+        guard let source, source.isMainFrame, let webView = source.webView else { return }
+        let (say, url) = offered(action.request.url)
+        guard say else { return }
+        let site = SiteOrigin.of(page) ?? ""
+        // Said once WebKit has its answer, not while it waits for one.
+        Task { @MainActor [weak webView] in
+            guard let webView else { return }
+            // From a sign-in popup's own page: said in the browser window behind it, the one that opened it.
+            if let popup = PopupWindowController.all.first(where: { $0.webView === webView }) {
+                guard let browser = popup.parentWindow?.windowController as? BrowserWindowController,
+                      shouldNotice("\(ObjectIdentifier(browser))|\(site)") else { return }
+                blocked(url, from: page, opener: nil, in: browser)
+                return
+            }
+            guard let webView = webView as? BrowserWebView, let tab = webView.owner,
+                  let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === tab } }),
+                  shouldNotice("\(ObjectIdentifier(controller))|\(site)") else { return }
+            blocked(url, from: page, opener: tab, in: controller)
         }
-        guard let webView = message.webView as? BrowserWebView, let tab = webView.owner,
-              let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === tab } }) else { return }
-        // It did open, the page just doesn't get it back (noopener).
-        if let opened = tab.lastOpenedWindow, Date().timeIntervalSince(opened) < 2 { return }
-        Self.blocked(url, from: tab.url, opener: tab, in: controller)
     }
 
     /// Whether a page may open the window it asks for. WebKit hands every request here (its own blocker is off, as
     /// it can only say yes or no for every site at once): one that comes from a click opens, and so does any from a
     /// site you've allowed pop-ups for, as a real pop-up the page can talk to. That's what sign-ins need, such as
     /// Teams asking for permission after a click inside one of its apps, a step WebKit no longer counts as the
-    /// click. Anything else returns nothing, and the page's own script reports it blocked.
+    /// click. Anything else returns nothing, and is said to be blocked.
     static func allows(_ action: WKNavigationAction, from page: URL?, isPrivate: Bool) -> Bool {
         if isUserInitiated(action) { return true }
-        guard !isPrivate, let origin = SiteOrigin.of(page) else { return false }
-        return SitePermissions.popups(origin: origin)
+        if !isPrivate, let origin = SiteOrigin.of(page), SitePermissions.popups(origin: origin) { return true }
+        report(action, from: page)
+        return false
     }
 
     /// WebKit's own record of whether a click or a key started it (not public API, but long-standing); without
