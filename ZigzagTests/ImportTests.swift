@@ -203,3 +203,46 @@ struct SafariExportTests {
         #expect(SafariImporter.decodeEntities("R&D & more &bogus;") == "R&D & more &bogus;")
     }
 }
+
+/// Importing the same profile again: what its space already has stays once, and a space deleted since comes back.
+struct ImportAgainTests {
+    static let name = "From Chrome (A)"
+    static let bookmarks = [ImportBatch.Bookmark(url: URL(string: "https://example.com/")!, title: "Example"),
+                            ImportBatch.Bookmark(url: URL(string: "https://example.org/")!, title: "Example Org", folders: ["Work"])]
+    static let personal = SpaceInfo(name: "Personal", color: .sky)
+
+    /// The space as an import of `bookmarks` leaves it.
+    static func imported(_ new: [ImportBatch.Bookmark]) -> SpaceInfo {
+        var space = SpaceInfo(name: name, color: .mint)
+        space.bookmarks = new.map { Bookmark(url: $0.url, title: $0.title) }
+        return space
+    }
+
+    @Test func aDeletedSpaceComesBackWithItsPages() {
+        let first = ImportCoordinator.merged(Self.bookmarks, into: [Self.personal], named: Self.name)
+        #expect(first.space == nil)
+        #expect(first.new.count == 2)
+        // Deleted: only Personal is left, so all of it is new again, its folder too.
+        let space = Self.imported(first.new)
+        let again = ImportCoordinator.merged(Self.bookmarks, into: [Self.personal, space].filter { $0.id != space.id }, named: Self.name)
+        #expect(again.space == nil)
+        #expect(again.new.map(\.title) == ["Example", "Example Org"])
+        #expect(again.new.last?.folders == ["Work"])
+    }
+
+    @Test func importingTwiceAddsNothingTwice() {
+        let space = Self.imported(ImportCoordinator.merged(Self.bookmarks, into: [Self.personal], named: Self.name).new)
+        let same = ImportBatch.Bookmark(url: URL(string: "http://www.example.com")!, title: "Same page")
+        let again = ImportCoordinator.merged(Self.bookmarks + [same], into: [Self.personal, space], named: Self.name)
+        #expect(again.space?.id == space.id)
+        #expect(again.new.isEmpty)
+    }
+
+    /// A finished Import window asked for again starts over, so importing again really imports.
+    @Test func aFinishedImportWindowStartsOver() {
+        #expect(ImportWindowController.startsOver(.done))
+        #expect(!ImportWindowController.startsOver(.choose))
+        #expect(!ImportWindowController.startsOver(.importing))
+        #expect(!ImportWindowController.startsOver(nil))
+    }
+}

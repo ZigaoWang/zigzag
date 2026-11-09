@@ -423,18 +423,22 @@ enum ImportCoordinator {
     /// Bookmarks go into a space of their own ("From Chrome"), so nothing already here gets crowded.
     private static func addBookmarks(_ bookmarks: [ImportBatch.Bookmark], from name: String) -> Int {
         let spaceName = String(localized: "From \(name)", comment: "Name of the space imported bookmarks go into. The placeholder is a browser's name: From Chrome.")
-        let space = Library.shared.spaces.first { $0.name == spaceName } ?? Library.shared.addSpace(name: spaceName)
-        var known = Set((Library.shared.spaces.first { $0.id == space.id }?.bookmarks ?? []).map { TabManager.normalize($0.url) })
-        var new: [(url: URL, title: String)] = [], paths: [[String]] = []
-        for bookmark in bookmarks where known.insert(TabManager.normalize(bookmark.url)).inserted {
-            new.append((bookmark.url, bookmark.title))
-            paths.append(bookmark.folders)
-        }
+        let merge = merged(bookmarks, into: Library.shared.spaces, named: spaceName)
+        guard !merge.new.isEmpty else { return 0 }
+        let space = merge.space ?? Library.shared.addSpace(name: spaceName)
         // All in one change: thousands of bookmarks one at a time would redraw every window thousands of times. Their
         // folders come over as folders.
-        let added = Library.shared.appendBookmarks(new, to: space.id, folders: paths)
+        let added = Library.shared.appendBookmarks(merge.new.map { ($0.url, $0.title) }, to: space.id, folders: merge.new.map(\.folders))
         // Icons for the first ones now; the sidebar fetches the rest for the rows it shows.
         for bookmark in added.prefix(40) { FaviconStore.shared.prefetch(for: bookmark.url) }
         return added.count
+    }
+
+    /// What importing bookmarks again adds: only the pages its space doesn't have yet, once each. With that space
+    /// deleted, `space` is nil and everything is new, so the space comes back whole.
+    static func merged(_ bookmarks: [ImportBatch.Bookmark], into spaces: [SpaceInfo], named spaceName: String) -> (space: SpaceInfo?, new: [ImportBatch.Bookmark]) {
+        let space = spaces.first { $0.name == spaceName }
+        var known = Set((space?.bookmarks ?? []).map { TabManager.normalize($0.url) })
+        return (space, bookmarks.filter { known.insert(TabManager.normalize($0.url)).inserted })
     }
 }

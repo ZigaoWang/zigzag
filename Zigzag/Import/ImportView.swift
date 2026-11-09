@@ -659,7 +659,13 @@ final class ImportWindowController: NSWindowController, NSWindowDelegate {
     static var shared: ImportWindowController?
 
     static func show() {
-        if let shared { shared.window?.makeKeyAndOrderFront(nil); return }
+        if let shared {
+            // A finished import left open behind the browser starts over when asked for again: brought back as it
+            // was, it showed the last result as if it had just imported, and its Done imported nothing (a space
+            // deleted since stayed gone).
+            guard Self.startsOver((shared.window?.contentView as? ImportView)?.stage) else { shared.window?.makeKeyAndOrderFront(nil); return }
+            shared.window?.close()
+        }
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 560), styleMask: [.titled, .closable, .fullSizeContentView],
                               backing: .buffered, defer: true)
         window.titlebarAppearsTransparent = true
@@ -685,6 +691,10 @@ final class ImportWindowController: NSWindowController, NSWindowDelegate {
         shared = controller
         controller.showWindow(nil)
     }
+
+    /// Whether the Import window, asked for again, opens afresh: once its import is done. Choosing or importing,
+    /// it comes forward as it is.
+    static func startsOver(_ stage: ImportView.Stage?) -> Bool { stage == .done }
 
     func windowWillClose(_ notification: Notification) { Self.shared = nil }
 }
