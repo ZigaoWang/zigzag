@@ -305,13 +305,7 @@ enum ExtensionStore {
         defer { try? FileManager.default.removeItem(at: zipFile) }
         do {
             try package.zip.write(to: zipFile)
-            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
-            let unzip = Process()
-            unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-            unzip.arguments = ["-x", "-k", zipFile.path, staging.path]
-            try unzip.run()
-            unzip.waitUntilExit()
-            guard unzip.terminationStatus == 0, let version = manifestVersion(in: staging) else {
+            guard extract(zipFile, into: staging), let version = manifestVersion(in: staging) else {
                 try? FileManager.default.removeItem(at: staging)
                 return .failure(.unpack)
             }
@@ -320,6 +314,45 @@ enum ExtensionStore {
             try? FileManager.default.removeItem(at: staging)
             return .failure(.unpack)
         }
+    }
+
+    /// Unzips a package into a new folder, and keeps it only if every entry is a plain file or folder inside it: a
+    /// link in the package (to a file elsewhere on the Mac) would let the extension read that file as its own.
+    nonisolated static func extract(_ zipFile: URL, into folder: URL) -> Bool {
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let unzip = Process()
+            unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+            unzip.arguments = ["-x", "-k", zipFile.path, folder.path]
+            try unzip.run()
+            unzip.waitUntilExit()
+            guard unzip.terminationStatus == 0, holdsOnlyItsOwnFiles(folder) else {
+                try? FileManager.default.removeItem(at: folder)
+                return false
+            }
+            return true
+        } catch {
+            try? FileManager.default.removeItem(at: folder)
+            return false
+        }
+    }
+
+    /// Whether everything in the folder is a plain file or folder of its own: no symbolic link, no hard link shared
+    /// with a file elsewhere, nothing that resolves outside it.
+    nonisolated static func holdsOnlyItsOwnFiles(_ folder: URL) -> Bool {
+        let root = folder.resolvingSymlinksInPath().standardizedFileURL.path + "/"
+        let keys: [URLResourceKey] = [.isSymbolicLinkKey, .isRegularFileKey, .isDirectoryKey]
+        guard let walk = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: keys, options: [], errorHandler: { _, _ in false }) else { return false }
+        for case let url as URL in walk {
+            guard let values = try? url.resourceValues(forKeys: Set(keys)), values.isSymbolicLink != true,
+                  values.isRegularFile == true || values.isDirectory == true,
+                  url.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(root) else { return false }
+            if values.isRegularFile == true {
+                let links = (try? FileManager.default.attributesOfItem(atPath: url.path)[.referenceCount] as? Int) ?? 0
+                guard links == 1 else { return false }
+            }
+        }
+        return true
     }
 
     /// Moves a downloaded package into its version folder.
