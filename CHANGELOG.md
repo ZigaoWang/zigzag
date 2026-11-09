@@ -5,6 +5,23 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-11-09
+
+### Fixed
+- ← and → no longer play the error sound on pages that use them themselves, like seeking on YouTube.
+
+### Security
+- A page can't open Zigzag's Settings or History, in a new tab or by going back.
+- A tab a page opens shows no address until a page really arrives in it, so it can't pose as another site.
+- Visit Anyway on a certificate warning needs your own click on that warning.
+- The password menu opens only when you click or tab into a field, and ignores clicks for its first moment. Logins from other parts of a site wait behind their own row.
+- Zigzag offers to save only passwords you typed. A site's sign-in sheet fills in only the password saved for that exact address, and Fill from My Card fills only the fields you can see.
+- Extensions stay out of private windows, and listen to a tab's sound only after you use them on that tab.
+- An extension asks before it gets more access after you install it, opens downloads only after a click, and packages that hold file links aren't installed.
+- Camera, microphone and location answers for a site embedded in another stay with that page.
+- The Pop-up Blocked notice and other notices ignore clicks for their first half second, so a page can't time a misclick onto them.
+- Exported passwords can't run as spreadsheet formulas, imported Chrome cookies keep their cross-site protection, and copies left by an interrupted import are cleared at launch.
+
 ## [0.7.4] - 2026-11-09
 
 ### New
