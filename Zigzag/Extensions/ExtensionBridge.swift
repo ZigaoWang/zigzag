@@ -13,26 +13,37 @@ import WebKit
 @available(macOS 15.4, *)
 @MainActor
 final class ExtensionBridge {
-    static let shared = ExtensionBridge()
-    static let host = "zigzag.bridge"
+    /// The name extensions' scripts send their calls to.
+    static let hostName = "zigzag.bridge"
 
+    /// The extensions it answers: one profile's. What a namespace keeps by an extension's ID is kept here, so two
+    /// profiles' copies of the same extension never see each other's.
+    unowned let host: ExtensionHost
     private let namespaces: [String: any BridgeNamespace]
     /// Side panels, which the toolbar's click handling asks first (ExtensionHost.performAction).
-    let sidePanel = BridgeSidePanel()
+    let sidePanel: BridgeSidePanel
     /// Offscreen pages, which runtime.getContexts reports.
-    let offscreen = BridgeOffscreen()
+    let offscreen: BridgeOffscreen
     /// Tab capture, whose captures end with the popup that made them.
-    let tabCapture = BridgeTabCapture()
+    let tabCapture: BridgeTabCapture
     /// Proxy settings, put back at launch before any page loads.
-    let proxy = BridgeProxy()
+    let proxy: BridgeProxy
     /// Sites' own sign-ins, which extensions' onAuthRequired listeners may answer before the sheet asks.
-    let webRequest = BridgeWebRequest()
+    let webRequest: BridgeWebRequest
     /// Open event ports, by extension, with the events each has listeners for.
     private var ports: [ObjectIdentifier: (port: WKWebExtension.MessagePort, id: String, events: Set<String>)] = [:]
 
-    private init() {
-        let all: [any BridgeNamespace] = [BridgeHistory(), BridgeTopSites(), BridgeBookmarks(), BridgeDownloads(), BridgeNotifications(), BridgeIdle(), BridgeDisplay(), BridgeContexts(), BridgeRuntime(), BridgeFavicons(),
-                                          BridgeSpeech(), BridgePower(), offscreen, BridgeIdentity(), sidePanel, tabCapture, BridgeUserScripts(), proxy, webRequest]
+    init(host: ExtensionHost) {
+        self.host = host
+        sidePanel = BridgeSidePanel(host: host)
+        offscreen = BridgeOffscreen(host: host)
+        tabCapture = BridgeTabCapture(host: host)
+        proxy = BridgeProxy(host: host)
+        webRequest = BridgeWebRequest(host: host)
+        let others: [any BridgeNamespace.Type] = [BridgeHistory.self, BridgeTopSites.self, BridgeBookmarks.self, BridgeDownloads.self, BridgeNotifications.self, BridgeIdle.self,
+                                                  BridgeDisplay.self, BridgeContexts.self, BridgeRuntime.self, BridgeSpeech.self, BridgePower.self, BridgeIdentity.self,
+                                                  BridgeUserScripts.self, BridgeFavicons.self]
+        let all: [any BridgeNamespace] = others.map { $0.init(host: host) } + [offscreen, sidePanel, tabCapture, proxy, webRequest]
         namespaces = Dictionary(uniqueKeysWithValues: all.map { (type(of: $0).name, $0) })
     }
 
@@ -75,8 +86,8 @@ final class ExtensionBridge {
     }
 
     /// The same, by the extension's ID, for namespaces that check a further permission ("downloads.open").
-    static func allows(_ permission: String, for extensionID: String) -> Bool {
-        ExtensionHost.shared.context(for: extensionID).map { allows(permission, for: $0) } ?? false
+    func allows(_ permission: String, for extensionID: String) -> Bool {
+        host.context(for: extensionID).map { Self.allows(permission, for: $0) } ?? false
     }
 
     // MARK: Events
@@ -190,6 +201,8 @@ protocol BridgeNamespace: AnyObject {
     static var name: String { get }
     /// The manifest permission an extension needs to use it.
     static var permission: String { get }
+    /// Made for one profile's extensions.
+    init(host: ExtensionHost)
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any?
     /// Something now listens to this namespace's events: start watching for them, if it needs to.
     func startEvents()
@@ -215,4 +228,40 @@ extension Dictionary where Key == String, Value == Any {
     func number(_ key: String) -> Double? { (self[key] as? NSNumber)?.doubleValue }
     /// Chrome's times are milliseconds since 1970.
     func date(_ key: String) -> Date? { number(key).map { Date(timeIntervalSince1970: $0 / 1000) } }
+}
+
+/// The name macOS knows an extension's notification by: whose it is, so a click on it reaches the extension that made
+/// it, in the profile it's in. The first profile's keep the form they've always had.
+nonisolated struct ExtensionNotificationKey: Equatable {
+    static let prefix = "ext|"
+    /// Nil for the first profile.
+    var profile: UUID?
+    var extensionID: String
+    var id: String
+
+    init(profile: UUID?, extensionID: String, id: String) {
+        self.profile = profile
+        self.extensionID = extensionID
+        self.id = id
+    }
+
+    /// From a notification's name; nil if it isn't an extension's. An extension's ID is never a UUID, so a UUID in
+    /// first place is a profile.
+    init?(_ string: String) {
+        guard string.hasPrefix(Self.prefix) else { return nil }
+        let rest = string.dropFirst(Self.prefix.count)
+        let first = rest.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+        guard first.count == 2 else { return nil }
+        if let profile = UUID(uuidString: first[0]) {
+            let parts = first[1].split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+            guard parts.count == 2 else { return nil }
+            self.init(profile: profile, extensionID: parts[0], id: parts[1])
+        } else {
+            self.init(profile: nil, extensionID: first[0], id: first[1])
+        }
+    }
+
+    var string: String {
+        Self.prefix + (profile.map { "\($0.uuidString)|" } ?? "") + "\(extensionID)|\(id)"
+    }
 }

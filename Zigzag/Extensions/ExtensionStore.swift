@@ -265,7 +265,7 @@ enum ExtensionStore {
         // An extension engine whose extension went while Zigzag was closed: the one you had before.
         ExtensionSearchProvider.reconcile()
         // An extension's proxy applies from the first page on, not from when its background has started again.
-        ExtensionBridge.shared.proxy.restore()
+        ExtensionHost.shared.bridge.proxy.restore()
         Task {
             await migrateLegacyInstalls()
             // An extension that went while Zigzag was closed takes its pin with it.

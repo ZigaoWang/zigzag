@@ -22,6 +22,9 @@ import CryptoKit
 final class BridgeUserScripts: BridgeNamespace {
     static let name = "userScripts"
     static let permission = "userScripts"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
     /// The folder in the extension's loaded copy that the files go in.
     static let folderName = "zigzag-user-scripts"
 

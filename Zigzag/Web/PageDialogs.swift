@@ -224,8 +224,10 @@ enum AuthenticationPrompt {
     /// they're asked once more, as in Chrome; after that only the sheet asks, so a wrong answer can't go round and round.
     @MainActor
     private static func askExtensions(_ challenge: URLAuthenticationChallenge, page: WKWebView?, tab: (any WKWebExtensionTab)?) async -> BridgeWebRequest.Answer {
-        guard challenge.previousFailureCount < 2, let site = SiteChallenge(challenge, pageURL: page?.url) else { return .none }
-        return await ExtensionBridge.shared.webRequest.askForSignIn(site, tab: tab)
+        // The extensions of the profile the page is in: another profile's never hear of its sign-ins.
+        guard challenge.previousFailureCount < 2, let page, let site = SiteChallenge(challenge, pageURL: page.url),
+              let host = (page as? BrowserWebView)?.owner?.extensionHost ?? Profiles.shared.profile(of: page)?.extensions else { return .none }
+        return await host.bridge.webRequest.askForSignIn(site, tab: tab)
     }
 
     @MainActor

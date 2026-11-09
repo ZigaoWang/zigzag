@@ -24,6 +24,8 @@ final class ExtensionHost: NSObject {
     private(set) var contexts: [WKWebExtensionContext] = []
     /// Fires when extensions load or their toolbar actions change.
     let changed = Signal<Void>()
+    /// Answers the Chrome APIs WebKit doesn't have, for this profile's extensions.
+    private(set) lazy var bridge = ExtensionBridge(host: self)
     /// Passes its two signals on to the ones views watch for any profile (ExtensionCenter).
     private var forwarding: [SignalToken] = []
     private var nativePorts: [ObjectIdentifier: NativeMessagingHost] = [:]
@@ -251,7 +253,7 @@ final class ExtensionHost: NSObject {
         contexts.removeAll { $0 === context }
         // Its companion-app helpers end with it, whether or not WebKit closed their ports.
         NativeMessagingHost.terminateAll(for: id)
-        ExtensionBridge.shared.release(id)
+        bridge.release(id)
         use.forget(id)
         Passkeys.refresh()
         changed.send()
@@ -533,7 +535,7 @@ final class ExtensionHost: NSObject {
         if hasPopup, let open = openPopups.values.first(where: { $0.extensionID == item.id && $0.window === controller.window && $0.popover.isShown }) {
             // Either way that opening is over: on screen the click closes it; out of sight a new one replaces it.
             if let page = open.page {
-                let capture = ExtensionBridge.shared.tabCapture
+                let capture = bridge.tabCapture
                 capture.popupClosed(item.id, page: page, opening: capture.currentOpening(item.id))
             }
             if open.isOnScreen {
@@ -546,10 +548,10 @@ final class ExtensionHost: NSObject {
         actionClicks[item.id] = Date()
         noteInvocation(item.id, tab: tab)
         // Its side panel, when that's what its button opens.
-        if ExtensionBridge.shared.sidePanel.handleClick(item.id, hasPopup: hasPopup, in: controller) { return }
+        if bridge.sidePanel.handleClick(item.id, hasPopup: hasPopup, in: controller) { return }
         // A new opening of its popup starts here: its page runs (and may capture the tab) before it's shown.
         if hasPopup {
-            _ = ExtensionBridge.shared.tabCapture.popupOpened(item.id)
+            _ = bridge.tabCapture.popupOpened(item.id)
             popupRequest = PopupRequest(extensionID: item.id, fromPin: fromPin, controller: controller)
         }
         context.performAction(for: tab)
@@ -943,7 +945,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         // Read now, while WebKit is showing it: asked for after it closes, WebKit would make a new popup page to answer.
         let page = action.popupWebView?.url?.path
         openPopups[key] = OpenPopup(extensionID: extensionID, action: action, popover: popover, page: page, window: window, fromPin: fromPin)
-        let opening = ExtensionBridge.shared.tabCapture.currentOpening(extensionID)
+        let opening = bridge.tabCapture.currentOpening(extensionID)
         let place = PopupPlace(extensionID, window)
         let closing = NotificationCenter.default.addObserver(forName: NSPopover.willCloseNotification, object: popover, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.popupClosedAt[place] = ProcessInfo.processInfo.systemUptime }
@@ -956,7 +958,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
                 self?.openPopups[key] = nil
                 self?.popupsChanged.send()
                 guard let page else { return }
-                ExtensionBridge.shared.tabCapture.popupClosed(extensionID, page: page, opening: opening)
+                self?.bridge.tabCapture.popupClosed(extensionID, page: page, opening: opening)
             }
         }
         popupCloseObservers[key] = [closing, closed]
@@ -973,8 +975,8 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             replyHandler(nil, nil)
             return
         }
-        if applicationIdentifier == ExtensionBridge.host {
-            ExtensionBridge.shared.handle(message, from: extensionContext, reply: replyHandler)
+        if applicationIdentifier == ExtensionBridge.hostName {
+            bridge.handle(message, from: extensionContext, reply: replyHandler)
             return
         }
         // A companion app only for an extension that asked for native messaging itself; the loaded copy's grant is
@@ -1003,8 +1005,8 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             completionHandler(nil)
             return
         }
-        if port.applicationIdentifier == ExtensionBridge.host {
-            ExtensionBridge.shared.connect(port, for: extensionContext)
+        if port.applicationIdentifier == ExtensionBridge.hostName {
+            bridge.connect(port, for: extensionContext)
             completionHandler(nil)
             return
         }

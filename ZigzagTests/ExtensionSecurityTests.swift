@@ -253,7 +253,7 @@ struct ExtensionSecurityTests {
             try await webView.evaluateJavaScript("typeof window.webkit?.messageHandlers?.zigzagTap") as? String == "object"
         }
         #expect(try await !seen())
-        let capture = BridgeTabCapture()
+        let capture = BridgeTabCapture(host: Profiles.shared.default.extensions)
         capture.listen(in: webView)
         capture.listen(in: webView)
         #expect(try await seen())

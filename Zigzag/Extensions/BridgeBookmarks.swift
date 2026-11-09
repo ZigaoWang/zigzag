@@ -13,6 +13,9 @@ import Foundation
 final class BridgeBookmarks: BridgeNamespace {
     static let name = "bookmarks"
     static let permission = "bookmarks"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
     private var library: Library { .shared }
     /// The tree as last told to listening extensions, to work out what changed (Library says only that something did).
     private var lastSeen: [String: Placed]?
@@ -327,7 +330,7 @@ final class BridgeBookmarks: BridgeNamespace {
         guard let before = lastSeen else { return }
         let after = snapshot()
         lastSeen = after
-        let bridge = ExtensionBridge.shared
+        let bridge = host.bridge
         guard ["bookmarks.onCreated", "bookmarks.onRemoved", "bookmarks.onChanged", "bookmarks.onMoved"].contains(where: { bridge.isListened($0) }) else { return }
         for id in after.keys where before[id] == nil {
             bridge.emit("bookmarks.onCreated", [id, node(id, depth: 0)])

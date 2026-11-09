@@ -136,11 +136,11 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
 
     /// An extension's notification (`chrome.notifications`), titled with its name. Unlike a site's, it shows even
     /// with Zigzag in front: the extension isn't a tab you're looking at.
-    func showForExtension(key: String, extensionID: String, title: String, message: String, context: String?, silent: Bool) async -> Bool {
+    func showForExtension(key: String, extensionID: String, name: String, title: String, message: String, context: String?, silent: Bool) async -> Bool {
         guard !AppDelegate.isHostingTests, await authorize() else { return false }
         let content = UNMutableNotificationContent()
         content.title = String(title.prefix(200))
-        content.subtitle = ExtensionHost.shared.displayName(for: extensionID)
+        content.subtitle = name
         content.body = String(([message] + [context].compactMap { $0 }).joined(separator: "\n").prefix(1000))
         content.threadIdentifier = "extension:\(extensionID)"
         content.categoryIdentifier = Self.category

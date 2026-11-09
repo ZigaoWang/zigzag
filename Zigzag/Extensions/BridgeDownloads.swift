@@ -9,6 +9,9 @@ import WebKit
 final class BridgeDownloads: BridgeNamespace {
     static let name = "downloads"
     static let permission = "downloads"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
     private let manager = DownloadManager.shared
     /// Chrome's download IDs are numbers that last the session; each Zigzag download gets one when first seen.
     private var numbers: [UUID: Int] = [:]
@@ -17,7 +20,7 @@ final class BridgeDownloads: BridgeNamespace {
     /// Each download's state as last told, to say what changed.
     private var lastSeen: [UUID: [String: Any]] = [:]
     /// The fetcher for downloads no tab started: your normal cookies, never a private window's.
-    private lazy var fetcher = WKWebView(frame: .zero, configuration: WebKitSetup.makeConfiguration(for: ExtensionHost.shared.profile))
+    private lazy var fetcher = WKWebView(frame: .zero, configuration: WebKitSetup.makeConfiguration(for: host.profile))
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         switch fn {
@@ -42,9 +45,9 @@ final class BridgeDownloads: BridgeNamespace {
             try FileManager.default.trashItem(at: file, resultingItemURL: nil)
             return nil
         case "open":
-            guard ExtensionBridge.allows("downloads.open", for: extensionID) else { throw BridgeError("Opening downloads needs the “downloads.open” permission") }
+            guard host.bridge.allows("downloads.open", for: extensionID) else { throw BridgeError("Opening downloads needs the “downloads.open” permission") }
             // As in Chrome, only in answer to you: a click on the extension, or in its popup or pages, a moment ago.
-            guard ExtensionHost.shared.hasRecentGesture(extensionID) else { throw BridgeError("downloads.open() may only be called in response to a user gesture.") }
+            guard host.hasRecentGesture(extensionID) else { throw BridgeError("downloads.open() may only be called in response to a user gesture.") }
             guard let item = item(Int(args.number(0) ?? -1)), item.state == .finished else { throw BridgeError("Download must be complete") }
             manager.open(item)
             return nil
@@ -183,7 +186,7 @@ final class BridgeDownloads: BridgeNamespace {
     }
 
     private func announceChanges() {
-        let bridge = ExtensionBridge.shared
+        let bridge = host.bridge
         let current = manager.items.filter { !$0.isPrivate }
         let ids = Set(current.map(\.id))
         for item in current {
