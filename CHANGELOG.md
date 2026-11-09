@@ -36,7 +36,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Several tabs opened in the background beside yours keep the order they were opened in.
 - Extensions that check their access to a local address with a port, as 1Password does, no longer fail there.
 - Control-Tab switches tabs while a page has the focus, which it almost always does; before, it often did nothing. ([#11](https://github.com/ZigaoWang/zigzag/issues/11))
-- Rabby and other wallets built like MetaMask start again after Zigzag relaunches, instead of saying their background isn't responding. ([#12](https://github.com/ZigaoWang/zigzag/issues/12))
+- Rabby starts again after Zigzag relaunches, instead of saying its background isn't responding. ([#12](https://github.com/ZigaoWang/zigzag/issues/12))
 - When your network or proxy changes, sites connect afresh instead of reusing a remembered HTTP/3 route that could go around a VPN or proxy.
 
 Thanks to [@maxacarvalho](https://github.com/maxacarvalho) for #11 and [@vandenbulckjean](https://github.com/vandenbulckjean) for #12, to neooo on LINUX DO for the Bitwarden and IPv6 reports, and to Philip and Harry on Product Hunt for asking for the mini window, proxy extensions and ChatGPT search.
