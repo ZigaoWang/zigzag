@@ -318,6 +318,9 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .foot-brand p { margin: 10px 0 0; font-size: 14px; color: var(--soft); }
 .foot-brand .nav-home { margin: 0; }
 .end .fine { grid-column: 1 / -1; margin: 16px 0 0; }
+/* The other pages' footer: one centered row of links and the copyright under the full-width line, not the home page's columns. */
+.end.end-simple { display: block; padding: 28px 24px 64px; text-align: center; }
+.end.end-simple .fine { margin: 14px 0 0; }
 @media (max-width: 760px) {
   .nav-links, .nav-gh { display: none; } .hero-text { padding-top: 88px; }
   .intro { grid-template-columns: 1fr; gap: 8px; } .end { grid-template-columns: 1fr 1fr; } .foot-brand { grid-column: 1 / -1; }
