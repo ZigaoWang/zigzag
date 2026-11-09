@@ -82,6 +82,16 @@ struct SecurityFixesTests {
         #expect(Reader.route(for: try url("mailto:a@example.com")) == .externalApp)
         #expect(Reader.route(for: try url("zoommtg://zoom.us/join")) == .externalApp)
     }
+
+    @Test func pagesCantOpenZigzagsOwnPagesInNewWindows() throws {
+        // window.open, target=_blank or Open Link in New Tab onto Settings or History: refused, in any case.
+        #expect(!Tab.mayOpenInNewWebView(URL(string: "zigzag://settings/privacy")))
+        #expect(!Tab.mayOpenInNewWebView(URL(string: "ZIGZAG://settings/extensions")))
+        #expect(!Tab.mayOpenInNewWebView(URL(string: "zigzag://history")))
+        #expect(Tab.mayOpenInNewWebView(URL(string: "https://example.com/")))
+        #expect(Tab.mayOpenInNewWebView(URL(string: "about:blank")))
+        #expect(Tab.mayOpenInNewWebView(nil))
+    }
 }
 
 /// Site permissions are kept per origin (scheme, host and port), never per host: an answer given to

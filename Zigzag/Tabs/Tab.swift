@@ -333,6 +333,10 @@ final class Tab: NSObject {
 
     static func isExtensionPage(_ url: URL?) -> Bool { url?.scheme == "webkit-extension" }
 
+    /// What a page may open in a new window or tab (window.open, target=_blank, Open Link in New Tab): anything but
+    /// Zigzag's own pages, which open from Zigzag.
+    static func mayOpenInNewWebView(_ url: URL?) -> Bool { url?.scheme?.lowercased() != HistoryPage.scheme }
+
     /// WebKit shows an extension's pages only in a web view set up by that extension.
     private static func extensionConfiguration(for url: URL?) -> WKWebViewConfiguration? {
         guard #available(macOS 15.4, *), isExtensionPage(url), let host = url?.host() else { return nil }
@@ -930,6 +934,11 @@ extension Tab: WKUIDelegate {
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Zigzag's own Open in New Tab, New Window or Peek always opens; a page's own request needs a click or your say.
         guard BrowserWebView.pendingDisposition(for: webView) != nil || PopupNotice.allows(navigationAction, from: url, isPrivate: isPrivate) else { return nil }
+        // Zigzag's own pages never open as a page's new window: Settings would show over it before anything loaded.
+        guard Self.mayOpenInNewWebView(navigationAction.request.url) else {
+            _ = BrowserWebView.takePendingDisposition(for: webView)
+            return nil
+        }
         lastOpenedWindow = Date()
         return host?.tab(self, createWebViewWith: configuration, for: navigationAction, features: windowFeatures)
     }

@@ -189,7 +189,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        guard PopupNotice.allows(navigationAction, from: webView.url, isPrivate: isPrivate) else { return nil }
+        guard PopupNotice.allows(navigationAction, from: webView.url, isPrivate: isPrivate),
+              Tab.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
         // A plain link (a help page, the terms) opens as a tab in the browser window, brought forward, as a
         // browser would; only another sized window.open() is a popup of its own.
         let sized = windowFeatures.width != nil || windowFeatures.height != nil || windowFeatures.toolbarsVisibility?.boolValue == false
@@ -219,6 +220,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
         if navigationAction.shouldPerformDownload { return .download }
+        // Zigzag's own pages (History) open in its tabs, never in a page's pop-up.
+        if navigationAction.request.url?.scheme?.lowercased() == HistoryPage.scheme { return .cancel }
         if let url = navigationAction.request.url, ExternalLinks.isExternal(url), url.scheme?.lowercased() != "file" {
             ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
                                isClick: PopupNotice.isUserInitiated(navigationAction), from: webView,
