@@ -106,8 +106,16 @@ final class TabManager {
 
     // MARK: Reading
 
-    /// The profile of the space you're in. There is one today.
-    var profile: Profile { Profiles.shared.default }
+    /// The profile of the space you're in.
+    var profile: Profile { Profiles.shared.profile(forSpace: currentSpaceID) }
+
+    /// A space on this profile for something that belongs there (a page one of its extensions opens): the one
+    /// you're in if it's on that profile, else one with tabs in this window, else the profile's first.
+    func space(for profile: Profile) -> UUID? {
+        if self.profile === profile { return currentSpaceID }
+        let spaces = Library.shared.spaces(in: profile.id).map(\.id)
+        return spaces.first { !tabs(in: $0).isEmpty } ?? spaces.first
+    }
     /// That profile's extensions; none in a private window, where extensions don't run.
     @available(macOS 15.4, *)
     var extensionHost: ExtensionHost? { isPrivate ? nil : profile.extensions }
@@ -203,7 +211,8 @@ final class TabManager {
     @discardableResult
     func newTab(url: URL?, spaceID: UUID? = nil, select: Bool = true, configuration: WKWebViewConfiguration? = nil,
                 opener: Tab? = nil, title: String? = nil) -> Tab {
-        let space = spaceID ?? currentSpaceID
+        // A page another page opened stays with it: WebKit made it in that page's profile.
+        let space = spaceID ?? (configuration != nil ? opener?.spaceID : nil) ?? currentSpaceID
         let tab = Tab(url: url, title: title, spaceID: space, configuration: configuration)
         tab.host = host
         watch(tab)
@@ -598,6 +607,8 @@ final class TabManager {
             changed.send(.space)
             changed.send(.selection)
         }
+        // A space put on another profile takes its open pages there.
+        for tab in allTabs { tab.settleProfile() }
         changed.send(.structure)
         if splits.count != splitCount { changed.send(.selection) }
     }

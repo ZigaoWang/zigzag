@@ -77,6 +77,17 @@ final class ExtensionHost: NSObject {
 
     // MARK: Loading
 
+    /// Brings up a profile's extensions the first time something in it needs them, as the first profile's are at
+    /// launch: a proxy one of them set applies from the first page, then each that's on is loaded.
+    func start() {
+        bridge.proxy.restore()
+        Task {
+            // An extension that went while this profile wasn't in use takes its pin with it.
+            profile.installs.pins = profile.installs.pins.keeping(profile.installs.hasRecord)
+            await loadInstalled()
+        }
+    }
+
     /// Every installed extension, on or off, for Settings. Filled in as they are read at launch.
     private(set) var installed: [String: WKWebExtension] = [:]
 
@@ -379,7 +390,10 @@ final class ExtensionHost: NSObject {
     private func announceExistingWindows(to context: WKWebExtensionContext) {
         for window in openWindows {
             controller.didOpenWindow(window)
-            for tab in window.tabManager.allTabs { controller.didOpenTab(tab) }
+            for tab in window.tabManager.allTabs where tab.extensionHost === self {
+                tab.toldTo = self
+                controller.didOpenTab(tab)
+            }
         }
         if let key = WindowManager.shared.keyController, !key.tabManager.isPrivate { controller.didFocusWindow(key) }
     }
@@ -763,17 +777,25 @@ struct ExtensionUse {
 extension ExtensionHost: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, openWindowsFor extensionContext: WKWebExtensionContext) -> [any WKWebExtensionWindow] {
         // The focused window first, as extensions expect; sign-in popups count too.
-        let popups: [any WKWebExtensionWindow] = PopupWindowController.all.filter { !$0.isPrivate } + MiniWindowController.all
+        // A browser window shows spaces of several profiles, so every profile's extensions have it, each seeing
+        // their own tabs there. A sign-in popup or a Zigzag Mini is one page: only its own profile's have it.
+        let popups: [any WKWebExtensionWindow] = PopupWindowController.all.filter(isOurs) + MiniWindowController.all.filter(isOurs)
         let windows: [any WKWebExtensionWindow] = openWindows
-        let key: (any WKWebExtensionWindow)? = PopupWindowController.key ?? MiniWindowController.key
+        let key: (any WKWebExtensionWindow)? = PopupWindowController.key.flatMap { isOurs($0) ? $0 : nil } ?? MiniWindowController.key.flatMap { isOurs($0) ? $0 : nil }
         return key.map { key in [key] + windows + popups.filter { $0 !== key } } ?? windows + popups
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
-        if let popup = PopupWindowController.key { return popup }
-        if let mini = MiniWindowController.key { return mini }
+        if let popup = PopupWindowController.key { return isOurs(popup) ? popup : nil }
+        if let mini = MiniWindowController.key { return isOurs(mini) ? mini : nil }
         return WindowManager.shared.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
     }
+
+    private func isOurs(_ popup: PopupWindowController) -> Bool {
+        !popup.isPrivate && popup.webView.configuration.websiteDataStore === profile.store
+    }
+
+    private func isOurs(_ mini: MiniWindowController) -> Bool { mini.tab.extensionHost === self }
 
     func webExtensionController(_ controller: WKWebExtensionController, openNewTabUsing configuration: WKWebExtension.TabConfiguration,
                                 for extensionContext: WKWebExtensionContext, completionHandler: @escaping ((any WKWebExtensionTab)?, (any Error)?) -> Void) {
@@ -781,7 +803,8 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         let key = WindowManager.shared.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
         let window = (configuration.window as? BrowserWindowController) ?? key ?? openWindows.last
             ?? WindowManager.shared.restoreIfNoWindows() ?? WindowManager.shared.newWindow(showCommandBar: false)
-        let tab = window.tabManager.newTab(url: configuration.url, select: configuration.shouldBeActive)
+        // In a space on this profile: the page is the extension's, with this profile's sign-ins.
+        let tab = window.tabManager.newTab(url: configuration.url, spaceID: window.tabManager.space(for: profile), select: configuration.shouldBeActive)
         completionHandler(tab, nil)
     }
 
@@ -811,15 +834,16 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         }
         // The saved session comes back first, or the new window's first save would replace it.
         WindowManager.shared.restoreIfNoWindows()
-        let window = WindowManager.shared.newWindow(url: configuration.tabURLs.first, showCommandBar: false)
-        for url in configuration.tabURLs.dropFirst() { window.tabManager.newTab(url: url, select: false) }
+        let space = WindowManager.shared.keyController?.tabManager.space(for: profile) ?? Library.shared.spaces(in: profile.id).first?.id
+        let window = WindowManager.shared.newWindow(url: configuration.tabURLs.first, spaceID: space, showCommandBar: false)
+        for url in configuration.tabURLs.dropFirst() { window.tabManager.newTab(url: url, spaceID: space, select: false) }
         completionHandler(window, nil)
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, openOptionsPageFor extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping ((any Error)?) -> Void) {
         if let url = extensionContext.optionsPageURL, let window = WindowManager.shared.keyController {
-            window.tabManager.newTab(url: url, title: extensionContext.webExtension.displayName)
+            window.tabManager.newTab(url: url, spaceID: window.tabManager.space(for: profile), title: extensionContext.webExtension.displayName)
         }
         completionHandler(nil)
     }
@@ -1033,15 +1057,21 @@ extension Tab: WKWebExtensionTab {
         return WindowManager.shared.controllers.first { $0.tabManager.tab(with: id) === self }
     }
 
+    /// Whether this context's extensions are the tab's own profile's.
+    func isSeen(by context: WKWebExtensionContext) -> Bool {
+        !isPrivate && context.webExtensionController === profile.startedExtensions?.controller
+    }
+
     /// The Zigzag Mini it's the page of, while it is.
     private var miniWindow: MiniWindowController? { (host as? MiniWindowController).flatMap { $0.tab === self ? $0 : nil } }
 
     func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { miniWindow ?? windowController }
     func indexInWindow(for context: WKWebExtensionContext) -> Int {
-        windowController?.tabManager.navigableTabs.firstIndex { $0 === self } ?? 0
+        windowController?.tabManager.navigableTabs.filter { $0.isSeen(by: context) }.firstIndex { $0 === self } ?? 0
     }
     // A private tab that reaches an extension anyway (none should) tells it nothing: no page, title or address.
-    func webView(for context: WKWebExtensionContext) -> WKWebView? { isPrivate ? nil : webView }
+    // Nor does a tab on another profile: its page isn't one this context's extensions may reach.
+    func webView(for context: WKWebExtensionContext) -> WKWebView? { isSeen(by: context) ? webView : nil }
     func title(for context: WKWebExtensionContext) -> String? { isPrivate ? nil : displayTitle }
     func url(for context: WKWebExtensionContext) -> URL? { isPrivate ? nil : url }
     func isLoadingComplete(for context: WKWebExtensionContext) -> Bool { !isLoading }
@@ -1097,8 +1127,18 @@ extension Tab: WKWebExtensionTab {
 @available(macOS 15.4, *)
 extension BrowserWindowController: WKWebExtensionWindow {
     // A private window is never listed, but should one be reached anyway, its tabs stay unseen.
-    func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] { tabManager.isPrivate ? [] : tabManager.navigableTabs }
-    func activeTab(for context: WKWebExtensionContext) -> (any WKWebExtensionTab)? { tabManager.isPrivate ? nil : tabManager.selectedTab }
+    // An extension sees the tabs of its own profile: the window may be showing a space on another.
+    func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] {
+        tabManager.isPrivate ? [] : tabManager.navigableTabs.filter { $0.isSeen(by: context) }
+    }
+
+    /// The tab you're on if it's on the extension's profile; else the one you left selected in a space that is,
+    /// since Chrome's extensions expect a window to have an active tab.
+    func activeTab(for context: WKWebExtensionContext) -> (any WKWebExtensionTab)? {
+        guard !tabManager.isPrivate else { return nil }
+        if let tab = tabManager.selectedTab, tab.isSeen(by: context) { return tab }
+        return Library.shared.spaces.lazy.compactMap { self.tabManager.selectedTab(in: $0.id) }.first { $0.isSeen(by: context) }
+    }
     func windowType(for context: WKWebExtensionContext) -> WKWebExtension.WindowType { .normal }
     func windowState(for context: WKWebExtensionContext) -> WKWebExtension.WindowState {
         guard let window else { return .normal }

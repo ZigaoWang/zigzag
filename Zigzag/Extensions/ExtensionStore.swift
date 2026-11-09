@@ -215,6 +215,13 @@ enum ExtensionStore {
             .appendingPathComponent("Library/WebKit/\(Bundle.main.bundleIdentifier ?? "")/WebsiteData/Default", isDirectory: true)
     }
 
+    /// Where WebKit keeps the files of a store made for an identifier (another profile's): the same layout, under
+    /// the identifier in lowercase.
+    nonisolated static func websiteData(ofStore id: UUID) -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/WebKit/\(Bundle.main.bundleIdentifier ?? "")/WebsiteDataStore/\(id.uuidString.lowercased())/Origins", isDirectory: true)
+    }
+
     /// At launch: moves extensions installed by older builds to the untouched layout, loads what's installed,
     /// sets up 1Password when its app is on this Mac, and checks for updates once a day.
     static func setUpIfNeeded() {
