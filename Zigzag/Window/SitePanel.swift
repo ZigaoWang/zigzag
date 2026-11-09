@@ -227,7 +227,8 @@ final class SitePanel: FloatingPanelView {
     }
 
     private func buildExtensions() {
-        guard #available(macOS 15.4, *) else { return }
+        // Extensions don't run in a private window, as in Chrome's incognito: none to show, nor to get here.
+        guard #available(macOS 15.4, *), !tab.isPrivate else { return }
         let items = ExtensionHost.shared.actions(for: tab)
         extensionTiles = items.map { item in
             let tile = PanelTile(image: item.icon, symbol: "puzzlepiece.extension", caption: nil)
@@ -275,7 +276,8 @@ final class SitePanel: FloatingPanelView {
                 self.tab.reload()
             })
         }
-        if #available(macOS 15.4, *), !ExtensionHost.shared.contexts.isEmpty {
+        // Not in a private window, where extensions don't run (and its site would be kept in the list).
+        if #available(macOS 15.4, *), !tab.isPrivate, !ExtensionHost.shared.contexts.isEmpty {
             let off = ExtensionStore.extensionsOffSites.contains(site)
             rows.append(.toggle(String(localized: "Extensions", comment: "Row in the site panel's This Site group."), on: !off, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                 guard let self else { return }

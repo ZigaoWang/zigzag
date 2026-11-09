@@ -256,17 +256,20 @@ final class ExtensionHost: NSObject {
         var id: String { context.uniqueIdentifier }
     }
 
+    /// None for a private tab: as in Chrome's incognito, extensions don't run there, so they can't be clicked there.
     func actions(for tab: Tab?) -> [ActionItem] {
-        contexts.compactMap { context in
+        guard tab?.isPrivate != true else { return [] }
+        return contexts.compactMap { context in
             guard let action = context.action(for: tab) else { return nil }
             return ActionItem(context: context, icon: action.icon(for: NSSize(width: 32, height: 32)), label: action.label,
                               badge: action.badgeText, attention: attention[context.uniqueIdentifier])
         }
     }
 
-    /// Extension items for a page's right-click menu.
+    /// Extension items for a page's right-click menu; none in a private tab.
     func menuItems(for tab: Tab) -> [NSMenuItem] {
-        contexts.flatMap { $0.menuItems(for: tab) }
+        guard !tab.isPrivate else { return [] }
+        return contexts.flatMap { $0.menuItems(for: tab) }
     }
 
     private weak var actionAnchor: NSView?
@@ -285,6 +288,8 @@ final class ExtensionHost: NSObject {
     private var popupReplacedByWindow: [String: Date] = [:]
 
     func performAction(_ item: ActionItem, tab: Tab?, anchor: NSView) {
+        // Never handed a private tab, nor given its site.
+        guard tab?.isPrivate != true else { return }
         var anchor = anchor
         var anchorRect = anchor.bounds
         // From the site panel: the panel steps aside and the popup opens from the address bar, where it stays put.
@@ -485,8 +490,9 @@ final class ExtensionHost: NSObject {
     /// The windows extensions may see: every one but the private ones.
     private var openWindows: [BrowserWindowController] { WindowManager.shared.controllers.filter { !$0.tabManager.isPrivate } }
 
-    /// Keyboard shortcuts declared by extensions (1Password's fill shortcut).
+    /// Keyboard shortcuts declared by extensions (1Password's fill shortcut). Not in a private window.
     func performCommand(for event: NSEvent) -> Bool {
+        if (event.window?.windowController as? BrowserWindowController)?.tabManager.isPrivate == true { return false }
         for context in contexts where context.performCommand(for: event) { return true }
         return false
     }
@@ -729,15 +735,16 @@ extension Tab: WKWebExtensionTab {
     func indexInWindow(for context: WKWebExtensionContext) -> Int {
         windowController?.tabManager.navigableTabs.firstIndex { $0 === self } ?? 0
     }
-    func webView(for context: WKWebExtensionContext) -> WKWebView? { webView }
-    func title(for context: WKWebExtensionContext) -> String? { displayTitle }
-    func url(for context: WKWebExtensionContext) -> URL? { url }
+    // A private tab that reaches an extension anyway (none should) tells it nothing: no page, title or address.
+    func webView(for context: WKWebExtensionContext) -> WKWebView? { isPrivate ? nil : webView }
+    func title(for context: WKWebExtensionContext) -> String? { isPrivate ? nil : displayTitle }
+    func url(for context: WKWebExtensionContext) -> URL? { isPrivate ? nil : url }
     func isLoadingComplete(for context: WKWebExtensionContext) -> Bool { !isLoading }
     func isSelected(for context: WKWebExtensionContext) -> Bool { miniWindow != nil || windowController?.tabManager.selectedTab === self }
     func isPinned(for context: WKWebExtensionContext) -> Bool { bookmarkID != nil }
     func isPlayingAudio(for context: WKWebExtensionContext) -> Bool { isPlayingAudio }
     func isMuted(for context: WKWebExtensionContext) -> Bool { isMuted }
-    func shouldGrantPermissionsOnUserGesture(for context: WKWebExtensionContext) -> Bool { true }
+    func shouldGrantPermissionsOnUserGesture(for context: WKWebExtensionContext) -> Bool { !isPrivate }
 
     func activate(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         miniWindow?.window?.makeKeyAndOrderFront(nil)

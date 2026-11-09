@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WebKit
 @testable import Zigzag
 
 /// What keeps an extension inside its lines: the files its package may hold, and what Zigzag opens for it.
@@ -72,6 +73,33 @@ struct ExtensionSecurityTests {
         try FileManager.default.createDirectory(at: plain.appendingPathComponent("nested"), withIntermediateDirectories: true)
         try Data("ok".utf8).write(to: plain.appendingPathComponent("nested/file.js"))
         #expect(ExtensionStore.holdsOnlyItsOwnFiles(plain))
+    }
+
+    /// A small extension's context, read from a manifest in a temporary folder.
+    private static func context(_ manifest: [String: Any] = [:]) async throws -> WKWebExtensionContext {
+        let folder = try temporaryFolder()
+        var full: [String: Any] = ["manifest_version": 3, "name": "Test", "version": "1.0"]
+        full.merge(manifest) { $1 }
+        try JSONSerialization.data(withJSONObject: full).write(to: folder.appendingPathComponent("manifest.json"))
+        return WKWebExtensionContext(for: try await WKWebExtension(resourceBaseURL: folder))
+    }
+
+    @Test func privateTabsTellExtensionsNothing() async throws {
+        let context = try await Self.context()
+        let url = URL(string: "https://example.com/private")!
+        let everyday = Tab(url: url, title: "Everyday", spaceID: UUID())
+        #expect(everyday.url(for: context) == url)
+        #expect(everyday.title(for: context) == "Everyday")
+        #expect(everyday.shouldGrantPermissionsOnUserGesture(for: context))
+
+        let hidden = Tab(url: url, title: "Private", spaceID: UUID())
+        hidden.privateStore = .nonPersistent()
+        #expect(hidden.url(for: context) == nil)
+        #expect(hidden.title(for: context) == nil)
+        #expect(hidden.webView(for: context) == nil)
+        #expect(!hidden.shouldGrantPermissionsOnUserGesture(for: context))
+        #expect(ExtensionHost.shared.actions(for: hidden).isEmpty)
+        #expect(ExtensionHost.shared.menuItems(for: hidden).isEmpty)
     }
 
     @Test func onlyAServiceWorkerGetsTheSocketStandIn() {
