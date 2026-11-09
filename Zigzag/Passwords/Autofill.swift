@@ -97,12 +97,6 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 var readable = true
                 do { all = try await PasswordStore.shared.all() } catch { debugLog("autofill vault error \(error)"); all = []; readable = false }
                 let logins = all.filter { $0.origin.fills(on: origin) }
-                    // Saved for this exact page first, then other parts of the site; newest used first within each.
-                    .sorted { a, b in
-                        let exactA = a.origin.isExact(for: origin), exactB = b.origin.isExact(for: origin)
-                        if exactA != exactB { return exactA }
-                        return (a.lastUsed ?? a.modified) > (b.lastUsed ?? b.modified)
-                    }
                 debugLog("autofill \(origin.host): \(logins.count) of \(all.count) match")
                 guard current == self.generation else { return }
                 if logins.isEmpty {
@@ -115,7 +109,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                     }
                     return
                 }
-                self.show(logins.map { .login($0) }, under: field, in: webView, frame: frame, origin: origin)
+                self.show(Self.menuItems(logins, on: origin), under: field, in: webView, frame: frame, origin: origin)
             }
         case "blur":
             generation += 1
@@ -139,8 +133,26 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         }
     }
 
+    /// The rows for the logins that may fill on `origin`: those saved for this host, newest used first, then one quiet
+    /// row standing for those saved for other parts of the site, which list only once you pick it. A login of
+    /// another subdomain is never one click away.
+    static func menuItems(_ logins: [Credential], on origin: Origin) -> [AutofillMenu.Item] {
+        let newest: (Credential, Credential) -> Bool = { a, b in
+            if a.origin.isExact(for: origin) != b.origin.isExact(for: origin) { return a.origin.isExact(for: origin) }
+            return (a.lastUsed ?? a.modified) > (b.lastUsed ?? b.modified)
+        }
+        let here = logins.filter { $0.origin.host == origin.host }.sorted(by: newest)
+        let elsewhere = logins.filter { $0.origin.host != origin.host }.sorted(by: newest)
+        guard !elsewhere.isEmpty else { return here.map { .login($0) } }
+        return here.prefix(7).map { .login($0) } + [.elsewhere(elsewhere)]
+    }
+
+    /// Where the menu showing was put: picking "other parts of the site" lists them in the same place.
+    private var field = NSRect.zero
+
     private func show(_ items: [AutofillMenu.Item], under field: NSRect, in webView: BrowserWebView, frame: WKFrameInfo, origin: Origin) {
         guard let overlay = Self.overlay(for: webView) else { return }
+        self.field = field
         menu?.removeFromSuperview()
         let menu = AutofillMenu(items: Array(items.prefix(8)), origin: origin)
         menu.onPick = { [weak self] item in self?.pick(item) }
@@ -216,6 +228,10 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     private func pick(_ item: AutofillMenu.Item) {
         switch item {
         case .login(let login): fill(login)
+        case .elsewhere(let logins):
+            // The same field, now with the logins of the site's other addresses: picking one is a second, deliberate step.
+            guard let target, Self.isInFront(target.webView) else { hide(); return }
+            show(logins.map { .login($0) }, under: field, in: target.webView, frame: target.frame, origin: target.origin)
         case .generate: fillGenerated()
         case .contact: fillContact()
         case .importFrom:
@@ -606,6 +622,9 @@ final class AutofillMenu: FloatingPanelView {
         case missing
         /// Nothing saved at all: bring passwords over from this browser.
         case importFrom(String)
+        /// Logins saved for other parts of the site (mail.example.com, signing in on www.example.com): listed only
+        /// once you ask for them.
+        case elsewhere([Credential])
     }
 
     /// When it came up. For the first half second it takes no clicks, so a page can't bring it up just as you click
@@ -632,7 +651,7 @@ final class AutofillMenu: FloatingPanelView {
     private let rowHeight = Tokens.Space.x10 + Tokens.Space.x1
 
     init(items: [Item], origin: Origin) {
-        hasFooter = items.contains { if case .login = $0 { true } else { false } }
+        hasFooter = items.contains { switch $0 { case .login, .elsewhere: true; default: false } }
         super.init(frame: .zero)
         if hasFooter {
             [footerLine, footer].forEach { addSubview($0) }
@@ -702,6 +721,14 @@ private final class AutofillRow: InteractiveView {
             detail = Label(String(localized: "Import them, and sign in here in one click", comment: "Under the row offering to import passwords, in the fill-password menu."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
             icon.image = Tokens.Symbol.image("square.and.arrow.down")
             icon.contentTintColor = Tokens.Color.accent
+        case .elsewhere(let logins):
+            let site = PublicSuffix.registrableDomain(origin.host) ?? origin.displayName
+            name = Label(String(localized: "From other parts of \(site)", comment: "A quiet row in the fill-password menu: shows the logins saved for other addresses on the same site. The placeholder is a site, like example.com."), font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
+            var hosts: [String] = []
+            for login in logins where !hosts.contains(login.origin.displayName) { hosts.append(login.origin.displayName) }
+            detail = Label(ListFormatter.localizedString(byJoining: hosts), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            icon.image = Tokens.Symbol.image("chevron.right")
+            icon.contentTintColor = Tokens.Color.textSecondary
         case .missing:
             name = Label(String(localized: "No saved password for \(PublicSuffix.registrableDomain(origin.host) ?? origin.displayName)", comment: "A row in the fill-password menu. The placeholder is a site, like github.com."), font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
             detail = Label(String(localized: "Search your passwords", comment: "Under the row saying nothing is saved for a site, in the fill-password menu."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)

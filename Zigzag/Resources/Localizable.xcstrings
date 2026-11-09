@@ -5162,6 +5162,17 @@
         }
       }
     },
+    "From other parts of %@" : {
+      "comment" : "A quiet row in the fill-password menu: shows the logins saved for other addresses on the same site. The placeholder is a site, like example.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自 %@ 的其他网址"
+          }
+        }
+      }
+    },
     "From your card in Contacts" : {
       "comment" : "Under the person's name in the menu that fills a form from Contacts.",
       "localizations" : {

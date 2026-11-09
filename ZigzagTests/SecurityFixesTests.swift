@@ -489,6 +489,25 @@ struct PasswordSafetyTests {
         #expect(AuthenticationPrompt.prefill([exact, login("https://router.example.com", "guest")], for: here) == nil)
     }
 
+    private func logins(_ items: [AutofillMenu.Item]) -> [String] {
+        items.map { item in
+            switch item {
+            case .login(let login): login.username
+            case .elsewhere(let logins): "elsewhere: " + logins.map(\.username).joined(separator: ",")
+            default: "other"
+            }
+        }
+    }
+
+    @Test func otherPartsOfTheSiteWaitBehindTheirOwnRow() throws {
+        let here = try #require(Origin(URL(string: "https://www.example.com")))
+        let mine = login("https://www.example.com", "sam"), old = login("http://www.example.com", "old")
+        let mail = login("https://mail.example.com", "mail")
+        #expect(logins(Autofill.menuItems([mail, mine, old], on: here)) == ["sam", "old", "elsewhere: mail"])
+        #expect(logins(Autofill.menuItems([mail], on: here)) == ["elsewhere: mail"])
+        #expect(logins(Autofill.menuItems([mine], on: here)) == ["sam"])
+    }
+
     @Test func theMenuTakesNoClickForHalfASecond() async throws {
         let menu = AutofillMenu(items: [.login(login("https://www.example.com", "sam"))], origin: try #require(Origin(URL(string: "https://www.example.com"))))
         let host = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
