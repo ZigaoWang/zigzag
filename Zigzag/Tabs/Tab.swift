@@ -424,14 +424,19 @@ final class Tab: NSObject {
     }
 
     /// What a local page may read: its folder, for its pictures and styles beside it. Not when it sits loose in
-    /// Downloads, which holds everything you've ever downloaded: there only the file, unless it was saved as a whole
-    /// page with its "_files" folder.
-    static func readAccess(for file: URL) -> URL {
+    /// Downloads, or the folder Settings saves downloads to, which hold everything you've ever downloaded: there
+    /// only the file, unless it was saved as a whole page with its "_files" folder.
+    static func readAccess(for file: URL, downloadFolders: [URL] = Tab.downloadFolders) -> URL {
         let folder = file.deletingLastPathComponent()
-        let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-        guard folder.standardizedFileURL.path == downloads?.standardizedFileURL.path else { return folder }
+        let path = folder.resolvingSymlinksInPath().standardizedFileURL.path
+        guard downloadFolders.contains(where: { $0.resolvingSymlinksInPath().standardizedFileURL.path == path }) else { return folder }
         let saved = folder.appendingPathComponent(file.deletingPathExtension().lastPathComponent + "_files")
         return FileManager.default.fileExists(atPath: saved.path) ? folder : file
+    }
+
+    /// Where downloads land: Downloads, and the folder chosen in Settings if it's another.
+    static var downloadFolders: [URL] {
+        FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask) + [DownloadManager.folder]
     }
 
     /// Takes the web view's address as the tab's: the page shown now, or one Zigzag itself is loading.

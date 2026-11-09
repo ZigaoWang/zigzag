@@ -140,6 +140,27 @@ struct SecurityFixesTests {
         let link = try #require(CertificateExceptions.proceedLink(for: page, nonce: first))
         #expect(CertificateExceptions.destination(of: link, warnedHost: "router.local", nonce: second) == nil)
     }
+
+    @Test func aLooseDownloadReadsOnlyItselfInAnyDownloadsFolder() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("ReadAccess-\(UUID().uuidString)")
+        let chosen = root.appendingPathComponent("My Downloads")
+        let project = root.appendingPathComponent("site")
+        try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let folders = [root.appendingPathComponent("Downloads"), chosen]
+
+        // Loose in the folder Settings saves downloads to: the file alone, not everything beside it.
+        let loose = chosen.appendingPathComponent("invoice.html")
+        #expect(Tab.readAccess(for: loose, downloadFolders: folders).path == loose.path)
+        // Saved as a whole page, with its own folder of pictures: the folder, so it shows.
+        let page = chosen.appendingPathComponent("article.html")
+        try FileManager.default.createDirectory(at: chosen.appendingPathComponent("article_files"), withIntermediateDirectories: true)
+        #expect(Tab.readAccess(for: page, downloadFolders: folders).path == chosen.path)
+        // Anywhere else: its folder, as before.
+        let index = project.appendingPathComponent("index.html")
+        #expect(Tab.readAccess(for: index, downloadFolders: folders).path == project.path)
+    }
 }
 
 /// Site permissions are kept per origin (scheme, host and port), never per host: an answer given to
