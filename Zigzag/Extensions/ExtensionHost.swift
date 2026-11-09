@@ -15,8 +15,11 @@ enum ExtensionPopups {
 /// set up for you, so they work the way they do in other browsers.
 @available(macOS 15.4, *)
 final class ExtensionHost: NSObject {
-    static let shared = ExtensionHost()
+    /// The first profile's extensions, for code that doesn't yet say which profile it means.
+    static var shared: ExtensionHost { Profiles.shared.default.extensions }
 
+    /// Whose extensions these are.
+    unowned let profile: Profile
     let controller: WKWebExtensionController
     private(set) var contexts: [WKWebExtensionContext] = []
     /// Fires when extensions load or their toolbar actions change.
@@ -24,8 +27,16 @@ final class ExtensionHost: NSObject {
     private var nativePorts: [ObjectIdentifier: NativeMessagingHost] = [:]
     private var socketBridges: [ObjectIdentifier: WebSocketBridge] = [:]
 
-    private override init() {
-        let configuration = WKWebExtensionController.Configuration(identifier: UUID(uuidString: "6F1E2D6A-5B0C-4C1B-9E1A-2A7B5D3C9E10")!)
+    init(profile: Profile) {
+        self.profile = profile
+        // Under the profile's own identifier: what its extensions store (chrome.storage, their rules) is kept apart
+        // from any other profile's copy of the same extension.
+        let configuration = WKWebExtensionController.Configuration(identifier: profile.id)
+        // Both, and the same store: the first is what extensions' cookie calls read, the second is where their own
+        // pages and background keep localStorage and IndexedDB. Two controllers never share a store, since WebKit
+        // clears a store of extension data its controller doesn't know.
+        configuration.defaultWebsiteDataStore = profile.store
+        configuration.webViewConfiguration.websiteDataStore = profile.store
         // What extensions' requests tell servers is what Zigzag is, as its network traffic shows: a server that checks
         // (shazam.com's) turns away one that claims Chrome but doesn't look it. Their own code still reads Chrome
         // (bridge.js), since several choose their code path from navigator.userAgent.
