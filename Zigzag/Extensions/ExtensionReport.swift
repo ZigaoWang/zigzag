@@ -17,6 +17,16 @@ struct ExtensionReport {
     let abilities: [Line]
     /// Features it asks for that won't work in Zigzag, as short names ("Side panel", "Signing in").
     let limits: [String]
+    /// What the lines were worded from, so several extensions' can be put together.
+    private var asked = Asked()
+
+    private struct Asked {
+        var permissions: Set<String> = []
+        var patterns: Set<String> = []
+        var replacesNewTab = false
+        var searchEngines: [String] = []
+        var ids: Set<String> = []
+    }
 
     init(extension ext: WKWebExtension, manifest: [String: Any], id: String) {
         let requested = Self.strings(manifest, ["permissions", "optional_permissions"])
@@ -25,7 +35,9 @@ struct ExtensionReport {
         let replacesNewTab = (manifest["chrome_url_overrides"] as? [String: Any])?["newtab"] != nil
         // Nor is a search engine of its own, offered once it's added.
         let searchEngine = ExtensionSearchProvider(manifest: manifest, extensionID: id)?.name
-        abilities = Self.abilities(permissions: requested, patterns: ext.allRequestedMatchPatterns.map(\.string), id: id, replacesNewTab: replacesNewTab, searchEngine: searchEngine)
+        let patterns = ext.allRequestedMatchPatterns.map(\.string)
+        abilities = Self.abilities(permissions: requested, patterns: patterns, id: id, replacesNewTab: replacesNewTab, searchEngine: searchEngine)
+        asked = Asked(permissions: requested, patterns: Set(patterns), replacesNewTab: replacesNewTab, searchEngines: searchEngine.map { [$0] } ?? [], ids: [id])
 
         var limits: [String] = ExtensionProfile.profile(for: id)?.knownIssue.map { [$0] } ?? []
         let covered = (ExtensionProfile.profile(for: id)?.coveredPermissions ?? []).union(ExtensionBridgeScript.permissions)
@@ -35,6 +47,32 @@ struct ExtensionReport {
         for (permission, name) in Self.partLimits where requested.contains(permission) && !limits.contains(name) { limits.append(name) }
         for (key, name) in Self.manifestLimits where manifest[key] != nil && !limits.contains(name) { limits.append(name) }
         self.limits = limits
+    }
+
+    /// What several extensions added together will be able to do, worded once: "every website" once, not once
+    /// for each of them. Each one's own limits stay with it.
+    init(combining reports: [ExtensionReport]) {
+        var all = Asked()
+        for report in reports {
+            all.permissions.formUnion(report.asked.permissions)
+            all.patterns.formUnion(report.asked.patterns)
+            all.replacesNewTab = all.replacesNewTab || report.asked.replacesNewTab
+            all.searchEngines += report.asked.searchEngines.filter { !all.searchEngines.contains($0) }
+            all.ids.formUnion(report.asked.ids)
+        }
+        // A password manager's line names its app only when it's the one asking.
+        let id = all.ids.count == 1 ? all.ids.first ?? "" : ""
+        var lines = Self.abilities(permissions: all.permissions, patterns: all.patterns.sorted(), id: id,
+                                   replacesNewTab: all.replacesNewTab, searchEngine: all.searchEngines.first)
+        if let index = lines.firstIndex(where: { $0.symbol == "magnifyingglass" }) {
+            let more = all.searchEngines.dropFirst().map { engine in
+                Line(symbol: "magnifyingglass", text: String(localized: "Offer \(engine) as your search engine", comment: "One thing an extension can do, listed in its install sheet and in Settings. The name is the search engine's, like ChatGPT."))
+            }
+            lines.insert(contentsOf: more, at: index + 1)
+        }
+        abilities = lines
+        limits = []
+        asked = all
     }
 
     /// Only what a new version asks for beyond the old one, for approving an update.
