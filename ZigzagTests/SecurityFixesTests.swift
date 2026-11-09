@@ -470,4 +470,22 @@ struct PasswordSafetyTests {
         #expect(!heard.kinds.contains("login"))
         #expect(!heard.kinds.contains("change"))
     }
+
+    // MARK: Saved logins
+
+    private func login(_ site: String, _ username: String) -> Credential {
+        Credential(id: UUID(), origin: Origin(URL(string: site))!, username: username, title: "", notes: "", otpAuth: "",
+                   created: Date(), modified: Date(), lastUsed: nil)
+    }
+
+    @Test func signInSheetFillsInOnlyThisAddresssLogin() throws {
+        let here = try #require(Origin(URL(string: "https://router.example.com")))
+        let exact = login("https://router.example.com", "admin")
+        let elsewhere = login("https://mail.example.com", "sam")
+        #expect(AuthenticationPrompt.prefill([exact, elsewhere], for: here)?.id == exact.id)
+        // Saved for another part of the site only: nothing filled in; it waits behind Saved Passwords.
+        #expect(AuthenticationPrompt.prefill([elsewhere], for: here) == nil)
+        // Two for this address: you choose.
+        #expect(AuthenticationPrompt.prefill([exact, login("https://router.example.com", "guest")], for: here) == nil)
+    }
 }
