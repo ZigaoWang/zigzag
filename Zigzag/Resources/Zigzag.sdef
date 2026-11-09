@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+
+<!-- What AppleScript, Shortcuts and osascript can do with Zigzag. The names follow Safari's and Chrome's dictionaries,
+     so scripts written for them mostly work here too. The Swift side is in App/Scripting.swift. -->
+<dictionary title="Zigzag Terminology">
+
+	<suite name="Standard Suite" code="????" description="Common classes and commands for all applications.">
+
+		<command name="open" code="aevtodoc" description="Open a file.">
+			<direct-parameter description="The file(s) to be opened.">
+				<type type="file"/>
+				<type type="file" list="yes"/>
+			</direct-parameter>
+		</command>
+
+		<command name="close" code="coreclos" description="Close a window or a tab.">
+			<cocoa class="NSCloseCommand"/>
+			<direct-parameter type="specifier" description="The window(s) or tab(s) to close."/>
+		</command>
+
+		<command name="quit" code="aevtquit" description="Quit the application.">
+			<cocoa class="NSQuitCommand"/>
+		</command>
+
+		<command name="count" code="corecnte" description="Return the number of elements of a particular class within an object.">
+			<cocoa class="NSCountCommand"/>
+			<direct-parameter type="specifier" description="The objects to be counted."/>
+			<parameter name="each" code="kocl" type="type" optional="yes" description="The class of objects to be counted." hidden="yes">
+				<cocoa key="ObjectClass"/>
+			</parameter>
+			<result type="integer" description="The count."/>
+		</command>
+
+		<command name="delete" code="coredelo" description="Close a tab.">
+			<cocoa class="ZigzagTabCommand"/>
+			<direct-parameter type="specifier" description="The tab(s) to close."/>
+		</command>
+
+		<command name="exists" code="coredoex" description="Verify that an object exists.">
+			<cocoa class="NSExistsCommand"/>
+			<direct-parameter type="any" description="The object(s) to check."/>
+			<result type="boolean" description="Did the object(s) exist?"/>
+		</command>
+
+		<command name="make" code="corecrel" description="Make a new window or tab.">
+			<cocoa class="ZigzagMakeCommand"/>
+			<parameter name="new" code="kocl" type="type" description="The class of the new object: window or tab.">
+				<cocoa key="ObjectClass"/>
+			</parameter>
+			<parameter name="at" code="insh" type="location specifier" optional="yes" description="Where to make it, such as at end of tabs of window 1. A tab goes to the front window without it.">
+				<cocoa key="Location"/>
+			</parameter>
+			<parameter name="with properties" code="prdt" type="record" optional="yes" description="The initial values for properties of the object, such as {URL:&quot;https://example.com&quot;}.">
+				<cocoa key="KeyDictionary"/>
+			</parameter>
+			<result type="specifier" description="The new object."/>
+		</command>
+
+		<class name="application" code="capp" description="Zigzag.">
+			<cocoa class="NSApplication"/>
+			<property name="name" code="pnam" type="text" access="r" description="The name of the application.">
+				<cocoa key="scriptingName"/>
+			</property>
+			<property name="frontmost" code="pisf" type="boolean" access="r" description="Is this the active application?">
+				<cocoa key="isActive"/>
+			</property>
+			<property name="version" code="vers" type="text" access="r" description="The version number of the application.">
+				<cocoa key="scriptingVersion"/>
+			</property>
+			<element type="window" access="r" description="Browser windows, front to back. Private windows are never listed.">
+				<cocoa key="scriptingWindows"/>
+			</element>
+			<responds-to command="open">
+				<cocoa method="handleOpenScriptCommand:"/>
+			</responds-to>
+			<responds-to command="quit">
+				<cocoa method="handleQuitScriptCommand:"/>
+			</responds-to>
+		</class>
+
+		<class name="window" code="cwin" description="A browser window.">
+			<cocoa class="NSWindow"/>
+			<property name="name" code="pnam" type="text" access="r" description="The title of the window's current tab.">
+				<cocoa key="title"/>
+			</property>
+			<property name="id" code="ID  " type="integer" access="r" description="The unique identifier of the window.">
+				<cocoa key="scriptingID"/>
+			</property>
+			<property name="index" code="pidx" type="integer" access="r" description="The index of the window, ordered front to back.">
+				<cocoa key="scriptingIndex"/>
+			</property>
+			<property name="bounds" code="pbnd" type="rectangle" description="The bounding rectangle of the window.">
+				<cocoa key="boundsAsQDRect"/>
+			</property>
+			<property name="closeable" code="hclb" type="boolean" access="r" description="Does the window have a close button?">
+				<cocoa key="hasCloseBox"/>
+			</property>
+			<property name="miniaturizable" code="ismn" type="boolean" access="r" description="Does the window have a minimize button?">
+				<cocoa key="isMiniaturizable"/>
+			</property>
+			<property name="miniaturized" code="pmnd" type="boolean" description="Is the window minimized right now?">
+				<cocoa key="isMiniaturized"/>
+			</property>
+			<property name="resizable" code="prsz" type="boolean" access="r" description="Can the window be resized?">
+				<cocoa key="isResizable"/>
+			</property>
+			<property name="visible" code="pvis" type="boolean" description="Is the window visible right now?">
+				<cocoa key="isVisible"/>
+			</property>
+			<property name="zoomable" code="iszm" type="boolean" access="r" description="Does the window have a zoom button?">
+				<cocoa key="isZoomable"/>
+			</property>
+			<property name="zoomed" code="pzum" type="boolean" description="Is the window zoomed right now?">
+				<cocoa key="isZoomed"/>
+			</property>
+			<responds-to command="close">
+				<cocoa method="handleCloseScriptCommand:"/>
+			</responds-to>
+		</class>
+
+	</suite>
+
+	<suite name="Zigzag Suite" code="Zgzg" description="Zigzag's windows, tabs and pages.">
+
+		<class-extension extends="window" description="A browser window.">
+			<cocoa class="NSWindow"/>
+			<element type="tab" description="The window's tabs, in every space: favorites, then each space's pinned tabs and tabs.">
+				<cocoa key="scriptTabs"/>
+			</element>
+			<property name="current tab" code="cTab" type="tab" description="The tab on screen. Setting it switches to that tab (and its space).">
+				<synonym name="active tab"/>
+				<cocoa key="scriptCurrentTab"/>
+			</property>
+			<property name="space" code="ZSpc" type="text" access="r" description="The name of the space on screen.">
+				<cocoa key="scriptSpace"/>
+			</property>
+		</class-extension>
+
+		<class name="tab" code="bTab" description="A tab." plural="tabs">
+			<cocoa class="ZigzagScriptTab"/>
+			<property name="id" code="ID  " type="integer" access="r" description="The unique identifier of the tab, kept until Zigzag quits.">
+				<cocoa key="uniqueID"/>
+			</property>
+			<property name="index" code="pidx" type="integer" access="r" description="The index of the tab in its window's tabs.">
+				<cocoa key="scriptIndex"/>
+			</property>
+			<property name="name" code="pnam" type="text" access="r" description="The title of the tab.">
+				<synonym name="title"/>
+				<cocoa key="scriptName"/>
+			</property>
+			<property name="URL" code="pURL" type="text" description="The address of the tab's page. Setting it goes there.">
+				<cocoa key="scriptURL"/>
+			</property>
+			<property name="loading" code="ZLdg" type="boolean" access="r" description="Is the page still loading?">
+				<cocoa key="scriptLoading"/>
+			</property>
+			<property name="text" code="conT" type="text" access="r" description="The text of the page, as it reads on screen.">
+				<cocoa key="scriptText"/>
+			</property>
+			<property name="source" code="conS" type="text" access="r" description="The HTML of the page as it is now.">
+				<cocoa key="scriptSource"/>
+			</property>
+			<property name="pinned" code="ZPin" type="boolean" access="r" description="Is the tab a pinned tab?">
+				<cocoa key="scriptPinned"/>
+			</property>
+			<property name="favorite" code="ZFav" type="boolean" access="r" description="Is the tab one of the favorites?">
+				<cocoa key="scriptFavorite"/>
+			</property>
+			<property name="space" code="ZSpc" type="text" access="r" description="The name of the tab's space.">
+				<cocoa key="scriptSpace"/>
+			</property>
+			<responds-to command="close">
+				<cocoa method="handleCloseScriptCommand:"/>
+			</responds-to>
+			<responds-to command="delete">
+				<cocoa method="handleTabScriptCommand:"/>
+			</responds-to>
+			<responds-to command="execute">
+				<cocoa method="handleExecuteScriptCommand:"/>
+			</responds-to>
+			<responds-to command="reload">
+				<cocoa method="handleTabScriptCommand:"/>
+			</responds-to>
+			<responds-to command="go back">
+				<cocoa method="handleTabScriptCommand:"/>
+			</responds-to>
+			<responds-to command="go forward">
+				<cocoa method="handleTabScriptCommand:"/>
+			</responds-to>
+		</class>
+
+		<command name="do JavaScript" code="ZgzgDoJS" description="Run JavaScript in a tab's page, as Safari does, and return its result as text. Turned off until you allow it in Settings › General › Automation.">
+			<cocoa class="ZigzagJavaScriptCommand"/>
+			<direct-parameter type="text" description="The JavaScript. Its last value is the result; with await or return at the top, it runs as an async function and its returned value is the result."/>
+			<parameter name="in" code="dcnm" type="specifier" optional="yes" description="The tab to run it in. The front window's current tab without it.">
+				<cocoa key="Tab"/>
+			</parameter>
+			<result type="text" description="The result, as text: JSON for lists and records."/>
+		</command>
+
+		<command name="execute" code="ZgzgExec" description="Run JavaScript in a tab's page, as Chrome's execute does. The same as do JavaScript.">
+			<cocoa class="ZigzagJavaScriptCommand"/>
+			<direct-parameter type="specifier" description="The tab to run it in."/>
+			<parameter name="javascript" code="JvSc" type="text" description="The JavaScript.">
+				<cocoa key="JavaScript"/>
+			</parameter>
+			<result type="text" description="The result, as text."/>
+		</command>
+
+		<command name="reload" code="ZgzgRlod" description="Reload a tab.">
+			<cocoa class="ZigzagTabCommand"/>
+			<direct-parameter type="specifier" optional="yes" description="The tab. The front window's current tab without it."/>
+		</command>
+
+		<command name="go back" code="ZgzgGoBk" description="Go back in a tab's history.">
+			<cocoa class="ZigzagTabCommand"/>
+			<direct-parameter type="specifier" optional="yes" description="The tab. The front window's current tab without it."/>
+		</command>
+
+		<command name="go forward" code="ZgzgGoFw" description="Go forward in a tab's history.">
+			<cocoa class="ZigzagTabCommand"/>
+			<direct-parameter type="specifier" optional="yes" description="The tab. The front window's current tab without it."/>
+		</command>
+
+	</suite>
+
+</dictionary>

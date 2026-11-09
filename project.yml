@@ -94,6 +94,9 @@ targets:
         NSHighResolutionCapable: true
         NSSupportsAutomaticTermination: false
         NSSupportsSuddenTermination: false
+        # AppleScript, Shortcuts and osascript: what they can do is in Resources/Zigzag.sdef.
+        NSAppleScriptEnabled: true
+        OSAScriptingDefinition: Zigzag.sdef
         # What macOS shows when it asks for each permission. Translations go in Resources/InfoPlist.xcstrings, keyed
         # by these names; keep its English the same as here.
         NSCameraUsageDescription: Websites you visit can ask to use your camera.

@@ -92,6 +92,8 @@
 		<key>NSAllowsArbitraryLoadsInWebContent</key>
 		<true/>
 	</dict>
+	<key>NSAppleScriptEnabled</key>
+	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Websites you visit can ask to use your camera.</string>
 	<key>NSContactsUsageDescription</key>
@@ -116,6 +118,8 @@
 	<false/>
 	<key>NSSupportsSuddenTermination</key>
 	<false/>
+	<key>OSAScriptingDefinition</key>
+	<string>Zigzag.sdef</string>
 	<key>SUAutomaticallyUpdate</key>
 	<true/>
 	<key>SUEnableAutomaticChecks</key>
