@@ -14,6 +14,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A link clicked in another app opens only Zigzag Mini. Your browser windows stay exactly where they were instead of coming up behind it, and closing it takes you back to the app you were in.
 - One Esc closes Zigzag Mini, even on sites that keep Esc for themselves, like a search page with its cursor in an empty box. In a box you've typed in, or with a site's own dialog open, the first Esc goes there.
 - Swiping back or forward in Zigzag Mini shows the same arrow as in a tab.
+- An extension that listens to a tab (tabCapture) now hears only that tab. When a tab's sound can't be reached on its own, as with streamed video, the capture stops and the tab's sound comes back, instead of hearing everything Zigzag plays, other tabs and private windows included. Thanks to [zemu](https://github.com/ze-mu-zhou) for reporting it and writing the fix.
 
 ## [0.7.3] - 2026-11-09
 
