@@ -15,16 +15,16 @@ enum WebKitSetup {
         return "Version/\(version) Safari/605.1.15"
     }()
 
-    static func makeConfiguration() -> WKWebViewConfiguration {
+    /// What a page in this profile is made with: the profile's website data and its extensions.
+    static func makeConfiguration(for profile: Profile) -> WKWebViewConfiguration {
         let configuration = WKWebViewConfiguration()
-        configure(configuration)
+        configure(configuration, for: profile)
         return configuration
     }
 
     /// Applies our defaults. Popup configurations handed to us by WebKit already carry most of these.
-    static func configure(_ configuration: WKWebViewConfiguration) {
-        configuration.websiteDataStore = .default()
-        allowCrossSiteCookies(in: .default())
+    static func configure(_ configuration: WKWebViewConfiguration, for profile: Profile) {
+        configuration.websiteDataStore = profile.store
         configuration.applicationNameForUserAgent = applicationNameForUserAgent
         configuration.preferences.isElementFullscreenEnabled = true
         configuration.preferences.isFraudulentWebsiteWarningEnabled = true
@@ -45,7 +45,7 @@ enum WebKitSetup {
         configuration.upgradeKnownHostsToHTTPS = true
         configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
         if #available(macOS 15.4, *), configuration.webExtensionController == nil {
-            configuration.webExtensionController = ExtensionHost.shared.controller
+            configuration.webExtensionController = profile.extensions.controller
         }
         if configuration.userContentController.userScripts.isEmpty {
             for script in PageScripts.all + Reader.scripts { configuration.userContentController.addUserScript(script) }
@@ -88,13 +88,9 @@ enum WebKitSetup {
     /// WebKit's tracking prevention keeps cookies from any site embedded in another, as Safari does by default. That
     /// breaks sign-ins that check quietly in a hidden frame: Teams' Assignments asks Microsoft's sign-in page whether
     /// you're signed in, hears no, and its Continue gives up without opening anything. Chrome and Arc send them, and
-    /// so does Zigzag; the content blocker still stops trackers loading at all. Private windows keep their own
-    /// store, untouched.
-    private static var crossSiteCookiesAllowed = false
-
-    private static func allowCrossSiteCookies(in store: WKWebsiteDataStore) {
-        guard !crossSiteCookiesAllowed else { return }
-        crossSiteCookiesAllowed = true
+    /// so does Zigzag; the content blocker still stops trackers loading at all. Each store has its own setting, so
+    /// each profile's is told once, when the profile is made. Private windows keep their own store, untouched.
+    static func allowCrossSiteCookies(in store: WKWebsiteDataStore) {
         // Not public API, but how Safari's own "Prevent cross-site tracking" switch is made.
         let statistics = NSSelectorFromString("_setResourceLoadStatisticsEnabled:")
         if store.responds(to: statistics) {

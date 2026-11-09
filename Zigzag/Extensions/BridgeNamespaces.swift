@@ -634,7 +634,7 @@ final class BridgeIdentity: NSObject, BridgeNamespace, WKNavigationDelegate, NSW
     }
 
     private func start(_ url: URL, interactive: Bool, extensionID: String, finish: @escaping (Result<URL, BridgeError>) -> Void) {
-        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 480, height: 640), configuration: WebKitSetup.makeConfiguration())
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 480, height: 640), configuration: WebKitSetup.makeConfiguration(for: ExtensionHost.shared.profile))
         webView.navigationDelegate = self
         var window: NSWindow?
         if interactive {

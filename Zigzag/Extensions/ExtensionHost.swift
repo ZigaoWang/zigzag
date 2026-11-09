@@ -778,7 +778,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         if configuration.windowType == .popup, configuration.tabURLs.count <= 1, !configuration.shouldBePrivate {
             let url = configuration.tabURLs.first ?? extensionContext.baseURL
             let pageConfiguration = url.host() == extensionContext.baseURL.host() ? extensionContext.webViewConfiguration : nil
-            let popup = PopupWindowController.openForExtension(url: url, configuration: pageConfiguration ?? WebKitSetup.makeConfiguration(),
+            let popup = PopupWindowController.openForExtension(url: url, configuration: pageConfiguration ?? WebKitSetup.makeConfiguration(for: profile),
                                                                frame: configuration.frame, parent: WindowManager.shared.keyController?.window)
             // In Chrome the popup that asked closes as the window takes focus; the window is where it continues.
             // Its popup page often opens the window before Zigzag has shown the popup at all: then it isn't shown.

@@ -81,6 +81,8 @@ final class Tab: NSObject {
     /// Set for tabs in a private window: their own throwaway storage, and nothing remembered.
     var privateStore: WKWebsiteDataStore?
     var isPrivate: Bool { privateStore != nil }
+    /// The profile its page is made in. There is one today.
+    var profile: Profile { Profiles.shared.default }
     /// In a call (camera or microphone on, even muted) or floating in Picture in Picture: not to be put to sleep.
     var isInUse: Bool {
         guard let webView else { return false }
@@ -184,12 +186,12 @@ final class Tab: NSObject {
         if let webView { return webView }
         let fromWebKit = pendingConfiguration != nil
         let extensionConfiguration = fromWebKit ? nil : Self.extensionConfiguration(for: url)
-        let configuration = pendingConfiguration ?? extensionConfiguration ?? WebKitSetup.makeConfiguration()
+        let configuration = pendingConfiguration ?? extensionConfiguration ?? WebKitSetup.makeConfiguration(for: profile)
         pendingConfiguration = nil
         if extensionConfiguration != nil {
             configuration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
         } else if !fromWebKit {
-            WebKitSetup.configure(configuration)
+            WebKitSetup.configure(configuration, for: profile)
             WebNotifications.attach(to: configuration, isPrivate: privateStore != nil)
             Passkeys.attach(to: configuration, isPrivate: privateStore != nil)
             HistoryPage.attach(to: configuration)

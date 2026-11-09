@@ -17,7 +17,7 @@ final class BridgeDownloads: BridgeNamespace {
     /// Each download's state as last told, to say what changed.
     private var lastSeen: [UUID: [String: Any]] = [:]
     /// The fetcher for downloads no tab started: your normal cookies, never a private window's.
-    private lazy var fetcher = WKWebView(frame: .zero, configuration: WebKitSetup.makeConfiguration())
+    private lazy var fetcher = WKWebView(frame: .zero, configuration: WebKitSetup.makeConfiguration(for: ExtensionHost.shared.profile))
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         switch fn {
