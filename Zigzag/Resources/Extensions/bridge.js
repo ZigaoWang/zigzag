@@ -559,7 +559,14 @@
     };
     // Collected from Zigzag about fifty times a second while the stream lives.
     let collecting = true;
-    const ended = () => { collecting = false; if (heard) { heard = false; stopHearing(id); } };
+    const ended = () => {
+      if (!collecting) return;
+      collecting = false;
+      if (heard) { heard = false; stopHearing(id); }
+      for (const track of destination.stream.getAudioTracks()) track.stop();
+      player.disconnect();
+      context.close().catch(() => {});
+    };
     const collect = async () => {
       if (!collecting) return;
       try {
@@ -577,8 +584,6 @@
       track.stop = () => {
         stop();
         ended();
-        player.disconnect();
-        context.close().catch(() => {});
         send('tabCapture', 'stop', [id]).catch(() => {});
       };
     }

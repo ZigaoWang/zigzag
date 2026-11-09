@@ -779,9 +779,6 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         var started = Date()
         /// Whether the page's own sound has come through yet (streamed video gives Web Audio only silence).
         var heard = false
-        /// Hearing Zigzag's own sound instead, once the page's gave only silence while the tab played.
-        var system: AnyObject?
-        var switching = false
         /// Sound waiting for the extension's page to collect it, and when it last did.
         var waiting: [[Any]] = []
         var lastRead = Date()
@@ -790,9 +787,6 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         var page = ""
         /// Which opening of the extension's popup was showing when it began.
         var opening = 0
-        /// What the extension has played for Zigzag to play itself, and how loud, for the extensions log.
-        var played = 0
-        var playedPeak: Float = 0
     }
     /// Each extension's popup openings, counted, so closing one ends only what that one started.
     private var openings: [String: Int] = [:]
@@ -863,9 +857,12 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
                 guard let elements = (result?["tapped"] as? NSNumber)?.intValue else { throw BridgeError("Play something in the tab first, then try again") }
                 taps[id] = Tap(extensionID: extensionID, webView: webView, tabID: tab.id, world: Self.world, script: Self.elementScript, page: page, opening: currentOpening(extensionID))
                 ExtensionLog.write("tab capture for \(host.displayName(for: extensionID)): \(elements) media element(s)")
-                // Streamed video (YouTube, most video sites) gives Web Audio only silence: straight to Zigzag's own
-                // sound, so the extension hears it from the start.
-                if result?["streamed"] as? Bool == true { switchToSystemAudio(id) }
+                // Never widen a tab capture to WebKit's shared audio process: it also plays other tabs,
+                // including private windows. Stop and restore this tab's sound instead.
+                if result?["streamed"] as? Bool == true {
+                    stop(id, because: "streamed audio cannot be captured within this tab")
+                    throw BridgeError("This tab’s streamed audio cannot be captured without recording other tabs.")
+                }
             }
             Toast.show(String(localized: "\(host.displayName(for: extensionID)) is listening to this tab", comment: "Toast when an extension starts hearing a tab's sound. The placeholder is the extension's name."), symbol: "waveform", duration: 3, in: controller)
             return ["id": id, "tabId": tab.id.hashValue & 0x7fffffff]
@@ -880,22 +877,6 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
             tap.hasRead = true
             taps[id] = tap
             return chunks
-        case "play":
-            // What the extension plays while hearing Zigzag's own sound (whose web audio is muted meanwhile, as a
-            // captured tab is in Chrome): played from Zigzag itself, so it's heard and never captured again.
-            guard let id = args.string(0), let source = args.string(1), let tap = taps[id], tap.extensionID == extensionID, tap.system != nil,
-                  let rate = args.number(2), let pcm = args.string(3), let data = Data(base64Encoded: pcm) else { return nil }
-            let samples = data.withUnsafeBytes { raw in raw.bindMemory(to: Int16.self).map { Float($0) / 32768 } }
-            NativeAudioOut.shared.feed(id + "|" + source, samples: samples, rate: rate)
-            if var tap = taps[id] {
-                tap.played += 1
-                tap.playedPeak = max(tap.playedPeak, samples.map(abs).max() ?? 0)
-                taps[id] = tap
-                if tap.played == 100 {
-                    ExtensionLog.write("tab capture for \(ExtensionHost.shared.displayName(for: extensionID)): Zigzag plays its sound itself, peak \(String(format: "%.4f", tap.playedPeak))")
-                }
-            }
-            return nil
         case "stop":
             if let id = args.string(0), taps[id]?.extensionID == extensionID { stop(id) }
             return nil
@@ -931,10 +912,9 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
             let collecting = tap.hasRead ? Date().timeIntervalSince(tap.lastRead) < 0.3 : Date().timeIntervalSince(tap.started) < 5
             if tap.webView == nil || tap.webView !== tab.webView || !collecting {
                 stop(id, because: "its page closed")
-            } else if tap.system == nil {
+            } else {
                 throw BridgeError("Cannot capture a tab with an active stream.")
             }
-            // One hearing Zigzag's own sound takes nothing from the tab: another extension can listen as well.
         }
     }
 
@@ -955,9 +935,6 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     private func stop(_ id: String, because reason: String = "the extension stopped it") {
         guard let tap = taps.removeValue(forKey: id) else { return }
         ExtensionLog.write("tab capture for \(ExtensionHost.shared.displayName(for: tap.extensionID)) ended after \(Int(Date().timeIntervalSince(tap.started))) s: \(reason)")
-        if #available(macOS 14.4, *) { (tap.system as? SystemAudioTap)?.stop() }
-        (tap.system as? DispatchSourceTimer)?.cancel()
-        NativeAudioOut.shared.end(sourcesStartingWith: id)
         tap.webView?.callAsyncJavaScript(tap.script, arguments: ["tap": id, "stop": true], in: nil, in: tap.world, completionHandler: nil)
     }
 
@@ -968,69 +945,10 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         return nil
     }
 
-    // MARK: Zigzag's own sound
-
-    /// The page's sound gave only silence while the tab plays (streamed or protected video): the capture carries on
-    /// with the sound Zigzag plays instead, once you've let the extension hear it. As in Chrome the tab goes quiet
-    /// meanwhile (Zigzag's web audio is muted at the source), and what the extension plays (Shazam passing it on, a
-    /// booster's louder copy) is played by Zigzag itself (NativeAudioOut): heard, and never captured again.
-    private func switchToSystemAudio(_ id: String) {
-        guard #available(macOS 14.4, *), var tap = taps[id], !tap.switching, let webView = tap.webView,
-              let (tab, controller) = tab(tap.tabID) else { return }
-        tap.switching = true
-        taps[id] = tap
-        webView.callAsyncJavaScript(tap.script, arguments: ["tap": id, "stop": true], in: nil, in: tap.world, completionHandler: nil)
-        let name = ExtensionHost.shared.displayName(for: tap.extensionID)
-        Task { @MainActor in
-            guard await allowsSystemAudio(tap.extensionID, name: name, tab: tab, in: controller), taps[id] != nil else {
-                ExtensionLog.write("tab capture for \(name): this tab's sound can't reach it (streamed video), and hearing Zigzag's sound wasn't allowed")
-                return
-            }
-            let pid = SystemAudioTap.webAudioProcess(of: webView)
-            let system = SystemAudioTap()
-            let chunks = ChunkMaker { [weak self] rate, pcm in
-                DispatchQueue.main.async { MainActor.assumeIsolated { self?.emitSystemChunk(id, rate: rate, pcm: pcm) } }
-            }
-            chunks.report = { peak in
-                ExtensionLog.write("tab capture for \(name): Zigzag's sound over the first 3 s peaked at \(String(format: "%.4f", peak))\(peak == 0 ? " (silence: macOS may not be letting Zigzag hear it)" : "")")
-            }
-            do {
-                #if DEBUG
-                if UserDefaults.standard.bool(forKey: "DebugFakeSystemAudio") {
-                    // Silence at the real pace, without macOS's capture, to test everything around it.
-                    taps[id]?.system = ChunkMaker.fakeSilence(into: chunks) as AnyObject
-                    ExtensionLog.write("tab capture for \(name): fake Zigzag sound (debug)")
-                    return
-                }
-                #endif
-                try system.start(pid: pid, muting: true) { samples, rate in chunks.add(samples, rate: rate) }
-            } catch {
-                ExtensionLog.write("tab capture for \(name): hearing Zigzag's sound failed: \(error)")
-                return
-            }
-            taps[id]?.system = system
-            ExtensionLog.write("tab capture for \(name): streamed video, so Zigzag's own sound")
-        }
-    }
-
-    private func emitSystemChunk(_ id: String, rate: Double, pcm: String) {
-        guard let tap = taps[id] else { return }
-        guard isListening(tap) else { stop(id, because: "it stopped listening"); return }
-        keep([rate, pcm, Date().timeIntervalSince1970 * 1000, true], for: id)
-    }
-
-    private static let allowedKey = "TabCaptureHearsZigzag"
-
-    /// Asked once per extension, in Zigzag's own words, before macOS asks its own question the first time.
-    private func allowsSystemAudio(_ extensionID: String, name: String, tab: Tab, in controller: BrowserWindowController) async -> Bool {
-        var allowed = UserDefaults.standard.stringArray(forKey: Self.allowedKey) ?? []
-        if allowed.contains(extensionID) { return true }
-        let answer = await PermissionPrompt.ask(host: name, what: "the sound this tab plays", symbol: "waveform", in: controller, tab: tab,
-                                                title: String(localized: "Hear what this tab plays", comment: "Title of the prompt asking whether an extension may hear the sound a tab plays."), allowTitle: String(localized: "Allow", comment: "Button in the prompt asking whether an extension may hear a tab's sound."), denyTitle: String(localized: "Don’t Allow", comment: "Button in the prompt asking whether an extension may hear a tab's sound."))
-        guard answer == .allow else { return false }
-        allowed.append(extensionID)
-        UserDefaults.standard.set(allowed, forKey: Self.allowedKey)
-        return true
+    /// Web Audio cannot capture some streamed or protected media. Failing here keeps the original tab's sound
+    /// playing without exposing audio from other tabs through WebKit's shared GPU process.
+    private func stopUnavailableCapture(_ id: String) {
+        stop(id, because: "audio cannot be captured within this tab")
     }
 
     nonisolated func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -1044,14 +962,14 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         #endif
         let world = message.world
         MainActor.assumeIsolated {
-            // Only from the half that's listening, in the tab it's listening to, until it hands over.
-            guard var tap = taps[id], !tap.switching, tap.webView === message.webView, tap.world == world else { return }
+            // Only from the half that's listening, in the tab it's listening to.
+            guard var tap = taps[id], tap.webView === message.webView, tap.world == world else { return }
             // The extension stopped listening (its popup closed): the tap goes too, and the tab's sound comes back.
             guard isListening(tap) else { stop(id, because: "it stopped listening"); return }
             if level > 0.0001, !tap.heard { tap.heard = true; taps[id]?.heard = true }
             // A second of silence while the tab is playing sound: the page's sound is out of Web Audio's reach.
             if !tap.heard, Date().timeIntervalSince(tap.started) > 1.2, tab(tap.tabID)?.0.isPlayingAudio == true {
-                switchToSystemAudio(id)
+                stopUnavailableCapture(id)
                 return
             }
             keep([rate, pcm, at, false], for: id)
@@ -1068,44 +986,5 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     func release(_ extensionID: String) {
         for (id, tap) in taps where tap.extensionID == extensionID { stop(id, because: "the extension went away") }
         pending = pending.filter { $0.value.extensionID != extensionID }
-    }
-}
-
-/// Gathers Zigzag's own sound into chunks like the page taps send: about a fiftieth of a second of 16-bit mono.
-nonisolated private final class ChunkMaker: @unchecked Sendable {
-    private var samples: [Int16] = []
-    private let send: @Sendable (Double, String) -> Void
-    /// How loud what's been heard is, for the extensions log: a capture that hears nothing says so.
-    private var peak: Float = 0
-    private var heardFor = 0
-    var report: (@Sendable (Float) -> Void)?
-
-    init(send: @escaping @Sendable (Double, String) -> Void) { self.send = send }
-
-    #if DEBUG
-    /// Silence at the real pace, on a queue of its own, as the system tap would send it.
-    static func fakeSilence(into chunks: ChunkMaker) -> DispatchSourceTimer {
-        let silence = [Float](repeating: 0, count: 480)
-        let timer = DispatchSource.makeTimerSource(queue: .global())
-        timer.schedule(deadline: .now(), repeating: .milliseconds(10))
-        timer.setEventHandler { silence.withUnsafeBufferPointer { chunks.add($0, rate: 48000) } }
-        timer.resume()
-        return timer
-    }
-    #endif
-
-    func add(_ buffer: UnsafeBufferPointer<Float>, rate: Double) {
-        for value in buffer {
-            peak = max(peak, abs(value))
-            let clamped = max(-1, min(1, value))
-            samples.append(Int16(clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff))
-        }
-        let size = Int(rate / 48)
-        guard samples.count >= size else { return }
-        let pcm = samples.withUnsafeBufferPointer { Data(buffer: $0) }.base64EncodedString()
-        samples.removeAll(keepingCapacity: true)
-        send(rate, pcm)
-        heardFor += 1
-        if heardFor == 150 { report?(peak) }
     }
 }

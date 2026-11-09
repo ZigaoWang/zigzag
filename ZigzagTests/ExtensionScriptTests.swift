@@ -2,6 +2,75 @@ import JavaScriptCore
 import Testing
 @testable import Zigzag
 
+extension ExtensionScriptTests {
+    @Test func nativeCaptureEndingClosesTheExtensionsAudioStream() throws {
+        let source = ExtensionBridgeScript.source
+        let start = try #require(source.range(of: "  const captureStream = (id) => {"))
+        let end = try #require(source.range(of: "  tabStream = (streamId)", range: start.upperBound..<source.endIndex))
+        let context = JSContext()!
+        context.evaluateScript("""
+        var __stops = 0, __closed = 0, __disconnected = 0;
+        var __track = { readyState: 'live', stop: () => { __stops++; __track.readyState = 'ended'; } };
+        var AudioContext = function () {
+          this.sampleRate = 48000;
+          this.createMediaStreamDestination = () => ({ stream: { getAudioTracks: () => [__track] } });
+          this.createScriptProcessor = () => ({ connect: () => {}, disconnect: () => __disconnected++ });
+          this.close = () => { __closed++; return Promise.resolve(); };
+        };
+        var send = () => Promise.resolve(null), setTimeout = () => {};
+        \(source[start.lowerBound..<end.lowerBound])
+        captureStream('test');
+        """)
+        #expect(context.exception == nil)
+        #expect(context.objectForKeyedSubscript("__stops")?.toInt32() == 1)
+        #expect(context.objectForKeyedSubscript("__closed")?.toInt32() == 1)
+        #expect(context.objectForKeyedSubscript("__disconnected")?.toInt32() == 1)
+        #expect(context.evaluateScript("__track.readyState")?.toString() == "ended")
+    }
+
+    @Test func streamedTabAudioIsRejectedBeforeRoutingOrMuting() throws {
+        let url = try #require(Bundle.main.url(forResource: "tab-capture", withExtension: "js"))
+        let source = try String(contentsOf: url, encoding: .utf8)
+        let context = JSContext()!
+        context.evaluateScript("""
+        var window = {}, __contexts = 0, __failure = '';
+        var document = { querySelectorAll: () => [{ paused: false, currentSrc: 'blob:https://example.com/media' }] };
+        var AudioContext = function () { __contexts++; };
+        const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+        new AsyncFunction('tap', 'stop', \(Self.quoted(source)))('test', false)
+          .then(() => { __failure = 'unexpected success'; }, (e) => { __failure = e.message; });
+        """)
+        #expect(context.exception == nil)
+        #expect(context.objectForKeyedSubscript("__failure")?.toString().contains("cannot be captured without recording other tabs") == true)
+        #expect(context.objectForKeyedSubscript("__contexts")?.toInt32() == 0)
+        #expect(context.evaluateScript("window.__zigzagTap === undefined")?.toBool() == true)
+    }
+
+    @Test func stoppingTabCaptureRestoresSoundEvenAfterMediaBecomesStreamed() throws {
+        let url = try #require(Bundle.main.url(forResource: "tab-capture", withExtension: "js"))
+        let source = try String(contentsOf: url, encoding: .utf8)
+        let context = JSContext()!
+        context.evaluateScript("""
+        var __restored = 0, __disconnected = 0, __removed = 0, __result = -1;
+        const source = { context: { destination: {} }, connect: () => __restored++ };
+        var window = { __zigzagTap: { taps: new Map([['test', {
+          processor: { disconnect: () => __disconnected++ }, mix: { disconnect: () => __disconnected++ },
+          observer: { disconnect: () => __disconnected++ }, muted: [source], onPlay: () => {}
+        }]]) } };
+        var document = { querySelectorAll: () => [{ paused: false, currentSrc: 'blob:https://example.com/media' }],
+                         removeEventListener: () => __removed++ };
+        const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+        new AsyncFunction('tap', 'stop', \(Self.quoted(source)))('test', true).then((result) => { __result = result; });
+        """)
+        #expect(context.exception == nil)
+        #expect(context.objectForKeyedSubscript("__restored")?.toInt32() == 1)
+        #expect(context.objectForKeyedSubscript("__disconnected")?.toInt32() == 3)
+        #expect(context.objectForKeyedSubscript("__removed")?.toInt32() == 1)
+        #expect(context.objectForKeyedSubscript("__result")?.toInt32() == 0)
+        #expect(context.evaluateScript("window.__zigzagTap.taps.size")?.toInt32() == 0)
+    }
+}
+
 /// Every script Zigzag puts in front of an extension's own code parses. One that doesn't stops every extension from
 /// starting, so it's checked here rather than found by someone using one.
 @MainActor
