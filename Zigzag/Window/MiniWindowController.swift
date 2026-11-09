@@ -60,7 +60,6 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             // where they were, and closing it goes back to the app the link came from.
             controller.returnTo = AppSwitching.lastOtherApp
             if !NSApp.isActive { NSRunningApplication.current.activate(options: []) }
-            MiniLinkWake.linkOpenedInMini()
         }
         return controller
     }
@@ -929,64 +928,6 @@ extension MiniWindowController: PromptHost {
     var promptAnchor: NSView? { strip }
     func promptToast(_ text: String, symbol: String, duration: TimeInterval) {
         Toast.show(text, symbol: symbol, duration: duration, over: overlay, area: overlay.bounds)
-    }
-}
-
-/// A link for Zigzag Mini from another app wakes Zigzag, and macOS brings every Zigzag window forward with it, a moment
-/// before Zigzag hears of the link. So when Zigzag is woken from the background (not by ⌘Tab or a click on one of its
-/// windows), its browser windows wait unseen for that moment: a link for Zigzag Mini puts them back where they were,
-/// behind the app you clicked in, before they show again; anything else shows them right where macOS put them.
-enum MiniLinkWake {
-    private static var waiting: [NSWindow] = []
-    /// Each waiting window's place as Zigzag woke: the window just above it, of any app, top to bottom.
-    private static var places: [(window: NSWindow, below: Int?)] = []
-    private static var timeout: DispatchWorkItem?
-
-    static func appWillActivate() {
-        guard MiniWindowController.opensExternalLinks, waiting.isEmpty else { return }
-        // ⌘Tab holds ⌘; a click on a Zigzag window is that window's.
-        if NSEvent.modifierFlags.contains(.command) { return }
-        let windows = WindowManager.shared.controllers.compactMap(\.window).filter { $0.isVisible && !$0.isMiniaturized }
-        let pointer = NSEvent.mouseLocation
-        guard !windows.isEmpty, !(NSEvent.pressedMouseButtons != 0 && windows.contains { $0.frame.contains(pointer) }) else { return }
-        places = Self.places(of: windows)
-        waiting = windows
-        windows.forEach { $0.alphaValue = 0 }
-        let work = DispatchWorkItem { release(restoring: false) }
-        timeout = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
-    }
-
-    /// The link went to Zigzag Mini: the browser windows go back exactly where they were.
-    static func linkOpenedInMini() {
-        guard !waiting.isEmpty else { return }
-        release(restoring: true)
-    }
-
-    private static func release(restoring: Bool) {
-        timeout?.cancel()
-        timeout = nil
-        if restoring {
-            // Top to bottom, so each window it goes under is already back in its place.
-            for place in places { if let below = place.below { place.window.order(.below, relativeTo: below) } }
-        }
-        waiting.forEach { $0.alphaValue = 1 }
-        waiting = []
-        places = []
-    }
-
-    /// Where each window sits among every app's windows on screen, as the window right above it.
-    private static func places(of windows: [NSWindow]) -> [(window: NSWindow, below: Int?)] {
-        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return [] }
-        let byNumber = Dictionary(windows.map { ($0.windowNumber, $0) }, uniquingKeysWith: { first, _ in first })
-        var result: [(window: NSWindow, below: Int?)] = []
-        var above: Int?
-        for entry in list where (entry[kCGWindowLayer as String] as? Int) == 0 {
-            guard let number = entry[kCGWindowNumber as String] as? Int else { continue }
-            if let window = byNumber[number] { result.append((window, above)) }
-            above = number
-        }
-        return result
     }
 }
 

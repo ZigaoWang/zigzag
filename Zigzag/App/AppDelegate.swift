@@ -90,8 +90,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DebugBridge.start()
     }
 
-    func applicationWillBecomeActive(_ notification: Notification) { MiniLinkWake.appWillActivate() }
-
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         // Only a Zigzag Mini up counts as no window: the Dock icon brings the browser back.
         let browsing = WindowManager.shared.controllers.contains { $0.window?.isVisible == true }
