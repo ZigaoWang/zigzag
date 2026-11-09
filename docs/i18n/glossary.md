@@ -48,7 +48,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Private window | 无痕浏览窗口 | 隐私浏览窗口, 无痕窗口 | Safari's New Private Window is 新建无痕浏览窗口. |
 | Split View | 分屏浏览 | 分栏 | macOS calls its Split View 分屏浏览. |
 | Peek | 速览 | 预览, keep "Peek" | No Apple word; Quick Look is 快速查看, so 速览 is close without clashing. 预览 clashes with the Preview app; English would read as untranslated. |
-| Mini window | 迷你窗口 | 小窗口, 迷你 Arc | Arc called it Little Arc; Zigzag's is a mini window, said plainly. |
+| Zigzag Mini | Zigzag Mini | 迷你窗口, 小窗口, 迷你 Arc | A name, like the app's, so it stays in Latin letters (新建 Zigzag Mini). Arc called it Little Arc. Where a plain noun reads better in a sentence, 迷你窗口. |
 | Command Bar | 命令栏 | 指令栏 | Arc's Chinese users say 命令栏; 指令栏 is seen less. |
 | Site controls (the site panel) | 网站设置 | 网站控制 | Safari's per-site settings are 网站设置; "控制" sounds technical. |
 | Address (field) | 地址栏 | 智能搜索栏 | Safari calls it 智能搜索栏, but Zigzag's field is plainer; 地址栏 is what people say. |

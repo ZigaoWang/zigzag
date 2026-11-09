@@ -1548,13 +1548,13 @@
         }
       }
     },
-    "A small window for the page, without the sidebar. Open it in Zigzag to keep it as a tab." : {
-      "comment" : "Explanation under “Open links from other apps in a mini window” in Settings › General.",
+    "A small window for a quick look at a page. Move it into your browser window when you want to keep it." : {
+      "comment" : "Explanation under “New Zigzag Mini” in Settings › General: what Zigzag Mini is.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "为页面单独开一个小窗口，没有边栏。在 Zigzag 中打开即可留作标签页。"
+            "value" : "用一个小窗口快速看一眼页面。想留下时，把它移到浏览器窗口中。"
           }
         }
       }
@@ -1868,7 +1868,7 @@
       }
     },
     "Address" : {
-      "comment" : "VoiceOver label of the address field in a mini window's top strip.\nVoiceOver name of the address in a split view page's strip, while it has none.",
+      "comment" : "VoiceOver name of the address in a split view page's strip, while it has none.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5613,6 +5613,17 @@
         }
       }
     },
+    "Instead of in a new tab." : {
+      "comment" : "Explanation under “Open links from other apps in Zigzag Mini” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "而不是在新标签页中打开。"
+          }
+        }
+      }
+    },
     "It loads a little slower the first time. You stay signed in." : {
       "comment" : "Message of the sheet that asks before clearing one site's cache.",
       "localizations" : {
@@ -6666,17 +6677,6 @@
         }
       }
     },
-    "New Mini Window" : {
-      "comment" : "File menu item: a small window for one page, without the sidebar.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "新建迷你窗口"
-          }
-        }
-      }
-    },
     "New Private Window" : {
       "comment" : "File menu item.\nItem in the Dock icon's menu.",
       "localizations" : {
@@ -6717,6 +6717,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新建窗口"
+          }
+        }
+      }
+    },
+    "New Zigzag Mini" : {
+      "comment" : "A row in Settings › General, under Zigzag Mini, showing its keyboard shortcut. Zigzag Mini is a name, kept in Latin letters.\nFile menu item: opens the command bar on its own, for a page in Zigzag Mini (a small window for one page, without the sidebar). Zigzag Mini is a name, kept in Latin letters.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建 Zigzag Mini"
           }
         }
       }
@@ -7624,7 +7635,7 @@
       }
     },
     "Open in Zigzag" : {
-      "comment" : "Tooltip of the button in a mini window's top strip that moves its page into a Zigzag window as a tab.",
+      "comment" : "File menu item in place of Open File… while Zigzag Mini is in front: moves its page into a browser window as a tab.\nTooltip of the button in a mini window's top strip that moves its page into a Zigzag window as a tab.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7634,13 +7645,13 @@
         }
       }
     },
-    "Open links from other apps in a mini window" : {
-      "comment" : "A setting in Settings › General.",
+    "Open links from other apps in Zigzag Mini" : {
+      "comment" : "A setting in Settings › General, under Zigzag Mini.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在迷你窗口中打开来自其他 App 的链接"
+            "value" : "在 Zigzag Mini 中打开来自其他 App 的链接"
           }
         }
       }
@@ -13287,6 +13298,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigao，Zigzag 的作者"
+          }
+        }
+      }
+    },
+    "Zigzag Mini" : {
+      "comment" : "The name of Zigzag's small window for one page, without the sidebar (Arc called it Little Arc). Kept in Latin letters, like the app's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag Mini"
           }
         }
       }
