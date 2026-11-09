@@ -5,7 +5,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-## [0.7.5] - 2026-11-09
+## [0.7.5] - 2026-11-10
 
 ### New
 - Settings has its own sections for Appearance, Tabs, Search and Zigzag Mini, so General keeps just the basics. ([#28](https://github.com/ZigaoWang/zigzag/issues/28))
