@@ -138,9 +138,9 @@ final class BrowserWindow: NSWindow {
 
     /// A key nothing took (an arrow at a page's end, Return on picked sidebar rows) goes by quietly, as in Safari and
     /// Chrome: AppKit's beep there says nothing useful. A ⌘ shortcut that matches nothing still beeps, as on any Mac.
+    /// The window's controller is the last to be asked, after the window, so it asks this too (`QuietKeys`).
     override func noResponder(for eventSelector: Selector) {
-        if eventSelector == #selector(NSResponder.keyDown(with:)), let event = currentEvent, event.type == .keyDown,
-           !event.modifierFlags.contains(.command) { return }
+        if QuietKeys.passQuietly(eventSelector, currentEvent) { return }
         super.noResponder(for: eventSelector)
     }
 
@@ -272,4 +272,13 @@ final class BrowserWindow: NSWindow {
     }
 
     var trafficLightHeight: CGFloat { standardWindowButton(.closeButton)?.frame.height ?? 14 }
+}
+
+/// Keys no one took go by without AppKit's beep, except a ⌘ shortcut that matches nothing. Pages pass back keys they
+/// use too (YouTube seeks on ← and →), so without this every arrow on a video would beep.
+enum QuietKeys {
+    static func passQuietly(_ selector: Selector, _ event: NSEvent?) -> Bool {
+        guard selector == #selector(NSResponder.keyDown(with:)), let event, event.type == .keyDown else { return false }
+        return !event.modifierFlags.contains(.command)
+    }
 }

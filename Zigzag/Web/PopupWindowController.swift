@@ -4,6 +4,12 @@ import WebKit
 /// Sign-in and payment popups (window.open with a size). A small real window that shows
 /// which site you are talking to, keeps window.opener working, and closes itself when the page does.
 final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDelegate, WKNavigationDelegate {
+    /// The last to be asked about a key: one nothing took goes by quietly (`QuietKeys`).
+    override func noResponder(for eventSelector: Selector) {
+        if QuietKeys.passQuietly(eventSelector, NSApp.currentEvent) { return }
+        super.noResponder(for: eventSelector)
+    }
+
     private static var open: Set<PopupWindowController> = []
     /// Every popup window, for extensions: 1Password fills sign-in popups as it does tabs.
     static var all: [PopupWindowController] { Array(open) }

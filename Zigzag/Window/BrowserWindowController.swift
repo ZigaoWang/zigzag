@@ -4,6 +4,12 @@ import WebKit
 
 /// One browser window: its tabs, its sidebar, its page card, and everything floating above them.
 final class BrowserWindowController: NSWindowController, NSWindowDelegate {
+    /// The last to be asked about a key: one nothing took goes by quietly (`QuietKeys`).
+    override func noResponder(for eventSelector: Selector) {
+        if QuietKeys.passQuietly(eventSelector, NSApp.currentEvent) { return }
+        super.noResponder(for: eventSelector)
+    }
+
     let tabManager: TabManager
     let sidebar = SidebarView()
     let root: BrowserRootView

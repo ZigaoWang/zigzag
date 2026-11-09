@@ -7,6 +7,12 @@ import WebKit
 /// history, blocking, autofill and extensions work as they do anywhere; Open in moves that same live page into a
 /// browser window, in the space chosen on the strip. It's never saved: quitting lets it go, as Arc did.
 final class MiniWindowController: NSWindowController, NSWindowDelegate {
+    /// The last to be asked about a key: one nothing took goes by quietly (`QuietKeys`).
+    override func noResponder(for eventSelector: Selector) {
+        if QuietKeys.passQuietly(eventSelector, NSApp.currentEvent) { return }
+        super.noResponder(for: eventSelector)
+    }
+
     /// Open ones, oldest first, for placing the next one and for extensions.
     private(set) static var all: [MiniWindowController] = []
     /// The one you're in, if any.
