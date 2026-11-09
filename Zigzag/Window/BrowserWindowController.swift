@@ -113,7 +113,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.address.onPinDragBegan = { [weak self] in
             if #available(macOS 15.4, *) { ExtensionCenter.closePopups(in: self?.window) }
         }
-        sidebar.address.onPinsReordered = { ExtensionStore.reorderPins(visible: $0) }
+        sidebar.address.onPinsReordered = { [weak self] in self?.installs.reorderPins(visible: $0) }
         sidebar.address.siteControlsButton.onClick = { [weak self] _ in
             if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
         }
@@ -557,28 +557,32 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         findBar.pageChanged()
     }
 
+    /// What the profile you're in decided about its extensions: the menus and the pins by the address are about those.
+    private var installs: ExtensionInstalls { tabManager.profile.installs }
+
     /// Where an extension may read and change pages, Chrome's three choices.
     private func siteAccessItem(for id: String) -> NSMenuItem {
         let item = NSMenuItem(title: String(localized: "Site Access", comment: "Submenu of an extension's menu: which sites the extension may read and change."), action: nil, keyEquivalent: "")
         item.image = Tokens.Symbol.image("globe")
         let menu = NSMenu()
         menu.autoenablesItems = false
-        let access = ExtensionStore.siteAccess(id)
+        let installs = installs
+        let access = installs.siteAccess(id)
         let tab = tabManager.selectedTab
         let site = ContentBlocker.site(of: tab?.url)
-        let all = SidebarMenus.Item(String(localized: "On All Sites", comment: "Site Access choice: the extension works on every site.")) { ExtensionStore.setSiteAccess(id, .all); tab?.reload() }
+        let all = SidebarMenus.Item(String(localized: "On All Sites", comment: "Site Access choice: the extension works on every site.")) { installs.setSiteAccess(id, .all); tab?.reload() }
         all.state = access == .all ? .on : .off
-        let click = SidebarMenus.Item(String(localized: "When You Click It", comment: "Site Access choice: the extension works on a site only after its button is clicked.")) { ExtensionStore.setSiteAccess(id, .click, sites: []); tab?.reload() }
+        let click = SidebarMenus.Item(String(localized: "When You Click It", comment: "Site Access choice: the extension works on a site only after its button is clicked.")) { installs.setSiteAccess(id, .click, sites: []); tab?.reload() }
         click.state = access == .click ? .on : .off
         menu.addItem(all)
         menu.addItem(click)
         if let site {
-            let sites = access == .sites ? ExtensionStore.accessSites(id) : []
+            let sites = access == .sites ? installs.accessSites(id) : []
             let listed = sites.contains(site)
             let only = SidebarMenus.Item(access == .sites ? String(localized: "On \(site)", comment: "Site Access choice: the extension works on this site, one of the sites listed for it. The site is a domain.")
                                                                  : String(localized: "Only on \(site)", comment: "Site Access choice: the extension works only on this site. The site is a domain.")) {
                 let next = listed ? sites.filter { $0 != site } : sites + [site]
-                ExtensionStore.setSiteAccess(id, .sites, sites: next)
+                installs.setSiteAccess(id, .sites, sites: next)
                 tab?.reload()
             }
             only.state = listed ? .on : .off
@@ -586,7 +590,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             menu.addItem(only)
             if access == .sites {
                 for other in sites where other != site {
-                    let entry = SidebarMenus.Item(String(localized: "On \(other)", comment: "Site Access choice: the extension works on this site, one of the sites listed for it. The site is a domain.")) { ExtensionStore.setSiteAccess(id, .sites, sites: sites.filter { $0 != other }) }
+                    let entry = SidebarMenus.Item(String(localized: "On \(other)", comment: "Site Access choice: the extension works on this site, one of the sites listed for it. The site is a domain.")) { installs.setSiteAccess(id, .sites, sites: sites.filter { $0 != other }) }
                     entry.state = .on
                     menu.addItem(entry)
                 }
@@ -633,7 +637,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard id != offeredExtensionID else { return }
         if offeredExtensionID != nil { WebStoreOffer.hide() }
         offeredExtensionID = id
-        guard let id, !ExtensionStore.isInstalled(id) else { return }
+        guard let id, !installs.isInstalled(id) else { return }
         // Shown once the page has its title, so the bar can name the extension.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
             guard let self, self.offeredExtensionID == id else { return }
@@ -651,6 +655,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// hears each stage (the store bar shows them); without it, toasts do.
     func installExtension(_ id: String, progress: ((InstallStage) -> Void)? = nil) {
         guard #available(macOS 15.4, *) else { return }
+        // The profile you were in when you asked: it's added there, wherever you are by the time it's ready.
+        let profile = tabManager.profile
         let report: (InstallStage) -> Void = { [weak self] stage in
             if let progress { progress(stage); return }
             guard let self else { return }
@@ -684,7 +690,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 ExtensionSheet.present(content, in: self, onConfirm: {
                     report(.adding)
                     Task {
-                        switch await ExtensionStore.finishInstall(prepared) {
+                        switch await ExtensionStore.finishInstall(prepared, in: profile) {
                         case .success(let name):
                             report(.added(name))
                             // After the store bar has gone, when it's up, so the two never sit on each other.
@@ -954,9 +960,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func addPinItems(to menu: NSMenu, id: String) {
-        let pinned = ExtensionStore.pins.contains(id)
-        let item = SidebarMenus.Item(pinned ? SitePanel.unpinTitle : SitePanel.pinTitle, symbol: pinned ? "pin.slash" : "pin") { ExtensionStore.togglePin(id) }
-        if !pinned, !ExtensionStore.canPin(id) {
+        let installs = installs
+        let pinned = installs.pins.contains(id)
+        let item = SidebarMenus.Item(pinned ? SitePanel.unpinTitle : SitePanel.pinTitle, symbol: pinned ? "pin.slash" : "pin") { installs.togglePin(id) }
+        if !pinned, !installs.canPin(id) {
             item.isEnabled = false
             item.toolTip = SitePanel.pinLimitTip
         }
@@ -978,6 +985,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let menu = NSMenu()
         menu.autoenablesItems = false
         let id = context.uniqueIdentifier
+        let profile = tabManager.profile
+        let installs = profile.installs
         let title = NSMenuItem(title: context.webExtension.displayName ?? String(localized: "Extension", comment: "Heading of an extension's menu when the extension has no name."), action: nil, keyEquivalent: "")
         title.isEnabled = false
         menu.addItem(title)
@@ -988,10 +997,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         menu.addItem(siteAccessItem(for: id))
         addPinItems(to: menu, id: id)
-        menu.addItem(SidebarMenus.Item(String(localized: "Turn Off", comment: "Item in an extension's menu: turns the extension off."), symbol: "pause.circle") { ExtensionStore.setEnabled(id, false) })
+        menu.addItem(SidebarMenus.Item(String(localized: "Turn Off", comment: "Item in an extension's menu: turns the extension off."), symbol: "pause.circle") { installs.setEnabled(id, false) })
         menu.addItem(SidebarMenus.Item(String(localized: "Remove from Zigzag…", comment: "Item in an extension's menu: removes the extension."), symbol: "trash") { [weak self] in
             guard let self else { return }
-            ConfirmSheet.removeExtension(id: id, name: context.webExtension.displayName, in: self.root.overlay)
+            ConfirmSheet.removeExtension(id: id, name: context.webExtension.displayName, from: profile, in: self.root.overlay)
         })
         guard footer else { return menu }
         menu.addItem(.separator())

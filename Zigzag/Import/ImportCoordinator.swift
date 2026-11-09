@@ -220,7 +220,7 @@ enum ImportCoordinator {
     /// `extensions`: count the extensions it has that Zigzag doesn't, where they're offered.
     static func preview(_ source: Source, extensions: Bool = false) async -> String {
         let kind = source.kind
-        let installed: Set<String>? = extensions ? Set(ExtensionStore.installedIDs) : nil
+        let installed: Set<String>? = extensions ? Set(Profiles.shared.default.installs.installedIDs) : nil
         return await Task.detached(priority: .utility) { () -> String in
             let spaces = String(localized: "spaces", comment: "Item in the short list of what a browser holds, in the Import window: Arc's spaces.")
             let history = String(localized: "history", comment: "Item in the short list of what a browser holds, in the Import window: its browsing history.")
@@ -357,13 +357,13 @@ enum ImportCoordinator {
         }
 
         if choice.contains(.extensions), case .chromium(let browser) = source.kind {
-            let installed = Set(ExtensionStore.installedIDs), name = source.name
+            let installed = Set(Profiles.shared.default.installs.installedIDs), name = source.name
             summary.foundExtensions = await Task.detached(priority: .userInitiated) {
                 ChromiumExtensions.toAdd(ChromiumExtensions.found(in: browser, source: name), installed: installed)
             }.value
         }
         if choice.contains(.extensions), case .orion(let browser) = source.kind {
-            let installed = Set(ExtensionStore.installedIDs), name = source.name
+            let installed = Set(Profiles.shared.default.installs.installedIDs), name = source.name
             summary.foundExtensions = await Task.detached(priority: .userInitiated) {
                 ChromiumExtensions.toAdd(OrionImporter.extensions(of: browser, source: name), installed: installed)
             }.value

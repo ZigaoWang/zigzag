@@ -196,7 +196,7 @@ final class Tab: NSObject {
         } else if !fromWebKit {
             WebKitSetup.configure(configuration, for: profile)
             WebNotifications.attach(to: configuration, isPrivate: privateStore != nil)
-            Passkeys.attach(to: configuration, isPrivate: privateStore != nil)
+            Passkeys.attach(to: configuration, isPrivate: privateStore != nil, profile: profile)
             HistoryPage.attach(to: configuration)
             if let privateStore {
                 configuration.websiteDataStore = privateStore

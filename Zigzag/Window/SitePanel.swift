@@ -285,7 +285,8 @@ final class SitePanel: FloatingPanelView {
     }
 
     private func wireHoverPin(_ tile: PanelTile, _ pin: HoverPin, id: String) {
-        pin.onClick = { _ in ExtensionStore.togglePin(id) }
+        let installs = tab.profile.installs
+        pin.onClick = { _ in installs.togglePin(id) }
         // The pointer on the tile or on the pin; or the keyboard on the tile.
         let update: (Bool) -> Void = { [weak tile, weak pin] _ in
             guard let tile, let pin else { return }
@@ -317,16 +318,17 @@ final class SitePanel: FloatingPanelView {
     private func refreshHoverPins() {
         // A count that came or went moves the pin to the other corner.
         needsLayout = true
-        let pins = ExtensionStore.pins
+        let installs = tab.profile.installs
+        let pins = installs.pins
         for entry in hoverPins {
             let pinned = pins.contains(entry.id)
             let id = entry.id
-            entry.pin.state = pinned ? .pinned : ExtensionStore.canPin(id) ? .unpinned : .atLimit
+            entry.pin.state = pinned ? .pinned : installs.canPin(id) ? .unpinned : .atLimit
             let state = pinned ? String(localized: "Pinned", comment: "VoiceOver value of an extension's button in the site panel when it's pinned to the address bar.") : nil
             entry.tile.setAccessibilityValue([entry.value, state].compactMap { $0 }.joined(separator: ", "))
             entry.tile.setAccessibilityCustomActions(entry.pin.state == .atLimit ? nil : [
                 NSAccessibilityCustomAction(name: pinned ? Self.unpinTitle : Self.pinTitle) {
-                    MainActor.assumeIsolated { ExtensionStore.togglePin(id) }
+                    MainActor.assumeIsolated { installs.togglePin(id) }
                     return true
                 },
             ])

@@ -75,11 +75,11 @@ enum WebKitSetup {
         }
         // Sites an extension lets message it get Chrome's name for that messaging.
         if #available(macOS 15.4, *) {
-            let patterns = ExtensionStore.externallyConnectablePatterns()
+            let patterns = profile.installs.externallyConnectablePatterns()
             if !patterns.isEmpty { configuration.userContentController.addUserScript(PageScripts.chromeRuntime(matching: patterns)) }
         }
         // With an extension that can capture tabs (Shazam), pages note where their Web Audio plays, so it can hear them.
-        if #available(macOS 15.4, *), ExtensionStore.someEnabledExtensionDeclares("tabCapture"),
+        if #available(macOS 15.4, *), profile.installs.someEnabledExtensionDeclares("tabCapture"),
            !configuration.userContentController.userScripts.contains(BridgeTabCapture.routesScript) {
             configuration.userContentController.addUserScript(BridgeTabCapture.routesScript)
         }

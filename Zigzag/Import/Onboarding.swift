@@ -1865,7 +1865,7 @@ private final class ExtensionsPicker: StepContent {
         list.layer?.borderWidth = 0
         addSubview(list)
         var installed: Set<String> = []
-        if #available(macOS 15.4, *) { installed = Set(ExtensionHost.shared.installed.keys) }
+        if #available(macOS 15.4, *) { installed = Set(Profiles.shared.default.extensions.installed.keys) }
         for (i, s) in Self.suggestions.enumerated() {
             let row = ExtensionRow(name: s.name, kind: s.kind)
             if installed.contains(s.id) { row.state = .added }
@@ -1914,7 +1914,7 @@ private final class ExtensionsPicker: StepContent {
             var failed = false
             for (row, id) in work {
                 row.state = .working
-                switch await ExtensionStore.install(id) {
+                switch await ExtensionStore.install(id, in: Profiles.shared.default) {
                 case .success: row.state = .added
                 case .failure(let error):
                     failed = true
