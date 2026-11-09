@@ -79,6 +79,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // So does the guide while it points at something in it.
         root.keepsRevealed = { [weak self] in
             SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) || GuidedTour.holdsSidebar(in: self?.window)
+                || self?.popupHoldsSidebar == true
         }
         root.onSplitRatioChange = { [weak self] ratio, final in
             guard let self, final, let tab = self.tabManager.selectedTab else { return }
@@ -106,6 +107,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
+        sidebar.address.onPinsMoved = { [weak self] in
+            if #available(macOS 15.4, *), let self { ExtensionHost.shared.repositionPinPopups(of: self) }
+        }
         sidebar.address.siteControlsButton.onClick = { [weak self] _ in
             if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
         }
@@ -848,6 +852,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if root.sidebarVisible || root.isSidebarFloatingVisible { return (sidebar.address, sidebar.address.bounds) }
         let card = root.cardFrame
         return (root.overlay, NSRect(x: card.minX + Tokens.Space.x3, y: card.minY + Tokens.Space.x2, width: 1, height: 1))
+    }
+
+    /// Where a popup opens from: under its pinned button when it was opened from one still showing, otherwise
+    /// `addressAnchor`. `id` nil for any other popup.
+    func popupAnchor(forPin id: String?) -> (view: NSView, rect: NSRect) {
+        guard let id, root.sidebarVisible || root.isSidebarFloatingVisible, sidebar.address.visiblePinIDs.contains(id),
+              let button = sidebar.address.pinButton(for: id) else { return addressAnchor }
+        return (sidebar.address, button.frame)
+    }
+
+    private var popupHoldsSidebar: Bool {
+        guard #available(macOS 15.4, *) else { return false }
+        return ExtensionHost.shared.holdsSidebar(in: window)
     }
 
     /// The page you're working in: the whole page area, or in split view the focused pane.

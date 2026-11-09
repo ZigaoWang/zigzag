@@ -542,7 +542,7 @@ class FloatingPanelView: NSView {
     var replacesExtensionPopup: Bool { false }
 
     func present(arrival: Arrival = .pop) {
-        if replacesExtensionPopup, #available(macOS 15.4, *) { ExtensionHost.shared.closeActionPopup() }
+        if replacesExtensionPopup, #available(macOS 15.4, *) { ExtensionHost.shared.closePopups(in: window) }
         layoutSubtreeIfNeeded()
         recede(true)
         alphaValue = 1

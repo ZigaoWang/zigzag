@@ -942,15 +942,15 @@ enum DebugBridge {
             }
         case "extclickpanel":
             // As if clicked in the site panel.
-            if #available(macOS 15.4, *), let panel = SitePanel.shown, let anchor = panel.subviews.first?.subviews.last ?? panel.subviews.first,
+            if #available(macOS 15.4, *), SitePanel.shown != nil,
                let item = ExtensionHost.shared.actions(for: controller.tabManager.selectedTab).first(where: { $0.id == arg }) {
-                ExtensionHost.shared.performAction(item, tab: controller.tabManager.selectedTab, anchor: anchor)
+                ExtensionHost.shared.performAction(item, tab: controller.tabManager.selectedTab, in: controller)
             }
         case "extclick":
             // extclick <extension id>: clicks its button, as from the site panel.
             if #available(macOS 15.4, *), let item = ExtensionHost.shared.actions(for: controller.tabManager.selectedTab).first(where: { $0.id == arg }) {
                 debugLog("extclick \(item.label) attention=\(item.attention != nil)")
-                ExtensionHost.shared.performAction(item, tab: controller.tabManager.selectedTab, anchor: controller.sidebar.address)
+                ExtensionHost.shared.performAction(item, tab: controller.tabManager.selectedTab, in: controller)
             } else { debugLog("extclick: no action for \(arg)") }
         case "loadunpacked": Task { _ = await ExtensionStore.loadUnpacked(URL(fileURLWithPath: arg, isDirectory: true)) }
         case "extaccess":
@@ -973,7 +973,7 @@ enum DebugBridge {
             } else { debugLog("extpopupstate: no popup page") }
         case "extpopup":
             if let item = ExtensionHost.shared.actions(for: controller.tabManager.selectedTab).first(where: { $0.id == arg }) {
-                ExtensionHost.shared.performAction(item, tab: controller.tabManager.selectedTab, anchor: controller.sidebar.address)
+                ExtensionHost.shared.performAction(item, tab: controller.tabManager.selectedTab, in: controller)
             }
         case "extapprove": Task { await ExtensionStore.approvePendingUpdate(arg) }
         case "extoff": ExtensionStore.setEnabled(arg, false)
@@ -1233,7 +1233,7 @@ enum DebugBridge {
         if let item {
             ExtensionHost.shared.lastAction = nil
             let tabs = controller.tabManager.currentTabs.count
-            ExtensionHost.shared.performAction(item, tab: tab, anchor: controller.sidebar.address)
+            ExtensionHost.shared.performAction(item, tab: tab, in: controller)
             try? await Task.sleep(for: .seconds(3))
             let popup = ExtensionHost.shared.lastAction?.popupWebView
             report["popup"] = popup != nil
