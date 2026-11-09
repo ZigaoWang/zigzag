@@ -35,9 +35,9 @@ enum WebKitSetup {
         // Testing on video sites: nothing plays until clicked, so nothing makes a sound.
         if UserDefaults.standard.bool(forKey: "DebugNoAutoplay") { configuration.mediaTypesRequiringUserActionForPlayback = .all }
         #endif
-        // WKWebView leaves Picture in Picture off for MSE players (Bilibili's blob: video), so the page says it
-        // "doesn't support it" and View › Picture in Picture finds nothing to float. Safari has it on. The key is
-        // WebKit's own and unpublished, so it's only set when WebKit still has it.
+        // WKWebView leaves a page's own Picture in Picture off for every video (Safari has it on), so sites like
+        // Bilibili say they "don't support it" and View › Picture in Picture finds nothing to float. Pages still need
+        // a click to float a video. The key is WebKit's own and unpublished, so it's only set when WebKit still has it.
         if configuration.preferences.responds(to: NSSelectorFromString("_setAllowsPictureInPictureMediaPlayback:")) {
             configuration.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
         }
