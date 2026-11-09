@@ -187,7 +187,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     private func choose(space id: UUID) {
         guard id != tab.spaceID, Library.shared.space(id) != nil else { return }
-        tab.spaceID = id
+        tab.setSpace(id)
         paint(animated: true)
         refreshStrip()
     }

@@ -41,7 +41,8 @@ final class Tab: NSObject {
     }
 
     let id: UUID
-    var spaceID: UUID
+    /// The space it's in. Changed only through `setSpace`, the one place that can see a tab change profile.
+    private(set) var spaceID: UUID
     /// Set when this tab is the live page behind a bookmark. Such tabs live in the bookmark row, not the tab list.
     var bookmarkID: UUID?
     /// Set when this tab is the live page behind a favorite tile.
@@ -93,6 +94,12 @@ final class Tab: NSObject {
     /// Set for tabs in a private window: their own throwaway storage, and nothing remembered.
     var privateStore: WKWebsiteDataStore?
     var isPrivate: Bool { privateStore != nil }
+
+    /// Moves it to another space.
+    func setSpace(_ id: UUID) {
+        spaceID = id
+    }
+
     /// The profile its page is made in. There is one today.
     var profile: Profile { Profiles.shared.default }
     /// Its profile's extensions. None for a private tab: as in Chrome, extensions stay out of private browsing.
