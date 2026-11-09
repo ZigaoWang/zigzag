@@ -110,6 +110,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.address.onPinsMoved = { [weak self] in
             if #available(macOS 15.4, *), let self { ExtensionHost.shared.repositionPinPopups(of: self) }
         }
+        sidebar.address.onPinDragBegan = { [weak self] in
+            if #available(macOS 15.4, *) { ExtensionHost.shared.closePopups(in: self?.window) }
+        }
+        sidebar.address.onPinsReordered = { ExtensionStore.reorderPins(visible: $0) }
         sidebar.address.siteControlsButton.onClick = { [weak self] _ in
             if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
         }
@@ -959,6 +963,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             item.toolTip = SitePanel.pinLimitTip
         }
         menu.addItem(item)
+        let visible = sidebar.address.visiblePinIDs
+        guard visible.count > 1, let index = visible.firstIndex(of: id) else { return }
+        menu.addItem(.separator())
+        let left = SidebarMenus.Item(AddressView.moveLeftTitle, symbol: "arrow.left") { [weak self] in self?.sidebar.address.movePin(id, by: -1) }
+        left.isEnabled = index > 0
+        menu.addItem(left)
+        let right = SidebarMenus.Item(AddressView.moveRightTitle, symbol: "arrow.right") { [weak self] in self?.sidebar.address.movePin(id, by: 1) }
+        right.isEnabled = index < visible.count - 1
+        menu.addItem(right)
+        menu.addItem(.separator())
     }
 
     @available(macOS 15.4, *)

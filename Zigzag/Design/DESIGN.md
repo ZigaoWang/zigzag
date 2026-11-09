@@ -128,7 +128,7 @@ The browser window's compact scale (`Tokens.Sidebar`, `Tokens.Pane`):
 | Element | Size |
 |---|---|
 | Toolbar | 14pt glyphs in 26pt buttons (`Sidebar.glyph`, `button`), no fill at rest, a radius-6 hover fill; every glyph's ink on the traffic lights' center line (`Sidebar.lightsCenter`, 22), reload's ink as far from the right edge as the lights from the left |
-| Address | 30pt soft field, radius 8, `Chrome.field` and no line, the host at 13pt 10pt in, its buttons 22pt with 13pt glyphs; the accent ring from the keyboard |
+| Address | 30pt soft field, radius 8, `Chrome.field` and no line, the host at 13pt 10pt in, its buttons 26pt with 14pt glyphs; up to 3 pinned extensions before Site Controls, dragged sideways to reorder (lifted to 104%, a neighbor gliding aside at the halfway point), hiding from the left so the host keeps 72pt; the accent ring from the keyboard |
 | Favorites | As many to a row as fit 56pt wide (3 at the usual width), or 2, 3 or 4 as chosen in Settings; 36pt soft tiles 6pt apart, 18pt icons, radius 8, `Chrome.field`; a fine `Chrome.openEdge` while the page is open, the card while it's the one you're on; the × chip 14pt, 3pt inside the corner |
 | Space name | 26 light, as typed (`Font.spaceName`), kern -0.6, 36pt slot, its ink on the icon column |
 | Rows | 13pt text (`Font.sidebarRow`), 30pt tall, 2pt apart, 16pt favicons; icons at 12pt from the sidebar's edge, titles at 36; a pinned page that's open has a fine `Chrome.openEdge`, as a favorite does |
@@ -264,7 +264,7 @@ something came from, answers at once, and can be interrupted.
 - **Sidebar**: on the frame, compact (`Tokens.Sidebar`, the table above). Top row: the traffic lights,
   `Sidebar.lightsGap` (12) to the toggle's glyph, then back, forward and reload at the trailing end, every glyph's
   ink centered on the lights' line (`Symbol.inkOffset`), in `Color.chromeIcon`, no fill until the pointer is on it.
-  The address: a soft field of the space's color (`Chrome.field`, the host in `textPrimary`, its own small buttons,
+  The address: a soft field of the space's color (`Chrome.field`, the host in `textPrimary`, its own small buttons, any pinned extensions by Site Controls at its right,
   the accent ring from the keyboard). Favorites: small soft tiles four to a row in the same look. The space's name,
   26 light, over its pinned tabs. The tab you're on: the light card of the color, which slides when you pick another. A split row shows both pages, each half with its icon, its title and, while that page
   plays or is muted, its own speaker. A pinned page that has wandered reads "<its name> / <the page it's on>". Then
