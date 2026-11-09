@@ -63,6 +63,35 @@
   const portable = (value) => {
     try { return JSON.parse(JSON.stringify(value, (key, v) => (v instanceof Error ? { name: v.name, message: v.message, stack: v.stack } : v))); } catch (e) { return value; }
   };
+  // Between a page and its worker Chrome copies bytes too (a file's, to upload); a runtime port carries only JSON,
+  // so they go as base64 and come out as what they were.
+  const BYTES_KEY = '__zigzagBytes';
+  const carried = (value) => {
+    try {
+      return JSON.parse(JSON.stringify(value, (key, v) => {
+        if (v instanceof ArrayBuffer || ArrayBuffer.isView(v)) {
+          const bytes = v instanceof ArrayBuffer ? new Uint8Array(v) : new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+          let text = '';
+          for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+          return { [BYTES_KEY]: btoa(text), type: v instanceof ArrayBuffer ? 'ArrayBuffer' : v.constructor.name };
+        }
+        return v instanceof Error ? { name: v.name, message: v.message, stack: v.stack } : v;
+      }));
+    } catch (e) { return value; }
+  };
+  const restored = (value) => {
+    if (!value || typeof value !== 'object') return value;
+    if (typeof value[BYTES_KEY] === 'string') {
+      const text = atob(value[BYTES_KEY]);
+      const bytes = new Uint8Array(text.length);
+      for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
+      const View = globalThis[value.type];
+      if (value.type === 'ArrayBuffer' || typeof View !== 'function') return bytes.buffer;
+      return View === DataView ? new DataView(bytes.buffer) : new View(bytes.buffer, 0, bytes.length / View.BYTES_PER_ELEMENT);
+    }
+    for (const key of Object.keys(value)) value[key] = restored(value[key]);
+    return value;
+  };
   const workerPage = (() => {
     if (isWorker || typeof location === 'undefined' || location.protocol !== 'webkit-extension:') return null;
     const container = globalThis.navigator && navigator.serviceWorker;
@@ -71,23 +100,54 @@
     let port = null;
     // The worker the page posted to, as its messages' source.
     let worker = null;
+    // MessageChannel ports the page handed its worker, by number: what the worker posts on one arrives here, and
+    // what's posted to this end goes to the worker's.
+    const handed = new Map();
+    let handedCount = 0;
     const connect = () => {
       if (port) return port;
       const api = globalThis.chrome || globalThis.browser;
-      port = api.runtime.connect({ name: WORKER_PORT });
-      port.onMessage.addListener((message) => {
-        if (!message || message.kind !== 'message') return;
-        const event = new MessageEvent('message', { data: message.data, origin: location.origin });
+      const current = port = api.runtime.connect({ name: WORKER_PORT });
+      current.onMessage.addListener((message) => {
+        if (!message) return;
+        if (message.kind === 'port') {
+          const relay = handed.get(message.id);
+          if (relay) relay.end.postMessage(restored(message.data));
+          return;
+        }
+        if (message.kind !== 'message') return;
+        const event = new MessageEvent('message', { data: restored(message.data), origin: location.origin });
         Object.defineProperty(event, 'source', { value: container.controller || worker });
         container.dispatchEvent(event);
       });
-      // The worker was unloaded: the next message wakes it, over a new port.
-      port.onDisconnect.addListener(() => { port = null; });
-      return port;
+      // The worker was unloaded: the next message wakes it, over a new port. The ports handed to it are gone with it.
+      current.onDisconnect.addListener(() => {
+        if (port === current) port = null;
+        for (const [id, relay] of handed) {
+          if (relay.over !== current) continue;
+          handed.delete(id);
+          try { relay.end.close(); } catch (e) {}
+        }
+      });
+      return current;
     };
-    const send = (message) => connect().postMessage({ kind: 'message', data: portable(message) });
+    const send = (message, transfer) => {
+      const over = connect();
+      const list = Array.isArray(transfer) ? transfer : (transfer && transfer.transfer) || [];
+      const ports = [];
+      for (const end of list) {
+        if (typeof MessagePort === 'undefined' || !(end instanceof MessagePort)) continue;
+        const id = ++handedCount;
+        handed.set(id, { end, over });
+        end.onmessage = (event) => { try { over.postMessage({ kind: 'port', id, data: carried(event.data) }); } catch (e) {} };
+        ports.push(id);
+      }
+      over.postMessage({ kind: 'message', data: carried(message), ports });
+    };
     // controller stays WebKit's (none): Violentmonkey then posts to navigator.serviceWorker.ready's active worker,
-    // which WebKit does give, and only those posts, to the extension's own worker, go over the port.
+    // which WebKit does give, and only those posts, to the extension's own worker, go over the port. A Message-
+    // Channel's ports handed over with a post go too, each end relayed over the port (Kondo's site reaches its worker
+    // through one).
     try {
       const post = ServiceWorker.prototype.postMessage;
       ServiceWorker.prototype.postMessage = function (message, ...rest) {
@@ -95,9 +155,39 @@
         try { url = String(this.scriptURL); } catch (e) {}
         if (!url.startsWith(own)) return post.call(this, message, ...rest);
         worker = this;
-        return send(message);
+        return send(message, rest[0]);
       };
     } catch (e) { return null; }
+    // An extension page in a tab, or in a frame on a site, has no worker in WebKit (navigator.serviceWorker.ready
+    // never settles), where Chrome gives every page of the extension its worker. Kondo's frame on its site waited
+    // there for good, so the site never reached the extension. When WebKit has none for the page, ready gives one
+    // that stands for the extension's worker; its posts take the port above.
+    try {
+      const ready = Object.getOwnPropertyDescriptor(ServiceWorkerContainer.prototype, 'ready');
+      let standIn = null;
+      if (ready && ready.get) {
+        Object.defineProperty(container, 'ready', { configurable: true, get() {
+          if (standIn) return standIn;
+          const native = ready.get.call(container);
+          const api = globalThis.chrome || globalThis.browser;
+          let script = null;
+          try { script = ((api.runtime.getManifest() || {}).background || {}).service_worker; } catch (e) {}
+          if (!script) return native;
+          standIn = container.getRegistration().then((registration) => {
+            if (registration) return native;
+            const active = Object.create(ServiceWorker.prototype, {
+              scriptURL: { value: own + String(script).replace(/^\//, '') }, state: { value: 'activated' },
+              onstatechange: { value: null, writable: true }, onerror: { value: null, writable: true },
+            });
+            return Object.create(ServiceWorkerRegistration.prototype, {
+              active: { value: active }, installing: { value: null }, waiting: { value: null }, scope: { value: own },
+              update: { value: () => Promise.resolve() }, unregister: { value: () => Promise.resolve(false) },
+            });
+          }, () => native);
+          return standIn;
+        } });
+      }
+    } catch (e) {}
     return { connect };
   })();
 
@@ -501,19 +591,37 @@
             postMessage: (message, transfer) => {
               const handed = Array.isArray(transfer) ? transfer : transfer && transfer.transfer;
               if (handed && handed.length) throw new DOMException('A port or buffer handed over cannot reach this page.', 'DataCloneError');
-              try { port.postMessage({ kind: 'message', data: portable(message) }); } catch (e) {}
+              try { port.postMessage({ kind: 'message', data: carried(message) }); } catch (e) {}
             },
           };
           pages.set(port, client);
           if (keepOpen) keepOpen(port);
+          // The worker's ends of the ports the page handed over (above), by the page's numbers.
+          const ends = new Map();
           port.onMessage.addListener((message) => {
-            if (!message || message.kind !== 'message') return;
-            const event = new MessageEvent('message', { data: message.data });
+            if (!message) return;
+            if (message.kind === 'port') {
+              const end = ends.get(message.id);
+              if (end) end.postMessage(restored(message.data));
+              return;
+            }
+            if (message.kind !== 'message') return;
+            const handed = (Array.isArray(message.ports) ? message.ports : []).map((id) => {
+              const channel = new MessageChannel();
+              ends.set(id, channel.port2);
+              channel.port2.onmessage = (event) => { try { port.postMessage({ kind: 'port', id, data: carried(event.data) }); } catch (e) {} };
+              return channel.port1;
+            });
+            const event = new MessageEvent('message', { data: restored(message.data), ports: handed });
             Object.defineProperty(event, 'source', { value: client });
             Object.defineProperty(event, 'waitUntil', { value: (promise) => { Promise.resolve(promise).catch(() => {}); } });
             globalThis.dispatchEvent(event);
           });
-          port.onDisconnect.addListener(() => pages.delete(port));
+          port.onDisconnect.addListener(() => {
+            pages.delete(port);
+            for (const end of ends.values()) { try { end.close(); } catch (e) {} }
+            ends.clear();
+          });
         });
         // Violentmonkey makes its offscreen page and looks for it among its clients straight away, before the page
         // has posted anything; it may be an offscreen page left from the worker's last run.

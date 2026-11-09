@@ -210,9 +210,9 @@ struct ExtensionScriptTests {
         };
         if (\(worker)) {
           var ServiceWorkerGlobalScope = class { static [Symbol.hasInstance](o) { return o === globalThis; } };
-          var MessageEvent = class { constructor(type, init) { this.type = type; this.data = init.data; } };
-          var __heard = [];
-          var dispatchEvent = (e) => { __heard.push(e.data); };
+          var MessageEvent = class { constructor(type, init) { this.type = type; this.data = init.data; this.ports = init.ports || []; } };
+          var __heard = [], __events = [];
+          var dispatchEvent = (e) => { __heard.push(e.data); __events.push(e); };
           var __matchAll = async () => [], __get = async () => undefined;
           var clients = { matchAll: __matchAll, get: __get };
         } else {
@@ -307,6 +307,79 @@ struct ExtensionScriptTests {
         #expect(refused?.toString() == "DataCloneError")
         worker.evaluateScript("__client.postMessage('plain', []); __client.postMessage('also')")
         #expect(worker.evaluateScript("__page.sent.map((m) => m.data).join()").toString() == "plain,also")
+    }
+
+    /// What a page and its worker have of the web beyond what JavaScriptCore has: ports and base64.
+    private static let messagingWorld = """
+    var __b64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    var btoa = (s) => { let o = ''; for (let i = 0; i < s.length; i += 3) { const n = (s.charCodeAt(i) << 16) | ((s.charCodeAt(i + 1) || 0) << 8) | (s.charCodeAt(i + 2) || 0);
+      o += __b64[n >> 18 & 63] + __b64[n >> 12 & 63] + (i + 1 < s.length ? __b64[n >> 6 & 63] : '=') + (i + 2 < s.length ? __b64[n & 63] : '='); } return o; };
+    var atob = (s) => { let o = '', bits = 0, n = 0; for (const c of s.replace(/=+$/, '')) { n = (n << 6) | __b64.indexOf(c); bits += 6; if (bits >= 8) { bits -= 8; o += String.fromCharCode((n >> bits) & 255); } } return o; };
+    var MessagePort = class { constructor() { this.sent = []; this.closed = false; } postMessage(m) { this.sent.push(m); } close() { this.closed = true; } };
+    var MessageChannel = class { constructor() {
+      const a = new MessagePort(), b = new MessagePort();
+      a.postMessage = (m) => { a.sent.push(m); if (b.onmessage) b.onmessage({ data: m }); };
+      b.postMessage = (m) => { b.sent.push(m); if (a.onmessage) a.onmessage({ data: m }); };
+      this.port1 = a; this.port2 = b;
+    } };
+    """
+
+    @Test func aPortHandedToTheWorkerIsRelayedBothWays() {
+        // Kondo's site hands its extension a MessageChannel port, which the extension's frame passes on to its worker
+        // and every request then goes over. WebKit's way to the worker is a runtime port, which carries JSON only.
+        let page = Self.workerWorld(worker: false, setup: Self.messagingWorld)
+        page.evaluateScript("""
+        var __end = new MessagePort();
+        new ServiceWorker('webkit-extension://x/zigzag-entry.js').postMessage({ source: 'kondo-iframe' }, [__end]);
+        """)
+        #expect(page.evaluateScript("JSON.stringify(__ports[0].sent[0])").toString() == #"{"kind":"message","data":{"source":"kondo-iframe"},"ports":[1]}"#)
+        // What the site posts on its end goes to the worker, bytes as bytes; what comes back reaches the site.
+        page.evaluateScript("__end.onmessage({ data: { id: 1, file: new Uint8Array([1, 2, 255]) } })")
+        #expect(page.evaluateScript("JSON.stringify(__ports[0].sent[1])").toString()
+                == #"{"kind":"port","id":1,"data":{"id":1,"file":{"__zigzagBytes":"AQL/","type":"Uint8Array"}}}"#)
+        page.evaluateScript("__ports[0].onMessage.fire({ kind: 'port', id: 1, data: { id: 1, response: { body: { __zigzagBytes: 'AQL/', type: 'Uint8Array' } } } })")
+        #expect(page.evaluateScript("__end.sent[0].id === 1 && __end.sent[0].response.body instanceof Uint8Array && __end.sent[0].response.body.join()").toString() == "1,2,255")
+        // The worker went away: so does what was handed to it.
+        page.evaluateScript("__ports[0].onDisconnect.fire()")
+        #expect(page.evaluateScript("__end.closed").toBool())
+
+        // At the worker: the message comes with a port of its own, and the two are joined over the runtime port.
+        let worker = Self.workerWorld(worker: true, setup: Self.messagingWorld)
+        worker.evaluateScript("""
+        var __page = __port('__zigzagWorkerClient', { url: 'webkit-extension://x/ext.html' });
+        chrome.runtime.onConnect.fire(__page);
+        __page.onMessage.fire({ kind: 'message', data: { source: 'kondo-iframe' }, ports: [1] });
+        var __got = null;
+        __events[0].ports[0].onmessage = (e) => { __got = e.data; __events[0].ports[0].postMessage({ id: e.data.id, response: 'ok' }); };
+        __page.onMessage.fire({ kind: 'port', id: 1, data: { id: 7 } });
+        """)
+        #expect(worker.evaluateScript("__heard[0].source").toString() == "kondo-iframe")
+        #expect(worker.evaluateScript("__got.id").toInt32() == 7)
+        #expect(worker.evaluateScript("JSON.stringify(__page.sent[__page.sent.length - 1])").toString() == #"{"kind":"port","id":1,"data":{"id":7,"response":"ok"}}"#)
+    }
+
+    @Test func aPageWithNoWorkerOfItsOwnIsGivenOne() {
+        // WebKit gives an extension's page in a tab, or in a frame on a site (Kondo's), no worker: ready never
+        // settles. Chrome gives every page of the extension its worker.
+        let setup = """
+        var ServiceWorkerRegistration = class {};
+        var ServiceWorkerContainer = class {};
+        Object.defineProperty(ServiceWorkerContainer.prototype, 'ready', { get() { return this.__native; } });
+        var __registration;
+        navigator.serviceWorker = Object.assign(new ServiceWorkerContainer(), { controller: null, dispatchEvent: () => true,
+          __native: Promise.resolve('webkit'), getRegistration: () => Promise.resolve(__registration) });
+        chrome.runtime.getManifest = () => ({ background: { service_worker: 'zigzag-entry.js' } });
+        """
+        let tab = Self.workerWorld(worker: false, setup: setup)
+        tab.evaluateScript("navigator.serviceWorker.ready.then((r) => { globalThis.__url = r.active.scriptURL; r.active.postMessage('hi'); })")
+        #expect(tab.evaluateScript("__url").toString() == "webkit-extension://x/zigzag-entry.js")
+        #expect(tab.evaluateScript("__ports.length === 1 && __ports[0].sent[0].data").toString() == "hi")
+        #expect(tab.evaluateScript("navigator.serviceWorker.ready === navigator.serviceWorker.ready").toBool())
+
+        // Where WebKit has one (the popup), it's WebKit's.
+        let popup = Self.workerWorld(worker: false, setup: setup + "__registration = {};")
+        popup.evaluateScript("navigator.serviceWorker.ready.then((r) => { globalThis.__ready = r; })")
+        #expect(popup.evaluateScript("__ready").toString() == "webkit")
     }
 
     @Test func permissionsContainsAnswersForAnOriginWithAPort() {
