@@ -4646,6 +4646,34 @@
         }
       }
     },
+    "Embedded content from %@" : {
+      "comment" : "Who asks, in a site's permission question, for a frame from another site on a page with no site. The placeholder is the frame's site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自 %@ 的嵌入内容"
+          }
+        }
+      }
+    },
+    "Embedded content from %@ on %@" : {
+      "comment" : "Who asks, in a site's permission question, for a frame from another site: the frame's site, then the page's site it's on.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Embedded content from %1$@ on %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$@ 上来自 %1$@ 的嵌入内容"
+          }
+        }
+      }
+    },
     "Empty" : {
       "comment" : "Under a space's name in Settings › Spaces: it has no tabs.",
       "localizations" : {

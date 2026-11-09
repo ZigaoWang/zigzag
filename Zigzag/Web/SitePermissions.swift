@@ -88,6 +88,50 @@ enum SitePermissions {
         all = after
     }
 
+    /// What an answer is kept under. A frame from the page's own origin asks as the page. One from elsewhere (a call
+    /// embedded with allow="camera") asks as itself on that page only, kept under "page|embed:frame", so an answer
+    /// it got on one site never lets it in on another, nor one the frame's own site got. With no page origin to keep
+    /// that under (a file: page), nil: asked every time.
+    static func answerKey(frame: String?, page: String?) -> String? {
+        guard let frame, let page else { return nil }
+        return frame == page ? frame : "\(page)|embed:\(frame)"
+    }
+
+    /// The page's origin for a question from `tab`'s page. Without a tab to say, the frame is taken as the page.
+    private static func page(of tab: Tab?, frame: String?) -> String? {
+        guard let tab else { return frame }
+        return SiteOrigin.of(tab.url)
+    }
+
+    /// How a question names who asks: the site, or for an embedded frame, it and the page it's on.
+    static func askerName(frame: String?, page: String?) -> String {
+        guard let frame, frame != page else { return askerName(frame) }
+        guard let page else {
+            return String(localized: "Embedded content from \(SiteOrigin.label(frame))", comment: "Who asks, in a site's permission question, for a frame from another site on a page with no site. The placeholder is the frame's site.")
+        }
+        return String(localized: "Embedded content from \(SiteOrigin.label(frame)) on \(SiteOrigin.label(page))", comment: "Who asks, in a site's permission question, for a frame from another site: the frame's site, then the page's site it's on.")
+    }
+
+    /// The keys for these kinds on a site's own page: its own answers and those of frames from elsewhere on it.
+    private static func keys(_ kinds: [String], on origin: String) -> [String] {
+        let suffixes = kinds.map { "|" + $0 }
+        return all.keys.filter { k in
+            kinds.contains { k == "\(origin)|\($0)" } || (k.hasPrefix(origin + "|embed:") && suffixes.contains { k.hasSuffix($0) })
+        }
+    }
+
+    /// Camera and microphone answers given on a site's page: its own, and those of frames from elsewhere on it.
+    static func mediaDecisions(origin: String) -> [Bool] {
+        let now = all
+        return keys(["camera", "microphone", "cameraAndMicrophone"], on: origin).compactMap { now[$0] }
+    }
+
+    /// Location answers given on a site's page, its frames' included.
+    static func locationDecisions(origin: String) -> [Bool] {
+        let now = all
+        return keys(["location"], on: origin).compactMap { now[$0] }
+    }
+
     static func decision(origin: String, type: WKMediaCaptureType) -> Bool? { all["\(origin)|\(kind(type))"] }
 
     static func remember(_ allowed: Bool, origin: String, type: WKMediaCaptureType) { all["\(origin)|\(kind(type))"] = allowed }
@@ -116,13 +160,18 @@ enum SitePermissions {
     /// A site's answer about your location, if it ever asked.
     static func location(origin: String) -> Bool? { all["\(origin)|location"] }
 
-    static func forgetLocation(origin: String) { all["\(origin)|location"] = nil }
+    /// Frames from elsewhere on the site's page forget theirs too.
+    static func forgetLocation(origin: String) {
+        var now = all
+        for k in keys(["location"], on: origin) { now[k] = nil }
+        all = now
+    }
 
     /// "Ask again" for the camera and microphone only: location, notifications and apps to open each have their own
-    /// row, and stay as they are.
+    /// row, and stay as they are. Frames from elsewhere on the site's page forget theirs too.
     static func forget(origin: String) {
         var now = all
-        for kind in ["camera", "microphone", "cameraAndMicrophone"] { now["\(origin)|\(kind)"] = nil }
+        for k in keys(["camera", "microphone", "cameraAndMicrophone"], on: origin) { now[k] = nil }
         all = now
     }
 
@@ -172,15 +221,17 @@ enum SitePermissions {
     /// Location, asked and remembered the same way as the camera. A page with no origin to keep it under (file:)
     /// is asked every time.
     static func requestLocation(origin securityOrigin: WKSecurityOrigin, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> WKPermissionDecision {
-        let origin = SiteOrigin.of(securityOrigin)
-        if let origin, let known = location(origin: origin) { return known ? .grant : .deny }
+        let frame = SiteOrigin.of(securityOrigin), page = page(of: tab, frame: frame)
+        let key = answerKey(frame: frame, page: page)
+        if let key, let known = location(origin: key) { return known ? .grant : .deny }
         guard let controller = WindowManager.shared.promptHost(for: window) else { return .deny }
-        let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: "your location", symbol: "location.fill", in: controller, tab: tab,
+        let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: "your location",
+                                                symbol: "location.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
-                                                answered: { origin.flatMap { location(origin: $0) }.map { $0 ? .allow : .deny } })
+                                                answered: { key.flatMap { location(origin: $0) }.map { $0 ? .allow : .deny } })
         switch answer {
         case .allow, .deny:
-            if !isPrivate, let origin { all["\(origin)|location"] = answer == .allow }
+            if !isPrivate, let key { all["\(key)|location"] = answer == .allow }
             return answer == .allow ? .grant : .deny
         case .notNow:
             return .deny
@@ -189,8 +240,9 @@ enum SitePermissions {
 
     static func request(origin securityOrigin: WKSecurityOrigin, type: WKMediaCaptureType, window: NSWindow?, isPrivate: Bool,
                         tab: Tab? = nil) async -> WKPermissionDecision {
-        let origin = SiteOrigin.of(securityOrigin)
-        if let origin, let known = decision(origin: origin, type: type) { return known ? .grant : .deny }
+        let frame = SiteOrigin.of(securityOrigin), page = page(of: tab, frame: frame)
+        let key = answerKey(frame: frame, page: page)
+        if let key, let known = decision(origin: key, type: type) { return known ? .grant : .deny }
         let what: String, title: String
         switch type {
         case .camera: (what, title) = ("your camera", String(localized: "Use your camera", comment: "A site's permission question, without its question mark."))
@@ -201,16 +253,17 @@ enum SitePermissions {
             // Nowhere to ask (a sign-in popup): say no this time, without remembering it.
             return .deny
         }
-        let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: what, symbol: type == .microphone ? "mic.fill" : "video.fill",
-                                                in: controller, tab: tab, title: title,
-                                                answered: { origin.flatMap { decision(origin: $0, type: type) }.map { $0 ? .allow : .deny } })
+        // The question goes once the tab leaves the page it was asked on.
+        let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: what,
+                                                symbol: type == .microphone ? "mic.fill" : "video.fill", in: controller, tab: tab, title: title,
+                                                answered: { key.flatMap { decision(origin: $0, type: type) }.map { $0 ? .allow : .deny } })
         // Only a clicked answer is remembered; Esc, or the window closing, is "not now".
         switch answer {
         case .allow:
-            if !isPrivate, let origin { remember(true, origin: origin, type: type) }
+            if !isPrivate, let key { remember(true, origin: key, type: type) }
             return .grant
         case .deny:
-            if !isPrivate, let origin { remember(false, origin: origin, type: type) }
+            if !isPrivate, let key { remember(false, origin: key, type: type) }
             return .deny
         case .notNow:
             return .deny

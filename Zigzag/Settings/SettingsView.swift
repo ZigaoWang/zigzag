@@ -1694,7 +1694,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let origin = origins[site]
             let choices = origin.map { SitePermissions.choices(origin: $0) } ?? [:]
             for kind in ["camera", "microphone", "cameraAndMicrophone", "location", "notifications", "popups"] {
-                if let allowed = choices[kind], let choice = Self.siteChoice(kind, allowed: allowed) { said.append(choice) }
+                // A frame from elsewhere answered on the site's page: shown on the site's row when it has none of its own.
+                let allowed = choices[kind] ?? choices.first { $0.key.hasPrefix("embed:") && $0.key.hasSuffix("|" + kind) }?.value
+                if let allowed, let choice = Self.siteChoice(kind, allowed: allowed) { said.append(choice) }
             }
             for (kind, allowed) in choices.sorted(by: { $0.key < $1.key }) where allowed && kind.hasPrefix("app:") {
                 let app = ExternalLinks.appName(forScheme: String(kind.dropFirst(4)))

@@ -296,8 +296,9 @@ final class SitePanel: FloatingPanelView {
         }
         // Answers are the page's origin's: another port or scheme on the same host has its own.
         if let origin {
-            // Calls (Meet, Zoom, Teams) ask for both at once and are kept as one answer; that counts here too.
-            let media = [WKMediaCaptureType.camera, .microphone, .cameraAndMicrophone].compactMap { SitePermissions.decision(origin: origin, type: $0) }
+            // Calls (Meet, Zoom, Teams) ask for both at once and are kept as one answer; that counts here too, and
+            // so do the answers of a call from elsewhere embedded in the page.
+            let media = SitePermissions.mediaDecisions(origin: origin)
             if !media.isEmpty {
                 let allowed = media.allSatisfy { $0 }
                 rows.append(.value(String(localized: "Camera and microphone", comment: "Row in the site panel's This Site group."), allowed ? Self.allowed : Self.blocked, action: Self.askAgain) { [weak self] in
@@ -305,7 +306,9 @@ final class SitePanel: FloatingPanelView {
                     self?.rebuildRows()
                 })
             }
-            if let allowed = SitePermissions.location(origin: origin) {
+            let locations = SitePermissions.locationDecisions(origin: origin)
+            if !locations.isEmpty {
+                let allowed = locations.allSatisfy { $0 }
                 rows.append(.value(String(localized: "Location", comment: "Row in the site panel's This Site group."), allowed ? Self.allowed : Self.blocked, action: Self.askAgain) { [weak self] in
                     SitePermissions.forgetLocation(origin: origin)
                     self?.rebuildRows()
