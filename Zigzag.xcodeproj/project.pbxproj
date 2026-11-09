@@ -85,6 +85,7 @@
 		55E2EE95BF56E2D3A4B618EF /* PageCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979ECE3AE8285E787E972E3E /* PageCardView.swift */; };
 		57456DF0F211F4F978E29567 /* SitePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B14798B8A091AAE19C57100 /* SitePanel.swift */; };
 		5825C6C1A2BFB78C050115ED /* PasswordHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C6B64529E363AA584C30979 /* PasswordHealth.swift */; };
+		58E9C13EC966E01059CFEF0A /* ChromiumExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EA6931C96DF7709CF8A2B6 /* ChromiumExtensions.swift */; };
 		5C65A6AF892576313C6E9F2B /* Feedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61765B735BE30C84A0D55AA /* Feedback.swift */; };
 		5DEA33BF35DB8A21FE90DDC9 /* WhatsNewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0210E259AE4B1296648499E /* WhatsNewTests.swift */; };
 		5E2555180F5809CC3A7C971A /* GuidedTour.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62342912C2566D4F242E9B14 /* GuidedTour.swift */; };
@@ -131,6 +132,7 @@
 		91501632F628CC18660775E6 /* SecurityFixesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7890881D589D032D70E5DC20 /* SecurityFixesTests.swift */; };
 		92E095E45C00B0891F8EBF6B /* ConfirmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD3351437EE20BC819F95CD /* ConfirmSheet.swift */; };
 		94ADB66CC737D1DA231E3D74 /* ads.html in Resources */ = {isa = PBXBuildFile; fileRef = 016FF1BFB8B47B23AE450117 /* ads.html */; };
+		95116D4DAA8CC50801C588B5 /* ChromiumExtensionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7069B71082962459B24D179F /* ChromiumExtensionsTests.swift */; };
 		95A0A278C6E484155212F812 /* FaviconRankTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888D287756137DE5F88678F5 /* FaviconRankTests.swift */; };
 		9704C8BCFA0009792B8AC0FF /* PasswordGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 959ACDC16ECDF0A6CED7B431 /* PasswordGenerator.swift */; };
 		995DC7DEF8E08A8C2ADFFE2D /* SavePasswordPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7620A6879D1A5DEB651B0A66 /* SavePasswordPrompt.swift */; };
@@ -324,6 +326,7 @@
 		6CE05E70848504F5FE346B61 /* ZigzagRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ZigzagRelease.entitlements; sourceTree = "<group>"; };
 		6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
 		6E9E28B1061F9D52B96C814E /* ZigzagTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZigzagTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7069B71082962459B24D179F /* ChromiumExtensionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromiumExtensionsTests.swift; sourceTree = "<group>"; };
 		71C449E3F3ECA4A28D2BCAA7 /* bridge.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = bridge.js; sourceTree = "<group>"; };
 		7620A6879D1A5DEB651B0A66 /* SavePasswordPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavePasswordPrompt.swift; sourceTree = "<group>"; };
 		765C1F36BCEE463F8B5316BE /* Paths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Paths.swift; sourceTree = "<group>"; };
@@ -404,6 +407,7 @@
 		D0B754CF4F921CAA567C219B /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		D0FDA440FDF6324DAFBA1C61 /* PasswordsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordsWindow.swift; sourceTree = "<group>"; };
 		D1368F679CEF702DA00EC3E6 /* Atmosphere.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Atmosphere.swift; sourceTree = "<group>"; };
+		D2EA6931C96DF7709CF8A2B6 /* ChromiumExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromiumExtensions.swift; sourceTree = "<group>"; };
 		D31A2391B831DAAD2A652FCA /* Onboarding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Onboarding.swift; sourceTree = "<group>"; };
 		D33639F712B0A57DBFC66DB5 /* IconChoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconChoice.swift; sourceTree = "<group>"; };
 		D3EF002AF6A129FB4291D7A1 /* Zigzag.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Zigzag.entitlements; sourceTree = "<group>"; };
@@ -700,6 +704,7 @@
 			isa = PBXGroup;
 			children = (
 				EDF5DDEF3F10D52662345203 /* ArcImporter.swift */,
+				D2EA6931C96DF7709CF8A2B6 /* ChromiumExtensions.swift */,
 				59824EC63CB9D39A3EFC97CC /* ChromiumImporter.swift */,
 				E314E1B3C6242087C5B2B7E3 /* CSVImporter.swift */,
 				1F512EE34F01C45AF2FE2C52 /* FirefoxImporter.swift */,
@@ -787,6 +792,7 @@
 				AFA72586980E3DDF9FDA59A8 /* AddressTests.swift */,
 				E4C5CC6B99DC222FF742570A /* BrandContrastTests.swift */,
 				BF2F4BA4D4D31C1518CC7B9E /* CapitalizationTests.swift */,
+				7069B71082962459B24D179F /* ChromiumExtensionsTests.swift */,
 				F18C84CC63265389A43E642F /* CommandActionTests.swift */,
 				8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */,
 				3014AEB17D7BEE4384710CD9 /* DeveloperToolsTests.swift */,
@@ -1044,6 +1050,7 @@
 				D4333F0C5C4389BE81F84324 /* CRXPackage.swift in Sources */,
 				0DAF6898E779587B63BA4240 /* CSVImporter.swift in Sources */,
 				6C9AC35EBAD0FD18FB48FE1F /* CarriedCopy.swift in Sources */,
+				58E9C13EC966E01059CFEF0A /* ChromiumExtensions.swift in Sources */,
 				D14729ACC5D7A52A9E69E2A9 /* ChromiumImporter.swift in Sources */,
 				407F631827EF97F15F292C2B /* CommandBarController.swift in Sources */,
 				C48183B2BC3873DC93F30DF6 /* CommandBarModel.swift in Sources */,
@@ -1175,6 +1182,7 @@
 				2E6B0BE7362F9BFA6D652A71 /* BrandContrastTests.swift in Sources */,
 				247132AF897197093E229872 /* CRXPackageTests.swift in Sources */,
 				1EA0745E8CAC4A123D48C269 /* CapitalizationTests.swift in Sources */,
+				95116D4DAA8CC50801C588B5 /* ChromiumExtensionsTests.swift in Sources */,
 				54665D76641D0469C5A31D12 /* CommandActionTests.swift in Sources */,
 				B5E6F1A8F313A228FEF5DE37 /* DeveloperToolsTests.swift in Sources */,
 				4E5CF0E3E770AEFADC046339 /* DiagnosticsTests.swift in Sources */,
