@@ -8,11 +8,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [0.7.4] - 2026-11-09
 
 ### New
-- Zigzag Mini follows Settings › General › Borderless page: borderless, the page meets the window's edges under the slim strip, as in your browser window; otherwise it sits in a thin frame of your space's color.
+- Zigzag Mini follows Settings › General › Borderless page: borderless, the page fills the window under the slim strip; otherwise it sits in a thin frame of your space's color.
 
 ### Fixed
 - A link clicked in another app opens only Zigzag Mini. Your browser windows stay exactly where they were instead of coming up behind it, and closing it takes you back to the app you were in.
-- Esc closes Zigzag Mini even when a site puts the cursor in its empty search box. In a box you've typed in, the first Esc still only leaves the box.
+- One Esc closes Zigzag Mini, even on sites that keep Esc for themselves, like a search page with its cursor in an empty box. In a box you've typed in, or with a site's own dialog open, the first Esc goes there.
 - Swiping back or forward in Zigzag Mini shows the same arrow as in a tab.
 
 ## [0.7.3] - 2026-11-09
@@ -38,7 +38,7 @@ Thanks to [@philigrin](https://github.com/philigrin) for #13.
 - Settings › Shortcuts shows an × beside a shortcut when you point at it: click it and the command has no shortcut, for one that gets in a website's way.
 
 ### Fixed
-- Site permissions are kept for each exact site, its address's scheme, host and port together. Before, allowing the microphone, camera, location, notifications, pop-ups or opening an app for one port of a host allowed every other port of it too. Sites you had allowed ask once more.
+- Site permissions are kept for each exact site, its address's scheme, host and port together. Before, allowing the microphone, camera, location, notifications, pop-ups or opening an app for one port of a host allowed every other port of it too. Sites you had allowed ask once more. Thanks to [zemu](https://github.com/ze-mu-zhou) for reporting it.
 - Right-click › Open Link in New Tab, Open Link in Peek and the new window items work on busy pages, like a forum's long topic list, where they could do nothing.
 - In a text box, ⌘← and ⌘→ jump to the start and end of the line again, as on any Mac, instead of going back or forward a page. Away from a text box they still go back and forward.
 - With the sidebar hidden, touching the window's left edge and coming straight back, as when clicking a website's own list along that side, no longer pulls the sidebar out. Going to the edge still opens it right away.
