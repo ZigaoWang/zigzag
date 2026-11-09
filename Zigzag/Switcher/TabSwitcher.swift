@@ -371,8 +371,9 @@ final class TabSwitcher {
                 case 53 /* esc */: cancel()
                 case 123 /* ← */: step(-1)
                 case 124 /* → */: step(1)
-                case 126 /* ↑ */: if index - columns >= 0 { index -= columns; updateSelection() }
-                case 125 /* ↓ */: if index + columns < tabs.count { index += columns; updateSelection() }
+                // Up and down by rows once the cards are on screen; the last row may be shorter, so down lands on its end.
+                case 126 /* ↑ */: if shown, index - columns >= 0 { index -= columns; updateSelection() }
+                case 125 /* ↓ */: if shown, index / columns < (tabs.count - 1) / columns { index = min(index + columns, tabs.count - 1); updateSelection() }
                 case 36, 76 /* return, enter */: commit()
                 default: break
                 }
