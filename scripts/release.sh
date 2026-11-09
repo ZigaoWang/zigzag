@@ -27,6 +27,9 @@ rm -rf "$OUT" && mkdir -p "$OUT/updates"
 PLANNED=$(awk -F'"' '/MARKETING_VERSION:/ {print $2; exit}' project.yml)
 grep -q "^## \[$PLANNED\]" CHANGELOG.md || { echo "CHANGELOG.md has no section for $PLANNED. Add one, then release."; exit 1; }
 
+# The network to the site and to Apple can drop for a moment: each upload is tried a few times before giving up.
+again() { local n; for n in 1 2 3 4 5; do "$@" && return 0; echo "Retrying ($n): $1"; sleep 5; done; return 1; }
+
 # A beta is the planned version with a suffix (0.5.0-beta.2), and its notes are the planned version's.
 VERSION_OVERRIDE=()
 if [[ "${1:-}" == "--beta" ]]; then
@@ -44,7 +47,7 @@ if $PUBLISHING; then
   for FEED in appcast beta; do
     # Only a missing feed (404) means "nothing live yet": any other failure stops here, rather than publishing a
     # build number that may be no higher than the live one.
-    STATUS=$(curl -sS -o /tmp/zigzag-live-$FEED.xml -w '%{http_code}' "https://$SITE_HOST/updates/$FEED.xml" || echo 000)
+    STATUS=$(curl -sS --retry 6 --retry-all-errors --retry-delay 5 --max-time 30 -o /tmp/zigzag-live-$FEED.xml -w '%{http_code}' "https://$SITE_HOST/updates/$FEED.xml" || echo 000)
     if [[ "$STATUS" != 200 && "$STATUS" != 404 ]]; then
       echo "Couldn't read the live $FEED feed (HTTP $STATUS), so the build number can't be checked. Try again."
       exit 1
@@ -136,8 +139,8 @@ if [[ "${1:-}" == "--beta" ]]; then
   echo "Writing the beta feed…"
   "$GENERATE" --download-url-prefix "https://$SITE_HOST/releases/" "$OUT/updates"
   mv "$OUT/updates/appcast.xml" "$OUT/updates/beta.xml"
-  rsync -a "$ZIP" "$SERVER:$SITE_ROOT/releases/"
-  rsync -a "$OUT/updates/beta.xml" "$SERVER:$SITE_ROOT/updates/beta.xml"
+  again rsync -a "$ZIP" "$SERVER:$SITE_ROOT/releases/"
+  again rsync -a "$OUT/updates/beta.xml" "$SERVER:$SITE_ROOT/updates/beta.xml"
   echo "Done: $VERSION is on the beta feed."
   exit 0
 fi
@@ -171,17 +174,17 @@ if [[ "${1:-}" == "--publish" ]]; then
   echo "Writing appcast…"
   "$GENERATE" --download-url-prefix "https://$SITE_HOST/releases/" "$OUT/updates"
   echo "Uploading to $SITE_HOST…"
-  rsync -a "$ZIP" "$DMG" "$SERVER:$SITE_ROOT/releases/"
-  ssh "$SERVER" "ln -sfn Zigzag-$VERSION.dmg $SITE_ROOT/releases/Zigzag-latest.dmg && ln -sfn Zigzag-$VERSION.zip $SITE_ROOT/releases/Zigzag-latest.zip"
+  again rsync -a "$ZIP" "$DMG" "$SERVER:$SITE_ROOT/releases/"
+  again ssh "$SERVER" "ln -sfn Zigzag-$VERSION.dmg $SITE_ROOT/releases/Zigzag-latest.dmg && ln -sfn Zigzag-$VERSION.zip $SITE_ROOT/releases/Zigzag-latest.zip"
   # The feed goes last, so no Mac is offered an update before its zip is there.
-  rsync -a "$OUT/updates/appcast.xml" "$SERVER:$SITE_ROOT/updates/appcast.xml"
+  again rsync -a "$OUT/updates/appcast.xml" "$SERVER:$SITE_ROOT/updates/appcast.xml"
   # The beta feed carries each stable release too, so anyone on a beta moves on to it, unless its betas already
   # lead up to a later version (0.5.0-beta.3 leads up to 0.5.0): replacing it then would move them back.
-  if BETA_FEED=$(curl -fsSL "https://$SITE_HOST/updates/beta.xml"); then
+  if BETA_FEED=$(curl -fsSL --retry 6 --retry-all-errors --retry-delay 5 --max-time 30 "https://$SITE_HOST/updates/beta.xml"); then
     NEWEST_BETA=$(print -r -- "$BETA_FEED" | grep -oE '[0-9]+(\.[0-9]+)*-beta\.[0-9]+' | sed -E 's/-beta\.[0-9]+$//' \
       | sort -t. -k1,1n -k2,2n -k3,3n | tail -1 || true)
     if [[ -z "$NEWEST_BETA" ]] || zsh scripts/version-at-least.sh "$VERSION" "$NEWEST_BETA"; then
-      rsync -a "$OUT/updates/appcast.xml" "$SERVER:$SITE_ROOT/updates/beta.xml"
+      again rsync -a "$OUT/updates/appcast.xml" "$SERVER:$SITE_ROOT/updates/beta.xml"
     else
       echo "The beta feed is left as it is: its betas lead up to $NEWEST_BETA, after $VERSION."
     fi
