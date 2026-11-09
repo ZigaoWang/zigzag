@@ -60,6 +60,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             // where they were, and closing it goes back to the app the link came from.
             controller.returnTo = AppSwitching.lastOtherApp
             if !NSApp.isActive { NSRunningApplication.current.activate(options: []) }
+            MiniLinkWake.linkOpenedInMini()
         }
         return controller
     }
