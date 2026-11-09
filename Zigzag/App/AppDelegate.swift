@@ -17,20 +17,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.register(defaults: Self.pageTextDefaults)
-        // A second copy (one opened from the disk image while the installed one runs) would load the same profile
+        // A second copy (one opened from the disk image while the installed one runs) would load the same data
         // and save over it: it hands over to the one already running and goes, before reading anything.
         if !Self.isHostingTests, !SingleCopy.claim() {
             SingleCopy.showRunningCopy()
             exit(0)
         }
         if !Self.isHostingTests {
-            // A new version backs up the profile the last one left, and a restore asked for before restarting puts
+            // A new version backs up the data the last one left, and a restore asked for before restarting puts
             // a backup back, both before anything reads it.
             // A new version owes its notes: noted before the backup records this version as the one that ran.
             WhatsNew.noteLaunch()
             let info = Bundle.main.infoDictionary
-            ProfileBackup.backUpIfUpdated(build: info?["CFBundleVersion"] as? String ?? "", version: info?["CFBundleShortVersionString"] as? String ?? "")
-            ProfileBackup.restoreIfAsked()
+            UpdateBackup.backUpIfUpdated(build: info?["CFBundleVersion"] as? String ?? "", version: info?["CFBundleShortVersionString"] as? String ?? "")
+            UpdateBackup.restoreIfAsked()
             // Site permissions kept by host alone become per origin before any page can ask.
             SitePermissions.migrateHostOnlyAnswers()
             // Extensions' service worker backgrounds start afresh, as in Chrome, before WebKit reads their registrations.
@@ -354,7 +354,7 @@ extension AppDelegate: NSMenuItemValidation {
     }
 }
 
-/// One Zigzag per profile: a lock on a file beside the profile, held for as long as Zigzag runs. The system lets it
+/// One Zigzag per data folder: a lock on a file in it, held for as long as Zigzag runs. The system lets it
 /// go when the process ends, crash or not.
 enum SingleCopy {
     private static var lock: Int32 = -1

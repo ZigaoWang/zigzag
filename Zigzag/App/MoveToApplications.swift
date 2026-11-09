@@ -72,7 +72,7 @@ enum MoveToApplications {
         if !((try? source.resourceValues(forKeys: [.volumeIsReadOnlyKey]))?.volumeIsReadOnly ?? true) {
             try? manager.trashItem(at: source, resultingItemURL: nil)
         }
-        // The new copy can only start once this one has quit (one Zigzag per profile), so it waits for that.
+        // The new copy can only start once this one has quit (one Zigzag per data folder), so it waits for that.
         let relaunch = Process()
         relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
         relaunch.arguments = ["-c", "while /bin/kill -0 \"$1\" 2>/dev/null; do /bin/sleep 0.2; done; /usr/bin/open \"$0\"",

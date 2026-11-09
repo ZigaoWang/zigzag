@@ -466,9 +466,9 @@ struct BookmarkFolderTests {
     }
 }
 
-/// The profile backup made when a new version first runs, and the restore that puts one back: in a folder of their
+/// The backup made when a new version first runs, and the restore that puts one back: in a folder of their
 /// own, never the real profile.
-struct ProfileBackupTests {
+struct UpdateBackupTests {
     private func makeRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-backup-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -483,20 +483,20 @@ struct ProfileBackupTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { try? FileManager.default.removeItem(at: root); defaults.removePersistentDomain(forName: suite) }
         // A first run, with no profile yet: nothing to back up, only the build noted.
-        ProfileBackup.backUpIfUpdated(build: "18", version: "0.4.0", defaults: defaults, root: root)
-        #expect(ProfileBackup.all(in: root).isEmpty)
+        UpdateBackup.backUpIfUpdated(build: "18", version: "0.4.0", defaults: defaults, root: root)
+        #expect(UpdateBackup.all(in: root).isEmpty)
         try "spaces".write(to: root.appendingPathComponent("Library.json"), atomically: true, encoding: .utf8)
         // The same build again: still nothing.
-        ProfileBackup.backUpIfUpdated(build: "18", version: "0.4.0", defaults: defaults, root: root)
-        #expect(ProfileBackup.all(in: root).isEmpty)
+        UpdateBackup.backUpIfUpdated(build: "18", version: "0.4.0", defaults: defaults, root: root)
+        #expect(UpdateBackup.all(in: root).isEmpty)
         // A new build: one backup, named for the version it came from.
-        ProfileBackup.backUpIfUpdated(build: "19", version: "0.5.0", defaults: defaults, root: root)
-        let backups = ProfileBackup.updates(in: root)
+        UpdateBackup.backUpIfUpdated(build: "19", version: "0.5.0", defaults: defaults, root: root)
+        let backups = UpdateBackup.updates(in: root)
         #expect(backups.count == 1)
         #expect(backups.first?.lastPathComponent.hasSuffix("Z 0.4.0") == true)
         #expect(backups.first.flatMap { read($0.appendingPathComponent("Library.json")) } == "spaces")
-        ProfileBackup.backUpIfUpdated(build: "19", version: "0.5.0", defaults: defaults, root: root)
-        #expect(ProfileBackup.all(in: root).count == 1)
+        UpdateBackup.backUpIfUpdated(build: "19", version: "0.5.0", defaults: defaults, root: root)
+        #expect(UpdateBackup.all(in: root).count == 1)
     }
 
     @Test func namesSortByTimeAcrossTheOldAndNewStamps() throws {
@@ -505,11 +505,11 @@ struct ProfileBackupTests {
         let folder = root.appendingPathComponent("Backups", isDirectory: true)
         let names = ["2026-10-01T10-00-00 0.3.0", "2026-10-03T08-00-00Z 0.5.0 before restore", "2026-10-02T09-00-00Z 0.4.0"]
         for name in names { try FileManager.default.createDirectory(at: folder.appendingPathComponent(name), withIntermediateDirectories: true) }
-        #expect(ProfileBackup.all(in: root).map(\.lastPathComponent) == [names[1], names[2], names[0]])
+        #expect(UpdateBackup.all(in: root).map(\.lastPathComponent) == [names[1], names[2], names[0]])
         // A restore puts back an update's backup, never the one made just before a restore.
-        #expect(ProfileBackup.updates(in: root).map(\.lastPathComponent) == [names[2], names[0]])
-        #expect(ProfileBackup.date(of: names[2]) == ISO8601DateFormatter().date(from: "2026-10-02T09:00:00Z"))
-        #expect(ProfileBackup.date(of: "not a backup") == nil)
+        #expect(UpdateBackup.updates(in: root).map(\.lastPathComponent) == [names[2], names[0]])
+        #expect(UpdateBackup.date(of: names[2]) == ISO8601DateFormatter().date(from: "2026-10-02T09:00:00Z"))
+        #expect(UpdateBackup.date(of: "not a backup") == nil)
     }
 
     @Test func restoreKeepsWhatWasThereAndSwapsWholeFiles() throws {
@@ -523,14 +523,14 @@ struct ProfileBackupTests {
         try "then".write(to: folder.appendingPathComponent(name).appendingPathComponent("Library.json"), atomically: true, encoding: .utf8)
         try name.write(to: folder.appendingPathComponent("Restore"), atomically: true, encoding: .utf8)
 
-        ProfileBackup.restoreIfAsked(root: root)
+        UpdateBackup.restoreIfAsked(root: root)
 
         #expect(read(root.appendingPathComponent("Library.json")) == "then")
         // The journal didn't come with the backup, so it no longer belongs.
         #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("History.sqlite-wal").path))
         #expect(!FileManager.default.fileExists(atPath: folder.appendingPathComponent("Restore").path))
         // What was there is kept, so the restore can be undone.
-        let before = try #require(ProfileBackup.all(in: root).first { $0.lastPathComponent.hasSuffix("before restore") })
+        let before = try #require(UpdateBackup.all(in: root).first { $0.lastPathComponent.hasSuffix("before restore") })
         #expect(read(before.appendingPathComponent("Library.json")) == "now")
         #expect(read(before.appendingPathComponent("History.sqlite-wal")) == "journal")
         // Nothing staged is left lying around.

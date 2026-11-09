@@ -174,7 +174,7 @@ enum WhatsNew {
     /// the offer has been on screen. A launch with no browser window to show it in keeps it for the next one.
     static let pendingKey = "WhatsNewPending"
 
-    /// At launch, before anything records this version as run (`ProfileBackup` does, as it backs up): a new version
+    /// At launch, before anything records this version as run (`UpdateBackup` does, as it backs up): a new version
     /// owes its notes. A fresh install has nothing to compare against and stays quiet.
     static func noteLaunch(defaults: UserDefaults = .standard, version: String = version) {
         let last = defaults.string(forKey: "LastRunVersion")

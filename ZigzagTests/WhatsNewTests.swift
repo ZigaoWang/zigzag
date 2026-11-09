@@ -123,7 +123,7 @@ struct WhatsNewTests {
         // Updated from 0.7.6: owed, even after the backup records 0.7.7 as run, as it does at every new build.
         defaults.set("0.7.6", forKey: "LastRunVersion")
         WhatsNew.noteLaunch(defaults: defaults, version: "0.7.7")
-        ProfileBackup.backUpIfUpdated(build: "72", version: "0.7.7", defaults: defaults, root: FileManager.default.temporaryDirectory.appendingPathComponent(suite))
+        UpdateBackup.backUpIfUpdated(build: "72", version: "0.7.7", defaults: defaults, root: FileManager.default.temporaryDirectory.appendingPathComponent(suite))
         #expect(defaults.string(forKey: "LastRunVersion") == "0.7.7")
         #expect(WhatsNew.isPending(defaults: defaults, version: "0.7.7"))
         // No browser window came up that launch: the next one still owes it.

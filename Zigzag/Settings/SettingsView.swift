@@ -202,15 +202,15 @@ enum SettingsVersionRow {
         return row
     }
 
-    /// The profile as it was before the last update, put back. Only there when a backup is.
+    /// Your data as it was before the last update, put back. Only there when a backup is.
     static func restore() -> FormRow? {
-        guard let date = ProfileBackup.latestDate else { return nil }
+        guard let date = UpdateBackup.latestDate else { return nil }
         let formatter = DateFormatter()
         formatter.locale = Words.locale
         formatter.setLocalizedDateFormatFromTemplate("MMMdjmm")
         let saved = formatter.string(from: date)
         var detail = String(localized: "Saved \(saved)", comment: "Under “Restore from before the last update” in Settings › General: when the backup was made.")
-        if let name = ProfileBackup.latest?.lastPathComponent, let space = name.firstIndex(of: " ") {
+        if let name = UpdateBackup.latest?.lastPathComponent, let space = name.firstIndex(of: " ") {
             let version = String(name[name.index(after: space)...])
             detail = String(localized: "Saved \(saved), before updating from \(version)",
                             comment: "Under “Restore from before the last update” in Settings › General: when the backup was made, and the version updated from.")
@@ -222,7 +222,7 @@ enum SettingsVersionRow {
                               message: String(localized: "Your spaces, tabs, favorites and history go back to how they were before the last update, and Zigzag restarts. Logins and passwords aren’t affected.",
                                               comment: "Message of the sheet that restores the backup."),
                               confirmTitle: String(localized: "Restore and Restart", comment: "Button of the sheet that restores the backup.")) { confirmed in
-                if confirmed { ProfileBackup.restoreLatestAndRelaunch() }
+                if confirmed { UpdateBackup.restoreLatestAndRelaunch() }
             }
         }
         let row = FormRow(title: String(localized: "Restore from before the last update", comment: "A setting in Settings › General."), detail: detail, control: button)
@@ -1621,7 +1621,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                           message: String(localized: "Your windows and tabs come back as they are. Or it switches the next time you open Zigzag.",
                                           comment: "Message of the sheet after picking a language in Settings › General."),
                           confirmTitle: String(localized: "Restart Now", comment: "Button of the sheet after picking a language in Settings › General.")) { confirmed in
-            if confirmed { ProfileBackup.relaunch() }
+            if confirmed { UpdateBackup.relaunch() }
         }
     }
 

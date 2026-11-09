@@ -47,7 +47,7 @@ final class HistoryStore {
 
     /// Runs a removal on the history in every update backup too, erasing it there as here.
     private static func scrubBackups(_ sql: String) {
-        for backup in ProfileBackup.all() {
+        for backup in UpdateBackup.all() {
             let file = backup.appendingPathComponent("History.sqlite")
             guard FileManager.default.fileExists(atPath: file.path) else { continue }
             var copy: OpaquePointer?
