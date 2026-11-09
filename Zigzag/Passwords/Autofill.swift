@@ -443,18 +443,18 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     /// Fills the focused form's fields for your details from `values` (keyed by autocomplete token), each field found
     /// by its autocomplete attribute or else its name; selects (country, state) pick the matching option. Fields
     /// already filled in are left as they are.
-    private static let formFiller = """
+    static let formFiller = """
     // Checked here, at the moment of filling: only the site the card was offered on gets it.
     if (location.origin !== expectedOrigin) return 0;
     const active = document.activeElement;
     const scope = (active && active.form) || document;
-    // Your phone and address go only where you could see them land: on the page across, near where you are
-    // (a long checkout form runs on below), not clipped away inside a tiny box, and not covered by something else.
+    // Your phone and address go only where you can see them land: on screen now (a field far down the page is
+    // one you'd never notice filled), not clipped away inside a tiny box, and not covered by something else.
     const visible = (el) => {
       if (el.disabled || el.readOnly || el.type === 'hidden') return false;
       const r = el.getBoundingClientRect();
       if (r.width < 8 || r.height < 8) return false;
-      if (r.right < 0 || r.left > innerWidth || r.bottom < -innerHeight || r.top > innerHeight * 3) return false;
+      if (r.right < 0 || r.left > innerWidth || r.bottom < 0 || r.top > innerHeight) return false;
       if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
       const style = getComputedStyle(el);
       if (style.visibility !== 'visible' || parseFloat(style.opacity) < 0.1) return false;
@@ -464,17 +464,19 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         if (!/(hidden|clip|scroll|auto)/.test(overflow)) continue;
         const b = box.getBoundingClientRect();
         if (b.width < 8 || b.height < 8) return false;
-        // A scrolling box can be scrolled to what's below; one that clips can't.
-        if (!/(hidden|clip)/.test(overflow)) continue;
+        // On screen means inside any box it's in too, scrolling or not.
         const w = Math.min(r.right, b.right) - Math.max(r.left, b.left), h = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top);
         if (w < 8 || h < 8) return false;
       }
-      if (r.top >= 0 && r.bottom <= innerHeight) {
-        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-        if (hit && hit !== el && !el.contains(hit) && !(hit.control === el)) return false;
-      }
+      const x = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1), y = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
+      const hit = document.elementFromPoint(x, y);
+      if (hit && hit !== el && !el.contains(hit) && !(hit.control === el)) return false;
       return true;
     };
+    // A form with a section for shipping and one for billing (autocomplete "section-…", "shipping", "billing"):
+    // only the part you're in.
+    const section = (el) => ((el && el.autocomplete) || '').toLowerCase().split(/\\s+/).filter((t) => /^(section-|shipping$|billing$)/.test(t)).join(' ');
+    const here = section(active);
     const guess = (el) => {
       const auto = (el.autocomplete || '').toLowerCase().split(/\\s+/).filter((t) => !/^(section-|shipping|billing|home|work|mobile)/.test(t)).pop();
       if (auto && values[auto] !== undefined) return auto;
@@ -510,7 +512,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     window.__zigzagFilling = true;
     let filled = 0;
     try {
-      for (const el of [...scope.querySelectorAll('input, select')].filter(visible)) {
+      for (const el of [...scope.querySelectorAll('input, select')].filter((el) => visible(el) && section(el) === here)) {
         const key = guess(el);
         if (!key) continue;
         if (el.tagName === 'SELECT') {

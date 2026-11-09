@@ -377,4 +377,58 @@ struct PasswordSafetyTests {
         #expect(fm.fileExists(atPath: fresh.path))
         #expect(fm.fileExists(atPath: other.path))
     }
+
+    // MARK: Pages
+
+    private final class Loading: NSObject, WKNavigationDelegate {
+        var done: CheckedContinuation<Void, Never>?
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
+    }
+
+    /// A made-up page on https://example.com, in a window that's never shown.
+    private func page(_ html: String) async -> (WKWebView, NSWindow, Loading) {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        window.contentView = webView
+        let loading = Loading()
+        webView.navigationDelegate = loading
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString(html, baseURL: URL(string: "https://example.com/"))
+        }
+        return (webView, window, loading)
+    }
+
+    private func value(_ id: String, in webView: WKWebView) async -> String? {
+        try? await webView.evaluateJavaScript("document.getElementById('\(id)').value") as? String
+    }
+
+    private func fillMyCard(_ webView: WKWebView, focusing id: String) async throws {
+        _ = try await webView.evaluateJavaScript("document.getElementById('\(id)').focus()")
+        let values: [String: String] = ["given-name": "Ada", "email": "ada@example.com", "tel": "555 0100"]
+        _ = try await webView.callAsyncJavaScript(Autofill.formFiller, arguments: ["values": values, "expectedOrigin": "https://example.com"],
+                                                  in: nil, contentWorld: .defaultClient)
+    }
+
+    @Test func myCardFillsOnlyWhatsOnScreen() async throws {
+        let (webView, _, _) = await page("""
+        <form><input id="name" name="first_name"><input id="email" name="email"><div style="height: 1000px"></div><input id="far" name="phone"></form>
+        """)
+        try await fillMyCard(webView, focusing: "name")
+        #expect(await value("name", in: webView) == "Ada")
+        #expect(await value("email", in: webView) == "ada@example.com")
+        // Below the screen: you'd never see it filled.
+        #expect(await value("far", in: webView) == "")
+    }
+
+    @Test func myCardFillsOnlyYourPartOfTheForm() async throws {
+        let (webView, _, _) = await page("""
+        <form><input id="name" autocomplete="shipping given-name"><input id="email" autocomplete="shipping email">
+        <input id="billing" autocomplete="billing email"></form>
+        """)
+        try await fillMyCard(webView, focusing: "name")
+        #expect(await value("email", in: webView) == "ada@example.com")
+        #expect(await value("billing", in: webView) == "")
+    }
 }
