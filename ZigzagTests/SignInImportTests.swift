@@ -95,10 +95,13 @@ struct SignInImportTests {
         #expect(!hostOnly.isHTTPOnly)
         #expect(hostOnly.sameSitePolicy == .sameSiteStrict)
 
-        for none in [Int64(0), -1] {
-            let open = SignInImporter.ChromiumRow(host: "example.org", name: "n", value: "v", expiresUTC: Self.in2030, secure: true, sameSite: none)
-            #expect(cookie(SignInImporter.chromiumCookie(open, key: nil, version: 24, now: Self.now))?.httpCookie?.sameSitePolicy == nil)
-        }
+        let open = SignInImporter.ChromiumRow(host: "example.org", name: "n", value: "v", expiresUTC: Self.in2030, secure: true, sameSite: 0)
+        #expect(cookie(SignInImporter.chromiumCookie(open, key: nil, version: 24, now: Self.now))?.httpCookie?.sameSitePolicy == nil)
+        // Set with no SameSite at all: Lax, as Chromium treats it, never sent along with other sites' requests.
+        let unspecified = SignInImporter.ChromiumRow(host: "example.org", name: "n", value: "v", expiresUTC: Self.in2030, secure: true, sameSite: -1)
+        let lax = try #require(cookie(SignInImporter.chromiumCookie(unspecified, key: nil, version: 24, now: Self.now)))
+        #expect(lax.sameSite == .lax)
+        #expect(lax.httpCookie?.sameSitePolicy == .sameSiteLax)
     }
 
     @Test func neverPrintsTheValue() throws {

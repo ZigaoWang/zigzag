@@ -176,11 +176,12 @@ nonisolated enum SignInImporter {
             guard let stripped = stripDomainHash(plain, host: row.host, version: version), ChromiumImporter.isText(stripped) else { return .unreadable }
             value = String(decoding: stripped, as: UTF8.self)
         }
+        // A cookie the site set with no SameSite (-1) is Lax in Chromium; set with no policy here, it would go out
+        // with every other site's requests too.
         let sameSite: SameSite = switch row.sameSite {
         case 0: .none
-        case 1: .lax
         case 2: .strict
-        default: .unset
+        default: .lax
         }
         return .cookie(Cookie(domain: row.host, name: row.name, value: value, path: row.path, expires: expires,
                               secure: row.secure, httpOnly: row.httpOnly, sameSite: sameSite))
