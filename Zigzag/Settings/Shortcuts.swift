@@ -150,11 +150,14 @@ enum Shortcuts {
     /// "Reload (⌘R)" for a tooltip: the name with the shortcut as it is now (set in Settings), or just the name if
     /// there isn't one.
     static func tooltip(_ title: String, for action: Selector) -> String {
-        guard let item = allItems.first(where: { $0.action == action }) else { return title }
-        let keys = caps(item)
-        guard !keys.isEmpty else { return title }
-        let shortcut = keys.joined()
+        let shortcut = keys(for: action)
+        guard !shortcut.isEmpty else { return title }
         return String(localized: "\(title) (\(shortcut))", comment: "A button's tooltip: its name, then its keyboard shortcut in parentheses, like “Reload (⌘R)”.")
+    }
+
+    /// "⌘O": the menu item's shortcut as it is now, or empty if it has none.
+    static func keys(for action: Selector) -> String {
+        allItems.first { $0.action == action }.map { caps($0).joined() } ?? ""
     }
 
     private static func name(of key: String) -> String {
