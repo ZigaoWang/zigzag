@@ -31,7 +31,8 @@ enum DebugBridge {
     #if DEBUG
     /// mini [url] (blank: the quick open bar, as ⌃⌘N), miniquick [text] (the quick open bar, with this typed in it),
     /// miniquickenter, miniquickesc, minibar [text] (⌘L's bar over the mini page), miniext <url> (as a link from another app), minisetting on|off,
-    /// minitype <text> (typed into the address field and entered), minimove (Open in Zigzag), miniclose,
+    /// minitype <text> (typed into the address field and entered), minimove (Open in), miniclose,
+    /// minispace [name] (the strip's space menu, or that space chosen), minicopy (Copy Link), miniresize <w> <h>,
     /// minimenu <char> [cmd|shift|ctrl|opt...] (a menu item's action, sent as the menu would to Zigzag Mini),
     /// ministate <path> (JSON), minishot <path> (the window's own drawing, as a PNG; web content may be blank),
     /// miniclosebrowsers, minijs <script> (run in the mini page), miniesc (Esc in the address field), miniquit,
@@ -60,7 +61,16 @@ enum DebugBridge {
         case "minisetting": MiniWindowController.opensExternalLinks = arg == "on"
         case "minitype": mini?.debugEnter(arg)
         case "minimove": mini?.openInZigzag()
-        case "miniclose": mini?.window?.performClose(nil)
+        case "minispace": mini?.debugSpace(arg)
+        case "minicopy": mini?.copyPageURL(nil)
+        case "miniresize":
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            if n.count == 2, let window = mini?.window {
+                var frame = window.frame
+                frame.origin.y += frame.height - n[1]
+                frame.size = NSSize(width: n[0], height: n[1])
+                window.setFrame(frame, display: true)
+            }        case "miniclose": mini?.window?.performClose(nil)
         case "miniclosebrowsers": WindowManager.shared.controllers.forEach { $0.window?.performClose(nil) }
         case "minijs": mini?.tab.webView?.evaluateJavaScript(arg, completionHandler: nil)
         case "miniesc": mini?.debugEscape()
