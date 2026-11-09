@@ -106,6 +106,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
+        sidebar.address.siteControlsButton.onClick = { [weak self] _ in
+            if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
+        }
+        sidebar.address.siteControlsButton.onRightClick = { [weak self] _ in
+            if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
+            return nil
+        }
         sidebar.address.captureButton.onClick = { [weak self] _ in
             guard let self, let tab = self.tabManager.selectedTab, let origin = SiteOrigin.of(tab.url) else { return }
             MenuPanel.show([
@@ -888,14 +895,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         _ = tab?.url
         var attention = false
         if #available(macOS 15.4, *) { attention = ExtensionHost.shared.actions(for: tab).contains { $0.attention != nil } }
-        sidebar.address.setActions([AddressView.ActionButton(symbol: "slider.horizontal.3",
-            label: String(localized: "Site Controls", comment: "Name of the button by the address that opens the site panel: its tooltip and VoiceOver name."),
-            needsAttention: attention,
-            action: { [weak self] anchor in if let self { SitePanel.toggle(in: self, from: self.sidebar.address) } },
-            menu: { [weak self] in
-                if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
-                return nil
-            })])
+        sidebar.address.setSiteControls(needsAttention: attention)
     }
 
     var isShowingReader: Bool { reader != nil }

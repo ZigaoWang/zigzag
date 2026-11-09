@@ -24,41 +24,113 @@ final class AddressView: InteractiveView {
     let readerButton = AddressView.button("doc.plaintext", toolTip: String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."))
 
     func setCapture(camera: Bool, microphone: Bool) {
-        captureButton.isHidden = !(camera || microphone)
+        wantsCapture = camera || microphone
         captureButton.symbol = camera ? "video.fill" : "mic.fill"
         captureButton.tint = .systemOrange
         captureButton.toolTip = camera && microphone ? String(localized: "Using your camera and microphone", comment: "Tooltip of the address bar's capture button: the page uses both.")
             : camera ? String(localized: "Using your camera", comment: "Tooltip of the address bar's capture button: the page uses the camera.") : String(localized: "Using your microphone", comment: "Tooltip of the address bar's capture button: the page uses the microphone.")
-        needsLayout = true
+        reflow(animated: true)
     }
 
-    /// Extension buttons at the trailing end, like Safari's address bar.
-    private(set) var actionButtons: [IconButton] = []
+    /// Everything about this page, at the field's right end: always there, even on a new tab.
+    let siteControlsButton = AddressView.button("slider.horizontal.3", toolTip: String(localized: "Site Controls", comment: "Name of the button by the address that opens the site panel: its tooltip and VoiceOver name."))
+    private var siteControlsBadge: BadgeView?
 
-    struct ActionButton {
+    /// The dot on Site Controls while an extension can't work until you do something.
+    func setSiteControls(needsAttention: Bool) {
+        guard needsAttention != (siteControlsBadge != nil) else { return }
+        siteControlsBadge?.removeFromSuperview()
+        siteControlsBadge = nil
+        guard needsAttention else { return }
+        let badge = BadgeView(text: "!", attention: true)
+        siteControlsButton.addSubview(badge)
+        siteControlsBadge = badge
+    }
+
+    /// An extension pinned to the address, as its button should look now.
+    struct Pin {
+        let id: String
         var image: NSImage?
-        var symbol = "puzzlepiece.extension"
         var label: String
-        /// A short count or word in the corner; "!" when the extension needs the person.
+        /// A short count or word in the corner.
         var badge = ""
         var needsAttention = false
-        var action: (NSView) -> Void
+        /// Its popup is open in this window.
+        var isActive = false
+        var action: (IconButton) -> Void
         var menu: () -> NSMenu?
     }
 
-    func setActions(_ items: [ActionButton]) {
-        actionButtons.forEach { $0.removeFromSuperview() }
-        actionButtons = items.map { item in
-            let button = AddressView.button(item.symbol, toolTip: item.label)
-            if let image = item.image { button.image = image }
-            button.onClick = { [weak button] _ in if let button { item.action(button) } }
-            button.onRightClick = { _ in item.menu() }
-            let badge = item.needsAttention ? "!" : item.badge
-            if !badge.isEmpty { button.addSubview(BadgeView(text: badge, attention: item.needsAttention)) }
-            addSubview(button)
-            return button
+    /// A pin's button lives as long as the pin: updates change it in place, so nothing flickers and a popup opened
+    /// from it stays where it is.
+    private final class PinEntry {
+        let button: IconButton
+        var badge: BadgeView?
+        var pin: Pin
+        init(pin: Pin, button: IconButton) {
+            self.pin = pin
+            self.button = button
         }
-        needsLayout = true
+    }
+    private var pinEntries: [PinEntry] = []
+    /// The pins showing now, left to right. Those that don't fit wait in Site Controls.
+    private(set) var visiblePinIDs: [String] = []
+
+    func pinButton(for id: String) -> IconButton? { pinEntries.first { $0.pin.id == id }?.button }
+
+    /// The pins as they are now, left to right.
+    func setPins(_ pins: [Pin], animated: Bool) {
+        let kept = Set(pins.map(\.id))
+        for gone in pinEntries where !kept.contains(gone.pin.id) { takeAway(gone.button, animated: animated, removing: true) }
+        let existing = Dictionary(uniqueKeysWithValues: pinEntries.map { ($0.pin.id, $0) })
+        pinEntries = pins.map { pin in
+            let entry = existing[pin.id] ?? makeEntry(pin)
+            update(entry, to: pin)
+            return entry
+        }
+        reflow(animated: animated)
+    }
+
+    private func makeEntry(_ pin: Pin) -> PinEntry {
+        let button = AddressView.button("puzzlepiece.extension", toolTip: pin.label)
+        button.isHidden = true
+        let entry = PinEntry(pin: pin, button: button)
+        button.onClick = { [weak entry, weak button] _ in if let entry, let button { entry.pin.action(button) } }
+        button.onRightClick = { [weak entry] _ in entry?.pin.menu() }
+        // The size of the field's own glyphs, so a row of them reads as one set.
+        button.imageSide = Tokens.Sidebar.addressGlyph
+        addSubview(button)
+        return entry
+    }
+
+    private func update(_ entry: PinEntry, to pin: Pin) {
+        entry.pin = pin
+        let button = entry.button
+        button.image = pin.image
+        button.isSelected = pin.isActive
+        button.toolTip = pin.needsAttention ? String(localized: "\(pin.label): needs attention", comment: "Tooltip of an extension's button in the site panel when the extension asks for attention. The name is the extension's.") : pin.label
+        // VoiceOver reads the extension's name, then what its badge says.
+        button.setAccessibilityLabel(pin.label)
+        button.setAccessibilityValue(pin.needsAttention ? String(localized: "Needs attention", comment: "VoiceOver value of an extension's button in the site panel when the extension asks for attention.") : pin.badge.isEmpty ? nil : pin.badge)
+        let text = pin.needsAttention ? "!" : pin.badge
+        if text.isEmpty {
+            entry.badge?.removeFromSuperview()
+            entry.badge = nil
+        } else if let badge = entry.badge {
+            badge.update(text: text, attention: pin.needsAttention)
+        } else {
+            let badge = BadgeView(text: text, attention: pin.needsAttention)
+            button.addSubview(badge)
+            entry.badge = badge
+        }
+    }
+
+    /// How many of `count` pins can show when `otherButtons` share the end of a field with `room` for text and
+    /// buttons: the site's name keeps its minimum, and every button takes its width and a gap.
+    static func pinsThatFit(count: Int, otherButtons: Int, room: CGFloat) -> Int {
+        let step = buttonSide + 2
+        let spare = room - Tokens.Sidebar.addressMinText - CGFloat(otherButtons) * step
+        return max(0, min(count, Int(floor(spare / step))))
     }
 
     override init(frame: NSRect) {
@@ -76,6 +148,7 @@ final class AddressView: InteractiveView {
         addSubview(captureButton)
         readerButton.isHidden = true
         addSubview(readerButton)
+        addSubview(siteControlsButton)
         setAccessibilityRole(.button)
         setAccessibilityHelp(String(localized: "Opens the command bar", comment: "Accessibility help of the address in the sidebar."))
     }
@@ -83,12 +156,12 @@ final class AddressView: InteractiveView {
     required init?(coder: NSCoder) { fatalError() }
 
     func setReader(available: Bool, active: Bool) {
-        readerButton.isHidden = !available && !active
+        wantsReader = available || active
         readerButton.isSelected = active
         readerButton.toolTip = Shortcuts.tooltip(active ? String(localized: "Hide Reader", comment: "Tooltip of the address bar's Reader button while Reader is on.")
                                                          : String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."),
                                                   for: #selector(BrowserWindowController.toggleReader(_:)))
-        needsLayout = true
+        reflow(animated: true)
     }
 
     /// The site's name as the address shows it: without "www.", with a port that isn't the usual one, so
@@ -145,41 +218,135 @@ final class AddressView: InteractiveView {
         lock.isHidden = !insecure
         lock.toolTip = insecure ? SitePanel.notSecure : nil
         setAccessibilityLabel(insecure ? String(localized: "\(label.stringValue), \(SitePanel.notSecure)", comment: "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.") : label.stringValue)
-        needsLayout = true
+        reflow(animated: true)
     }
 
     override func layout() {
         super.layout()
+        // A resize follows the pointer, so nothing here animates; changes of what's showing go through `reflow`.
+        reflow(animated: false)
+    }
+
+    private var wantsReader = false
+    private var wantsCapture = false
+    /// The buttons drawn in the field, those leaving aside.
+    private var drawn = Set<ObjectIdentifier>()
+
+    /// Works out what fits and puts everything in its place. The one place the field is laid out, so a button and the
+    /// text beside it never disagree; when nothing changed it does nothing, as it runs throughout a page load.
+    private func reflow(animated requested: Bool) {
+        guard bounds.width > 0 else { return }
+        let animated = requested && window != nil && !Tokens.Motion.isFromKey
+        let side = AddressView.buttonSide, inset = (bounds.height - side) / 2
         // The host sits clear of the field's rounded edge, as far in as the buttons are from its right end, so the
         // text has room to breathe. After the not-secure mark when there is one.
-        let pad = Tokens.Space.x3
-        var x = pad
-        if !lock.isHidden {
-            lock.frame = NSRect(x: x, y: 0, width: Tokens.Space.x3, height: bounds.height)
-            x = lock.frame.maxX + Tokens.Space.x1
+        var x = Tokens.Space.x3
+        let lockFrame = NSRect(x: x, y: 0, width: Tokens.Space.x3, height: bounds.height)
+        if !lock.isHidden { x = lockFrame.maxX + Tokens.Space.x1 }
+
+        var others: [IconButton] = []
+        for (button, wanted) in [(readerButton, wantsReader), (captureButton, wantsCapture)] {
+            if wanted { others.append(button) } else { takeAway(button, animated: animated, removing: false) }
         }
-        let side = AddressView.buttonSide, inset = (bounds.height - side) / 2
+        let room = bounds.width - x - inset - Tokens.Space.x1
+        let fit = Self.pinsThatFit(count: pinEntries.count, otherButtons: others.count + 1, room: room)
+        // The one furthest from Site Controls gives way first.
+        let showing = pinEntries.suffix(fit)
+        for entry in pinEntries.dropLast(fit) { takeAway(entry.button, animated: animated, removing: false) }
+        visiblePinIDs = showing.map(\.pin.id)
+
+        let trailing = others + showing.map(\.button) + [siteControlsButton]
         var right = bounds.width - inset
-        let trailingButtons = [readerButton, captureButton].filter { !$0.isHidden } + actionButtons
-        for (index, button) in trailingButtons.enumerated().reversed() {
-            button.frame = NSRect(x: right - side, y: inset, width: side, height: side)
+        for (index, button) in trailing.enumerated().reversed() {
+            let frame = NSRect(x: right - side, y: inset, width: side, height: side)
             // Concentric with the field's corners.
             button.radius = Tokens.Sidebar.addressRadius - inset
             // The field's rim around it presses it too: top to bottom, out to the field's end, half the gap to a
             // neighbor.
-            button.pressOutset = NSEdgeInsets(top: inset, left: 1, bottom: inset, right: index == trailingButtons.count - 1 ? inset : 1)
-            right = button.frame.minX - 2
+            button.pressOutset = NSEdgeInsets(top: inset, left: 1, bottom: inset, right: index == trailing.count - 1 ? inset : 1)
+            place(button, at: frame, animated: animated)
+            right = frame.minX - 2
         }
-        let trailing = trailingButtons.isEmpty ? bounds.width - pad : right - Tokens.Space.x1
+
         let h = ceil(label.intrinsicContentSize.height)
-        label.frame = NSRect(x: x - Label.inset, y: (bounds.height - h) / 2, width: trailing - x + Label.inset * 2, height: h)
+        let labelFrame = NSRect(x: x - Label.inset, y: (bounds.height - h) / 2, width: right - Tokens.Space.x1 - x + Label.inset * 2, height: h)
+        // A mark appearing starts in its place rather than flying in from the corner.
+        if lock.frame.width == 0 { lock.frame = lockFrame }
+        guard label.frame != labelFrame || lock.frame != lockFrame else { return }
+        if animated && label.frame.width > 0 {
+            Tokens.Motion.animate(Tokens.Motion.Curve(duration: Tokens.Motion.standard), moves: true) {
+                self.label.animator().frame = labelFrame
+                self.lock.animator().frame = lockFrame
+            }
+        } else {
+            label.frame = labelFrame
+            lock.frame = lockFrame
+        }
+    }
+
+    private func place(_ button: IconButton, at frame: NSRect, animated: Bool) {
+        guard drawn.insert(ObjectIdentifier(button)).inserted else {
+            guard button.frame != frame else { return }
+            if animated {
+                Tokens.Motion.glide(button, to: frame, timing: Tokens.Motion.easeOut)
+            } else {
+                Tokens.Motion.withoutAnimation { button.frame = frame }
+            }
+            return
+        }
+        button.layer?.removeAnimation(forKey: "address.leave")
+        button.isHidden = false
+        Tokens.Motion.withoutAnimation { button.frame = frame }
+        if animated, let layer = button.layer { layer.add(appearance(of: layer, arriving: true), forKey: "address.arrive") }
+    }
+
+    /// Takes a button out of the field, if it's in it. `removing`: its pin is gone for good, so the button goes
+    /// whether or not it was showing.
+    private func takeAway(_ button: IconButton, animated: Bool, removing: Bool) {
+        let wasDrawn = drawn.remove(ObjectIdentifier(button)) != nil
+        guard wasDrawn || removing else { return }
+        button.isPressed = false
+        button.isHovered = false
+        let finish = { [weak self, weak button] in
+            guard let self, let button, !self.drawn.contains(ObjectIdentifier(button)) else { return }
+            button.layer?.removeAnimation(forKey: "address.leave")
+            button.isHidden = true
+            if removing { button.removeFromSuperview() }
+        }
+        guard wasDrawn, animated, let layer = button.layer else { finish(); return }
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { MainActor.assumeIsolated(finish) }
+        layer.add(appearance(of: layer, arriving: false), forKey: "address.leave")
+        CATransaction.commit()
+    }
+
+    /// A button coming or going: its fade, and, unless Reduce Motion is on, its growth from `Motion.pinFrom`.
+    private func appearance(of layer: CALayer, arriving: Bool) -> CAAnimation {
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = arriving ? 0 : 1
+        fade.toValue = arriving ? 1 : 0
+        let group = CAAnimationGroup()
+        group.animations = [fade]
+        if !Tokens.Motion.reduceMotion {
+            let small = NSValue(caTransform3D: Tokens.Motion.scale(Tokens.Motion.pinFrom, of: layer)), full = NSValue(caTransform3D: CATransform3DIdentity)
+            let scale = CABasicAnimation(keyPath: "transform")
+            scale.fromValue = arriving ? small : full
+            scale.toValue = arriving ? full : small
+            group.animations?.append(scale)
+        }
+        group.duration = Tokens.Motion.standard
+        group.timingFunction = Tokens.Motion.easeOut
+        // Leaving, it stays gone until its button is hidden.
+        group.fillMode = arriving ? .backwards : .forwards
+        group.isRemovedOnCompletion = arriving
+        return group
     }
 
     /// The field's trailing end belongs to its buttons (`pressOutset`): a press on the rim around one presses it
     /// rather than opening the command bar.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
-        for button in [readerButton, captureButton] + actionButtons where !button.isHidden {
+        for button in [readerButton, captureButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
             if button.pressArea.contains(button.convert(local, from: self)) { return button }
         }
         return super.hitTest(point)
@@ -1578,7 +1745,8 @@ enum SpaceSwipe {
 /// The little capsule on an extension's button: a blocked count, a word, or "!" when it needs you.
 final class BadgeView: NSView {
     private let label: Label
-    private let attention: Bool
+    private var attention: Bool
+    var text: String { label.stringValue }
 
     init(text: String, attention: Bool) {
         self.attention = attention
@@ -1592,6 +1760,13 @@ final class BadgeView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// What it says now, in place.
+    func update(text: String, attention: Bool) {
+        self.attention = attention
+        label.stringValue = attention ? "" : String(text.prefix(4))
+        needsLayout = true
+    }
 
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }

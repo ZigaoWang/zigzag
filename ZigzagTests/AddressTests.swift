@@ -49,8 +49,64 @@ struct AddressTests {
         #expect(try JSONDecoder().decode(ExtensionStore.State.self, from: json).version == "1.0")
     }
 
+    /// Text and button room is the field less the text's insets and, on http, the mark's 16pt.
+    @Test(arguments: [(224.0, 0.0, 1, 3), (224.0, 16.0, 1, 3), (200.0, 0.0, 1, 2), (200.0, 16.0, 1, 2), (170.0, 0.0, 1, 1), (160.0, 16.0, 1, 0), (200.0, 0.0, 3, 0), (200.0, 16.0, 3, 0)])
+    func pinsFitTheField(field: Double, http: Double, others: Int, fits: Int) {
+        #expect(AddressView.pinsThatFit(count: 3, otherButtons: others, room: field - 18 - http) == fits)
+    }
+
+    @Test func pinsNeverFitANegativeCountOrMoreThanThereAre() {
+        #expect(AddressView.pinsThatFit(count: 3, otherButtons: 5, room: 20) == 0)
+        #expect(AddressView.pinsThatFit(count: 1, otherButtons: 1, room: 400) == 1)
+    }
+
+    private func pin(_ id: String, badge: String = "") -> AddressView.Pin {
+        AddressView.Pin(id: id, image: nil, label: id, badge: badge, action: { _ in }, menu: { nil })
+    }
+
+    private func field() -> AddressView { AddressView(frame: NSRect(x: 0, y: 0, width: 224, height: 30)) }
+
+    @Test func aPinKeepsItsButtonAcrossUpdates() {
+        let address = field()
+        address.setPins([pin("a"), pin("b")], animated: false)
+        let button = address.pinButton(for: "a")
+        address.setPins([pin("a", badge: "7"), pin("b")], animated: false)
+        #expect(address.pinButton(for: "a") === button)
+        #expect((button?.subviews.compactMap { $0 as? BadgeView }.first)?.text == "7")
+        let badge = button?.subviews.compactMap { $0 as? BadgeView }.first
+        address.setPins([pin("a", badge: "8"), pin("b")], animated: false)
+        #expect((button?.subviews.compactMap { $0 as? BadgeView }.first) === badge)
+        #expect(badge?.text == "8")
+    }
+
+    @Test func aPinThatWentLosesItsButton() {
+        let address = field()
+        address.setPins([pin("a"), pin("b")], animated: false)
+        let button = address.pinButton(for: "a")
+        address.setPins([pin("b")], animated: false)
+        #expect(address.pinButton(for: "a") == nil)
+        #expect(button?.superview == nil)
+        #expect(address.visiblePinIDs == ["b"])
+    }
+
+    @Test func thePinFurthestFromSiteControlsHidesFirst() {
+        let address = AddressView(frame: NSRect(x: 0, y: 0, width: 200, height: 30))
+        address.setPins([pin("a"), pin("b"), pin("c")], animated: false)
+        #expect(address.visiblePinIDs == ["b", "c"])
+        #expect(address.pinButton(for: "a")?.isHidden == true)
+    }
+
     @Test func keepingDropsOnlyWhatIsNoLongerKept() {
         #expect(ExtensionPins(ids: ["a", "b", "c"]).keeping { $0 != "b" }.ids == ["a", "c"])
+    }
+
+    @Test func removingAHiddenPinRemovesItsButton() {
+        let address = AddressView(frame: NSRect(x: 0, y: 0, width: 200, height: 30))
+        address.setPins([pin("a"), pin("b"), pin("c")], animated: false)
+        let button = address.pinButton(for: "a")
+        #expect(button?.superview === address)
+        address.setPins([pin("b"), pin("c")], animated: false)
+        #expect(button?.superview == nil)
     }
 
     @Test func searches() {
