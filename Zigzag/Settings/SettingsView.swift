@@ -509,6 +509,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let importGroup = FormGroup()
     private let spacesGroup = FormGroup()
     private let windowGroup = FormGroup()
+    private let miniGroup = FormGroup()
+    /// Zigzag Mini's shortcut, as the menu has it now.
+    private let miniKeys = KeyCaps()
     private let passwordsGroup = FormGroup()
     private let passwordsWindowGroup = FormGroup()
     private let privacyGroup = FormGroup()
@@ -676,10 +679,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         generalGroup.add(FormRow(title: String(localized: "Default browser", comment: "A setting in Settings › General."),
                                  detail: String(localized: "Links from other apps open here.", comment: "Explanation under “Default browser” in Settings › General."),
                                  control: defaultControl))
-        miniToggle.onChange = { on in MiniWindowController.opensExternalLinks = on }
-        generalGroup.add(FormRow(title: String(localized: "Open links from other apps in a mini window", comment: "A setting in Settings › General."),
-                                 detail: String(localized: "A small window for the page, without the sidebar. Open it in Zigzag to keep it as a tab.", comment: "Explanation under “Open links from other apps in a mini window” in Settings › General."),
-                                 control: miniToggle))
         // Only once Zigzag speaks more than one language: macOS lists an app under Language & Region only then.
         if Self.hasLanguages {
             // Each language named in itself, so anyone finds theirs whatever Zigzag is in now.
@@ -757,6 +756,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         windowGroup.add(FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
                                 detail: String(localized: "So ⌘Q never closes everything by accident.", comment: "Explanation under “Ask before quitting” in Settings › General."),
                                 control: quitToggle))
+        // Zigzag Mini: what it is and how to open it, then where links from other apps go.
+        miniGroup.add(FormRow(title: String(localized: "New Zigzag Mini", comment: "A row in Settings › General, under Zigzag Mini, showing its keyboard shortcut. Zigzag Mini is a name, kept in Latin letters."),
+                              detail: String(localized: "A small window for a quick look at a page. Move it into your browser window when you want to keep it.", comment: "Explanation under “New Zigzag Mini” in Settings › General: what Zigzag Mini is."),
+                              control: miniKeys))
+        miniToggle.onChange = { on in MiniWindowController.opensExternalLinks = on }
+        miniGroup.add(FormRow(title: String(localized: "Open links from other apps in Zigzag Mini", comment: "A setting in Settings › General, under Zigzag Mini."),
+                              detail: String(localized: "Instead of in a new tab.", comment: "Explanation under “Open links from other apps in Zigzag Mini” in Settings › General."),
+                              control: miniToggle))
         motionToggle.onChange = { on in Tokens.Motion.reducesMotionHere = on }
         windowGroup.add(FormRow(title: String(localized: "Reduce motion", comment: "A setting in Settings › General."),
                                 detail: String(localized: "Things appear in place instead of sliding or growing. Fades stay.", comment: "Explanation under “Reduce motion” in Settings › General."),
@@ -1239,6 +1246,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     // The groups' headings, each said once for the page and its search.
     private static var tabsHeading: String { String(localized: "Tabs", comment: "A heading in Settings › General.") }
     private static var windowHeading: String { String(localized: "Window", comment: "A heading in Settings › General.") }
+    private static var miniHeading: String { MiniWindowController.name }
     private static var downloadsHeading: String { String(localized: "Downloads", comment: "A heading in Settings › General.") }
     private static var spacesHeading: String { String(localized: "Your Spaces", comment: "A heading in Settings › Spaces.") }
     private static var browsingDataHeading: String { String(localized: "Browsing Data", comment: "A heading in Settings › Privacy.") }
@@ -1271,7 +1279,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Each section's groups and their headings, as a search goes through them.
     private func groups(of pane: SettingsPane) -> [(title: String?, group: FormGroup)] {
         switch pane {
-        case .general: [(nil, generalGroup), (Self.tabsHeading, tabsGroup), (Self.windowHeading, windowGroup), (Self.downloadsHeading, downloadsGroup),
+        case .general: [(nil, generalGroup), (Self.tabsHeading, tabsGroup), (Self.windowHeading, windowGroup), (Self.miniHeading, miniGroup),
+                        (Self.downloadsHeading, downloadsGroup),
                         (nil, importGroup), (nil, versionGroup)]
         case .spaces: [(Self.spacesHeading, spacesGroup)]
         case .passwords: [(nil, passwordsGroup), (nil, passwordsWindowGroup)]
@@ -1352,6 +1361,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             section(nil, generalGroup)
             section(Self.tabsHeading, tabsGroup)
             section(Self.windowHeading, windowGroup)
+            section(Self.miniHeading, miniGroup)
             section(Self.downloadsHeading, downloadsGroup)
             section(nil, importGroup)
             section(nil, versionGroup)
@@ -1487,6 +1497,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         newTabPlace.selectedIndex = TabManager.NewTabPlace.allCases.firstIndex(of: TabManager.newTabPlace) ?? 0
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
         miniToggle.isOn = MiniWindowController.opensExternalLinks
+        miniKeys.keys = Shortcuts.allItems.first { $0.action == #selector(AppDelegate.newMiniWindow(_:)) }.map(Shortcuts.caps) ?? []
         energyToggle.isOn = EnergyWatch.sleepsBusyTabs
         motionToggle.isOn = Tokens.Motion.reducesMotionHere
         refreshDownloadPlace()
@@ -1811,6 +1822,37 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let copy = icon.copy() as! NSImage
         copy.size = NSSize(width: 16, height: 16)
         return copy
+    }
+}
+
+/// A shortcut's keys as small keycaps, as Settings › Shortcuts draws them, for a row elsewhere that names one.
+final class KeyCaps: NSView {
+    var keys: [String] = [] {
+        didSet {
+            guard keys != oldValue else { return }
+            caps.forEach { $0.removeFromSuperview() }
+            caps = keys.map { KeyCap($0) }
+            caps.forEach(addSubview)
+            setAccessibilityLabel(keys.joined(separator: " "))
+            invalidateIntrinsicContentSize()
+            needsLayout = true
+        }
+    }
+    private var caps: [KeyCap] = []
+
+    override var isFlipped: Bool { true }
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: caps.reduce(0) { $0 + $1.width } + Tokens.Space.x1 * CGFloat(max(0, caps.count - 1)), height: Tokens.Metric.keyCapHeight)
+    }
+    override var fittingSize: NSSize { intrinsicContentSize }
+
+    override func layout() {
+        super.layout()
+        var x: CGFloat = 0
+        for cap in caps {
+            cap.frame = NSRect(x: x, y: (bounds.height - Tokens.Metric.keyCapHeight) / 2, width: cap.width, height: Tokens.Metric.keyCapHeight)
+            x = cap.frame.maxX + Tokens.Space.x1
+        }
     }
 }
 
