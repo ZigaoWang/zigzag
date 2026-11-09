@@ -928,11 +928,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         var attention = false
         var pins: [AddressView.Pin] = []
         var animated = false
-        if #available(macOS 15.4, *) {
-            let host = ExtensionHost.shared
+        // Extensions don't run in a private window: no host, so nothing to show.
+        if #available(macOS 15.4, *), let host = tab?.extensionHost ?? tabManager.extensionHost {
             attention = host.needsAttention(for: tab)
-            // Extensions don't run in a private window.
-            if !tabManager.isPrivate { pins = host.pinnedActions(for: tab).map(addressPin) }
+            pins = host.pinnedActions(for: tab).map { addressPin(for: $0, host: host) }
             animated = host.finishedLoading
         }
         sidebar.address.setSiteControls(needsAttention: attention)
@@ -940,9 +939,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @available(macOS 15.4, *)
-    private func addressPin(for item: ExtensionHost.ActionItem) -> AddressView.Pin {
-        let host = ExtensionHost.shared
-        return AddressView.Pin(id: item.id, image: item.icon, label: item.label, badge: item.badge, needsAttention: item.attention != nil,
+    private func addressPin(for item: ExtensionHost.ActionItem, host: ExtensionHost) -> AddressView.Pin {
+        AddressView.Pin(id: item.id, image: item.icon, label: item.label, badge: item.badge, needsAttention: item.attention != nil,
                                isActive: host.isPopupOnScreen(item.id, in: window),
                                action: { [weak self] button in
             guard let self else { return }

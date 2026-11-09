@@ -13,6 +13,13 @@ enum ExtensionCenter {
 
     private static var hosts: [ExtensionHost] { Profiles.shared.all.map(\.extensions) }
 
+    /// The extension an extension's own page belongs to, to name the page and give it its icon. Any profile that has
+    /// it loaded will do: the same address is the same extension in each.
+    static func webExtension(ofPage url: URL?) -> WKWebExtension? {
+        for host in hosts { if let context = host.context(forPage: url) { return context.webExtension } }
+        return nil
+    }
+
     // MARK: Tabs
 
     static func tabOpened(_ tab: Tab) { tab.extensionHost?.tabOpened(tab) }

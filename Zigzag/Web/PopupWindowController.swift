@@ -314,9 +314,8 @@ final class PopupHeaderView: NSView {
 
     func show(url: URL?, secure: Bool) {
         // An extension's own page: whose it is, not an address no one could read.
-        if #available(macOS 15.4, *), let url, url.scheme == "webkit-extension",
-           let context = ExtensionHost.shared.contexts.first(where: { $0.baseURL.host() == url.host() }) {
-            label.stringValue = context.webExtension.displayName ?? ""
+        if #available(macOS 15.4, *), let ext = ExtensionCenter.webExtension(ofPage: url) {
+            label.stringValue = ext.displayName ?? ""
             lock.image = Tokens.Symbol.image("puzzlepiece.extension", size: Tokens.Symbol.inline)
             lock.isHidden = false
             lock.setAccessibilityLabel(String(localized: "Extension", comment: "VoiceOver label of the icon before an extension's address in a pop-up window."))

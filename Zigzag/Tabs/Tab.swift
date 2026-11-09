@@ -203,7 +203,7 @@ final class Tab: NSObject {
     func ensureWebView() -> BrowserWebView {
         if let webView { return webView }
         let fromWebKit = pendingConfiguration != nil
-        let extensionConfiguration = fromWebKit ? nil : Self.extensionConfiguration(for: url)
+        let extensionConfiguration = fromWebKit ? nil : Self.extensionConfiguration(for: url, in: profile)
         let configuration = pendingConfiguration ?? extensionConfiguration ?? WebKitSetup.makeConfiguration(for: profile)
         pendingConfiguration = nil
         if extensionConfiguration != nil {
@@ -428,9 +428,14 @@ final class Tab: NSObject {
     static func mayOpenInNewWebView(_ url: URL?) -> Bool { url?.scheme?.lowercased() != HistoryPage.scheme }
 
     /// WebKit shows an extension's pages only in a web view set up by that extension.
-    private static func extensionConfiguration(for url: URL?) -> WKWebViewConfiguration? {
-        guard #available(macOS 15.4, *), isExtensionPage(url), let host = url?.host() else { return nil }
-        return ExtensionHost.shared.contexts.first { $0.baseURL.host() == host }?.webViewConfiguration
+    private static func extensionConfiguration(for url: URL?, in profile: Profile) -> WKWebViewConfiguration? {
+        guard #available(macOS 15.4, *) else { return nil }
+        return profile.extensions.context(forPage: url)?.webViewConfiguration
+    }
+
+    /// The profile a page is in: its tab's, or for a page that isn't a tab's (a pop-up window), the one it was made in.
+    private static func profile(of webView: WKWebView) -> Profile {
+        (webView as? BrowserWebView)?.owner?.profile ?? Profiles.shared.profile(of: webView) ?? Profiles.shared.default
     }
 
     /// Starts this tab with another tab's back/forward list, then navigates: used for search folding.
@@ -466,14 +471,15 @@ final class Tab: NSObject {
     /// Local files need read access granted to their folder; everything else is a plain request.
     static func load(_ url: URL, in webView: WKWebView) {
         // WebKit quietly ignores a page from an extension it doesn't have; say what happened instead.
-        if isExtensionPage(url), extensionConfiguration(for: url) == nil {
+        let profile = Self.profile(of: webView)
+        if isExtensionPage(url), extensionConfiguration(for: url, in: profile) == nil {
             // Opened by an extension that's still loading (1Password's welcome page, right after it installs):
             // wait for it, briefly, before saying the page is unavailable.
             if #available(macOS 15.4, *) {
                 var token: SignalToken?
                 var waited = false
-                token = ExtensionHost.shared.changed.observe { [weak webView] in
-                    guard let webView, !waited, extensionConfiguration(for: url) != nil else { return }
+                token = profile.extensions.changed.observe { [weak webView] in
+                    guard let webView, !waited, extensionConfiguration(for: url, in: profile) != nil else { return }
                     waited = true
                     token = nil
                     (webView as? BrowserWebView)?.owner?.load(url)

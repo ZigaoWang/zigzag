@@ -128,7 +128,7 @@ final class EnergyWatch {
         guard told.insert(url.scheme == "webkit-extension" ? "\(tab.id)" : "\(site)|\(asleep)").inserted else { return }
         // An extension's own page: name the extension, and offer to close the page.
         if url.scheme == "webkit-extension", #available(macOS 15.4, *) {
-            let name = ExtensionHost.shared.contexts.first { $0.baseURL.host() == url.host() }?.webExtension.displayName
+            let name = ExtensionCenter.webExtension(ofPage: url)?.displayName
             Toast.show(name.map { String(localized: "\($0)’s page is using a lot of energy", comment: "Toast when an extension's own page uses a lot of energy. The name is the extension's.") }
                            ?? String(localized: "An extension’s page is using a lot of energy", comment: "Toast when the page of an extension with no name uses a lot of energy."),
                        symbol: "bolt",
