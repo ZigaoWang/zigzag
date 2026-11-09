@@ -93,9 +93,6 @@ final class Tab: NSObject {
     }
     /// The tab that opened this one, so closing it can return there.
     weak var opener: Tab? { didSet { opener?.openedHere.add(self) } }
-    /// When this page last opened a window or tab. WebKit asks only for ones it lets through, so a window.open() that
-    /// came back empty just after (a noopener one does) wasn't blocked.
-    var lastOpenedWindow: Date?
     /// Tabs opened from this one: when it closes, their Back stops offering to return here.
     private let openedHere = NSHashTable<Tab>.weakObjects()
     /// Opened from a link, with nothing earlier in this tab: Back closes it and goes back to the page that opened
@@ -189,7 +186,6 @@ final class Tab: NSObject {
             WebKitSetup.configure(configuration)
             WebNotifications.attach(to: configuration, isPrivate: privateStore != nil)
             Passkeys.attach(to: configuration, isPrivate: privateStore != nil)
-            PopupNotice.attach(to: configuration)
             HistoryPage.attach(to: configuration)
             if let privateStore {
                 configuration.websiteDataStore = privateStore
@@ -1009,7 +1005,6 @@ extension Tab: WKUIDelegate {
             _ = BrowserWebView.takePendingDisposition(for: webView)
             return nil
         }
-        lastOpenedWindow = Date()
         return host?.tab(self, createWebViewWith: configuration, for: navigationAction, features: windowFeatures)
     }
 

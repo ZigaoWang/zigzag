@@ -5,11 +5,6 @@ import WebKit
 /// (a payment or a sign-in that just doesn't appear), Zigzag says so and offers to allow them.
 @MainActor
 enum PopupNotice {
-    /// Nothing to add to the page. A blocked pop-up used to be reported by a script in the page's own world, which
-    /// the page could post to as often as it liked; now it's seen where WebKit asks for the window (`allows`),
-    /// which only a real window.open() reaches. Still called as a web view is set up.
-    static func attach(to configuration: WKWebViewConfiguration) {}
-
     /// When each window last said a site's pop-up was blocked: once every few seconds is enough, so a page that
     /// opens window after window can't keep the toast coming up under the pointer.
     private static var lastNotice: [String: Date] = [:]
