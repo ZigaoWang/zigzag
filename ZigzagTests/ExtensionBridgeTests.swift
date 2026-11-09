@@ -61,3 +61,31 @@ extension ExtensionBridgeTests {
         #expect(BridgeDownloads.safeName("a:b.txt") == "a-b.txt")
     }
 }
+
+/// An extension's notification is named so a click on it finds the extension again, in its own profile.
+struct ExtensionNotificationKeyTests {
+    private let rabby = "acmacodkjbdgmoleebolmdjonilkdbch"
+
+    @Test func theFirstProfilesKeepTheirForm() {
+        let key = ExtensionNotificationKey(profile: nil, extensionID: rabby, id: "tx-1")
+        #expect(key.string == "ext|\(rabby)|tx-1")
+        #expect(ExtensionNotificationKey(key.string) == key)
+    }
+
+    @Test func anotherProfilesNameIt() throws {
+        let profile = try #require(UUID(uuidString: "B2222222-2222-4222-8222-222222222222"))
+        let key = ExtensionNotificationKey(profile: profile, extensionID: rabby, id: "tx-1")
+        #expect(key.string == "ext|B2222222-2222-4222-8222-222222222222|\(rabby)|tx-1")
+        #expect(ExtensionNotificationKey(key.string) == key)
+    }
+
+    @Test func anIDMayHoldBarsAndBeEmpty() {
+        #expect(ExtensionNotificationKey("ext|\(rabby)|a|b")?.id == "a|b")
+        #expect(ExtensionNotificationKey("ext|\(rabby)|")?.id == "")
+    }
+
+    @Test func whatIsntAnExtensionsIsRefused() {
+        #expect(ExtensionNotificationKey("site|example.com|1") == nil)
+        #expect(ExtensionNotificationKey("ext|\(rabby)") == nil)
+    }
+}

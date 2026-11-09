@@ -14,6 +14,9 @@ import WebKit
 final class BridgeWebRequest: BridgeNamespace {
     static let name = "webRequest"
     static let permission = "webRequest"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
     static let event = "webRequest.onAuthRequired"
     /// How long extensions have to answer before the sheet asks. 1Password answers at once, from its own fill.
     static let timeout: Duration = .seconds(4)
@@ -44,8 +47,8 @@ final class BridgeWebRequest: BridgeNamespace {
     /// Extensions that have listened for sign-ins this run, so one whose background went to sleep is woken to answer.
     private var heard: Set<String> = []
     /// How a question reaches an extension; tests stand in for the bridge's port.
-    var send: (String, [String: Any]) -> Void = { ExtensionBridge.shared.emit(BridgeWebRequest.event, [$1], to: $0) }
-    var isListening: (String) -> Bool = { ExtensionBridge.shared.isListened(BridgeWebRequest.event, by: $0) }
+    lazy var send: (String, [String: Any]) -> Void = { [unowned self] in host.bridge.emit(BridgeWebRequest.event, [$1], to: $0) }
+    lazy var isListening: (String) -> Bool = { [unowned self] in host.bridge.isListened(BridgeWebRequest.event, by: $0) }
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         switch fn {
@@ -63,7 +66,7 @@ final class BridgeWebRequest: BridgeNamespace {
 
     /// Asks the extensions that may answer this sign-in, and says what the first of them answered.
     func askForSignIn(_ challenge: SiteChallenge, tab: (any WKWebExtensionTab)?) async -> Answer {
-        let contexts = ExtensionHost.shared.contexts.filter { context in
+        let contexts = host.contexts.filter { context in
             Self.mayAnswer(allows: { ExtensionBridge.allows($0, for: context) }, manifestVersion: context.webExtension.manifestVersion,
                            hasAccess: context.hasAccess(to: challenge.url))
         }
@@ -75,7 +78,7 @@ final class BridgeWebRequest: BridgeNamespace {
         }
         let hint = contexts.first.flatMap { context in tab.map { Self.tabHint($0, for: context) } }
         let answer = await ask(Self.details(challenge, tabHint: hint), of: ids)
-        let names = ids.map { ExtensionHost.shared.displayName(for: $0) }.joined(separator: ", ")
+        let names = ids.map { host.displayName(for: $0) }.joined(separator: ", ")
         switch answer {
         case .credentials: ExtensionLog.write("site sign-in for \(challenge.host): an extension answered (asked \(names))")
         case .cancel: ExtensionLog.write("site sign-in for \(challenge.host): an extension cancelled it (asked \(names))")
@@ -116,7 +119,7 @@ final class BridgeWebRequest: BridgeNamespace {
 
     /// Something listens again: a background that slept, now awake, gets the questions it's still owed.
     func startEvents() {
-        for context in ExtensionHost.shared.contexts where isListening(context.uniqueIdentifier) { heard.insert(context.uniqueIdentifier) }
+        for context in host.contexts where isListening(context.uniqueIdentifier) { heard.insert(context.uniqueIdentifier) }
         for question in questions.values {
             for extensionID in question.waiting.subtracting(question.sent) where isListening(extensionID) {
                 question.sent.insert(extensionID)

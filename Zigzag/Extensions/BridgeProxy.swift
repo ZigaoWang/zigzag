@@ -19,6 +19,9 @@ import WebKit
 final class BridgeProxy: BridgeNamespace {
     static let name = "proxy"
     static let permission = "proxy"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
 
     /// Each extension's setting, as it gave it.
     private var settings: [String: [String: Any]] = [:]
@@ -99,9 +102,9 @@ final class BridgeProxy: BridgeNamespace {
     /// Sets WebKit's proxies to what the extension in control asked for, and tells every extension listening.
     private func changed() {
         apply()
-        for context in ExtensionHost.shared.contexts {
+        for context in host.contexts {
             let id = context.uniqueIdentifier
-            ExtensionBridge.shared.emit("proxy.settings.onChange", [describe(for: id)], to: id)
+            host.bridge.emit("proxy.settings.onChange", [describe(for: id)], to: id)
         }
     }
 
@@ -144,7 +147,7 @@ final class BridgeProxy: BridgeNamespace {
     private func askForSignIn(_ extensionID: String, again: Bool = false) {
         guard holder == extensionID, let value = settings[extensionID], case .fixed(let server, _) = try? ProxyRules.parse(value),
               server.kind != .socks5, again || credentials[extensionID]?.server != server,
-              ExtensionBridge.shared.isListened("proxy.onAuthRequired", by: extensionID) else { return }
+              host.bridge.isListened("proxy.onAuthRequired", by: extensionID) else { return }
         asked += 1
         let id = "zigzag-proxy-\(asked)"
         // Only the latest question counts; a proxy with no password is never answered.
@@ -155,7 +158,7 @@ final class BridgeProxy: BridgeNamespace {
             "type": "other", "timeStamp": Date().timeIntervalSince1970 * 1000, "isProxy": true, "scheme": "basic", "realm": "",
             "challenger": ["host": server.host, "port": server.port], "statusCode": 407, "statusLine": "HTTP/1.1 407 Proxy Authentication Required",
         ]
-        ExtensionBridge.shared.emit("proxy.onAuthRequired", [details], to: extensionID)
+        host.bridge.emit("proxy.onAuthRequired", [details], to: extensionID)
     }
 
     /// Its listeners may start listening after it set the proxy: they're asked then.

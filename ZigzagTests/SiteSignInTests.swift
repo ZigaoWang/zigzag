@@ -92,7 +92,7 @@ struct SiteSignInTests {
 
     /// A bridge whose questions go to `reply` instead of extensions, which answers as each extension would.
     private func bridge(listening: Set<String>, reply: @escaping (BridgeWebRequest, String, String) -> Void) -> (BridgeWebRequest, () -> [String]) {
-        let bridge = BridgeWebRequest()
+        let bridge = BridgeWebRequest(host: Profiles.shared.default.extensions)
         final class Log { var sent: [String] = [] }
         let log = Log()
         bridge.isListening = { listening.contains($0) }
@@ -151,7 +151,7 @@ struct SiteSignInTests {
     }
 
     @Test func noOneToAskIsNoAnswer() async {
-        #expect(await BridgeWebRequest().ask([:], of: [], timeout: .seconds(5)) == .none)
+        #expect(await BridgeWebRequest(host: Profiles.shared.default.extensions).ask([:], of: [], timeout: .seconds(5)) == .none)
     }
 
     // MARK: The bridge script's side

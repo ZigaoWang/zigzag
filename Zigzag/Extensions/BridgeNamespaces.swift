@@ -15,6 +15,9 @@ import UserNotifications
 final class BridgeHistory: BridgeNamespace {
     static let name = "history"
     static let permission = "history"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
     private let store = HistoryStore.shared
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
@@ -54,12 +57,12 @@ final class BridgeHistory: BridgeNamespace {
 
     func startEvents() {
         guard store.onVisit == nil else { return }
-        store.onVisit = { url in
-            guard ExtensionBridge.shared.isListened("history.onVisited"), let found = HistoryStore.shared.item(for: url) else { return }
-            ExtensionBridge.shared.emit("history.onVisited", [Self.item(found)])
+        store.onVisit = { [unowned self] url in
+            guard host.bridge.isListened("history.onVisited"), let found = HistoryStore.shared.item(for: url) else { return }
+            host.bridge.emit("history.onVisited", [Self.item(found)])
         }
-        store.onRemove = { urls in
-            ExtensionBridge.shared.emit("history.onVisitRemoved", [["allHistory": urls == nil, "urls": (urls ?? []).map(\.absoluteString)] as [String: Any]])
+        store.onRemove = { [unowned self] urls in
+            host.bridge.emit("history.onVisitRemoved", [["allHistory": urls == nil, "urls": (urls ?? []).map(\.absoluteString)] as [String: Any]])
         }
     }
 
@@ -77,6 +80,9 @@ final class BridgeHistory: BridgeNamespace {
 final class BridgeTopSites: BridgeNamespace {
     static let name = "topSites"
     static let permission = "topSites"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         guard fn == "get" else { throw BridgeError.unsupported(Self.name, fn) }
@@ -99,7 +105,10 @@ final class BridgeTopSites: BridgeNamespace {
 final class BridgeNotifications: BridgeNamespace {
     static let name = "notifications"
     static let permission = "notifications"
-    static let prefix = "ext|"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
+    static let prefix = ExtensionNotificationKey.prefix
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         switch fn {
@@ -107,17 +116,17 @@ final class BridgeNotifications: BridgeNamespace {
             // create(id?, options) or create(options); update(id, options).
             let id = args.string(0) ?? UUID().uuidString
             let options = args.first is String ? args.object(1) : args.object(0)
-            let shown = await WebNotifications.shared.showForExtension(key: Self.key(extensionID, id), extensionID: extensionID,
+            let shown = await WebNotifications.shared.showForExtension(key: key(extensionID, id), extensionID: extensionID, name: host.displayName(for: extensionID),
                                                                        title: options.string("title") ?? "", message: options.string("message") ?? "",
                                                                        context: options.string("contextMessage"), silent: options["silent"] as? Bool == true)
             return fn == "create" ? id : shown
         case "clear":
             guard let id = args.string(0) else { return false }
-            WebNotifications.shared.clearForExtension(keys: [Self.key(extensionID, id)])
+            WebNotifications.shared.clearForExtension(keys: [key(extensionID, id)])
             return true
         case "getAll":
             let delivered = await UNUserNotificationCenter.current().deliveredNotifications()
-            let mine = Self.key(extensionID, "")
+            let mine = key(extensionID, "")
             return Dictionary(uniqueKeysWithValues: delivered.map(\.request.identifier).filter { $0.hasPrefix(mine) }.map { (String($0.dropFirst(mine.count)), true) })
         case "getPermissionLevel":
             return "granted"
@@ -126,21 +135,23 @@ final class BridgeNotifications: BridgeNamespace {
         }
     }
 
-    static func key(_ extensionID: String, _ id: String) -> String { "\(prefix)\(extensionID)|\(id)" }
+    private func key(_ extensionID: String, _ id: String) -> String {
+        ExtensionNotificationKey(profile: host.profile.isDefault ? nil : host.profile.id, extensionID: extensionID, id: id).string
+    }
 
-    /// macOS said it was clicked or swiped away: tell the extension that made it.
+    /// macOS said it was clicked or swiped away: tell the extension that made it, in the profile it's in.
     static func answered(key: String, dismissed: Bool) {
-        let parts = key.dropFirst(prefix.count).split(separator: "|", maxSplits: 1).map(String.init)
-        guard parts.count == 2 else { return }
+        guard let key = ExtensionNotificationKey(key),
+              let profile = Profiles.shared.all.first(where: { $0.id == key.profile ?? Profile.defaultID }) else { return }
         if dismissed {
-            ExtensionBridge.shared.emit("notifications.onClosed", [parts[1], true], to: parts[0])
+            profile.extensions.bridge.emit("notifications.onClosed", [key.id, true], to: key.extensionID)
         } else {
-            ExtensionBridge.shared.emit("notifications.onClicked", [parts[1]], to: parts[0])
+            profile.extensions.bridge.emit("notifications.onClicked", [key.id], to: key.extensionID)
         }
     }
 
     func release(_ extensionID: String) {
-        let mine = Self.key(extensionID, "")
+        let mine = key(extensionID, "")
         Task { @MainActor in
             let delivered = await UNUserNotificationCenter.current().deliveredNotifications().map(\.request.identifier).filter { $0.hasPrefix(mine) }
             WebNotifications.shared.clearForExtension(keys: delivered)
@@ -158,10 +169,12 @@ final class BridgeNotifications: BridgeNamespace {
 final class BridgeContexts: BridgeNamespace {
     static let name = "contexts"
     static let permission = ""
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         guard fn == "getContexts" else { throw BridgeError.unsupported(Self.name, fn) }
-        let host = ExtensionHost.shared
         guard let context = host.context(for: extensionID) else { return [Any]() }
         var found: [[String: Any]] = []
         let add = { (type: String, url: URL?) in
@@ -173,7 +186,7 @@ final class BridgeContexts: BridgeNamespace {
         }
         let background = (context.webExtension.manifest["background"] as? [String: Any])?["service_worker"] as? String
         add("BACKGROUND", background.flatMap { URL(string: $0, relativeTo: context.baseURL)?.absoluteURL })
-        if let url = ExtensionBridge.shared.offscreen.pageURL(for: extensionID) { add("OFFSCREEN_DOCUMENT", url) }
+        if let url = host.bridge.offscreen.pageURL(for: extensionID) { add("OFFSCREEN_DOCUMENT", url) }
         if let page = host.shownPopupPage(for: extensionID) { add("POPUP", URL(string: page, relativeTo: context.baseURL)?.absoluteURL) }
         for controller in WindowManager.shared.controllers where controller.root.showsSidePanel && controller.root.sidePanel.extensionID == extensionID {
             add("SIDE_PANEL", controller.root.sidePanel.webView?.url)
@@ -198,6 +211,9 @@ final class BridgeContexts: BridgeNamespace {
 final class BridgeRuntime: BridgeNamespace {
     static let name = "runtime"
     static let permission = ""
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         guard fn == "isNewInstall" else { throw BridgeError.unsupported(Self.name, fn) }
@@ -220,10 +236,13 @@ final class BridgeFavicons: BridgeNamespace {
     static let side = 32
 
     private var encoded: [ObjectIdentifier: (image: NSImage, url: String)] = [:]
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         guard fn == "forPages", let asked = args.first as? [Any] else { throw BridgeError.unsupported(Self.name, fn) }
-        guard let context = ExtensionHost.shared.context(for: extensionID) else { return [] }
+        guard let context = host.context(for: extensionID) else { return [] }
         let readsAll = context.hasPermission(.tabs)
         let open = WindowManager.shared.controllers.filter { !$0.tabManager.isPrivate }.flatMap(\.tabManager.allTabs).compactMap { tab -> OpenTab? in
             guard let url = tab.webView?.url ?? tab.url else { return nil }
@@ -282,6 +301,9 @@ final class BridgeFavicons: BridgeNamespace {
 final class BridgeDisplay: BridgeNamespace {
     static let name = "system.display"
     static let permission = "system.display"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         switch fn {
@@ -320,6 +342,9 @@ final class BridgeDisplay: BridgeNamespace {
 final class BridgeIdle: BridgeNamespace {
     static let name = "idle"
     static let permission = "idle"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
     private var interval: Double = 60
     private var timer: Timer?
     private var last = "active"
@@ -339,9 +364,9 @@ final class BridgeIdle: BridgeNamespace {
         timer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                guard ExtensionBridge.shared.isListened("idle.onStateChanged") else { self.timer?.invalidate(); self.timer = nil; return }
+                guard self.host.bridge.isListened("idle.onStateChanged") else { self.timer?.invalidate(); self.timer = nil; return }
                 let now = Self.state(threshold: self.interval)
-                if now != self.last { self.last = now; ExtensionBridge.shared.emit("idle.onStateChanged", [now]) }
+                if now != self.last { self.last = now; self.host.bridge.emit("idle.onStateChanged", [now]) }
             }
         }
     }
@@ -361,11 +386,14 @@ final class BridgeIdle: BridgeNamespace {
 final class BridgeSpeech: NSObject, BridgeNamespace, AVSpeechSynthesizerDelegate {
     static let name = "tts"
     static let permission = "tts"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
     private let synthesizer = AVSpeechSynthesizer()
     /// The utterance speaking, with the extension and the ID its script gave it for `onEvent`.
     private var speaking: [ObjectIdentifier: (extensionID: String, id: String)] = [:]
 
-    override init() {
+    init(host: ExtensionHost) {
+        self.host = host
         super.init()
         synthesizer.delegate = self
     }
@@ -416,7 +444,7 @@ final class BridgeSpeech: NSObject, BridgeNamespace, AVSpeechSynthesizerDelegate
         guard let owner = speaking[ObjectIdentifier(utterance)] else { return }
         var event: [String: Any] = ["type": type]
         if let charIndex { event["charIndex"] = charIndex }
-        ExtensionBridge.shared.emit("tts.utterance", [owner.id, event], to: owner.extensionID)
+        host.bridge.emit("tts.utterance", [owner.id, event], to: owner.extensionID)
         if ["end", "interrupted", "cancelled"].contains(type) {
             speaking[ObjectIdentifier(utterance)] = nil
             kept[ObjectIdentifier(utterance)] = nil
@@ -451,6 +479,9 @@ final class BridgeSpeech: NSObject, BridgeNamespace, AVSpeechSynthesizerDelegate
 final class BridgePower: BridgeNamespace {
     static let name = "power"
     static let permission = "power"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
     private var assertions: [String: IOPMAssertionID] = [:]
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
@@ -459,7 +490,7 @@ final class BridgePower: BridgeNamespace {
             release(extensionID)
             let type = args.string(0) == "display" ? kIOPMAssertionTypePreventUserIdleDisplaySleep : kIOPMAssertionTypePreventUserIdleSystemSleep
             var id: IOPMAssertionID = 0
-            let reason = "An extension in Zigzag (\(ExtensionHost.shared.displayName(for: extensionID)))" as CFString
+            let reason = "An extension in Zigzag (\(host.displayName(for: extensionID)))" as CFString
             if IOPMAssertionCreateWithName(type as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn), reason, &id) == kIOReturnSuccess {
                 assertions[extensionID] = id
             }
@@ -487,14 +518,17 @@ final class BridgePower: BridgeNamespace {
 final class BridgeOffscreen: BridgeNamespace {
     static let name = "offscreen"
     static let permission = "offscreen"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
     private var pages: [String: WKWebView] = [:]
     /// The extension's offscreen page's address, if it has one open (for runtime.getContexts).
     func pageURL(for extensionID: String) -> URL? { pages[extensionID]?.url }
     /// Off screen, but in a window: a page in no window counts as hidden, and WebKit pauses its sound.
-    private var host: NSWindow?
+    private var window: NSWindow?
 
     private func place(_ page: WKWebView) {
-        if host == nil {
+        if self.window == nil {
             let window = NSWindow(contentRect: NSRect(x: -20000, y: -20000, width: 800, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.ignoresMouseEvents = true
@@ -507,7 +541,7 @@ final class BridgeOffscreen: BridgeNamespace {
             window.hasShadow = false
             window.collectionBehavior = [.transient, .ignoresCycle, .fullScreenNone, .stationary]
             window.orderBack(nil)
-            host = window
+            self.window = window
         }
         // Behind every other window, it would count as covered up, and hidden all the same.
         let occlusion = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
@@ -515,21 +549,21 @@ final class BridgeOffscreen: BridgeNamespace {
             typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
             unsafeBitCast(page.method(for: occlusion), to: SetBool.self)(page, occlusion, false)
         }
-        host?.contentView?.addSubview(page)
+        window?.contentView?.addSubview(page)
     }
 
     private func remove(_ extensionID: String) {
         guard let page = pages.removeValue(forKey: extensionID) else { return }
         page.stopLoading()
         page.removeFromSuperview()
-        if pages.isEmpty { host?.close(); host = nil }
+        if pages.isEmpty { window?.close(); window = nil }
     }
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         switch fn {
         case "createDocument":
             guard pages[extensionID] == nil else { throw BridgeError("Only a single offscreen document may be created.") }
-            guard let context = ExtensionHost.shared.context(for: extensionID), let configuration = context.webViewConfiguration,
+            guard let context = host.context(for: extensionID), let configuration = context.webViewConfiguration,
                   let path = args.object(0).string("url"), let url = URL(string: path, relativeTo: context.baseURL)?.absoluteURL,
                   url.scheme == context.baseURL.scheme, url.host() == context.baseURL.host() else {
                 throw BridgeError("The offscreen document must be one of the extension's own pages")
@@ -543,7 +577,7 @@ final class BridgeOffscreen: BridgeNamespace {
             page.load(URLRequest(url: url))
             await loaded.wait(seconds: 10)
             page.navigationDelegate = nil
-            ExtensionLog.write("offscreen page for \(ExtensionHost.shared.displayName(for: extensionID)) opened: \(url.lastPathComponent)")
+            ExtensionLog.write("offscreen page for \(host.displayName(for: extensionID)) opened: \(url.lastPathComponent)")
             return nil
         case "closeDocument":
             guard pages[extensionID] != nil else { throw BridgeError("No current offscreen document.") }
@@ -601,6 +635,9 @@ private final class PageLoad: NSObject, WKNavigationDelegate {
 final class BridgeIdentity: NSObject, BridgeNamespace, WKNavigationDelegate, NSWindowDelegate {
     static let name = "identity"
     static let permission = "identity"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host; super.init() }
     private struct Flow {
         let extensionID: String
         let window: NSWindow?
@@ -634,12 +671,12 @@ final class BridgeIdentity: NSObject, BridgeNamespace, WKNavigationDelegate, NSW
     }
 
     private func start(_ url: URL, interactive: Bool, extensionID: String, finish: @escaping (Result<URL, BridgeError>) -> Void) {
-        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 480, height: 640), configuration: WebKitSetup.makeConfiguration(for: ExtensionHost.shared.profile))
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 480, height: 640), configuration: WebKitSetup.makeConfiguration(for: host.profile))
         webView.navigationDelegate = self
         var window: NSWindow?
         if interactive {
             let made = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 640), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-            made.title = String(localized: "Sign In for \(ExtensionHost.shared.displayName(for: extensionID))", comment: "Title of the window where an extension signs in to an account. The placeholder is the extension's name.")
+            made.title = String(localized: "Sign In for \(host.displayName(for: extensionID))", comment: "Title of the window where an extension signs in to an account. The placeholder is the extension's name.")
             made.subtitle = url.host() ?? ""
             made.contentView = webView
             made.isReleasedWhenClosed = false
@@ -712,6 +749,9 @@ final class BridgeIdentity: NSObject, BridgeNamespace, WKNavigationDelegate, NSW
 final class BridgeSidePanel: BridgeNamespace {
     static let name = "sidePanel"
     static let permission = "sidePanel"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
     private var paths: [String: String] = [:]
     private var disabled: Set<String> = []
     private var opensOnClick: Set<String> = []
@@ -776,7 +816,7 @@ final class BridgeSidePanel: BridgeNamespace {
     @discardableResult
     func open(_ extensionID: String, in controller: BrowserWindowController?) -> Bool {
         guard let controller, !disabled.contains(extensionID), let path = path(for: extensionID),
-              let context = ExtensionHost.shared.context(for: extensionID), let configuration = context.webViewConfiguration,
+              let context = host.context(for: extensionID), let configuration = context.webViewConfiguration,
               let url = URL(string: path, relativeTo: context.baseURL)?.absoluteURL, url.host() == context.baseURL.host() else { return false }
         let root = controller.root
         if root.showsSidePanel, root.sidePanel.extensionID == extensionID, root.sidePanel.webView?.url?.path == url.path { return true }
@@ -828,6 +868,9 @@ final class BridgeSidePanel: BridgeNamespace {
 final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler {
     static let name = "tabCapture"
     static let permission = "tabCapture"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host; super.init() }
     private static let world = WKContentWorld.world(name: "zigzag-tab-capture")
     private static func resource(_ name: String) -> String {
         guard let url = Bundle.main.url(forResource: name, withExtension: "js") else { return "" }
@@ -922,7 +965,6 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         case "capture":
             let options = args.object(0)
             guard options["audio"] as? Bool == true else { throw BridgeError("Zigzag can capture a tab's sound, not its picture") }
-            let host = ExtensionHost.shared
             let tab: Tab, controller: BrowserWindowController
             if let streamID = options.string("streamId") {
                 // A tab getMediaStreamId named: good once, for a few seconds, for the extension it was given to.
@@ -1014,7 +1056,6 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     /// showed then, and only while the popup or window of that use is open or a moment after. Never a private tab,
     /// nor a site the extension can't reach or where extensions are off.
     private func invokedTab(for extensionID: String) throws -> (Tab, BrowserWindowController) {
-        let host = ExtensionHost.shared
         guard let invocation = host.use.invocations[extensionID], let found = tab(invocation.tabID),
               host.use.mayCapture(extensionID, tabID: found.0.id, origin: SiteOrigin.of(found.0.webView?.url ?? found.0.url),
                                   popupShown: host.isPopupShown(for: extensionID),
@@ -1028,7 +1069,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     /// A tab the extension may hear: an everyday one, with its page, on a site its site access reaches.
     private func ensureReachable(_ tab: Tab, in controller: BrowserWindowController, by extensionID: String) throws {
         guard !controller.tabManager.isPrivate, !tab.isPrivate, let webView = tab.webView, let url = webView.url ?? tab.url,
-              let context = ExtensionHost.shared.context(for: extensionID) else { throw BridgeError("Cannot capture a tab here") }
+              let context = host.context(for: extensionID) else { throw BridgeError("Cannot capture a tab here") }
         guard Self.siteAllows(url, offSites: ExtensionStore.extensionsOffSites,
                               hasAccess: context.hasAccess(to: url, in: tab), allSites: ExtensionStore.siteAccess(extensionID) == .all) else {
             throw BridgeError("Extension manifest must request permission to access this host.")
@@ -1101,7 +1142,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
 
     private func stop(_ id: String, because reason: String = "the extension stopped it") {
         guard let tap = taps.removeValue(forKey: id) else { return }
-        ExtensionLog.write("tab capture for \(ExtensionHost.shared.displayName(for: tap.extensionID)) ended after \(Int(Date().timeIntervalSince(tap.started))) s: \(reason)")
+        ExtensionLog.write("tab capture for \(host.displayName(for: tap.extensionID)) ended after \(Int(Date().timeIntervalSince(tap.started))) s: \(reason)")
         // A shared capture's tap goes with it (WebKit's sound comes back), and so does what the extension played.
         tap.shared?.end()
         NativeAudioOut.shared.end(sourcesStartingWith: id)
