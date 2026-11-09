@@ -37,7 +37,9 @@ enum DebugBridge {
     /// ministate <path> (JSON), minishot <path> (the window's own drawing, as a PNG; web content may be blank),
     /// miniclosebrowsers, minijs <script> (run in the mini page), miniesc (Esc in the address field), miniquit,
     /// miniask notifications, minianswer allow|deny|notnow (the site's question), minisave save|notnow,
-    /// minieval <path> <script>. With no Zigzag Mini open, miniask and minianswer use the front browser window.
+    /// minieval <path> <script>, miniswipe <dx> [slow] [noend] (as `swipe page`, over the mini page),
+    /// miniborderless on|off (Settings › General › Borderless page). With no Zigzag Mini open, miniask and minianswer
+    /// use the front browser window.
     private static func runMini(_ name: String, _ arg: String) {
         let mini = MiniWindowController.all.last
         switch name {
@@ -70,7 +72,13 @@ enum DebugBridge {
                 frame.origin.y += frame.height - n[1]
                 frame.size = NSSize(width: n[0], height: n[1])
                 window.setFrame(frame, display: true)
-            }        case "miniclose": mini?.window?.performClose(nil)
+            }
+        case "miniswipe":
+            // miniswipe <dx per step> [slow] [noend]: `swipe page`, over the mini page.
+            guard let window = mini?.window else { break }
+            sendSwipe(arg, to: window, at: NSPoint(x: window.frame.width / 2, y: window.frame.height / 2))
+        case "miniborderless": BrowserRootView.isBorderless = arg == "on"
+        case "miniclose": mini?.window?.performClose(nil)
         case "miniclosebrowsers": WindowManager.shared.controllers.forEach { $0.window?.performClose(nil) }
         case "minijs": mini?.tab.webView?.evaluateJavaScript(arg, completionHandler: nil)
         case "miniesc": mini?.debugEscape()
@@ -158,6 +166,31 @@ enum DebugBridge {
             view.cacheDisplay(in: view.bounds, to: rep)
             try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: arg))
         default: break
+        }
+    }
+
+    /// A synthetic two-finger horizontal swipe, `arg` as `swipe` takes it, sent to `window` at `point` (window
+    /// coordinates) the way the trackpad's events arrive. Only to this window: nothing goes to the system.
+    private static func sendSwipe(_ arg: String, to window: NSWindow, at point: NSPoint) {
+        let parts = arg.split(separator: " ")
+        guard let first = parts.first, let dx = Int32(first) else { return }
+        let phaseless = parts.contains("nophase")
+        let screenPoint = window.convertPoint(toScreen: point)
+        let flipped = CGPoint(x: screenPoint.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screenPoint.y)
+        var phases: [Int64] = [1]
+        phases += Array(repeating: 2, count: parts.contains("slow") ? 48 : 12)
+        if !parts.contains("noend") { phases.append(4) }
+        for (i, phase) in phases.enumerated() {
+            let d: Int32 = phase == 2 ? dx : 0
+            guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: d, wheel3: 0) else { continue }
+            cg.location = flipped
+            cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phaseless ? 0 : phase)
+            cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+            cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: Double(d))
+            cg.timestamp = CGEventTimestamp(DispatchTime.now().uptimeNanoseconds) + UInt64(i) * 16_000_000
+            if let event = NSEvent(cgEvent: cg) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.016) { window.sendEvent(event) }
+            }
         }
     }
 
@@ -723,28 +756,9 @@ enum DebugBridge {
             }
         case "swipe":
             // swipe <dx per step>: a synthetic two-finger horizontal swipe over the sidebar.
-            let parts = arg.split(separator: " ")
-            guard let window = controller.window, let first = parts.first, let dx = Int32(first) else { break }
-            let phaseless = parts.contains("nophase")
+            guard let window = controller.window else { break }
             // "page": over the middle of the page instead.
-            let onPage = parts.contains("page")
-            let screenPoint = window.convertPoint(toScreen: onPage ? NSPoint(x: window.frame.width * 0.6, y: window.frame.height / 2) : NSPoint(x: 100, y: window.frame.height - 300))
-            let flipped = CGPoint(x: screenPoint.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screenPoint.y)
-            var phases: [Int64] = [1]
-            phases += Array(repeating: 2, count: parts.contains("slow") ? 48 : 12)
-            if !parts.contains("noend") { phases.append(4) }
-            for (i, phase) in phases.enumerated() {
-                let d: Int32 = phase == 2 ? dx : 0
-                guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: d, wheel3: 0) else { continue }
-                cg.location = flipped
-                cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phaseless ? 0 : phase)
-                cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
-                cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: Double(d))
-                cg.timestamp = CGEventTimestamp(DispatchTime.now().uptimeNanoseconds) + UInt64(i) * 16_000_000
-                if let event = NSEvent(cgEvent: cg) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.016) { window.sendEvent(event) }
-                }
-            }
+            sendSwipe(arg, to: window, at: arg.split(separator: " ").contains("page") ? NSPoint(x: window.frame.width * 0.6, y: window.frame.height / 2) : NSPoint(x: 100, y: window.frame.height - 300))
         case "copylink": controller.copyPageURL(nil)
         case "zoomout": controller.zoomOut(nil)
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
