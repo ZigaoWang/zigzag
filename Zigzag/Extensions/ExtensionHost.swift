@@ -47,6 +47,7 @@ final class ExtensionHost: NSObject {
         controller = WKWebExtensionController(configuration: configuration)
         super.init()
         controller.delegate = self
+        watchGestures()
     }
 
     // MARK: Loading
@@ -85,9 +86,57 @@ final class ExtensionHost: NSObject {
         lastAction?.closePopup()
     }
 
-    /// When each extension's button was last clicked: some APIs act only in answer to that (tab capture).
+    /// When each extension's button was last clicked.
     private var actionClicks: [String: Date] = [:]
     func lastActionClick(_ id: String) -> Date { actionClicks[id] ?? .distantPast }
+
+    /// What you last did with each extension: the tab you used it on, and when you last touched its own pages. Some
+    /// APIs act only in answer to that (tab capture, opening a download, asking for more access), as in Chrome.
+    private(set) var use = ExtensionUse()
+    private var gestureMonitor: Any?
+    private var menuObserver: NSObjectProtocol?
+    /// The extension and tab behind each extension item in a page's right-click menu, to note the one you choose.
+    private let menuOwners = NSMapTable<NSMenuItem, MenuOwner>.weakToStrongObjects()
+    private final class MenuOwner {
+        let id: String
+        weak var tab: Tab?
+        init(id: String, tab: Tab) { self.id = id; self.tab = tab }
+    }
+
+    /// You used the extension on a tab: by its button, its item in the page's menu or its shortcut.
+    func noteInvocation(_ id: String, tab: Tab?) {
+        guard let tab, !tab.isPrivate else { use.touched(id); return }
+        use.invoked(id, tabID: tab.id, origin: SiteOrigin.of(tab.webView?.url ?? tab.url))
+    }
+
+    /// Whether you did something with the extension a moment ago: clicked it, or clicked or typed in one of its pages.
+    func hasRecentGesture(_ id: String) -> Bool { use.hasGesture(id) }
+
+    /// A click or key in one of an extension's own pages (its popup, its window, its side panel, its options) is
+    /// you using it. A page's script can't make these.
+    private func watchGestures() {
+        gestureMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
+            if let self, let id = self.extensionPage(under: event) { self.use.touched(id) }
+            return event
+        }
+        menuObserver = NotificationCenter.default.addObserver(forName: NSMenu.willSendActionNotification, object: nil, queue: .main) { [weak self] note in
+            // Menus send their actions on the main thread, where this runs.
+            nonisolated(unsafe) let chosen = note.userInfo?["MenuItem"] as? NSMenuItem
+            MainActor.assumeIsolated {
+                guard let item = chosen else { return }
+                guard let self, let owner = self.menuOwners.object(forKey: item) else { return }
+                self.noteInvocation(owner.id, tab: owner.tab)
+            }
+        }
+    }
+
+    private func extensionPage(under event: NSEvent) -> String? {
+        guard let window = event.window else { return nil }
+        var view: NSView? = event.type == .keyDown ? window.firstResponder as? NSView : window.contentView?.hitTest(event.locationInWindow)
+        while let current = view, !(current is WKWebView) { view = current.superview }
+        guard let url = (view as? WKWebView)?.url, url.scheme == "webkit-extension", let id = url.host(), context(for: id) != nil else { return nil }
+        return id
+    }
 
     /// The page an extension puts in place of a new tab (`chrome_url_overrides.newtab`), as in Chrome: the most
     /// recently loaded one that asks, while it's on. Nil keeps Zigzag's own command bar.
@@ -113,6 +162,7 @@ final class ExtensionHost: NSObject {
         // Its companion-app helpers end with it, whether or not WebKit closed their ports.
         NativeMessagingHost.terminateAll(for: id)
         ExtensionBridge.shared.release(id)
+        use.forget(id)
         Passkeys.refresh()
         changed.send()
     }
@@ -269,7 +319,18 @@ final class ExtensionHost: NSObject {
     /// Extension items for a page's right-click menu; none in a private tab.
     func menuItems(for tab: Tab) -> [NSMenuItem] {
         guard !tab.isPrivate else { return [] }
-        return contexts.flatMap { $0.menuItems(for: tab) }
+        var all: [NSMenuItem] = []
+        for context in contexts {
+            let items = context.menuItems(for: tab)
+            let owner = MenuOwner(id: context.uniqueIdentifier, tab: tab)
+            var queue = items
+            while let item = queue.popLast() {
+                menuOwners.setObject(owner, forKey: item)
+                queue += item.submenu?.items ?? []
+            }
+            all += items
+        }
+        return all
     }
 
     private weak var actionAnchor: NSView?
@@ -342,6 +403,7 @@ final class ExtensionHost: NSObject {
             }
         }
         actionClicks[item.id] = Date()
+        noteInvocation(item.id, tab: tab)
         // Its side panel, when that's what its button opens.
         let controller = WindowManager.shared.controllers.first { $0.window === anchor.window } ?? WindowManager.shared.keyController
         if ExtensionBridge.shared.sidePanel.handleClick(item.id, hasPopup: hasPopup, in: controller) { return }
@@ -492,9 +554,61 @@ final class ExtensionHost: NSObject {
 
     /// Keyboard shortcuts declared by extensions (1Password's fill shortcut). Not in a private window.
     func performCommand(for event: NSEvent) -> Bool {
-        if (event.window?.windowController as? BrowserWindowController)?.tabManager.isPrivate == true { return false }
-        for context in contexts where context.performCommand(for: event) { return true }
+        let window = event.window?.windowController as? BrowserWindowController
+        if window?.tabManager.isPrivate == true { return false }
+        for context in contexts where context.performCommand(for: event) {
+            noteInvocation(context.uniqueIdentifier, tab: window?.tabManager.selectedTab)
+            return true
+        }
         return false
+    }
+}
+
+/// What you last did with each extension, for the APIs Chrome lets act only in answer to you: the tab you used it on
+/// (and that tab's origin then), the window it opened in answer, and when you last clicked or typed in its pages.
+struct ExtensionUse {
+    struct Invocation: Equatable {
+        let tabID: UUID
+        let origin: String?
+        let at: Date
+        /// Its own window, opened right after the click.
+        var window: ObjectIdentifier?
+    }
+
+    /// How long a click or key counts as a gesture, as Chrome's transient activation.
+    static let gestureWindow: TimeInterval = 5
+    /// How long after you use it an extension may start capturing the tab, without its popup or window open.
+    static let captureWindow: TimeInterval = 15
+
+    private(set) var invocations: [String: Invocation] = [:]
+    private var gestures: [String: Date] = [:]
+
+    mutating func invoked(_ id: String, tabID: UUID, origin: String?, at date: Date = Date()) {
+        invocations[id] = Invocation(tabID: tabID, origin: origin, at: date)
+        gestures[id] = date
+    }
+
+    mutating func touched(_ id: String, at date: Date = Date()) { gestures[id] = date }
+
+    mutating func openedWindow(_ id: String, _ window: ObjectIdentifier) { invocations[id]?.window = window }
+
+    mutating func forget(_ id: String) {
+        invocations[id] = nil
+        gestures[id] = nil
+    }
+
+    func hasGesture(_ id: String, now: Date = Date()) -> Bool {
+        guard let at = gestures[id] else { return false }
+        return now >= at && now.timeIntervalSince(at) < Self.gestureWindow
+    }
+
+    /// Whether the extension may capture this tab now: the one you used it on, still showing the same origin, while
+    /// the popup or window of that use is open or for a short while after.
+    func mayCapture(_ id: String, tabID: UUID, origin: String?, popupShown: Bool, windowOpen: (ObjectIdentifier) -> Bool,
+                    now: Date = Date()) -> Bool {
+        guard let invocation = invocations[id], invocation.tabID == tabID, let origin, invocation.origin == origin else { return false }
+        if popupShown || invocation.window.map(windowOpen) == true { return true }
+        return now >= invocation.at && now.timeIntervalSince(invocation.at) < Self.captureWindow
     }
 }
 
@@ -542,6 +656,10 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
                 closeActionPopup()
             } else if Date().timeIntervalSince(lastActionClick(extensionContext.uniqueIdentifier)) < 3 {
                 popupReplacedByWindow[extensionContext.uniqueIdentifier] = Date()
+            }
+            // Opened in answer to a click: while it's open, it carries on that use, on the tab you clicked it on.
+            if Date().timeIntervalSince(lastActionClick(extensionContext.uniqueIdentifier)) < 3 {
+                use.openedWindow(extensionContext.uniqueIdentifier, ObjectIdentifier(popup))
             }
             completionHandler(popup, nil)
             return

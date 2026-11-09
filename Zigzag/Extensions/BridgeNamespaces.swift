@@ -749,9 +749,10 @@ final class BridgeSidePanel: BridgeNamespace {
 /// a normal MediaStream. Two halves: the page's own Web Audio when it uses it (Resources/Extensions/
 /// tab-capture-page.js, over the routes audio-routes.js noted), else its media elements, from a script world of
 /// Zigzag's own (tab-capture.js). As in Chrome the tab goes quiet while captured, and the extension plays it back if
-/// it wants. Only the tab in front, never a private window's, and only while the extension's popup is open or soon
-/// after you click it; a note says it's listening, and it stops when the extension stops listening or goes away.
-/// `getMediaStreamId` is the same, in two steps (Sound Booster): it names the tab in front, and the extension's
+/// it wants. Only the tab you used the extension on (its button, menu item or shortcut), while it shows the same site,
+/// never a private window's, and only while the popup or window of that use is open or soon after; a note says it's
+/// listening, and it stops when the extension stops listening or goes away.
+/// `getMediaStreamId` is the same, in two steps (Sound Booster): it names that tab, and the extension's
 /// page then asks `getUserMedia` for that tab, within a few seconds, once.
 @available(macOS 15.4, *)
 @MainActor
@@ -803,6 +804,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     private struct Pending {
         let extensionID: String
         weak var tab: Tab?
+        let origin: String?
         let expires: Date
     }
     private var pending: [String: Pending] = [:]
@@ -814,11 +816,11 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         switch fn {
         case "getMediaStreamId":
-            let (tab, _) = try frontTab(for: extensionID)
+            let (tab, _) = try invokedTab(for: extensionID)
             try ensureNotCaptured(tab)
             pending = pending.filter { $0.value.expires > Date() }
             let id = UUID().uuidString
-            pending[id] = Pending(extensionID: extensionID, tab: tab, expires: Date().addingTimeInterval(10))
+            pending[id] = Pending(extensionID: extensionID, tab: tab, origin: SiteOrigin.of(tab.webView?.url ?? tab.url), expires: Date().addingTimeInterval(10))
             return id
         case "capture":
             let options = args.object(0)
@@ -827,12 +829,15 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
             let tab: Tab, controller: BrowserWindowController
             if let streamID = options.string("streamId") {
                 // A tab getMediaStreamId named: good once, for a few seconds, for the extension it was given to.
+                // Still on the site it was named on.
                 guard let named = pending.removeValue(forKey: streamID), named.extensionID == extensionID, named.expires > Date(),
                       let namedTab = named.tab, let owner = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === namedTab } }),
-                      !owner.tabManager.isPrivate else { throw BridgeError("Invalid stream ID") }
+                      !owner.tabManager.isPrivate, named.origin != nil, SiteOrigin.of(namedTab.webView?.url ?? namedTab.url) == named.origin
+                else { throw BridgeError("Invalid stream ID") }
+                try ensureReachable(namedTab, in: owner, by: extensionID)
                 (tab, controller) = (namedTab, owner)
             } else {
-                (tab, controller) = try frontTab(for: extensionID)
+                (tab, controller) = try invokedTab(for: extensionID)
             }
             guard let webView = tab.webView else { throw BridgeError("Cannot capture a tab here") }
             try ensureNotCaptured(tab)
@@ -887,18 +892,36 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         }
     }
 
-    /// The tab in front, for an extension you're using: its popup or its own window is open, or you clicked it a
-    /// moment ago.
-    private func frontTab(for extensionID: String) throws -> (Tab, BrowserWindowController) {
+    /// The tab you used the extension on (its button, its menu item, its shortcut), while it still shows the site it
+    /// showed then, and only while the popup or window of that use is open or a moment after. Never a private tab,
+    /// nor a site the extension can't reach or where extensions are off.
+    private func invokedTab(for extensionID: String) throws -> (Tab, BrowserWindowController) {
         let host = ExtensionHost.shared
-        let base = host.context(for: extensionID)?.baseURL.host()
-        let ownWindow = base != nil && PopupWindowController.all.contains { $0.window?.isVisible == true && $0.webView.url?.host() == base }
-        guard ownWindow || host.isPopupShown(for: extensionID) || Date().timeIntervalSince(host.lastActionClick(extensionID)) < 120 else {
+        guard let invocation = host.use.invocations[extensionID], let found = tab(invocation.tabID),
+              host.use.mayCapture(extensionID, tabID: found.0.id, origin: SiteOrigin.of(found.0.webView?.url ?? found.0.url),
+                                  popupShown: host.isPopupShown(for: extensionID),
+                                  windowOpen: { id in PopupWindowController.all.contains { ObjectIdentifier($0) == id && $0.window?.isVisible == true } }) else {
             throw BridgeError("Extension has not been invoked for the current page (see activeTab permission).")
         }
-        guard let controller = WindowManager.shared.keyController, !controller.tabManager.isPrivate,
-              let tab = controller.tabManager.selectedTab, tab.webView != nil else { throw BridgeError("Cannot capture a tab here") }
-        return (tab, controller)
+        try ensureReachable(found.0, in: found.1, by: extensionID)
+        return found
+    }
+
+    /// A tab the extension may hear: an everyday one, with its page, on a site its site access reaches.
+    private func ensureReachable(_ tab: Tab, in controller: BrowserWindowController, by extensionID: String) throws {
+        guard !controller.tabManager.isPrivate, !tab.isPrivate, let webView = tab.webView, let url = webView.url ?? tab.url,
+              let context = ExtensionHost.shared.context(for: extensionID) else { throw BridgeError("Cannot capture a tab here") }
+        guard Self.siteAllows(url, offSites: ExtensionStore.extensionsOffSites,
+                              hasAccess: context.hasAccess(to: url, in: tab), allSites: ExtensionStore.siteAccess(extensionID) == .all) else {
+            throw BridgeError("Extension manifest must request permission to access this host.")
+        }
+    }
+
+    /// Whether site settings let an extension capture a page there: never where extensions are off; else where it has
+    /// access, or anywhere when you let it reach every site it asked for (Chrome's capture needs no host permission).
+    static func siteAllows(_ url: URL, offSites: Set<String>, hasAccess: Bool, allSites: Bool) -> Bool {
+        if let site = ContentBlocker.site(of: url), offSites.contains(where: { site == $0 || site.hasSuffix("." + $0) }) { return false }
+        return hasAccess || allSites
     }
 
     /// As in Chrome, a tab is captured once at a time: a second capture is refused until the first stops (extensions

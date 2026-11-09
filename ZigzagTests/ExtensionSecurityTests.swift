@@ -102,6 +102,62 @@ struct ExtensionSecurityTests {
         #expect(ExtensionHost.shared.menuItems(for: hidden).isEmpty)
     }
 
+    @Test func captureIsOfTheTabYouUsedItOn() {
+        let id = "abcdefghijklmnopabcdefghijklmnop"
+        let tab = UUID(), other = UUID()
+        let start = Date()
+        var use = ExtensionUse()
+        let closed: (ObjectIdentifier) -> Bool = { _ in false }
+        // Never used: nothing.
+        #expect(!use.mayCapture(id, tabID: tab, origin: "https://music.example", popupShown: true, windowOpen: closed, now: start))
+
+        use.invoked(id, tabID: tab, origin: "https://music.example", at: start)
+        #expect(use.mayCapture(id, tabID: tab, origin: "https://music.example", popupShown: false, windowOpen: closed, now: start.addingTimeInterval(2)))
+        // Another tab, or the same tab gone to another site: not that use.
+        #expect(!use.mayCapture(id, tabID: other, origin: "https://music.example", popupShown: true, windowOpen: closed, now: start.addingTimeInterval(2)))
+        #expect(!use.mayCapture(id, tabID: tab, origin: "https://bank.example", popupShown: true, windowOpen: closed, now: start.addingTimeInterval(2)))
+        #expect(!use.mayCapture(id, tabID: tab, origin: nil, popupShown: true, windowOpen: closed, now: start.addingTimeInterval(2)))
+        // Later on, only while its popup, or the window it opened in answer, is still open.
+        let later = start.addingTimeInterval(ExtensionUse.captureWindow + 1)
+        #expect(!use.mayCapture(id, tabID: tab, origin: "https://music.example", popupShown: false, windowOpen: closed, now: later))
+        #expect(use.mayCapture(id, tabID: tab, origin: "https://music.example", popupShown: true, windowOpen: closed, now: later))
+        let window = ObjectIdentifier(NSObject())
+        #expect(!use.mayCapture(id, tabID: tab, origin: "https://music.example", popupShown: false, windowOpen: { $0 == window }, now: later))
+        use.openedWindow(id, window)
+        #expect(use.mayCapture(id, tabID: tab, origin: "https://music.example", popupShown: false, windowOpen: { $0 == window }, now: later))
+        #expect(!use.mayCapture(id, tabID: tab, origin: "https://music.example", popupShown: false, windowOpen: closed, now: later))
+        // Another extension used on that tab is no use of this one.
+        #expect(!use.mayCapture("ponmlkjihgfedcbaponmlkjihgfedcba", tabID: tab, origin: "https://music.example", popupShown: true, windowOpen: closed, now: start))
+
+        use.forget(id)
+        #expect(!use.mayCapture(id, tabID: tab, origin: "https://music.example", popupShown: true, windowOpen: closed, now: start))
+    }
+
+    @Test func aGestureCountsForAMoment() {
+        let id = "abcdefghijklmnopabcdefghijklmnop"
+        let start = Date()
+        var use = ExtensionUse()
+        #expect(!use.hasGesture(id, now: start))
+        use.touched(id, at: start)
+        #expect(use.hasGesture(id, now: start.addingTimeInterval(1)))
+        #expect(!use.hasGesture(id, now: start.addingTimeInterval(ExtensionUse.gestureWindow + 1)))
+        #expect(!use.hasGesture("ponmlkjihgfedcbaponmlkjihgfedcba", now: start.addingTimeInterval(1)))
+        // Using it on a tab is a gesture too.
+        use.invoked(id, tabID: UUID(), origin: nil, at: start.addingTimeInterval(10))
+        #expect(use.hasGesture(id, now: start.addingTimeInterval(11)))
+    }
+
+    @Test func captureFollowsSiteSettings() {
+        let url = URL(string: "https://www.music.example/song")!
+        #expect(BridgeTabCapture.siteAllows(url, offSites: [], hasAccess: true, allSites: false))
+        #expect(BridgeTabCapture.siteAllows(url, offSites: [], hasAccess: false, allSites: true))
+        #expect(!BridgeTabCapture.siteAllows(url, offSites: [], hasAccess: false, allSites: false))
+        // Extensions off on the site, or on the site it's under: never, whatever access says.
+        #expect(!BridgeTabCapture.siteAllows(url, offSites: ["music.example"], hasAccess: true, allSites: true))
+        #expect(!BridgeTabCapture.siteAllows(URL(string: "https://player.music.example/")!, offSites: ["music.example"], hasAccess: true, allSites: true))
+        #expect(BridgeTabCapture.siteAllows(URL(string: "https://notmusic.example/")!, offSites: ["music.example"], hasAccess: true, allSites: true))
+    }
+
     @Test func onlyAServiceWorkerGetsTheSocketStandIn() {
         #expect(ExtensionProfile.usesWebSocketShim(manifest: ["background": ["service_worker": "background.js"]]))
         #expect(!ExtensionProfile.usesWebSocketShim(manifest: ["background": ["scripts": ["background.js"]]]))
