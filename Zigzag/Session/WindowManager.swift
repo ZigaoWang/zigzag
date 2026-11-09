@@ -82,6 +82,12 @@ final class WindowManager {
 
     @discardableResult
     func newWindow(url: URL? = nil, spaceID: UUID? = nil, showCommandBar: Bool = true, isPrivate: Bool = false) -> BrowserWindowController {
+        // Opened for Zigzag Mini alone, the saved windows are still waiting: they come back first, so a new window never
+        // saves over them, and a plain ⌘N is simply them.
+        if sessionWaiting, !isPrivate, restoreSession(), url == nil, let restored = controllers.last(where: { !$0.tabManager.isPrivate }) {
+            restored.window?.makeKeyAndOrderFront(nil)
+            return restored
+        }
         let manager = TabManager(spaceID: spaceID ?? keyController?.tabManager.currentSpaceID, isPrivate: isPrivate)
         var frame: NSRect?
         if let key = keyController, let window = key.window {
@@ -168,7 +174,17 @@ final class WindowManager {
         // Settings › Zigzag Mini can send links to a Zigzag Mini of their own instead; files and links before onboarding
         // still open here. Zigzag Mini is never saved, so nothing about the session changes.
         if opensInMini(url) {
+            // The app the link came from, as it was in front when the link arrived: macOS brings every Zigzag window
+            // forward with the link, and Zigzag Mini is meant to come up alone over it, as Little Arc does.
+            let from = Self.frontWindowOfAnotherApp()
             MiniWindowController.open(url: url)
+            if let from {
+                DispatchQueue.main.async { [weak self] in
+                    for window in self?.controllers.compactMap(\.window) ?? [] where window.isVisible && !window.isMiniaturized {
+                        window.order(.below, relativeTo: from)
+                    }
+                }
+            }
             return
         }
         // A link opened before onboarding was finished: you're browsing now, so the next launch restores this window
@@ -196,7 +212,7 @@ final class WindowManager {
 
     func saveNow(synchronously: Bool = false) {
         saveDebouncer.cancel()
-        guard !controllers.isEmpty else { return }
+        guard !controllers.isEmpty, !sessionWaiting else { return }
         // Private windows are never written down.
         let saved = controllers.filter { !$0.tabManager.isPrivate }
         guard !saved.isEmpty else { return }
@@ -269,9 +285,21 @@ final class WindowManager {
 
     // MARK: Restoring
 
+    /// The window in front that isn't Zigzag's, on the main level: where a link from another app came from.
+    static func frontWindowOfAnotherApp() -> Int? {
+        let me = ProcessInfo.processInfo.processIdentifier
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
+        return list.first { ($0[kCGWindowLayer as String] as? Int) == 0 && ($0[kCGWindowOwnerPID as String] as? Int32) != me }?[kCGWindowNumber as String] as? Int
+    }
+
+    /// Zigzag opened for a link going to Zigzag Mini, as Arc's Little Arc does: the browser windows weren't brought back.
+    /// Whatever asks for a browser window next brings them back first.
+    var sessionWaiting = false
+
     /// Brings back every window and tab from the last run, crash or not. Returns false if there was nothing.
     @discardableResult
     func restoreSession() -> Bool {
+        sessionWaiting = false
         guard let state = JSONStore.load(SessionState.self, from: Paths.session), !state.windows.isEmpty else { return false }
         var allIDs = Set<UUID>()
         for windowState in state.windows {

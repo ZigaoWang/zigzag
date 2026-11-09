@@ -63,8 +63,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if #available(macOS 15.4, *) {
             ExtensionStore.setUpIfNeeded()
         }
-        // Onboarding not finished: it comes first, instead of the window that was waiting behind it.
-        let restored = WindowManager.needsOnboarding ? false : WindowManager.shared.restoreSession()
+        // Onboarding not finished: it comes first, instead of the window that was waiting behind it. Opened for links that
+        // all go to Zigzag Mini, only Zigzag Mini comes up, as Little Arc does; the windows come back when you ask.
+        let miniOnly = !pendingURLs.isEmpty && !WindowManager.needsOnboarding && pendingURLs.allSatisfy(WindowManager.shared.opensInMini)
+        WindowManager.shared.sessionWaiting = miniOnly
+        let restored = WindowManager.needsOnboarding || miniOnly ? false : WindowManager.shared.restoreSession()
         // Opened from the disk image or a download macOS keeps apart: offered a move to Applications, so it can update.
         MoveToApplications.offerWhenReady()
         launched = true
@@ -86,7 +89,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        guard !flag else { return true }
+        // Only a Zigzag Mini up counts as no window: the Dock icon brings the browser back.
+        let browsing = WindowManager.shared.controllers.contains { $0.window?.isVisible == true }
+        guard !flag || !browsing else { return true }
         // Only minimized: the window comes back (the last one you used first), rather than another opening beside it.
         let windows = ([WindowManager.shared.keyController] + WindowManager.shared.controllers.reversed()).compactMap { $0?.window }
         if let minimized = windows.first(where: \.isMiniaturized) {
