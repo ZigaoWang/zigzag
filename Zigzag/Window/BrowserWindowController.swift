@@ -1427,6 +1427,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func intercept(_ event: NSEvent) -> Bool {
         if (event.type == .keyDown || event.type == .flagsChanged), switcher.handle(event) { return true }
         if spaceSwitcher.handle(event) { return true }
+        // A mouse's side buttons go back and forward, as in Chrome and Arc (Safari leaves them to the page, which rarely
+        // uses them). On release, and the press is taken too, so the page never sees half of it.
+        if event.type == .otherMouseDown || event.type == .otherMouseUp, event.buttonNumber == 3 || event.buttonNumber == 4 {
+            if event.type == .otherMouseUp { event.buttonNumber == 3 ? goBack(nil) : goForward(nil) }
+            return true
+        }
         if event.type == .leftMouseDown, root.splitRatio != nil { focusPane(at: event.locationInWindow) }
         // A click anywhere else finishes a name being typed into a sidebar row, as in Finder: rows don't take focus,
         // so without this the name stays open through drags and ⌘Z keeps going to it.
