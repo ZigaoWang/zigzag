@@ -357,4 +357,24 @@ struct PasswordSafetyTests {
         // The password stays exactly as it is, or the file wouldn't sign you in.
         #expect(PasswordExport.field("=secret", neutralized: false) == "=secret")
     }
+
+    @Test func importCopiesAreYoursAloneAndLeftoversGo() throws {
+        let fm = FileManager.default
+        let parent = fm.temporaryDirectory.appendingPathComponent("PasswordSafetyTests-\(UUID().uuidString)", isDirectory: true)
+        try fm.createDirectory(at: parent, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: parent) }
+        let old = try ImportScratch.makeFolder("zigzag-safari-", in: parent)
+        #expect((try fm.attributesOfItem(atPath: old.path))[.posixPermissions] as? Int == 0o700)
+        try fm.setAttributes([.creationDate: Date().addingTimeInterval(-3600)], ofItemAtPath: old.path)
+        let fresh = try ImportScratch.makeFolder("zigzag-import-", in: parent)
+        let other = parent.appendingPathComponent("someone-else", isDirectory: true)
+        try fm.createDirectory(at: other, withIntermediateDirectories: true)
+        try fm.setAttributes([.creationDate: Date().addingTimeInterval(-3600)], ofItemAtPath: other.path)
+
+        ImportScratch.removeLeftovers(in: parent)
+        #expect(!fm.fileExists(atPath: old.path))
+        // One made just now may be another Zigzag's import in progress; folders that aren't Zigzag's stay.
+        #expect(fm.fileExists(atPath: fresh.path))
+        #expect(fm.fileExists(atPath: other.path))
+    }
 }

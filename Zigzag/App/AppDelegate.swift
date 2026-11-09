@@ -45,6 +45,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = HistoryStore.shared
         // Icons clearing history set aside, if Zigzag didn't get to remove them when it quit.
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
+        // Copies an import read through, if Zigzag stopped before removing them: they can hold passwords.
+        DispatchQueue.global(qos: .utility).async { ImportScratch.removeLeftovers() }
         ContentBlocker.prepare()
         // A page stuck working hard (an extension in a loop, usually) gets named, with a way out.
         EnergyWatch.shared.start()

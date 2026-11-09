@@ -72,6 +72,31 @@ nonisolated enum BrowserFolders {
     #endif
 }
 
+/// The folders an import reads through: a browser's database copied out of its way, Safari's export unzipped. They
+/// can hold passwords, so they're yours alone, and any a crash left behind go at the next launch.
+nonisolated enum ImportScratch {
+    static let prefixes = ["zigzag-import-", "zigzag-safari-"]
+
+    /// A new, empty folder only you can open.
+    static func makeFolder(_ prefix: String, in parent: URL = FileManager.default.temporaryDirectory) throws -> URL {
+        let folder = parent.appendingPathComponent("\(prefix)\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        return folder
+    }
+
+    /// Removes folders left from imports that never finished. Not one made in the last few minutes: another Zigzag
+    /// (the dev copy, say) may be reading through it right now.
+    static func removeLeftovers(in parent: URL = FileManager.default.temporaryDirectory, now: Date = Date()) {
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: parent.path) else { return }
+        for name in names where prefixes.contains(where: name.hasPrefix) {
+            let folder = parent.appendingPathComponent(name, isDirectory: true)
+            let made = (try? fm.attributesOfItem(atPath: folder.path))?[.creationDate] as? Date ?? .distantPast
+            if now.timeIntervalSince(made) > 10 * 60 { try? fm.removeItem(at: folder) }
+        }
+    }
+}
+
 /// Reads a browser's SQLite database through a private copy: browsers keep theirs open and locked.
 nonisolated final class SQLiteReader {
     private var db: OpaquePointer?
@@ -79,10 +104,9 @@ nonisolated final class SQLiteReader {
 
     init?(_ source: URL) {
         let fm = FileManager.default
-        let folder = fm.temporaryDirectory.appendingPathComponent("zigzag-import-\(UUID().uuidString)", isDirectory: true)
+        guard let folder = try? ImportScratch.makeFolder("zigzag-import-") else { return nil }
         copy = folder.appendingPathComponent(source.lastPathComponent)
         do {
-            try fm.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             try fm.copyItem(at: source, to: copy)
             // The write-ahead log holds recent changes; without it the copy can miss the newest rows.
             for suffix in ["-wal", "-shm"] {

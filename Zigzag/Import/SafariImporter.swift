@@ -73,14 +73,15 @@ nonisolated enum SafariImporter {
     /// Safari's "Export Browsing Data" zip: its passwords CSV, bookmarks HTML and history JSON, whichever are in it.
     static func readExport(_ zip: URL) -> ImportBatch {
         var batch = ImportBatch()
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-safari-\(UUID().uuidString)", isDirectory: true)
+        let unreadable = ImportProblem(message: String(localized: "\(zip.lastPathComponent) isn’t a Safari export Zigzag can open. In Safari, choose File › Export Browsing Data, then choose the zip it makes.",
+                                                              comment: "Problem in the Import window. The placeholder is the file's name; File › Export Browsing Data is Safari's own menu wording."),
+                                       fix: .none)
+        // Unzipped into a folder only you can open: the export's passwords are in plain text.
+        guard let folder = try? ImportScratch.makeFolder("zigzag-safari-") else { batch.problems.append(unreadable); return batch }
         defer { try? FileManager.default.removeItem(at: folder) }
         let unzip = Process()
         unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
         unzip.arguments = ["-x", "-k", zip.path, folder.path]
-        let unreadable = ImportProblem(message: String(localized: "\(zip.lastPathComponent) isn’t a Safari export Zigzag can open. In Safari, choose File › Export Browsing Data, then choose the zip it makes.",
-                                                              comment: "Problem in the Import window. The placeholder is the file's name; File › Export Browsing Data is Safari's own menu wording."),
-                                       fix: .none)
         guard (try? unzip.run()) != nil else { batch.problems.append(unreadable); return batch }
         unzip.waitUntilExit()
         guard unzip.terminationStatus == 0 else { batch.problems.append(unreadable); return batch }
