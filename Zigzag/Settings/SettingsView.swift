@@ -513,6 +513,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private let versionGroup = FormGroup()
     private let generalGroup = FormGroup()
+    private let automationGroup = FormGroup()
     private let tabsGroup = FormGroup()
     private let searchGroup = FormGroup()
     private let blockingGroup = FormGroup()
@@ -571,6 +572,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let borderlessToggle = Toggle()
     private let largeNamesToggle = Toggle()
     private let quitToggle = Toggle()
+    private let scriptJavaScriptToggle = Toggle()
     private let motionToggle = Toggle()
     /// Where downloads go: Downloads, another folder, or ask each time.
     private let downloadPlace = DropdownButton()
@@ -684,6 +686,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         generalGroup.add(FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
                                  detail: String(localized: "So ⌘Q never closes everything by accident.", comment: "Explanation under “Ask before quitting” in Settings › General."),
                                  control: quitToggle))
+        scriptJavaScriptToggle.onChange = { on in Scripting.allowsJavaScript = on }
+        automationGroup.add(FormRow(title: String(localized: "Allow JavaScript from Apple Events", comment: "A setting in Settings › General, under Automation, as Safari names it."),
+                                    detail: String(localized: "Scripts and apps you allow in Privacy & Security › Automation can then read and change any page you have open, signed in or not. Never in private windows.",
+                                                   comment: "Explanation under “Allow JavaScript from Apple Events” in Settings › General."),
+                                    control: scriptJavaScriptToggle))
 
         // Appearance
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
@@ -1271,6 +1278,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     // The groups' headings, each said once for the page and its search.
     private static var updatesHeading: String { String(localized: "Updates", comment: "A heading in Settings › General: Zigzag's version and how it updates.") }
+    private static var automationHeading: String { String(localized: "Automation", comment: "A heading in Settings › General: what scripts and Shortcuts may do in Zigzag.") }
     private static var spacesHeading: String { String(localized: "Your Spaces", comment: "A heading in Settings › Spaces.") }
     private static var browsingDataHeading: String { String(localized: "Clear Browsing Data", comment: "A heading in Settings › Privacy: buttons that clear history, cache and cookies.") }
     private static var siteDataHeading: String { String(localized: "Stored by Websites", comment: "A heading in Settings › Privacy: what each site keeps on this Mac, with a Remove button each.") }
@@ -1303,7 +1311,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Each section's groups and their headings, as a search goes through them.
     private func groups(of pane: SettingsPane) -> [(title: String?, group: FormGroup)] {
         switch pane {
-        case .general: [(nil, generalGroup), (Self.updatesHeading, versionGroup)]
+        case .general: [(nil, generalGroup), (Self.automationHeading, automationGroup), (Self.updatesHeading, versionGroup)]
         case .appearance: [(nil, appearanceGroup)]
         case .tabs: [(nil, tabsGroup)]
         case .search: [(nil, searchGroup)]
@@ -1514,6 +1522,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         borderlessToggle.isOn = BrowserRootView.isBorderless
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
+        scriptJavaScriptToggle.isOn = Scripting.allowsJavaScript
         newTabPlace.selectedIndex = TabManager.NewTabPlace.allCases.firstIndex(of: TabManager.newTabPlace) ?? 0
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
         miniToggle.isOn = MiniWindowController.opensExternalLinks

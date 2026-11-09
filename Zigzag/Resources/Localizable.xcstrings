@@ -2139,6 +2139,17 @@
         }
       }
     },
+    "Allow JavaScript from Apple Events" : {
+      "comment" : "A setting in Settings › General, under Automation, as Safari names it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许来自 Apple 事件的 JavaScript"
+          }
+        }
+      }
+    },
     "Allow Saving" : {
       "comment" : "Button for a Never Saved site in the Passwords window: offer to save its passwords again.",
       "localizations" : {
@@ -2421,6 +2432,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选“自动”时，边栏窄就放得少一些、大一些。"
+          }
+        }
+      }
+    },
+    "Automation" : {
+      "comment" : "A heading in Settings › General: what scripts and Shortcuts may do in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动化"
           }
         }
       }
@@ -6106,6 +6128,17 @@
         }
       }
     },
+    "JavaScript from Apple Events is turned off. To allow it, turn on “Allow JavaScript from Apple Events” in Zigzag’s Settings › General." : {
+      "comment" : "Error a script gets when it runs JavaScript in a page before the setting is on. The setting's name is in quotes.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自 Apple 事件的 JavaScript 已关闭。如要允许，请在 Zigzag 的“设置 › 通用”中打开“允许来自 Apple 事件的 JavaScript”。"
+          }
+        }
+      }
+    },
     "Jump to Selection" : {
       "comment" : "Edit › Find menu item.",
       "localizations" : {
@@ -7331,6 +7364,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "以后"
+          }
+        }
+      }
+    },
+    "Not a web address. Use a full address, starting with https:// or http://." : {
+      "comment" : "Error a script gets when it opens something other than a website in a tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这不是网址。请使用以 https:// 或 http:// 开头的完整网址。"
           }
         }
       }
@@ -10083,6 +10127,39 @@
         }
       }
     },
+    "Scripts and apps you allow in Privacy & Security › Automation can then read and change any page you have open, signed in or not. Never in private windows." : {
+      "comment" : "Explanation under “Allow JavaScript from Apple Events” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开后，你在“隐私与安全性 › 自动化”中允许的脚本和应用可以读取和更改你打开的任何网页，无论是否已登录。无痕浏览窗口除外。"
+          }
+        }
+      }
+    },
+    "Scripts can run JavaScript only in web pages." : {
+      "comment" : "Error a script gets when it runs JavaScript in Settings, History or an extension's page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本只能在网页中运行 JavaScript。"
+          }
+        }
+      }
+    },
+    "Scripts can’t run JavaScript in a private window." : {
+      "comment" : "Error a script gets when it runs JavaScript in a private window's tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本不能在无痕浏览窗口中运行 JavaScript。"
+          }
+        }
+      }
+    },
     "Search" : {
       "comment" : "A section of Settings: the search engine and suggestions.\nAction label at the right of the selected command bar result, saying what Return does: searches for it.",
       "localizations" : {
@@ -11695,6 +11772,17 @@
         }
       }
     },
+    "That tab isn’t in this window." : {
+      "comment" : "Error a script gets when it makes a tab from another window the current tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该标签页不在这个窗口中。"
+          }
+        }
+      }
+    },
     "That’s Peek" : {
       "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
       "localizations" : {
@@ -11860,6 +11948,17 @@
         }
       }
     },
+    "The result can’t be given as text. For a promise, put await before it and return its value." : {
+      "comment" : "Error a script gets when its JavaScript ends on a value like a promise or a page element.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结果无法以文本形式返回。如果是 Promise，请在前面加上 await 并 return 它的值。"
+          }
+        }
+      }
+    },
     "The secure connection was cut off, often by the network you’re on. Try again, or try another network." : {
       "comment" : "Message on the page Zigzag shows when a page can't load.",
       "localizations" : {
@@ -11966,6 +12065,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "该网站的证书不是由你的 Mac 信任的机构颁发的。你自己网络上的网站（比如路由器）常常是这样。"
+          }
+        }
+      }
+    },
+    "There’s no tab to run it in." : {
+      "comment" : "Error a script gets when it runs JavaScript with no window open.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可以运行它的标签页。"
           }
         }
       }
