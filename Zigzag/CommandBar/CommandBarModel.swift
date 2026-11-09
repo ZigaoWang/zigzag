@@ -325,9 +325,9 @@ enum CommandRanker {
         let words = query.lowercased().split(separator: " ").map(String.init)
         let engine = Library.shared.searchEngine
 
-        // Zigzag's own commands, when the words fit one. One you've named ("import", "pin tab") comes first: typing
-        // its name means the command. One the words only touch through a keyword ("contact" for Send Feedback) waits
-        // after the search, so Return still searches for what you typed.
+        // What you typed always comes first, as a search or the address it names, so Return never does something
+        // else: someone typing "settings" may want to search the web for it. Zigzag's own commands follow, the ones
+        // you've named ("import", "pin tab") right under it, then those the words only touch through a keyword.
         let matched = historyOnly ? [] : manager.map { commands(for: query, context: context(for: $0)) } ?? []
         let named = matched.filter { Self.isNamed($0, by: words) }
         func addActions(_ list: [Action]) {
@@ -338,8 +338,6 @@ enum CommandRanker {
                                   symbol: action.symbol), key: "action:\(action.id)")
             }
         }
-        addActions(named)
-
         if !historyOnly {
             if let url = url(from: query) {
                 add(CommandResult(kind: .open(url), title: displayURL(url), detail: "", icon: FaviconStore.shared.cachedIcon(for: url), symbol: "globe"),
@@ -348,6 +346,7 @@ enum CommandRanker {
                 add(CommandResult(kind: .search(query), title: query, detail: engine.name, symbol: "magnifyingglass"), key: "search:\(query)")
             }
         }
+        addActions(named)
         addActions(matched.filter { !Self.isNamed($0, by: words) })
 
         if !historyOnly {
