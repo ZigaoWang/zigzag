@@ -238,6 +238,15 @@ struct ImportAgainTests {
         #expect(again.new.isEmpty)
     }
 
+    /// History brought over again says nothing new came, not every page once more.
+    @Test func historyAgainCountsOnlyNewPages() {
+        let store = HistoryStore(path: ":memory:")
+        let visits = [(URL(string: "https://example.com/")!, "Example", 2, Date()), (URL(string: "https://example.org/")!, "Org", 1, Date())]
+        #expect(store.importVisits(visits) == 2)
+        #expect(store.importVisits(visits) == 0)
+        #expect(store.importVisits(visits + [(URL(string: "https://example.net/")!, "Net", 1, Date())]) == 1)
+    }
+
     /// A finished Import window asked for again starts over, so importing again really imports.
     @Test func aFinishedImportWindowStartsOver() {
         #expect(ImportWindowController.startsOver(.done))

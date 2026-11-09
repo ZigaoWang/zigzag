@@ -132,16 +132,19 @@ final class HistoryStore {
     }
 
     /// Bulk import inside one transaction, with one statement. A page already here keeps the larger count, not
-    /// the sum: importing the same browser again never doubles its visits.
-    func importVisits(_ entries: [(URL, String, Int, Date)]) {
+    /// the sum: importing the same browser again never doubles its visits. Returns how many pages are new here,
+    /// so importing the same browser again says it brought nothing new rather than every page once more.
+    @discardableResult
+    func importVisits(_ entries: [(URL, String, Int, Date)]) -> Int {
         guard let statement = prepare("""
         INSERT INTO visits (url, host, title, visit_count, last_visit) VALUES (?1, ?2, ?3, ?4, ?5)
         ON CONFLICT(url) DO UPDATE SET visit_count = MAX(visit_count, ?4),
             last_visit = MAX(last_visit, ?5),
             title = CASE WHEN ?3 = '' THEN title ELSE ?3 END
-        """) else { return }
+        """) else { return 0 }
         defer { sqlite3_finalize(statement) }
         exec("BEGIN")
+        let before = pageCount()
         for (url, title, count, date) in entries where Self.shouldRecord(url) {
             sqlite3_reset(statement)
             sqlite3_bind_text(statement, 1, url.absoluteString, -1, transient)
@@ -151,7 +154,15 @@ final class HistoryStore {
             sqlite3_bind_double(statement, 5, date.timeIntervalSince1970)
             sqlite3_step(statement)
         }
+        let added = pageCount() - before
         exec("COMMIT")
+        return max(0, added)
+    }
+
+    private func pageCount() -> Int {
+        guard let statement = prepare("SELECT count(*) FROM visits") else { return 0 }
+        defer { sqlite3_finalize(statement) }
+        return sqlite3_step(statement) == SQLITE_ROW ? Int(sqlite3_column_int64(statement, 0)) : 0
     }
 
     /// Takes everything visited out of History, or everything since `date`. Archived tabs go with it (they're pages
