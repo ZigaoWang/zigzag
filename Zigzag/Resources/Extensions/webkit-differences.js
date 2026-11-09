@@ -79,14 +79,19 @@
       }));
     } catch (e) { return value; }
   };
+  // Only these come back as what they were. What a site posts on a port reaches the worker this way too, and its
+  // `type` must never name some other constructor of the worker's to call.
+  const VIEWS = new Set(['DataView', 'Int8Array', 'Uint8Array', 'Uint8ClampedArray', 'Int16Array', 'Uint16Array', 'Int32Array',
+    'Uint32Array', 'Float16Array', 'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array']);
   const restored = (value) => {
     if (!value || typeof value !== 'object') return value;
     if (typeof value[BYTES_KEY] === 'string') {
-      const text = atob(value[BYTES_KEY]);
+      let text = '';
+      try { text = atob(value[BYTES_KEY]); } catch (e) {}
       const bytes = new Uint8Array(text.length);
       for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
-      const View = globalThis[value.type];
-      if (value.type === 'ArrayBuffer' || typeof View !== 'function') return bytes.buffer;
+      const View = VIEWS.has(value.type) ? globalThis[value.type] : null;
+      if (typeof View !== 'function' || (View.BYTES_PER_ELEMENT && bytes.length % View.BYTES_PER_ELEMENT)) return bytes.buffer;
       return View === DataView ? new DataView(bytes.buffer) : new View(bytes.buffer, 0, bytes.length / View.BYTES_PER_ELEMENT);
     }
     for (const key of Object.keys(value)) value[key] = restored(value[key]);

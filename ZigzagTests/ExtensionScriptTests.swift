@@ -358,6 +358,24 @@ struct ExtensionScriptTests {
         #expect(worker.evaluateScript("JSON.stringify(__page.sent[__page.sent.length - 1])").toString() == #"{"kind":"port","id":1,"data":{"id":7,"response":"ok"}}"#)
     }
 
+    @Test func bytesFromASiteComeBackOnlyAsBytes() {
+        // What a site posts on its port reaches the worker: its `type` never names another constructor to call.
+        let worker = Self.workerWorld(worker: true, setup: Self.messagingWorld + """
+        var __made = 0;
+        var Spy = class { constructor() { __made++; } };
+        """)
+        worker.evaluateScript("""
+        var __page = __port('__zigzagWorkerClient', { url: 'webkit-extension://x/ext.html' });
+        chrome.runtime.onConnect.fire(__page);
+        __page.onMessage.fire({ kind: 'message', ports: [], data: {
+          spy: { __zigzagBytes: 'AQL/', type: 'Spy' }, odd: { __zigzagBytes: 'AQL/', type: 'Float64Array' },
+          broken: { __zigzagBytes: '%%%', type: 'Uint8Array' }, bytes: { __zigzagBytes: 'AQL/', type: 'Uint8Array' } } });
+        """)
+        #expect(worker.evaluateScript("__made").toInt32() == 0)
+        #expect(worker.evaluateScript("__heard[0].spy instanceof ArrayBuffer && __heard[0].odd instanceof ArrayBuffer").toBool())
+        #expect(worker.evaluateScript("__heard[0].bytes instanceof Uint8Array && __heard[0].bytes.join()").toString() == "1,2,255")
+    }
+
     @Test func aPageWithNoWorkerOfItsOwnIsGivenOne() {
         // WebKit gives an extension's page in a tab, or in a frame on a site (Kondo's), no worker: ready never
         // settles. Chrome gives every page of the extension its worker.
