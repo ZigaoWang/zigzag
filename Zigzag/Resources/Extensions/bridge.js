@@ -316,38 +316,99 @@
     onProxyError: event('proxy.onProxyError'),
   });
 
-  // Proxy sign-in: Chrome asks webRequest.onAuthRequired listeners when a proxy wants a password (FoxyProxy answers
-  // from the sign-ins you gave it). WebKit never asks, so Zigzag asks them itself, with Chrome's details, as soon as
-  // the extension sets a proxy, and gives the proxy their answer. A listener answers as in Chrome, returning
-  // { authCredentials } or calling back with it (asyncBlocking), or with a promise of it, as in Firefox.
-  if (asked.has('proxy') && asked.has('webRequest')) {
-    const signIn = new Map();   // listener -> whether it answers through a callback
-    const ask = async (details) => {
-      for (const [listener, callsBack] of [...signIn]) {
-        let answer;
-        try {
-          answer = await new Promise((resolve) => {
-            const returned = listener(Object.assign({}, details), callsBack ? resolve : undefined);
-            if (!callsBack) Promise.resolve(returned).then(resolve, () => resolve(undefined));
-            setTimeout(() => resolve(undefined), 10000);
-          });
-        } catch (e) {}
+  // Sign-ins: Chrome asks webRequest.onAuthRequired listeners when a site or a proxy wants a name and password
+  // (1Password and Bitwarden fill a site's, FoxyProxy its proxies'). WebKit's own listeners only watch, so Zigzag asks
+  // these itself, with Chrome's details: a site's as it asks (BridgeWebRequest.swift), a proxy's as soon as the
+  // extension sets it (BridgeProxy.swift). A listener answers as in Chrome, returning { authCredentials } or
+  // { cancel: true } or calling back with it (asyncBlocking), or with a promise of it, as in Firefox. Each listener's
+  // filter applies; the first to answer is the answer.
+  const signsInSites = asked.has('webRequestAuthProvider') || asked.has('webRequestBlocking');
+  if (asked.has('webRequest') && (asked.has('proxy') || signsInSites)) {
+    const signIn = new Map();   // listener -> { callsBack, filter, headers }
+    // Chrome's match patterns, enough for a filter's urls: scheme, host (with *. for subdomains) and path.
+    const matchesPattern = (pattern, address) => {
+      if (pattern === '<all_urls>') return /^(https?|wss?|ftp|file):/.test(address);
+      const parts = /^(\*|https?|wss?|ftp|file):\/\/([^/]*)(\/.*)?$/.exec(String(pattern));
+      let url;
+      try { url = new URL(address); } catch (e) { return false; }
+      if (!parts) return false;
+      const scheme = url.protocol.slice(0, -1);
+      if (parts[1] === '*' ? !['http', 'https', 'ws', 'wss'].includes(scheme) : parts[1] !== scheme) return false;
+      const host = parts[2].replace(/:(\d+|\*)$/, '');
+      if (host !== '*' && host !== url.hostname && !(host.startsWith('*.') && (url.hostname === host.slice(2) || url.hostname.endsWith(host.slice(1))))) return false;
+      const path = new RegExp('^' + (parts[3] || '/*').split('*').map((piece) => piece.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$');
+      return path.test(url.pathname + url.search);
+    };
+    const wants = (filter, details) => {
+      if (!filter || typeof filter !== 'object') return true;
+      if (Array.isArray(filter.types) && !filter.types.includes(details.type)) return false;
+      if (typeof filter.tabId === 'number' && filter.tabId !== details.tabId) return false;
+      return !Array.isArray(filter.urls) || filter.urls.some((pattern) => matchesPattern(pattern, details.url));
+    };
+    // Every listener whose filter wants it, at once; the first that answers decides, and one that's said nothing in
+    // ten seconds counts as nothing. Resolves { authCredentials }, { cancel: true } or {}.
+    const ask = (details) => new Promise((resolve) => {
+      const listening = [...signIn].filter(([, entry]) => wants(entry.filter, details));
+      let left = listening.length;
+      let done = false;
+      const settle = (answer) => {
+        if (done) return;
         const credentials = answer && answer.authCredentials;
+        if (answer && answer.cancel === true) { done = true; resolve({ cancel: true }); return; }
         if (credentials && typeof credentials.username === 'string') {
-          send('proxy', 'authAnswer', [details.requestId, { username: credentials.username, password: String(credentials.password || '') }]).catch(() => {});
+          done = true;
+          resolve({ authCredentials: { username: credentials.username, password: String(credentials.password == null ? '' : credentials.password) } });
           return;
         }
+        if (--left <= 0) { done = true; resolve({}); }
+      };
+      if (!left) { resolve({}); return; }
+      for (const [listener, entry] of listening) {
+        let said = false;
+        const say = (answer) => { if (!said) { said = true; settle(answer); } };
+        const given = Object.assign({}, details);
+        if (!entry.headers) delete given.responseHeaders;
+        try {
+          const returned = listener(given, entry.callsBack ? say : undefined);
+          if (!entry.callsBack) Promise.resolve(returned).then(say, () => say(undefined));
+        } catch (e) { say(undefined); }
+        setTimeout(() => say(undefined), 10000);
       }
+    });
+    // A site's sign-in names the tab asking by WebKit's ID, which only this extension's tabs.query knows: Zigzag
+    // says where the tab is, and it's found here. 1Password keeps what you picked for a tab by that ID.
+    const tabFor = async (hint) => {
+      if (!hint || !api.tabs || typeof api.tabs.query !== 'function') return -1;
+      try {
+        const tabs = await api.tabs.query({});
+        const there = tabs.filter((tab) => hint.url && (tab.url === hint.url || tab.pendingUrl === hint.url));
+        const found = there.find((tab) => tab.index === hint.index && !!tab.active === !!hint.active) || (there.length === 1 ? there[0] : null);
+        return found && typeof found.id === 'number' ? found.id : -1;
+      } catch (e) { return -1; }
+    };
+    const askForSite = async (details) => {
+      const hint = details.__zigzagTab;
+      delete details.__zigzagTab;
+      details.tabId = await tabFor(hint);
+      const answer = await ask(details);
+      send('webRequest', 'authAnswer', [details.requestId, answer]).catch(() => {});
+    };
+    const askForProxy = async (details) => {
+      const answer = await ask(details);
+      if (answer.authCredentials) send('proxy', 'authAnswer', [details.requestId, answer.authCredentials]).catch(() => {});
     };
     // WebKit has its own onAuthRequired and won't let it be replaced here: webkit-differences.js, which can stand in
     // for it, tells this about each listener as it's added.
-    Object.defineProperty(globalThis, '__zigzagProxySignIn', { value: {
-      add(listener, extraInfoSpec) {
+    Object.defineProperty(globalThis, '__zigzagSignIn', { value: {
+      add(listener, filter, extraInfoSpec) {
         if (typeof listener !== 'function') return;
-        signIn.set(listener, Array.isArray(extraInfoSpec) && extraInfoSpec.includes('asyncBlocking'));
-        on('proxy.onAuthRequired', ask);
+        const spec = Array.isArray(extraInfoSpec) ? extraInfoSpec : [];
+        signIn.set(listener, { callsBack: spec.includes('asyncBlocking'), filter, headers: spec.includes('responseHeaders') });
+        if (asked.has('proxy')) on('proxy.onAuthRequired', askForProxy);
+        if (signsInSites) on('webRequest.onAuthRequired', askForSite);
       },
       remove(listener) { signIn.delete(listener); },
+      has(listener) { return signIn.has(listener); },
     }, configurable: true });
   }
 

@@ -29,9 +29,7 @@ struct ExtensionReport {
 
         var limits: [String] = ExtensionProfile.profile(for: id)?.knownIssue.map { [$0] } ?? []
         let covered = (ExtensionProfile.profile(for: id)?.coveredPermissions ?? []).union(ExtensionBridgeScript.permissions)
-        // A proxy extension's sign-in provider answers its proxy's password, which the bridge passes on (BridgeProxy).
-        let answered: Set<String> = requested.contains("proxy") ? ["webRequestAuthProvider"] : []
-        for permission in requested.subtracting(recognized).subtracting(covered).subtracting(answered).sorted() {
+        for permission in requested.subtracting(recognized).subtracting(covered).sorted() {
             if let name = Self.limitNames[permission], !limits.contains(name) { limits.append(name) }
         }
         for (permission, name) in Self.partLimits where requested.contains(permission) && !limits.contains(name) { limits.append(name) }
@@ -141,7 +139,6 @@ struct ExtensionReport {
         "idle": String(localized: "Knowing when you’re away", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
         "offscreen": String(localized: "Background audio and clipboard", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
         "webRequestBlocking": String(localized: "Blocking requests the old way", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "webRequestAuthProvider": String(localized: "Filling in sign-in dialogs", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
         "history": String(localized: "Your browsing history", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
         "bookmarks": String(localized: "Your bookmarks", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
         "topSites": String(localized: "Your top sites", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),

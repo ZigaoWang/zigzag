@@ -4947,17 +4947,6 @@
         }
       }
     },
-    "Filling in sign-in dialogs" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "填写登录对话框"
-          }
-        }
-      }
-    },
     "Fills %@ from Contacts" : {
       "comment" : "Under the person's name in the menu that fills a form. The placeholder lists what the card holds, like “email, phone and address”.",
       "localizations" : {

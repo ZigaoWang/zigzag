@@ -151,9 +151,10 @@ enum PageDialogs {
 
 enum AuthenticationPrompt {
     /// `store`: the asking web view's data store, whose certificate exceptions apply. `page`: the web view asking,
-    /// whose tab the sign-in sheet stays with; without one it covers the window.
+    /// whose tab the sign-in sheet stays with; without one it covers the window. `tab`: the tab asking, as extensions
+    /// know it, whose onAuthRequired listeners may answer before the sheet; never a private one.
     static func respond(to challenge: URLAuthenticationChallenge, window: NSWindow?, store: WKWebsiteDataStore,
-                        page: WKWebView? = nil) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+                        page: WKWebView? = nil, tab: (any WKWebExtensionTab)? = nil) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         let method = challenge.protectionSpace.authenticationMethod
         // A certificate you chose to trust on the warning page: accepted for this session.
         if method == NSURLAuthenticationMethodServerTrust, let trust = challenge.protectionSpace.serverTrust,
@@ -176,11 +177,32 @@ enum AuthenticationPrompt {
         // Several loads asking for the same sign-in at once (a page and its images): one question, one answer for all.
         let space = challenge.protectionSpace
         let key = "\(ObjectIdentifier(store).hashValue)|\(space.host):\(space.port)|\(space.realm ?? "")"
-        if challenge.previousFailureCount == 0, let asking = signingIn[key] { return await asking.value }
-        let task = Task { @MainActor in await ask(challenge, window: window, page: page) }
-        signingIn[key] = task
+        let asker = store.isPersistent ? tab : nil
+        if challenge.previousFailureCount == 0, let asking = signingIn[key] {
+            // Asked again while the sheet is up: the page loaded again, often because an extension was told what to
+            // fill (1Password reloads the tab once you pick a login in it). Its answer answers the sheet too.
+            if asking.sheetShown, case .credentials(let username, let password) = await askExtensions(challenge, page: page, tab: asker) {
+                PageDialogSheet.answer(tag: key, with: [username, password])
+                return (.useCredential, URLCredential(user: username, password: password, persistence: .forSession))
+            }
+            return await asking.task?.value ?? (.cancelAuthenticationChallenge, nil)
+        }
+        let attempt = SigningIn()
+        signingIn[key] = attempt
+        let task = Task { @MainActor () -> (URLSession.AuthChallengeDisposition, URLCredential?) in
+            switch await askExtensions(challenge, page: page, tab: asker) {
+            case .credentials(let username, let password):
+                return (.useCredential, URLCredential(user: username, password: password, persistence: .forSession))
+            case .cancel:
+                return (.cancelAuthenticationChallenge, nil)
+            case .none:
+                attempt.sheetShown = true
+                return await ask(challenge, window: window, page: page, tag: key)
+            }
+        }
+        attempt.task = task
         let answer = await task.value
-        if signingIn[key] == task { signingIn[key] = nil }
+        if signingIn[key] === attempt { signingIn[key] = nil }
         return answer
     }
 
@@ -188,17 +210,32 @@ enum AuthenticationPrompt {
         a == b || (PublicSuffix.registrableDomain(a) ?? a) == (PublicSuffix.registrableDomain(b) ?? b)
     }
 
-    @MainActor private static var signingIn: [String: Task<(URLSession.AuthChallengeDisposition, URLCredential?), Never>] = [:]
+    /// One sign-in being answered, by extensions and then the sheet.
+    @MainActor private final class SigningIn {
+        var task: Task<(URLSession.AuthChallengeDisposition, URLCredential?), Never>?
+        var sheetShown = false
+    }
+
+    @MainActor private static var signingIn: [String: SigningIn] = [:]
+
+    /// Extensions' onAuthRequired listeners, asked as Chrome asks them before its own dialog. After a wrong password
+    /// they're asked once more, as in Chrome; after that only the sheet asks, so a wrong answer can't go round and round.
+    @MainActor
+    private static func askExtensions(_ challenge: URLAuthenticationChallenge, page: WKWebView?, tab: (any WKWebExtensionTab)?) async -> BridgeWebRequest.Answer {
+        guard challenge.previousFailureCount < 2, let site = SiteChallenge(challenge, pageURL: page?.url) else { return .none }
+        return await ExtensionBridge.shared.webRequest.askForSignIn(site, tab: tab)
+    }
 
     @MainActor
     private static func ask(_ challenge: URLAuthenticationChallenge, window: NSWindow,
-                            page: WKWebView?) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+                            page: WKWebView?, tag: String) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         Diagnostics.note(challenge.previousFailureCount > 0 ? "Site sign-in didn’t work" : "Site asked to sign in", site: challenge.protectionSpace.host,
                          isPrivate: page?.configuration.websiteDataStore.isPersistent != true)
         let message = challenge.previousFailureCount > 0 ? String(localized: "That name or password didn’t work. Try again.", comment: "Message in the sheet a site's HTTP sign-in asks with, after a wrong name or password.") : String(localized: "This site needs a name and password.", comment: "Message in the sheet a site's HTTP sign-in asks with.")
+        let fields: [PageDialogSheet.Field] = [.init(placeholder: String(localized: "Username", comment: "Placeholder of the name field in a site's HTTP sign-in sheet.")), .init(placeholder: String(localized: "Password", comment: "Placeholder of the password field in a site's HTTP sign-in sheet."), secure: true)]
         let result = await PageDialogSheet.ask(in: window, title: String(localized: "Sign in to \(challenge.protectionSpace.host)", comment: "Title of the sheet a site's HTTP sign-in asks with. The placeholder is the site's host name."), message: message,
-                                               fields: [.init(placeholder: String(localized: "Username", comment: "Placeholder of the name field in a site's HTTP sign-in sheet.")), .init(placeholder: String(localized: "Password", comment: "Placeholder of the password field in a site's HTTP sign-in sheet."), secure: true)],
-                                               confirmTitle: String(localized: "Sign In", comment: "Button in a site's HTTP sign-in sheet."), showsCancel: true, offersBlock: false, page: page)
+                                               fields: fields, confirmTitle: String(localized: "Sign In", comment: "Button in a site's HTTP sign-in sheet."), showsCancel: true, offersBlock: false, page: page,
+                                               tag: tag)
         guard case .confirmed(let values) = result, values.count == 2 else { return (.cancelAuthenticationChallenge, nil) }
         return (.useCredential, URLCredential(user: values[0], password: values[1], persistence: .forSession))
     }

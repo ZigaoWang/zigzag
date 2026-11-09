@@ -597,19 +597,23 @@
       if (has) setMember(['runtime', 'onConnect'], 'hasListener', (listener) => has(shown.get(listener) || listener));
     }
 
-    // webRequest.onAuthRequired, for a proxy extension: its listeners also answer for the proxy it sets, as the bridge
-    // asks them (bridge.js). WebKit's own still hears what it can.
-    const signIn = globalThis.__zigzagProxySignIn;
+    // webRequest.onAuthRequired: its listeners also answer sign-ins, a site's or the proxy the extension sets, as the
+    // bridge asks them (bridge.js). WebKit's own still hears what it can.
+    const signIn = globalThis.__zigzagSignIn;
     const authRequired = api.webRequest && api.webRequest.onAuthRequired;
     if (signIn && authRequired && typeof authRequired.addListener === 'function') {
       const add = authRequired.addListener.bind(authRequired);
       const remove = authRequired.removeListener && authRequired.removeListener.bind(authRequired);
+      const has = authRequired.hasListener && authRequired.hasListener.bind(authRequired);
       try {
         setMember(['webRequest', 'onAuthRequired'], 'addListener', (listener, filter, extraInfoSpec, ...rest) => {
-          signIn.add(listener, extraInfoSpec);
+          signIn.add(listener, filter, extraInfoSpec);
+          // WebKit refuses the blocking options it can't honor; it still watches without them.
           try { return add(listener, filter, extraInfoSpec, ...rest); } catch (e) {}
+          try { return add(listener, filter); } catch (e) {}
         });
         setMember(['webRequest', 'onAuthRequired'], 'removeListener', (listener) => { signIn.remove(listener); if (remove) return remove(listener); });
+        setMember(['webRequest', 'onAuthRequired'], 'hasListener', (listener) => signIn.has(listener) || (has ? has(listener) : false));
       } catch (e) {}
     }
 

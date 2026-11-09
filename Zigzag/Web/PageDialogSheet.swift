@@ -27,6 +27,8 @@ final class PageDialogSheet: NSView {
     private let confirm: PillButton
     private let cancel = PillButton(title: String(localized: "Cancel", comment: "Button in a page's JavaScript dialog sheet."), style: .plain)
     private let block = PillButton(title: String(localized: "Block Dialogs", comment: "Button in a page's JavaScript dialog sheet, once it has shown a second dialog."), style: .quiet)
+    /// Says which question it answers, so another way of answering it (an extension) can close it.
+    private var answers: String?
     private var monitor: Any?
     private var closeObserver: Any?
     /// The page that asked, when a page did: the sheet sits on it, and goes when the page does.
@@ -78,7 +80,7 @@ final class PageDialogSheet: NSView {
 
     @MainActor
     static func ask(in window: NSWindow, title: String, message: String, fields: [Field] = [], confirmTitle: String = String(localized: "OK", comment: "Button that answers a page's JavaScript dialog sheet."),
-                    showsCancel: Bool, offersBlock: Bool, page: WKWebView? = nil) async -> Result {
+                    showsCancel: Bool, offersBlock: Bool, page: WKWebView? = nil, tag: String? = nil) async -> Result {
         // Over the page that asked, so it stays with its tab; a dialog without a page covers the window.
         guard let host = page ?? window.contentView else { return .cancelled }
         // One at a time on a page: a second question (two sign-ins at once) waits for the first, never stacks on it.
@@ -87,7 +89,7 @@ final class PageDialogSheet: NSView {
         let task = Task { @MainActor in
             _ = await before?.value
             return await present(in: window, host: host, title: title, message: message, fields: fields, confirmTitle: confirmTitle,
-                                 showsCancel: showsCancel, offersBlock: offersBlock, page: page)
+                                 showsCancel: showsCancel, offersBlock: offersBlock, page: page, tag: tag)
         }
         queue[key] = task
         let result = await task.value
@@ -99,11 +101,12 @@ final class PageDialogSheet: NSView {
 
     @MainActor
     private static func present(in window: NSWindow, host: NSView, title: String, message: String, fields: [Field], confirmTitle: String,
-                                showsCancel: Bool, offersBlock: Bool, page: WKWebView?) async -> Result {
+                                showsCancel: Bool, offersBlock: Bool, page: WKWebView?, tag: String?) async -> Result {
         return await withCheckedContinuation { continuation in
-            let sheet = PageDialogSheet(title: title, message: message, fields: fields, confirmTitle: confirmTitle,
-                                        showsCancel: showsCancel, offersBlock: offersBlock) { continuation.resume(returning: $0) }
+            let sheet = PageDialogSheet(title: title, message: message, fields: fields, confirmTitle: confirmTitle, showsCancel: showsCancel,
+                                        offersBlock: offersBlock) { continuation.resume(returning: $0) }
             sheet.page = page
+            sheet.answers = tag
             sheet.homeWindow = window
             open = open.filter { $0.sheet != nil } + [WeakBox(sheet: sheet)]
             // Closing the window doesn't take its views down with it: the page hears "cancel", not silence. Its tab
@@ -141,6 +144,12 @@ final class PageDialogSheet: NSView {
         if responder.isDescendant(of: self) { return true }
         guard let page else { return true }
         return responder.isDescendant(of: page)
+    }
+
+    /// Answered another way (an extension gave the sign-in it asks for): the sheet tagged so goes, with these values.
+    static func answer(tag: String, with values: [String]) {
+        for box in open where box.sheet?.answers == tag { box.sheet?.finish(.confirmed(values)) }
+        open = open.filter { $0.sheet != nil && $0.sheet?.superview != nil }
     }
 
     /// The page closed (its tab, or a new process): its dialogs answer "cancel" and go.
