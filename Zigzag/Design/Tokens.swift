@@ -109,8 +109,12 @@ enum Tokens {
         static let popupDefaultSize = NSSize(width: 520, height: 640)
         /// Zigzag Mini, for one page opened from another app: big enough to read, small enough to stay out of the way.
         static let miniWindowSize = NSSize(width: 900, height: 640)
-        /// The smallest Zigzag Mini gets: its strip's lights, the page's name and its button, over a page you can read.
+        /// The smallest Zigzag Mini gets: its strip's lights, its space and its button, over a page you can read.
         static let miniWindowMinSize = NSSize(width: 360, height: 260)
+        /// Zigzag Mini's strip on top: as slim as a split view pane's, the traffic lights centered in it.
+        static let miniStripHeight: CGFloat = Pane.height
+        /// The space's color around Zigzag Mini's page, on its sides and below: a thin, even frame.
+        static let miniFrame: CGFloat = Space.x1 + 2
         /// ⌘L's command bar over Zigzag Mini's strip, at its widest before you type.
         static let miniAddressWidth: CGFloat = 480
         static let windowDefaultSize = NSSize(width: 1280, height: 820)

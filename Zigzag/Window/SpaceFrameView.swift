@@ -146,6 +146,15 @@ class SpaceFrameView: ColorView {
         glassView.alphaValue = on ? 1 : 0
     }
 
+    #if DEBUG
+    var debugGlass: [String: Any] {
+        ["opaque": window?.isOpaque ?? false, "wanted": glassWanted, "frosted": !glassView.isHidden, "frostedAlpha": glassView.alphaValue,
+         "clear": clearGlass.map { !$0.isHidden } ?? false, "clearAlpha": clearGlass?.alphaValue ?? -1,
+         "clearFrame": NSStringFromRect(clearGlass?.frame ?? .zero), "occlusionVisible": window?.occlusionState.contains(.visible) ?? false,
+         "background": window?.backgroundColor.description ?? ""]
+    }
+    #endif
+
     /// The clear glass, once a clear space has asked for it.
     private var clearGlass: NSView?
     /// Grain inside the clear glass, matching the frame's.
