@@ -167,6 +167,8 @@ enum Scripting {
     static func read(_ source: String, in tab: Tab) -> String {
         let box = Box<String?>(nil), finished = Box(false)
         whenAwake(tab) { webView in
+            // Woken or done loading, it may be on another page now: one of Zigzag's own has nothing to give.
+            guard isReadable(url: webView.url, isPrivate: tab.isPrivate) else { finished.value = true; return }
             webView.evaluateJavaScript(source, in: nil, in: .defaultClient) { result in
                 box.value = (try? result.get()) as? String
                 finished.value = true
@@ -439,6 +441,14 @@ extension Scripting {
         }
         command.suspendExecution()
         whenAwake(scripted.tab) { webView in
+            // Asked while it slept or loaded, it may be on another page now: one of Zigzag's own (History, an
+            // extension's page), where JavaScript could do more than a website's. Checked again, on that page.
+            if let refusal = javaScriptRefusal(url: webView.url, isPrivate: scripted.tab.isPrivate, allowed: allowsJavaScript) {
+                command.scriptErrorNumber = refusal == .turnedOff ? errAEEventNotPermitted : errAEEventFailed
+                command.scriptErrorString = message(for: refusal)
+                command.resumeExecution(withResult: nil)
+                return
+            }
             run(source, in: webView) { result in
                 switch result {
                 case .success(let text):
