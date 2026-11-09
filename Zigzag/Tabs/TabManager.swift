@@ -230,7 +230,7 @@ final class TabManager {
 
     /// A pinned page's or favorite's open page from another window, in the space you're in.
     func insertBookmarkTab(_ tab: Tab, bookmarkID: UUID) {
-        tab.spaceID = currentSpaceID
+        tab.setSpace(currentSpaceID)
         adoptBookmarkTab(tab, bookmarkID: bookmarkID)
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
     }
@@ -238,7 +238,7 @@ final class TabManager {
     /// Adds a tab that already has a page (a promoted peek) to the top of the list and shows it.
     func insert(_ tab: Tab, at index: Int = 0) {
         tab.host = host
-        tab.spaceID = currentSpaceID
+        tab.setSpace(currentSpaceID)
         watch(tab)
         var list = tabsBySpace[currentSpaceID] ?? []
         list.insert(tab, at: min(max(index, 0), list.count))
@@ -284,7 +284,7 @@ final class TabManager {
         guard !tab.isClosed else { return }
         Autofill.shared.hide()
         // Favorites belong to every space: they open in the one you're in.
-        if tab.isFavorite { tab.spaceID = currentSpaceID }
+        if tab.isFavorite { tab.setSpace(currentSpaceID) }
         if tab.spaceID != currentSpaceID {
             currentSpaceID = tab.spaceID
             changed.send(.space)
@@ -547,7 +547,7 @@ final class TabManager {
         // Bookmarks moved to another space carry their live tab; one that became, or stopped being, a favorite
         // (undo, another window) says so.
         for (id, tab) in bookmarkTabs {
-            if let space = Library.shared.spaceID(ofBookmark: id) { tab.spaceID = space }
+            if let space = Library.shared.spaceID(ofBookmark: id) { tab.setSpace(space) }
             tab.isFavorite = Library.shared.isFavorite(id)
         }
         // Pinned pages stop being a pinned split (separated, one made a favorite, undo, another window): the split on
@@ -612,7 +612,7 @@ final class TabManager {
                 let mark = Bookmark(url: half.url ?? url, title: Self.bookmarkTitle(half.displayTitle, url: half.url ?? url))
                 removeFromList(half)
                 half.bookmarkID = mark.id
-                half.spaceID = space
+                half.setSpace(space)
                 bookmarkTabs[mark.id] = half
                 return mark
             }
@@ -623,7 +623,7 @@ final class TabManager {
         removeFromList(tab)
         let bookmarkID = UUID()
         tab.bookmarkID = bookmarkID
-        tab.spaceID = space
+        tab.setSpace(space)
         bookmarkTabs[bookmarkID] = tab
         Library.shared.addBookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), to: space, at: index, id: bookmarkID)
     }
@@ -636,7 +636,7 @@ final class TabManager {
         let mark = Bookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url))
         removeFromList(tab)
         tab.bookmarkID = mark.id
-        tab.spaceID = space
+        tab.setSpace(space)
         bookmarkTabs[mark.id] = tab
         Library.shared.pinBeside(mark, bookmarkID, onRight: tabOnRight)
         openBookmark(mark)
@@ -660,7 +660,7 @@ final class TabManager {
         let space = (isFavorite ? spaceID : nil) ?? Library.shared.spaceID(ofBookmark: bookmarkID) ?? currentSpaceID
         if let pinned = Library.shared.pinnedSplit(containing: bookmarkID) { return unpin(pinned, returning: bookmarkID, toIndex: index, in: space) }
         if isFavorite {
-            bookmarkTabs[bookmarkID]?.spaceID = space
+            bookmarkTabs[bookmarkID]?.setSpace(space)
             bookmarkTabs[bookmarkID]?.isFavorite = false
         }
         var result: Tab?
@@ -692,7 +692,7 @@ final class TabManager {
                 tab.bookmarkID = nil
                 // A split favorite comes back as tabs in the space you're in.
                 tab.isFavorite = false
-                tab.spaceID = space
+                tab.setSpace(space)
                 halves.append((id, tab))
             } else if anyOpen || index != nil, let bookmark = Library.shared.bookmark(id) {
                 let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: space)
@@ -731,7 +731,7 @@ final class TabManager {
         bookmarkTabs[bookmarkID] = nil
         tab.bookmarkID = nil
         tab.isFavorite = false
-        tab.spaceID = currentSpaceID
+        tab.setSpace(currentSpaceID)
         tabsBySpace[currentSpaceID, default: []].insert(tab, at: 0)
         changed.send(.structure)
         select(tab)
@@ -926,7 +926,7 @@ final class TabManager {
             let halves = pair.left == tab.id ? [tab, other] : [other, tab]
             halves.forEach { removeFromList($0) }
             for half in halves {
-                half.spaceID = target
+                half.setSpace(target)
                 for (space, id) in selectedBySpace where id == half.id && space != target { selectedBySpace[space] = nil }
             }
             var list = tabsBySpace[target] ?? []
@@ -938,7 +938,7 @@ final class TabManager {
         // A split with a pinned page can't span two spaces: moving the tab out ends it.
         if target != tab.spaceID { splits.removeAll { $0.left == tab.id || $0.right == tab.id } }
         removeFromList(tab)
-        tab.spaceID = target
+        tab.setSpace(target)
         var list = tabsBySpace[target] ?? []
         list.insert(tab, at: max(0, min(index, list.count)))
         tabsBySpace[target] = list
@@ -1063,7 +1063,7 @@ final class TabManager {
         unsplit(other, notify: false)
         if other.spaceID != tab.spaceID {
             removeFromList(other)
-            other.spaceID = tab.spaceID
+            other.setSpace(tab.spaceID)
             tabsBySpace[tab.spaceID, default: []].insert(other, at: 0)
         }
         splits.append(otherOnRight ? SplitPair(left: tab.id, right: other.id) : SplitPair(left: other.id, right: tab.id))
@@ -1202,7 +1202,7 @@ final class TabManager {
         bookmarkTabs = target.pinned.compactMapValues { alive[$0] }
         for (bookmark, id) in now.pinned { if let tab = since[id], bookmarkTabs[bookmark] == nil { bookmarkTabs[bookmark] = tab } }
         for (id, tab) in alive {
-            tab.spaceID = target.spaces[id] ?? tab.spaceID
+            tab.setSpace(target.spaces[id] ?? tab.spaceID)
             tab.bookmarkID = target.pinned.first { $0.value == id }?.key
             tab.isFavorite = tab.bookmarkID.map(Library.shared.isFavorite) ?? false
         }
