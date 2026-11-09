@@ -382,6 +382,21 @@ struct ExtensionScriptTests {
         #expect(popup.evaluateScript("__ready").toString() == "webkit")
     }
 
+    @Test func cookiesAsChromeDescribesThemAreSet() {
+        // A cookie Chrome listed names its store "0" and may have a SameSite of "unspecified"; WebKit refuses both.
+        let page = Self.workerWorld(worker: false, setup: """
+        var __set = [];
+        chrome.cookies = { set: (details) => { __set.push(details); return Promise.resolve(details); }, get: () => Promise.resolve(null),
+                           getAll: () => Promise.resolve([]), remove: () => Promise.resolve(null), onChanged: event() };
+        """)
+        page.evaluateScript("""
+        chrome.cookies.set({ url: 'https://linkedin.com', name: 'li_at', value: 'v', storeId: '0', sameSite: 'unspecified', secure: true });
+        chrome.cookies.set({ url: 'https://linkedin.com', name: 'lang', value: 'v', storeId: 'persistent-1', sameSite: 'lax' });
+        """)
+        #expect(page.evaluateScript("JSON.stringify(__set[0])").toString() == #"{"url":"https://linkedin.com","name":"li_at","value":"v","secure":true}"#)
+        #expect(page.evaluateScript("__set[1].storeId + ' ' + __set[1].sameSite").toString() == "persistent-1 lax")
+    }
+
     @Test func permissionsContainsAnswersForAnOriginWithAPort() {
         // WebKit refuses a pattern with a port, as 1Password asks on local sites; Chrome answers, as the pattern without it does.
         let page = Self.workerWorld(worker: false, setup: """

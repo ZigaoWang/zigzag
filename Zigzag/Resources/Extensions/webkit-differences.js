@@ -317,6 +317,24 @@
       if (has) setMember(['cookies', 'onChanged'], 'hasListener', (listener) => has(guarded.get(listener) || listener));
     }
 
+    // cookies: a cookie as Chrome described it can name Chrome's everyday store, "0", and a SameSite of "unspecified";
+    // WebKit's store has its own name, and it refuses both, so the cookie isn't set. Kondo puts back a LinkedIn
+    // sign-in it saved that way. Both mean what no storeId and no sameSite mean, so they're left out.
+    const cookies = api.cookies;
+    if (cookies) {
+      for (const name of ['get', 'getAll', 'set', 'remove']) {
+        if (typeof cookies[name] !== 'function') continue;
+        const native = cookies[name].bind(cookies);
+        setMember(['cookies'], name, (details, ...rest) => {
+          if (!details || typeof details !== 'object' || (details.storeId !== '0' && details.sameSite !== 'unspecified')) return native(details, ...rest);
+          const own = { ...details };
+          if (own.storeId === '0') delete own.storeId;
+          if (own.sameSite === 'unspecified') delete own.sameSite;
+          return native(own, ...rest);
+        });
+      }
+    }
+
     // action.setIcon: WebKit refuses details that give both imageData and path, where Chrome takes imageData and
     // passes over path. Violentmonkey gives both each time it marks a tab, so its button's icon never changed.
     for (const name of ['action', 'browserAction']) {
