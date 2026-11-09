@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Testing
 @testable import Zigzag
 
@@ -23,6 +23,44 @@ struct AddressTests {
         for address in ["about:blank", "file:///tmp/a.html", "data:text/plain,hi", "zigzag://history", "zigzag://settings"] {
             #expect(!URL(string: address)!.offersCopyLink, "\(address)")
         }
+    }
+
+    @Test func aNewPinGoesLeftAndPinningTwiceChangesNothing() {
+        let pins = ExtensionPins(ids: ["a", "b"]).pinning("c")
+        #expect(pins.ids == ["c", "a", "b"])
+        #expect(pins.pinning("a") == pins)
+        #expect(pins.unpinning("a").ids == ["c", "b"])
+    }
+
+    @Test func onlyExtensionsThatAreOnUseASlot() {
+        let pins = ExtensionPins(ids: ["a", "b", "c"], limit: 3)
+        #expect(!pins.canPin(loaded: ["a", "b", "c", "d"]))
+        #expect(pins.canPin(loaded: ["a", "b", "d"]))
+    }
+
+    @Test func theRightmostLoadedPinsShow() {
+        let pins = ExtensionPins(ids: ["a", "b", "c", "d"], limit: 3)
+        #expect(pins.shown(among: ["a", "b", "c", "d"]) == ["b", "c", "d"])
+        #expect(pins.shown(among: ["a", "b", "d"]) == ["a", "b", "d"])
+        #expect(pins.shown(among: []).isEmpty)
+    }
+
+    @Test func reorderingFillsOnlyTheVisiblePlaces() {
+        // "b" is hidden or off and stays where it is.
+        let pins = ExtensionPins(ids: ["a", "b", "c", "d"])
+        #expect(pins.reordered(visible: ["d", "a", "c"]).ids == ["d", "b", "a", "c"])
+        // "x" went away during the drag.
+        #expect(pins.reordered(visible: ["c", "x", "a"]).ids == ["c", "b", "a", "d"])
+    }
+
+    @Test func oldStateWithThePinnedFieldStillDecodes() throws {
+        let json = Data(#"{"version":"1.0","enabled":true,"pinned":true}"#.utf8)
+        #expect(try JSONDecoder().decode(ExtensionStore.State.self, from: json).version == "1.0")
+    }
+
+    /// Text and button room is the field less the text's insets, Copy Link's 20pt and, on http, the mark's 16pt.
+    @Test func keepingDropsOnlyWhatIsNoLongerKept() {
+        #expect(ExtensionPins(ids: ["a", "b", "c"]).keeping { $0 != "b" }.ids == ["a", "c"])
     }
 
     @Test func searches() {

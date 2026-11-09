@@ -2,6 +2,46 @@ import AppKit
 import CryptoKit
 import WebKit
 
+/// The extensions pinned to the address, left to right. An extension that's off keeps its place and uses no slot.
+struct ExtensionPins: Equatable {
+    private(set) var ids: [String]
+    var limit = Tokens.Sidebar.maxPins
+
+    init(ids: [String] = [], limit: Int = Tokens.Sidebar.maxPins) {
+        self.ids = ids
+        self.limit = limit
+    }
+
+    func contains(_ id: String) -> Bool { ids.contains(id) }
+
+    /// A new pin goes on the left, so the ones already there don't move.
+    func pinning(_ id: String) -> ExtensionPins {
+        contains(id) ? self : ExtensionPins(ids: [id] + ids, limit: limit)
+    }
+
+    func unpinning(_ id: String) -> ExtensionPins {
+        ExtensionPins(ids: ids.filter { $0 != id }, limit: limit)
+    }
+
+    func keeping(_ isKept: (String) -> Bool) -> ExtensionPins {
+        ExtensionPins(ids: ids.filter(isKept), limit: limit)
+    }
+
+    /// Whether there's a free slot, with these extensions loaded.
+    func canPin(loaded: Set<String>) -> Bool { ids.filter(loaded.contains).count < limit }
+
+    /// The pins that get a button: those loaded, nearest Site Controls first in line for the limit.
+    func shown(among loaded: Set<String>) -> [String] { Array(ids.filter(loaded.contains).suffix(limit)) }
+
+    /// The showing pins in a new order. They take the places the showing pins held, so a pin that's hidden or off
+    /// keeps its own; one that went away meanwhile is left out.
+    func reordered(visible: [String]) -> ExtensionPins {
+        let present = visible.filter(contains)
+        var next = present.makeIterator()
+        return ExtensionPins(ids: ids.map { present.contains($0) ? next.next() ?? $0 : $0 }, limit: limit)
+    }
+}
+
 /// Where extensions live and what the person decided about them. Packages come from the Chrome Web Store,
 /// the same files Chrome users get, verified and never edited: each version sits in its own folder exactly as
 /// it was downloaded. What's ours (on or off, granted permissions, which version is current) is kept beside it.
@@ -34,8 +74,6 @@ enum ExtensionStore {
         var pendingVersion: String?
         /// For an unpacked extension: the folder it's read from.
         var unpackedPath: String?
-        /// Shown as a button by the address. Nil means the default: pinned.
-        var pinned: Bool?
         /// Where it may read and change pages. Nil means the default: everywhere it was approved for.
         var siteAccess: SiteAccess?
         /// For `.sites`: the sites it may use ("github.com"), and for `.click`, the ones clicked on so far.
@@ -85,10 +123,12 @@ enum ExtensionStore {
     }
 
     static func isInstalled(_ id: String) -> Bool { packageDirectory(for: id) != nil }
+    /// Whether we still keep this extension, even if its package can't be read right now (an unpacked folder on a
+    /// drive that isn't connected).
+    static func hasRecord(_ id: String) -> Bool { state(id) != nil }
     static func isEnabled(_ id: String) -> Bool { state(id)?.enabled ?? false }
     static func isUnpacked(_ id: String) -> Bool { state(id)?.unpackedPath != nil }
     static func needsApproval(_ id: String) -> Bool { state(id)?.pendingVersion != nil }
-    static func isPinned(_ id: String) -> Bool { state(id)?.pinned ?? true }
     static func siteAccess(_ id: String) -> SiteAccess { state(id)?.siteAccess ?? .all }
     static func accessSites(_ id: String) -> [String] { state(id)?.accessSites ?? [] }
 
@@ -112,9 +152,39 @@ enum ExtensionStore {
         }
     }
 
-    static func setPinned(_ id: String, _ pinned: Bool) {
-        guard #available(macOS 15.4, *) else { return }
-        update(id) { $0.pinned = pinned }
+    // MARK: Pins
+
+    private static let pinsKey = "ExtensionsPinned"
+
+    /// The extensions pinned to the address, in every window.
+    static var pins: ExtensionPins {
+        get { ExtensionPins(ids: UserDefaults.standard.stringArray(forKey: pinsKey) ?? []) }
+        set { UserDefaults.standard.set(newValue.ids, forKey: pinsKey) }
+    }
+
+    /// Whether this extension can be pinned now: there's a free slot, counting only those that are on.
+    static func canPin(_ id: String) -> Bool {
+        guard #available(macOS 15.4, *) else { return false }
+        return !pins.contains(id) && pins.canPin(loaded: Set(ExtensionHost.shared.contexts.map(\.uniqueIdentifier)))
+    }
+
+    /// Pins it, if there's a free slot, or unpins it: decided from what's true now, whoever asks.
+    static func togglePin(_ id: String) {
+        if pins.contains(id) {
+            changePins(pins.unpinning(id))
+        } else if canPin(id) {
+            changePins(pins.pinning(id))
+        }
+    }
+
+    /// The showing pins dropped into a new order.
+    static func reorderPins(visible: [String]) {
+        changePins(pins.reordered(visible: visible))
+    }
+
+    private static func changePins(_ new: ExtensionPins) {
+        guard #available(macOS 15.4, *), new != pins else { return }
+        pins = new
         ExtensionHost.shared.changed.send()
     }
 
@@ -164,6 +234,8 @@ enum ExtensionStore {
         ExtensionBridge.shared.proxy.restore()
         Task {
             await migrateLegacyInstalls()
+            // An extension that went while Zigzag was closed takes its pin with it.
+            pins = pins.keeping(hasRecord)
             await ExtensionHost.shared.loadInstalled()
             await checkForUpdatesIfDue()
         }
@@ -520,6 +592,7 @@ enum ExtensionStore {
     static func uninstall(_ id: String) {
         guard #available(macOS 15.4, *) else { return }
         let unpacked = isUnpacked(id)
+        pins = pins.unpinning(id)
         ExtensionHost.shared.unload(id)
         ExtensionHost.shared.removeData(for: id)
         // An unpacked extension's own folder belongs to its developer; only our record of it goes.
