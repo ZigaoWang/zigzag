@@ -938,8 +938,8 @@ extension MiniWindowController: PromptHost {
 /// behind the app you clicked in, before they show again; anything else shows them right where macOS put them.
 enum MiniLinkWake {
     private static var waiting: [NSWindow] = []
-    /// The window in front, of the app you were in, as Zigzag woke.
-    private static var front: Int?
+    /// Each waiting window's place as Zigzag woke: the window just above it, of any app, top to bottom.
+    private static var places: [(window: NSWindow, below: Int?)] = []
     private static var timeout: DispatchWorkItem?
 
     static func appWillActivate() {
@@ -949,33 +949,44 @@ enum MiniLinkWake {
         let windows = WindowManager.shared.controllers.compactMap(\.window).filter { $0.isVisible && !$0.isMiniaturized }
         let pointer = NSEvent.mouseLocation
         guard !windows.isEmpty, !(NSEvent.pressedMouseButtons != 0 && windows.contains { $0.frame.contains(pointer) }) else { return }
-        front = frontWindowOfAnotherApp()
+        places = Self.places(of: windows)
         waiting = windows
         windows.forEach { $0.alphaValue = 0 }
-        let work = DispatchWorkItem { release(backTo: nil) }
+        let work = DispatchWorkItem { release(restoring: false) }
         timeout = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
     }
 
-    /// The link went to Zigzag Mini: the browser windows go back behind the app it came from.
+    /// The link went to Zigzag Mini: the browser windows go back exactly where they were.
     static func linkOpenedInMini() {
         guard !waiting.isEmpty else { return }
-        release(backTo: front)
+        release(restoring: true)
     }
 
-    private static func release(backTo front: Int?) {
+    private static func release(restoring: Bool) {
         timeout?.cancel()
         timeout = nil
-        let windows = waiting
+        if restoring {
+            // Top to bottom, so each window it goes under is already back in its place.
+            for place in places { if let below = place.below { place.window.order(.below, relativeTo: below) } }
+        }
+        waiting.forEach { $0.alphaValue = 1 }
         waiting = []
-        if let front { windows.reversed().forEach { $0.order(.below, relativeTo: front) } }
-        windows.forEach { $0.alphaValue = 1 }
+        places = []
     }
 
-    private static func frontWindowOfAnotherApp() -> Int? {
-        let me = ProcessInfo.processInfo.processIdentifier
-        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
-        return list.first { ($0[kCGWindowLayer as String] as? Int) == 0 && ($0[kCGWindowOwnerPID as String] as? Int32) != me }?[kCGWindowNumber as String] as? Int
+    /// Where each window sits among every app's windows on screen, as the window right above it.
+    private static func places(of windows: [NSWindow]) -> [(window: NSWindow, below: Int?)] {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return [] }
+        let byNumber = Dictionary(windows.map { ($0.windowNumber, $0) }, uniquingKeysWith: { first, _ in first })
+        var result: [(window: NSWindow, below: Int?)] = []
+        var above: Int?
+        for entry in list where (entry[kCGWindowLayer as String] as? Int) == 0 {
+            guard let number = entry[kCGWindowNumber as String] as? Int else { continue }
+            if let window = byNumber[number] { result.append((window, above)) }
+            above = number
+        }
+        return result
     }
 }
 
