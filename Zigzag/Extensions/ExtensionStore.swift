@@ -1,5 +1,6 @@
 import AppKit
 import CryptoKit
+import SQLite3
 import WebKit
 
 /// Where extensions live and what the person decided about them. Packages come from the Chrome Web Store,
@@ -152,6 +153,36 @@ enum ExtensionStore {
     static var isOnePasswordAppInstalled: Bool {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") != nil
             || FileManager.default.fileExists(atPath: "/Applications/1Password.app")
+    }
+
+    /// WebKit keeps a service worker background's registration from one launch to the next, and on a later launch
+    /// can bring it back without running its script: WebKit says the background loaded, but it never starts, and the
+    /// extension's popup waits forever (1Password, from the second launch on). Chrome starts each worker afresh at
+    /// launch. WebKit lists no data records for extensions' own origins, so their registrations come out of its
+    /// registration files directly, before anything starts WebKit: only rows whose script is an extension's, so
+    /// sites keep their workers and extensions keep what they stored. A layout WebKit has changed is left alone, and
+    /// the extensions log says so, since backgrounds may then stop starting again.
+    nonisolated static func forgetServiceWorkerRegistrations(in websiteData: URL = defaultWebsiteData) {
+        let files = FileManager.default
+        for partition in (try? files.contentsOfDirectory(at: websiteData, includingPropertiesForKeys: nil)) ?? [] {
+            for origin in (try? files.contentsOfDirectory(at: partition, includingPropertiesForKeys: nil)) ?? [] {
+                let folder = origin.appendingPathComponent("ServiceWorkers", isDirectory: true)
+                for name in (try? files.contentsOfDirectory(atPath: folder.path)) ?? []
+                where name.hasPrefix("ServiceWorkerRegistrations-") && name.hasSuffix(".sqlite3") {
+                    var db: OpaquePointer?
+                    var cleared = sqlite3_open_v2(folder.appendingPathComponent(name).path, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK
+                    cleared = cleared && sqlite3_exec(db, "DELETE FROM Records WHERE scriptURL LIKE 'webkit-extension://%'", nil, nil, nil) == SQLITE_OK
+                    if !cleared { ExtensionLog.write("couldn't forget service workers in \(name): \(String(cString: sqlite3_errmsg(db)))") }
+                    sqlite3_close(db)
+                }
+            }
+        }
+    }
+
+    /// Where WebKit keeps the default website data store's files, service worker registrations among them.
+    nonisolated static var defaultWebsiteData: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/WebKit/\(Bundle.main.bundleIdentifier ?? "")/WebsiteData/Default", isDirectory: true)
     }
 
     /// At launch: moves extensions installed by older builds to the untouched layout, loads what's installed,
