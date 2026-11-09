@@ -186,10 +186,14 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("WebNotifications", isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         var data: Data?, type = UTType.png
-        if let icon, ["https", "http", "data"].contains(icon.scheme ?? "") {
+        // A data: icon is the page's own bytes; one on the web only from a public address (`IconAddress`), as
+        // fetched by Zigzag, never from this Mac or its network. Otherwise the site's own icon stands in.
+        var fetches = icon?.scheme?.lowercased() == "data"
+        if let icon, !fetches { fetches = await IconAddress.mayFetch(icon) }
+        if let icon, fetches {
             var request = URLRequest(url: icon, timeoutInterval: 4)
             request.setValue(WebKitSetup.applicationNameForUserAgent, forHTTPHeaderField: "User-Agent")
-            if let (bytes, response) = try? await Self.session.data(for: request), bytes.count < 4_000_000,
+            if let (bytes, response) = try? await Self.session.data(for: request, delegate: Self.redirects), bytes.count < 4_000_000,
                let mime = response.mimeType, let found = UTType(mimeType: mime), [UTType.png, .jpeg, .gif].contains(found) {
                 data = bytes
                 type = found
@@ -207,6 +211,7 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
 
     /// No cookies or cache: an icon is fetched like a stranger would.
     private static let session = URLSession(configuration: .ephemeral)
+    private static let redirects = IconRedirects()
 
     private func remove(_ keys: [String]) {
         guard !keys.isEmpty else { return }
@@ -385,4 +390,102 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
       if (usable && !isPrivate) send({ kind: 'state' }).then((state) => { if (state === 'granted' || state === 'denied' || state === 'default') permission = state; });
     })();
     """
+}
+
+/// Where Zigzag itself may fetch a notification's icon from. The fetch is Zigzag's, not the page's, so it could go
+/// where a page's own requests can't reach unseen: this Mac (localhost), the network it's on (a router's page, a
+/// printer), a link-local address. Only http and https to a public address, then, checked for every address the
+/// name resolves to, and again for any redirect.
+nonisolated enum IconAddress {
+    /// Whether `url` may be fetched: http or https, on a host that's a public address or resolves only to them.
+    static func mayFetch(_ url: URL) async -> Bool {
+        guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let host = url.host(percentEncoded: false), isPublicName(host) else { return false }
+        if let literal = bytes(of: host) { return isPublic(literal) }
+        let addresses = await Task.detached { resolve(host) }.value
+        return !addresses.isEmpty && addresses.allSatisfy(isPublic)
+    }
+
+    /// Names that are this Mac or its own network, whatever they resolve to, are not.
+    static func isPublicName(_ host: String) -> Bool {
+        var name = host.lowercased()
+        if name.hasSuffix(".") { name.removeLast() }
+        guard !name.isEmpty, name != "localhost" else { return false }
+        return !["localhost", "local", "internal", "home.arpa"].contains { name.hasSuffix("." + $0) }
+    }
+
+    /// Whether an address, as text ("10.0.0.1", "::1"), is a public one. Text that isn't an address is not.
+    static func isPublic(_ text: String) -> Bool { bytes(of: text).map(isPublic) ?? false }
+
+    /// The address's bytes, 4 or 16, when the text is one.
+    private static func bytes(of text: String) -> [UInt8]? {
+        var host = text
+        if host.hasPrefix("["), host.hasSuffix("]") { host = String(host.dropFirst().dropLast()) }
+        var v4 = in_addr()
+        if inet_pton(AF_INET, host, &v4) == 1 { return withUnsafeBytes(of: &v4) { Array($0) } }
+        var v6 = in6_addr()
+        if inet_pton(AF_INET6, host, &v6) == 1 { return withUnsafeBytes(of: &v6) { Array($0) } }
+        return nil
+    }
+
+    private static func isPublic(_ a: [UInt8]) -> Bool {
+        if a.count == 4 {
+            switch (a[0], a[1]) {
+            case (0, _), (10, _), (127, _), (169, 254), (192, 168), (172, 16...31): return false
+            // Carrier NAT's shared space, and the one kept for testing networks.
+            case (100, 64...127), (198, 18...19): return false
+            case (192, 0) where a[2] == 0: return false
+            // Multicast and the reserved space above it.
+            default: return a[0] < 224
+            }
+        }
+        guard a.count == 16 else { return false }
+        // An IPv4 address carried in IPv6 (::ffff:a.b.c.d, ::a.b.c.d, 64:ff9b::a.b.c.d, 6to4) is judged as itself;
+        // :: and ::1 are this Mac.
+        if a[0..<10].allSatisfy({ $0 == 0 }), (a[10] == 0xff && a[11] == 0xff) || (a[10] == 0 && a[11] == 0) {
+            if a[10] == 0, a[12..<15].allSatisfy({ $0 == 0 }), a[15] <= 1 { return false }
+            return isPublic(Array(a[12..<16]))
+        }
+        if Array(a[0..<12]) == [0x00, 0x64, 0xff, 0x9b, 0, 0, 0, 0, 0, 0, 0, 0] { return isPublic(Array(a[12..<16])) }
+        if a[0] == 0x20, a[1] == 0x02 { return isPublic(Array(a[2..<6])) }
+        // Unique local (fc00::/7), link-local (fe80::/10) and the old site-local (fec0::/10), and multicast.
+        if a[0] & 0xfe == 0xfc { return false }
+        if a[0] == 0xfe, a[1] & 0x80 == 0x80 { return false }
+        return a[0] != 0xff
+    }
+
+    /// Every address the name resolves to, as bytes.
+    private static func resolve(_ host: String) -> [[UInt8]] {
+        var hints = addrinfo()
+        hints.ai_family = AF_UNSPEC
+        hints.ai_socktype = SOCK_STREAM
+        var list: UnsafeMutablePointer<addrinfo>?
+        guard getaddrinfo(host, nil, &hints, &list) == 0, let first = list else { return [] }
+        defer { freeaddrinfo(first) }
+        var found: [[UInt8]] = []
+        var next: UnsafeMutablePointer<addrinfo>? = first
+        while let info = next {
+            if let address = info.pointee.ai_addr {
+                switch Int32(address.pointee.sa_family) {
+                case AF_INET:
+                    var v4 = address.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee.sin_addr }
+                    found.append(withUnsafeBytes(of: &v4) { Array($0) })
+                case AF_INET6:
+                    var v6 = address.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) { $0.pointee.sin6_addr }
+                    found.append(withUnsafeBytes(of: &v6) { Array($0) })
+                default: break
+                }
+            }
+            next = info.pointee.ai_next
+        }
+        return found
+    }
+}
+
+/// Follows an icon's redirect only to where the icon itself could have been.
+nonisolated final class IconRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+        guard let url = request.url else { completionHandler(nil); return }
+        Task { completionHandler(await IconAddress.mayFetch(url) ? request : nil) }
+    }
 }
