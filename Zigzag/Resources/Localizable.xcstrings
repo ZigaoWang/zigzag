@@ -4404,6 +4404,17 @@
         }
       }
     },
+    "Doesn’t work in Zigzag yet." : {
+      "comment" : "One line beside an extension's name when WebKit can't run it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂时无法在 Zigzag 中使用。"
+          }
+        }
+      }
+    },
     "Done" : {
       "comment" : "Button that closes the Import window when the import is done.\nButton that closes the What’s New sheet.\nIn the tab overview (all spaces' tabs as cards), a button that leaves the overview.\nTooltip of the find bar's close button.",
       "localizations" : {
@@ -7141,6 +7152,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "还有一些内容没有导入。"
+          }
+        }
+      }
+    },
+    "Not in the Chrome Web Store any more." : {
+      "comment" : "One line beside an extension's name when the Chrome Web Store no longer has it. Chrome Web Store is Google's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已不在 Chrome 网上应用店中。"
           }
         }
       }
@@ -11813,6 +11835,17 @@
         }
       }
     },
+    "This extension doesn’t work in Zigzag yet." : {
+      "comment" : "Shown when an extension couldn't be installed because WebKit can't run it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个扩展暂时无法在 Zigzag 中使用。"
+          }
+        }
+      }
+    },
     "This extension isn’t here" : {
       "comment" : "Title of the page Zigzag shows when a page can't load.",
       "localizations" : {
@@ -11820,6 +11853,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此扩展不在这里"
+          }
+        }
+      }
+    },
+    "This extension isn’t in the Chrome Web Store any more." : {
+      "comment" : "Shown when an extension couldn't be installed because the Chrome Web Store no longer has it. Chrome Web Store is Google's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个扩展已不在 Chrome 网上应用店中。"
           }
         }
       }

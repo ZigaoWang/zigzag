@@ -206,12 +206,18 @@ enum ExtensionStore {
 
     enum InstallError: Error {
         case download, verification, unpack
+        /// The store has nothing under its ID any more: taken down, or moved to a new listing.
+        case notListed
+        /// WebKit couldn't read it as an extension.
+        case unsupported
         /// What to tell the person, in plain words.
         var message: String {
             switch self {
             case .download: String(localized: "Couldn’t download this extension. Check your connection and try again.", comment: "Shown when an extension couldn't be installed because its download failed.")
             case .verification: String(localized: "This extension’s package couldn’t be verified, so it wasn’t installed.", comment: "Shown when an extension couldn't be installed because its package didn't pass the signature check.")
             case .unpack: String(localized: "This extension’s package is damaged, so it wasn’t installed.", comment: "Shown when an extension couldn't be installed because its package is damaged.")
+            case .notListed: String(localized: "This extension isn’t in the Chrome Web Store any more.", comment: "Shown when an extension couldn't be installed because the Chrome Web Store no longer has it. Chrome Web Store is Google's name.")
+            case .unsupported: String(localized: "This extension doesn’t work in Zigzag yet.", comment: "Shown when an extension couldn't be installed because WebKit can't run it.")
             }
         }
         /// The same, short enough for one line beside the extension's name.
@@ -220,6 +226,8 @@ enum ExtensionStore {
             case .download: String(localized: "Couldn’t download it. Check your connection.", comment: "One line beside an extension's name when its update couldn't be downloaded.")
             case .verification: String(localized: "Its package couldn’t be verified.", comment: "One line beside an extension's name when its update didn't pass the signature check.")
             case .unpack: String(localized: "Its package is damaged.", comment: "One line beside an extension's name when its update's package is damaged.")
+            case .notListed: String(localized: "Not in the Chrome Web Store any more.", comment: "One line beside an extension's name when the Chrome Web Store no longer has it. Chrome Web Store is Google's name.")
+            case .unsupported: String(localized: "Doesn’t work in Zigzag yet.", comment: "One line beside an extension's name when WebKit can't run it.")
             }
         }
     }
@@ -243,9 +251,14 @@ enum ExtensionStore {
         case .success(let value): package = value
         case .failure(let error): return .failure(error)
         }
-        guard let ext = try? await WKWebExtension(resourceBaseURL: package.folder), let manifest = manifest(in: package.folder) else {
+        guard let manifest = manifest(in: package.folder) else {
             try? FileManager.default.removeItem(at: package.folder)
             return .failure(.unpack)
+        }
+        // A sound package WebKit still can't read (an app, a manifest it doesn't know) won't run here.
+        guard let ext = try? await WKWebExtension(resourceBaseURL: package.folder) else {
+            try? FileManager.default.removeItem(at: package.folder)
+            return .failure(.unsupported)
         }
         let report = ExtensionReport(extension: ext, manifest: manifest, id: id)
         return .success(PreparedInstall(id: id, version: package.version, folder: package.folder, extensionInfo: ext, report: report))
@@ -325,8 +338,11 @@ enum ExtensionStore {
             .init(name: "acceptformat", value: "crx3"),
             .init(name: "x", value: "id=\(id)&uc"),
         ]
-        guard let url = components.url, let (data, response) = try? await URLSession.shared.data(from: url),
-              (response as? HTTPURLResponse)?.statusCode == 200 else { return .failure(.download) }
+        guard let url = components.url, let (data, response) = try? await URLSession.shared.data(from: url) else { return .failure(.download) }
+        let status = (response as? HTTPURLResponse)?.statusCode
+        // The store answers an ID it doesn't have with nothing at all.
+        if status == 404 || status == 204 { return .failure(.notListed) }
+        guard status == 200 else { return .failure(.download) }
         // Checking the signature over the whole package and unpacking it take a moment: off the main thread.
         return await Task.detached(priority: .userInitiated) { unpack(data, id: id) }.value
     }
