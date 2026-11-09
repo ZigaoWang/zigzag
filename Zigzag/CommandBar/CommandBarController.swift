@@ -148,6 +148,11 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private let panel = FloatingPanelView()
     /// The bar itself, for pointing at it (the Getting started guide).
     var panelView: NSView { panel }
+    /// On a window of its own over the desktop (Zigzag Mini's quick open).
+    var showsDesktop: Bool {
+        get { panel.showsDesktop }
+        set { panel.showsDesktop = newValue }
+    }
     private let field = PlainTextField(font: Tokens.Font.title(.regular), placeholder: String(localized: "Search or enter address", comment: "Placeholder of the command bar's field."))
     private let fieldIcon = NSImageView()
     private let divider = ColorView(color: Tokens.Color.separator)
@@ -480,6 +485,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         results = CommandRanker.results(for: editing ? "" : typed, manager: host.commandBarTabs, suggestions: suggestions,
                                         editingCurrent: mode == .editCurrent, historyOnly: mode == .history)
         if editing { results = [] }
+        // Zigzag's commands act on a browser window's tabs: outside one there's nothing for them to act on.
+        if controller == nil { results.removeAll { if case .action = $0.kind { true } else { false } } }
         if let scope {
             // Searching one site: the query there first, then suggestions, all searching that site.
             let q = typed.trimmingCharacters(in: .whitespaces)
@@ -936,6 +943,12 @@ extension CommandBarController {
         field.stringValue = text
         field.currentEditor()?.selectedRange = NSRange(location: (text as NSString).length, length: 0)
         controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+    }
+
+    /// Esc in the field, as the key would press it.
+    func debugEscape() {
+        guard let editor = field.currentEditor() as? NSTextView else { dismiss(); return }
+        _ = control(field, textView: editor, doCommandBy: #selector(NSResponder.cancelOperation(_:)))
     }
 }
 #endif

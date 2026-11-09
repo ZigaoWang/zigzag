@@ -285,7 +285,7 @@ private final class PopupWindow: NSWindow {
 final class PopupHeaderView: NSView {
     private let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
     private let lock = NSImageView()
-    /// Room kept clear at the right end for buttons laid over the strip (a mini window's Open in Zigzag).
+    /// Room kept clear at the right end for buttons laid over the strip (Zigzag Mini's Open in Zigzag).
     var trailingInset: CGFloat = 0 { didSet { needsLayout = true } }
 
     override init(frame: NSRect) {

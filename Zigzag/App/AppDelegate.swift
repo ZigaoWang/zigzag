@@ -67,7 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MoveToApplications.offerWhenReady()
         launched = true
         if !pendingURLs.isEmpty {
-            // A link for a mini window opens just that, as it would with Zigzag already running.
+            // A link for Zigzag Mini opens just that, as it would with Zigzag already running.
             if !restored, !WindowManager.shared.opensInMini(pendingURLs[0]) {
                 WindowManager.shared.newWindow(url: pendingURLs.removeFirst(), showCommandBar: false)
             }
@@ -241,13 +241,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if WindowManager.shared.controllers.contains(where: { !$0.tabManager.isPrivate }) { WindowManager.shared.newWindow() } else { WindowManager.shared.reopen() }
     }
     @objc func newPrivateWindow(_ sender: Any?) { WindowManager.shared.newWindow(isPrivate: true) }
-    /// A mini window with its address field ready: for a quick look that needn't become a tab.
-    @objc func newMiniWindow(_ sender: Any?) { MiniWindowController.open(url: nil) }
+    /// The command bar on its own, for a quick look in Zigzag Mini that needn't become a tab. Again, it goes.
+    @objc func newMiniWindow(_ sender: Any?) { MiniQuickOpen.toggle() }
 
     // With Passwords or Import in front, or no window open, these reach here rather than a browser window: that
     // window comes forward (or the closed one comes back) and does it, instead of the menu item being greyed out.
     @objc func newTab(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .newTab) }
     @objc func openLocation(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .editCurrent) }
+    @objc func openDocument(_ sender: Any?) { frontBrowserWindow()?.openDocument(sender) }
     @objc func reopenClosedWindow(_ sender: Any?) { WindowManager.shared.reopenClosedWindow() }
     /// With no window open, the tab went with its window: that comes back instead.
     @objc func reopenClosedTab(_ sender: Any?) {
@@ -292,6 +293,8 @@ extension AppDelegate: NSMenuItemValidation {
     /// Reopen Closed Window is dimmed when there's nothing to bring back; Set as Default Browser hides once it is.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(reopenClosedWindow(_:)) { return WindowManager.shared.canReopenClosedWindow }
+        // Zigzag Mini names it Open in Zigzag while it's in front; anywhere else it's itself again.
+        if menuItem.action == #selector(openDocument(_:)) { menuItem.title = BrowserWindowController.openFileTitle }
         if menuItem.action == #selector(reopenClosedTab(_:)) {
             let manager = (WindowManager.shared.keyController ?? WindowManager.shared.controllers.first)?.tabManager
             return manager?.canReopenClosedTab ?? WindowManager.shared.canReopenClosedWindow

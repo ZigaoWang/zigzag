@@ -74,6 +74,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
     @objc func reopenClosedTab(_ sender: Any?) { tabManager.reopenClosedTab() }
 
+    static var openFileTitle: String { String(localized: "Open File…", comment: "File menu item.") }
+
     @objc func openDocument(_ sender: Any?) {
         guard let window else { return }
         let panel = NSOpenPanel()
@@ -495,6 +497,10 @@ extension BrowserWindowController: NSMenuItemValidation {
             return false
         }
         switch item.action {
+        case #selector(openDocument(_:)):
+            // Zigzag Mini names it Open in Zigzag while it's in front; here it's itself again.
+            item.title = Self.openFileTitle
+            return true
         case #selector(goBack(_:)): return (peekController?.isVisible == true) || (tab?.canGoBackOrReturn ?? false)
         case #selector(goForward(_:)): return (peekController?.isVisible == true) || (tab?.canGoForward ?? false)
         case #selector(takePageScreenshot(_:)): return PageScreenshot.canTake(tab)

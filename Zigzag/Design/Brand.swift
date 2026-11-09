@@ -3,6 +3,12 @@ import AppKit
 // The logo and wordmark drawn here are trademarks of Zigao Wang and aren't covered by the Apache license;
 // see TRADEMARKS.md. A fork keeps the code and draws its own.
 
+/// A window that isn't a browser window but wears a space all the same (Zigzag Mini, its quick open): what's drawn
+/// in it takes that space's accent and inks.
+@MainActor protocol SpaceTinted: AnyObject {
+    var tintSpace: SpaceInfo? { get }
+}
+
 /// Zigzag's brand: the icon's navy and pale ribbon, each space's own accent, and the ribbon
 /// Z itself, drawn from the icon's exact geometry. It appears in key moments (banners, first launch, import
 /// finished, the active tab, loading); controls stay native.
@@ -169,10 +175,12 @@ enum Brand {
         /// Zigzag's own blue, for windows that belong to the app rather than a space (see `Tokens.Color.accent`).
         static let brand = Theme(hue: Brand.navyHue)
 
-        /// The theme for a view: its browser window's space, or the brand blue in any other window.
+        /// The theme for a view: its browser window's space (or the space of a window that wears one, like Zigzag
+        /// Mini), or the brand blue in any other window.
         /// A view not in a window yet gets the brand; views refresh when they join one.
         @MainActor static func `for`(_ view: NSView?) -> Theme {
             guard let window = view?.window else { return brand }
+            if let owner = window.windowController as? SpaceTinted { return of(owner.tintSpace) }
             guard let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return brand }
             return of(controller.tabManager.currentSpace)
         }

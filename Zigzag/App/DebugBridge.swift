@@ -29,17 +29,25 @@ enum DebugBridge {
     }
 
     #if DEBUG
-    /// mini [url] (blank: the address field), miniext <url> (as a link from another app), minisetting on|off,
+    /// mini [url] (blank: the quick open bar, as ⌃⌘N), miniquick [text] (the quick open bar, with this typed in it),
+    /// miniquickenter, miniquickesc, minibar [text] (⌘L's bar over the mini page), miniext <url> (as a link from another app), minisetting on|off,
     /// minitype <text> (typed into the address field and entered), minimove (Open in Zigzag), miniclose,
-    /// minimenu <char> [cmd|shift|ctrl|opt...] (a menu item's action, sent as the menu would to the mini window),
+    /// minimenu <char> [cmd|shift|ctrl|opt...] (a menu item's action, sent as the menu would to Zigzag Mini),
     /// ministate <path> (JSON), minishot <path> (the window's own drawing, as a PNG; web content may be blank),
     /// miniclosebrowsers, minijs <script> (run in the mini page), miniesc (Esc in the address field), miniquit,
     /// miniask notifications, minianswer allow|deny|notnow (the site's question), minisave save|notnow,
-    /// minieval <path> <script>. With no mini window open, miniask and minianswer use the front browser window.
+    /// minieval <path> <script>. With no Zigzag Mini open, miniask and minianswer use the front browser window.
     private static func runMini(_ name: String, _ arg: String) {
         let mini = MiniWindowController.all.last
         switch name {
-        case "mini": MiniWindowController.open(url: arg.isEmpty ? nil : URL(string: arg))
+        case "mini":
+            if let url = URL(string: arg), !arg.isEmpty { MiniWindowController.open(url: url) } else { MiniQuickOpen.toggle() }
+        case "miniquick":
+            if !MiniQuickOpen.isShown { MiniQuickOpen.toggle() }
+            if !arg.isEmpty { MiniQuickOpen.current?.debugBar.debugType(arg) }
+        case "miniquickenter": MiniQuickOpen.current?.debugBar.debugEnter()
+        case "miniquickesc": MiniQuickOpen.current?.debugBar.debugEscape()
+        case "minibar": mini?.debugBar(arg)
         case "miniext": if let url = URL(string: arg) { WindowManager.shared.openExternal(url) }
         case "minisetting": MiniWindowController.opensExternalLinks = arg == "on"
         case "minitype": mini?.debugEnter(arg)
@@ -96,6 +104,7 @@ enum DebugBridge {
             let minis: [[String: Any]] = MiniWindowController.all.map { m in
                 let f = m.window?.frame ?? .zero
                 return ["frame": [f.minX, f.minY, f.width, f.height], "url": m.tab.url?.absoluteString ?? "", "title": m.window?.title ?? "",
+                        "windowNumber": m.window?.windowNumber ?? 0,
                         "key": m.window?.isKeyWindow == true, "visible": m.window?.isVisible == true, "debug": m.debugState,
                         "screen": m.window?.screen.map { [$0.visibleFrame.minX, $0.visibleFrame.minY, $0.visibleFrame.width, $0.visibleFrame.height] } ?? []]
             }
@@ -107,6 +116,12 @@ enum DebugBridge {
             }
             let saved = JSONStore.load(SessionState.self, from: Paths.session)?.windows.map { $0.spaces.flatMap { $0.tabs.compactMap { $0.url?.absoluteString } } } ?? []
             var json: [String: Any] = ["minis": minis, "windows": windows, "savedTabs": saved, "setting": MiniWindowController.opensExternalLinks]
+            if let quick = MiniQuickOpen.current {
+                let f = quick.debugPanelFrame
+                json["quickOpen"] = ["windowNumber": quick.window?.windowNumber ?? 0, "visible": quick.window?.isVisible == true,
+                                     "key": quick.window?.isKeyWindow == true, "bar": [f.minX, f.minY, f.width, f.height]]
+            }
+            json["browserWindowNumbers"] = WindowManager.shared.controllers.map { $0.window?.windowNumber ?? 0 }
             // The questions on screen, and which window each is in.
             if let mini { json["permissionInMini"] = PermissionPrompt.debugShowing(in: mini) ?? "" }
             json["permissionInBrowsers"] = WindowManager.shared.controllers.map { PermissionPrompt.debugShowing(in: $0) ?? "" }
@@ -132,7 +147,7 @@ enum DebugBridge {
         let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
         guard let name = parts.first else { return }
         let arg = parts.count > 1 ? parts[1] : ""
-        // Mini windows come first: they work with no browser window open, and must not bring one forward.
+        // Zigzag Mini windows come first: they work with no browser window open, and must not bring one forward.
         if name.hasPrefix("mini") { runMini(name, arg); return }
         guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
         NSApp.activate()

@@ -463,7 +463,7 @@ final class ExtensionHost: NSObject {
         controller.didCloseTab(popup.tab, windowIsClosing: true)
         controller.didCloseWindow(popup)
     }
-    // Mini windows: a window with its one tab, like a sign-in popup. Its tab is a real one, so its changes are told
+    // Zigzag Mini windows: a window with its one tab, like a sign-in popup. Its tab is a real one, so its changes are told
     // as any tab's are.
     func miniOpened(_ mini: MiniWindowController) {
         controller.didOpenWindow(mini)
@@ -718,7 +718,7 @@ extension Tab: WKWebExtensionTab {
         return WindowManager.shared.controllers.first { $0.tabManager.tab(with: id) === self }
     }
 
-    /// The mini window it's the page of, while it is.
+    /// The Zigzag Mini it's the page of, while it is.
     private var miniWindow: MiniWindowController? { (host as? MiniWindowController).flatMap { $0.tab === self ? $0 : nil } }
 
     func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { miniWindow ?? windowController }

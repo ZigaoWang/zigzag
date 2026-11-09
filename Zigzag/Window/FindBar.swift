@@ -364,6 +364,9 @@ class FloatingPanelView: NSView {
     }()
     var onLayout: (() -> Void)?
     var radius: CGFloat = Tokens.Radius.panel { didSet { needsLayout = true } }
+    /// In a window of its own with nothing else in it (Zigzag Mini's quick open), the material shows the desktop
+    /// behind, as it shows the page behind in a browser window.
+    var showsDesktop = false { didSet { material.blendingMode = showsDesktop ? .behindWindow : .withinWindow } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)

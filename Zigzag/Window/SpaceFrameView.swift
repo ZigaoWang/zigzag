@@ -1,7 +1,7 @@
 import AppKit
 
 /// The window's frame, behind everything: the space's color, its gradient, its grain, and the frosted desktop for a
-/// see-through space. A browser window draws it behind its sidebar and page, a mini window behind its page, so the
+/// see-through space. A browser window draws it behind its sidebar and page, Zigzag Mini behind its page, so the
 /// two are the same space's color down to the grain.
 class SpaceFrameView: ColorView {
     /// Paints the window for a space: its mode, color, gradient, how see-through it is, and grain. Private windows are

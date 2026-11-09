@@ -160,13 +160,13 @@ final class Autofill: NSObject, WKScriptMessageHandler {
 
     var isShowing: Bool { menu != nil }
 
-    /// Where the menu floats over a page: its browser window's overlay, or a mini window's.
+    /// Where the menu floats over a page: its browser window's overlay, or Zigzag Mini's.
     private static func overlay(for webView: WKWebView) -> NSView? {
         if let controller = WindowManager.shared.controllers.first(where: { $0.window === webView.window }) { return controller.root.overlay }
         return MiniWindowController.all.first { $0.tab.webView === webView }?.overlay
     }
 
-    /// The page is the one on screen in its window: the selected tab's, or a mini window's only page.
+    /// The page is the one on screen in its window: the selected tab's, or Zigzag Mini's only page.
     private static func isInFront(_ webView: WKWebView) -> Bool {
         if let controller = WindowManager.shared.controllers.first(where: { $0.window === webView.window }) { return controller.selectedWebView === webView }
         return MiniWindowController.all.contains { $0.tab.webView === webView && $0.window === webView.window }

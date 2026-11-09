@@ -1,7 +1,7 @@
 import AppKit
 
 /// A window a page's own questions show in: a site's permission question and Save password? come up over the page
-/// that asked, in a browser window or a mini window alike. This is all they need to know about where they are.
+/// that asked, in a browser window or Zigzag Mini alike. This is all they need to know about where they are.
 protocol PromptHost: AnyObject {
     var window: NSWindow? { get }
     /// The flipped layer over the pages where floating things go.
@@ -34,7 +34,7 @@ protocol PromptHost: AnyObject {
 }
 
 extension WindowManager {
-    /// The window a page in `window` asks its questions in: a browser window, or a mini window.
+    /// The window a page in `window` asks its questions in: a browser window, or Zigzag Mini.
     func promptHost(for window: NSWindow?) -> PromptHost? {
         guard let window else { return nil }
         if let controller = controllers.first(where: { $0.window === window }) { return controller }

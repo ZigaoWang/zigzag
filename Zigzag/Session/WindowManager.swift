@@ -165,8 +165,8 @@ final class WindowManager {
     /// Opens a URL from outside (another app, Finder, the Dock) in the frontmost window. Never a private one: a link
     /// from elsewhere doesn't get to choose that.
     func openExternal(_ url: URL) {
-        // Settings › General can send links to a mini window of their own instead; files and links before onboarding
-        // still open here. Mini windows are never saved, so nothing about the session changes.
+        // Settings › Zigzag Mini can send links to a Zigzag Mini of their own instead; files and links before onboarding
+        // still open here. Zigzag Mini is never saved, so nothing about the session changes.
         if opensInMini(url) {
             MiniWindowController.open(url: url)
             return
@@ -183,7 +183,7 @@ final class WindowManager {
         }
     }
 
-    /// A page from another app goes to a mini window rather than a tab here.
+    /// A page from another app goes to Zigzag Mini rather than a tab here.
     func opensInMini(_ url: URL) -> Bool {
         MiniWindowController.takes(url, settingOn: MiniWindowController.opensExternalLinks, needsOnboarding: Self.needsOnboarding)
     }

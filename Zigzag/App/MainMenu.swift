@@ -50,7 +50,7 @@ enum MainMenu {
             item(String(localized: "New Window", comment: "File menu item."), #selector(AppDelegate.newWindow(_:)), "n"),
             item(String(localized: "New Private Window", comment: "File menu item."), #selector(AppDelegate.newPrivateWindow(_:)), "n", [.command, .shift]),
             // Arc's Little Arc was ⌥⌘N, which is New Space here.
-            item(String(localized: "New Mini Window", comment: "File menu item: a small window for one page, without the sidebar."), #selector(AppDelegate.newMiniWindow(_:)), "n", [.command, .control]),
+            item(String(localized: "New Zigzag Mini", comment: "File menu item: opens the command bar on its own, for a page in Zigzag Mini (a small window for one page, without the sidebar). Zigzag Mini is a name, kept in Latin letters."), #selector(AppDelegate.newMiniWindow(_:)), "n", [.command, .control]),
             item(String(localized: "Open Location…", comment: "File menu item."), #selector(C.openLocation(_:)), "l"),
             item(String(localized: "Open File…", comment: "File menu item."), #selector(C.openDocument(_:)), "o"),
             .separator(),
