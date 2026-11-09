@@ -115,6 +115,8 @@ final class Tab: NSObject {
     private var certificateWarningHost: String?
     /// The certificate that warning was about: the one "Visit anyway" trusts.
     private var certificateWarningCertificate: Data?
+    /// The nonce written into that warning's "Visit anyway" link, new for each warning.
+    private var certificateWarningNonce: String?
     let changed = Signal<Change>()
 
     private(set) var webView: BrowserWebView?
@@ -718,16 +720,19 @@ extension Tab: WKNavigationDelegate {
         guard let url = navigationAction.request.url else { return (.cancel, preferences) }
 
         // Schemes the web view cannot handle go to the system (mailto:, facetime:, app links). Extension pages stay here.
-        // "Visit this site anyway" on the certificate warning: trust it for this session and go. Only from the warning
-        // this tab is showing, in its main frame, for that same host, with the launch's nonce; any other page or frame
-        // asking for it gets nothing.
+        // "Visit this site anyway" on the certificate warning: trust it for this session and go. Only a click on the
+        // warning this tab is showing, in its own main frame (not a window that opened it), for that same host, with
+        // that warning's nonce; any other page or frame asking for it gets nothing.
         if url.scheme == CertificateExceptions.scheme {
-            let fromWarning = navigationAction.targetFrame?.isMainFrame == true && navigationAction.sourceFrame.isMainFrame
-                && webView.url?.host()?.lowercased() == certificateWarningHost
-            if fromWarning, let real = CertificateExceptions.destination(of: url, warnedHost: certificateWarningHost, nonce: CertificateExceptions.nonce),
-               let host = real.host() {
+            let fromWarning = Self.isClickOnWarning(targetsMainFrame: navigationAction.targetFrame?.isMainFrame == true,
+                                                    sourceIsMainFrame: navigationAction.sourceFrame.isMainFrame,
+                                                    sameWebView: navigationAction.sourceFrame.webView === webView, userInitiated: userInitiated,
+                                                    pageHost: webView.url?.host()?.lowercased(), warnedHost: certificateWarningHost)
+            if fromWarning, let nonce = certificateWarningNonce,
+               let real = CertificateExceptions.destination(of: url, warnedHost: certificateWarningHost, nonce: nonce), let host = real.host() {
                 CertificateExceptions.allow(host, certificate: certificateWarningCertificate, in: webView.configuration.websiteDataStore)
                 certificateWarningHost = nil
+                certificateWarningNonce = nil
                 DispatchQueue.main.async { [weak self] in self?.load(real) }
             }
             return (.cancel, preferences)
@@ -789,6 +794,13 @@ extension Tab: WKNavigationDelegate {
             addressWaitsForCommit = openedByPage || (!ownLoad && ![.backForward, .reload].contains(navigationAction.navigationType))
         }
         return (.allow, preferences)
+    }
+
+    /// Whether a "Visit anyway" link came from the certificate warning itself: a click in the main frame of the web
+    /// view showing it, on the host it warned about.
+    static func isClickOnWarning(targetsMainFrame: Bool, sourceIsMainFrame: Bool, sameWebView: Bool, userInitiated: Bool,
+                                 pageHost: String?, warnedHost: String?) -> Bool {
+        targetsMainFrame && sourceIsMainFrame && sameWebView && userInitiated && warnedHost != nil && pageHost == warnedHost
     }
 
     /// Whether a navigation may land on one of Zigzag's own pages: Zigzag's own load, Back or Forward, or a link
@@ -948,8 +960,9 @@ extension Tab: WKNavigationDelegate {
         let failingURL = (nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? url
         certificateWarningHost = ErrorPage.offersProceed(nsError) ? failingURL?.host()?.lowercased() : nil
         certificateWarningCertificate = certificateWarningHost == nil ? nil : CertificateExceptions.certificate(in: nsError)
+        certificateWarningNonce = certificateWarningHost == nil ? nil : CertificateExceptions.makeNonce()
         Diagnostics.note("Page didn’t load", site: failingURL?.host(), Diagnostics.describe(nsError), isPrivate: isPrivate)
-        ErrorPage.show(error: nsError, url: failingURL, in: webView)
+        ErrorPage.show(error: nsError, url: failingURL, in: webView, proceedNonce: certificateWarningNonce)
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

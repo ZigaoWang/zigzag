@@ -246,7 +246,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         if nsError.code == NSURLErrorCancelled || (nsError.domain == "WebKitErrorDomain" && [102, 204].contains(nsError.code)) { return }
         let failingURL = (nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? webView.url
         Diagnostics.note("Pop-up didn’t load", site: failingURL?.host(), Diagnostics.describe(nsError), isPrivate: isPrivate)
-        ErrorPage.show(error: nsError, url: failingURL, in: webView, canProceed: false)
+        ErrorPage.show(error: nsError, url: failingURL, in: webView)
     }
 
     /// The page's process crashed: load it again rather than leave a blank window, unless it just did the same.

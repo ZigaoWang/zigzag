@@ -118,6 +118,28 @@ struct SecurityFixesTests {
         // A website sending the tab there.
         #expect(!Tab.mayGoToInternalPage(ownLoad: false, ownHistory: false, isBackForward: false, fromInternalPage: false))
     }
+
+    @Test func visitAnywayNeedsAClickOnThatWarning() throws {
+        func click(main: Bool = true, source: Bool = true, same: Bool = true, user: Bool = true, page: String? = "router.local",
+                   warned: String? = "router.local") -> Bool {
+            Tab.isClickOnWarning(targetsMainFrame: main, sourceIsMainFrame: source, sameWebView: same, userInitiated: user,
+                                 pageHost: page, warnedHost: warned)
+        }
+        #expect(click())
+        // The window that opened the tab, a script with no click, a frame, or another host's page.
+        #expect(!click(same: false))
+        #expect(!click(user: false))
+        #expect(!click(source: false))
+        #expect(!click(main: false))
+        #expect(!click(page: "bank.com"))
+        #expect(!click(page: nil, warned: nil))
+        // Each warning has its own nonce: a link read off one warning opens nothing on the next.
+        let first = CertificateExceptions.makeNonce(), second = CertificateExceptions.makeNonce()
+        #expect(first != second)
+        let page = try #require(URL(string: "https://router.local/"))
+        let link = try #require(CertificateExceptions.proceedLink(for: page, nonce: first))
+        #expect(CertificateExceptions.destination(of: link, warnedHost: "router.local", nonce: second) == nil)
+    }
 }
 
 /// Site permissions are kept per origin (scheme, host and port), never per host: an answer given to

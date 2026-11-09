@@ -125,8 +125,9 @@ enum PageDialogs {
     static let scheme = "zigzag-proceed"
     /// Carries the nonce on that link, so a page can't make one up.
     private static let nonceItem = "zigzag-nonce"
-    /// Made fresh each launch and written only into Zigzag's own warning page.
-    static let nonce = UUID().uuidString
+    /// Made fresh for each warning and written only into that page: one a page read from another warning (its own
+    /// site's) opens nothing.
+    static func makeNonce() -> String { UUID().uuidString }
 
     /// The "Visit anyway" link for a page whose certificate failed.
     static func proceedLink(for url: URL, nonce: String) -> URL? {
@@ -136,7 +137,7 @@ enum PageDialogs {
         return parts.url
     }
 
-    /// The page a "Visit anyway" link opens, or nil unless it carries this launch's nonce and is for the host the
+    /// The page a "Visit anyway" link opens, or nil unless it carries the warning's nonce and is for the host the
     /// tab warned about.
     static func destination(of link: URL, warnedHost: String?, nonce: String) -> URL? {
         guard link.scheme == scheme, var parts = URLComponents(url: link, resolvingAgainstBaseURL: false),
@@ -316,15 +317,16 @@ enum ErrorPage {
         return true
     }
 
-    /// `canProceed` is false where a certificate can't be let through (a popup): the page explains, with no way past.
-    static func show(error: NSError, url: URL?, in webView: WKWebView, canProceed: Bool = true) {
+    /// `proceedNonce`: the nonce for this warning's "Visit anyway" link. Without one (a popup, where a certificate
+    /// can't be let through) the page explains, with no way past.
+    static func show(error: NSError, url: URL?, in webView: WKWebView, proceedNonce: String? = nil) {
         guard let url else { return }
         pending.add(webView)
         let (title, message) = describe(error, url: url)
         // For a certificate you know is fine (your router, a dev server), a quiet way through, with the reason first.
         var proceed = ""
-        if canProceed, offersProceed(error) {
-            if let link = CertificateExceptions.proceedLink(for: url, nonce: CertificateExceptions.nonce) {
+        if let proceedNonce, offersProceed(error) {
+            if let link = CertificateExceptions.proceedLink(for: url, nonce: proceedNonce) {
                 proceed = """
                 <details><summary>\(escape(String(localized: "Show details", comment: "Disclosure on the page Zigzag shows for a site whose certificate can't be trusted.")))</summary><p class="why">\(escape(certificateReason(error.code)))</p>
                 <a class="anyway" href="\(escape(link.absoluteString))">\(escape(String(localized: "Visit this site anyway", comment: "Link on the page Zigzag shows for a site whose certificate can't be trusted, under Show details.")))</a></details>
