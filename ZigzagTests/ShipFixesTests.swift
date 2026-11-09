@@ -512,6 +512,42 @@ struct UpdateBackupTests {
         #expect(UpdateBackup.date(of: "not a backup") == nil)
     }
 
+    /// A backup from before there were profiles has no Profiles.json: putting it back leaves the one there is, so
+    /// spaces stay on their profiles.
+    @Test func restoreLeavesProfilesWhenTheBackupHasNone() throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try "now".write(to: root.appendingPathComponent("Library.json"), atomically: true, encoding: .utf8)
+        try "profiles now".write(to: root.appendingPathComponent("Profiles.json"), atomically: true, encoding: .utf8)
+        let folder = root.appendingPathComponent("Backups", isDirectory: true)
+        let old = "2026-10-02T09-00-00Z 0.4.0"
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent(old), withIntermediateDirectories: true)
+        try "then".write(to: folder.appendingPathComponent(old).appendingPathComponent("Library.json"), atomically: true, encoding: .utf8)
+        try old.write(to: folder.appendingPathComponent("Restore"), atomically: true, encoding: .utf8)
+
+        UpdateBackup.restoreIfAsked(root: root)
+
+        #expect(read(root.appendingPathComponent("Library.json")) == "then")
+        #expect(read(root.appendingPathComponent("Profiles.json")) == "profiles now")
+    }
+
+    @Test func restorePutsBackTheProfilesABackupHas() throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try "now".write(to: root.appendingPathComponent("Library.json"), atomically: true, encoding: .utf8)
+        try "profiles now".write(to: root.appendingPathComponent("Profiles.json"), atomically: true, encoding: .utf8)
+        let folder = root.appendingPathComponent("Backups", isDirectory: true)
+        let newer = "2026-11-02T09-00-00Z 0.8.0"
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent(newer), withIntermediateDirectories: true)
+        try "later".write(to: folder.appendingPathComponent(newer).appendingPathComponent("Library.json"), atomically: true, encoding: .utf8)
+        try "profiles then".write(to: folder.appendingPathComponent(newer).appendingPathComponent("Profiles.json"), atomically: true, encoding: .utf8)
+        try newer.write(to: folder.appendingPathComponent("Restore"), atomically: true, encoding: .utf8)
+
+        UpdateBackup.restoreIfAsked(root: root)
+
+        #expect(read(root.appendingPathComponent("Profiles.json")) == "profiles then")
+    }
+
     @Test func restoreKeepsWhatWasThereAndSwapsWholeFiles() throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }

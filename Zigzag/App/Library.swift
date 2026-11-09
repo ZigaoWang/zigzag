@@ -410,10 +410,18 @@ final class Library {
     var searchEngine: SearchEngine { didSet { save() } }
     var importedFromArc: Bool { didSet { save() } }
 
+    /// The profiles there are, and which space is on which (Profiles.json).
+    private(set) var directory: ProfileDirectory
+    /// What Profiles.json held when it was last read or written, so it's only written when it has changed: someone
+    /// who never makes a second profile never gets the file.
+    private var savedDirectory: ProfileDirectory
+
     /// Fires whenever spaces or bookmarks change.
     let changed = Signal<Void>()
 
     private init() {
+        directory = FileManager.default.fileExists(atPath: Paths.profiles.path) ? JSONStore.load(ProfileDirectory.self, from: Paths.profiles) ?? ProfileDirectory() : ProfileDirectory()
+        savedDirectory = directory
         if let stored = JSONStore.load(Stored.self, from: Paths.library), !stored.spaces.isEmpty {
             spaces = stored.spaces.map(\.upgraded)
             favorites = stored.favorites ?? []
@@ -438,6 +446,10 @@ final class Library {
         saveDebouncer.cancel()
         JSONStore.save(Stored(spaces: spaces, favorites: favorites, favoriteSplits: favoriteSplits.isEmpty ? nil : favoriteSplits,
                               searchEngine: searchEngine, importedFromArc: importedFromArc), to: Paths.library)
+        if directory != savedDirectory {
+            JSONStore.save(directory, to: Paths.profiles)
+            savedDirectory = directory
+        }
     }
 
     private func commit() {
@@ -1278,16 +1290,72 @@ final class Library {
         fileprivate let spaces: [SpaceInfo]
         fileprivate let favorites: [Bookmark]
         fileprivate let favoriteSplits: [PinnedSplit]
+        /// Which space was on which profile: moving a space to another profile can be undone. The profiles
+        /// themselves aren't kept: making or removing one isn't undone.
+        fileprivate let spaceProfiles: [String: UUID]
         var spaceIDs: Set<UUID> { Set(spaces.map(\.id)) }
     }
 
-    var snapshot: Snapshot { Snapshot(spaces: spaces, favorites: favorites, favoriteSplits: favoriteSplits) }
+    var snapshot: Snapshot {
+        Snapshot(spaces: spaces, favorites: favorites, favoriteSplits: favoriteSplits, spaceProfiles: directory.assignments)
+    }
 
     func restore(_ snapshot: Snapshot) {
         spaces = snapshot.spaces
         favorites = snapshot.favorites
         favoriteSplits = snapshot.favoriteSplits
+        directory.restore(assignments: snapshot.spaceProfiles)
         commit()
+    }
+
+    // MARK: Profiles
+
+    /// Every profile, the first one first.
+    var profiles: [ProfileInfo] { directory.all }
+    /// Whether there's more than the first profile: only then does anything in the window speak of profiles.
+    var hasManyProfiles: Bool { directory.all.count > 1 }
+
+    func profileID(ofSpace id: UUID) -> UUID { directory.profileID(ofSpace: id) }
+    func spaces(in profile: UUID) -> [SpaceInfo] { spaces.filter { directory.profileID(ofSpace: $0.id) == profile } }
+
+    @discardableResult
+    func addProfile(name: String, color: SpaceColor? = nil) -> ProfileInfo {
+        let info = directory.add(name: name, color: color)
+        commit()
+        return info
+    }
+
+    func updateProfile(_ id: UUID, name: String?, color: SpaceColor?) {
+        directory.update(id, name: name, color: color)
+        commit()
+    }
+
+    /// Puts a space on a profile. Its open pages are then rebuilt there (TabManager, on `changed`).
+    func setProfile(_ profile: UUID, forSpace space: UUID) {
+        guard directory.profileID(ofSpace: space) != profile else { return }
+        directory.assign(space: space, to: profile)
+        commit()
+    }
+
+    /// Takes a profile out of the list, leaving its data to be erased (Profiles). Its spaces move to the first
+    /// profile. Written at once: from here on, a removal that's interrupted is finished at the next start.
+    func removeProfile(_ id: UUID) {
+        guard directory.profile(id)?.isDefault == false else { return }
+        directory.remove(id)
+        saveNow()
+        changed.send()
+    }
+
+    /// A removed profile's data is erased.
+    func finishedRemovingProfile(_ id: UUID) {
+        directory.finishedDeleting(id)
+        saveNow()
+    }
+
+    /// At launch: spaces that are gone are forgotten.
+    func pruneProfileAssignments() {
+        directory.prune(keeping: Set(spaces.map(\.id)))
+        save()
     }
 
     func appendSpaces(_ newSpaces: [SpaceInfo]) {
