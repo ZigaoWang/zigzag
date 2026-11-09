@@ -59,6 +59,9 @@ final class BrowserWindow: NSWindow {
     override var canBecomeMain: Bool { true }
 
     /// Browser shortcuts win over the page: the menu bar sees key equivalents before the web view does.
+    /// The last ⌘← or ⌘→ answered, to know it when WebKit hands it back.
+    private var lastArrow: (timestamp: TimeInterval, keyCode: UInt16)?
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         // ⌘Z / ⇧⌘Z: the sidebar's undo, unless you were just typing on the page or in a field.
         // Only the four modifier keys count: arrow keys always carry .function and .numericPad, and Caps Lock may be
@@ -75,18 +78,37 @@ final class BrowserWindow: NSWindow {
             return true
         }
         // ⌘← / ⌘→ move the cursor while you're typing; only away from a text field do they mean Back and Forward.
+        // The key goes to the field or page here and is taken: let through, the menu bar would get it next, and its
+        // Back on the same keys would go back from inside a text box.
         if mods == .command, event.keyCode == 123 || event.keyCode == 124 {
-            if firstResponder is NSText { return false }
+            // A key the page left alone comes back here a second time: it was answered the first time.
+            if event.timestamp == lastArrow?.timestamp, event.keyCode == lastArrow?.keyCode { return true }
+            lastArrow = (event.timestamp, event.keyCode)
+            if let text = firstResponder as? NSText {
+                text.keyDown(with: event)
+                return true
+            }
             if let webView = firstResponder as? WKWebView, let controller = windowController as? BrowserWindowController {
+                webView.keyDown(with: event)
                 let back = event.keyCode == 123
-                let editing = "(() => { const e = document.activeElement; return !!e && (e.isContentEditable || /^(input|textarea|select)$/i.test(e.tagName)); })()"
+                // Typing anywhere in the page counts: inside a web component (its shadow root), and inside a frame,
+                // where many editors live and the page sees only the frame. A focused button or checkbox doesn't.
+                let editing = """
+                    (() => {
+                      let e = document.activeElement;
+                      while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
+                      if (!e) return false;
+                      if (e.isContentEditable || /^(textarea|select|iframe|frame)$/i.test(e.tagName)) return true;
+                      return e.tagName === 'INPUT' && !/^(button|submit|reset|checkbox|radio|range|color|file|image|hidden)$/i.test(e.type);
+                    })()
+                    """
                 webView.evaluateJavaScript(editing) { [weak controller] result, _ in
                     MainActor.assumeIsolated {
                         guard (result as? Bool) != true, let controller else { return }
                         back ? controller.goBack(nil) : controller.goForward(nil)
                     }
                 }
-                return false
+                return true
             }
         }
         // A page's own shortcuts come first, as in Safari: ⌘S commits in GitHub's editor, ⌘F searches a document,
