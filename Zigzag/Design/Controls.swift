@@ -143,8 +143,12 @@ class InteractiveView: NSView {
     var onRightClick: ((NSEvent) -> NSMenu?)?
     /// Called once the mouse moves far enough while pressed. Return true to take over the drag.
     var onDragStart: ((NSEvent) -> Bool)?
+    /// Only sideways movement starts a drag, for something that moves along a row: a wobble up or down stays a click.
+    var dragsHorizontally = false
     /// Fires the click on mouse down instead of mouse up (tabs feel faster this way).
     var clicksOnMouseDown = false
+    /// The mouse-down behind the click being handled; nil when the click came from the keyboard or VoiceOver.
+    var currentPress: NSEvent? { mouseDownEvent }
 
     private var trackingArea: NSTrackingArea?
     private var mouseDownEvent: NSEvent?
@@ -211,7 +215,8 @@ class InteractiveView: NSView {
 
     override func mouseDragged(with event: NSEvent) {
         guard isEnabled, let start = mouseDownEvent, !dragging else { return }
-        let distance = hypot(event.locationInWindow.x - start.locationInWindow.x, event.locationInWindow.y - start.locationInWindow.y)
+        let dx = event.locationInWindow.x - start.locationInWindow.x, dy = event.locationInWindow.y - start.locationInWindow.y
+        let distance = dragsHorizontally ? abs(dx) : hypot(dx, dy)
         if distance > 4, let onDragStart {
             // Picked up, it's no longer being pressed: it doesn't keep the pressed look through the whole drag.
             isPressed = false
@@ -243,6 +248,30 @@ class InteractiveView: NSView {
         guard let event else { return false }
         onClick(event)
         return true
+    }
+
+    /// Opens what a right-click opens, for the keyboard and VoiceOver: from the control's middle. A control whose
+    /// right-click acts by itself and returns no menu has already done so.
+    @discardableResult
+    func showContextMenu() -> Bool {
+        guard isEnabled, let onRightClick, let window else { return false }
+        let middle = NSPoint(x: bounds.midX, y: bounds.midY)
+        guard let event = NSEvent.mouseEvent(with: .rightMouseDown, location: convert(middle, to: nil), modifierFlags: [],
+                                             timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                             context: nil, eventNumber: 0, clickCount: 1, pressure: 0) else { return false }
+        onRightClick(event)?.popUp(positioning: nil, at: middle, in: self)
+        return true
+    }
+
+    override func accessibilityPerformShowMenu() -> Bool { showContextMenu() }
+
+    /// Whether this control has a menu to show.
+    var offersMenu: Bool { onRightClick != nil }
+
+    /// VoiceOver offers Show Menu only on a control that has one.
+    override func isAccessibilitySelectorAllowed(_ selector: Selector) -> Bool {
+        if selector == #selector(NSView.accessibilityPerformShowMenu) { return offersMenu }
+        return super.isAccessibilitySelectorAllowed(selector)
     }
 
     // MARK: Keyboard
@@ -297,6 +326,9 @@ class InteractiveView: NSView {
         let plain = event.modifierFlags.intersection([.command, .option, .control]).isEmpty
         // Space, Return or Enter press the focused control.
         if hasKeyboardFocus, plain, [49, 36, 76].contains(event.keyCode), accessibilityPerformPress() { return }
+        // Control-Return opens the right-click menu, as it does across the Mac with Full Keyboard Access.
+        if hasKeyboardFocus, event.modifierFlags.intersection([.command, .option, .control]) == .control,
+           [36, 76].contains(event.keyCode), showContextMenu() { return }
         super.keyDown(with: event)
     }
 
@@ -1264,6 +1296,7 @@ final class DropdownButton: InteractiveView {
         super.keyDown(with: event)
     }
 
+    override var offersMenu: Bool { true }
     override func accessibilityPerformShowMenu() -> Bool { openMenu(); return true }
 
     override func stateDidChange(animated: Bool) {

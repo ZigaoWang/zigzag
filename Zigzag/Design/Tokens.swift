@@ -221,6 +221,13 @@ enum Tokens {
         static let addressRadius: CGFloat = Radius.field
         static let addressButton: CGFloat = button
         static let addressGlyph: CGFloat = glyph
+        /// The room the site's name always keeps: pinned extensions give way before it gets narrower.
+        static let addressMinText: CGFloat = 72
+        /// How many extensions can be pinned to the address.
+        static let maxPins = 3
+        /// The round pin on an extension's tile in Site Controls, and how far past the tile's corner it sits.
+        static let hoverPin: CGFloat = 19
+        static let hoverPinOverhang: CGFloat = 4
 
         /// The bottom bar: 26pt buttons, 4pt from its edges, a space key (`spaceKey`) for each space.
         static let bottomBarHeight: CGFloat = 34
@@ -550,6 +557,12 @@ enum Tokens {
         /// A sheet (a confirmation, the notes) grows from a little below its middle, so it settles up into place over
         /// its scrim rather than swelling out of a point.
         static let sheetOrigin = CGPoint(x: 0.5, y: 0.7)
+        /// A small glyph popping in where another was: from this scale with a fade, in `enter`.
+        static let glyphFrom: CGFloat = 0.7
+        /// A button joining or leaving the address field grows from, or shrinks to, this scale.
+        static let pinFrom: CGFloat = 0.6
+        /// How much a pinned button grows while it's carried along the address field.
+        static let dragLift: CGFloat = 1.04
         /// One shared highlight gliding from row to row in a menu, and a selection gliding between a list's places
         /// or a filter's segments.
         static let highlightGlide: TimeInterval = 0.14
