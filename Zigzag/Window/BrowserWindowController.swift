@@ -471,37 +471,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Draws the window for a space: its mode, color, gradient, how see-through it is, and grain.
     private func render(_ space: SpaceInfo, animated: Bool, crossFadesMode: Bool = true) {
-        if !tabManager.isPrivate {
-            let mode = space.readableAppearance
-            let name: NSAppearance.Name? = mode == "light" ? .aqua : mode == "dark" ? .darkAqua : nil
-            if window?.appearance?.name != name {
-                // Light to dark and back cross-fades with the color, rather than snapping.
-                if animated, crossFadesMode, !Tokens.Motion.reduceMotion, let frameLayer = window?.contentView?.superview?.layer {
-                    let fade = CATransition()
-                    fade.type = .fade
-                    fade.duration = Tokens.Motion.standard
-                    fade.timingFunction = Tokens.Motion.easeOut
-                    frameLayer.add(fade, forKey: "appearance")
-                }
-                window?.appearance = name.flatMap(NSAppearance.init(named:))
-            }
-        }
-        // Reduce Transparency in System Settings: a see-through space shows its color solid instead.
-        let clear = !tabManager.isPrivate && space.isSeeThrough && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
-        // Solid, the space's own color at full strength; see-through, thinned over the frosting.
-        let reduced = space.isSeeThrough && !clear
-        let color = tabManager.isPrivate ? SpaceColor.graphite.background : reduced ? space.background : space.frameColor
-        let end = tabManager.isPrivate ? nil : reduced ? space.background2 : space.frameColor2
-        // See-through: the window lets the frosted desktop through, and the space's color washes over it, thinner the
-        // more shows.
-        window?.isOpaque = !clear
-        window?.backgroundColor = clear ? .clear : .windowBackgroundColor
-        root.setGlass(clear, clear: space.usesClearGlass, tint: space.frameColor)
-        // See-through, the wash goes in the gradient layer, the one above the frosted desktop (the frame's own color
-        // sits under it and would be hidden); a single color washes as a gradient of itself.
-        root.setColor(clear ? .clear : color, animated: animated)
-        root.setGradient(from: color, to: clear ? end ?? color : end, angle: space.gradientAngle, animated: animated)
-        root.setGrain(tabManager.isPrivate ? 0 : space.grain ?? 0, animated: animated)
+        let (color, end) = root.paint(space, isPrivate: tabManager.isPrivate, animated: animated, crossFadesMode: crossFadesMode)
         root.sidebarContainer.tint = color
         root.sidebarContainer.gradient = end.map { ($0, space.gradientAngle) }
         root.sidebarContainer.grain = tabManager.isPrivate ? 0 : space.grain ?? 0

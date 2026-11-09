@@ -254,7 +254,7 @@ final class ResizeHandle: NSView {
 }
 
 /// The window's content: one continuous tinted background, the sidebar, and the page card.
-final class BrowserRootView: ColorView {
+final class BrowserRootView: SpaceFrameView {
     /// The least a pane gets while you drag the line between two: room for its header's six buttons and some of its
     /// address, or for its header and a little page when stacked.
     static let minimumPaneWidth: CGFloat = 260
@@ -603,82 +603,16 @@ final class BrowserRootView: ColorView {
         return NSRect(x: x, y: inset, width: sidebarWidth, height: bounds.height - inset * 2)
     }
 
-    /// Frosted glass behind the frame, for spaces that want the desktop to show through: blurred, so what's behind
-    /// reads as soft shapes and never as text under the sidebar's own. The sidebar's material, the clearest there is.
-    private lazy var glassView: NSVisualEffectView = {
-        let glass = NSVisualEffectView()
-        glass.blendingMode = .behindWindow
-        glass.material = .sidebar
-        // Live while the window is in front; a still frosting behind other apps' windows, as macOS's own sidebars.
-        glass.state = .followsWindowActiveState
-        glass.isHidden = true
-        addSubview(glass, positioned: .below, relativeTo: nil)
-        glass.wantsLayer = true
-        glass.layer?.zPosition = -3
-        return glass
-    }()
-
-    /// The frosting always covers all of what's behind: anything thinner lets it through sharp, and its text then
-    /// reads under the sidebar's own. See-through spaces thin their color over the blur instead.
-    /// `clear`: Liquid Glass, really transparent and still blurred, tinted with `tint` (it draws over the frame's own
-    /// wash, so the color goes in the glass). Before macOS 26 the frosted glass stands in.
-    func setGlass(_ on: Bool, clear: Bool = false, tint: NSColor? = nil) {
-        glassWanted = on
-        defer { refreshGlassOcclusion() }
-        if #available(macOS 26.0, *), clear {
-            glassView.isHidden = true
-            let glass = clearGlass as? NSGlassEffectView ?? {
-                let made = NSGlassEffectView()
-                // Regular, not the clear style: still plainly see-through, but blurred enough that what's behind reads
-                // as color and shape, never as text under the sidebar's own.
-                made.style = .regular
-                made.cornerRadius = 0
-                made.wantsLayer = true
-                made.layer?.zPosition = -3
-                addSubview(made, positioned: .below, relativeTo: nil)
-                clearGlass = made
-                return made
-            }()
-            glass.isHidden = !on
-            glass.tintColor = tint
-            if on { glass.frame = glassFrame }
-            // The glass draws over the frame's own grain, so it carries its own, kept in step by `setGrain`.
-            if glass.contentView == nil {
-                let content = NSView()
-                content.wantsLayer = true
-                content.layer?.addSublayer(glassGrain)
-                glass.contentView = content
-            }
-            Tokens.Motion.withoutAnimation { glassGrain.frame = glassGrainBounds }
-            return
-        }
-        clearGlass?.isHidden = true
-        glassView.isHidden = !on
-        glassView.material = .sidebar
-        if on { glassView.frame = glassFrame }
-    }
     /// Where the glass needs to be: only what you can see through. With the page meeting the sidebar, that's the
     /// sidebar alone; the page covers the rest, and a live blur under it would cost the window server a fresh blur
     /// of the whole window every frame the page changes (a video, an animation). Otherwise the whole window.
-    private var glassFrame: NSRect {
+    override var glassFrame: NSRect {
         // An empty space shows the frame where the page would be: glass under all of it.
         // A split view's seam between its two pages shows the frame too: glass under all of it then.
         guard sidebarVisible, card.isAttached, !card.isHidden, !isEmpty, secondCard.isHidden || secondCard.alphaValue == 0 else { return bounds }
         return NSRect(x: 0, y: 0, width: min(bounds.width, sidebarWidth + Tokens.Radius.attached * 2), height: bounds.height)
     }
-    private var glassGrainBounds: NSRect { NSRect(origin: .zero, size: glassFrame.size) }
 
-    /// Puts the glass where it needs to be now (after a space empties or fills).
-    private func refreshGlassFrame() {
-        if !glassView.isHidden { glassView.frame = glassFrame }
-        if let clearGlass, !clearGlass.isHidden {
-            clearGlass.frame = glassFrame
-            Tokens.Motion.withoutAnimation { glassGrain.frame = glassGrainBounds }
-        }
-    }
-
-    /// Whether the space wants glass; `refreshGlassOcclusion` keeps it off while the window can't be seen.
-    private var glassWanted = false
     /// Set while something opaque with glass of its own covers the whole window (the tab overview): the window's
     /// glass rests and the pages under it are hidden, so neither costs anything while out of sight.
     var glassCovered = false {
@@ -689,117 +623,12 @@ final class BrowserRootView: ColorView {
             refreshGlassOcclusion()
         }
     }
-    /// Follows the window's visibility for as long as the view is in one, so the glass comes back the moment the
-    /// window shows (at launch, from behind another window, back from the Dock).
-    private var occlusionObserver: NSObjectProtocol?
 
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        if let occlusionObserver { NotificationCenter.default.removeObserver(occlusionObserver) }
-        occlusionObserver = nil
-        guard let window else { return }
-        occlusionObserver = NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshGlassOcclusion() }
-        }
-        refreshGlassOcclusion()
-    }
-
-    /// A window you can't see (behind others, minimized, on another desktop) needs no live blur: the glass goes
-    /// until it shows again, so the window server isn't re-blurring a window nobody is looking at.
-    func refreshGlassOcclusion() {
-        let visible = window?.occlusionState.contains(.visible) ?? true
-        // Nothing to see through: the page runs edge to edge, or the tab overview covers the window with its own glass.
-        let covered = (isEdgeToEdge && !card.isHidden && !isEmpty) || glassCovered
-        let on = glassWanted && visible && !covered
-        if let clearGlass, !clearGlass.isHidden || on { clearGlass.alphaValue = on ? 1 : 0 }
-        glassView.alphaValue = on ? 1 : 0
-    }
-
-    /// The clear glass, once a clear space has asked for it.
-    private var clearGlass: NSView?
-    /// Grain inside the clear glass, matching the frame's.
-    private lazy var glassGrain: CALayer = {
-        let grain = CALayer()
-        grain.backgroundColor = MaterialImages.grain.cgColor
-        grain.opacity = 0
-        return grain
-    }()
-
-    /// A second color the frame fades into, corner to corner, under the grain.
-    private lazy var gradientLayer: CAGradientLayer = {
-        let gradient = CAGradientLayer()
-        gradient.startPoint = CGPoint(x: 0, y: 0)
-        gradient.endPoint = CGPoint(x: 1, y: 1)
-        gradient.zPosition = -2
-        gradient.opacity = 0
-        layer?.insertSublayer(gradient, at: 0)
-        return gradient
-    }()
-    private var gradientColors: (NSColor, NSColor)?
-
-    func setGradient(from start: NSColor, to end: NSColor?, angle: Double = 45, animated: Bool) {
-        gradientColors = end.map { (start, $0) }
-        // The angle as two points on the unit square, through its middle (0° runs left to right, 90° top to bottom;
-        // the view is flipped, so y grows downward here too).
-        let r = angle * .pi / 180
-        let dx = cos(r) / 2, dy = sin(r) / 2
-        Tokens.Motion.withoutAnimation {
-            gradientLayer.startPoint = CGPoint(x: 0.5 - dx, y: 0.5 - dy)
-            gradientLayer.endPoint = CGPoint(x: 0.5 + dx, y: 0.5 + dy)
-        }
-        applyGradient(animated: animated)
-    }
-
-    private func applyGradient(animated: Bool) {
-        CATransaction.begin()
-        CATransaction.setDisableActions(!animated)
-        CATransaction.setAnimationDuration(Tokens.Motion.large)
-        if let (start, end) = gradientColors {
-            effectiveAppearance.performAsCurrentDrawingAppearance {
-                gradientLayer.colors = [start.cgColor, end.cgColor]
-            }
-            gradientLayer.opacity = 1
-        } else {
-            gradientLayer.opacity = 0
-        }
-        CATransaction.commit()
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        applyGradient(animated: false)
-    }
-
-    /// The frame's grain, under everything else: the same fine noise as Zigzag's own branded screens.
-    private lazy var grainLayer: CALayer = {
-        let grain = CALayer()
-        grain.backgroundColor = MaterialImages.grain.cgColor
-        grain.opacity = 0
-        grain.zPosition = -1
-        layer?.insertSublayer(grain, at: 0)
-        return grain
-    }()
-
-    /// 0 is smooth; 1 is as much as reads as texture without becoming noise.
-    func setGrain(_ amount: Double, animated: Bool) {
-        let target = Float(min(max(amount, 0), 1) * 0.18)
-        guard grainLayer.opacity != target || glassGrain.opacity != target else { return }
-        CATransaction.begin()
-        CATransaction.setDisableActions(!animated)
-        CATransaction.setAnimationDuration(Tokens.Motion.standard)
-        grainLayer.opacity = target
-        glassGrain.opacity = target
-        CATransaction.commit()
-    }
+    /// Nothing to see through: the page runs edge to edge, or the tab overview covers the window with its own glass.
+    override var glassIsCovered: Bool { (isEdgeToEdge && !card.isHidden && !isEmpty) || glassCovered }
 
     override func layout() {
         super.layout()
-        Tokens.Motion.withoutAnimation { grainLayer.frame = bounds; gradientLayer.frame = bounds }
-        if !glassView.isHidden { glassView.frame = glassFrame }
-        if let clearGlass, !clearGlass.isHidden {
-            clearGlass.frame = glassFrame
-            Tokens.Motion.withoutAnimation { glassGrain.frame = glassGrainBounds }
-        }
         layoutCards()
         sidebarContainer.frame = sidebarFrame
         sidebarContainer.isFloating = !sidebarVisible
@@ -927,7 +756,6 @@ final class BrowserRootView: ColorView {
         pointerTimer?.invalidate()
         pointerObservers.forEach(NotificationCenter.default.removeObserver)
         if let borderlessToken { NotificationCenter.default.removeObserver(borderlessToken) }
-        if let occlusionObserver { NotificationCenter.default.removeObserver(occlusionObserver) }
     }
 
     private func followPointer() {

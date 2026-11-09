@@ -25,6 +25,7 @@
 		0E327AA7CF01C1AB193DDFA3 /* ProblemReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB9026CE3C5C707675A9BEEC /* ProblemReport.swift */; };
 		0E626C05ABE9E50F2CB2A884 /* SecretString.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84C767A263C67C27EF0F4BFB /* SecretString.swift */; };
 		0F7420EF801E473BA2A58F2A /* SpaceEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27025355902590144D7FABA3 /* SpaceEditor.swift */; };
+		0FFDB208CC831BB0246A6A7B /* SpaceFrameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2477477EEAA33212F1AA2281 /* SpaceFrameView.swift */; };
 		10324776656E836D07CD1B27 /* Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32289A47E7257A31AC82FCB0 /* Controls.swift */; };
 		116CB32D6BD3C4918FCD3F1C /* ImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F50C552DADDAC51AC86787B /* ImportView.swift */; };
 		1482F4A584F73FF91CA61BE4 /* AddressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA72586980E3DDF9FDA59A8 /* AddressTests.swift */; };
@@ -263,6 +264,7 @@
 		1F512EE34F01C45AF2FE2C52 /* FirefoxImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirefoxImporter.swift; sourceTree = "<group>"; };
 		1FB43BE39C48B06C807284C2 /* PeekController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeekController.swift; sourceTree = "<group>"; };
 		1FF592955291CE8F4D81FCBD /* NetworkChangesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkChangesTests.swift; sourceTree = "<group>"; };
+		2477477EEAA33212F1AA2281 /* SpaceFrameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFrameView.swift; sourceTree = "<group>"; };
 		253D16FCBE561D267ED6957C /* BrowserRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRootView.swift; sourceTree = "<group>"; };
 		256245226DA14768B001589E /* Tokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokens.swift; sourceTree = "<group>"; };
 		25F6D89709F01D7AD083FC85 /* Readability.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = Readability.js; sourceTree = "<group>"; };
@@ -849,6 +851,7 @@
 				B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */,
 				95BE2DC23683FEEFF817A678 /* SidebarUndo.swift */,
 				9B14798B8A091AAE19C57100 /* SitePanel.swift */,
+				2477477EEAA33212F1AA2281 /* SpaceFrameView.swift */,
 				D5AB7730FF54C85E4477E76E /* TourDemo.swift */,
 				98D9F429D6C84167482CCFC1 /* Tutorial.swift */,
 				E748383173F4821F4C0D92B3 /* WhatsNew.swift */,
@@ -1124,6 +1127,7 @@
 				DFB7FFE90CE40670E90BB664 /* SiteSearch.swift in Sources */,
 				D35C9F0D071FD702CE802ECF /* SpaceColor.swift in Sources */,
 				0F7420EF801E473BA2A58F2A /* SpaceEditor.swift in Sources */,
+				0FFDB208CC831BB0246A6A7B /* SpaceFrameView.swift in Sources */,
 				202F156ED958778A3916C4D1 /* SpaceSwitcher.swift in Sources */,
 				FAC7B9D0E2590199CED38D23 /* SwipeNavigation.swift in Sources */,
 				4796C99DFA31C01F7EBCB5AF /* SystemAudioTap.swift in Sources */,
