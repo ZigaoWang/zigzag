@@ -108,10 +108,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
         sidebar.address.onPinsMoved = { [weak self] in
-            if #available(macOS 15.4, *), let self { ExtensionHost.shared.repositionPinPopups(of: self) }
+            if #available(macOS 15.4, *), let self { ExtensionCenter.repositionPinPopups(of: self) }
         }
         sidebar.address.onPinDragBegan = { [weak self] in
-            if #available(macOS 15.4, *) { ExtensionHost.shared.closePopups(in: self?.window) }
+            if #available(macOS 15.4, *) { ExtensionCenter.closePopups(in: self?.window) }
         }
         sidebar.address.onPinsReordered = { ExtensionStore.reorderPins(visible: $0) }
         sidebar.address.siteControlsButton.onClick = { [weak self] _ in
@@ -162,8 +162,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.flyDownload(item)
         })
         if #available(macOS 15.4, *) {
-            tokens.append(ExtensionHost.shared.changed.observe { [weak self] in self?.refreshExtensionActions() })
-            tokens.append(ExtensionHost.shared.popupsChanged.observe { [weak self] in self?.refreshExtensionActions() })
+            tokens.append(ExtensionCenter.changed.observe { [weak self] in self?.refreshExtensionActions() })
+            tokens.append(ExtensionCenter.popupsChanged.observe { [weak self] in self?.refreshExtensionActions() })
         }
 
         // Fading is slow; checking once a minute is plenty.
@@ -869,7 +869,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private var popupHoldsSidebar: Bool {
         guard #available(macOS 15.4, *) else { return false }
-        return ExtensionHost.shared.holdsSidebar(in: window)
+        return ExtensionCenter.holdsSidebar(in: window)
     }
 
     /// The page you're working in: the whole page area, or in split view the focused pane.
@@ -1558,7 +1558,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         #endif
         if event.type == .scrollWheel, !desk.isVisible, sidebarContains(event), sidebar.handleSwipe(event) { return true }
         if event.type == .keyDown, #available(macOS 15.4, *), !event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
-           ExtensionHost.shared.performCommand(for: event) {
+           ExtensionCenter.performCommand(for: event) {
             return true
         }
         return false

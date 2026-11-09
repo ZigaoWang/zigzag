@@ -59,7 +59,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         all.append(controller)
         Diagnostics.note("Zigzag Mini opened", site: url.host())
         controller.appear(from: origin)
-        if #available(macOS 15.4, *) { ExtensionHost.shared.miniOpened(controller) }
+        if #available(macOS 15.4, *) { ExtensionCenter.miniOpened(controller) }
         if let webView = controller.tab.webView { controller.window?.makeFirstResponder(webView) }
         if fromAnotherApp {
             // From a link in another app, as Little Arc: only this window comes forward, the browser windows stay
@@ -433,7 +433,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         pageGone.send()
         tokens.removeAll()
         Autofill.shared.forget(windowOf: window)
-        if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
+        if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
         tab.webView?.removeFromSuperview()
         tab.isPeek = false
         target.tabManager.switchToSpace(spaceID)
@@ -517,15 +517,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         Autofill.shared.forget(windowOf: window)
         if !movedOut {
             tokens.removeAll()
-            if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab, windowClosing: true) }
+            if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab, windowClosing: true) }
             tab.close()
         }
-        if #available(macOS 15.4, *) { ExtensionHost.shared.miniClosed(self) }
+        if #available(macOS 15.4, *) { ExtensionCenter.miniClosed(self) }
         Self.all.removeAll { $0 === self }
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
-        if #available(macOS 15.4, *) { ExtensionHost.shared.miniFocused(self) }
+        if #available(macOS 15.4, *) { ExtensionCenter.miniFocused(self) }
     }
 }
 

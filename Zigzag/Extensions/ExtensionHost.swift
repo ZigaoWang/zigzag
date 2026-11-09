@@ -24,6 +24,8 @@ final class ExtensionHost: NSObject {
     private(set) var contexts: [WKWebExtensionContext] = []
     /// Fires when extensions load or their toolbar actions change.
     let changed = Signal<Void>()
+    /// Passes its two signals on to the ones views watch for any profile (ExtensionCenter).
+    private var forwarding: [SignalToken] = []
     private var nativePorts: [ObjectIdentifier: NativeMessagingHost] = [:]
     private var socketBridges: [ObjectIdentifier: WebSocketBridge] = [:]
 
@@ -67,6 +69,7 @@ final class ExtensionHost: NSObject {
         controller = WKWebExtensionController(configuration: configuration)
         super.init()
         controller.delegate = self
+        forwarding = [changed.observe { ExtensionCenter.changed.send() }, popupsChanged.observe { ExtensionCenter.popupsChanged.send() }]
         watchGestures()
         watchPopupVisibility()
     }
@@ -213,7 +216,9 @@ final class ExtensionHost: NSObject {
         guard let window = event.window else { return nil }
         var view: NSView? = event.type == .keyDown ? window.firstResponder as? NSView : window.contentView?.hitTest(event.locationInWindow)
         while let current = view, !(current is WKWebView) { view = current.superview }
-        guard let url = (view as? WKWebView)?.url, url.scheme == "webkit-extension", let id = url.host(), context(for: id) != nil else { return nil }
+        // The same extension can be open in another profile at the same address: only this profile's page counts here.
+        guard let page = view as? WKWebView, page.configuration.websiteDataStore === profile.store,
+              let url = page.url, url.scheme == "webkit-extension", let id = url.host(), context(for: id) != nil else { return nil }
         return id
     }
 
@@ -626,7 +631,8 @@ final class ExtensionHost: NSObject {
     func tabClosed(_ tab: Tab, windowClosing: Bool = false) { if !tab.isPrivate { controller.didCloseTab(tab, windowIsClosing: windowClosing) } }
     func tabActivated(_ tab: Tab, previous: Tab?) {
         guard !tab.isPrivate else { return }
-        controller.didActivateTab(tab, previousActiveTab: previous?.isPrivate == true ? nil : previous)
+        // The tab you left is only news to the extensions that knew it.
+        controller.didActivateTab(tab, previousActiveTab: previous?.extensionHost === self ? previous : nil)
     }
     func tabChanged(_ tab: Tab, _ change: Tab.Change) {
         guard !tab.isPrivate else { return }

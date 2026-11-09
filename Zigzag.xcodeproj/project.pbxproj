@@ -140,6 +140,7 @@
 		8CB207822183B9D650B3F443 /* Tab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0560887D19F137BADD3B098 /* Tab.swift */; };
 		8D5DA9B18AB78EDB306BDE3F /* ExternalLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2664CEA2397AB72FA6371E /* ExternalLinks.swift */; };
 		8E3C385DDEE5EEBB729EF55B /* BrowserRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 253D16FCBE561D267ED6957C /* BrowserRootView.swift */; };
+		8EA92F19466027B9503E537A /* ExtensionCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDEA633FD3B5DC3FC7268252 /* ExtensionCenter.swift */; };
 		902CD60C9DC21A528D47701B /* CrashReports.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8551A279CC24B357CC11755E /* CrashReports.swift */; };
 		91501632F628CC18660775E6 /* SecurityFixesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7890881D589D032D70E5DC20 /* SecurityFixesTests.swift */; };
 		92E095E45C00B0891F8EBF6B /* ConfirmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD3351437EE20BC819F95CD /* ConfirmSheet.swift */; };
@@ -426,6 +427,7 @@
 		BCA8F1625F7717F1444D8B29 /* Words.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Words.swift; sourceTree = "<group>"; };
 		BCDDE0751DF4A678A1B2C2DC /* blocklist.json.lzfse */ = {isa = PBXFileReference; path = blocklist.json.lzfse; sourceTree = "<group>"; };
 		BD2664CEA2397AB72FA6371E /* ExternalLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalLinks.swift; sourceTree = "<group>"; };
+		BDEA633FD3B5DC3FC7268252 /* ExtensionCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionCenter.swift; sourceTree = "<group>"; };
 		BF2F4BA4D4D31C1518CC7B9E /* CapitalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapitalizationTests.swift; sourceTree = "<group>"; };
 		C0943F5424EE8E9EE3A714D4 /* ImportExtensionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportExtensionViews.swift; sourceTree = "<group>"; };
 		C09641835EC802C4387DBF55 /* ErrorPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorPageTests.swift; sourceTree = "<group>"; };
@@ -674,6 +676,7 @@
 				445BFF7EFE1744F510AC8334 /* BridgeWebRequest.swift */,
 				9AD01A7A43B5EDAF47909918 /* CRXPackage.swift */,
 				AEBF6D0A14B73E1B6D7748A8 /* ExtensionBridge.swift */,
+				BDEA633FD3B5DC3FC7268252 /* ExtensionCenter.swift */,
 				AB8EE08C53EADEDF40AA9E51 /* ExtensionHost.swift */,
 				81370CCCA627CE0FAFB02E03 /* ExtensionImport.swift */,
 				30417C99681AAC2507555F94 /* ExtensionReport.swift */,
@@ -1167,6 +1170,7 @@
 				CD77ADCA81FF68CE94D13F63 /* EnergyWatch.swift in Sources */,
 				0CDD41C7E897852C45B38991 /* ErrorPage.swift in Sources */,
 				FC7890AF73B47C398FD5A153 /* ExtensionBridge.swift in Sources */,
+				8EA92F19466027B9503E537A /* ExtensionCenter.swift in Sources */,
 				0104054FA97C0D01FC9A422C /* ExtensionHost.swift in Sources */,
 				DA0CF4513053251D16C07C2A /* ExtensionImport.swift in Sources */,
 				72E2F6BF3464C210D83D8ADB /* ExtensionReport.swift in Sources */,

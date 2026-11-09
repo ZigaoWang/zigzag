@@ -83,6 +83,9 @@ final class Tab: NSObject {
     var isPrivate: Bool { privateStore != nil }
     /// The profile its page is made in. There is one today.
     var profile: Profile { Profiles.shared.default }
+    /// Its profile's extensions. None for a private tab: as in Chrome, extensions stay out of private browsing.
+    @available(macOS 15.4, *)
+    var extensionHost: ExtensionHost? { isPrivate ? nil : profile.extensions }
     /// In a call (camera or microphone on, even muted) or floating in Picture in Picture: not to be put to sleep.
     var isInUse: Bool {
         guard let webView else { return false }
@@ -149,7 +152,7 @@ final class Tab: NSObject {
         if #available(macOS 15.4, *) {
             extensionToken = changed.observe { [weak self] change in
                 guard let self else { return }
-                ExtensionHost.shared.tabChanged(self, change)
+                ExtensionCenter.tabChanged(self, change)
             }
         }
     }
