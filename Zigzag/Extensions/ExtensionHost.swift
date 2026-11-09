@@ -99,6 +99,12 @@ final class ExtensionHost: NSObject {
 
     func context(for id: String) -> WKWebExtensionContext? { contexts.first { $0.uniqueIdentifier == id } }
 
+    /// The extension, loaded in this profile, that the page at this address is one of.
+    func context(forPage url: URL?) -> WKWebExtensionContext? {
+        guard let url, url.scheme == "webkit-extension" else { return nil }
+        return controller.extensionContext(for: url)
+    }
+
     /// Stops an extension: its buttons, scripts and background page go away.
     /// Whether an extension's popup is showing now (some APIs act while it's open, as in Chrome).
     func isPopupShown(for id: String) -> Bool {
@@ -1052,7 +1058,7 @@ extension Tab: WKWebExtensionTab {
 
     func loadURL(_ url: URL, for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         // Answered as done, not refused: Violentmonkey opens its page in a new tab when this one won't take it.
-        let tampermonkeyOn = ExtensionHost.shared.context(for: ExtensionShims.tampermonkeyID) != nil
+        let tampermonkeyOn = profile.extensions.context(for: ExtensionShims.tampermonkeyID) != nil
         if ExtensionShims.leavesInstallToTampermonkey(context.uniqueIdentifier, loading: url, tabURL: webView?.url ?? self.url,
                                                         tampermonkeyOn: tampermonkeyOn) {
             completionHandler(nil)

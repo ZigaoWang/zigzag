@@ -12,7 +12,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func newTab(_ sender: Any?) {
         if commandBar.isVisible && commandBar.mode == .newTab { commandBar.dismiss(); return }
         // An extension that replaces the new tab page (Momentum, say) gets a real tab, as in Chrome; ⌘L still searches.
-        if !tabManager.isPrivate, #available(macOS 15.4, *), let page = ExtensionHost.shared.newTabOverride() {
+        if #available(macOS 15.4, *), let page = tabManager.extensionHost?.newTabOverride() {
             tabManager.newTab(url: page)
             return
         }

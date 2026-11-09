@@ -102,6 +102,11 @@ final class TabManager {
 
     // MARK: Reading
 
+    /// The profile of the space you're in. There is one today.
+    var profile: Profile { Profiles.shared.default }
+    /// That profile's extensions; none in a private window, where extensions don't run.
+    @available(macOS 15.4, *)
+    var extensionHost: ExtensionHost? { isPrivate ? nil : profile.extensions }
     var currentSpace: SpaceInfo { Library.shared.space(currentSpaceID) ?? Library.shared.spaces[0] }
     var currentTabs: [Tab] { tabs(in: currentSpaceID) }
     func tabs(in spaceID: UUID) -> [Tab] { tabsBySpace[spaceID] ?? [] }

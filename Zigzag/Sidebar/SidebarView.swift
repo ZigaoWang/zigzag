@@ -383,10 +383,9 @@ final class AddressView: InteractiveView {
     /// The page's name as the address shows it: its site, or what a page with no site is (History, an extension's
     /// own page, a file). Empty for a blank page.
     static func name(of url: URL?) -> String {
-        if #available(macOS 15.4, *), let url, url.scheme == "webkit-extension",
-           let context = ExtensionHost.shared.contexts.first(where: { $0.baseURL.host() == url.host() }) {
+        if #available(macOS 15.4, *), let ext = ExtensionCenter.webExtension(ofPage: url) {
             // An extension's own page (its settings) is named after the extension, not its random address.
-            return context.webExtension.displayName ?? String(localized: "Extension", comment: "The address bar's name for an extension's own page, when the extension has no name.")
+            return ext.displayName ?? String(localized: "Extension", comment: "The address bar's name for an extension's own page, when the extension has no name.")
         } else if HistoryPage.isHistory(url) {
             return String(localized: "History", comment: "The address bar's name for Zigzag's History page.")
         } else if SettingsPage.isSettings(url) {

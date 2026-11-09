@@ -245,8 +245,8 @@ final class SitePanel: FloatingPanelView {
 
     private func buildExtensions() {
         // Extensions don't run in a private window, as in Chrome's incognito: none to show, nor to get here.
-        guard #available(macOS 15.4, *), !isPrivate else { return }
-        let items = ExtensionHost.shared.actions(for: tab)
+        guard #available(macOS 15.4, *), let host = tab.extensionHost else { return }
+        let items = host.actions(for: tab)
         extensionTiles = items.map { item in
             let tile = PanelTile(image: item.icon, symbol: "puzzlepiece.extension", caption: nil)
             tile.toolTip = item.attention != nil ? String(localized: "\(item.label): needs attention", comment: "Tooltip of an extension's button in the site panel when the extension asks for attention. The name is the extension's.") : item.label
@@ -258,7 +258,7 @@ final class SitePanel: FloatingPanelView {
             tile.badge = item.attention != nil ? "!" : item.badge
             tile.onClick = { [weak self] _ in
                 guard let self, let controller = self.controller else { return }
-                ExtensionHost.shared.performAction(item, tab: self.tab, in: controller)
+                host.performAction(item, tab: self.tab, in: controller)
             }
             tile.onRightClick = { [weak self] _ in self?.controller?.extensionMenu(for: item.context) }
             addSubview(tile)
@@ -351,7 +351,7 @@ final class SitePanel: FloatingPanelView {
             })
         }
         // Not in a private window, where extensions don't run (and its site would be kept in the list).
-        if #available(macOS 15.4, *), !isPrivate, !ExtensionHost.shared.contexts.isEmpty {
+        if #available(macOS 15.4, *), tab.extensionHost?.contexts.isEmpty == false {
             let off = ExtensionStore.extensionsOffSites.contains(site)
             rows.append(.toggle(String(localized: "Extensions", comment: "Row in the site panel's This Site group."), on: !off, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                 guard let self else { return }
