@@ -642,7 +642,7 @@ enum DebugBridge {
             debugLog("keychainprobe group=\(group) add=\(added) read=\(read) matches=\((out as? Data) == Data("not a password".utf8)) delete=\(deleted)")
         case "popupcatch":
             // Records the popup's errors from its first line on, then reloads it; read them with popupjs "__errors".
-            if #available(macOS 15.4, *), let webView = ExtensionHost.shared.lastAction?.popupWebView {
+            if #available(macOS 15.4, *), let webView = extensions(in: controller).lastAction?.popupWebView {
                 let source = "window.__errors = []; addEventListener('error', e => __errors.push(e.message + ' @' + (e.filename||'').split('/').pop() + ':' + e.lineno)); addEventListener('unhandledrejection', e => __errors.push('rejection: ' + (e.reason && (e.reason.message || e.reason))));"
                 webView.configuration.userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
                 webView.reload()
@@ -666,7 +666,7 @@ enum DebugBridge {
         case "back": controller.tabManager.selectedTab?.goBack()
         case "forward": controller.tabManager.selectedTab?.goForward()
         case "popupjs":
-            if #available(macOS 15.4, *), let webView = ExtensionHost.shared.lastAction?.popupWebView {
+            if #available(macOS 15.4, *), let webView = extensions(in: controller).lastAction?.popupWebView {
                 webView.evaluateJavaScript(arg) { result, error in
                     debugLog("popupjs => \(String(describing: result).prefix(2000)) \(String(describing: error))")
                 }
@@ -712,7 +712,7 @@ enum DebugBridge {
         case "popupjs":
             // Runs a script in the extension popup that's showing, to drive a real extension as you would.
             if #available(macOS 15.4, *) {
-                ExtensionHost.shared.lastAction?.popupWebView?.evaluateJavaScript(arg) { result, error in
+                extensions(in: controller).lastAction?.popupWebView?.evaluateJavaScript(arg) { result, error in
                     debugLog("popupjs => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
                 }
             }
@@ -1025,14 +1025,14 @@ enum DebugBridge {
         case "extclickpanel":
             // As if clicked in the site panel.
             if #available(macOS 15.4, *), SitePanel.shown != nil,
-               let item = ExtensionHost.shared.actions(for: controller.tabManager.selectedTab).first(where: { $0.id == arg }) {
-                ExtensionHost.shared.performAction(item, tab: controller.tabManager.selectedTab, in: controller)
+               let item = extensions(in: controller).actions(for: controller.tabManager.selectedTab).first(where: { $0.id == arg }) {
+                extensions(in: controller).performAction(item, tab: controller.tabManager.selectedTab, in: controller)
             }
         case "extclick":
             // extclick <extension id>: clicks its button, as from the site panel.
-            if #available(macOS 15.4, *), let item = ExtensionHost.shared.actions(for: controller.tabManager.selectedTab).first(where: { $0.id == arg }) {
+            if #available(macOS 15.4, *), let item = extensions(in: controller).actions(for: controller.tabManager.selectedTab).first(where: { $0.id == arg }) {
                 debugLog("extclick \(item.label) attention=\(item.attention != nil)")
-                ExtensionHost.shared.performAction(item, tab: controller.tabManager.selectedTab, in: controller)
+                extensions(in: controller).performAction(item, tab: controller.tabManager.selectedTab, in: controller)
             } else { debugLog("extclick: no action for \(arg)") }
         case "loadunpacked": Task { _ = await ExtensionStore.loadUnpacked(URL(fileURLWithPath: arg, isDirectory: true), in: controller.tabManager.profile) }
         case "extaccess":
@@ -1047,15 +1047,15 @@ enum DebugBridge {
             if f.count == 2 { var sites = ExtensionStore.extensionsOffSites; if f[1] == "on" { sites.insert(f[0]) } else { sites.remove(f[0]) }; ExtensionStore.extensionsOffSites = sites }
         case "extpopupstate":
             // extpopupstate <id> [script]: where its popup page is, even before WebKit asks to show it.
-            if #available(macOS 15.4, *), let item = ExtensionHost.shared.actions(for: controller.tabManager.selectedTab).first(where: { $0.id == String(arg.prefix { $0 != " " }) }),
+            if #available(macOS 15.4, *), let item = extensions(in: controller).actions(for: controller.tabManager.selectedTab).first(where: { $0.id == String(arg.prefix { $0 != " " }) }),
                let view = item.context.action(for: controller.tabManager.selectedTab)?.popupWebView {
                 let script = arg.contains(" ") ? String(arg.drop { $0 != " " }.dropFirst()) : "document.readyState"
                 debugLog("extpopupstate url=\(view.url?.absoluteString ?? "-") loading=\(view.isLoading) progress=\(view.estimatedProgress) size=\(view.frame.size)")
                 view.evaluateJavaScript(script) { result, error in debugLog("extpopupstate => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")") }
             } else { debugLog("extpopupstate: no popup page") }
         case "extpopup":
-            if let item = ExtensionHost.shared.actions(for: controller.tabManager.selectedTab).first(where: { $0.id == arg }) {
-                ExtensionHost.shared.performAction(item, tab: controller.tabManager.selectedTab, in: controller)
+            if let item = extensions(in: controller).actions(for: controller.tabManager.selectedTab).first(where: { $0.id == arg }) {
+                extensions(in: controller).performAction(item, tab: controller.tabManager.selectedTab, in: controller)
             }
         case "extapprove": Task { await ExtensionStore.approvePendingUpdate(arg) }
         case "extoff": controller.tabManager.profile.installs.setEnabled(arg, false)
@@ -1331,6 +1331,12 @@ enum DebugBridge {
     }
 
     @available(macOS 15.4, *)
+    /// The extensions a command means: those of the profile of the tab you're on.
+    @available(macOS 15.4, *)
+    private static func extensions(in controller: BrowserWindowController) -> ExtensionHost {
+        controller.tabManager.selectedTab?.extensionHost ?? controller.tabManager.profile.extensions
+    }
+
     static func extensionTest(_ id: String, page: URL, in controller: BrowserWindowController) async {
         var report: [String: Any] = ["id": id]
         let had = controller.tabManager.profile.installs.state(id) != nil
@@ -1338,10 +1344,10 @@ enum DebugBridge {
         if !had { report["install"] = String(describing: await ExtensionStore.install(id, in: controller.tabManager.profile)).prefix(160) }
         report["installSeconds"] = Int(Date().timeIntervalSince(started))
         for _ in 0..<60 {
-            if ExtensionHost.shared.contexts.contains(where: { $0.uniqueIdentifier == id }) { break }
+            if extensions(in: controller).contexts.contains(where: { $0.uniqueIdentifier == id }) { break }
             try? await Task.sleep(for: .milliseconds(250))
         }
-        let context = ExtensionHost.shared.contexts.first { $0.uniqueIdentifier == id }
+        let context = extensions(in: controller).contexts.first { $0.uniqueIdentifier == id }
         report["loaded"] = context != nil
         report["name"] = context?.webExtension.displayName ?? ""
         let tabsBefore = controller.tabManager.currentTabs.count
@@ -1353,23 +1359,23 @@ enum DebugBridge {
             try? await Task.sleep(for: .seconds(4))
             report["pageCPU"] = Int((cpuTime(pid) - a) / 4 * 100)
         }
-        let item = ExtensionHost.shared.actions(for: tab).first { $0.id == id }
+        let item = extensions(in: controller).actions(for: tab).first { $0.id == id }
         report["button"] = item != nil
         report["badge"] = item?.badge ?? ""
         report["needsAttention"] = item?.attention != nil
         if let item {
-            ExtensionHost.shared.lastAction = nil
+            extensions(in: controller).lastAction = nil
             let tabs = controller.tabManager.currentTabs.count
-            ExtensionHost.shared.performAction(item, tab: tab, in: controller)
+            extensions(in: controller).performAction(item, tab: tab, in: controller)
             try? await Task.sleep(for: .seconds(3))
-            let popup = ExtensionHost.shared.lastAction?.popupWebView
+            let popup = extensions(in: controller).lastAction?.popupWebView
             report["popup"] = popup != nil
             if let popup {
                 let text = try? await popup.evaluateJavaScript("(document.body && document.body.innerText || '').trim().length")
                 report["popupTextLength"] = (text as? Int) ?? 0
             }
             report["openedTab"] = controller.tabManager.currentTabs.count > tabs
-            ExtensionHost.shared.lastAction?.popupPopover?.close()
+            extensions(in: controller).lastAction?.popupPopover?.close()
         }
         debugLog("exttest " + ((try? String(data: JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]), encoding: .utf8)) ?? "?") ?? "?")
         while controller.tabManager.currentTabs.count > tabsBefore, let last = controller.tabManager.selectedTab { controller.tabManager.close(last) }

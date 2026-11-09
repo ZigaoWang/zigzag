@@ -15,9 +15,6 @@ enum ExtensionPopups {
 /// set up for you, so they work the way they do in other browsers.
 @available(macOS 15.4, *)
 final class ExtensionHost: NSObject {
-    /// The first profile's extensions, for code that doesn't yet say which profile it means.
-    static var shared: ExtensionHost { Profiles.shared.default.extensions }
-
     /// Whose extensions these are.
     unowned let profile: Profile
     let controller: WKWebExtensionController

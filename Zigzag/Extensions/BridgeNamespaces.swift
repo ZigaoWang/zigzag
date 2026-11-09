@@ -1119,7 +1119,6 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     }
 
     private func tellBusy(_ extensionID: String, holder: String, in controller: BrowserWindowController) {
-        let host = ExtensionHost.shared
         Toast.show(Self.busyText(host.displayName(for: extensionID), holder: host.displayName(for: holder)), symbol: "waveform", duration: 5, in: controller)
     }
 
@@ -1168,7 +1167,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
 
     /// Says where you're looking that the extension can't hear this tab, and why, instead of it seeming broken.
     private func tellUnreachable(_ extensionID: String, in controller: BrowserWindowController) {
-        Toast.show(String(localized: "\(ExtensionHost.shared.displayName(for: extensionID)) can’t hear this tab. Its sound is protected or can’t be reached.", comment: "Toast when an extension asks to hear a tab whose sound Zigzag can't hand it (protected video, or sound it can't reach). The placeholder is the extension's name."),
+        Toast.show(String(localized: "\(host.displayName(for: extensionID)) can’t hear this tab. Its sound is protected or can’t be reached.", comment: "Toast when an extension asks to hear a tab whose sound Zigzag can't hand it (protected video, or sound it can't reach). The placeholder is the extension's name."),
                    symbol: "waveform.slash", duration: 5, in: controller)
     }
 
@@ -1188,8 +1187,8 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     @discardableResult
     private func startShared(_ id: String) -> Bool {
         guard var tap = taps[id], let webView = tap.webView else { return false }
-        let name = ExtensionHost.shared.displayName(for: tap.extensionID)
-        let host = ExtensionHost.shared.context(for: tap.extensionID)?.baseURL.host()
+        let name = self.host.displayName(for: tap.extensionID)
+        let host = self.host.context(for: tap.extensionID)?.baseURL.host()
         let shared = SharedSoundCapture(SoundSource.all(capturing: webView, extensionHost: host), now: SystemAudioTap.now()) { [weak webView] receive in
             let chunks = SharedSoundChunks(send: receive)
             chunks.report = { peak in
@@ -1233,9 +1232,9 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         guard tap.origin != nil, SiteOrigin.of(webView.url) == tap.origin else { stop(id, because: "its tab went to another site"); return }
         guard (try? ensureReachable(tab, in: controller, by: tap.extensionID)) != nil else { stop(id, because: "it may no longer hear this site"); return }
         guard isListening(tap) else { stop(id, because: "it stopped listening"); return }
-        let name = ExtensionHost.shared.displayName(for: tap.extensionID)
+        let name = self.host.displayName(for: tap.extensionID)
         let now = SystemAudioTap.now()
-        let host = ExtensionHost.shared.context(for: tap.extensionID)?.baseURL.host()
+        let host = self.host.context(for: tap.extensionID)?.baseURL.host()
         let change = shared.update(SoundSource.all(capturing: webView, extensionHost: host), now: now)
         if let failure = shared.failure {
             ExtensionLog.write("tab capture for \(name): hearing WebKit's sound failed: \(failure)")
@@ -1285,7 +1284,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
             tap.script = Self.elementScript
             tap.switching = false
             self.taps[id] = tap
-            let name = ExtensionHost.shared.displayName(for: tap.extensionID)
+            let name = self.host.displayName(for: tap.extensionID)
             ExtensionLog.write("tab capture for \(name): the page's own audio is silent and streamed, so WebKit's sound, only while this tab is the one with sound")
             if !self.startShared(id), let controller = self.tab(tap.tabID)?.1 {
                 Toast.show(Self.pausedText(name), symbol: "pause.circle", duration: 3, in: controller)

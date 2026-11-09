@@ -123,8 +123,8 @@ struct ExtensionSecurityTests {
         #expect(hidden.title(for: context) == nil)
         #expect(hidden.webView(for: context) == nil)
         #expect(!hidden.shouldGrantPermissionsOnUserGesture(for: context))
-        #expect(ExtensionHost.shared.actions(for: hidden).isEmpty)
-        #expect(ExtensionHost.shared.menuItems(for: hidden).isEmpty)
+        #expect(Profiles.shared.default.extensions.actions(for: hidden).isEmpty)
+        #expect(Profiles.shared.default.extensions.menuItems(for: hidden).isEmpty)
     }
 
     @Test func captureIsOfTheTabYouUsedItOn() {
