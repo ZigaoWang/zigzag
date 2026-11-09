@@ -8342,17 +8342,6 @@
         }
       }
     },
-    "Passwords, bookmarks and history, from any browser on this Mac." : {
-      "comment" : "Subtitle of the Import window.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "来自这台 Mac 上任何浏览器的密码、书签和历史记录。"
-          }
-        }
-      }
-    },
     "Passwords, bookmarks and history. The other browser isn’t changed." : {
       "comment" : "Explanation under “Import from another browser” in Settings › General.",
       "localizations" : {
@@ -8371,6 +8360,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "密码、书签和历史记录。你原来的浏览器保持原样。"
+          }
+        }
+      }
+    },
+    "Passwords, bookmarks, history and extensions, from any browser on this Mac." : {
+      "comment" : "Subtitle of the Import window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自这台 Mac 上任何浏览器的密码、书签、历史记录和扩展。"
           }
         }
       }

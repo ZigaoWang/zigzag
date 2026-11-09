@@ -75,7 +75,7 @@ final class ImportView: NSView {
             banner.title = String(localized: "Bring your stuff over", comment: "Title of the Import window.")
             // Words only: the ribbon stays the app's icon, not a decoration on a form.
             banner.ribbonMark.isHidden = true
-            banner.subtitle = String(localized: "Passwords, bookmarks and history, from any browser on this Mac.", comment: "Subtitle of the Import window.")
+            banner.subtitle = String(localized: "Passwords, bookmarks, history and extensions, from any browser on this Mac.", comment: "Subtitle of the Import window.")
             addSubview(banner)
         }
         subtitle.font = Tokens.Font.body()
