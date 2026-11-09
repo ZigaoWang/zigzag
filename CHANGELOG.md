@@ -7,6 +7,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [0.7.5] - 2026-11-09
 
+### New
+- Settings has its own sections for Appearance, Tabs, Search and Zigzag Mini, so General keeps just the basics.
+
 ### Fixed
 - ← and → no longer play the error sound on pages that use them themselves, like seeking on YouTube.
 
