@@ -2296,6 +2296,17 @@
         }
       }
     },
+    "AutoFill" : {
+      "comment" : "A heading in Settings › Passwords: when Zigzag offers to save and fill passwords and forms.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动填充"
+          }
+        }
+      }
+    },
     "Automatic" : {
       "comment" : "A choice for “Favorites per row” in Settings › Appearance: as many as fit the sidebar's width.",
       "localizations" : {
@@ -2690,17 +2701,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "Browsing Data" : {
-      "comment" : "A heading in Settings › Privacy.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "浏览数据"
           }
         }
       }
@@ -3130,6 +3130,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除"
+          }
+        }
+      }
+    },
+    "Clear Browsing Data" : {
+      "comment" : "A heading in Settings › Privacy: buttons that clear history, cache and cookies.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除浏览数据"
           }
         }
       }
@@ -4515,7 +4526,7 @@
       }
     },
     "Downloads" : {
-      "comment" : "A heading in Settings › General.\nFeature name in the list of things an extension uses that won’t work in Zigzag.\nTitle of the downloads panel.\nTooltip of the floating downloads button, shown while the sidebar is hidden.\nTooltip of the sidebar's downloads button.\nWindow menu item.",
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.\nTitle of the downloads panel.\nTooltip of the floating downloads button, shown while the sidebar is hidden.\nTooltip of the sidebar's downloads button.\nWindow menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10674,13 +10685,13 @@
         }
       }
     },
-    "Site Data" : {
-      "comment" : "A heading in Settings › Privacy: what each site keeps on this Mac.",
+    "Site Permissions" : {
+      "comment" : "A heading in Settings › Privacy: camera, location, pop-ups and other choices made for single sites.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "各网站的数据"
+            "value" : "网站权限"
           }
         }
       }
@@ -10692,17 +10703,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 的网站设置"
-          }
-        }
-      }
-    },
-    "Sites" : {
-      "comment" : "A heading in Settings › Privacy: choices made for single sites.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "各网站的设置"
           }
         }
       }
@@ -11127,6 +11127,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "停止朗读"
+          }
+        }
+      }
+    },
+    "Stored by Websites" : {
+      "comment" : "A heading in Settings › Privacy: what each site keeps on this Mac, with a Remove button each.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站存储的数据"
           }
         }
       }
@@ -12616,6 +12627,17 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Updates" : {
+      "comment" : "A heading in Settings › General: Zigzag's version and how it updates.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
           }
         }
       }

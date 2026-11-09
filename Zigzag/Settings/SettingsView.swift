@@ -515,9 +515,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let generalGroup = FormGroup()
     private let tabsGroup = FormGroup()
     private let searchGroup = FormGroup()
-    private let downloadsGroup = FormGroup()
     private let blockingGroup = FormGroup()
-    private let importGroup = FormGroup()
     private let spacesGroup = FormGroup()
     private let appearanceGroup = FormGroup()
     private let miniGroup = FormGroup()
@@ -673,20 +671,20 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                                     comment: "Explanation under “Language” in Settings › General."),
                                      control: languagePicker))
         }
+        downloadPlace.onSelect = { index in DownloadPlace.pick(index) }
+        downloadPlaceToken = DownloadPlace.changed.observe { [weak self] in self?.refreshDownloadPlace() }
+        generalGroup.add(FormRow(title: String(localized: "Save downloads to", comment: "A setting in Settings › General."),
+                                 detail: String(localized: "Or have Zigzag ask where, each time.", comment: "Explanation under “Save downloads to” in Settings › General."),
+                                 control: downloadPlace))
+        let importButton = PillButton(title: String(localized: "Import…", comment: "Button in Settings › General that opens the Import window."))
+        importButton.onClick = { _ in ImportWindowController.show() }
+        generalGroup.add(FormRow(title: String(localized: "Import from another browser", comment: "A setting in Settings › General."),
+                                 detail: String(localized: "Passwords, bookmarks and history. The other browser isn’t changed.", comment: "Explanation under “Import from another browser” in Settings › General."),
+                                 control: importButton))
         quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
         generalGroup.add(FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
                                  detail: String(localized: "So ⌘Q never closes everything by accident.", comment: "Explanation under “Ask before quitting” in Settings › General."),
                                  control: quitToggle))
-        downloadPlace.onSelect = { index in DownloadPlace.pick(index) }
-        downloadPlaceToken = DownloadPlace.changed.observe { [weak self] in self?.refreshDownloadPlace() }
-        downloadsGroup.add(FormRow(title: String(localized: "Save downloads to", comment: "A setting in Settings › General."),
-                                   detail: String(localized: "Or have Zigzag ask where, each time.", comment: "Explanation under “Save downloads to” in Settings › General."),
-                                   control: downloadPlace))
-        let importButton = PillButton(title: String(localized: "Import…", comment: "Button in Settings › General that opens the Import window."))
-        importButton.onClick = { _ in ImportWindowController.show() }
-        importGroup.add(FormRow(title: String(localized: "Import from another browser", comment: "A setting in Settings › General."),
-                                detail: String(localized: "Passwords, bookmarks and history. The other browser isn’t changed.", comment: "Explanation under “Import from another browser” in Settings › General."),
-                                control: importButton))
 
         // Appearance
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
@@ -1277,12 +1275,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     // The groups' headings, each said once for the page and its search.
-    private static var downloadsHeading: String { String(localized: "Downloads", comment: "A heading in Settings › General.") }
+    private static var updatesHeading: String { String(localized: "Updates", comment: "A heading in Settings › General: Zigzag's version and how it updates.") }
     private static var spacesHeading: String { String(localized: "Your Spaces", comment: "A heading in Settings › Spaces.") }
-    private static var browsingDataHeading: String { String(localized: "Browsing Data", comment: "A heading in Settings › Privacy.") }
-    private static var siteDataHeading: String { String(localized: "Site Data", comment: "A heading in Settings › Privacy: what each site keeps on this Mac.") }
-    private static var sitesHeading: String { String(localized: "Sites", comment: "A heading in Settings › Privacy: choices made for single sites.") }
+    private static var browsingDataHeading: String { String(localized: "Clear Browsing Data", comment: "A heading in Settings › Privacy: buttons that clear history, cache and cookies.") }
+    private static var siteDataHeading: String { String(localized: "Stored by Websites", comment: "A heading in Settings › Privacy: what each site keeps on this Mac, with a Remove button each.") }
+    private static var sitesHeading: String { String(localized: "Site Permissions", comment: "A heading in Settings › Privacy: camera, location, pop-ups and other choices made for single sites.") }
     private static var alwaysTranslateHeading: String { String(localized: "Always Translate", comment: "A heading in Settings › Translation.") }
+    private static var fillingHeading: String { String(localized: "AutoFill", comment: "A heading in Settings › Passwords: when Zigzag offers to save and fill passwords and forms.") }
     private static var installedHeading: String { String(localized: "Installed", comment: "A heading in Settings › Extensions: the extensions you have.") }
     /// What a button says for a moment once it has cleared something.
     private static var cleared: String { String(localized: "Cleared", comment: "Shown on a Clear button in Settings › Privacy for a moment after it clears.") }
@@ -1309,14 +1308,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Each section's groups and their headings, as a search goes through them.
     private func groups(of pane: SettingsPane) -> [(title: String?, group: FormGroup)] {
         switch pane {
-        case .general: [(nil, generalGroup), (Self.downloadsHeading, downloadsGroup), (nil, importGroup), (nil, versionGroup)]
+        case .general: [(nil, generalGroup), (Self.updatesHeading, versionGroup)]
         case .appearance: [(nil, appearanceGroup)]
         case .tabs: [(nil, tabsGroup)]
         case .search: [(nil, searchGroup)]
         case .mini: [(nil, miniGroup)]
         case .spaces: [(Self.spacesHeading, spacesGroup)]
-        case .passwords: [(nil, passwordsGroup), (nil, passwordsWindowGroup)]
-        case .privacy: [(nil, blockingGroup), (Self.browsingDataHeading, privacyGroup), (Self.siteDataHeading, siteDataGroup), (Self.sitesHeading, sitesGroup)]
+        case .passwords: [(nil, passwordsWindowGroup), (Self.fillingHeading, passwordsGroup)]
+        case .privacy: [(nil, blockingGroup), (Self.sitesHeading, sitesGroup), (Self.browsingDataHeading, privacyGroup), (Self.siteDataHeading, siteDataGroup)]
         case .translation: [(nil, translationGroup), (Self.alwaysTranslateHeading, alwaysGroup)]
         case .extensions: [(Self.installedHeading, extensionsGroup), (nil, developerGroup)]
         case .shortcuts: shortcutGroups.map { ($0.0, $0.1) }
@@ -1403,13 +1402,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 y = hint.frame.maxY + Tokens.Page.groupGap
             }
         case .passwords:
-            section(nil, passwordsGroup)
             section(nil, passwordsWindowGroup)
+            section(Self.fillingHeading, passwordsGroup)
         case .privacy:
             section(nil, blockingGroup)
+            section(Self.sitesHeading, sitesGroup, accessory: sitesReset)
             section(Self.browsingDataHeading, privacyGroup)
             section(Self.siteDataHeading, siteDataGroup)
-            section(Self.sitesHeading, sitesGroup, accessory: sitesReset)
         case .translation:
             section(nil, translationGroup)
             section(Self.alwaysTranslateHeading, alwaysGroup, accessory: alwaysReset)
