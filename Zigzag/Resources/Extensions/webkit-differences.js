@@ -409,6 +409,48 @@
       if (has) setMember(['runtime', 'onInstalled'], 'hasListener', (listener) => has(guarded.get(listener) || listener));
     }
 
+    // Content scripts an extension registers: WebKit refuses file: match patterns, and one it refuses loses the whole
+    // registration, so Rabby's provider reached no site at all for the file://*/* beside its http and https. Asked as
+    // written first, so nothing is lost on a WebKit that takes them. If that fails for any reason it's asked once more
+    // without them, and if that fails too the extension hears the first answer. WebKit's words aren't relied on.
+    if (api.scripting && typeof api.scripting.registerContentScripts === 'function') {
+      const patternKeys = ['matches', 'excludeMatches'];
+      const isFile = (pattern) => String(pattern).startsWith('file:');
+      const namesFiles = (script) => script && typeof script === 'object' && patternKeys.some((key) => Array.isArray(script[key]) && script[key].some(isFile));
+      const withoutFiles = (script) => {
+        if (!namesFiles(script)) return script;
+        const copy = { ...script };
+        for (const key of patternKeys) { if (Array.isArray(copy[key])) copy[key] = copy[key].filter((pattern) => !isFile(pattern)); }
+        return copy;
+      };
+      const stillMatches = (script) => !script || typeof script !== 'object' || !Array.isArray(script.matches) || script.matches.length > 0;
+      const note = (name) => {
+        try { const sent = api.runtime.sendNativeMessage('zigzag.diagnostics', { where: 'scripting', kind: 'note', text: `${name}: registered without its file: patterns` }); if (sent && sent.catch) sent.catch(() => {}); } catch (e) {}
+      };
+      for (const name of ['registerContentScripts', 'updateContentScripts']) {
+        if (typeof api.scripting[name] !== 'function') continue;
+        const original = api.scripting[name].bind(api.scripting);
+        setMember(['scripting'], name, (scripts, ...rest) => {
+          if (!Array.isArray(scripts) || !scripts.some(namesFiles)) return original(scripts, ...rest);
+          const kept = scripts.map(withoutFiles).filter(stillMatches);
+          const callback = rest.find((argument) => typeof argument === 'function');
+          const asked = new Promise((resolve) => resolve(original(scripts)));
+          if (callback) {
+            // The last try keeps the callback, so a failure reaches it through runtime.lastError as usual.
+            asked.then(() => callback(), () => {
+              if (!kept.length) { original(scripts, callback); return; }
+              original(kept, (...results) => { if (!api.runtime.lastError) note(name); callback(...results); });
+            });
+            return undefined;
+          }
+          return asked.catch((error) => {
+            if (!kept.length) throw error;
+            return Promise.resolve(original(kept)).then((result) => { note(name); return result; }, () => { throw error; });
+          });
+        });
+      }
+    }
+
     // Ports into a service worker background: WebKit unloads such a background 30 seconds after the last event it
     // was sent, even while a page or content script is talking to it over a port (it means to keep it for open ports,
     // but doesn't count a worker's), and doesn't tell the other end, whose port goes quiet for good. Chrome keeps a
