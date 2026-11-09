@@ -158,6 +158,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         })
         if #available(macOS 15.4, *) {
             tokens.append(ExtensionHost.shared.changed.observe { [weak self] in self?.refreshExtensionActions() })
+            tokens.append(ExtensionHost.shared.popupsChanged.observe { [weak self] in self?.refreshExtensionActions() })
         }
 
         // Fading is slow; checking once a minute is plenty.
@@ -890,8 +891,29 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Always there, even on a new tab: it's also where your extensions live.
         _ = tab?.url
         var attention = false
-        if #available(macOS 15.4, *) { attention = ExtensionHost.shared.actions(for: tab).contains { $0.attention != nil } }
+        var pins: [AddressView.Pin] = []
+        var animated = false
+        if #available(macOS 15.4, *) {
+            let host = ExtensionHost.shared
+            attention = host.needsAttention(for: tab)
+            // Extensions don't run in a private window.
+            if !tabManager.isPrivate { pins = host.pinnedActions(for: tab).map(addressPin) }
+            animated = host.finishedLoading
+        }
         sidebar.address.setSiteControls(needsAttention: attention)
+        sidebar.address.setPins(pins, animated: animated)
+    }
+
+    @available(macOS 15.4, *)
+    private func addressPin(for item: ExtensionHost.ActionItem) -> AddressView.Pin {
+        let host = ExtensionHost.shared
+        return AddressView.Pin(id: item.id, image: item.icon, label: item.label, badge: item.badge, needsAttention: item.attention != nil,
+                               isActive: host.isPopupOnScreen(item.id, in: window),
+                               action: { [weak self] button in
+            guard let self else { return }
+            if let press = button.currentPress, host.popupClosed(item.id, in: self.window, since: press) { return }
+            host.performAction(item, tab: self.tabManager.selectedTab, in: self, fromPin: true)
+        }, menu: { [weak self] in self?.extensionMenu(for: item.context) })
     }
 
     var isShowingReader: Bool { reader != nil }
@@ -908,6 +930,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return menu
     }
 
+    private func addPinItems(to menu: NSMenu, id: String) {
+        let pinned = ExtensionStore.pins.contains(id)
+        let item = SidebarMenus.Item(pinned ? SitePanel.unpinTitle : SitePanel.pinTitle, symbol: pinned ? "pin.slash" : "pin") { ExtensionStore.togglePin(id) }
+        if !pinned, !ExtensionStore.canPin(id) {
+            item.isEnabled = false
+            item.toolTip = SitePanel.pinLimitTip
+        }
+        menu.addItem(item)
+    }
+
     @available(macOS 15.4, *)
     func extensionMenu(for context: WKWebExtensionContext, footer: Bool = true) -> NSMenu {
         let menu = NSMenu()
@@ -922,6 +954,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             })
         }
         menu.addItem(siteAccessItem(for: id))
+        addPinItems(to: menu, id: id)
         menu.addItem(SidebarMenus.Item(String(localized: "Turn Off", comment: "Item in an extension's menu: turns the extension off."), symbol: "pause.circle") { ExtensionStore.setEnabled(id, false) })
         menu.addItem(SidebarMenus.Item(String(localized: "Remove from Zigzag…", comment: "Item in an extension's menu: removes the extension."), symbol: "trash") { [weak self] in
             guard let self else { return }

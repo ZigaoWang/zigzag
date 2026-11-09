@@ -68,7 +68,11 @@ final class ExtensionHost: NSObject {
                 changed.send()
             }
         }
+        finishedLoading = true
     }
+
+    /// Everything installed has been loaded since launch: from here on a pin appearing is something happening.
+    private(set) var finishedLoading = false
 
     func context(for id: String) -> WKWebExtensionContext? { contexts.first { $0.uniqueIdentifier == id } }
 
@@ -358,11 +362,27 @@ final class ExtensionHost: NSObject {
     /// None for a private tab: as in Chrome's incognito, extensions don't run there, so they can't be clicked there.
     func actions(for tab: Tab?) -> [ActionItem] {
         guard tab?.isPrivate != true else { return [] }
-        return contexts.compactMap { context in
-            guard let action = context.action(for: tab) else { return nil }
-            return ActionItem(context: context, icon: action.icon(for: NSSize(width: 32, height: 32)), label: action.label,
-                              badge: action.badgeText, attention: attention[context.uniqueIdentifier])
+        return contexts.compactMap { actionItem($0, for: tab) }
+    }
+
+    /// The extensions with a button in the address, left to right. Only their icons are drawn.
+    func pinnedActions(for tab: Tab?) -> [ActionItem] {
+        guard tab?.isPrivate != true else { return [] }
+        return ExtensionStore.pins.shown(among: Set(contexts.map(\.uniqueIdentifier))).compactMap { id in
+            context(for: id).flatMap { actionItem($0, for: tab) }
         }
+    }
+
+    /// Whether an extension with a button here can't work until the person does something.
+    func needsAttention(for tab: Tab?) -> Bool {
+        guard tab?.isPrivate != true else { return false }
+        return contexts.contains { attention[$0.uniqueIdentifier] != nil && $0.action(for: tab) != nil }
+    }
+
+    private func actionItem(_ context: WKWebExtensionContext, for tab: Tab?) -> ActionItem? {
+        guard let action = context.action(for: tab) else { return nil }
+        return ActionItem(context: context, icon: action.icon(for: NSSize(width: 32, height: 32)), label: action.label,
+                          badge: action.badgeText, attention: attention[context.uniqueIdentifier])
     }
 
     /// Extension items for a page's right-click menu; none in a private tab.
@@ -391,6 +411,7 @@ final class ExtensionHost: NSObject {
         weak var controller: BrowserWindowController?
     }
     private var popupRequest: PopupRequest?
+    private var actionUpdatePending = false
     private static var toldAboutVerification = false
     private var popupShownAt: Date?
     static let log = Logger(subsystem: "wang.zigao.zigzag", category: "extensions")
@@ -831,7 +852,13 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, didUpdate action: WKWebExtension.Action, forExtensionContext context: WKWebExtensionContext) {
-        changed.send()
+        // A busy extension updates its badge many times at once: every window draws that once.
+        guard !actionUpdatePending else { return }
+        actionUpdatePending = true
+        DispatchQueue.main.async { [weak self] in
+            self?.actionUpdatePending = false
+            self?.changed.send()
+        }
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, presentActionPopup action: WKWebExtension.Action,

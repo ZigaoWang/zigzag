@@ -35,6 +35,9 @@ final class SitePanel: FloatingPanelView {
     private var actionTiles: [PanelTile] = []
     private let extensionsLabel = Label.section(String(localized: "Extensions", comment: "Section label over the extensions' buttons in the site panel."))
     private var extensionTiles: [PanelTile] = []
+    /// The pin on each extension's tile, beside the tile rather than in it, as it reaches past the tile's corner.
+    private var hoverPins: [(id: String, label: String, value: String?, tile: PanelTile, pin: HoverPin)] = []
+    private var extensionsToken: SignalToken?
     private let siteLabel = Label.section(String(localized: "This Site", comment: "Section label over the site's settings in the site panel."))
     private var rows: [PanelRow] = []
     private let group = PanelGroup()
@@ -43,6 +46,9 @@ final class SitePanel: FloatingPanelView {
     /// How a plain http page is marked, here and in the address bar: one symbol and one wording.
     static let notSecure = String(localized: "Not secure", comment: "How a page loaded over plain http is marked, in the site panel and the address bar's tooltip.")
     static let notSecureSymbol = "lock.open.fill"
+    static let pinTitle = String(localized: "Pin to Address", comment: "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: gives the extension a button in the address bar.")
+    static let unpinTitle = String(localized: "Unpin from Address", comment: "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: takes the extension's button out of the address bar.")
+    static var pinLimitTip: String { String(localized: "At most \(Tokens.Sidebar.maxPins) pins. Unpin one first.", comment: "Tooltip of the pin on an extension's tile, and of the disabled menu item, when the most extensions that can be pinned already are. The number is that limit.") }
     static let minimumWidth: CGFloat = 256
     private var width: CGFloat = SitePanel.width
     private var pad: CGFloat { width < Self.width ? Tokens.Space.x3 : Tokens.Space.x4 }
@@ -132,6 +138,7 @@ final class SitePanel: FloatingPanelView {
             panel.growsFrom = CGPoint(x: 0.5, y: 0)
         }
         panel.present(arrival: .pop)
+        controller.sidebar.address.siteControlsButton.isSelected = true
         current = panel
         panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
             // Only its own window: keys and clicks in Settings or another window are theirs. A menu open over it
@@ -150,6 +157,8 @@ final class SitePanel: FloatingPanelView {
 
     func close() {
         pageToken = nil
+        extensionsToken = nil
+        controller?.sidebar.address.siteControlsButton.isSelected = false
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         if Self.current === self { Self.current = nil }
@@ -236,7 +245,7 @@ final class SitePanel: FloatingPanelView {
             tile.toolTip = item.attention != nil ? String(localized: "\(item.label): needs attention", comment: "Tooltip of an extension's button in the site panel when the extension asks for attention. The name is the extension's.") : item.label
             // VoiceOver reads the extension's name, then what its badge says.
             tile.setAccessibilityLabel(item.label)
-            tile.setAccessibilityValue(item.attention != nil ? String(localized: "Needs attention", comment: "VoiceOver value of an extension's button in the site panel when the extension asks for attention.") : item.badge.isEmpty ? nil : item.badge)
+            let value = item.attention != nil ? String(localized: "Needs attention", comment: "VoiceOver value of an extension's button in the site panel when the extension asks for attention.") : item.badge.isEmpty ? nil : item.badge
             // Attention first: the badge takes its look from it.
             tile.isAttention = item.attention != nil
             tile.badge = item.attention != nil ? "!" : item.badge
@@ -246,6 +255,7 @@ final class SitePanel: FloatingPanelView {
             }
             tile.onRightClick = { [weak self] _ in self?.controller?.extensionMenu(for: item.context) }
             addSubview(tile)
+            hoverPins.append((item.id, item.label, value, tile, HoverPin()))
             return tile
         }
         let add = PanelTile(symbol: "plus", caption: nil)
@@ -258,6 +268,43 @@ final class SitePanel: FloatingPanelView {
         addSubview(add)
         extensionTiles.append(add)
         addSubview(extensionsLabel)
+        // Over every tile, so a neighbor is never drawn on top.
+        for entry in hoverPins {
+            addSubview(entry.pin)
+            wireHoverPin(entry.tile, entry.pin, id: entry.id)
+        }
+        refreshHoverPins()
+        extensionsToken = ExtensionHost.shared.changed.observe { [weak self] in self?.refreshHoverPins() }
+    }
+
+    private func wireHoverPin(_ tile: PanelTile, _ pin: HoverPin, id: String) {
+        pin.onClick = { _ in ExtensionStore.togglePin(id) }
+        // The pointer on the tile or on the pin, which reaches past the tile; or the keyboard on the tile.
+        let update: (Bool) -> Void = { [weak tile, weak pin] _ in
+            guard let tile, let pin else { return }
+            pin.setShowing(tile.isHovered || tile.hasKeyboardFocus || (pin.isShowing && pin.isHovered))
+        }
+        tile.hoverChanged = update
+        tile.keyboardFocusChanged = update
+        pin.hoverChanged = update
+    }
+
+    /// What each pin says now. Runs on every change, from here or another window, so the limit is always the truth.
+    private func refreshHoverPins() {
+        let pins = ExtensionStore.pins
+        for entry in hoverPins {
+            let pinned = pins.contains(entry.id)
+            let id = entry.id
+            entry.pin.state = pinned ? .pinned : ExtensionStore.canPin(id) ? .unpinned : .atLimit
+            let state = pinned ? String(localized: "Pinned", comment: "VoiceOver value of an extension's button in the site panel when it's pinned to the address bar.") : nil
+            entry.tile.setAccessibilityValue([entry.value, state].compactMap { $0 }.joined(separator: ", "))
+            entry.tile.setAccessibilityCustomActions(entry.pin.state == .atLimit ? nil : [
+                NSAccessibilityCustomAction(name: pinned ? Self.unpinTitle : Self.pinTitle) {
+                    MainActor.assumeIsolated { ExtensionStore.togglePin(id) }
+                    return true
+                },
+            ])
+        }
     }
 
     // What the rows of This Site say they're set to, and the button that forgets an answer.
@@ -473,7 +520,87 @@ final class SitePanel: FloatingPanelView {
         } else {
             y -= Tokens.Space.x5
         }
+        if !dryRun {
+            let side = Tokens.Sidebar.hoverPin, overhang = Tokens.Sidebar.hoverPinOverhang
+            for entry in hoverPins {
+                entry.pin.frame = NSRect(x: entry.tile.frame.maxX - side + overhang, y: entry.tile.frame.minY - overhang, width: side, height: side)
+            }
+        }
         return y + pad
+    }
+}
+
+/// The round pin on an extension's tile while the pointer or keyboard is on it: one click pins or unpins. The tile
+/// stays one thing to the keyboard and VoiceOver, which reach pinning through the tile's menu and actions.
+final class HoverPin: InteractiveView {
+    enum State { case unpinned, pinned, atLimit }
+
+    private let icon = NSImageView()
+    private(set) var isShowing = false
+    var state = State.unpinned {
+        didSet {
+            guard state != oldValue else { return }
+            toolTipForState()
+            stateDidChange(animated: window != nil)
+        }
+    }
+
+    init() {
+        let side = Tokens.Sidebar.hoverPin
+        super.init(frame: NSRect(x: 0, y: 0, width: side, height: side))
+        pressScales = true
+        isHidden = true
+        alphaValue = 0
+        layer?.cornerRadius = side / 2
+        icon.image = Tokens.Symbol.image("pin.fill", size: Tokens.Symbol.inline)
+        icon.imageScaling = .scaleNone
+        icon.frame = bounds
+        addSubview(icon)
+        setAccessibilityElement(false)
+        toolTipForState()
+        stateDidChange(animated: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var acceptsFirstResponder: Bool { false }
+
+    private func toolTipForState() {
+        toolTip = state == .pinned ? SitePanel.unpinTitle : state == .atLimit ? SitePanel.pinLimitTip : SitePanel.pinTitle
+    }
+
+    /// Fades in, growing from `Motion.glyphFrom`, and fades out; from the keyboard it's simply there.
+    func setShowing(_ showing: Bool) {
+        guard showing != isShowing else { return }
+        isShowing = showing
+        if showing {
+            isHidden = false
+            // A pointer already over it, when the tile brought it up, gets no "entered".
+            if let window { isHovered = bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)) }
+        }
+        Tokens.Motion.animate(Tokens.Motion.feedback, { self.animator().alphaValue = showing ? 1 : 0 }, completion: { [weak self] in
+            guard let self, !self.isShowing else { return }
+            self.isHidden = true
+        })
+        guard showing, !Tokens.Motion.isFromKey, !Tokens.Motion.reduceMotion, let layer else { return }
+        Tokens.Motion.animateTransform(of: layer, from: Tokens.Motion.scale(Tokens.Motion.glyphFrom, of: layer), to: CATransform3DIdentity,
+                                       duration: Tokens.Motion.menuIn, forKey: "appear")
+    }
+
+    override func stateDidChange(animated: Bool) {
+        guard let layer else { return }
+        let theme = Brand.Theme.for(self)
+        let pinned = state == .pinned
+        layer.set(backgroundColor: cgColor(pinned ? theme.accent : Tokens.Color.panelBackground), animated: animated, duration: Tokens.Motion.menuIn)
+        Tokens.Motion.withoutAnimation {
+            layer.borderWidth = pinned ? 0 : Tokens.Metric.hairline
+            layer.borderColor = cgColor(Tokens.Color.separator)
+            layer.shadowColor = cgColor(Tokens.Color.liftShadow)
+            layer.shadowRadius = Tokens.Shadow.liftRadius
+            layer.shadowOffset = CGSize(width: 0, height: Tokens.Shadow.liftDrop)
+            layer.shadowOpacity = state == .atLimit ? 0 : 1
+        }
+        icon.contentTintColor = pinned ? theme.onAccent : state == .atLimit ? Tokens.Color.textTertiary : isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
     }
 }
 

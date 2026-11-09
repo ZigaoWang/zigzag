@@ -2241,6 +2241,17 @@
         }
       }
     },
+    "At most %lld pins. Unpin one first." : {
+      "comment" : "Tooltip of the pin on an extension's tile, and of the disabled menu item, when the most extensions that can be pinned already are. The number is that limit.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最多可固定 %lld 个。请先取消固定一个。"
+          }
+        }
+      }
+    },
     "At the Bottom" : {
       "comment" : "A choice for “New tabs open” in Settings › Tabs: below the other tabs.",
       "localizations" : {
@@ -8391,6 +8402,17 @@
         }
       }
     },
+    "Pin to Address" : {
+      "comment" : "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: gives the extension a button in the address bar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定到地址栏"
+          }
+        }
+      }
+    },
     "Pinch to see all tabs" : {
       "comment" : "A setting in Settings › Tabs: whether pinching in on the trackpad opens the tab overview.",
       "localizations" : {
@@ -8425,7 +8447,7 @@
       }
     },
     "Pinned" : {
-      "comment" : "Said once a step is done in the getting-started guide, a card in the window.\nToast after a tab is pinned.",
+      "comment" : "Said once a step is done in the getting-started guide, a card in the window.\nToast after a tab is pinned.\nVoiceOver value of an extension's button in the site panel when it's pinned to the address bar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12517,6 +12539,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消固定标签页"
+          }
+        }
+      }
+    },
+    "Unpin from Address" : {
+      "comment" : "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: takes the extension's button out of the address bar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从地址栏取消固定"
           }
         }
       }
