@@ -19,6 +19,14 @@ final class PageDialogSheet: NSView {
         case blocked
     }
 
+    /// Saved passwords a sign-in sheet offers, behind a quiet button: picking one fills the fields with what `fill`
+    /// gives (nil leaves them as they are).
+    struct SavedLogins {
+        let logins: [Credential]
+        let origin: Origin
+        let fill: (Credential) async -> [String]?
+    }
+
     private let panel = FloatingPanelView()
     private let header: DialogHeader
     private let body: NSTextField
@@ -27,6 +35,9 @@ final class PageDialogSheet: NSView {
     private let confirm: PillButton
     private let cancel = PillButton(title: String(localized: "Cancel", comment: "Button in a page's JavaScript dialog sheet."), style: .plain)
     private let block = PillButton(title: String(localized: "Block Dialogs", comment: "Button in a page's JavaScript dialog sheet, once it has shown a second dialog."), style: .quiet)
+    private let saved = PillButton(title: String(localized: "Saved Passwords", comment: "Button in a site's HTTP sign-in sheet: lists the passwords saved for the site, to fill one in."), style: .quiet)
+    private var savedLogins: SavedLogins?
+    private var savedMenu: AutofillMenu?
     /// Says which question it answers, so another way of answering it (an extension) can close it.
     private var answers: String?
     private var monitor: Any?
@@ -43,7 +54,7 @@ final class PageDialogSheet: NSView {
     private let pad = Tokens.Dialog.padding
 
     private init(title: String, message: String, fields: [Field], confirmTitle: String, showsCancel: Bool, offersBlock: Bool,
-                 completion: @escaping (Result) -> Void) {
+                 savedLogins: SavedLogins?, completion: @escaping (Result) -> Void) {
         header = DialogHeader(title: title)
         body = NSTextField(wrappingLabelWithString: message)
         confirm = PillButton(title: confirmTitle, style: .prominent)
@@ -66,6 +77,10 @@ final class PageDialogSheet: NSView {
         if offersBlock {
             block.toolTip = String(localized: "Don’t let this page show more dialogs", comment: "Tooltip of Block Dialogs in a page's JavaScript dialog sheet.")
             buttons.leading = [block]
+        } else if let savedLogins, !savedLogins.logins.isEmpty {
+            self.savedLogins = savedLogins
+            buttons.leading = [saved]
+            saved.onClick = { [weak self] _ in self?.toggleSavedMenu() }
         }
         confirm.onClick = { [weak self] _ in self?.finish(.confirmed(self?.inputs.map(\.stringValue) ?? [])) }
         cancel.onClick = { [weak self] _ in self?.finish(.cancelled) }
@@ -80,7 +95,7 @@ final class PageDialogSheet: NSView {
 
     @MainActor
     static func ask(in window: NSWindow, title: String, message: String, fields: [Field] = [], confirmTitle: String = String(localized: "OK", comment: "Button that answers a page's JavaScript dialog sheet."),
-                    showsCancel: Bool, offersBlock: Bool, page: WKWebView? = nil, tag: String? = nil) async -> Result {
+                    showsCancel: Bool, offersBlock: Bool, page: WKWebView? = nil, savedLogins: SavedLogins? = nil, tag: String? = nil) async -> Result {
         // Over the page that asked, so it stays with its tab; a dialog without a page covers the window.
         guard let host = page ?? window.contentView else { return .cancelled }
         // One at a time on a page: a second question (two sign-ins at once) waits for the first, never stacks on it.
@@ -89,7 +104,7 @@ final class PageDialogSheet: NSView {
         let task = Task { @MainActor in
             _ = await before?.value
             return await present(in: window, host: host, title: title, message: message, fields: fields, confirmTitle: confirmTitle,
-                                 showsCancel: showsCancel, offersBlock: offersBlock, page: page, tag: tag)
+                                 showsCancel: showsCancel, offersBlock: offersBlock, page: page, savedLogins: savedLogins, tag: tag)
         }
         queue[key] = task
         let result = await task.value
@@ -101,10 +116,10 @@ final class PageDialogSheet: NSView {
 
     @MainActor
     private static func present(in window: NSWindow, host: NSView, title: String, message: String, fields: [Field], confirmTitle: String,
-                                showsCancel: Bool, offersBlock: Bool, page: WKWebView?, tag: String?) async -> Result {
+                                showsCancel: Bool, offersBlock: Bool, page: WKWebView?, savedLogins: SavedLogins?, tag: String?) async -> Result {
         return await withCheckedContinuation { continuation in
             let sheet = PageDialogSheet(title: title, message: message, fields: fields, confirmTitle: confirmTitle, showsCancel: showsCancel,
-                                        offersBlock: offersBlock) { continuation.resume(returning: $0) }
+                                        offersBlock: offersBlock, savedLogins: savedLogins) { continuation.resume(returning: $0) }
             sheet.page = page
             sheet.answers = tag
             sheet.homeWindow = window
@@ -127,6 +142,16 @@ final class PageDialogSheet: NSView {
                 guard let sheet, let window = sheet.window, event.window === window, sheet.ownsKeyboard else { return event }
                 // Return that commits a word being composed (Chinese, Japanese) belongs to the field.
                 if (window.firstResponder as? NSTextView)?.hasMarkedText() == true { return event }
+                // While the saved passwords are listed, the keys choose among them.
+                if let menu = sheet.savedMenu {
+                    switch event.keyCode {
+                    case 125: menu.move(1); return nil
+                    case 126: menu.move(-1); return nil
+                    case 36, 76: if case .login(let login)? = menu.selected { sheet.pickSaved(login) }; return nil
+                    case 53: sheet.closeSavedMenu(); return nil
+                    default: break
+                    }
+                }
                 switch event.keyCode {
                 case 36, 76: sheet.finish(.confirmed(sheet.inputs.map(\.stringValue))); return nil
                 case 53: sheet.finish(sheet.cancel.superview == nil ? .confirmed([]) : .cancelled); return nil
@@ -150,6 +175,40 @@ final class PageDialogSheet: NSView {
     static func answer(tag: String, with values: [String]) {
         for box in open where box.sheet?.answers == tag { box.sheet?.finish(.confirmed(values)) }
         open = open.filter { $0.sheet != nil && $0.sheet?.superview != nil }
+    }
+
+    // MARK: Saved passwords
+
+    /// The saved passwords, in the menu that fills a sign-in form, under the button.
+    private func toggleSavedMenu() {
+        if savedMenu != nil { closeSavedMenu(); return }
+        guard let savedLogins else { return }
+        let menu = AutofillMenu(items: savedLogins.logins.prefix(8).map { .login($0) }, origin: savedLogins.origin)
+        menu.onPick = { [weak self] item in if case .login(let login) = item { self?.pickSaved(login) } }
+        let anchor = convert(saved.bounds, from: saved)
+        let width = min(max(anchor.width, 260), 360), height = menu.contentHeight
+        var y = anchor.maxY + Tokens.Space.x1
+        if y + height > bounds.maxY - Tokens.Space.x2 { y = anchor.minY - Tokens.Space.x1 - height }
+        let x = min(max(anchor.minX, Tokens.Space.x2), bounds.maxX - width - Tokens.Space.x2)
+        menu.frame = NSRect(x: x, y: max(Tokens.Space.x2, y), width: width, height: height)
+        addSubview(menu)
+        menu.present(always: true)
+        savedMenu = menu
+    }
+
+    private func closeSavedMenu() {
+        savedMenu?.removeFromSuperview()
+        savedMenu = nil
+    }
+
+    private func pickSaved(_ login: Credential) {
+        closeSavedMenu()
+        guard let fill = savedLogins?.fill else { return }
+        Task { @MainActor [weak self] in
+            guard let values = await fill(login), let self, self.superview != nil else { return }
+            for (input, value) in zip(self.inputs, values) { input.stringValue = value }
+            self.window?.makeFirstResponder(self.inputs.last?.field)
+        }
     }
 
     /// The page closed (its tab, or a new process): its dialogs answer "cancel" and go.
@@ -196,8 +255,9 @@ final class PageDialogSheet: NSView {
         }
     }
 
-    // Clicks, scrolling and right-clicks on the backdrop don't reach the page underneath.
-    override func mouseDown(with event: NSEvent) {}
+    // Clicks, scrolling and right-clicks on the backdrop don't reach the page underneath. A click there puts away the
+    // saved passwords' menu.
+    override func mouseDown(with event: NSEvent) { closeSavedMenu() }
     override func rightMouseDown(with event: NSEvent) {}
     override func scrollWheel(with event: NSEvent) {}
 

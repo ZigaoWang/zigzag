@@ -229,15 +229,44 @@ enum AuthenticationPrompt {
     @MainActor
     private static func ask(_ challenge: URLAuthenticationChallenge, window: NSWindow,
                             page: WKWebView?, tag: String) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+        let isPrivate = page?.configuration.websiteDataStore.isPersistent != true
         Diagnostics.note(challenge.previousFailureCount > 0 ? "Site sign-in didn’t work" : "Site asked to sign in", site: challenge.protectionSpace.host,
-                         isPrivate: page?.configuration.websiteDataStore.isPersistent != true)
+                         isPrivate: isPrivate)
         let message = challenge.previousFailureCount > 0 ? String(localized: "That name or password didn’t work. Try again.", comment: "Message in the sheet a site's HTTP sign-in asks with, after a wrong name or password.") : String(localized: "This site needs a name and password.", comment: "Message in the sheet a site's HTTP sign-in asks with.")
-        let fields: [PageDialogSheet.Field] = [.init(placeholder: String(localized: "Username", comment: "Placeholder of the name field in a site's HTTP sign-in sheet.")), .init(placeholder: String(localized: "Password", comment: "Placeholder of the password field in a site's HTTP sign-in sheet."), secure: true)]
+        var fields: [PageDialogSheet.Field] = [.init(placeholder: String(localized: "Username", comment: "Placeholder of the name field in a site's HTTP sign-in sheet.")), .init(placeholder: String(localized: "Password", comment: "Placeholder of the password field in a site's HTTP sign-in sheet."), secure: true)]
+        // Passwords you saved for the site: one comes filled in, several wait behind a quiet button. Filling asks for
+        // no Touch ID, as filling a page's form doesn't. After a wrong password, nothing is filled in again by itself.
+        let saved = await savedLogins(for: challenge.protectionSpace, isPrivate: isPrivate)
+        if let saved, saved.logins.count == 1, challenge.previousFailureCount == 0, let values = await saved.fill(saved.logins[0]) {
+            fields[0].value = values[0]
+            fields[1].value = values[1]
+        }
+        let offered = saved.flatMap { $0.logins.count > 1 || challenge.previousFailureCount > 0 ? $0 : nil }
         let result = await PageDialogSheet.ask(in: window, title: String(localized: "Sign in to \(challenge.protectionSpace.host)", comment: "Title of the sheet a site's HTTP sign-in asks with. The placeholder is the site's host name."), message: message,
                                                fields: fields, confirmTitle: String(localized: "Sign In", comment: "Button in a site's HTTP sign-in sheet."), showsCancel: true, offersBlock: false, page: page,
-                                               tag: tag)
+                                               savedLogins: offered, tag: tag)
         guard case .confirmed(let values) = result, values.count == 2 else { return (.cancelAuthenticationChallenge, nil) }
         return (.useCredential, URLCredential(user: values[0], password: values[1], persistence: .forSession))
+    }
+
+    /// The logins saved for the site asking, as the menu that fills a page's form lists them: those saved for this
+    /// exact address first, then other parts of the site, newest used first.
+    @MainActor
+    private static func savedLogins(for space: URLProtectionSpace, isPrivate: Bool) async -> PageDialogSheet.SavedLogins? {
+        guard let origin = Origin(URL(string: "\(space.protocol ?? "https")://\(space.host):\(space.port)")),
+              let all = try? await PasswordStore.shared.all() else { return nil }
+        let logins = all.filter { $0.origin.fills(on: origin) }.sorted { a, b in
+            let exactA = a.origin.isExact(for: origin), exactB = b.origin.isExact(for: origin)
+            if exactA != exactB { return exactA }
+            return (a.lastUsed ?? a.modified) > (b.lastUsed ?? b.modified)
+        }
+        guard !logins.isEmpty else { return nil }
+        return PageDialogSheet.SavedLogins(logins: logins, origin: origin) { login in
+            guard let password = try? await PasswordStore.shared.password(for: login.id) else { return nil }
+            // Private windows leave no trace, not even "last used".
+            if !isPrivate { try? await PasswordStore.shared.markUsed(login.id) }
+            return [login.username, password.withUnsafeString { String($0) }]
+        }
     }
 }
 
