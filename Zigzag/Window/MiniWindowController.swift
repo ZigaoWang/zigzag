@@ -658,7 +658,7 @@ final class MiniStripView: NSView {
     }
 }
 
-/// The space Open in moves the page to, after the traffic lights: its icon (or its color's dot) and name, quiet, in
+/// The space Open in moves the page to, after the traffic lights: its icon, when it has one, and name, quiet, in
 /// the sidebar's small type. A click opens the spaces to choose another; the window takes its color.
 final class MiniSpaceChip: InteractiveView {
     private let picture = NSImageView()
@@ -682,36 +682,28 @@ final class MiniSpaceChip: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// A space's picture where a symbol can't stand for it: its emoji, or a dot of its color.
-    static func picture(of space: SpaceInfo, size: CGFloat) -> NSImage {
-        if let icon = space.icon { return IconChoice.image(icon, size: size) }
-        let color = space.swatch
-        return NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
-            let d = round(size * 0.6)
-            let dot = NSBezierPath(ovalIn: NSRect(x: rect.midX - d / 2, y: rect.midY - d / 2, width: d, height: d))
-            color.setFill()
-            dot.fill()
-            // A fine edge, so a white or pale space's dot still shows on its own frame.
-            Tokens.Color.keyCapEdge.setStroke()
-            dot.lineWidth = Tokens.Metric.hairline / 2
-            dot.stroke()
-            return true
-        }
+    /// A space's own picture where a symbol can't stand for it, its emoji; none when it has no icon, as in the sidebar.
+    static func picture(of space: SpaceInfo, size: CGFloat) -> NSImage? {
+        space.icon.map { IconChoice.image($0, size: size) }
     }
 
     func show(_ space: SpaceInfo) {
         picture.image = Self.picture(of: space, size: Self.side)
+        picture.isHidden = picture.image == nil
         label.stringValue = space.name
         setAccessibilityValue(space.name)
         needsLayout = true
     }
 
-    var fittingWidth: CGFloat { Self.pad * 2 + Self.side + Tokens.Space.x1 + 2 + label.inkWidth + 2 }
+    /// The picture's room, when the space has one.
+    private var pictureRoom: CGFloat { picture.isHidden ? 0 : Self.side + Tokens.Space.x1 + 2 }
+
+    var fittingWidth: CGFloat { Self.pad * 2 + pictureRoom + label.inkWidth + 2 }
 
     override func layout() {
         super.layout()
         picture.frame = NSRect(x: Self.pad, y: round((bounds.height - Self.side) / 2), width: Self.side, height: Self.side)
-        let x = picture.frame.maxX + Tokens.Space.x1 + 2
+        let x = Self.pad + pictureRoom
         let h = label.lineHeight
         label.frame = NSRect(x: x - Label.inset, y: round((bounds.height - h) / 2), width: max(0, bounds.width - Self.pad - x + Label.inset * 2), height: h)
     }
