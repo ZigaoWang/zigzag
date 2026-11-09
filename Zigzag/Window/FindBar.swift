@@ -760,6 +760,9 @@ enum Toast {
     }
     private static var showing: [ObjectIdentifier: Showing] = [:]
 
+    /// Whether an action shown at `shownAt` takes a click yet.
+    static func acceptsAction(shownAt: Date, now: Date = Date()) -> Bool { now.timeIntervalSince(shownAt) > 0.5 }
+
     private static func state(for host: NSView) -> Showing {
         showing = showing.filter { $0.value.toast?.superview != nil }
         if let state = showing[ObjectIdentifier(host)] { return state }
@@ -844,7 +847,11 @@ enum Toast {
         toast.actionButton.isHidden = action == nil
         if let action {
             toast.actionButton.title = action.title
+            // No click for the first half second, as on a site's permission question: a toast a page can bring up
+            // ("Pop-up blocked") never catches a click meant for the page on its action.
+            let shownAt = Date()
             toast.actionButton.onClick = { [weak toast] _ in
+                guard Toast.acceptsAction(shownAt: shownAt) else { return }
                 action.run()
                 toast?.dismiss(always: true)
             }
