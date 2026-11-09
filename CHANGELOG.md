@@ -5,6 +5,16 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-11-09
+
+### New
+- Zigzag Mini follows Settings › General › Borderless page: borderless, the page meets the window's edges under the slim strip, as in your browser window; otherwise it sits in a thin frame of your space's color.
+
+### Fixed
+- A link clicked in another app opens only Zigzag Mini. Your browser windows stay exactly where they were instead of coming up behind it, and closing it takes you back to the app you were in.
+- Esc closes Zigzag Mini even when a site puts the cursor in its empty search box. In a box you've typed in, the first Esc still only leaves the box.
+- Swiping back or forward in Zigzag Mini shows the same arrow as in a tab.
+
 ## [0.7.3] - 2026-11-09
 
 ### New
