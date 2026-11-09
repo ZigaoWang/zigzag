@@ -34,7 +34,7 @@ final class ExtensionHost: NSObject {
         // its own extension's pages, before their scripts.
         // The compatibility layer on every extension page too (popups, options), before their own scripts.
         configuration.webViewConfiguration.userContentController.addUserScript(
-            WKUserScript(source: "if (location.protocol === 'webkit-extension:') {\n\(ExtensionBridgeScript.source)\n\(ExtensionProfile.compatibility)\n\(ExtensionBridgeScript.afterCompatibility)\n}",
+            WKUserScript(source: "if (location.protocol === 'webkit-extension:') {\n\(ExtensionBridgeScript.source)\n\(ExtensionShims.compatibility)\n\(ExtensionBridgeScript.afterCompatibility)\n}",
                          injectionTime: .atDocumentStart, forMainFrameOnly: false))
         // Chrome gives extension pages its system font (and a smaller base size) unless they set their own; many
         // popups rely on it and would otherwise fall to WebKit's default serif. Zero specificity, first in the
@@ -48,7 +48,7 @@ final class ExtensionHost: NSObject {
             """
         configuration.webViewConfiguration.userContentController.addUserScript(
             WKUserScript(source: fonts, injectionTime: .atDocumentStart, forMainFrameOnly: false))
-        for (id, source) in ExtensionProfile.pagePreludes {
+        for (id, source) in ExtensionShims.pagePreludes {
             let guarded = "if (location.host === '\(id)') {\n\(source)\n}"
             configuration.webViewConfiguration.userContentController.addUserScript(
                 WKUserScript(source: guarded, injectionTime: .atDocumentStart, forMainFrameOnly: false))
@@ -263,7 +263,7 @@ final class ExtensionHost: NSObject {
             context.uniqueIdentifier = id
             // A fixed address, so its pages (settings, dashboards) still open after a relaunch.
             if let base = URL(string: "webkit-extension://\(id)/") { context.baseURL = base }
-            context.unsupportedAPIs = ExtensionProfile.profile(for: id)?.unsupportedAPIs ?? []
+            context.unsupportedAPIs = ExtensionShims.shim(for: id)?.unsupportedAPIs ?? []
             #if DEBUG
             context.isInspectable = true
             #endif
@@ -943,7 +943,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
 
     func webExtensionController(_ controller: WKWebExtensionController, sendMessage message: Any, toApplicationWithIdentifier applicationIdentifier: String?,
                                 for extensionContext: WKWebExtensionContext, replyHandler: @escaping (Any?, (any Error)?) -> Void) {
-        if applicationIdentifier == ExtensionProfile.diagnosticsHost {
+        if applicationIdentifier == ExtensionShims.diagnosticsHost {
             let report = message as? [String: Any]
             let line = ((report?["text"] as? String) ?? "").replacingOccurrences(of: "\n", with: " ⏎ ")
             ExtensionLog.write("\(extensionContext.webExtension.displayName ?? "extension") [\(report?["where"] ?? "?")] \(report?["kind"] ?? "?"): \(line)")
@@ -969,7 +969,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
                                 for extensionContext: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         // A WebSocket for a background, which WebKit can't open there itself (see WebSocketBridge).
         if port.applicationIdentifier == WebSocketBridge.host {
-            guard ExtensionProfile.usesWebSocketShim(manifest: ExtensionStore.manifest(for: extensionContext.uniqueIdentifier)) else {
+            guard ExtensionShims.usesWebSocketShim(manifest: ExtensionStore.manifest(for: extensionContext.uniqueIdentifier)) else {
                 completionHandler(NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
                 return
             }
@@ -1035,8 +1035,8 @@ extension Tab: WKWebExtensionTab {
 
     func loadURL(_ url: URL, for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         // Answered as done, not refused: Violentmonkey opens its page in a new tab when this one won't take it.
-        let tampermonkeyOn = ExtensionHost.shared.context(for: ExtensionProfile.tampermonkeyID) != nil
-        if ExtensionProfile.leavesInstallToTampermonkey(context.uniqueIdentifier, loading: url, tabURL: webView?.url ?? self.url,
+        let tampermonkeyOn = ExtensionHost.shared.context(for: ExtensionShims.tampermonkeyID) != nil
+        if ExtensionShims.leavesInstallToTampermonkey(context.uniqueIdentifier, loading: url, tabURL: webView?.url ?? self.url,
                                                         tampermonkeyOn: tampermonkeyOn) {
             completionHandler(nil)
             return

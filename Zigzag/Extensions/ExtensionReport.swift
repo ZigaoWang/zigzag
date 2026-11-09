@@ -39,8 +39,8 @@ struct ExtensionReport {
         abilities = Self.abilities(permissions: requested, patterns: patterns, id: id, replacesNewTab: replacesNewTab, searchEngine: searchEngine)
         asked = Asked(permissions: requested, patterns: Set(patterns), replacesNewTab: replacesNewTab, searchEngines: searchEngine.map { [$0] } ?? [], ids: [id])
 
-        var limits: [String] = ExtensionProfile.profile(for: id)?.knownIssue.map { [$0] } ?? []
-        let covered = (ExtensionProfile.profile(for: id)?.coveredPermissions ?? []).union(ExtensionBridgeScript.permissions)
+        var limits: [String] = ExtensionShims.shim(for: id)?.knownIssue.map { [$0] } ?? []
+        let covered = (ExtensionShims.shim(for: id)?.coveredPermissions ?? []).union(ExtensionBridgeScript.permissions)
         for permission in requested.subtracting(recognized).subtracting(covered).sorted() {
             if let name = Self.limitNames[permission], !limits.contains(name) { limits.append(name) }
         }

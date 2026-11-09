@@ -5,7 +5,7 @@ import WebKit
 ///
 /// In WebKit's extension service workers `new WebSocket(…)` never returns and freezes the whole background.
 /// 1Password opens one as the last step of signing in, so it stalled there. Its background gets a stand-in
-/// WebSocket (see `ExtensionProfile.webSocketShim`) that talks to this over a native port; this opens the real
+/// WebSocket (see `ExtensionShims.webSocketShim`) that talks to this over a native port; this opens the real
 /// connection with URLSession and passes frames both ways. Only hosts and close codes are logged, never frames.
 @available(macOS 15.4, *)
 final class WebSocketBridge: NSObject, URLSessionWebSocketDelegate {

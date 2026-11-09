@@ -284,10 +284,10 @@ struct ExtensionSecurityTests {
     }
 
     @Test func onlyAServiceWorkerGetsTheSocketStandIn() {
-        #expect(ExtensionProfile.usesWebSocketShim(manifest: ["background": ["service_worker": "background.js"]]))
-        #expect(!ExtensionProfile.usesWebSocketShim(manifest: ["background": ["scripts": ["background.js"]]]))
-        #expect(!ExtensionProfile.usesWebSocketShim(manifest: ["background": ["page": "background.html"]]))
-        #expect(!ExtensionProfile.usesWebSocketShim(manifest: ["name": "No background"]))
-        #expect(!ExtensionProfile.usesWebSocketShim(manifest: nil))
+        #expect(ExtensionShims.usesWebSocketShim(manifest: ["background": ["service_worker": "background.js"]]))
+        #expect(!ExtensionShims.usesWebSocketShim(manifest: ["background": ["scripts": ["background.js"]]]))
+        #expect(!ExtensionShims.usesWebSocketShim(manifest: ["background": ["page": "background.html"]]))
+        #expect(!ExtensionShims.usesWebSocketShim(manifest: ["name": "No background"]))
+        #expect(!ExtensionShims.usesWebSocketShim(manifest: nil))
     }
 }

@@ -706,8 +706,8 @@ enum ExtensionStore {
 }
 
 /// Per-extension adjustments the host applies, never by editing the package.
-enum ExtensionProfile {
-    struct Profile {
+enum ExtensionShims {
+    struct Shim {
         /// `browser.*` paths hidden from the extension, so it takes its own fallback instead of calling into nothing.
         var unsupportedAPIs: Set<String> = []
         /// Script run in the background before the extension's own, for APIs it calls without checking.
@@ -731,18 +731,18 @@ enum ExtensionProfile {
     }
 
     /// Every extension gets the compatibility layer first; some get their own fixes on top.
-    static func profile(for id: String) -> Profile? {
-        var profile = profiles[id] ?? Profile()
+    static func shim(for id: String) -> Shim? {
+        var shim = shims[id] ?? Shim()
         // Errors reported first (a background that stops as it starts says why), then the bridge (real answers from
         // Zigzag), then stand-ins for what's still missing. Every background gets the WebSocket stand-in: one opened
         // the WebKit way freezes the extension's pages along with it (MyBib's popup never came up).
-        profile.backgroundPrelude = diagnostics + ExtensionBridgeScript.source + "\n" + compatibility + "\n" + ExtensionBridgeScript.afterCompatibility + "\n" + webSocketShim + "\n" + (profile.backgroundPrelude ?? "")
+        shim.backgroundPrelude = diagnostics + ExtensionBridgeScript.source + "\n" + compatibility + "\n" + ExtensionBridgeScript.afterCompatibility + "\n" + webSocketShim + "\n" + (shim.backgroundPrelude ?? "")
         #if DEBUG
         // Testing builds say each background got past Zigzag's own scripts, so a quiet log means quiet, not broken.
         let started = "try { (globalThis.chrome || globalThis.browser).runtime.sendNativeMessage('\(diagnosticsHost)', { where: 'background', kind: 'started', text: 'ok' }); } catch (e) {}\n"
-        profile.backgroundPrelude = errorRecorder + (profile.backgroundPrelude ?? "") + started
+        shim.backgroundPrelude = errorRecorder + (shim.backgroundPrelude ?? "") + started
         #endif
-        return profile
+        return shim
     }
 
     #if DEBUG
@@ -865,19 +865,19 @@ enum ExtensionProfile {
     """
 
     /// Every page prelude, by extension ID.
-    static var pagePreludes: [(id: String, source: String)] { profiles.compactMap { id, profile in profile.pagePrelude.map { (id, $0) } } }
+    static var pagePreludes: [(id: String, source: String)] { shims.compactMap { id, shim in shim.pagePrelude.map { (id, $0) } } }
 
-    private static let profiles: [String: Profile] = [
-        ExtensionStore.onePasswordID: Profile(backgroundPrelude: onePasswordPrelude, pagePrelude: diagnostics,
+    private static let shims: [String: Shim] = [
+        ExtensionStore.onePasswordID: Shim(backgroundPrelude: onePasswordPrelude, pagePrelude: diagnostics,
                                               coveredPermissions: ["management", "privacy", "idle"]),
         // Bitwarden: its popup loop is answered by the prelude; its popup draws again (checked 2026-11-08).
-        "nngceckbapebfimnlniiiahkandclblb": Profile(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"],
+        "nngceckbapebfimnlniiiahkandclblb": Shim(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"],
                                                     patches: [bitwardenInlineMenuPatch]),
         // Return YouTube Dislike, as "Bring Back YouTube Dislikes".
-        "jleldmehlnopjhbldegndecakdemocah": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
-        "gebbhagfogifgggkldgodflihgfeippi": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
+        "jleldmehlnopjhbldegndecakdemocah": Shim(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
+        "gebbhagfogifgggkldgodflihgfeippi": Shim(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
         // Tampermonkey.
-        tampermonkeyID: Profile(patches: [tampermonkeyStartPatch, tampermonkeyPagesPatch, tampermonkeyInstallPatch,
+        tampermonkeyID: Shim(patches: [tampermonkeyStartPatch, tampermonkeyPagesPatch, tampermonkeyInstallPatch,
                                           tampermonkeyInlineCheckPatch, tampermonkeyInlinePatch]),
     ]
 
@@ -1165,14 +1165,14 @@ enum ExtensionProfile {
 }
 
 extension ExtensionStore {
-    /// The folder WebKit loads. Usually the untouched package itself. An extension whose profile needs a
+    /// The folder WebKit loads. Usually the untouched package itself. An extension whose shim needs a
     /// background prelude gets a sibling folder of hard links to the same files, plus a manifest that runs
     /// the prelude first. The package keeps its exact bytes either way.
     static func loadDirectory(for id: String) -> URL? {
         guard let package = packageDirectory(for: id), let state = state(id) else { return nil }
-        let profile = ExtensionProfile.profile(for: id)
-        let prelude = profile?.backgroundPrelude
-        let patches = profile?.patches ?? []
+        let shim = ExtensionShims.shim(for: id)
+        let prelude = shim?.backgroundPrelude
+        let patches = shim?.patches ?? []
         guard prelude != nil || !patches.isEmpty else { return package }
         let overlay = overlayFolder(for: id, version: state.version)
         // What this overlay was made from: rebuilt whenever the prelude, a patch or the language fill changes.
@@ -1242,7 +1242,7 @@ extension ExtensionStore {
     }
 
     /// A patched file is a real copy (the package's stays as it was); its link in the overlay is replaced.
-    private static func apply(_ patches: [ExtensionProfile.Patch], to file: String, in overlay: URL, from package: URL, id: String) {
+    private static func apply(_ patches: [ExtensionShims.Patch], to file: String, in overlay: URL, from package: URL, id: String) {
         let source = package.appendingPathComponent(file), target = overlay.appendingPathComponent(file)
         guard var text = try? String(contentsOf: source, encoding: .utf8) else { return }
         for patch in patches {
