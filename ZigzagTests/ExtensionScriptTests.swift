@@ -397,6 +397,34 @@ struct ExtensionScriptTests {
         #expect(page.evaluateScript("__set[1].storeId + ' ' + __set[1].sameSite").toString() == "persistent-1 lax")
     }
 
+    @Test func cookieListenersHearWhichCookieChanged() {
+        // WebKit calls cookies.onChanged listeners with nothing; Chrome says which cookie and why. Kondo waits for
+        // LinkedIn's sign-in cookie to arrive before it adds the account.
+        let background = Self.workerWorld(worker: true, setup: """
+        var __jar = [{ name: 'lang', value: 'en', domain: '.linkedin.com', path: '/', storeId: 'persistent-1' }];
+        var __changed = event();
+        chrome.cookies = { getAll: () => Promise.resolve(__jar.map((c) => ({ ...c }))), onChanged: __changed };
+        """)
+        background.evaluateScript("""
+        var __told = [];
+        chrome.cookies.onChanged.addListener((info) => __told.push([info.removed, info.cookie.name, info.cookie.value, info.cause].join(' ')));
+        var __second = 0;
+        const second = () => { __second++; };
+        chrome.cookies.onChanged.addListener(second);
+        """)
+        background.evaluateScript("__jar.push({ name: 'li_at', value: 'a', domain: '.www.linkedin.com', path: '/', storeId: 'persistent-1' }); __changed.fire();")
+        #expect(background.evaluateScript("__told.join()").toString() == "false li_at a explicit")
+        background.evaluateScript("__told = []; __jar[1].value = 'b'; __changed.fire();")
+        #expect(background.evaluateScript("__told.join()").toString() == "true li_at a overwrite,false li_at b explicit")
+        background.evaluateScript("__told = []; chrome.cookies.onChanged.removeListener(second); __jar.splice(0, 1); __changed.fire();")
+        #expect(background.evaluateScript("__told.join()").toString() == "true lang en explicit")
+        #expect(background.evaluateScript("__second").toInt32() == 3)
+        #expect(!background.evaluateScript("chrome.cookies.onChanged.hasListener(second)").toBool())
+        // Nothing different: nothing heard. A call that says what changed is passed on as it is.
+        background.evaluateScript("__told = []; __changed.fire(); __changed.fire({ removed: false, cookie: { name: 'x', value: '1' }, cause: 'explicit' });")
+        #expect(background.evaluateScript("__told.join()").toString() == "false x 1 explicit")
+    }
+
     @Test func permissionsContainsAnswersForAnOriginWithAPort() {
         // WebKit refuses a pattern with a port, as 1Password asks on local sites; Chrome answers, as the pattern without it does.
         let page = Self.workerWorld(worker: false, setup: """

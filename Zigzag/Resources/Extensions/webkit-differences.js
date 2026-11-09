@@ -299,22 +299,57 @@
       }
     }
 
-    // cookies.onChanged: WebKit sometimes calls listeners with nothing, where Chrome always says which cookie changed
-    // and why; extensions read it straight away (Grammarly). Those calls are passed over.
+    // cookies.onChanged: WebKit calls listeners with nothing, where Chrome says which cookie changed and why, and
+    // extensions read it straight away (Grammarly). Kondo waits for LinkedIn's sign-in cookie to arrive, so adding an
+    // account never finished. Here the extension's cookies are looked at again on each call, and its listeners hear
+    // what's different from the last look, one cookie at a time, as from Chrome. A call that does say is passed on.
     const changed = api.cookies && api.cookies.onChanged;
+    const allCookies = api.cookies && typeof api.cookies.getAll === 'function' ? api.cookies.getAll.bind(api.cookies) : null;
     if (changed && typeof changed.addListener === 'function') {
       const add = changed.addListener.bind(changed);
-      const remove = changed.removeListener && changed.removeListener.bind(changed);
-      const has = changed.hasListener && changed.hasListener.bind(changed);
-      const guarded = new WeakMap();
+      const listeners = new Set();
+      const tell = (info) => { for (const listener of [...listeners]) { try { listener(info); } catch (e) { console.error(e); } } };
+      const key = (cookie) => [cookie.storeId, cookie.domain, cookie.path, cookie.name].join('\u0001');
+      // The cookies at the last look, by Chrome's way of telling one from another.
+      let seen = null;
+      let looking = false;
+      let again = false;
+      const look = () => {
+        if (looking) { again = true; return; }
+        looking = true;
+        Promise.resolve(allCookies ? allCookies({}) : []).then((list) => {
+          const now = new Map((list || []).map((cookie) => [key(cookie), cookie]));
+          const before = seen;
+          seen = now;
+          if (!before) return;
+          for (const [id, cookie] of before) {
+            const after = now.get(id);
+            if (!after) {
+              const expired = typeof cookie.expirationDate === 'number' && cookie.expirationDate * 1000 <= Date.now();
+              tell({ removed: true, cookie, cause: expired ? 'expired' : 'explicit' });
+            } else if (JSON.stringify(after) !== JSON.stringify(cookie)) {
+              tell({ removed: true, cookie, cause: 'overwrite' });
+              tell({ removed: false, cookie: after, cause: 'explicit' });
+            }
+          }
+          for (const [id, cookie] of now) if (!before.has(id)) tell({ removed: false, cookie, cause: 'explicit' });
+        }, () => {}).finally(() => {
+          looking = false;
+          if (again) { again = false; look(); }
+        });
+      };
+      let watching = false;
       setMember(['cookies', 'onChanged'], 'addListener', (listener) => {
         if (typeof listener !== 'function') return add(listener);
-        const wrapped = (info, ...rest) => { if (info && info.cookie) return listener(info, ...rest); };
-        guarded.set(listener, wrapped);
-        return add(wrapped);
+        listeners.add(listener);
+        if (watching) return undefined;
+        // One listener of WebKit's for all of the extension's; the first look is what later ones are compared with.
+        watching = true;
+        look();
+        return add((info) => { if (info && info.cookie) tell(info); else look(); });
       });
-      if (remove) setMember(['cookies', 'onChanged'], 'removeListener', (listener) => remove(guarded.get(listener) || listener));
-      if (has) setMember(['cookies', 'onChanged'], 'hasListener', (listener) => has(guarded.get(listener) || listener));
+      setMember(['cookies', 'onChanged'], 'removeListener', (listener) => { listeners.delete(listener); });
+      setMember(['cookies', 'onChanged'], 'hasListener', (listener) => listeners.has(listener));
     }
 
     // cookies: a cookie as Chrome described it can name Chrome's everyday store, "0", and a SameSite of "unspecified";
