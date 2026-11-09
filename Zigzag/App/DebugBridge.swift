@@ -38,7 +38,7 @@ enum DebugBridge {
     /// miniclosebrowsers, minijs <script> (run in the mini page), miniesc (Esc in the address field), miniquit,
     /// miniask notifications, minianswer allow|deny|notnow (the site's question), minisave save|notnow,
     /// minieval <path> <script>, miniswipe <dx> [slow] [noend] (as `swipe page`, over the mini page),
-    /// miniborderless on|off (Settings › General › Borderless page). With no Zigzag Mini open, miniask and minianswer
+    /// miniborderless on|off (Settings › Appearance › Borderless page). With no Zigzag Mini open, miniask and minianswer
     /// use the front browser window.
     private static func runMini(_ name: String, _ arg: String) {
         let mini = MiniWindowController.all.last
@@ -866,8 +866,8 @@ enum DebugBridge {
                 document.scroll(NSPoint(x: 0, y: document.bounds.height - scroll.contentSize.height))
             }
         case "settingspane":
-            // settingspane <general|spaces|passwords|privacy|translation|extensions|shortcuts>
-            SettingsPage.open(SettingsPane.allCases.first { "\($0)" == arg }, in: controller)
+            // settingspane <general|appearance|tabs|spaces|search|mini|passwords|privacy|translation|extensions|shortcuts>
+            SettingsPage.open(SettingsPane(rawValue: arg), in: controller)
         case "allowads": ContentBlocker.setAllowed(arg != "off", on: controller.tabManager.selectedTab?.url); controller.tabManager.selectedTab?.reload()
         case "addext": controller.installExtension(arg)
         case "storeadd": WebStoreOffer.debugAdd()

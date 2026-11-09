@@ -20,6 +20,28 @@ struct SettingsPageTests {
         #expect(SettingsPage.pane(for: URL(string: "zigzag://settings/shortcuts")) == .shortcuts)
     }
 
+    @Test func addressesFromBeforeTheNewSectionsStillOpen() {
+        // A Settings tab kept with the session names its section, so every name it may have saved still opens it.
+        let saved: [String: SettingsPane] = ["general": .general, "spaces": .spaces, "passwords": .passwords, "privacy": .privacy,
+                                             "translation": .translation, "extensions": .extensions, "shortcuts": .shortcuts]
+        for (name, pane) in saved {
+            #expect(SettingsPage.pane(for: URL(string: "zigzag://settings/\(name)")) == pane)
+        }
+    }
+
+    @Test func theNewSectionsHaveTheirOwnAddresses() {
+        #expect(SettingsPage.pane(for: URL(string: "zigzag://settings/appearance")) == .appearance)
+        #expect(SettingsPage.pane(for: URL(string: "zigzag://settings/tabs")) == .tabs)
+        #expect(SettingsPage.pane(for: URL(string: "zigzag://settings/search")) == .search)
+        #expect(SettingsPage.pane(for: URL(string: "zigzag://settings/mini")) == .mini)
+        #expect(SettingsPage.url(for: .mini).absoluteString == "zigzag://settings/mini")
+    }
+
+    @Test func theColumnKeepsItsOrder() {
+        #expect(SettingsPane.allCases == [.general, .appearance, .tabs, .spaces, .search, .mini, .passwords, .privacy,
+                                          .translation, .extensions, .shortcuts])
+    }
+
     @Test func onlyItsOwnAddressIsSettings() {
         #expect(SettingsPage.isSettings(URL(string: "zigzag://settings/spaces")))
         #expect(!SettingsPage.isSettings(URL(string: "zigzag://history")))

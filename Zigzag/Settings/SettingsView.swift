@@ -434,14 +434,20 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
 
 // MARK: - The page
 
-/// The parts of Settings, each a pane of its own, picked from the column of sections at the left.
-enum SettingsPane: Int, CaseIterable {
-    case general, spaces, passwords, privacy, translation, extensions, shortcuts
+/// The parts of Settings, each a pane of its own, picked from the column of sections at the left. The raw value is
+/// its name in the page's address (zigzag://settings/privacy), which a tab keeps with the session: a pane can be
+/// added anywhere in the column, but a name never changes.
+enum SettingsPane: String, CaseIterable {
+    case general, appearance, tabs, spaces, search, mini, passwords, privacy, translation, extensions, shortcuts
 
     var title: String {
         switch self {
         case .general: String(localized: "General", comment: "A section of Settings.")
+        case .appearance: String(localized: "Appearance", comment: "A section of Settings: how the window and sidebar look.")
+        case .tabs: String(localized: "Tabs", comment: "A section of Settings.")
         case .spaces: String(localized: "Spaces", comment: "A section of Settings.")
+        case .search: String(localized: "Search", comment: "A section of Settings: the search engine and suggestions.")
+        case .mini: MiniWindowController.name
         case .passwords: String(localized: "Passwords", comment: "A section of Settings.")
         case .privacy: String(localized: "Privacy", comment: "A section of Settings.")
         case .translation: String(localized: "Translation", comment: "A section of Settings: translating web pages.")
@@ -453,7 +459,11 @@ enum SettingsPane: Int, CaseIterable {
     var symbol: String {
         switch self {
         case .general: "gearshape"
+        case .appearance: "paintbrush"
+        case .tabs: "square.on.square"
         case .spaces: "square.stack"
+        case .search: "magnifyingglass"
+        case .mini: "macwindow"
         case .passwords: "key"
         case .privacy: "hand.raised"
         case .translation: "translate"
@@ -463,7 +473,7 @@ enum SettingsPane: Int, CaseIterable {
     }
 
     /// Its name in the page's address: zigzag://settings/privacy.
-    var path: String { "\(self)" }
+    var path: String { rawValue }
 }
 
 /// One section in the column: a list item, as every list of places in Zigzag draws them.
@@ -504,11 +514,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let versionGroup = FormGroup()
     private let generalGroup = FormGroup()
     private let tabsGroup = FormGroup()
+    private let searchGroup = FormGroup()
     private let downloadsGroup = FormGroup()
     private let blockingGroup = FormGroup()
     private let importGroup = FormGroup()
     private let spacesGroup = FormGroup()
-    private let windowGroup = FormGroup()
+    private let appearanceGroup = FormGroup()
     private let miniGroup = FormGroup()
     /// Zigzag Mini's shortcut, as the menu has it now.
     private let miniKeys = KeyCaps()
@@ -543,9 +554,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         field.heightAnchor.constraint(equalToConstant: Tokens.Page.controlHeight).isActive = true
         return field
     }()
-    private lazy var customSearchRow = FormRow(title: String(localized: "Search address", comment: "A setting in Settings › General, shown when the search engine is Custom."),
+    private lazy var customSearchRow = FormRow(title: String(localized: "Search address", comment: "A setting in Settings › Search, shown when the search engine is Custom."),
                                                detail: String(localized: "Put %s where the words you search for go.",
-                                                              comment: "Explanation under “Search address” in Settings › General. Keep %s as it is: it's what the address uses."),
+                                                              comment: "Explanation under “Search address” in Settings › Search. Keep %s as it is: it's what the address uses."),
                                                control: customSearch)
     private let archiveAfter = DropdownButton()
     private let favoritesPerRow = DropdownButton()
@@ -642,6 +653,101 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         themeToken = Brand.themeChanged.observe { [weak self] in self?.needsDisplay = true }
 
         // General
+        defaultButton.onClick = { [weak self] _ in self?.makeDefault() }
+        let defaultControl = NSStackView(views: [defaultStatus, defaultButton])
+        defaultControl.spacing = Tokens.Space.x2
+        versionGroup.add(SettingsVersionRow.make())
+        versionGroup.add(SettingsVersionRow.betas())
+        if let restore = SettingsVersionRow.restore() { versionGroup.add(restore) }
+        generalGroup.add(FormRow(title: String(localized: "Default browser", comment: "A setting in Settings › General."),
+                                 detail: String(localized: "Links from other apps open here.", comment: "Explanation under “Default browser” in Settings › General."),
+                                 control: defaultControl))
+        // Only once Zigzag speaks more than one language: macOS lists an app under Language & Region only then.
+        if Self.hasLanguages {
+            // Each language named in itself, so anyone finds theirs whatever Zigzag is in now.
+            languagePicker.options = AppLanguage.choices.map { DropdownButton.Option(title: $0.title) }
+            languagePicker.selectedIndex = AppLanguage.choices.firstIndex { $0.code == AppLanguage.chosen } ?? 0
+            languagePicker.onSelect = { [weak self] index in self?.chooseLanguage(AppLanguage.choices[index].code) }
+            generalGroup.add(FormRow(title: String(localized: "Language", comment: "A setting in Settings › General."),
+                                     detail: String(localized: "Zigzag follows your Mac’s language unless you pick one here.",
+                                                    comment: "Explanation under “Language” in Settings › General."),
+                                     control: languagePicker))
+        }
+        quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
+        generalGroup.add(FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
+                                 detail: String(localized: "So ⌘Q never closes everything by accident.", comment: "Explanation under “Ask before quitting” in Settings › General."),
+                                 control: quitToggle))
+        downloadPlace.onSelect = { index in DownloadPlace.pick(index) }
+        downloadPlaceToken = DownloadPlace.changed.observe { [weak self] in self?.refreshDownloadPlace() }
+        downloadsGroup.add(FormRow(title: String(localized: "Save downloads to", comment: "A setting in Settings › General."),
+                                   detail: String(localized: "Or have Zigzag ask where, each time.", comment: "Explanation under “Save downloads to” in Settings › General."),
+                                   control: downloadPlace))
+        let importButton = PillButton(title: String(localized: "Import…", comment: "Button in Settings › General that opens the Import window."))
+        importButton.onClick = { _ in ImportWindowController.show() }
+        importGroup.add(FormRow(title: String(localized: "Import from another browser", comment: "A setting in Settings › General."),
+                                detail: String(localized: "Passwords, bookmarks and history. The other browser isn’t changed.", comment: "Explanation under “Import from another browser” in Settings › General."),
+                                control: importButton))
+
+        // Appearance
+        borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
+        appearanceGroup.add(FormRow(title: String(localized: "Borderless page", comment: "A setting in Settings › Appearance."),
+                                    detail: String(localized: "The page meets the window’s edges instead of floating inside it.", comment: "Explanation under “Borderless page” in Settings › Appearance."),
+                                    control: borderlessToggle))
+        largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
+        appearanceGroup.add(FormRow(title: String(localized: "Large space names", comment: "A setting in Settings › Appearance."),
+                                    detail: String(localized: "Shows the space’s name large and light above its tabs. When off, it’s a plain heading.", comment: "Explanation under “Large space names” in Settings › Appearance."),
+                                    control: largeNamesToggle))
+        favoritesPerRow.options = FavoritesView.perRowChoices.map { count in
+            DropdownButton.Option(title: count == 0 ? String(localized: "Automatic", comment: "A choice for “Favorites per row” in Settings › Appearance: as many as fit the sidebar's width.") : count.formatted())
+        }
+        favoritesPerRow.onSelect = { index in FavoritesView.perRow = FavoritesView.perRowChoices[index] }
+        appearanceGroup.add(FormRow(title: String(localized: "Favorites per row", comment: "A setting in Settings › Appearance: how many favorites' tiles sit side by side in the sidebar."),
+                                    detail: String(localized: "Automatic fits fewer, larger ones in a narrow sidebar.", comment: "Explanation under “Favorites per row” in Settings › Appearance."),
+                                    control: favoritesPerRow))
+        motionToggle.onChange = { on in Tokens.Motion.reducesMotionHere = on }
+        appearanceGroup.add(FormRow(title: String(localized: "Reduce motion", comment: "A setting in Settings › Appearance."),
+                                    detail: String(localized: "Things appear in place instead of sliding or growing. Fades stay.", comment: "Explanation under “Reduce motion” in Settings › Appearance."),
+                                    control: motionToggle))
+
+        // Tabs
+        newTabPlace.options = TabManager.NewTabPlace.allCases.map { place in
+            let title = switch place {
+            case .next: String(localized: "Next to the Current Tab", comment: "A choice for “New tabs open” in Settings › Tabs: just below the tab you're on, or the page a link came from.")
+            case .top: String(localized: "At the Top", comment: "A choice for “New tabs open” in Settings › Tabs: above the other tabs.")
+            case .bottom: String(localized: "At the Bottom", comment: "A choice for “New tabs open” in Settings › Tabs: below the other tabs.")
+            }
+            return DropdownButton.Option(title: title)
+        }
+        newTabPlace.onSelect = { index in TabManager.newTabPlace = TabManager.NewTabPlace.allCases[index] }
+        tabsGroup.add(FormRow(title: String(localized: "New tabs open", comment: "A setting in Settings › Tabs: where a new tab goes in the sidebar's list."),
+                              detail: String(localized: "Where ⌘T and links put a new tab in the sidebar.", comment: "Explanation under “New tabs open” in Settings › Tabs."),
+                              control: newTabPlace))
+        archiveAfter.options = TabArchive.After.allCases.map { DropdownButton.Option(title: $0.title) }
+        archiveAfter.onSelect = { index in TabArchive.after = TabArchive.After.allCases[index] }
+        tabsGroup.add(FormRow(title: String(localized: "Archive tabs you haven’t used", comment: "A setting in Settings › Tabs."),
+                              detail: String(localized: "They leave the sidebar. Type a few letters in the address bar to bring one back.", comment: "Explanation under “Archive tabs you haven’t used” in Settings › Tabs."),
+                              control: archiveAfter))
+        energyToggle.onChange = { on in EnergyWatch.sleepsBusyTabs = on }
+        tabsGroup.add(FormRow(title: String(localized: "Put busy background tabs to sleep", comment: "A setting in Settings › Tabs."),
+                              detail: String(localized: "A tab you’re not using that keeps working hard sleeps until you open it again.", comment: "Explanation under “Put busy background tabs to sleep” in Settings › Tabs."),
+                              control: energyToggle))
+        pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
+        tabsGroup.add(FormRow(title: String(localized: "Keep videos playing when you switch tabs", comment: "A setting in Settings › Tabs."),
+                              detail: String(localized: "A playing video floats in its own window until you come back.", comment: "Explanation under “Keep videos playing when you switch tabs” in Settings › Tabs."),
+                              control: pipToggle))
+        pinOfferToggle.onChange = { on in BrowserWindowController.offersToPinWanderedPage = on }
+        tabsGroup.add(FormRow(title: String(localized: "Offer to pin the page you moved to", comment: "A setting in Settings › Tabs."),
+                              detail: String(localized: "After you close a pinned tab that went to another page, like a new chat.", comment: "Explanation under “Offer to pin the page you moved to” in Settings › Tabs."),
+                              control: pinOfferToggle))
+        pinchToggle.onChange = { on in DeskController.pinchOpens = on }
+        tabsGroup.add(FormRow(title: String(localized: "Pinch to see all tabs", comment: "A setting in Settings › Tabs: whether pinching in on the trackpad opens the tab overview."),
+                              detail: String(localized: "When off, websites get the pinch, for maps and games that zoom with it.", comment: "Explanation under “Pinch to see all tabs” in Settings › Tabs."),
+                              control: pinchToggle))
+
+        // Spaces
+        addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
+
+        // Search
         refreshEngines()
         SearchEngine.builtIn.forEach { if FaviconStore.shared.cachedIcon(for: $0.homeURL) == nil { FaviconStore.shared.prefetch(for: $0.homeURL) } }
         engine.onSelect = { [weak self] index in
@@ -661,118 +767,32 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         customSearch.stringValue = SearchEngine.customTemplate
         customSearch.field.target = self
         customSearch.field.action = #selector(customSearchChanged)
-        defaultButton.onClick = { [weak self] _ in self?.makeDefault() }
-        let defaultControl = NSStackView(views: [defaultStatus, defaultButton])
-        defaultControl.spacing = Tokens.Space.x2
-        versionGroup.add(SettingsVersionRow.make())
-        versionGroup.add(SettingsVersionRow.betas())
-        if let restore = SettingsVersionRow.restore() { versionGroup.add(restore) }
-        generalGroup.add(FormRow(title: String(localized: "Search engine", comment: "A setting in Settings › General."),
-                                 detail: String(localized: "Used when what you type isn’t an address.", comment: "Explanation under “Search engine” in Settings › General."),
-                                 control: engine))
-        generalGroup.add(customSearchRow)
+        searchGroup.add(FormRow(title: String(localized: "Search engine", comment: "A setting in Settings › Search."),
+                                detail: String(localized: "Used when what you type isn’t an address.", comment: "Explanation under “Search engine” in Settings › Search."),
+                                control: engine))
+        searchGroup.add(customSearchRow)
         refreshCustomSearch()
         suggestionsToggle.onChange = { on in SuggestionFetcher.isOn = on }
-        generalGroup.add(FormRow(title: String(localized: "Search suggestions", comment: "A setting in Settings › General."),
-                                 detail: String(localized: "What you type in the address bar is sent to your search engine for suggestions.", comment: "Explanation under “Search suggestions” in Settings › General."),
-                                 control: suggestionsToggle))
         // Searching a site with Tab is taught where it's used (the address bar shows the key), not listed here.
-        generalGroup.add(FormRow(title: String(localized: "Default browser", comment: "A setting in Settings › General."),
-                                 detail: String(localized: "Links from other apps open here.", comment: "Explanation under “Default browser” in Settings › General."),
-                                 control: defaultControl))
-        // Only once Zigzag speaks more than one language: macOS lists an app under Language & Region only then.
-        if Self.hasLanguages {
-            // Each language named in itself, so anyone finds theirs whatever Zigzag is in now.
-            languagePicker.options = AppLanguage.choices.map { DropdownButton.Option(title: $0.title) }
-            languagePicker.selectedIndex = AppLanguage.choices.firstIndex { $0.code == AppLanguage.chosen } ?? 0
-            languagePicker.onSelect = { [weak self] index in self?.chooseLanguage(AppLanguage.choices[index].code) }
-            generalGroup.add(FormRow(title: String(localized: "Language", comment: "A setting in Settings › General."),
-                                     detail: String(localized: "Zigzag follows your Mac’s language unless you pick one here.",
-                                                    comment: "Explanation under “Language” in Settings › General."),
-                                     control: languagePicker))
-        }
+        searchGroup.add(FormRow(title: String(localized: "Search suggestions", comment: "A setting in Settings › Search."),
+                                detail: String(localized: "What you type in the address bar is sent to your search engine for suggestions.", comment: "Explanation under “Search suggestions” in Settings › Search."),
+                                control: suggestionsToggle))
+
+        // Zigzag Mini: what it is and how to open it, then where links from other apps go.
+        miniGroup.add(FormRow(title: String(localized: "New Zigzag Mini", comment: "A row in Settings › Zigzag Mini, showing its keyboard shortcut. Zigzag Mini is a name, kept in Latin letters."),
+                              detail: String(localized: "A small window for a quick look at a page. Esc closes it, and ⌘O moves it into your browser window to keep it.", comment: "Explanation under “New Zigzag Mini” in Settings › Zigzag Mini: what Zigzag Mini is."),
+                              control: miniKeys))
+        miniToggle.onChange = { on in MiniWindowController.opensExternalLinks = on }
+        miniGroup.add(FormRow(title: String(localized: "Open links from other apps in Zigzag Mini", comment: "A setting in Settings › Zigzag Mini."),
+                              detail: String(localized: "Instead of in a new tab.", comment: "Explanation under “Open links from other apps in Zigzag Mini” in Settings › Zigzag Mini."),
+                              control: miniToggle))
+
+        // Privacy
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
-        pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
-        downloadPlace.onSelect = { index in DownloadPlace.pick(index) }
-        downloadPlaceToken = DownloadPlace.changed.observe { [weak self] in self?.refreshDownloadPlace() }
-        newTabPlace.options = TabManager.NewTabPlace.allCases.map { place in
-            let title = switch place {
-            case .next: String(localized: "Next to the Current Tab", comment: "A choice for “New tabs open” in Settings › General: just below the tab you're on, or the page a link came from.")
-            case .top: String(localized: "At the Top", comment: "A choice for “New tabs open” in Settings › General: above the other tabs.")
-            case .bottom: String(localized: "At the Bottom", comment: "A choice for “New tabs open” in Settings › General: below the other tabs.")
-            }
-            return DropdownButton.Option(title: title)
-        }
-        newTabPlace.onSelect = { index in TabManager.newTabPlace = TabManager.NewTabPlace.allCases[index] }
-        tabsGroup.add(FormRow(title: String(localized: "New tabs open", comment: "A setting in Settings › General: where a new tab goes in the sidebar's list."),
-                                detail: String(localized: "Where ⌘T and links put a new tab in the sidebar.", comment: "Explanation under “New tabs open” in Settings › General."),
-                                control: newTabPlace))
-        archiveAfter.options = TabArchive.After.allCases.map { DropdownButton.Option(title: $0.title) }
-        archiveAfter.onSelect = { index in TabArchive.after = TabArchive.After.allCases[index] }
-        tabsGroup.add(FormRow(title: String(localized: "Archive tabs you haven’t used", comment: "A setting in Settings › General."),
-                              detail: String(localized: "They leave the sidebar. Type a few letters in the address bar to bring one back.", comment: "Explanation under “Archive tabs you haven’t used” in Settings › General."),
-                              control: archiveAfter))
-        energyToggle.onChange = { on in EnergyWatch.sleepsBusyTabs = on }
-        tabsGroup.add(FormRow(title: String(localized: "Put busy background tabs to sleep", comment: "A setting in Settings › General."),
-                              detail: String(localized: "A tab you’re not using that keeps working hard sleeps until you open it again.", comment: "Explanation under “Put busy background tabs to sleep” in Settings › General."),
-                              control: energyToggle))
-        tabsGroup.add(FormRow(title: String(localized: "Keep videos playing when you switch tabs", comment: "A setting in Settings › General."),
-                              detail: String(localized: "A playing video floats in its own window until you come back.", comment: "Explanation under “Keep videos playing when you switch tabs” in Settings › General."),
-                              control: pipToggle))
-        pinOfferToggle.onChange = { on in BrowserWindowController.offersToPinWanderedPage = on }
-        tabsGroup.add(FormRow(title: String(localized: "Offer to pin the page you moved to", comment: "A setting in Settings › General."),
-                                detail: String(localized: "After you close a pinned tab that went to another page, like a new chat.", comment: "Explanation under “Offer to pin the page you moved to” in Settings › General."),
-                                control: pinOfferToggle))
-        downloadsGroup.add(FormRow(title: String(localized: "Save downloads to", comment: "A setting in Settings › General."),
-                                   detail: String(localized: "Or have Zigzag ask where, each time.", comment: "Explanation under “Save downloads to” in Settings › General."),
-                                   control: downloadPlace))
         // EasyList's licence asks for credit; this is where people look for what does the blocking.
         blockingGroup.add(FormRow(title: String(localized: "Block ads and trackers", comment: "A setting in Settings › Privacy."),
                                   detail: String(localized: "Uses EasyList and EasyPrivacy, by the EasyList authors.", comment: "Explanation under “Block ads and trackers” in Settings › Privacy."),
                                   control: blockingToggle))
-        quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
-        let importButton = PillButton(title: String(localized: "Import…", comment: "Button in Settings › General that opens the Import window."))
-        importButton.onClick = { _ in ImportWindowController.show() }
-        importGroup.add(FormRow(title: String(localized: "Import from another browser", comment: "A setting in Settings › General."),
-                                detail: String(localized: "Passwords, bookmarks and history. The other browser isn’t changed.", comment: "Explanation under “Import from another browser” in Settings › General."),
-                                control: importButton))
-
-        // Spaces
-        addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
-        borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
-        windowGroup.add(FormRow(title: String(localized: "Borderless page", comment: "A setting in Settings › General."),
-                                detail: String(localized: "The page meets the window’s edges instead of floating inside it.", comment: "Explanation under “Borderless page” in Settings › General."),
-                                control: borderlessToggle))
-        largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
-        windowGroup.add(FormRow(title: String(localized: "Large space names", comment: "A setting in Settings › General."),
-                                detail: String(localized: "Shows the space’s name large and light above its tabs. When off, it’s a plain heading.", comment: "Explanation under “Large space names” in Settings › General."),
-                                control: largeNamesToggle))
-        favoritesPerRow.options = FavoritesView.perRowChoices.map { count in
-            DropdownButton.Option(title: count == 0 ? String(localized: "Automatic", comment: "A choice for “Favorites per row” in Settings › General: as many as fit the sidebar's width.") : count.formatted())
-        }
-        favoritesPerRow.onSelect = { index in FavoritesView.perRow = FavoritesView.perRowChoices[index] }
-        windowGroup.add(FormRow(title: String(localized: "Favorites per row", comment: "A setting in Settings › General: how many favorites' tiles sit side by side in the sidebar."),
-                                detail: String(localized: "Automatic fits fewer, larger ones in a narrow sidebar.", comment: "Explanation under “Favorites per row” in Settings › General."),
-                                control: favoritesPerRow))
-        windowGroup.add(FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
-                                detail: String(localized: "So ⌘Q never closes everything by accident.", comment: "Explanation under “Ask before quitting” in Settings › General."),
-                                control: quitToggle))
-        // Zigzag Mini: what it is and how to open it, then where links from other apps go.
-        miniGroup.add(FormRow(title: String(localized: "New Zigzag Mini", comment: "A row in Settings › General, under Zigzag Mini, showing its keyboard shortcut. Zigzag Mini is a name, kept in Latin letters."),
-                              detail: String(localized: "A small window for a quick look at a page. Esc closes it, and ⌘O moves it into your browser window to keep it.", comment: "Explanation under “New Zigzag Mini” in Settings › General: what Zigzag Mini is."),
-                              control: miniKeys))
-        miniToggle.onChange = { on in MiniWindowController.opensExternalLinks = on }
-        miniGroup.add(FormRow(title: String(localized: "Open links from other apps in Zigzag Mini", comment: "A setting in Settings › General, under Zigzag Mini."),
-                              detail: String(localized: "Instead of in a new tab.", comment: "Explanation under “Open links from other apps in Zigzag Mini” in Settings › General."),
-                              control: miniToggle))
-        pinchToggle.onChange = { on in DeskController.pinchOpens = on }
-        windowGroup.add(FormRow(title: String(localized: "Pinch to see all tabs", comment: "A setting in Settings › General: whether pinching in on the trackpad opens the tab overview."),
-                                detail: String(localized: "When off, websites get the pinch, for maps and games that zoom with it.", comment: "Explanation under “Pinch to see all tabs” in Settings › General."),
-                                control: pinchToggle))
-        motionToggle.onChange = { on in Tokens.Motion.reducesMotionHere = on }
-        windowGroup.add(FormRow(title: String(localized: "Reduce motion", comment: "A setting in Settings › General."),
-                                detail: String(localized: "Things appear in place instead of sliding or growing. Fades stay.", comment: "Explanation under “Reduce motion” in Settings › General."),
-                                control: motionToggle))
 
         // Passwords
         saveToggle.onChange = { [weak self] on in
@@ -902,21 +922,29 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let count = CGFloat(items.count)
         // In the row they shrink to fit, rather than run off the page's edge.
         let side = arrangement == .row ? min(Tokens.Space.x10, floor((column.bounds.width - Tokens.Space.x2 * 2) / count)) : Tokens.Space.x10
+        // Down the column, a short page (a small window) takes some height off each section, never below a control's,
+        // so all of them fit under the title.
+        let top = Tokens.Page.headerHeight + Tokens.Space.x1
+        func height(_ tallest: CGFloat) -> CGFloat {
+            max(Tokens.Page.controlHeight, min(tallest, floor((column.bounds.height - top - Tokens.Space.x2) / count) - 2))
+        }
         switch arrangement {
         case .column:
             // The title sits where History's does; the sections' text lines up under it, their fills reaching past.
             let gutter = Tokens.Page.gutter, inset = Tokens.Page.rowInset
             columnTitle.frame = NSRect(x: gutter, y: Tokens.Page.headerTop, width: column.bounds.width - gutter * 2, height: Tokens.Page.controlHeight)
-            var y = Tokens.Page.headerHeight + Tokens.Space.x1
+            let rowHeight = height(Tokens.Page.rowHeight)
+            var y = top
             for item in items {
-                item.frame = NSRect(x: gutter - inset, y: y, width: column.bounds.width - (gutter - inset) * 2, height: Tokens.Page.rowHeight)
-                y += Tokens.Page.rowHeight + 2
+                item.frame = NSRect(x: gutter - inset, y: y, width: column.bounds.width - (gutter - inset) * 2, height: rowHeight)
+                y += rowHeight + 2
             }
         case .rail:
-            var y = Tokens.Page.headerHeight + Tokens.Space.x1
+            let rowHeight = height(side)
+            var y = top
             for item in items {
-                item.frame = NSRect(x: (column.bounds.width - side) / 2, y: y, width: side, height: side)
-                y += side + 2
+                item.frame = NSRect(x: (column.bounds.width - side) / 2, y: y, width: side, height: rowHeight)
+                y += rowHeight + 2
             }
         case .row:
             // Spread evenly across, but never further apart than the rail has them.
@@ -1249,9 +1277,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     // The groups' headings, each said once for the page and its search.
-    private static var tabsHeading: String { String(localized: "Tabs", comment: "A heading in Settings › General.") }
-    private static var windowHeading: String { String(localized: "Window", comment: "A heading in Settings › General.") }
-    private static var miniHeading: String { MiniWindowController.name }
     private static var downloadsHeading: String { String(localized: "Downloads", comment: "A heading in Settings › General.") }
     private static var spacesHeading: String { String(localized: "Your Spaces", comment: "A heading in Settings › Spaces.") }
     private static var browsingDataHeading: String { String(localized: "Browsing Data", comment: "A heading in Settings › Privacy.") }
@@ -1284,9 +1309,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Each section's groups and their headings, as a search goes through them.
     private func groups(of pane: SettingsPane) -> [(title: String?, group: FormGroup)] {
         switch pane {
-        case .general: [(nil, generalGroup), (Self.tabsHeading, tabsGroup), (Self.windowHeading, windowGroup), (Self.miniHeading, miniGroup),
-                        (Self.downloadsHeading, downloadsGroup),
-                        (nil, importGroup), (nil, versionGroup)]
+        case .general: [(nil, generalGroup), (Self.downloadsHeading, downloadsGroup), (nil, importGroup), (nil, versionGroup)]
+        case .appearance: [(nil, appearanceGroup)]
+        case .tabs: [(nil, tabsGroup)]
+        case .search: [(nil, searchGroup)]
+        case .mini: [(nil, miniGroup)]
         case .spaces: [(Self.spacesHeading, spacesGroup)]
         case .passwords: [(nil, passwordsGroup), (nil, passwordsWindowGroup)]
         case .privacy: [(nil, blockingGroup), (Self.browsingDataHeading, privacyGroup), (Self.siteDataHeading, siteDataGroup), (Self.sitesHeading, sitesGroup)]
@@ -1362,14 +1389,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
 
         switch pane {
-        case .general:
-            section(nil, generalGroup)
-            section(Self.tabsHeading, tabsGroup)
-            section(Self.windowHeading, windowGroup)
-            section(Self.miniHeading, miniGroup)
-            section(Self.downloadsHeading, downloadsGroup)
-            section(nil, importGroup)
-            section(nil, versionGroup)
+        case .general, .appearance, .tabs, .search, .mini:
+            for (title, group) in groups(of: pane) { section(title, group) }
         case .spaces:
             section(Self.spacesHeading, spacesGroup, accessory: addSpaceButton)
             // Said once, under the list, and only when there's an order to change.
@@ -1478,7 +1499,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let text = customSearch.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard text.isEmpty || SearchEngine.isValidTemplate(text) else {
             Toast.show(String(localized: "Use a web address with %s where the words go.",
-                              comment: "Toast when the custom search address in Settings › General isn't valid. Keep %s as it is."),
+                              comment: "Toast when the custom search address in Settings › Search isn't valid. Keep %s as it is."),
                        symbol: "exclamationmark.triangle", duration: 3, over: self, area: bounds)
             return
         }

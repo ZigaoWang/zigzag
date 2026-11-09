@@ -16,7 +16,7 @@ enum SettingsPage {
 
     static func pane(for url: URL?) -> SettingsPane {
         guard let name = url?.pathComponents.first(where: { $0 != "/" }) else { return .general }
-        return SettingsPane.allCases.first { $0.path == name } ?? .general
+        return SettingsPane(rawValue: name) ?? .general
     }
 
     /// ⌘,: the Settings tab this window already has (in this space first, then any other), or a new one; at `pane`

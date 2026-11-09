@@ -1527,7 +1527,7 @@
       }
     },
     "A playing video floats in its own window until you come back." : {
-      "comment" : "Explanation under “Keep videos playing when you switch tabs” in Settings › General.",
+      "comment" : "Explanation under “Keep videos playing when you switch tabs” in Settings › Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1549,7 +1549,7 @@
       }
     },
     "A small window for a quick look at a page. Esc closes it, and ⌘O moves it into your browser window to keep it." : {
-      "comment" : "Explanation under “New Zigzag Mini” in Settings › General: what Zigzag Mini is.",
+      "comment" : "Explanation under “New Zigzag Mini” in Settings › Zigzag Mini: what Zigzag Mini is.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1582,7 +1582,7 @@
       }
     },
     "A tab you’re not using that keeps working hard sleeps until you open it again." : {
-      "comment" : "Explanation under “Put busy background tabs to sleep” in Settings › General.",
+      "comment" : "Explanation under “Put busy background tabs to sleep” in Settings › Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1945,7 +1945,7 @@
       }
     },
     "After you close a pinned tab that went to another page, like a new chat." : {
-      "comment" : "Explanation under “Offer to pin the page you moved to” in Settings › General.",
+      "comment" : "Explanation under “Offer to pin the page you moved to” in Settings › Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2153,8 +2153,19 @@
         }
       }
     },
+    "Appearance" : {
+      "comment" : "A section of Settings: how the window and sidebar look.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外观"
+          }
+        }
+      }
+    },
     "Archive tabs you haven’t used" : {
-      "comment" : "A setting in Settings › General.",
+      "comment" : "A setting in Settings › Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2231,7 +2242,7 @@
       }
     },
     "At the Bottom" : {
-      "comment" : "A choice for “New tabs open” in Settings › General: below the other tabs.",
+      "comment" : "A choice for “New tabs open” in Settings › Tabs: below the other tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2242,7 +2253,7 @@
       }
     },
     "At the Top" : {
-      "comment" : "A choice for “New tabs open” in Settings › General: above the other tabs.",
+      "comment" : "A choice for “New tabs open” in Settings › Tabs: above the other tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2286,7 +2297,7 @@
       }
     },
     "Automatic" : {
-      "comment" : "A choice for “Favorites per row” in Settings › General: as many as fit the sidebar's width.",
+      "comment" : "A choice for “Favorites per row” in Settings › Appearance: as many as fit the sidebar's width.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2297,7 +2308,7 @@
       }
     },
     "Automatic fits fewer, larger ones in a narrow sidebar." : {
-      "comment" : "Explanation under “Favorites per row” in Settings › General.",
+      "comment" : "Explanation under “Favorites per row” in Settings › Appearance.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2517,7 +2528,7 @@
       }
     },
     "Borderless page" : {
-      "comment" : "A setting in Settings › General.",
+      "comment" : "A setting in Settings › Appearance.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4932,7 +4943,7 @@
       }
     },
     "Favorites per row" : {
-      "comment" : "A setting in Settings › General: how many favorites' tiles sit side by side in the sidebar.",
+      "comment" : "A setting in Settings › Appearance: how many favorites' tiles sit side by side in the sidebar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5664,7 +5675,7 @@
       }
     },
     "Instead of in a new tab." : {
-      "comment" : "Explanation under “Open links from other apps in Zigzag Mini” in Settings › General.",
+      "comment" : "Explanation under “Open links from other apps in Zigzag Mini” in Settings › Zigzag Mini.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5884,7 +5895,7 @@
       }
     },
     "Keep videos playing when you switch tabs" : {
-      "comment" : "A setting in Settings › General.",
+      "comment" : "A setting in Settings › Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5974,7 +5985,7 @@
       }
     },
     "Large space names" : {
-      "comment" : "A setting in Settings › General.",
+      "comment" : "A setting in Settings › Appearance.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6794,7 +6805,7 @@
       }
     },
     "New Zigzag Mini" : {
-      "comment" : "A row in Settings › General, under Zigzag Mini, showing its keyboard shortcut. Zigzag Mini is a name, kept in Latin letters.\nFile menu item: opens the command bar on its own, for a page in Zigzag Mini (a small window for one page, without the sidebar). Zigzag Mini is a name, kept in Latin letters.",
+      "comment" : "A row in Settings › Zigzag Mini, showing its keyboard shortcut. Zigzag Mini is a name, kept in Latin letters.\nFile menu item: opens the command bar on its own, for a page in Zigzag Mini (a small window for one page, without the sidebar). Zigzag Mini is a name, kept in Latin letters.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6805,7 +6816,7 @@
       }
     },
     "New tabs open" : {
-      "comment" : "A setting in Settings › General: where a new tab goes in the sidebar's list.",
+      "comment" : "A setting in Settings › Tabs: where a new tab goes in the sidebar's list.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6860,7 +6871,7 @@
       }
     },
     "Next to the Current Tab" : {
-      "comment" : "A choice for “New tabs open” in Settings › General: just below the tab you're on, or the page a link came from.",
+      "comment" : "A choice for “New tabs open” in Settings › Tabs: just below the tab you're on, or the page a link came from.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7377,7 +7388,7 @@
       }
     },
     "Offer to pin the page you moved to" : {
-      "comment" : "A setting in Settings › General.",
+      "comment" : "A setting in Settings › Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7718,7 +7729,7 @@
       }
     },
     "Open links from other apps in Zigzag Mini" : {
-      "comment" : "A setting in Settings › General, under Zigzag Mini.",
+      "comment" : "A setting in Settings › Zigzag Mini.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8359,7 +8370,7 @@
       }
     },
     "Pinch to see all tabs" : {
-      "comment" : "A setting in Settings › General: whether pinching in on the trackpad opens the tab overview.",
+      "comment" : "A setting in Settings › Tabs: whether pinching in on the trackpad opens the tab overview.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8623,7 +8634,7 @@
       }
     },
     "Put %s where the words you search for go." : {
-      "comment" : "Explanation under “Search address” in Settings › General. Keep %s as it is: it's what the address uses.",
+      "comment" : "Explanation under “Search address” in Settings › Search. Keep %s as it is: it's what the address uses.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8634,7 +8645,7 @@
       }
     },
     "Put busy background tabs to sleep" : {
-      "comment" : "A setting in Settings › General.",
+      "comment" : "A setting in Settings › Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8920,7 +8931,7 @@
       }
     },
     "Reduce motion" : {
-      "comment" : "A setting in Settings › General.",
+      "comment" : "A setting in Settings › Appearance.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9828,7 +9839,7 @@
       }
     },
     "Search" : {
-      "comment" : "Action label at the right of the selected command bar result, saying what Return does: searches for it.",
+      "comment" : "A section of Settings: the search engine and suggestions.\nAction label at the right of the selected command bar result, saying what Return does: searches for it.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9850,7 +9861,7 @@
       }
     },
     "Search address" : {
-      "comment" : "A setting in Settings › General, shown when the search engine is Custom.",
+      "comment" : "A setting in Settings › Search, shown when the search engine is Custom.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9861,7 +9872,7 @@
       }
     },
     "Search engine" : {
-      "comment" : "A setting in Settings › General.",
+      "comment" : "A setting in Settings › Search.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9905,7 +9916,7 @@
       }
     },
     "Search suggestions" : {
-      "comment" : "A setting in Settings › General.",
+      "comment" : "A setting in Settings › Search.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10532,7 +10543,7 @@
       }
     },
     "Shows the space’s name large and light above its tabs. When off, it’s a plain heading." : {
-      "comment" : "Explanation under “Large space names” in Settings › General.",
+      "comment" : "Explanation under “Large space names” in Settings › Appearance.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11253,7 +11264,7 @@
       }
     },
     "Tabs" : {
-      "comment" : "A heading in Settings › General.\nThe quiet label above today's tabs in the sidebar, below the pinned tabs.",
+      "comment" : "A section of Settings.\nThe quiet label above today's tabs in the sidebar, below the pinned tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11572,7 +11583,7 @@
       }
     },
     "The page meets the window’s edges instead of floating inside it." : {
-      "comment" : "Explanation under “Borderless page” in Settings › General.",
+      "comment" : "Explanation under “Borderless page” in Settings › Appearance.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11704,7 +11715,7 @@
       }
     },
     "They leave the sidebar. Type a few letters in the address bar to bring one back." : {
-      "comment" : "Explanation under “Archive tabs you haven’t used” in Settings › General.",
+      "comment" : "Explanation under “Archive tabs you haven’t used” in Settings › Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11726,7 +11737,7 @@
       }
     },
     "Things appear in place instead of sliding or growing. Fades stay." : {
-      "comment" : "Explanation under “Reduce motion” in Settings › General.",
+      "comment" : "Explanation under “Reduce motion” in Settings › Appearance.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12654,7 +12665,7 @@
       }
     },
     "Use a web address with %s where the words go." : {
-      "comment" : "Toast when the custom search address in Settings › General isn't valid. Keep %s as it is.",
+      "comment" : "Toast when the custom search address in Settings › Search isn't valid. Keep %s as it is.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12731,7 +12742,7 @@
       }
     },
     "Used when what you type isn’t an address." : {
-      "comment" : "Explanation under “Search engine” in Settings › General.",
+      "comment" : "Explanation under “Search engine” in Settings › Search.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13012,7 +13023,7 @@
       }
     },
     "What you type in the address bar is sent to your search engine for suggestions." : {
-      "comment" : "Explanation under “Search suggestions” in Settings › General.",
+      "comment" : "Explanation under “Search suggestions” in Settings › Search.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13067,7 +13078,7 @@
       }
     },
     "When off, websites get the pinch, for maps and games that zoom with it." : {
-      "comment" : "Explanation under “Pinch to see all tabs” in Settings › General.",
+      "comment" : "Explanation under “Pinch to see all tabs” in Settings › Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13078,7 +13089,7 @@
       }
     },
     "Where ⌘T and links put a new tab in the sidebar." : {
-      "comment" : "Explanation under “New tabs open” in Settings › General.",
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13111,7 +13122,7 @@
       }
     },
     "Window" : {
-      "comment" : "A heading in Settings › General.\nA menu in the menu bar.",
+      "comment" : "A menu in the menu bar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
