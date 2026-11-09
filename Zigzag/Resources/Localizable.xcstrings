@@ -2022,7 +2022,7 @@
       }
     },
     "Allow" : {
-      "comment" : "Button by a browser in the welcome window: let Zigzag read it.\nButton in the prompt asking whether an extension may hear a tab's sound.\nButton of the folder panel that lets Zigzag read a browser’s data, from the welcome window.\nButton on a site's permission question.",
+      "comment" : "Button by a browser in the welcome window: let Zigzag read it.\nButton of the folder panel that lets Zigzag read a browser’s data, from the welcome window.\nButton on a site's permission question.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4383,7 +4383,7 @@
       }
     },
     "Don’t Allow" : {
-      "comment" : "Button in the prompt asking whether an extension may hear a tab's sound.\nButton on a site's permission question.",
+      "comment" : "Button on a site's permission question.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5328,17 +5328,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "绿色"
-          }
-        }
-      }
-    },
-    "Hear what this tab plays" : {
-      "comment" : "Title of the prompt asking whether an extension may hear the sound a tab plays.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "收听此标签页播放的声音"
           }
         }
       }

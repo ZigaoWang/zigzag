@@ -1,24 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "NSAudioCaptureUsageDescription" : {
-      "comment" : "Shown by macOS when an extension first listens to a tab's sound. Shazam is a product name.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Extensions you use, like Shazam, can hear what a tab plays, only while they listen."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你使用的扩展（比如 Shazam）可以听到标签页播放的声音，但只在它们收听时。"
-          }
-        }
-      }
-    },
     "NSCameraUsageDescription" : {
       "comment" : "Shown by macOS when a website first asks to use the camera.",
       "extractionState" : "extracted_with_value",
