@@ -29,6 +29,8 @@ final class ExtensionHost: NSObject {
     /// Passes its two signals on to the ones views watch for any profile (ExtensionCenter).
     private var forwarding: [SignalToken] = []
     private var nativePorts: [ObjectIdentifier: NativeMessagingHost] = [:]
+    /// When each extension last started helpers for a connection, to slow down one that keeps reconnecting.
+    fileprivate var helperStarts: [String: [Date]] = [:]
     private var socketBridges: [ObjectIdentifier: WebSocketBridge] = [:]
 
     init(profile: Profile) {
@@ -252,7 +254,7 @@ final class ExtensionHost: NSObject {
         try? controller.unload(context)
         contexts.removeAll { $0 === context }
         // Its companion-app helpers end with it, whether or not WebKit closed their ports.
-        NativeMessagingHost.terminateAll(for: id)
+        NativeMessagingHost.terminateAll(for: id, of: self)
         bridge.release(id)
         use.forget(id)
         Passkeys.refresh()
@@ -982,7 +984,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         // A companion app only for an extension that asked for native messaging itself; the loaded copy's grant is
         // for Zigzag's bridge alone.
         guard ExtensionBridge.allows("nativeMessaging", for: extensionContext),
-              let host = NativeMessagingHost(name: applicationIdentifier, context: extensionContext) else {
+              let host = NativeMessagingHost(name: applicationIdentifier, context: extensionContext, owner: self) else {
             companionAppMissing(for: extensionContext)
             replyHandler(nil, NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
             return
@@ -1011,7 +1013,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             return
         }
         guard ExtensionBridge.allows("nativeMessaging", for: extensionContext),
-              let host = NativeMessagingHost(name: port.applicationIdentifier, context: extensionContext) else {
+              let host = NativeMessagingHost(name: port.applicationIdentifier, context: extensionContext, owner: self) else {
             companionAppMissing(for: extensionContext)
             completionHandler(NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
             return
@@ -1139,8 +1141,8 @@ final class NativeMessagingHost {
     /// Every helper running, kept alive here until it ends, so quitting Zigzag or turning the extension off
     /// ends them too instead of leaving them running.
     private static var running: [ObjectIdentifier: NativeMessagingHost] = [:]
-    /// When each extension last started helpers for a connection, to slow down one that keeps reconnecting.
-    private static var recentStarts: [String: [Date]] = [:]
+    /// The profile's extensions it was started for: the same extension in another profile has helpers of its own.
+    private weak var owner: ExtensionHost?
     /// A one-off message gets this long for its answer; a locked app waiting on you can take a while.
     private static let replyTimeout: TimeInterval = 60
 
@@ -1148,8 +1150,8 @@ final class NativeMessagingHost {
         for host in Array(running.values) { host.finish() }
     }
 
-    static func terminateAll(for id: String) {
-        for host in Array(running.values) where host.extensionID == id { host.finish() }
+    static func terminateAll(for id: String, of owner: ExtensionHost) {
+        for host in Array(running.values) where host.extensionID == id && host.owner === owner { host.finish() }
     }
 
     private var process: Process?
@@ -1160,7 +1162,8 @@ final class NativeMessagingHost {
     private var onMessage: ((Any) -> Void)?
     private var onExit: (() -> Void)?
 
-    init?(name: String?, context: WKWebExtensionContext) {
+    init?(name: String?, context: WKWebExtensionContext, owner: ExtensionHost) {
+        self.owner = owner
         let id = context.uniqueIdentifier
         guard let name, let manifest = Self.manifest(named: name), let host = Self.host(in: manifest, for: id) else { return nil }
         executable = host.executable
@@ -1293,7 +1296,7 @@ final class NativeMessagingHost {
             reply(response, error)
         }
         onMessage = { [weak self] response in
-            ExtensionHost.shared.nativeHostReplied(response, for: id)
+            self?.owner?.nativeHostReplied(response, for: id)
             answer(response, nil)
             self?.finish()
         }
@@ -1316,10 +1319,10 @@ final class NativeMessagingHost {
     /// A connection that keeps reconnecting (a restarting background, an app that keeps hanging up) waits a little
     /// longer each time, instead of starting helper after helper. Only helpers that really started count, and one
     /// that answers clears the slate, so an extension retrying while it waits is never locked out.
-    private static func delayBeforeStarting(for id: String) -> TimeInterval {
+    private func delayBeforeStarting() -> TimeInterval {
         let now = Date()
-        let recent = (recentStarts[id] ?? []).filter { now.timeIntervalSince($0) < 30 }
-        recentStarts[id] = recent
+        let recent = (owner?.helperStarts[extensionID] ?? []).filter { now.timeIntervalSince($0) < 30 }
+        owner?.helperStarts[extensionID] = recent
         return recent.count < 3 ? 0 : min(Double(recent.count - 2) * 2, 15)
     }
 
@@ -1329,10 +1332,10 @@ final class NativeMessagingHost {
         var sent = 0
         // What the extension says before the helper is up waits for it.
         var waiting: [Any] = []
-        onMessage = { message in
+        onMessage = { [weak owner] message in
             received += 1
-            if received == 1 { Self.recentStarts[id] = nil }
-            ExtensionHost.shared.nativeHostReplied(message, for: id)
+            if received == 1 { owner?.helperStarts[id] = nil }
+            owner?.nativeHostReplied(message, for: id)
             port.sendMessage(message, completionHandler: nil)
         }
         onExit = {
@@ -1351,14 +1354,14 @@ final class NativeMessagingHost {
         let begin = { [weak self] in
             guard let self, !self.finished else { return }
             let started = self.start()
-            if started { Self.recentStarts[id, default: []].append(Date()) }
+            if started { self.owner?.helperStarts[id, default: []].append(Date()) }
             ExtensionLog.write("native host for \(id) started=\(started)")
             guard started else { self.finish(); return }
             waiting.forEach { self.write($0) }
             waiting = []
             self.pointAtAppIfWaiting(received: { received }, sent: { sent })
         }
-        let delay = Self.delayBeforeStarting(for: id)
+        let delay = delayBeforeStarting()
         if delay > 0 {
             ExtensionLog.write("native host for \(id) reconnecting quickly; starting in \(Int(delay))s")
             // Kept alive while it waits; the extension hanging up meanwhile ends it before a helper starts.
