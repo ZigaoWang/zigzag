@@ -857,6 +857,12 @@ enum ExtensionProfile {
       let result;
     """)
 
+    /// Whether the WebSocket stand-in is live in the extension's background: only in a service worker, as the
+    /// stand-in steps aside in a background page. Only those extensions may open Zigzag's socket port.
+    static func usesWebSocketShim(manifest: [String: Any]?) -> Bool {
+        (manifest?["background"] as? [String: Any])?["service_worker"] is String
+    }
+
     /// WebKit's extension service workers freeze on `new WebSocket(…)`. This stands in for it, with the same
     /// events and methods, and Zigzag opens the real connection over a native port (WebSocketBridge). A background
     /// page (not a worker) opens its own as usual.

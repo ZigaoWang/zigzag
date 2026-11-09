@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Zigzag
 
-/// What keeps an extension inside its lines: the files its package may hold.
+/// What keeps an extension inside its lines: the files its package may hold, and what Zigzag opens for it.
 @MainActor
 struct ExtensionSecurityTests {
     private static func temporaryFolder() throws -> URL {
@@ -72,5 +72,13 @@ struct ExtensionSecurityTests {
         try FileManager.default.createDirectory(at: plain.appendingPathComponent("nested"), withIntermediateDirectories: true)
         try Data("ok".utf8).write(to: plain.appendingPathComponent("nested/file.js"))
         #expect(ExtensionStore.holdsOnlyItsOwnFiles(plain))
+    }
+
+    @Test func onlyAServiceWorkerGetsTheSocketStandIn() {
+        #expect(ExtensionProfile.usesWebSocketShim(manifest: ["background": ["service_worker": "background.js"]]))
+        #expect(!ExtensionProfile.usesWebSocketShim(manifest: ["background": ["scripts": ["background.js"]]]))
+        #expect(!ExtensionProfile.usesWebSocketShim(manifest: ["background": ["page": "background.html"]]))
+        #expect(!ExtensionProfile.usesWebSocketShim(manifest: ["name": "No background"]))
+        #expect(!ExtensionProfile.usesWebSocketShim(manifest: nil))
     }
 }

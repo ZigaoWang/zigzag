@@ -682,6 +682,10 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
                                 for extensionContext: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         // A WebSocket for a background, which WebKit can't open there itself (see WebSocketBridge).
         if port.applicationIdentifier == WebSocketBridge.host {
+            guard ExtensionProfile.usesWebSocketShim(manifest: ExtensionStore.manifest(for: extensionContext.uniqueIdentifier)) else {
+                completionHandler(NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
+                return
+            }
             let key = ObjectIdentifier(port)
             socketBridges[key] = WebSocketBridge(port: port, extensionID: extensionContext.uniqueIdentifier) { [weak self] in
                 self?.socketBridges[key] = nil
