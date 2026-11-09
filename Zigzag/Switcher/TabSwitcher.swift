@@ -327,7 +327,28 @@ final class TabSwitcher {
     private var thumbs: [TabThumbnailView] = []
     private var tabs: [Tab] = []
     private var index = 0
+    /// Cards in a row, for ↑ and ↓.
+    private var columns = 1
     private(set) var isActive = false
+
+    /// How many cards go in a row, and how wide each is: as big as the usual card when they fit side by side,
+    /// otherwise in rows, balanced, so titles stay readable instead of the row shrinking to slivers. Narrower only
+    /// when even that won't fit the window.
+    static func grid(count: Int, room: NSSize, aspect: CGFloat, chrome: CGFloat, gap: CGFloat = 0) -> (columns: Int, width: CGFloat) {
+        let full = Tokens.Metric.switcherThumbWidth, least = Tokens.Metric.switcherThumbMinWidth
+        guard count > 0, room.width > 0 else { return (1, full) }
+        let fits = max(1, Int((room.width + gap) / (least + gap)))
+        let rows = Int((Double(count) / Double(fits)).rounded(.up))
+        let columns = Int((Double(count) / Double(rows)).rounded(.up))
+        var width = min(full, floor((room.width - CGFloat(columns - 1) * gap) / CGFloat(columns)))
+        // Rows taller than the window: smaller cards, keeping their shape.
+        let tall = CGFloat(rows) * (width * aspect + chrome) + CGFloat(rows - 1) * gap
+        if tall > room.height {
+            let pictures = (room.height - CGFloat(rows - 1) * gap - CGFloat(rows) * chrome) / (CGFloat(rows) * aspect)
+            width = max(least * 0.6, floor(pictures))
+        }
+        return (columns, width)
+    }
     private var shown = false
     private var showWork: DispatchWorkItem?
 
@@ -350,6 +371,8 @@ final class TabSwitcher {
                 case 53 /* esc */: cancel()
                 case 123 /* ← */: step(-1)
                 case 124 /* → */: step(1)
+                case 126 /* ↑ */: if index - columns >= 0 { index -= columns; updateSelection() }
+                case 125 /* ↓ */: if index + columns < tabs.count { index += columns; updateSelection() }
                 case 36, 76 /* return, enter */: commit()
                 default: break
                 }
@@ -392,18 +415,20 @@ final class TabSwitcher {
         let card = controller.root.cardFrame
         let aspect = min(max(card.height / max(card.width, 1), 0.5), 0.8)
         // Cards side by side, the panel a step in from them: panel, card and picture corners run together.
-        let gap = 0 as CGFloat
         let pad = Tokens.Space.x1
-        // Over the page, beside the sidebar when it shows: centered where you're looking, not on the whole window.
-        let area = controller.root.convert(card, to: controller.root.overlay)
-        let maxWidth = area.width - Tokens.Space.x16
-        var thumbWidth = Tokens.Metric.switcherThumbWidth
-        let count = CGFloat(tabs.count)
-        if count * thumbWidth + (count - 1) * gap + pad * 2 > maxWidth {
-            thumbWidth = floor((maxWidth - pad * 2 - (count - 1) * gap) / count)
-        }
         let inset = Tokens.Space.x1
+        // A little air between cards, so a grid of busy pages still reads as separate pages.
+        let gap = Tokens.Space.x2
+        // Centered on the whole window, as Command+Tab is on the screen, with or without the sidebar.
+        let area = controller.root.overlay.bounds
+        let grid = Self.grid(count: tabs.count, room: NSSize(width: area.width - Tokens.Space.x16 - pad * 2, height: area.height - Tokens.Space.x16 - pad * 2),
+                             aspect: aspect, chrome: TabThumbnailView.titleHeight + inset * 2, gap: gap)
+        columns = grid.columns
+        let thumbWidth = grid.width
         let thumbHeight = round((thumbWidth - inset * 2) * aspect) + TabThumbnailView.titleHeight + inset
+        let rows = Int((Double(tabs.count) / Double(grid.columns)).rounded(.up))
+        let across = min(tabs.count, grid.columns)
+        let width = pad * 2 + CGFloat(across) * thumbWidth + CGFloat(across - 1) * gap
         thumbs = tabs.enumerated().map { i, tab in
             let thumb = TabThumbnailView()
             if let pair = controller.tabManager.split(for: tab), let left = controller.tabManager.tab(with: pair.left),
@@ -413,13 +438,18 @@ final class TabSwitcher {
                 thumb.configure(tab)
             }
             thumb.showsHover = false
-            thumb.frame = NSRect(x: pad + CGFloat(i) * (thumbWidth + gap), y: pad, width: thumbWidth, height: thumbHeight)
+            // The chosen card is ringed, as in the tab overview: among a few rows of colorful pages a soft fill is easy to lose.
+            thumb.showsRing = true
+            // Row by row, most recent first; a shorter last row sits in the middle, as text centers.
+            let row = i / grid.columns, column = i % grid.columns
+            let inRow = row == rows - 1 ? tabs.count - row * grid.columns : grid.columns
+            let lead = (width - pad * 2 - CGFloat(inRow) * thumbWidth - CGFloat(inRow - 1) * gap) / 2
+            thumb.frame = NSRect(x: pad + lead + CGFloat(column) * (thumbWidth + gap), y: pad + CGFloat(row) * (thumbHeight + gap), width: thumbWidth, height: thumbHeight)
             thumb.onClick = { [weak self] _ in self?.index = i; self?.commit() }
             panel.addSubview(thumb)
             return thumb
         }
-        let width = pad * 2 + count * thumbWidth + (count - 1) * gap
-        let height = pad * 2 + thumbHeight
+        let height = pad * 2 + CGFloat(rows) * thumbHeight + CGFloat(rows - 1) * gap
         panel.frame = NSRect(x: round(area.midX - width / 2), y: round(area.midY - height / 2), width: width, height: height)
         controller.root.overlay.addSubview(panel)
         panel.present()

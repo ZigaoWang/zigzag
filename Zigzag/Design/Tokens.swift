@@ -102,6 +102,8 @@ enum Tokens {
         static let commandBarMaxRows: Int = 8
         static let previewWidth: CGFloat = 320
         static let switcherThumbWidth: CGFloat = 224
+        /// The narrowest a Control+Tab card gets before the cards go into rows: its title still reads.
+        static let switcherThumbMinWidth: CGFloat = 184
         static let peekInsetRatio: CGFloat = 0.08
         static let findBarWidth: CGFloat = 320
         static let popupDefaultSize = NSSize(width: 520, height: 640)
