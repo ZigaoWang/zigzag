@@ -207,3 +207,138 @@ struct SiteOriginPermissionTests {
         }
     }
 }
+
+/// A frame from another site asks as itself on that page only: what it was told on one site never lets it in on
+/// another, nor on its own site.
+@Suite(.serialized)
+@MainActor
+struct EmbeddedPermissionTests {
+    private func withDefaults(_ body: () throws -> Void) throws {
+        let suite = "zigzag-embedded-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: suite)
+        }
+        try body()
+    }
+
+    @Test func aFrameOnItsOwnSiteAsksAsThePage() {
+        #expect(SitePermissions.answerKey(frame: "https://meet.example", page: "https://meet.example") == "https://meet.example")
+        #expect(SitePermissions.answerKey(frame: "https://meet.example", page: "https://news.example") == "https://news.example|embed:https://meet.example")
+        #expect(SitePermissions.answerKey(frame: "https://meet.example", page: nil) == nil)
+        #expect(SitePermissions.answerKey(frame: nil, page: "https://news.example") == nil)
+    }
+
+    @Test func anEmbeddedAnswerStaysOnItsPage() throws {
+        try withDefaults {
+            let frame = "https://meet.example", news = "https://news.example"
+            // Allowed on its own site, it still asks when another site frames it.
+            SitePermissions.remember(true, origin: frame, type: .camera)
+            let embedded = try #require(SitePermissions.answerKey(frame: frame, page: news))
+            #expect(SitePermissions.decision(origin: embedded, type: .camera) == nil)
+            // Allowed framed by one site, it asks framed by another, and on its own site.
+            SitePermissions.remember(true, origin: embedded, type: .microphone)
+            let elsewhere = try #require(SitePermissions.answerKey(frame: frame, page: "https://evil.example"))
+            #expect(SitePermissions.decision(origin: elsewhere, type: .microphone) == nil)
+            #expect(SitePermissions.decision(origin: frame, type: .microphone) == nil)
+            #expect(SitePermissions.decision(origin: news, type: .microphone) == nil)
+            // Kept under the page: it's the page's row, and forgetting the page forgets it.
+            #expect(SitePermissions.sites == [frame, news])
+            #expect(SitePermissions.mediaDecisions(origin: news) == [true])
+            #expect(SitePermissions.mediaDecisions(origin: frame) == [true])
+            SitePermissions.forget(origin: news)
+            #expect(SitePermissions.decision(origin: embedded, type: .microphone) == nil)
+            #expect(SitePermissions.decision(origin: frame, type: .camera) == true)
+            SitePermissions.remember(false, origin: embedded, type: .camera)
+            SitePermissions.forgetEverything(origin: news)
+            #expect(SitePermissions.sites == [frame])
+        }
+    }
+
+    @Test func embeddedLocationIsForgottenWithThePage() throws {
+        try withDefaults {
+            let embedded = try #require(SitePermissions.answerKey(frame: "https://maps.example", page: "https://shop.example"))
+            SitePermissions.defaults.set(["\(embedded)|location": true, "https://maps.example|location": false], forKey: "SitePermissions")
+            #expect(SitePermissions.locationDecisions(origin: "https://shop.example") == [true])
+            #expect(SitePermissions.location(origin: "https://shop.example") == nil)
+            SitePermissions.forgetLocation(origin: "https://shop.example")
+            #expect(SitePermissions.locationDecisions(origin: "https://shop.example").isEmpty)
+            #expect(SitePermissions.location(origin: "https://maps.example") == false)
+        }
+    }
+
+    @Test func theQuestionNamesTheFrameAndThePage() {
+        #expect(SitePermissions.askerName(frame: "https://meet.example", page: "https://meet.example") == "meet.example")
+        let both = SitePermissions.askerName(frame: "https://meet.example", page: "http://localhost:3000")
+        #expect(both.contains("meet.example") && both.contains("http://localhost:3000"))
+        #expect(SitePermissions.askerName(frame: "https://meet.example", page: nil).contains("meet.example"))
+    }
+}
+
+/// Pop-up notices, toasts' actions, notification icons and pop-up headers: what a page can't use against you.
+@MainActor
+struct PageNoticeTests {
+    @Test func aToastsActionWaitsAHalfSecond() {
+        let shown = Date()
+        #expect(!Toast.acceptsAction(shownAt: shown, now: shown))
+        #expect(!Toast.acceptsAction(shownAt: shown, now: shown.addingTimeInterval(0.4)))
+        #expect(Toast.acceptsAction(shownAt: shown, now: shown.addingTimeInterval(0.6)))
+    }
+
+    @Test func aBlockedPopupIsSaidOnceInAWhile() {
+        let key = "test-\(UUID().uuidString)|https://example.com", now = Date()
+        #expect(PopupNotice.shouldNotice(key, now: now))
+        #expect(!PopupNotice.shouldNotice(key, now: now.addingTimeInterval(1)))
+        #expect(!PopupNotice.shouldNotice(key, now: now.addingTimeInterval(PopupNotice.noticeInterval - 1)))
+        #expect(PopupNotice.shouldNotice("test-\(UUID().uuidString)|https://other.example", now: now.addingTimeInterval(1)))
+        #expect(PopupNotice.shouldNotice(key, now: now.addingTimeInterval(PopupNotice.noticeInterval + 1)))
+    }
+
+    @Test func onlyWebPopupsAreOffered() throws {
+        let page = try #require(URL(string: "https://pay.example/checkout"))
+        #expect(PopupNotice.offered(page) == (true, page))
+        #expect(PopupNotice.offered(nil) == (true, nil))
+        #expect(PopupNotice.offered(URL(string: "about:blank")) == (true, nil))
+        #expect(PopupNotice.offered(URL(string: "javascript:alert(1)")) == (false, nil))
+        #expect(PopupNotice.offered(URL(string: "data:text/html,hi")) == (false, nil))
+    }
+
+    @Test func iconsComeOnlyFromPublicAddresses() {
+        for address in ["127.0.0.1", "127.1.2.3", "10.0.0.1", "172.16.0.1", "172.31.255.255", "192.168.1.1", "169.254.169.254",
+                        "0.0.0.0", "100.64.0.1", "224.0.0.1", "255.255.255.255", "::1", "::", "[::1]", "fe80::1", "fc00::1",
+                        "fd12:3456::1", "ff02::1", "::ffff:127.0.0.1", "::ffff:192.168.0.1", "64:ff9b::a00:1", "2002:c0a8:101::1",
+                        "not an address", ""] {
+            #expect(!IconAddress.isPublic(address), "\(address)")
+        }
+        for address in ["8.8.8.8", "93.184.216.34", "172.32.0.1", "192.169.0.1", "2606:4700::1111", "::ffff:8.8.8.8"] {
+            #expect(IconAddress.isPublic(address), "\(address)")
+        }
+        for name in ["localhost", "LOCALHOST.", "app.localhost", "printer.local", "router.home.arpa", "db.internal", ""] {
+            #expect(!IconAddress.isPublicName(name), "\(name)")
+        }
+        #expect(IconAddress.isPublicName("cdn.example.com"))
+    }
+
+    @Test func iconsAreFetchedOnlyOverTheWeb() async throws {
+        for text in ["http://127.0.0.1/icon.png", "https://[::1]/icon.png", "http://localhost:8080/icon.png", "http://192.168.1.1/x.png",
+                     "file:///etc/hosts", "ftp://8.8.8.8/x.png", "http://169.254.169.254/latest"] {
+            let url = try #require(URL(string: text))
+            #expect(await !IconAddress.mayFetch(url), "\(text)")
+        }
+        #expect(await IconAddress.mayFetch(try #require(URL(string: "https://8.8.8.8/icon.png"))))
+    }
+
+    @Test func popupHeaderNamesASiteOnlyWhenThereIsOne() {
+        #expect(PopupHeaderView.site(of: URL(string: "https://accounts.example.com/signin")) == "accounts.example.com")
+        #expect(PopupHeaderView.site(of: URL(string: "https://accounts.example.com:81/")) == "accounts.example.com:81")
+        #expect(PopupHeaderView.site(of: URL(string: "blob:https://pay.example/0a1b-2c3d")) == "pay.example")
+        #expect(PopupHeaderView.site(of: URL(string: "blob:http://localhost:3000/0a1b")) == "localhost:3000")
+        #expect(PopupHeaderView.site(of: URL(string: "data:text/html,hi")) == nil)
+        #expect(PopupHeaderView.site(of: URL(string: "about:blank")) == nil)
+        #expect(PopupHeaderView.site(of: URL(string: "blob:null/0a1b")) == nil)
+        #expect(PopupHeaderView.site(of: nil) == nil)
+    }
+}
