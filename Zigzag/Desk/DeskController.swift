@@ -1339,6 +1339,13 @@ final class DeskController {
     /// zooming, can't be talked out of it, and a page left halfway stays shrunk and shifted (further with every
     /// pinch). So the first steps are held until the pinch shows which way it's going: closing opens the desk, and
     /// anything else goes to the page whole, held steps first, so it zooms as if nothing had waited.
+    /// Whether pinching in on the trackpad opens the tab overview (Settings › General). Off, the pinch goes to the page,
+    /// for maps and games that zoom with it (GeoGuessr); ⌘⇧\ still opens the overview, and pinching out still closes it.
+    static var pinchOpens: Bool {
+        get { UserDefaults.standard.object(forKey: "PinchOpensTabOverview") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "PinchOpensTabOverview") }
+    }
+
     func handleMagnify(_ event: NSEvent) -> Bool {
         guard event.type == .magnify, let controller else { return false }
         let ends = event.phase == .ended || event.phase == .cancelled
@@ -1361,6 +1368,7 @@ final class DeskController {
             }
             return true
         }
+        guard Self.pinchOpens else { return false }
         switch pinch {
         case .idle:
             return false

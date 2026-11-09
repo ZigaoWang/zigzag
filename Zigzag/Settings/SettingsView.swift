@@ -563,6 +563,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let largeNamesToggle = Toggle()
     private let quitToggle = Toggle()
     private let motionToggle = Toggle()
+    private let pinchToggle = Toggle()
     /// Where downloads go: Downloads, another folder, or ask each time.
     private let downloadPlace = DropdownButton()
     private var downloadPlaceToken: SignalToken?
@@ -764,6 +765,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         miniGroup.add(FormRow(title: String(localized: "Open links from other apps in Zigzag Mini", comment: "A setting in Settings › General, under Zigzag Mini."),
                               detail: String(localized: "Instead of in a new tab.", comment: "Explanation under “Open links from other apps in Zigzag Mini” in Settings › General."),
                               control: miniToggle))
+        pinchToggle.onChange = { on in DeskController.pinchOpens = on }
+        windowGroup.add(FormRow(title: String(localized: "Pinch to see all tabs", comment: "A setting in Settings › General: whether pinching in on the trackpad opens the tab overview."),
+                                detail: String(localized: "When off, websites get the pinch, for maps and games that zoom with it.", comment: "Explanation under “Pinch to see all tabs” in Settings › General."),
+                                control: pinchToggle))
         motionToggle.onChange = { on in Tokens.Motion.reducesMotionHere = on }
         windowGroup.add(FormRow(title: String(localized: "Reduce motion", comment: "A setting in Settings › General."),
                                 detail: String(localized: "Things appear in place instead of sliding or growing. Fades stay.", comment: "Explanation under “Reduce motion” in Settings › General."),
@@ -1500,6 +1505,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         miniKeys.keys = Shortcuts.allItems.first { $0.action == #selector(AppDelegate.newMiniWindow(_:)) }.map(Shortcuts.caps) ?? []
         energyToggle.isOn = EnergyWatch.sleepsBusyTabs
         motionToggle.isOn = Tokens.Motion.reducesMotionHere
+        pinchToggle.isOn = DeskController.pinchOpens
         refreshDownloadPlace()
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         favoritesPerRow.selectedIndex = FavoritesView.perRowChoices.firstIndex(of: FavoritesView.perRow) ?? 0

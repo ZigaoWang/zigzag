@@ -8286,6 +8286,17 @@
         }
       }
     },
+    "Pinch to see all tabs" : {
+      "comment" : "A setting in Settings › General: whether pinching in on the trackpad opens the tab overview.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "双指捏合查看所有标签页"
+          }
+        }
+      }
+    },
     "Pine" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor. A deep green.",
       "localizations" : {
@@ -12913,6 +12924,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "当页面是其他语言时，Zigzag 会在每个网站上询问一次。"
+          }
+        }
+      }
+    },
+    "When off, websites get the pinch, for maps and games that zoom with it." : {
+      "comment" : "Explanation under “Pinch to see all tabs” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭后，捏合手势交给网页，方便地图和用它缩放的游戏。"
           }
         }
       }
