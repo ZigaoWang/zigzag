@@ -8,7 +8,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [0.7.2] - 2026-11-09
 
 ### New
-- Zigzag Mini takes after Arc's Little Arc: a slim strip in your space's color with the page's site in the middle, the space it belongs to on the left (click it to pick another), and Copy Link and Open in Work ⌘O, named for that space, on the right. The page sits in a thin frame of the space's color. A link from another app opens only Zigzag Mini, over the app you clicked it in, and your browser windows stay where they were until you want them.
+- Zigzag Mini takes after Arc's Little Arc: a slim strip in your space's color with the page's site in the middle, the space it belongs to on the left (click it to pick another), and Copy Link and Open in Work ⌘O, named for that space, on the right. The page sits in a thin frame of the space's color. A link from another app opens only Zigzag Mini, over the app you clicked it in, and your browser windows stay where they were until you want them. Closing it takes you back to that app.
 - A mouse's side buttons go back and forward.
 - Settings › General can leave the trackpad pinch to websites, for maps and games like GeoGuessr that zoom with it. ⌘⇧\ still shows all tabs.
 - Settings › Shortcuts shows an × beside a shortcut when you point at it: click it and the command has no shortcut, for one that gets in a website's way.
