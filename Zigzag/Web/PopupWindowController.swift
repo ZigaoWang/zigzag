@@ -314,25 +314,38 @@ final class PopupHeaderView: NSView {
             needsLayout = true
             return
         }
-        // With a port that isn't the usual one, so "accounts.google.com:81" never reads as Google's own.
-        let usual = url?.scheme == "https" ? 443 : url?.scheme == "http" ? 80 : nil
-        label.stringValue = (url?.host() ?? "") + (url?.port.flatMap { $0 == usual ? nil : ":\($0)" } ?? "")
+        // No site at all (data:): said so, and no lock, which would vouch for a site that isn't there.
+        let site = Self.site(of: url)
+        label.stringValue = site ?? AddressView.name(of: url)
+        lock.isHidden = site == nil
         lock.image = Tokens.Symbol.image(secure ? "lock" : "exclamationmark.triangle", size: Tokens.Symbol.inline)
-        lock.isHidden = url == nil
         lock.setAccessibilityLabel(secure ? String(localized: "Secure connection", comment: "VoiceOver label of the lock before the address in a pop-up window.")
                                            : String(localized: "Not secure", comment: "VoiceOver label of the warning before the address in a pop-up window."))
         needsLayout = true
     }
 
+    /// The site a page's address names, with its port when it isn't the usual one, so "accounts.google.com:81"
+    /// never reads as Google's own. A blob: page is named for the site whose script made it, as the address names
+    /// it. Nil when there's no site (data:, about:blank).
+    static func site(of url: URL?) -> String? {
+        guard let url else { return nil }
+        let site = url.scheme?.lowercased() == "blob" ? URL(string: String(url.absoluteString.dropFirst("blob:".count))) : url
+        guard let site, site.scheme?.lowercased() != "blob", let host = site.host(), !host.isEmpty else { return nil }
+        let usual = site.scheme == "https" ? 443 : site.scheme == "http" ? 80 : nil
+        return host + (site.port.flatMap { $0 == usual ? nil : ":\($0)" } ?? "")
+    }
+
     override func layout() {
         super.layout()
         let textSize = NSSize(width: label.textWidth, height: label.lineHeight)
-        let lockWidth = Tokens.Space.x3
-        let total = lockWidth + Tokens.Space.x1 + ceil(textSize.width)
+        // Without its lock, the name alone is centered.
+        let lockWidth = lock.isHidden ? 0 : Tokens.Space.x3
+        let gap = lock.isHidden ? 0 : Tokens.Space.x1
+        let total = lockWidth + gap + ceil(textSize.width)
         let x = max(Tokens.Space.x16 + Tokens.Space.x4, (bounds.width - total) / 2)
         let h = ceil(textSize.height)
         lock.frame = NSRect(x: x, y: 0, width: lockWidth, height: bounds.height)
-        label.frame = NSRect(x: lock.frame.maxX + Tokens.Space.x1, y: (bounds.height - h) / 2, width: max(0, min(ceil(textSize.width), bounds.width - x - Tokens.Space.x4 - trailingInset)), height: h)
+        label.frame = NSRect(x: lock.frame.maxX + gap, y: (bounds.height - h) / 2, width: max(0, min(ceil(textSize.width), bounds.width - x - Tokens.Space.x4 - trailingInset)), height: h)
     }
 }
 
