@@ -488,4 +488,42 @@ struct PasswordSafetyTests {
         // Two for this address: you choose.
         #expect(AuthenticationPrompt.prefill([exact, login("https://router.example.com", "guest")], for: here) == nil)
     }
+
+    @Test func theMenuTakesNoClickForHalfASecond() async throws {
+        let menu = AutofillMenu(items: [.login(login("https://www.example.com", "sam"))], origin: try #require(Origin(URL(string: "https://www.example.com"))))
+        let host = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        host.addSubview(menu)
+        menu.frame = NSRect(x: 0, y: 0, width: 300, height: menu.contentHeight)
+        menu.needsLayout = true
+        menu.layoutSubtreeIfNeeded()
+        // The middle of the first row, in its superview's terms, as hit-testing takes it.
+        let onRow = menu.convert(NSPoint(x: 150, y: 28), to: host)
+        #expect(menu.hitTest(onRow) === menu)
+        try await Task.sleep(for: .milliseconds(600))
+        let hit = try #require(menu.hitTest(onRow))
+        #expect(hit !== menu)
+        #expect(hit is InteractiveView)
+    }
+
+    @Test func aPageMovingTheCursorDoesntOpenTheMenu() async throws {
+        let heard = Heard()
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController.addUserScript(Autofill.script)
+        configuration.userContentController.add(heard, contentWorld: .defaultClient, name: Autofill.messageName)
+        let (webView, _, _) = await page("""
+        <form><input id="user" name="username" autocomplete="username" autofocus><input id="pass" type="password"></form>
+        <script>setTimeout(() => document.getElementById('pass').focus(), 0)</script>
+        """, configuration: configuration)
+        #expect(try await webView.evaluateJavaScript("!!window.__zigzagAutofillWatcher", in: nil, contentWorld: .defaultClient) as? Bool == true)
+        _ = try await webView.evaluateJavaScript("""
+        document.getElementById('user').focus();
+        document.getElementById('pass').dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        document.getElementById('pass').focus();
+        """)
+        try await Task.sleep(for: .milliseconds(150))
+        _ = try await webView.callAsyncJavaScript("window.webkit.messageHandlers.zigzagAutofill.postMessage({ kind: 'done' })", arguments: [:],
+                                                  in: nil, contentWorld: .defaultClient)
+        await heard.wait(for: "done")
+        #expect(!heard.kinds.contains("focus"))
+    }
 }

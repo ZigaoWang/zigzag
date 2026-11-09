@@ -352,23 +352,28 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                minLength: el.minLength, maxLength: el.maxLength, rect: { x: r.left, y: r.top, w: r.width, h: r.height } });
       };
       const wanted = (el) => signIn(el) || isNew(el) || formField(el);
-      document.addEventListener('focusin', (e) => { if (!window.__zigzagFilling && wanted(e.target)) report(e.target); }, true);
+      // The menu opens only for something you did: a click on the field (or its label), or Tab to it. A page can put
+      // the cursor in a field by itself, and mustn't get the menu up under a click you were about to make elsewhere.
+      let pressed = null, pressedAt = -Infinity;
+      document.addEventListener('mousedown', (e) => { if (e.isTrusted) { pressed = e.target; pressedAt = performance.now(); } }, true);
+      const byYou = (el) => performance.now() - pressedAt < 1000
+        && (pressed === 'Tab' || pressed === el || [...(el.labels || [])].some((label) => label === pressed || label.contains(pressed)));
+      document.addEventListener('focusin', (e) => { if (!window.__zigzagFilling && wanted(e.target) && byYou(e.target)) report(e.target); }, true);
       document.addEventListener('mousedown', (e) => { if (e.isTrusted && e.target === document.activeElement && wanted(e.target)) report(e.target); }, true);
       document.addEventListener('focusout', (e) => { if (wanted(e.target)) post({ kind: 'blur' }); }, true);
-      // A field already focused when the page opened (Google's sign-in puts the cursor in the email box at once)
-      // never sends focusin to this script: offer for it too, once the page shows. Only sign-in fields, never forms.
-      const offerFocused = () => {
-        const el = document.activeElement;
-        if (!window.__zigzagFilling && !window.__zigzagSuggesting && document.visibilityState === 'visible' && (signIn(el) || isNew(el))) report(el);
-      };
-      offerFocused();
-      window.addEventListener('load', () => setTimeout(offerFocused, 50), { once: true });
-      document.addEventListener('visibilitychange', offerFocused);
       document.addEventListener('input', (e) => { if (window.__zigzagSuggesting && wanted(e.target)) post({ kind: 'blur' }); }, true);
       window.addEventListener('scroll', () => { if (window.__zigzagSuggesting) post({ kind: 'blur' }); }, true);
       document.addEventListener('keydown', (e) => {
+        if (!e.isTrusted) return;
+        if (e.key === 'Tab') { pressed = 'Tab'; pressedAt = performance.now(); }
+        // A field the page put the cursor in when it opened (Google's sign-in does): the menu comes with a click on it,
+        // or the down arrow.
+        if (e.key === 'ArrowDown' && !window.__zigzagSuggesting && !window.__zigzagFilling && e.target === document.activeElement && wanted(e.target)) {
+          report(e.target);
+          return;
+        }
         // Only keys a person pressed: a page can send itself key events, but must never pick a login with them.
-        if (!e.isTrusted || !window.__zigzagSuggesting || !['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) return;
+        if (!window.__zigzagSuggesting || !['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) return;
         if (e.key === 'Enter' && !window.__zigzagSelected) return;
         e.preventDefault(); e.stopPropagation();
         post({ kind: 'key', key: e.key });
@@ -602,6 +607,19 @@ final class AutofillMenu: FloatingPanelView {
         /// Nothing saved at all: bring passwords over from this browser.
         case importFrom(String)
     }
+
+    /// When it came up. For the first half second it takes no clicks, so a page can't bring it up just as you click
+    /// (a "click here, fast" game) and catch that click on a login.
+    private let shownAt = ProcessInfo.processInfo.systemUptime
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let hit = super.hitTest(point) else { return nil }
+        return ProcessInfo.processInfo.systemUptime - shownAt > 0.5 ? hit : self
+    }
+
+    /// A click on the menu that isn't on a row (or comes too soon) ends here, never on the page or window behind.
+    override func mouseDown(with event: NSEvent) {}
+    override func mouseUp(with event: NSEvent) {}
 
     private var rows: [AutofillRow] = []
     private let footer = TextButton(title: String(localized: "Passwords", comment: "Link at the bottom of the menu that fills a password into a page: opens the Passwords window."), font: Tokens.Font.small(.medium))
