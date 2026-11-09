@@ -5,6 +5,20 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-11-09
+
+### New
+- 1Password, Bitwarden and other password extensions can fill a site's own sign-in box, the one a router, a test server or an admin page asks with, as they do in Chrome. When none answers, Zigzag's sign-in sheet offers the passwords you've saved for the site. ([#13](https://github.com/ZigaoWang/zigzag/issues/13))
+- Drag a space's icon along the bottom of the sidebar to change the order of your spaces.
+- The disk image welcomes you on Zigzag's own sky, sharp on Retina screens.
+
+### Fixed
+- Switching to Zigzag with ⌘Tab always brings its windows back; sometimes they stayed hidden.
+- Importing a profile again after deleting its space brings the space back with its pages. Before, Import could show the last import's result and bring nothing over.
+- Importing the same history again says nothing new came over, instead of counting it all again.
+
+Thanks to [@philigrin](https://github.com/philigrin) for #13.
+
 ## [0.7.2] - 2026-11-09
 
 ### New
