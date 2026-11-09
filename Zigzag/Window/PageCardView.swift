@@ -30,7 +30,9 @@ final class PageCardView: NSView {
 
     /// The right corners that are the window's own corners, which the window rounds itself: square here.
     var squaresRightCorners = (top: false, bottom: false) { didSet { if squaresRightCorners != oldValue { needsLayout = true } } }
-    /// Meeting the window's edges beside the sidebar: its corners curve like the window's, so a split's two panes
+    /// The same on the left: Zigzag Mini's borderless page meets both of the window's bottom corners.
+    var squaresLeftCorners = (top: false, bottom: false) { didSet { if squaresLeftCorners != oldValue { needsLayout = true } } }
+    /// Meeting the window's edges beside the sidebar (or under Zigzag Mini's strip): its corners curve like the window's, so a split's two panes
     /// match across the gap and the corner by the sidebar matches the window's.
     var isAttached = false { didSet { if isAttached != oldValue { needsLayout = true; refreshColors() } } }
 
@@ -251,6 +253,8 @@ final class PageCardView: NSView {
             var corners: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
             if squaresRightCorners.top { corners.remove(.layerMaxXMaxYCorner) }
             if squaresRightCorners.bottom { corners.remove(.layerMaxXMinYCorner) }
+            if squaresLeftCorners.top { corners.remove(.layerMinXMaxYCorner) }
+            if squaresLeftCorners.bottom { corners.remove(.layerMinXMinYCorner) }
             clip.layer?.maskedCorners = corners
             edge.maskedCorners = corners
             layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)

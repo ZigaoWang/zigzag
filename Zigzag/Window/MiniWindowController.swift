@@ -592,7 +592,8 @@ extension MiniWindowController: TabHost {
 // MARK: - The window's content
 
 /// Zigzag Mini's content: the space's frame, the slim strip on top of it, and the page as a card in a thin, even
-/// frame of the space's color, so it reads as a small Zigzag window.
+/// frame of the space's color, so it reads as a small Zigzag window. Borderless (Settings › General), the page meets
+/// the window's sides and bottom as a browser window's does, rounding only under the strip.
 final class MiniRootView: SpaceFrameView {
     let strip = MiniStripView()
     let card = PageCardView()
@@ -600,20 +601,51 @@ final class MiniRootView: SpaceFrameView {
     let overlay = PassthroughView()
     /// Over the whole window: the command bar.
     let barLayer = PassthroughView()
+    private var borderlessToken: NSObjectProtocol?
 
     init() {
         super.init(color: SpaceColor.sky.background)
         [strip, card, overlay, barLayer].forEach(addSubview)
+        // The setting changed: the page grows to the edges (or back into its frame) as a browser window's does.
+        borderlessToken = NotificationCenter.default.addObserver(forName: BrowserRootView.borderlessChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                Tokens.Motion.animate(Tokens.Motion.gentle, moves: true) {
+                    self.needsLayout = true
+                    self.layoutSubtreeIfNeeded()
+                }
+            }
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
+    isolated deinit {
+        if let borderlessToken { NotificationCenter.default.removeObserver(borderlessToken) }
+    }
+
+    var cardFrame: NSRect {
+        let top = Tokens.Metric.miniStripHeight
+        if BrowserRootView.isBorderless { return NSRect(x: 0, y: top, width: bounds.width, height: max(0, bounds.height - top)) }
+        let inset = Tokens.Metric.miniFrame
+        return NSRect(x: inset, y: top, width: max(0, bounds.width - inset * 2), height: max(0, bounds.height - top - inset))
+    }
+
+    /// Borderless, the page covers all but the strip: the glass goes only under that and the page's round corners.
+    override var glassFrame: NSRect {
+        guard BrowserRootView.isBorderless else { return bounds }
+        return NSRect(x: 0, y: 0, width: bounds.width, height: min(bounds.height, Tokens.Metric.miniStripHeight + Tokens.Radius.attached * 2))
+    }
+
     override func layout() {
         super.layout()
-        let top = Tokens.Metric.miniStripHeight
-        let inset = Tokens.Metric.miniFrame
-        strip.frame = NSRect(x: 0, y: 0, width: bounds.width, height: top)
-        card.frame = NSRect(x: inset, y: top, width: max(0, bounds.width - inset * 2), height: max(0, bounds.height - top - inset))
+        let borderless = BrowserRootView.isBorderless
+        strip.frame = NSRect(x: 0, y: 0, width: bounds.width, height: Tokens.Metric.miniStripHeight)
+        // Meeting the window's bottom corners, the page leaves them to the window, which rounds them itself.
+        card.isAttached = borderless
+        card.squaresLeftCorners = (false, borderless)
+        card.squaresRightCorners = (false, borderless)
+        card.frame = cardFrame
         overlay.frame = card.frame
         barLayer.frame = bounds
     }
@@ -660,7 +692,7 @@ final class MiniStripView: NSView {
         let h = Tokens.Pane.addressHeight, b = Tokens.Pane.button
         let y = round(mid - h / 2)
         let left = Tokens.Sidebar.lightsX + trafficLightsWidth + Tokens.Space.x2
-        // The button's end lines up with the page's right edge, the frame's width in.
+        // The button's end lines up with the framed page's right edge, the frame's width in, borderless too.
         let right = bounds.width - Tokens.Metric.miniFrame
         // Narrow, the shortcut goes first, then the space's name shortens.
         openButton.showsKeys = true
