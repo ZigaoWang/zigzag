@@ -313,17 +313,48 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
           if (e && e.isContentEditable && e.textContent.trim()) return 'typing';
           if (e && /^(input|textarea)$/i.test(e.tagName) && e.value) return 'typing';
           if (e && /^iframe$/i.test(e.tagName)) return 'typing';
-          return document.querySelector('dialog[open], [aria-modal="true"]') ? 'dialog' : '';
+          // Only a dialog you can see: many sites keep theirs in the page, hidden, until they're needed.
+          const shown = (d) => { const r = d.getBoundingClientRect(); const s = getComputedStyle(d);
+            return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && s.opacity !== '0'; };
+          return [...document.querySelectorAll('dialog[open], [aria-modal="true"]')].some(shown) ? 'dialog' : '';
         })()
         """
+
+    /// When the last Esc came, for a second one close behind it.
+    private var lastEscape: TimeInterval = 0
+    private static let doubleEscape: TimeInterval = 0.6
 
     /// Called as Esc comes in, before the page gets it: WebKit runs this script ahead of the key, so the note says
     /// what the page looked like before its own Esc handler ran.
     private func noteEscape(_ event: NSEvent) -> Bool {
-        guard event.type == .keyDown, event.keyCode == 53, !commandBar.isVisible, let webView = tab.webView,
-              let focused = window?.firstResponder as? NSView, focused.isDescendant(of: webView) else { return false }
-        webView.evaluateJavaScript("window.__zigzagEsc = \(Self.escapeState)", completionHandler: nil)
-        return false
+        guard event.type == .keyDown, event.keyCode == 53, !event.isARepeat else { return false }
+        // Esc twice in a row always closes it, whatever the page did with the first (some take it for themselves).
+        let now = event.timestamp
+        defer { lastEscape = now }
+        if now - lastEscape < Self.doubleEscape, !isLeaving, !commandBar.isVisible,
+           !overlay.subviews.contains(where: { $0 is PermissionPrompt || $0 is SavePasswordPrompt }) {
+            window?.performClose(nil)
+            return true
+        }
+        guard !commandBar.isVisible, !isLeaving, let webView = tab.webView,
+              let focused = window?.firstResponder as? NSView, focused.isDescendant(of: webView),
+              !overlay.subviews.contains(where: { $0 is PermissionPrompt || $0 is SavePasswordPrompt }) else { return false }
+        // Asked before the page gets the key, as some sites keep Esc for themselves (Bing's search box): just a page,
+        // and Esc closes Zigzag Mini; typing in a box with text, or a dialog of the site's showing, it goes to the page.
+        webView.evaluateJavaScript(Self.escapeState) { [weak self, weak webView] result, _ in
+            MainActor.assumeIsolated {
+                guard let self, let webView else { return }
+                let state = result as? String ?? ""
+                if state.isEmpty {
+                    self.window?.performClose(nil)
+                } else {
+                    // Noted for the Esc the page leaves alone, which comes back to `escape`: typing, the field lets go.
+                    webView.evaluateJavaScript("window.__zigzagEsc = '\(state)'", completionHandler: nil)
+                    webView.keyDown(with: event)
+                }
+            }
+        }
+        return true
     }
 
     #if DEBUG
