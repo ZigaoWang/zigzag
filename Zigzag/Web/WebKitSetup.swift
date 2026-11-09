@@ -51,6 +51,8 @@ enum WebKitSetup {
             configuration.userContentController.add(Autofill.shared, contentWorld: .defaultClient, name: Autofill.messageName)
             configuration.userContentController.addUserScript(PageFrames.script)
             configuration.userContentController.add(PageFrames.shared, contentWorld: .defaultClient, name: PageFrames.messageName)
+            configuration.userContentController.addUserScript(SwipeAnswers.script)
+            configuration.userContentController.add(SwipeAnswers.shared, contentWorld: .defaultClient, name: SwipeAnswers.messageName)
             ContentBlocker.attach(to: configuration)
             ContentBlocker.attachYouTube(to: configuration)
             // Extension pages only: their uncaught errors go to the extensions log, so a page that stalls says why.

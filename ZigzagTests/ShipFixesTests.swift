@@ -139,6 +139,45 @@ struct BookmarkFolderTests {
         #expect(space.folders == nil)
     }
 
+    // MARK: Swiping back and forward
+
+    private func decide(dx: CGFloat, dy: CGFloat = 0, back: Bool = true, forward: Bool = false,
+                        scrolls: (left: Bool, right: Bool)? = (false, false), page: SwipeDecision.Page = .left,
+                        waited: TimeInterval = 0.02) -> SwipeDecision {
+        SwipeDecision.decide(dx: dx, dy: dy, canGoBack: back, canGoForward: forward, pageScrolls: scrolls, page: page, waited: waited)
+    }
+
+    @Test func swipeGoesBackOnAPlainPage() {
+        // Fingers to the right go back, once they've gone far enough to tell.
+        #expect(decide(dx: 4) == .undecided)
+        #expect(decide(dx: 14) == .track(-1))
+        #expect(decide(dx: -14, forward: true) == .track(1))
+        // Nowhere to go, or mostly down the page: a scroll.
+        #expect(decide(dx: -14) == .ignore)
+        #expect(decide(dx: 14, dy: 13) == .ignore)
+        // A page that scrolls sideways that way keeps it.
+        #expect(decide(dx: 14, scrolls: (true, false)) == .ignore)
+        #expect(decide(dx: 14, scrolls: (false, true)) == .track(-1))
+    }
+
+    @Test func swipeLeavesPagesThatPanThemselves() {
+        // Canva, Figma, Google Maps: the page cancelled the gesture's sideways scrolls, so it has the gesture, even
+        // before the fingers have gone far.
+        #expect(decide(dx: 4, page: .took) == .ignore)
+        #expect(decide(dx: 40, page: .took) == .ignore)
+        #expect(decide(dx: -40, forward: true, page: .took) == .ignore)
+    }
+
+    @Test func swipeWaitsBrieflyForThePagesAnswer() {
+        // Not heard from the page yet: a moment's wait, with the page still getting the gesture, then on without it.
+        #expect(decide(dx: 14, page: .unknown, waited: 0.01) == .undecided)
+        #expect(decide(dx: 14, page: .unknown, waited: SwipeDecision.answerWait) == .track(-1))
+        // An answer that it left them ends the wait at once.
+        #expect(decide(dx: 14, page: .left, waited: 0.001) == .track(-1))
+        // Nothing to wait for when the swipe couldn't go anyway.
+        #expect(decide(dx: -14, page: .unknown, waited: 0.001) == .ignore)
+    }
+
     // MARK: Swiping between spaces
 
     @Test func swipeFollowsTheFingersAndComesBack() {

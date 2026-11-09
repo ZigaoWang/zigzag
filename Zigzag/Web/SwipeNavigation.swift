@@ -4,7 +4,9 @@ import WebKit
 /// Two fingers sideways on a page goes back or forward, the way Arc and Chrome do it: a round arrow slides in from
 /// the page's edge as you swipe, fills once you've gone far enough, and letting go moves at once, with no slow
 /// slide of the whole page. A page that can scroll sideways where you are (a carousel, a map, a wide table) keeps
-/// the swipe for itself, and the system's "Swipe between pages" setting is respected.
+/// the swipe for itself, and so does one that handles the scroll itself (Canva, Figma, Google Maps pan with their own
+/// code): as in Safari and Chrome, the page sees the swipe's first steps and answers before anything moves. The
+/// system's "Swipe between pages" setting is respected.
 @MainActor
 final class SwipeNavigator {
     private weak var webView: BrowserWebView?
@@ -18,6 +20,12 @@ final class SwipeNavigator {
     private var direction = 0
     /// What the page can scroll sideways under the pointer, once the page has answered.
     private var pageScrolls: (left: Bool, right: Bool)?
+    /// Whether the page kept this gesture's sideways scrolls for itself (SwipeAnswers), once it has said.
+    private var page = SwipeDecision.Page.unknown
+    /// When the gesture began, to wait a moment for the page's answer and no longer.
+    private var began: TimeInterval = 0
+    /// Something covering the page has this gesture (a zoomed-in PDF), and says what room it has.
+    private var covered = false
     private var armed = false
     /// Recent finger movement, to tell a quick flick from a slow drag.
     private var samples: [(time: TimeInterval, dx: CGFloat)] = []
@@ -66,6 +74,10 @@ final class SwipeNavigator {
             guard webView.window != nil else { state = .idle; return false }
             state = .deciding
             dx = 0; dy = 0; direction = 0; armed = false; pageScrolls = nil; samples = []
+            began = event.timestamp
+            // Something covering the page has the scroll, not the page: what it says is its room.
+            covered = room != nil
+            page = covered ? .left : .unknown
             if let room { pageScrolls = room } else { probe(at: webView.convert(event.locationInWindow, from: nil)) }
             return false
         case .changed:
@@ -79,12 +91,15 @@ final class SwipeNavigator {
             if samples.count > 8 { samples.removeFirst(samples.count - 8) }
             switch state {
             case .deciding:
-                guard abs(dx) > 10 || abs(dy) > 10 else { return false }
-                // Mostly sideways is enough: a natural swipe is rarely dead level.
-                let sideways = abs(dx) > abs(dy) * 1.2
-                let wanted = dx > 0 ? -1 : 1
-                let canGo = wanted < 0 ? (webView.owner?.canGoBackOrReturn ?? webView.canGoBack) : webView.canGoForward
-                if sideways, canGo, !pageTakes(wanted) {
+                switch SwipeDecision.decide(dx: dx, dy: dy, canGoBack: webView.owner?.canGoBackOrReturn ?? webView.canGoBack,
+                                            canGoForward: webView.canGoForward, pageScrolls: pageScrolls, page: page,
+                                            waited: event.timestamp - began) {
+                case .undecided:
+                    return false
+                case .ignore:
+                    state = .ignoring
+                    return false
+                case .track(let wanted):
                     direction = wanted
                     state = .tracking
                     showArrow()
@@ -92,11 +107,9 @@ final class SwipeNavigator {
                     armWatchdog()
                     return true
                 }
-                state = .ignoring
-                return false
             case .tracking:
                 // The page answered late that it scrolls this way: hand the swipe back.
-                if pageTakes(direction) { cancel(); state = .ignoring; return false }
+                if page == .took || pageTakes(direction) { cancel(); state = .ignoring; return false }
                 update()
                 armWatchdog()
                 return true
@@ -118,6 +131,15 @@ final class SwipeNavigator {
         default:
             return state == .tracking
         }
+    }
+
+    /// The page's answer for this gesture's sideways scrolls: whether it called preventDefault() on them.
+    func pageAnswered(took: Bool) {
+        // Covered by something else (a zoomed-in PDF), the page isn't what's scrolling.
+        guard !covered, state == .deciding || state == .tracking, page != .took else { return }
+        page = took ? .took : .left
+        // It took it after all, answering after the swipe had started: the arrow goes and the page has the rest.
+        if took, state == .tracking { cancel(); state = .ignoring }
     }
 
     private var progress: CGFloat { max(0, CGFloat(-direction) * dx) / Self.threshold }
@@ -260,6 +282,72 @@ final class SwipeNavigator {
         settlePage()
         arrow?.leave(toward: -direction, navigated: false)
         arrow = nil
+    }
+}
+
+/// Whether a two-finger swipe on a page goes back or forward, from how far the fingers have gone and what the page
+/// said about it.
+enum SwipeDecision: Equatable {
+    /// Not sure yet: the page keeps getting the swipe meanwhile, as if nothing were deciding.
+    case undecided
+    /// Back (-1) or forward (1): the arrow comes and the page gets no more of the gesture.
+    case track(Int)
+    /// The page's, or a scroll: it gets the whole gesture.
+    case ignore
+
+    /// What the page did with the gesture's sideways scrolls, as SwipeAnswers hears it.
+    enum Page { case unknown, left, took }
+
+    /// How long a swipe waits for the page to answer before going on without it. Pages answer well within this,
+    /// so on most a swipe never waits; one too busy to answer can still take it back late.
+    static let answerWait: TimeInterval = 0.05
+
+    /// `pageScrolls` is the room the page (or what covers it) can still scroll sideways under the pointer, once known;
+    /// `waited`, the time since the gesture began.
+    static func decide(dx: CGFloat, dy: CGFloat, canGoBack: Bool, canGoForward: Bool,
+                       pageScrolls: (left: Bool, right: Bool)?, page: Page, waited: TimeInterval) -> SwipeDecision {
+        // A page that pans with its own code (a canvas, a map) has the gesture, as in Safari and Chrome.
+        if page == .took { return .ignore }
+        guard abs(dx) > 10 || abs(dy) > 10 else { return .undecided }
+        // Mostly sideways is enough: a natural swipe is rarely dead level.
+        let sideways = abs(dx) > abs(dy) * 1.2
+        let wanted = dx > 0 ? -1 : 1
+        let canGo = wanted < 0 ? canGoBack : canGoForward
+        // Swiping toward "back" moves the view left, so it's the page's room to the left that matters.
+        let pageTakes = pageScrolls.map { wanted < 0 ? $0.left : $0.right } ?? false
+        guard sideways, canGo, !pageTakes else { return .ignore }
+        if page == .unknown, waited < answerWait { return .undecided }
+        return .track(wanted)
+    }
+}
+
+/// The page's side of a swipe: whether it calls preventDefault() on the wheel events of a sideways scroll, as Canva,
+/// Figma, Google Maps and Sheets do to pan or scroll with their own code. Safari and Chrome only go back when it
+/// doesn't. Zigzag's own script world sees the page's events (and when they're cancelled) while the page can't see
+/// it or speak for it; it says so for sideways scrolls only, at most every 100 ms each way.
+final class SwipeAnswers: NSObject, WKScriptMessageHandler {
+    static let shared = SwipeAnswers()
+    static let messageName = "zigzagWheelTaken"
+
+    static let script = WKUserScript(source: """
+    (() => {
+      let tookAt = -1e9, leftAt = -1e9;
+      window.addEventListener('wheel', (e) => {
+        if (!e.isTrusted || e.ctrlKey || e.deltaX === 0 || Math.abs(e.deltaX) < Math.abs(e.deltaY)) return;
+        // Once the page's own listeners have all had it.
+        setTimeout(() => {
+          const took = e.defaultPrevented, now = performance.now();
+          if (now - (took ? tookAt : leftAt) < 100) return;
+          if (took) tookAt = now; else leftAt = now;
+          try { window.webkit.messageHandlers.\(messageName).postMessage(took); } catch (_) {}
+        }, 0);
+      }, { capture: true, passive: true });
+    })();
+    """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .defaultClient)
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == Self.messageName, let took = message.body as? Bool, let webView = message.webView as? BrowserWebView else { return }
+        webView.pageAnsweredSwipe(took: took)
     }
 }
 
