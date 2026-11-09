@@ -132,16 +132,16 @@ struct ExtensionScriptTests {
         #expect(!ExtensionBridgeScript.source.isEmpty)
         #expect(!ExtensionBridgeScript.surface.isEmpty)
         #expect(parses(ExtensionBridgeScript.source) == nil)
-        #expect(parses(ExtensionProfile.compatibility) == nil)
+        #expect(parses(ExtensionShims.compatibility) == nil)
         #expect(parses(ExtensionBridgeScript.surface) == nil)
         #expect(!ExtensionBridgeScript.differences.isEmpty)
         #expect(parses(ExtensionBridgeScript.differences) == nil)
         // Each extension's background prelude, as assembled, including those with fixes of their own.
         for id in ["anyextensionidaaaaaaaaaaaaaaaaaa", ExtensionStore.onePasswordID] {
-            let prelude = ExtensionProfile.profile(for: id)?.backgroundPrelude ?? ""
+            let prelude = ExtensionShims.shim(for: id)?.backgroundPrelude ?? ""
             #expect(parses(prelude) == nil, "background prelude for \(id)")
         }
-        for (id, source) in ExtensionProfile.pagePreludes { #expect(parses(source) == nil, "page prelude for \(id)") }
+        for (id, source) in ExtensionShims.pagePreludes { #expect(parses(source) == nil, "page prelude for \(id)") }
     }
 
     @Test func surfaceCoversWhatExtensionsTripOn() throws {

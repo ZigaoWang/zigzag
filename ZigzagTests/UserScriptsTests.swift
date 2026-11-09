@@ -40,10 +40,10 @@ struct UserScriptsTests {
     }
 
     @Test func withBothManagersOnAScriptAddressGoesToTampermonkey() {
-        let vm = ExtensionProfile.violentmonkeyID, tm = ExtensionProfile.tampermonkeyID
+        let vm = ExtensionShims.violentmonkeyID, tm = ExtensionShims.tampermonkeyID
         let confirm = URL(string: "webkit-extension://\(vm)/confirm/index.html#abc")!
-        func leaves(_ tab: String, on: Bool = true, from id: String = ExtensionProfile.violentmonkeyID, url: URL? = nil) -> Bool {
-            ExtensionProfile.leavesInstallToTampermonkey(id, loading: url ?? confirm, tabURL: URL(string: tab), tampermonkeyOn: on)
+        func leaves(_ tab: String, on: Bool = true, from id: String = ExtensionShims.violentmonkeyID, url: URL? = nil) -> Bool {
+            ExtensionShims.leavesInstallToTampermonkey(id, loading: url ?? confirm, tabURL: URL(string: tab), tampermonkeyOn: on)
         }
         #expect(leaves("https://greasyfork.org/scripts/1/code/x.user.js"))
         #expect(leaves("webkit-extension://\(tm)/ask.html?aid=1"))
