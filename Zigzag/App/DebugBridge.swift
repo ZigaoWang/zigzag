@@ -532,6 +532,19 @@ enum DebugBridge {
             if let view = controller.selectedWebView {
                 debugLog("webstate url=\(view.url?.absoluteString ?? "-") loading=\(view.isLoading) progress=\(view.estimatedProgress) title=\(view.title ?? "-")")
             }
+        case "allowpopups":
+            // allowpopups <url>: that page's site may open pop-ups without a click, as Site Controls allows them.
+            if let origin = SiteOrigin.of(URL(string: arg)) { SitePermissions.setPopups(true, origin: origin) }
+        case "tabinfo":
+            // tabinfo <path>: each tab in this window as the chrome names it, the page WebKit is on, and whether
+            // Settings shows over it (JSON).
+            let json = controller.tabManager.allTabs.map { tab -> [String: Any] in
+                ["title": tab.displayTitle, "url": tab.url?.absoluteString ?? "", "page": tab.webView?.url?.absoluteString ?? "",
+                 "settings": tab.settingsView != nil, "loading": tab.isLoading, "selected": tab === controller.tabManager.selectedTab]
+            }
+            if let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: arg)) }
+        case "back": controller.tabManager.selectedTab?.goBack()
+        case "forward": controller.tabManager.selectedTab?.goForward()
         case "popupjs":
             if #available(macOS 15.4, *), let webView = ExtensionHost.shared.lastAction?.popupWebView {
                 webView.evaluateJavaScript(arg) { result, error in
