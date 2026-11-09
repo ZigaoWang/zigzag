@@ -100,28 +100,33 @@ final class AddressView: InteractiveView {
         return "\(name):\(port)"
     }
 
-    func show(url: URL?, isSecure: Bool) {
+    /// The page's name as the address shows it: its site, or what a page with no site is (History, an extension's
+    /// own page, a file). Empty for a blank page.
+    static func name(of url: URL?) -> String {
         if #available(macOS 15.4, *), let url, url.scheme == "webkit-extension",
            let context = ExtensionHost.shared.contexts.first(where: { $0.baseURL.host() == url.host() }) {
             // An extension's own page (its settings) is named after the extension, not its random address.
-            label.stringValue = context.webExtension.displayName ?? String(localized: "Extension", comment: "The address bar's name for an extension's own page, when the extension has no name.")
+            return context.webExtension.displayName ?? String(localized: "Extension", comment: "The address bar's name for an extension's own page, when the extension has no name.")
         } else if HistoryPage.isHistory(url) {
-            label.stringValue = String(localized: "History", comment: "The address bar's name for Zigzag's History page.")
+            return String(localized: "History", comment: "The address bar's name for Zigzag's History page.")
         } else if SettingsPage.isSettings(url) {
-            label.stringValue = String(localized: "Settings", comment: "The address bar's name for Zigzag's Settings page.")
+            return String(localized: "Settings", comment: "The address bar's name for Zigzag's Settings page.")
         } else if let url, let host = url.host() {
-            label.stringValue = Self.site(host, port: url.port, scheme: url.scheme)
+            return site(host, port: url.port, scheme: url.scheme)
         } else if let url, url.isFileURL {
-            label.stringValue = url.lastPathComponent
+            return url.lastPathComponent
         } else if let url, url.scheme == "blob", let inner = URL(string: url.path), let host = inner.host() {
             // A page made by a site's own script: named for the site that made it.
-            label.stringValue = Self.site(host, port: inner.port, scheme: inner.scheme)
+            return site(host, port: inner.port, scheme: inner.scheme)
         } else if let url, let scheme = url.scheme, scheme != "about" || url.absoluteString != "about:blank" {
             // A page with no site (data:): said so, never left looking like an empty address bar.
-            label.stringValue = scheme == "about" ? url.absoluteString : String(localized: "\(scheme): page", comment: "The address bar's name for a page with no site, like a data: page. The placeholder is the address's scheme, like “data”.")
-        } else {
-            label.stringValue = ""
+            return scheme == "about" ? url.absoluteString : String(localized: "\(scheme): page", comment: "The address bar's name for a page with no site, like a data: page. The placeholder is the address's scheme, like “data”.")
         }
+        return ""
+    }
+
+    func show(url: URL?, isSecure: Bool) {
+        label.stringValue = Self.name(of: url)
         // The host crisp, in the text's own color; the prompt quiet.
         label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textPrimary
         if label.stringValue.isEmpty { label.stringValue = String(localized: "Search or enter address", comment: "Placeholder of the address in the sidebar, on a new tab.") }
