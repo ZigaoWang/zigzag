@@ -198,7 +198,7 @@ final class SwipeNavigator {
     // MARK: The arrow
 
     private func showArrow() {
-        guard let webView, let overlay = (webView.window?.windowController as? BrowserWindowController)?.root.overlay else { return }
+        guard let webView, let overlay = (webView.window?.windowController as? SwipeArrowHost)?.swipeArrowLayer else { return }
         arrow?.removeFromSuperview()
         let arrow = SwipeArrowView(back: direction < 0)
         overlay.addSubview(arrow)
@@ -261,6 +261,13 @@ final class SwipeNavigator {
         arrow?.leave(toward: -direction, navigated: false)
         arrow = nil
     }
+}
+
+/// A window whose page can be swiped back or forward: where the arrow floats while it does, over the page and the
+/// frame around it, so a browser window and Zigzag Mini show the same one.
+@MainActor
+protocol SwipeArrowHost: AnyObject {
+    var swipeArrowLayer: NSView { get }
 }
 
 /// The round arrow at the page's edge during a swipe: a small floating button in the panel's surface while you swipe,

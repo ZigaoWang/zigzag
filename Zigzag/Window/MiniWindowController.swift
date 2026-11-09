@@ -501,6 +501,11 @@ extension MiniWindowController: SpaceTinted {
     var tintSpace: SpaceInfo? { space }
 }
 
+/// Over the whole window, as in a browser window.
+extension MiniWindowController: SwipeArrowHost {
+    var swipeArrowLayer: NSView { root.barLayer }
+}
+
 // MARK: - The command bar over it
 
 extension MiniWindowController: CommandBarHost {

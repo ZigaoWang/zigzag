@@ -1460,6 +1460,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 }
 
+extension BrowserWindowController: SwipeArrowHost {
+    var swipeArrowLayer: NSView { root.overlay }
+}
+
 // MARK: - TabHost
 
 extension BrowserWindowController: TabHost {
