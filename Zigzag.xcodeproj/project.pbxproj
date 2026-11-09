@@ -159,6 +159,7 @@
 		A93EFB5F858A1B33E7E03B79 /* SiteSignInTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D7D2BAAFBF678F6CF7BC040 /* SiteSignInTests.swift */; };
 		AD420686AFB0AEBB23F9ADF7 /* InlineCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B09FDD82E339C4D35FD657C /* InlineCompletionTests.swift */; };
 		AFE7C6BEFFFF26CDDB8D783A /* ExtensionSidePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AC9B41E8717A89ACC4B6BD4 /* ExtensionSidePanel.swift */; };
+		B04713924CD34C38A4EC8FF5 /* ExtensionImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F75F27BD154DC2EB7A42D2DE /* ExtensionImportTests.swift */; };
 		B09D1913AC2A768692EAF240 /* HistoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A43306E6C8C1E74DFDB70B17 /* HistoryStoreTests.swift */; };
 		B0B613E852FA44892B755F04 /* AcknowledgementsWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D578A99D755C2A3834B9E52A /* AcknowledgementsWindow.swift */; };
 		B3E930E711A57185C86F557F /* MoveToApplications.swift in Sources */ = {isa = PBXBuildFile; fileRef = C472C971546CFF3A725753ED /* MoveToApplications.swift */; };
@@ -195,6 +196,7 @@
 		D4333F0C5C4389BE81F84324 /* CRXPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD01A7A43B5EDAF47909918 /* CRXPackage.swift */; };
 		D4E392F2E4665F1392953B9D /* PageScreenshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C625E33D1E438FE873F8B42 /* PageScreenshot.swift */; };
 		D8AACEBA75F8D120D6AFE1D1 /* ExtensionScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C7F87F644076D0EBA10F87 /* ExtensionScriptTests.swift */; };
+		DA0CF4513053251D16C07C2A /* ExtensionImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81370CCCA627CE0FAFB02E03 /* ExtensionImport.swift */; };
 		DDFF8EFE3CB4DBF463105561 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9088949B9C029636E9E355 /* Updater.swift */; };
 		DFB7FFE90CE40670E90BB664 /* SiteSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9272B1C4212C3BF6B875E0DB /* SiteSearch.swift */; };
 		E12D59946BA4DF7046EFE6F7 /* ImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58DD59DED7B66593D3CED57A /* ImportCoordinator.swift */; };
@@ -336,6 +338,7 @@
 		79F70CA73E1EF5C8460E9286 /* TabManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabManager.swift; sourceTree = "<group>"; };
 		7A6A928496FC897893B22DF7 /* BrowserWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWebView.swift; sourceTree = "<group>"; };
 		804A63C8F2764EC4BE20451D /* PasswordStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordStoreTests.swift; sourceTree = "<group>"; };
+		81370CCCA627CE0FAFB02E03 /* ExtensionImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionImport.swift; sourceTree = "<group>"; };
 		818D2FEE410E6D64CD17AADD /* logins.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = logins.json; sourceTree = "<group>"; };
 		820132CF9AAE60C1C4104C7B /* WebStoreOffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebStoreOffer.swift; sourceTree = "<group>"; };
 		840842D8431CA3F0AD989350 /* ExtensionBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionBridgeTests.swift; sourceTree = "<group>"; };
@@ -445,6 +448,7 @@
 		F51CBCCC0F5050F641CEAB31 /* SafariImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariImporter.swift; sourceTree = "<group>"; };
 		F5442E175B150EB5CA4E9BB9 /* PasswordHealthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordHealthTests.swift; sourceTree = "<group>"; };
 		F5C531844DCB5F002266118C /* BridgeNamespaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeNamespaces.swift; sourceTree = "<group>"; };
+		F75F27BD154DC2EB7A42D2DE /* ExtensionImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionImportTests.swift; sourceTree = "<group>"; };
 		F7CEDF75CC1B9CA997C2CF1C /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
 		FA29F3657E11FE3895D8BAC3 /* THIRD_PARTY_NOTICES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_NOTICES.md; sourceTree = "<group>"; };
 		FA898046DCAF6AC4AC020C07 /* ContactCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactCard.swift; sourceTree = "<group>"; };
@@ -604,6 +608,7 @@
 				9AD01A7A43B5EDAF47909918 /* CRXPackage.swift */,
 				AEBF6D0A14B73E1B6D7748A8 /* ExtensionBridge.swift */,
 				AB8EE08C53EADEDF40AA9E51 /* ExtensionHost.swift */,
+				81370CCCA627CE0FAFB02E03 /* ExtensionImport.swift */,
 				30417C99681AAC2507555F94 /* ExtensionReport.swift */,
 				CC57DDCE27AFE0FDF383357E /* ExtensionSearch.swift */,
 				4B8D72D98D3D83950CEE4AC3 /* ExtensionSheet.swift */,
@@ -799,6 +804,7 @@
 				14B44E3C60BDACED82D8B858 /* DiagnosticsTests.swift */,
 				53584D3A138EABED88285971 /* DialogPasswordFixesTests.swift */,
 				840842D8431CA3F0AD989350 /* ExtensionBridgeTests.swift */,
+				F75F27BD154DC2EB7A42D2DE /* ExtensionImportTests.swift */,
 				36C7F87F644076D0EBA10F87 /* ExtensionScriptTests.swift */,
 				5F25B6A15B8EF24B0520F26F /* ExtensionSearchTests.swift */,
 				14C20474FB5E7187A87874B1 /* ExtensionSecurityTests.swift */,
@@ -1070,6 +1076,7 @@
 				CD77ADCA81FF68CE94D13F63 /* EnergyWatch.swift in Sources */,
 				FC7890AF73B47C398FD5A153 /* ExtensionBridge.swift in Sources */,
 				0104054FA97C0D01FC9A422C /* ExtensionHost.swift in Sources */,
+				DA0CF4513053251D16C07C2A /* ExtensionImport.swift in Sources */,
 				72E2F6BF3464C210D83D8ADB /* ExtensionReport.swift in Sources */,
 				E81980017434711481EA11BC /* ExtensionSearch.swift in Sources */,
 				E8C4FE93204783B7BF9A6F13 /* ExtensionSheet.swift in Sources */,
@@ -1188,6 +1195,7 @@
 				4E5CF0E3E770AEFADC046339 /* DiagnosticsTests.swift in Sources */,
 				CE5616DC4C93BC6AEDB917D3 /* DialogPasswordFixesTests.swift in Sources */,
 				0CC1228D26EEC04E26173909 /* ExtensionBridgeTests.swift in Sources */,
+				B04713924CD34C38A4EC8FF5 /* ExtensionImportTests.swift in Sources */,
 				D8AACEBA75F8D120D6AFE1D1 /* ExtensionScriptTests.swift in Sources */,
 				79B109D184AEBA99124E805F /* ExtensionSearchTests.swift in Sources */,
 				9C1698F934167B4C7F79D557 /* ExtensionSecurityTests.swift in Sources */,
