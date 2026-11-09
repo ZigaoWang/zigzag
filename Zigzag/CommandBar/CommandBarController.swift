@@ -100,11 +100,49 @@ final class CommandRowView: InteractiveView {
     }
 }
 
+/// Where the command bar opens: a browser window, Zigzag Mini, or Zigzag Mini's quick open. The bar looks and types
+/// the same in each; the host says where it sits, what it ranks and what Return opens.
+protocol CommandBarHost: AnyObject {
+    var window: NSWindow? { get }
+    /// Holds the bar and the layer that catches clicks around it, over the whole host.
+    var commandBarOverlay: NSView { get }
+    /// The page the bar centers over, in the overlay's coordinates.
+    var commandBarPageFrame: NSRect { get }
+    /// The address the bar opens over while editing it, or nil to center it over the page. `asked` is the one the
+    /// caller named (a split pane's).
+    func commandBarAnchor(asked: NSView?) -> NSView?
+    /// Over an anchor in the middle of the window (Zigzag Mini's title), the bar widens evenly both ways.
+    var commandBarCentersOnAnchor: Bool { get }
+    /// The browser window's tabs, for open tabs among the results and for completing what you type; nil if there's none.
+    var commandBarTabs: TabManager? { get }
+    /// The page ⌘L edits.
+    var commandBarTab: Tab? { get }
+    /// The space whose accent the bar takes; nil in a private window.
+    var commandBarSpace: SpaceInfo? { get }
+    var commandBarIsPrivate: Bool { get }
+    /// Puts away whatever else floats here before the bar opens.
+    func commandBarWillShow()
+    /// Typing goes back to the page.
+    func commandBarRestoreFocus()
+    /// Opens a chosen result itself; false leaves it to the bar, which opens it in the browser window's tabs.
+    func commandBarOpen(_ kind: CommandResult.Kind, modifiers: NSEvent.ModifierFlags, editing: Bool) -> Bool
+    /// The bar is gone from the screen, its exit finished.
+    func commandBarDidHide()
+}
+
+extension CommandBarHost {
+    var commandBarCentersOnAnchor: Bool { false }
+    func commandBarOpen(_ kind: CommandResult.Kind, modifiers: NSEvent.ModifierFlags, editing: Bool) -> Bool { false }
+    func commandBarDidHide() {}
+}
+
 /// The floating command bar: one field for addresses, searches, tabs, bookmarks and history.
 final class CommandBarController: NSObject, NSTextFieldDelegate {
     enum Mode { case newTab, editCurrent, history }
 
-    private weak var controller: BrowserWindowController?
+    private weak var host: CommandBarHost?
+    /// The browser window it's in, for what only a browser window does (its commands, its other panels).
+    private var controller: BrowserWindowController? { host as? BrowserWindowController }
     /// Catches clicks outside the bar; it doesn't dim the page.
     private let scrim = ScrimView(dims: false)
     private let panel = FloatingPanelView()
@@ -149,8 +187,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     var isSearchingSite: Bool { scope != nil }
     var isOfferingSiteSearch: Bool { hinted != nil }
 
-    init(window: BrowserWindowController) {
-        controller = window
+    init(host: CommandBarHost) {
+        self.host = host
         super.init()
         field.delegate = self
         field.textInset = 2
@@ -193,9 +231,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     /// The bar is glass, whatever the space: what's under it shows through. It belongs to the space by its accent,
     /// in the cursor, the selected text and the chosen row.
     private func applySpaceTheme() {
-        guard let controller else { return }
-        let space = controller.tabManager.currentSpace
-        let accent = Brand.Theme.of(controller.tabManager.isPrivate ? nil : space).accent
+        guard let host else { return }
+        let accent = Brand.Theme.of(host.commandBarIsPrivate ? nil : host.commandBarSpace).accent
         if let editor = field.currentEditor() as? NSTextView {
             editor.insertionPointColor = accent
             editor.selectedTextAttributes = [.backgroundColor: accent.withAlphaComponent(Tokens.Color.textSelectionAlpha)]
@@ -209,7 +246,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     /// `anchor`: open over this address instead of the sidebar's (a split pane's), whether or not the sidebar shows.
     func show(mode: Mode, anchor: NSView? = nil) {
-        guard let controller else { return }
+        guard let host else { return }
         // A different place to open from is a fresh bar: it moves there.
         if isVisible, anchor !== self.anchor { dismiss(restoringFocus: false) }
         self.anchor = mode == .editCurrent ? anchor : nil
@@ -220,25 +257,16 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             setScope(nil)
         }
         self.mode = mode
-        fetcher.isPrivate = controller.tabManager.isPrivate
+        fetcher.isPrivate = host.commandBarIsPrivate
         mouseAtOpen = NSEvent.mouseLocation
-        let card = controller.root.cardFrame
+        let card = host.commandBarPageFrame
         let opening = !isVisible
         if !isVisible {
-            // One floating thing at a time. Over the tab overview, the overview steps aside: whatever you open or
-            // search for shows in the window, not behind the overview.
-            if controller.desk.isVisible { controller.desk.hide(openingTab: nil) }
-            SitePanel.closeCurrent()
-            DownloadsPanel.closeCurrent()
-            SpaceEditorPanel.current?.close()
-            // Over a peek, Esc and ⌘L would go to the peek's page or the tab behind it: put the peek away first.
-            controller.peek.close()
-            controller.previews.hide()
-            controller.linkStatus.show(nil, in: controller.root.cardFrame)
+            host.commandBarWillShow()
             isVisible = true
-            scrim.frame = isAnchored ? controller.root.bounds : card
-            controller.root.overlay.addSubview(scrim)
-            controller.root.overlay.addSubview(panel)
+            scrim.frame = isAnchored ? host.commandBarOverlay.bounds : card
+            host.commandBarOverlay.addSubview(scrim)
+            host.commandBarOverlay.addSubview(panel)
             scrim.show()
             typingMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 self?.letterWillReplaceCompletion(event)
@@ -254,7 +282,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let placeholder = mode == .history ? String(localized: "Search history", comment: "Placeholder of the command bar's field while it searches history.") : String(localized: "Search or enter address", comment: "Placeholder of the command bar's field.")
         field.placeholderAttributedString = NSAttributedString(string: placeholder,
                                                                attributes: [.font: font, .kern: Tokens.Font.voiceKern(font.pointSize), .foregroundColor: Tokens.Color.textTertiary])
-        if mode == .editCurrent, let url = controller.tabManager.selectedTab?.url {
+        if mode == .editCurrent, let url = host.commandBarTab?.url {
             field.stringValue = url.absoluteString
         } else if mode == .newTab, let unsent, Date().timeIntervalSince(unsent.at) < Self.unsentMemory {
             // Closed by a stray click or Esc a moment ago: what you'd typed is still here, selected, so typing replaces it.
@@ -274,7 +302,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // most) it's simply there (`present` knows); clicked open, it grows out of the page's top, or fades in place
         // over the address it stands in for.
         if opening { panel.present(arrival: isAnchored ? .fade : .pop) }
-        controller.window?.makeFirstResponder(field)
+        host.window?.makeFirstResponder(field)
         applySpaceTheme()
         field.currentEditor()?.selectAll(nil)
     }
@@ -284,7 +312,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private static let unsentMemory: TimeInterval = 10
 
     func dismiss(restoringFocus: Bool = true) {
-        guard isVisible, let controller else { return }
+        guard isVisible, let host else { return }
         isVisible = false
         // Kept only for the new tab bar; opening something clears it (`activate`).
         unsent = mode == .newTab && !typed.isEmpty ? (typed, Date()) : nil
@@ -292,13 +320,17 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         typingMonitor = nil
         fetcher.cancel()
         scrim.hide()
-        panel.dismiss(instantly: isAnchored)
-        if restoringFocus, let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
+        panel.dismiss(instantly: isAnchored) { [weak self, weak host] in
+            // Shown again while it was leaving: it's still here.
+            guard self?.isVisible == false else { return }
+            host?.commandBarDidHide()
+        }
+        if restoringFocus { host.commandBarRestoreFocus() }
     }
 
     func reposition() {
-        guard isVisible, let controller else { return }
-        scrim.frame = isAnchored ? controller.root.bounds : controller.root.cardFrame
+        guard isVisible, let host else { return }
+        scrim.frame = isAnchored ? host.commandBarOverlay.bounds : host.commandBarPageFrame
         // The window got shorter than the list: drop the rows that no longer fit.
         if results.count > rowsThatFit { refreshResults(animated: false) }
         panel.frame = panelFrame()
@@ -314,44 +346,44 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     /// Editing the address you're on opens right where it is: over the address field in the sidebar, reaching
     /// into the page, like a dropdown. New tabs and history keep the bar centered over the page.
     private var isAnchored: Bool {
-        guard let controller, mode == .editCurrent else { return false }
-        if let anchor, anchor.window != nil { return true }
-        return controller.root.sidebarVisible && !controller.root.isSidebarFloatingVisible
+        guard let host, mode == .editCurrent else { return false }
+        return host.commandBarAnchor(asked: anchor.flatMap { $0.window != nil ? $0 : nil }) != nil
     }
 
     /// The address the bar opens over, in the overlay's coordinates.
-    private func anchorFrame(in controller: BrowserWindowController) -> NSRect {
-        let view = anchor.flatMap { $0.window != nil ? $0 : nil } ?? controller.sidebar.address
-        return view.convert(view.bounds, to: controller.root.overlay)
+    private func anchorFrame(in host: CommandBarHost) -> NSRect {
+        guard let view = host.commandBarAnchor(asked: anchor.flatMap { $0.window != nil ? $0 : nil }) else { return .zero }
+        return view.convert(view.bounds, to: host.commandBarOverlay)
     }
 
     private func panelFrame() -> NSRect {
-        guard let controller else { return .zero }
+        guard let host else { return .zero }
         if isAnchored {
-            let address = anchorFrame(in: controller)
+            let address = anchorFrame(in: host)
             // From the address's own corner, wide enough for the whole address at once, reaching over the page;
             // suggestions continue below in the same panel. Never past the window's right edge: a pane's address
             // on the right opens toward the left.
             // The address field itself, opened in place: its own height and corners, as wide as it is unless the
             // address needs more room (then only as wide as the address), suggestions below once you type.
-            let bounds = controller.root.bounds
+            let bounds = host.commandBarOverlay.bounds
             let font = field.font ?? Tokens.Font.sidebarRow()
             let textWidth = ceil((field.stringValue as NSString).size(withAttributes: [.font: font]).width)
             // The same 12pt on both sides of the text as the resting field, and a hair for the caret.
             let needed = textWidth + Tokens.Space.x3 * 2 - 1
             let wanted = results.isEmpty ? needed : max(needed, Tokens.Metric.commandBarWidth * 0.7)
             let wide = min(max(wanted, address.width), Tokens.Metric.commandBarWidth, bounds.width - Tokens.Space.x2 - Tokens.Space.x4)
-            let x = max(Tokens.Space.x2, min(address.minX, bounds.maxX - Tokens.Space.x4 - wide))
+            let start = host.commandBarCentersOnAnchor ? round(address.midX - wide / 2) : address.minX
+            let x = max(Tokens.Space.x2, min(start, bounds.maxX - Tokens.Space.x4 - wide))
             return NSRect(x: x, y: address.minY, width: wide, height: fieldHeight + listHeight)
         }
-        let card = controller.root.cardFrame
+        let card = host.commandBarPageFrame
         // Room to breathe on both sides of the page, however narrow the window.
         let margin = Tokens.Space.x8
         let width = min(Tokens.Metric.commandBarWidth, card.width - margin * 2)
         let height = Tokens.Metric.commandBarFieldHeight + listHeight
         let top = panelTop(in: card)
         // Centered on the whole window, not just the page beside the sidebar, but never tight against either edge.
-        let x = min(max(card.minX + margin, floor(controller.root.bounds.midX - width / 2)), card.maxX - width - margin)
+        let x = min(max(card.minX + margin, floor(host.commandBarOverlay.bounds.midX - width / 2)), card.maxX - width - margin)
         return NSRect(x: x, y: top, width: width, height: height)
     }
 
@@ -359,13 +391,13 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     /// How many rows fit under the field before the bar would run off the bottom of the window.
     private var rowsThatFit: Int {
-        guard let controller else { return Tokens.Metric.commandBarMaxRows }
+        guard let host else { return Tokens.Metric.commandBarMaxRows }
         let top: CGFloat, bottom: CGFloat
         if isAnchored {
-            top = anchorFrame(in: controller).minY
-            bottom = controller.root.bounds.maxY
+            top = anchorFrame(in: host).minY
+            bottom = host.commandBarOverlay.bounds.maxY
         } else {
-            let card = controller.root.cardFrame
+            let card = host.commandBarPageFrame
             top = panelTop(in: card)
             bottom = card.maxY
         }
@@ -443,9 +475,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     // MARK: Results
 
     private func refreshResults(animated: Bool) {
-        guard let controller else { return }
-        let editing = mode == .editCurrent && typed == controller.tabManager.selectedTab?.url?.absoluteString
-        results = CommandRanker.results(for: editing ? "" : typed, manager: controller.tabManager, suggestions: suggestions,
+        guard let host else { return }
+        let editing = mode == .editCurrent && typed == host.commandBarTab?.url?.absoluteString
+        results = CommandRanker.results(for: editing ? "" : typed, manager: host.commandBarTabs, suggestions: suggestions,
                                         editingCurrent: mode == .editCurrent, historyOnly: mode == .history)
         if editing { results = [] }
         if let scope {
@@ -479,7 +511,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             results.insert(top, at: 0)
             // Already open in another tab? Enter still opens what you typed; switching to that tab is the row under it,
             // one ↓ away, so neither ever happens by surprise.
-            if let existing = controller.tabManager.existingTab(for: completionURL), existing !== controller.tabManager.selectedTab {
+            if let manager = host.commandBarTabs, let existing = manager.existingTab(for: completionURL), existing !== manager.selectedTab {
                 let other = CommandResult(kind: .switchTo(existing.id), title: existing.displayTitle,
                                           detail: CommandRanker.displayURL(completionURL), icon: existing.favicon)
                 results.removeAll { $0.kind == other.kind }
@@ -672,9 +704,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         typed = text
         completion = nil
         // Not in a site search or history, and never while an input method is still composing.
-        if allowed, scope == nil, let controller, mode != .history {
+        if allowed, scope == nil, let host, mode != .history {
             // A letter that agrees with the completion keeps it, unless it finished a host you've been to. One lookup per keystroke.
-            completion = InlineCompletion.next(previous: previous, found: CommandRanker.inlineCompletion(for: text, manager: controller.tabManager),
+            completion = InlineCompletion.next(previous: previous, found: CommandRanker.inlineCompletion(for: text, manager: host.commandBarTabs),
                                                typed: text)
             if let completion, completion.text.count > text.count {
                 // What you typed stays as you typed it; the rest follows, selected, so the next letter replaces it.
@@ -776,7 +808,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     /// A letter about to replace the selected completion: it's taken back first, so the letter goes after what you
     /// typed and Undo doesn't remember the completion as something you replaced.
     private func letterWillReplaceCompletion(_ event: NSEvent) {
-        guard isVisible, event.window === controller?.window, let editor = field.currentEditor() as? NSTextView,
+        guard isVisible, event.window === host?.window, let editor = field.currentEditor() as? NSTextView,
               editor.window?.firstResponder === editor, completionIsSelected(editor),
               event.modifierFlags.intersection([.command, .control]).isEmpty,
               let scalar = event.characters?.unicodeScalars.first,
@@ -801,21 +833,24 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             activate(results[selectedIndex], modifiers: modifiers)
         } else if let url = CommandRanker.url(from: field.stringValue) {
             activate(CommandResult(kind: .open(url), title: "", detail: ""), modifiers: modifiers)
-        } else if mode == .editCurrent, field.stringValue == controller?.tabManager.selectedTab?.url?.absoluteString {
-            controller?.tabManager.selectedTab?.reload()
+        } else if mode == .editCurrent, let tab = host?.commandBarTab, field.stringValue == tab.url?.absoluteString {
+            tab.reload()
             dismiss()
         }
     }
 
     private func activate(_ result: CommandResult, modifiers: NSEvent.ModifierFlags) {
-        guard let controller, result.isActionable else { return }
+        guard let host, result.isActionable else { return }
+        let editing = mode == .editCurrent && host.commandBarTab != nil
+        dismiss(restoringFocus: false)
+        unsent = nil
+        if host.commandBarOpen(result.kind, modifiers: modifiers, editing: editing) { return }
+        guard let controller else { return }
         let manager = controller.tabManager
         let inBackground = modifiers.contains(.command)
         // ⌥↩ on Switch to Tab: a second copy of that page in a new tab instead.
         let forceNew = modifiers.contains(.option)
-        let inCurrent = mode == .editCurrent && manager.selectedTab != nil
-        dismiss(restoringFocus: false)
-        unsent = nil
+        let inCurrent = editing
         func open(_ url: URL, search: Bool = false) {
             if !inCurrent { Tutorial.complete("newTab") }
             if inCurrent {

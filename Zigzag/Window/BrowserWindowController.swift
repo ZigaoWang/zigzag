@@ -16,7 +16,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     var onClose: ((BrowserWindowController) -> Void)?
     var onStateChange: (() -> Void)?
 
-    lazy var commandBar = CommandBarController(window: self)
+    lazy var commandBar = CommandBarController(host: self)
     lazy var findBar = FindBarController(window: self)
     lazy var desk = DeskController(window: self)
     lazy var previews = TabPreviewController(controller: self)
@@ -2016,3 +2016,36 @@ extension BrowserWindowController {
     }
 }
 #endif
+
+// MARK: - The command bar in a browser window
+
+extension BrowserWindowController: CommandBarHost {
+    var commandBarOverlay: NSView { root.overlay }
+    var commandBarPageFrame: NSRect { root.cardFrame }
+    /// A split pane's address when asked for; else the sidebar's, while the sidebar shows docked.
+    func commandBarAnchor(asked: NSView?) -> NSView? {
+        if let asked { return asked }
+        return root.sidebarVisible && !root.isSidebarFloatingVisible ? sidebar.address : nil
+    }
+    var commandBarTabs: TabManager? { tabManager }
+    var commandBarTab: Tab? { tabManager.selectedTab }
+    var commandBarSpace: SpaceInfo? { tabManager.currentSpace }
+    var commandBarIsPrivate: Bool { tabManager.isPrivate }
+
+    /// One floating thing at a time. Over the tab overview, the overview steps aside: whatever you open or search for
+    /// shows in the window, not behind the overview.
+    func commandBarWillShow() {
+        if desk.isVisible { desk.hide(openingTab: nil) }
+        SitePanel.closeCurrent()
+        DownloadsPanel.closeCurrent()
+        SpaceEditorPanel.current?.close()
+        // Over a peek, Esc and ⌘L would go to the peek's page or the tab behind it: put the peek away first.
+        peek.close()
+        previews.hide()
+        linkStatus.show(nil, in: root.cardFrame)
+    }
+
+    func commandBarRestoreFocus() {
+        if let selectedWebView { window?.makeFirstResponder(selectedWebView) }
+    }
+}

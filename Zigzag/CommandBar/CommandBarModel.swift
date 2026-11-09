@@ -95,7 +95,8 @@ enum CommandRanker {
 
     /// The address what you typed completes to, e.g. "wiki" → "wikipedia.org": sites from your history, weighed by
     /// how often and how lately you went, and the ones you keep at hand (open tabs, favorites, pinned tabs).
-    static func inlineCompletion(for text: String, manager: TabManager) -> InlineCompletion.Match? {
+    /// `manager`: the browser window whose open tabs count, if there is one.
+    static func inlineCompletion(for text: String, manager: TabManager?) -> InlineCompletion.Match? {
         let lower = text.lowercased()
         let bare = lower.hasPrefix("www.") ? String(lower.dropFirst(4)) : lower
         guard !bare.isEmpty, InlineCompletion.looksLikeHost(lower) else { return nil }
@@ -105,7 +106,7 @@ enum CommandRanker {
             InlineCompletion.target(entry.url, wholePage: true).map { InlineCompletion.Site(url: $0, score: score) }
         }
         // Each place a site is kept at hand counts as much as a visit this week.
-        let kept = manager.allTabs.compactMap(\.url) + Library.shared.favorites.map(\.url) + Library.shared.allBookmarks.map(\.0.url)
+        let kept = (manager?.allTabs ?? []).compactMap(\.url) + Library.shared.favorites.map(\.url) + Library.shared.allBookmarks.map(\.0.url)
         // Whether its host or a shorter form of it matches is for `best` to say.
         for url in kept where HistoryStore.normalizedHost(url).contains(bare) {
             if let site = InlineCompletion.target(url, wholePage: false) { sites.append(InlineCompletion.Site(url: site, score: 1)) }
@@ -285,7 +286,9 @@ enum CommandRanker {
         }
     }
 
-    static func results(for text: String, manager: TabManager, suggestions: [String], editingCurrent: Bool, historyOnly: Bool) -> [CommandResult] {
+    /// `manager`: the browser window whose tabs and commands are offered; with none (Zigzag Mini on its own), only
+    /// pages to open and searches.
+    static func results(for text: String, manager: TabManager?, suggestions: [String], editingCurrent: Bool, historyOnly: Bool) -> [CommandResult] {
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
         var results: [CommandResult] = []
         var seen = Set<String>()
@@ -311,7 +314,7 @@ enum CommandRanker {
                 return results
             }
             // Nothing typed yet: recent tabs, so switching is one keystroke away.
-            for tab in manager.recentTabs.prefix(6) where tab !== manager.selectedTab {
+            for tab in (manager?.recentTabs ?? []).prefix(6) where tab !== manager?.selectedTab {
                 guard let url = tab.url else { continue }
                 add(CommandResult(kind: .switchTo(tab.id), title: tab.displayTitle, detail: displayURL(url), icon: tab.favicon),
                     key: TabManager.normalize(url))
@@ -325,12 +328,12 @@ enum CommandRanker {
         // Zigzag's own commands, when the words fit one. One you've named ("import", "pin tab") comes first: typing
         // its name means the command. One the words only touch through a keyword ("contact" for Send Feedback) waits
         // after the search, so Return still searches for what you typed.
-        let matched = historyOnly ? [] : commands(for: query, context: context(for: manager))
+        let matched = historyOnly ? [] : manager.map { commands(for: query, context: context(for: $0)) } ?? []
         let named = matched.filter { Self.isNamed($0, by: words) }
         func addActions(_ list: [Action]) {
             for action in list {
                 // Split View says which page it puts beside this one.
-                let partner = action.id == "split" ? manager.selectedTab.flatMap { splitPartner(for: $0, in: manager) } : nil
+                let partner = action.id == "split" ? manager.flatMap { m in m.selectedTab.flatMap { splitPartner(for: $0, in: m) } } : nil
                 add(CommandResult(kind: .action(action.id), title: action.title, detail: partner.map { String(localized: "with \($0.displayTitle)", comment: "Under the command bar's Open in Split View command: the page it opens beside this one. The title is that page's.") } ?? "",
                                   symbol: action.symbol), key: "action:\(action.id)")
             }
@@ -349,7 +352,7 @@ enum CommandRanker {
 
         if !historyOnly {
             var tabCount = 0
-            for tab in manager.recentTabs + manager.allTabs where tabCount < 3 {
+            for tab in (manager?.recentTabs ?? []) + (manager?.allTabs ?? []) where tabCount < 3 {
                 guard let url = tab.url, matches(words, tab.displayTitle, url.absoluteString) else { continue }
                 let key = TabManager.normalize(url)
                 guard !seen.contains(key) else { continue }
