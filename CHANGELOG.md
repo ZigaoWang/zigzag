@@ -11,6 +11,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Settings has its own sections for Appearance, Tabs, Search and Zigzag Mini, so General keeps just the basics.
 
 ### Fixed
+- Swiping sideways in web apps that pan with two fingers, like Canva or Figma, moves around the page instead of going back.
+- Pinching always reaches the page, for maps and editors that zoom with it. ⌘⇧\ still shows all your tabs.
+- What you type in the command bar is always the first row, so Return searches for it; Zigzag's commands come right under it.
 - ← and → no longer play the error sound on pages that use them themselves, like seeking on YouTube.
 
 ### Security
