@@ -628,7 +628,7 @@ enum Tokens {
             #endif
             return NSWorkspace.shared.accessibilityDisplayShouldReduceMotion || reducesMotionHere
         }
-        /// Settings › General › Reduce motion: the same as the Mac's own, for Zigzag alone.
+        /// Settings › Appearance › Reduce motion: the same as the Mac's own, for Zigzag alone.
         static var reducesMotionHere: Bool {
             get { UserDefaults.standard.bool(forKey: "ReduceMotion") }
             set { UserDefaults.standard.set(newValue, forKey: "ReduceMotion") }

@@ -234,7 +234,7 @@ something came from, answers at once, and can be interrupted.
 - Light and dark cross-fade with the space's color when a space changes the window's mode: one fade, no flicker.
 - A closed tab's row folds away: it takes no more clicks, and its height closes as it fades, in step with the rows
   below gliding up.
-- Reduce Motion (the Mac's, or Settings › General › Reduce motion for Zigzag alone): nothing slides, scales or
+- Reduce Motion (the Mac's, or Settings › Appearance › Reduce motion for Zigzag alone): nothing slides, scales or
   travels; fades and color changes still play (`Motion.animate(moves:)`), and a space switch cross-fades the list in
   place instead of sliding it.
 - Arrivals and departures in lists: a new tab's row opens its height from nothing as it fades in; a closed one folds

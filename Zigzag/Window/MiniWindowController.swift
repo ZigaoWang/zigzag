@@ -630,7 +630,7 @@ extension MiniWindowController: TabHost {
 // MARK: - The window's content
 
 /// Zigzag Mini's content: the space's frame, the slim strip on top of it, and the page as a card in a thin, even
-/// frame of the space's color, so it reads as a small Zigzag window. Borderless (Settings › General), the page fills
+/// frame of the space's color, so it reads as a small Zigzag window. Borderless (Settings › Appearance), the page fills
 /// the window under the strip and meets it in a straight line, as a page meets the toolbar in a compact window; the
 /// window rounds its own corners.
 final class MiniRootView: SpaceFrameView {

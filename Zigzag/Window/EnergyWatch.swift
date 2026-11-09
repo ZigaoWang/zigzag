@@ -9,7 +9,7 @@ import WebKit
 @MainActor
 final class EnergyWatch {
     static let shared = EnergyWatch()
-    /// Settings › General. Off, a busy background tab is left alone and nothing is said.
+    /// Settings › Tabs. Off, a busy background tab is left alone and nothing is said.
     static var sleepsBusyTabs: Bool {
         get { UserDefaults.standard.object(forKey: "SleepsBusyTabs") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "SleepsBusyTabs") }

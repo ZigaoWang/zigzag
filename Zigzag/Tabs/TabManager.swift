@@ -132,7 +132,7 @@ final class TabManager {
 
     // MARK: Creating
 
-    /// Where a new tab goes in the list (Settings › General). Next to the current tab is what Chrome and Safari do, so
+    /// Where a new tab goes in the list (Settings › Tabs). Next to the current tab is what Chrome and Safari do, so
     /// a tab shows up where you were looking; Arc's way, on top, and the bottom are choices.
     enum NewTabPlace: String, CaseIterable { case next, top, bottom }
     static var newTabPlace: NewTabPlace {

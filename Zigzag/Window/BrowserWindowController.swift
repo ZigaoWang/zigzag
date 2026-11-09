@@ -1583,7 +1583,7 @@ extension BrowserWindowController: SidebarDelegate {
 
     func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? { sidebarUndo }
 
-    /// Settings › General: after closing a pinned tab that went to another page, offer to pin that page instead.
+    /// Settings › Tabs: after closing a pinned tab that went to another page, offer to pin that page instead.
     static var offersToPinWanderedPage: Bool {
         get { UserDefaults.standard.object(forKey: "OffersToPinWanderedPage") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "OffersToPinWanderedPage") }

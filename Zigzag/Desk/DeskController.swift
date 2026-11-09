@@ -1339,7 +1339,7 @@ final class DeskController {
     /// zooming, can't be talked out of it, and a page left halfway stays shrunk and shifted (further with every
     /// pinch). So the first steps are held until the pinch shows which way it's going: closing opens the desk, and
     /// anything else goes to the page whole, held steps first, so it zooms as if nothing had waited.
-    /// Whether pinching in on the trackpad opens the tab overview (Settings › General). Off, the pinch goes to the page,
+    /// Whether pinching in on the trackpad opens the tab overview (Settings › Tabs). Off, the pinch goes to the page,
     /// for maps and games that zoom with it (GeoGuessr); ⌘⇧\ still opens the overview, and pinching out still closes it.
     static var pinchOpens: Bool {
         get { UserDefaults.standard.object(forKey: "PinchOpensTabOverview") as? Bool ?? true }

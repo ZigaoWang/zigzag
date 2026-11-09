@@ -108,7 +108,7 @@ connections Zigzag makes on its own, apart from the pages you open:
   and nothing else; no system profile is sent. A new version downloads from there too.
 - **Search suggestions.** As you type in the address bar, the text goes to your search engine for suggestions,
   without cookies. Google, DuckDuckGo, Brave, Bing, Kagi and Ecosia offer them; with any other engine, nothing is
-  sent. Turn them off in Settings › General.
+  sent. Turn them off in Settings › Search.
 - **Site icons.** Icons come from each site itself, also for pinned tabs, favorites and imported bookmarks you
   haven't opened yet.
 - **Extensions.** Installing one downloads it from the Chrome Web Store. At launch, at most once a day, Zigzag
