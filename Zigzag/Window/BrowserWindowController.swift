@@ -428,7 +428,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let menu = NSMenu()
         for item in items.prefix(15) {
             let title = item.title?.isEmpty == false ? item.title! : (item.url.host() ?? item.url.absoluteString)
-            let entry = SidebarMenus.Item(String(title.prefix(60))) { [weak webView] in webView?.go(to: item) }
+            let entry = SidebarMenus.Item(String(title.prefix(60))) { [weak webView] in
+                if let owner = (webView as? BrowserWebView)?.owner { owner.go(to: item) } else { webView?.go(to: item) }
+            }
             if let icon = FaviconStore.shared.cachedIcon(for: item.url) {
                 let small = icon.copy() as! NSImage
                 small.size = NSSize(width: 16, height: 16)

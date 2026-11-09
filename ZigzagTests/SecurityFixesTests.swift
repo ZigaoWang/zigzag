@@ -106,6 +106,18 @@ struct SecurityFixesTests {
         let settings = Tab(url: URL(string: "zigzag://settings/privacy"), spaceID: UUID(), configuration: WKWebViewConfiguration())
         #expect(settings.url == nil && settings.settingsView == nil)
     }
+
+    @Test func onlyZigzagTakesATabBackToItsOwnPages() {
+        // Back or Forward onto Settings: only when Zigzag started it, never a page's history.back().
+        #expect(Tab.mayGoToInternalPage(ownLoad: false, ownHistory: true, isBackForward: true, fromInternalPage: false))
+        #expect(!Tab.mayGoToInternalPage(ownLoad: false, ownHistory: false, isBackForward: true, fromInternalPage: false))
+        #expect(!Tab.mayGoToInternalPage(ownLoad: false, ownHistory: false, isBackForward: true, fromInternalPage: true))
+        // Zigzag's own load, and a link from one of its pages to another.
+        #expect(Tab.mayGoToInternalPage(ownLoad: true, ownHistory: false, isBackForward: false, fromInternalPage: false))
+        #expect(Tab.mayGoToInternalPage(ownLoad: false, ownHistory: false, isBackForward: false, fromInternalPage: true))
+        // A website sending the tab there.
+        #expect(!Tab.mayGoToInternalPage(ownLoad: false, ownHistory: false, isBackForward: false, fromInternalPage: false))
+    }
 }
 
 /// Site permissions are kept per origin (scheme, host and port), never per host: an answer given to

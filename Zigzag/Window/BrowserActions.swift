@@ -405,7 +405,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     func duplicate(_ tab: Tab) {
         let copy = tabManager.newTab(url: nil, title: tab.displayTitle)
         if let state = tab.interactionStateForSaving {
-            copy.ensureWebView().interactionState = state as NSData
+            copy.restoreState(state)
         } else if let url = tab.url {
             copy.load(url)
         }

@@ -224,7 +224,7 @@ final class Tab: NSObject {
             pendingInteractionState = nil
             loadOwn(url, in: webView)
         } else if let state = pendingInteractionState {
-            webView.interactionState = state as NSData
+            restoreState(state, in: webView)
             pendingInteractionState = nil
             // Interaction state restores history but may not start a load on its own.
             if webView.url == nil, let url { loadOwn(url, in: webView) }
@@ -338,6 +338,9 @@ final class Tab: NSObject {
     private var openedByPage = false
     /// Zigzag itself is loading this tab (the address bar, a link from elsewhere): its address shows at once.
     private var ownLoadPending = false
+    /// Where Zigzag itself is taking this tab back or forward (its buttons, a swipe, the keyboard, restored history):
+    /// the only Back or Forward that may land on one of Zigzag's own pages. A page's history.back() may not.
+    private var ownHistoryTarget: URL?
     /// When the page last started a download without a click, and when a frame in it was last clicked into.
     private var lastScriptDownload: Date?
     private var frameClickedAt: Date?
@@ -357,7 +360,7 @@ final class Tab: NSObject {
     /// Starts this tab with another tab's back/forward list, then navigates: used for search folding.
     func restoreHistory(_ state: Data, thenLoad url: URL) {
         if let webView {
-            webView.interactionState = state as NSData
+            restoreState(state, in: webView)
         } else {
             pendingInteractionState = state
         }
@@ -365,6 +368,17 @@ final class Tab: NSObject {
         self.url = url
         changed.send(.url)
         loadOwn(url, in: webView)
+    }
+
+    /// Gives a new tab another's back and forward history (Duplicate).
+    func restoreState(_ state: Data) {
+        restoreState(state, in: ensureWebView())
+    }
+
+    /// Restoring history goes to the page it was on, as Zigzag's own Back or Forward would: Settings comes back too.
+    private func restoreState(_ state: Data, in webView: WKWebView) {
+        webView.interactionState = state as NSData
+        ownHistoryTarget = webView.backForwardList.currentItem?.url ?? url
     }
 
     /// Loads a page in this tab's web view as Zigzag's own doing (not the page's), so its address shows at once.
@@ -444,9 +458,20 @@ final class Tab: NSObject {
     }
 
     func goBack() {
-        if canGoBack { webView?.goBack() } else if returnsToOpener { host?.tabWantsToReturnToOpener(self) }
+        if canGoBack {
+            ownHistoryTarget = webView?.backForwardList.backItem?.url
+            webView?.goBack()
+        } else if returnsToOpener { host?.tabWantsToReturnToOpener(self) }
     }
-    func goForward() { webView?.goForward() }
+    func goForward() {
+        ownHistoryTarget = webView?.backForwardList.forwardItem?.url
+        webView?.goForward()
+    }
+    /// A page from the Back or Forward button's menu.
+    func go(to item: WKBackForwardListItem) {
+        ownHistoryTarget = item.url
+        webView?.go(to: item)
+    }
     func reload() {
         guard let webView else { ensureWebView(); return }
         if webView.url == nil, let url { loadOwn(url, in: webView) } else { webView.reload() }
@@ -668,8 +693,13 @@ extension Tab: WKNavigationDelegate {
         let userInitiated = PopupNotice.isUserInitiated(navigationAction)
         // Zigzag's own load counts for the main frame's next decision only, whatever comes of it (a download, an
         // app's link): never for a later one the page starts.
-        let ownLoad = navigationAction.targetFrame?.isMainFrame == true && ownLoadPending
-        if navigationAction.targetFrame?.isMainFrame == true { ownLoadPending = false }
+        let decidesMainFrame = navigationAction.targetFrame?.isMainFrame == true
+        let ownLoad = decidesMainFrame && ownLoadPending
+        let ownHistory = decidesMainFrame && ownHistoryTarget != nil && navigationAction.request.url == ownHistoryTarget
+        if decidesMainFrame {
+            ownLoadPending = false
+            ownHistoryTarget = nil
+        }
         if navigationAction.shouldPerformDownload {
             // A download link you click saves. One a script starts on its own saves too (an export that's ready),
             // but not a stream of them: another within half a minute is refused.
@@ -704,8 +734,9 @@ extension Tab: WKNavigationDelegate {
         }
         // Zigzag's own pages (Settings, History) open from Zigzag or from one another, never because a website
         // sent the tab there: a page could time it so your next click lands on a switch.
-        if url.scheme?.lowercased() == HistoryPage.scheme, !ownLoad, navigationAction.navigationType != .backForward,
-           navigationAction.sourceFrame.securityOrigin.protocol != HistoryPage.scheme {
+        if url.scheme?.lowercased() == HistoryPage.scheme,
+           !Self.mayGoToInternalPage(ownLoad: ownLoad, ownHistory: ownHistory, isBackForward: navigationAction.navigationType == .backForward,
+                                     fromInternalPage: navigationAction.sourceFrame.securityOrigin.protocol == HistoryPage.scheme) {
             return (.cancel, preferences)
         }
         if ExternalLinks.isExternal(url) {
@@ -758,6 +789,12 @@ extension Tab: WKNavigationDelegate {
             addressWaitsForCommit = openedByPage || (!ownLoad && ![.backForward, .reload].contains(navigationAction.navigationType))
         }
         return (.allow, preferences)
+    }
+
+    /// Whether a navigation may land on one of Zigzag's own pages: Zigzag's own load, Back or Forward, or a link
+    /// from another of its pages. Back and Forward only when Zigzag started them: a page can call history.back().
+    static func mayGoToInternalPage(ownLoad: Bool, ownHistory: Bool, isBackForward: Bool, fromInternalPage: Bool) -> Bool {
+        ownLoad || ownHistory || (fromInternalPage && !isBackForward)
     }
 
     /// The site a URL belongs to, so mail.google.com and accounts.google.com count as one: the last two parts of
