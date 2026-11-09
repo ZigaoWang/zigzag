@@ -48,8 +48,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// Opens one on `url`. `origin`: where on screen it grows from (the quick open bar it came out of); without
     /// one it takes the middle of the screen, a step down from any already there.
     @discardableResult
-    static func open(url: URL, isSearch: Bool = false, from origin: NSRect? = nil) -> MiniWindowController {
-        let controller = MiniWindowController(url: url, origin: origin)
+    static func open(url: URL, isSearch: Bool = false, from origin: NSRect? = nil, overFullScreen: Bool? = nil) -> MiniWindowController {
+        let controller = MiniWindowController(url: url, origin: origin, overFullScreen: overFullScreen ?? (NSApp.keyWindow?.styleMask.contains(.fullScreen) == true))
         controller.tab.isSearchTab = isSearch
         all.append(controller)
         Diagnostics.note("Zigzag Mini opened", site: url.host())
@@ -59,7 +59,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         return controller
     }
 
-    private init(url: URL, origin: NSRect?) {
+    private init(url: URL, origin: NSRect?, overFullScreen: Bool) {
         let spaceID = MiniQuickOpen.space.id
         tab = Tab(url: url, spaceID: spaceID)
         // Zigzag's own PDF viewer and Back to the page that opened it belong to a browser window's tabs; here the page
@@ -75,11 +75,12 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         window.minSize = Tokens.Metric.miniWindowMinSize
         window.collectionBehavior.remove(.fullScreenPrimary)
         // Opened over a full-screen window, it stays there in the same Space instead of opening off in another one.
-        if NSApp.keyWindow?.styleMask.contains(.fullScreen) == true { window.collectionBehavior.insert(.fullScreenAuxiliary) }
+        if overFullScreen { window.collectionBehavior.insert(.fullScreenAuxiliary) }
         window.setFrame(frame, display: false)
         super.init(window: window)
         window.delegate = self
         window.contentView = root
+        window.eventInterceptor = { [weak self] event in self?.noteEscape(event) ?? false }
         window.setAccessibilityTitle(Self.name)
 
         strip.openButton.onClick = { [weak self] _ in self?.openInZigzag() }
@@ -222,8 +223,10 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Esc puts Zigzag Mini away, as it does Spotlight or Quick Look: it's there for a quick look. Only an Esc the page
-    /// left alone gets here (a site closing its own dialog keeps the window), the command bar takes its own, and in a
-    /// field you're typing in the first Esc only leaves the field, so a half-written reply never goes on a stray key.
+    /// left alone gets here, and the command bar and Zigzag's questions over the page take their own. It stays when the
+    /// page has a dialog of its own open (many close on Esc without telling WebKit they took it), and in a field you're
+    /// typing in, also inside a frame or a web component, the first Esc only leaves the field, so a half-written reply
+    /// never goes on a stray key.
     override func keyDown(with event: NSEvent) {
         guard event.keyCode == 53, event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty else {
             super.keyDown(with: event)
@@ -235,18 +238,51 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     override func cancelOperation(_ sender: Any?) { escape() }
 
     private func escape() {
-        guard !isLeaving, !commandBar.isVisible else { return }
+        guard !isLeaving, !commandBar.isVisible, !overlay.subviews.contains(where: { $0 is PermissionPrompt || $0 is SavePasswordPrompt }) else { return }
         guard let webView = tab.webView, let focused = window?.firstResponder as? NSView, focused.isDescendant(of: webView) else {
             window?.performClose(nil)
             return
         }
-        let leaveField = "(() => { const e = document.activeElement; const typing = !!e && (e.isContentEditable || /^(input|textarea|select)$/i.test(e.tagName)); if (typing) e.blur(); return typing; })()"
-        webView.evaluateJavaScript(leaveField) { [weak self] result, _ in
+        // What the page was doing as Esc arrived (noted before the page saw it, in `noteEscape`), since by now its
+        // handler may have closed its dialog. Typing: the field lets go of the focus, and the window stays.
+        let decide = """
+            (() => {
+              const was = window.__zigzagEsc ?? (\(Self.escapeState));
+              delete window.__zigzagEsc;
+              if (was === 'typing') {
+                let e = document.activeElement;
+                while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
+                e?.blur();
+              }
+              return was;
+            })()
+            """
+        webView.evaluateJavaScript(decide) { [weak self] result, _ in
             MainActor.assumeIsolated {
-                guard (result as? Bool) != true else { return }
+                guard (result as? String) == "" else { return }
                 self?.window?.performClose(nil)
             }
         }
+    }
+
+    /// Whether the page is in the middle of something Esc shouldn't end: "typing" in a field (inside a frame or a web
+    /// component too), "dialog" with one of its own dialogs open, or "" when it's just a page.
+    private static let escapeState = """
+        (() => {
+          let e = document.activeElement;
+          while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
+          if (e && (e.isContentEditable || /^(input|textarea|select|iframe)$/i.test(e.tagName))) return 'typing';
+          return document.querySelector('dialog[open], [aria-modal="true"]') ? 'dialog' : '';
+        })()
+        """
+
+    /// Called as Esc comes in, before the page gets it: WebKit runs this script ahead of the key, so the note says
+    /// what the page looked like before its own Esc handler ran.
+    private func noteEscape(_ event: NSEvent) -> Bool {
+        guard event.type == .keyDown, event.keyCode == 53, !commandBar.isVisible, let webView = tab.webView,
+              let focused = window?.firstResponder as? NSView, focused.isDescendant(of: webView) else { return false }
+        webView.evaluateJavaScript("window.__zigzagEsc = \(Self.escapeState)", completionHandler: nil)
+        return false
     }
 
     #if DEBUG
@@ -684,7 +720,7 @@ extension MiniWindowController: PromptHost {
         linkStatus.hide()
         commandBar.dismiss()
     }
-    var promptIsCovered: Bool { false }
+    var promptIsCovered: Bool { commandBar.isVisible }
     var promptAnchor: NSView? { strip }
     func promptToast(_ text: String, symbol: String, duration: TimeInterval) {
         Toast.show(text, symbol: symbol, duration: duration, over: overlay, area: overlay.bounds)

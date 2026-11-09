@@ -83,8 +83,13 @@ final class MiniQuickOpen: NSWindowController, NSWindowDelegate {
     required init?(coder: NSCoder) { fatalError() }
 
     /// Centered on the screen you're using, the bar where ⌘T's sits over a page that size.
+    /// Whether it came up over a full-screen window, so the page opens in that same Space: by the time a result is
+    /// clicked, the bar itself is the window in front.
+    private var overFullScreen = false
+
     private func present() {
         guard let window else { return }
+        overFullScreen = NSApp.keyWindow?.styleMask.contains(.fullScreen) == true
         let screen = NSApp.keyWindow?.screen ?? NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
         let area = screen?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
         let top = area.maxY - max(Tokens.Space.x12, floor(area.height * 0.18))
@@ -151,7 +156,7 @@ extension MiniQuickOpen: CommandBarHost {
     func commandBarOpen(_ kind: CommandResult.Kind, modifiers: NSEvent.ModifierFlags, editing: Bool) -> Bool {
         if Self.switchToTab(kind) { return true }
         guard let (url, search) = Self.page(for: kind) else { return true }
-        MiniWindowController.open(url: url, isSearch: search, from: barFrameOnScreen)
+        MiniWindowController.open(url: url, isSearch: search, from: barFrameOnScreen, overFullScreen: overFullScreen)
         return true
     }
 
