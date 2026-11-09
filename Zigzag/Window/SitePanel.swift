@@ -33,6 +33,9 @@ final class SitePanel: FloatingPanelView {
     private let securityIcon = NSImageView()
     private let moreButton = IconButton(symbol: "ellipsis", toolTip: String(localized: "More", comment: "Tooltip of the … button in the site panel."))
     private var actionTiles: [PanelTile] = []
+    /// Hairlines setting the row of actions apart from the site above it and what's below.
+    private let actionsTopLine = ColorView(color: Tokens.Color.separator)
+    private let actionsBottomLine = ColorView(color: Tokens.Color.separator)
     private let extensionsLabel = Label.section(String(localized: "Extensions", comment: "Section label over the extensions' buttons in the site panel."))
     private var extensionTiles: [PanelTile] = []
     /// The pin on each extension's tile, beside the tile rather than in it, as it reaches past the tile's corner.
@@ -222,6 +225,8 @@ final class SitePanel: FloatingPanelView {
             addSubview(tile)
             return tile
         }
+        addSubview(actionsTopLine)
+        addSubview(actionsBottomLine)
     }
 
     /// Only a web site has a cache and cookies of its own to clear: not a file, an extension's page or a new tab.
@@ -473,7 +478,12 @@ final class SitePanel: FloatingPanelView {
         let lockSide: CGFloat = 10
         place(securityIcon, NSRect(x: textX, y: y + siteName.lineHeight + 3, width: lockSide, height: lockSide))
         place(security, NSRect(x: textX + lockSide + 4, y: y + siteName.lineHeight + 1, width: textWidth - lockSide - 4, height: security.lineHeight))
-        y += headerHeight + Tokens.Space.x4
+        y += headerHeight + (actionTiles.isEmpty ? Tokens.Space.x4 : 0)
+        func rule(_ line: NSView) {
+            y += Tokens.Space.x3
+            place(line, NSRect(x: pad, y: y, width: inner, height: Tokens.Metric.hairline))
+            y += Tokens.Metric.hairline + Tokens.Space.x3
+        }
 
         // Actions are named tiles, as many to a row as fit; extensions are icons on the same rhythm below.
         var gap = Tokens.Space.x2
@@ -492,6 +502,7 @@ final class SitePanel: FloatingPanelView {
         }
         let columns = inner >= 260 ? 6 : inner >= 200 ? 5 : 4
         if !actionTiles.isEmpty {
+            rule(actionsTopLine)
             // One row, like the markings along a device's edge: every action side by side. In a narrow panel,
             // where a name wouldn't show whole, they share two even rows instead.
             let spacing = gap
@@ -501,7 +512,10 @@ final class SitePanel: FloatingPanelView {
             let rows = fit >= actionTiles.count ? 1 : (actionTiles.count + fit - 1) / fit
             grid(actionTiles, columns: (actionTiles.count + rows - 1) / rows, centered: true) { _ in PanelTile.captionedHeight }
             gap = spacing
-            y += Tokens.Space.x5
+            // A line only between things: with nothing under the actions, the panel simply ends.
+            let hasMoreBelow = !extensionTiles.isEmpty || !self.rows.isEmpty
+            actionsBottomLine.isHidden = !hasMoreBelow
+            if hasMoreBelow { rule(actionsBottomLine) } else { y += Tokens.Space.x5 }
         }
         if !extensionTiles.isEmpty {
             place(extensionsLabel, NSRect(x: pad - Label.inset, y: y, width: inner + Label.inset * 2, height: extensionsLabel.lineHeight))
