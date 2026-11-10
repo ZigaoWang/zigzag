@@ -73,8 +73,42 @@ struct ProfileDirectoryTests {
         let crypto = directory.add(name: "Crypto")
         directory.assign(space: work, to: crypto.id)
         directory.assign(space: play, to: crypto.id)
-        directory.prune(keeping: [work])
-        #expect(directory.assignments.keys.sorted() == [work.uuidString])
+        directory.prune(keeping: [work], favorites: [])
+        #expect(directory.assignments.spaces.keys.sorted() == [work.uuidString])
+    }
+
+    @Test func aFavoriteIsTheFirstProfilesUntilItsGivenToAnother() {
+        var directory = ProfileDirectory()
+        let crypto = directory.add(name: "Crypto")
+        #expect(directory.profileID(ofFavorite: work) == Profile.defaultID)
+        directory.assign(favorite: work, to: crypto.id)
+        #expect(directory.profileID(ofFavorite: work) == crypto.id)
+        // A space and a favorite are told apart, whatever their ids.
+        #expect(directory.profileID(ofSpace: work) == Profile.defaultID)
+        directory.assign(favorite: work, to: Profile.defaultID)
+        #expect(directory.assignments.isEmpty)
+    }
+
+    @Test func aRemovedProfilesFavoritesArentKeptAndUndoDoesntBringThemBack() {
+        var directory = ProfileDirectory()
+        let crypto = directory.add(name: "Crypto"), school = directory.add(name: "School")
+        directory.assign(favorite: work, to: crypto.id)
+        directory.assign(favorite: study, to: school.id)
+        let before = directory.assignments
+        directory.remove(crypto.id)
+        #expect(directory.assignments.favorites == [study.uuidString: school.id])
+        directory.restore(assignments: before)
+        #expect(directory.profileID(ofFavorite: work) == Profile.defaultID)
+        #expect(directory.profileID(ofFavorite: study) == school.id)
+    }
+
+    @Test func favoritesThatAreGoneAreForgottenOnlyWhenAsked() {
+        var directory = ProfileDirectory()
+        let crypto = directory.add(name: "Crypto")
+        directory.assign(favorite: work, to: crypto.id)
+        directory.assign(favorite: play, to: crypto.id)
+        directory.prune(keeping: [], favorites: [play])
+        #expect(directory.assignments.favorites.keys.sorted() == [play.uuidString])
     }
 
     @Test func storesWithNoProfileAreOrphansButOnesBeingRemovedArent() {
@@ -90,6 +124,7 @@ struct ProfileDirectoryTests {
         let crypto = directory.add(name: "Crypto", color: .mint)
         directory.update(Profile.defaultID, name: "Home", color: nil)
         directory.assign(space: work, to: crypto.id)
+        directory.assign(favorite: play, to: crypto.id)
         directory.remove(directory.add(name: "Gone").id)
         let read = try JSONDecoder().decode(ProfileDirectory.self, from: JSONEncoder().encode(directory))
         #expect(read == directory)

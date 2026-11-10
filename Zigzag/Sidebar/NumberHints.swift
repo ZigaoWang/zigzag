@@ -259,7 +259,7 @@ final class NumberHints {
 
     func show(force: Bool = false) {
         guard let controller, force || canShow(focused: true) else { return }
-        let favorites = Library.shared.favoriteTiles.map(\.0.id)
+        let favorites = Library.shared.favoriteTiles(in: controller.tabManager.profile.id).map(\.0.id)
         let rows = controller.sidebar.list.pageRows
         let labels = TabNumbers.labels(count: favorites.count + rows.count)
         var tileNumbers: [UUID: Int] = [:]

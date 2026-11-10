@@ -92,7 +92,7 @@ final class BridgeBookmarks: BridgeNamespace {
     private func children(of id: String) -> [String] {
         switch id {
         case Self.root: return [Self.favorites, Self.spaces]
-        case Self.favorites: return library.favorites.map { "b:\($0.id)" }
+        case Self.favorites: return library.favorites(in: host.profile.id).map { "b:\($0.id)" }
         case Self.spaces: return library.spaces.map { "s:\($0.id)" }
         default: break
         }
@@ -174,7 +174,7 @@ final class BridgeBookmarks: BridgeNamespace {
     }
 
     private func allPages() -> [String] {
-        library.favorites.map { "b:\($0.id)" } + library.spaces.flatMap { $0.bookmarks.map { "b:\($0.id)" } }
+        library.favorites(in: host.profile.id).map { "b:\($0.id)" } + library.spaces.flatMap { $0.bookmarks.map { "b:\($0.id)" } }
     }
 
     /// `search("text")` matches title or address, every word; `search({ query, url, title })` as Chrome does.
@@ -211,7 +211,7 @@ final class BridgeBookmarks: BridgeNamespace {
             let name = title.isEmpty ? (url.host() ?? text) : title
             switch parentID {
             case Self.favorites:
-                return "b:\(library.addFavorite(url: url, title: name, at: index).id)"
+                return "b:\(library.addFavorite(url: url, title: name, at: index, in: host.profile.id).id)"
             case Self.root, Self.spaces:
                 guard let first = library.spaces.first, let page = library.addBookmark(url: url, title: name, to: first.id, at: index) else { throw BridgeError("Couldn't add the bookmark") }
                 return "b:\(page.id)"
@@ -261,7 +261,7 @@ final class BridgeBookmarks: BridgeNamespace {
         let index = destination.number("index").map(Int.init)
         switch (kind, target) {
         case ("b", Self.favorites):
-            if library.isFavorite(uuid) { library.moveFavorite(uuid, to: index ?? library.favorites.count) } else { library.makeFavorite(uuid, at: index) }
+            if library.isFavorite(uuid) { library.moveFavorite(uuid, to: index ?? library.favorites(in: host.profile.id).count) } else { library.makeFavorite(uuid, at: index, in: host.profile.id) }
         case ("b", _):
             guard let (parentKind, parentID) = parse(target) else { throw BridgeError("Can't find parent bookmark node") }
             if parentKind == "s" {

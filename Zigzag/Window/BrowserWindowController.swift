@@ -415,10 +415,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func reloadFavorites() {
-        let favorites = Library.shared.favorites
+        // The tiles are the profile's of the space you're in.
+        let favorites = Library.shared.favorites(in: tabManager.profile.id)
         let open = Set(favorites.map(\.id).filter { tabManager.bookmarkTab(for: $0) != nil })
         let tabs = Dictionary(uniqueKeysWithValues: favorites.compactMap { favorite in tabManager.bookmarkTab(for: favorite.id).map { (favorite.id, $0) } })
-        sidebar.favorites.reload(favorites: Library.shared.favoriteTiles, openIDs: open, selectedID: tabManager.selectedTab?.isFavorite == true ? tabManager.selectedTab?.bookmarkID : nil, tabs: tabs)
+        sidebar.favorites.reload(favorites: Library.shared.favoriteTiles(in: tabManager.profile.id), openIDs: open, selectedID: tabManager.selectedTab?.isFavorite == true ? tabManager.selectedTab?.bookmarkID : nil, tabs: tabs)
         sidebar.needsLayout = true
     }
 
@@ -2052,13 +2053,13 @@ extension BrowserWindowController: SidebarDelegate {
         // Each a tile after the one before (a split's two pages make one), in list order.
         var slot = index
         for item in items {
-            let tiles = Library.shared.favoriteTiles.count, at = slot
+            let tiles = Library.shared.favoriteTiles(in: tabManager.profile.id).count, at = slot
             switch item {
             case .tab(let id): if let tab = tabManager.tab(with: id) { favoriteWithUndo(tab, at: at) }
             case .bookmark(let id): pageChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in the Edit menu as Undo Add to Favorites.")) { [tabManager] in tabManager.favoriteBookmark(id, at: at) }
             default: break
             }
-            slot = slot.map { $0 + Library.shared.favoriteTiles.count - tiles }
+            slot = slot.map { $0 + Library.shared.favoriteTiles(in: tabManager.profile.id).count - tiles }
         }
         return true
     }

@@ -355,6 +355,7 @@ enum DebugBridge {
                         "spaces": library.spaces(in: info.id).map(\.name),
                         "extensionsUp": profile.isDefault || profile.startedExtensions != nil,
                         "loaded": (profile.isDefault ? profile.extensions : profile.startedExtensions)?.contexts.map(\.uniqueIdentifier).sorted() ?? [],
+                        "favorites": library.favorites(in: info.id).map(\.title),
                         "installed": profile.installs.installedIDs]
             }
             let tabs = controller.tabManager.allTabs.map { tab -> [String: Any] in
@@ -1224,6 +1225,9 @@ enum DebugBridge {
                 }
                 if let data = try? JSONSerialization.data(withJSONObject: json) { try? data.write(to: URL(fileURLWithPath: arg)) }
             }
+        case "openfav":
+            // openfav <title>: opens that favorite, whichever profile's, as choosing it in the command bar would.
+            if let favorite = Library.shared.favorites.first(where: { $0.title == arg }) { controller.tabManager.openBookmark(favorite) }
         case "favorite":
             if let tab = controller.tabManager.selectedTab { controller.tabManager.favoriteTab(tab) }
         case "pagecorner":
@@ -1259,7 +1263,7 @@ enum DebugBridge {
             let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
             guard let url = f.first.flatMap(URL.init(string:)) else { break }
             let title = f.count > 1 ? f[1] : url.host() ?? ""
-            if name == "addfav" { _ = Library.shared.addFavorite(url: url, title: title) }
+            if name == "addfav" { _ = Library.shared.addFavorite(url: url, title: title, in: controller.tabManager.profile.id) }
             else { _ = Library.shared.addBookmark(url: url, title: title, to: controller.tabManager.currentSpaceID) }
         case "unfavorite":
             // unfavorite <title>: back to a tab, in whichever window holds its page.

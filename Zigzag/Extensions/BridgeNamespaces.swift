@@ -87,7 +87,7 @@ final class BridgeTopSites: BridgeNamespace {
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         guard fn == "get" else { throw BridgeError.unsupported(Self.name, fn) }
         var seen = Set<String>(), sites: [[String: Any]] = []
-        let favorites = Library.shared.favorites.map { ($0.url, $0.title) }
+        let favorites = Library.shared.favorites(in: host.profile.id).map { ($0.url, $0.title) }
         let visited = HistoryStore.shared.mostVisited(limit: 20).map { ($0.url, $0.title) }
         for (url, title) in favorites + visited where sites.count < 10 && seen.insert(url.absoluteString).inserted {
             sites.append(["url": url.absoluteString, "title": title])
