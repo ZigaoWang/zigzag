@@ -174,20 +174,29 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private func showSpaceMenu() {
         guard !isLeaving else { return }
         let current = space.id
-        let entries: [MenuPanel.Entry] = Library.shared.spaces.map { other in
+        func entry(_ other: SpaceInfo) -> MenuPanel.Entry {
             let symbol = other.icon.flatMap { IconChoice.isSymbol($0) ? $0 : nil }
             let image = symbol == nil ? MiniSpaceChip.picture(of: other, size: DropdownButton.iconSide) : nil
             return .item(.init(title: other.name, image: image, symbol: symbol, isChecked: other.id == current) { [weak self] in
                 self?.choose(space: other.id)
             })
         }
+        // Under their profiles' names once there's more than one: a space on another profile reloads the page there.
+        let entries: [MenuPanel.Entry] = Library.shared.hasManyProfiles
+            ? Library.shared.spaceGroups().flatMap { group in [.header(group.profile.displayName)] + group.spaces.map(entry) }
+            : Library.shared.spaces.map(entry)
         strip.spaceChip.isSelected = true
         MenuPanel.show(entries, from: strip.spaceChip) { [weak self] in self?.strip.spaceChip.isSelected = false }
     }
 
     private func choose(space id: UUID) {
         guard id != tab.spaceID, Library.shared.space(id) != nil else { return }
+        // To a space on another profile, the page is rebuilt there: this window is then that profile's
+        // extensions' to know, not the one it left.
+        let crossing = Library.shared.profileID(ofSpace: id) != tab.profile.id
+        if #available(macOS 15.4, *), crossing { ExtensionCenter.miniClosed(self) }
         tab.setSpace(id)
+        if #available(macOS 15.4, *), crossing { ExtensionCenter.miniOpened(self) }
         paint(animated: true)
         refreshStrip()
     }

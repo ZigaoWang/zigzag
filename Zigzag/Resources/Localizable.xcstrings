@@ -191,6 +191,40 @@
         }
       }
     },
+    "%@ is on %@. The page reloads there, with that profile’s sign-ins and extensions, and keeps its back and forward history." : {
+      "comment" : "Message of the sheet that asks before a tab moves to a space on another profile. First the space's name, then the profile's.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ is on %2$@. The page reloads there, with that profile’s sign-ins and extensions, and keeps its back and forward history."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@”位于描述文件“%2$@”。页面会在那里重新载入，使用该描述文件的登录状态和扩展，并保留前进和后退记录。"
+          }
+        }
+      }
+    },
+    "%@ is on %@. The pages reload there, with that profile’s sign-ins and extensions, and keep their back and forward history." : {
+      "comment" : "Message of the sheet that asks before several tabs move to a space on another profile. First the space's name, then the profile's.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ is on %2$@. The pages reload there, with that profile’s sign-ins and extensions, and keep their back and forward history."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@”位于描述文件“%2$@”。这些页面会在那里重新载入，使用该描述文件的登录状态和扩展，并保留前进和后退记录。"
+          }
+        }
+      }
+    },
     "%@ isn’t a Safari export Zigzag can open. In Safari, choose File › Export Browsing Data, then choose the zip it makes." : {
       "comment" : "Problem in the Import window. The placeholder is the file's name; File › Export Browsing Data is Safari's own menu wording.",
       "localizations" : {
@@ -7000,6 +7034,17 @@
         }
       }
     },
+    "Move and Reload" : {
+      "comment" : "Button of the sheet that asks before tabs move to a space on another profile.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移动并重新载入"
+          }
+        }
+      }
+    },
     "Move into Folder" : {
       "comment" : "Undo action name, shown in the Edit menu as Undo Move into Folder.",
       "localizations" : {
@@ -7007,6 +7052,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "移入文件夹"
+          }
+        }
+      }
+    },
+    "Move these tabs to %@?" : {
+      "comment" : "Title of the sheet that asks before several tabs move to a space on another profile. The placeholder is the space's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要将这些标签页移到“%@”吗？"
+          }
+        }
+      }
+    },
+    "Move this tab to %@?" : {
+      "comment" : "Title of the sheet that asks before a tab moves to a space on another profile. The placeholder is the space's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要将这个标签页移到“%@”吗？"
           }
         }
       }

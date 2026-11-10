@@ -905,6 +905,22 @@ enum DebugBridge {
             debugLog("engine \(engine.rawValue) \(engine.name) \(engine.searchURL("zigzag test").absoluteString) home=\(engine.homeURL.absoluteString) offered=\(ExtensionSearchProvider.available.map(\.name)) before=\(ExtensionSearchProvider.previousEngine.rawValue)")
         case "largenames": SpaceHeaderView.isLarge = arg != "off"
         case "sitepanel": SitePanel.toggle(in: controller, from: controller.sidebar.address)
+        case "confirmsheet":
+            // Confirms any open confirmation, in every window.
+            for window in NSApp.windows {
+                func walk(_ view: NSView?) { for sub in view?.subviews ?? [] { (sub as? ConfirmSheet)?.debugConfirm(); walk(sub) } }
+                walk(window.contentView)
+            }
+        case "movetab":
+            // movetab <space name>: sends the selected tab to that space, as its menu's Move to Space would. Of two
+            // spaces with the name, the one on another profile.
+            if let tab = controller.tabManager.selectedTab {
+                let named = Library.shared.spaces.filter { $0.name == arg && $0.id != tab.spaceID }
+                if let space = named.first(where: { Library.shared.profileID(ofSpace: $0.id) != tab.profile.id }) ?? named.first {
+                    controller.moveToSpaceWithToast(tab, spaceID: space.id)
+                }
+            }
+        case "sheetdest": ExtensionSheet.debugChoose(destination: Int(arg) ?? 0)
         case "cancelsheet":
             // Cancels any open confirmation, in every window, without confirming it.
             for window in NSApp.windows {

@@ -1738,7 +1738,41 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     /// Moves a tab within or between spaces, undoably.
-    func moveWithUndo(_ tab: Tab, to index: Int, in spaceID: UUID) {
+    func moveWithUndo(_ tab: Tab, to index: Int, in spaceID: UUID, then done: (() -> Void)? = nil) {
+        // To a space on another profile, an open page reloads there: that's asked first, wherever the move began (a
+        // menu, a drag, the command bar).
+        confirmProfileCrossing([tab] + (tabManager.partner(of: tab).map { [$0] } ?? []), to: spaceID) { [weak self] in
+            self?.moveNow(tab, to: index, in: spaceID)
+            done?()
+        }
+    }
+
+    /// Asks before pages that are loaded move to a space on another profile, where they're rebuilt with that
+    /// profile's sign-ins and extensions; `move` runs at once when nothing would change profile. Undoing such a
+    /// move doesn't ask: it only puts back what was.
+    func confirmProfileCrossing(_ tabs: [Tab], to spaceID: UUID, then move: @escaping () -> Void) {
+        let target = Library.shared.profileID(ofSpace: spaceID)
+        let crossing = tabs.filter { !$0.isPrivate && $0.webView != nil && $0.profile.id != target }
+        guard !crossing.isEmpty, let space = Library.shared.space(spaceID), let profile = Library.shared.directory.profile(target) else { move(); return }
+        let one = crossing.count == 1
+        ConfirmSheet.show(in: root.overlay,
+                          title: one ? String(localized: "Move this tab to \(space.name)?", comment: "Title of the sheet that asks before a tab moves to a space on another profile. The placeholder is the space's name.")
+                                     : String(localized: "Move these tabs to \(space.name)?", comment: "Title of the sheet that asks before several tabs move to a space on another profile. The placeholder is the space's name."),
+                          message: one ? String(localized: "\(space.name) is on \(profile.displayName). The page reloads there, with that profile’s sign-ins and extensions, and keeps its back and forward history.", comment: "Message of the sheet that asks before a tab moves to a space on another profile. First the space's name, then the profile's.")
+                                       : String(localized: "\(space.name) is on \(profile.displayName). The pages reload there, with that profile’s sign-ins and extensions, and keep their back and forward history.", comment: "Message of the sheet that asks before several tabs move to a space on another profile. First the space's name, then the profile's."),
+                          confirmTitle: String(localized: "Move and Reload", comment: "Button of the sheet that asks before tabs move to a space on another profile.")) { confirmed in
+            // Not moved after all: a row dragged there goes back to where it was.
+            if confirmed { move() } else { self.sidebar.list.reload(animated: true) }
+        }
+    }
+
+    /// The same question for a pinned page, whose open page goes where it does.
+    private func confirmProfileCrossing(pinned id: UUID, to spaceID: UUID, then move: @escaping () -> Void) {
+        let ids = Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id]
+        confirmProfileCrossing(ids.compactMap { tabManager.bookmarkTab(for: $0) }, to: spaceID, then: move)
+    }
+
+    private func moveNow(_ tab: Tab, to index: Int, in spaceID: UUID) {
         pageChange(spaceID == tab.spaceID ? String(localized: "Move Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Tab.") : String(localized: "Move to Space", comment: "Undo action name, shown in the Edit menu as Undo Move to Space.")) { [weak self] in
             guard let self else { return }
             let oldSpace = tab.spaceID
@@ -1751,7 +1785,10 @@ extension BrowserWindowController: SidebarDelegate {
     /// Sends a tab to another space. It leaves the screen, so a toast says where it went, with Undo to bring it back.
     func moveToSpaceWithToast(_ tab: Tab, spaceID: UUID) {
         guard let name = Library.shared.space(spaceID)?.name, spaceID != tab.spaceID else { return }
-        moveWithUndo(tab, to: 0, in: spaceID)
+        moveWithUndo(tab, to: 0, in: spaceID) { [weak self] in self?.toastMoved(to: name) }
+    }
+
+    private func toastMoved(to name: String) {
         // Undo brings back this tab, never whatever else was done since.
         Toast.show(String(localized: "Moved to \(name)", comment: "Toast after a tab moves to another space. The name is the space's."), symbol: "arrow.right.square", action: (String(localized: "Undo", comment: "Button in a toast: takes back what was just done."), { [weak self] in
             guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == String(localized: "Move to Space", comment: "Undo action name, shown in the Edit menu as Undo Move to Space.") else { return }
@@ -1840,11 +1877,15 @@ extension BrowserWindowController: SidebarDelegate {
         }
     }
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID) {
-        pageChange(String(localized: "Move Pinned Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Pinned Tab.")) { Library.shared.moveBookmark(id, to: index, in: spaceID) }
+        confirmProfileCrossing(pinned: id, to: spaceID) { [weak self] in
+            self?.pageChange(String(localized: "Move Pinned Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Pinned Tab.")) { Library.shared.moveBookmark(id, to: index, in: spaceID) }
+        }
     }
     /// A pinned page dropped at a place in the list, landing in a folder or out of one.
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID, folder: UUID?) {
-        pageChange(String(localized: "Move Pinned Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Pinned Tab.")) { Library.shared.moveBookmark(id, to: index, in: spaceID, folder: .some(folder)) }
+        confirmProfileCrossing(pinned: id, to: spaceID) { [weak self] in
+            self?.pageChange(String(localized: "Move Pinned Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Pinned Tab.")) { Library.shared.moveBookmark(id, to: index, in: spaceID, folder: .some(folder)) }
+        }
     }
     func listMoveFolder(_ id: UUID, to index: Int, in spaceID: UUID, parent: UUID?) {
         pageChange(parent == nil ? String(localized: "Move Folder", comment: "Undo action name, shown in the Edit menu as Undo Move Folder.") : String(localized: "Move into Folder", comment: "Undo action name, shown in the Edit menu as Undo Move into Folder.")) { Library.shared.moveFolder(id, to: index, in: spaceID, parent: .some(parent)) }
@@ -1883,16 +1924,18 @@ extension BrowserWindowController: SidebarDelegate {
     func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) {
         // Pins are shared by every window: a private one's tabs stay out of them.
         guard !tabManager.isPrivate else { return }
-        bookmarkWithUndo(tab, at: index, in: spaceID)
+        confirmProfileCrossing([tab], to: spaceID) { [weak self] in self?.bookmarkWithUndo(tab, at: index, in: spaceID) }
     }
     func listUnbookmark(_ bookmarkID: UUID, to index: Int) {
         // Pins are shared by every window: a private one doesn't take them away.
         guard !tabManager.isPrivate else { return }
         let space = tabManager.currentSpaceID
-        pageChange(String(localized: "Unpin Tab", comment: "Undo action name, shown in the Edit menu as Undo Unpin Tab.")) { [tabManager] in
-            // Carried here from another space: into this one first, so it comes down among the tabs you're looking at.
-            if Library.shared.spaceID(ofBookmark: bookmarkID) != space { Library.shared.moveBookmark(bookmarkID, to: Int.max, in: space) }
-            tabManager.unbookmark(bookmarkID, toIndex: index)
+        confirmProfileCrossing(pinned: bookmarkID, to: space) { [weak self, tabManager] in
+            self?.pageChange(String(localized: "Unpin Tab", comment: "Undo action name, shown in the Edit menu as Undo Unpin Tab.")) {
+                // Carried here from another space: into this one first, so it comes down among the tabs you're looking at.
+                if Library.shared.spaceID(ofBookmark: bookmarkID) != space { Library.shared.moveBookmark(bookmarkID, to: Int.max, in: space) }
+                tabManager.unbookmark(bookmarkID, toIndex: index)
+            }
         }
     }
     /// A tab in a window of its own, a little down and to the right of this one, so both stay in view.
