@@ -9365,7 +9365,7 @@
       }
     },
     "Profile" : {
-      "comment" : "Label in a space's editor, before the choice of the profile the space is on.",
+      "comment" : "Label in a space's editor, before the choice of the profile the space is on.\nWhat VoiceOver calls a menu that chooses a profile, and the label before that choice in a space's editor.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

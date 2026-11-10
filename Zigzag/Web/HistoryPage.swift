@@ -217,7 +217,7 @@ enum HistoryPage {
         default: (clearTitle, clearMessage, nil)
         }
         let profile = profile(of: webView)
-        ConfirmSheet.show(in: host, title: title, message: message + whoseNote(profile.id), confirmTitle: clearHistory, destructive: true) { confirmed in
+        ConfirmSheet.show(in: host, title: title, message: Words.sentences(message, whoseNote(profile.id)), confirmTitle: clearHistory, destructive: true) { confirmed in
             if confirmed {
                 change(clearHistory, from: webView) { profile.history.remove(since: since) }
                 if let controller = controller(for: webView) { clearedToast(in: controller) }
@@ -246,9 +246,9 @@ enum HistoryPage {
     }
 
     /// With more than one profile, added to what a sheet that clears history says: whose history goes.
-    static func whoseNote(_ profile: UUID) -> String {
-        guard Library.shared.hasManyProfiles, let info = Library.shared.directory.profile(profile) else { return "" }
-        return " " + String(localized: "Only \(info.displayName)’s history is cleared; other profiles keep theirs.", comment: "Added to the message of a sheet that asks before clearing History, when there's more than one profile. The placeholder is the profile's name.")
+    static func whoseNote(_ profile: UUID) -> String? {
+        guard Library.shared.hasManyProfiles, let info = Library.shared.directory.profile(profile) else { return nil }
+        return String(localized: "Only \(info.displayName)’s history is cleared; other profiles keep theirs.", comment: "Added to the message of a sheet that asks before clearing History, when there's more than one profile. The placeholder is the profile's name.")
     }
 
     static var clearTitle: String { String(localized: "Clear all history?", comment: "Title of the sheet that asks before clearing all of History, from the History page, the menu or Settings.") }

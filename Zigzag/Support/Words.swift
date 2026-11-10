@@ -16,6 +16,13 @@ enum Words {
         locale.language.languageCode == .english ? Locale(identifier: "en_US") : locale
     }
 
+    /// Two whole sentences, one after the other, spaced as this language spaces them (not at all after a
+    /// full-width full stop). With no second sentence, the first as it is.
+    static func sentences(_ first: String, _ second: String?) -> String {
+        guard let second, !second.isEmpty else { return first }
+        return String(localized: "\(first) \(second)", comment: "Joins two sentences, one after the other. Leave out the space if your language doesn't put one between sentences.")
+    }
+
     /// "Chrome, Arc and Safari": a list joined the way this language joins one ("Chrome、Arc 和 Safari").
     static func list(_ items: [String]) -> String {
         let formatter = ListFormatter()

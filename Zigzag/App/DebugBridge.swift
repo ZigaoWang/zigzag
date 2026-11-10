@@ -338,10 +338,13 @@ enum DebugBridge {
             if arg.hasPrefix("type ") {
                 (sheet.window?.firstResponder as? NSTextView)?.insertText(String(arg.dropFirst(5)), replacementRange: NSRange(location: 0, length: (sheet.window?.firstResponder as? NSTextView)?.string.count ?? 0))
             } else {
+                // Confirming for you (a profile's removal, say) only in a test copy; cancelling anywhere.
+                guard arg != "confirm" || isTestCopy else { debugLog("formsheet confirm refused: not a test copy"); break }
                 sheet.debugAnswer(arg == "confirm")
             }
         case "delprofile":
-            // delprofile <name>: removes the profile and its data, without asking.
+            // delprofile <name>: removes the profile and its data, without asking. Only in a test copy.
+            guard isTestCopy else { debugLog("delprofile refused: not a test copy"); break }
             if let id = Library.shared.profiles.first(where: { $0.name == arg && !$0.isDefault })?.id {
                 Task { await Profiles.shared.remove(id); debugLog("delprofile \(arg) => deleting \(Library.shared.directory.deleting.count)") }
             }
@@ -833,12 +836,6 @@ enum DebugBridge {
                   let view = window.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }
             view.cacheDisplay(in: view.bounds, to: rep)
             try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: arg))
-        case "pwshot":
-            // pwshot <path>: the Passwords window's own drawing, on a test vault only.
-            guard PasswordStore.isTestVault, let view = PasswordsWindowController.shared?.window?.contentView?.superview,
-                  let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }
-            view.cacheDisplay(in: view.bounds, to: rep)
-            try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: arg))
         case "passwordsshow":
             (PasswordsWindowController.shared?.window?.contentView as? PasswordsView)?.debugShow(arg)
         case "passwordswindow":
@@ -929,7 +926,9 @@ enum DebugBridge {
         case "largenames": SpaceHeaderView.isLarge = arg != "off"
         case "sitepanel": SitePanel.toggle(in: controller, from: controller.sidebar.address)
         case "confirmsheet":
-            // Confirms any open confirmation, in every window.
+            // Confirms any open confirmation, in every window. Only in a test copy: what's asked first is asked
+            // because it can't be taken back.
+            guard isTestCopy else { debugLog("confirmsheet refused: not a test copy"); break }
             for window in NSApp.windows {
                 func walk(_ view: NSView?) { for sub in view?.subviews ?? [] { (sub as? ConfirmSheet)?.debugConfirm(); walk(sub) } }
                 walk(window.contentView)
@@ -1305,13 +1304,19 @@ enum DebugBridge {
         }
     }
 
-    @available(macOS 15.4, *)
     /// The extensions a command means: those of the profile of the tab you're on.
     @available(macOS 15.4, *)
     private static func extensions(in controller: BrowserWindowController) -> ExtensionHost {
         controller.tabManager.selectedTab?.extensionHost ?? controller.tabManager.profile.extensions
     }
 
+    /// Whether this is a copy set up for scripted checks: its own data folder and a test vault. The verbs that
+    /// confirm for you, or delete, work only there: never on the data and passwords you use.
+    private static var isTestCopy: Bool {
+        ProcessInfo.processInfo.environment["ZIGZAG_DATA_DIR"] != nil && PasswordStore.isTestVault
+    }
+
+    @available(macOS 15.4, *)
     static func extensionTest(_ id: String, page: URL, in controller: BrowserWindowController) async {
         var report: [String: Any] = ["id": id]
         let had = controller.tabManager.profile.installs.state(id) != nil

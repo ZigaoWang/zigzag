@@ -130,6 +130,14 @@ struct ProfileDirectoryTests {
         #expect(read == directory)
     }
 
+    /// A file that lists the first profile as being removed (damaged, or edited by hand) is read without it: what
+    /// finishes removals would otherwise erase the first profile's passwords and extensions.
+    @Test func theFirstProfileIsNeverReadAsBeingRemoved() throws {
+        let json = #"{"deleting":[{"id":"\#(Profile.defaultID.uuidString)","name":"Oops"},{"id":"\#(work.uuidString)","name":"Gone"}]}"#
+        let read = try JSONDecoder().decode(ProfileDirectory.self, from: Data(json.utf8))
+        #expect(read.deleting.map(\.id) == [work])
+    }
+
     @Test func aFileThatLeavesThingsOutStillReads() throws {
         let empty = try JSONDecoder().decode(ProfileDirectory.self, from: Data("{}".utf8))
         #expect(empty == ProfileDirectory())

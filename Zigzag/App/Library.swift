@@ -482,8 +482,7 @@ final class Library {
 
     @discardableResult
     func addSpace(name: String? = nil, color: SpaceColor? = nil) -> SpaceInfo {
-        let used = Set(spaces.map(\.color))
-        let pick = color ?? SpaceColor.allCases.first { !$0.isNeutral && !used.contains($0) } ?? SpaceColor.allCases[spaces.count % SpaceColor.allCases.count]
+        let pick = color ?? SpaceColor.next(unused: spaces.map(\.color))
         let space = SpaceInfo(name: name ?? String(localized: "Space \(spaces.count + 1)", comment: "The name of a new space: its number. People can rename it."),
                               color: pick)
         spaces.append(space)
