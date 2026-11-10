@@ -7412,6 +7412,17 @@
         }
       }
     },
+    "No strong password in a private window" : {
+      "comment" : "A dimmed row in the fill-password menu on a sign-up form in a private window, in place of Use Strong Password.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无痕浏览窗口里不提供强密码"
+          }
+        }
+      }
+    },
     "No tabs" : {
       "comment" : "In the tab overview (all spaces' tabs as cards), in a space with no tabs.",
       "localizations" : {
@@ -9061,6 +9072,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无痕浏览"
+          }
+        }
+      }
+    },
+    "Private windows don’t save new passwords" : {
+      "comment" : "Under the dimmed row saying a private window offers no strong password, in the fill-password menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无痕浏览窗口不存储新密码"
           }
         }
       }
@@ -12498,6 +12520,17 @@
         }
       }
     },
+    "This page changed before Zigzag could fill it. Click the field again." : {
+      "comment" : "Toast when a login or strong password was picked but the page went to another site, or its tab was no longer in front.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 填写前这个页面变了。请再点一下输入框。"
+          }
+        }
+      }
+    },
     "This page doesn’t have an article to read" : {
       "comment" : "Toast when Reader can't find an article on the page.",
       "localizations" : {
@@ -14303,6 +14336,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzag 无法读取你的名片。请在“系统设置 › 隐私与安全性 › 通讯录”中允许访问，并在“通讯录”中设置“我的名片”。"
+          }
+        }
+      }
+    },
+    "Zigzag couldn’t find a password field it can see on this page. Copy the password from Passwords instead." : {
+      "comment" : "Toast when a login or strong password was picked but the page has no visible password field to put it in. Passwords is the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 在这个页面上找不到看得见的密码框。请到“密码”里拷贝密码。"
           }
         }
       }

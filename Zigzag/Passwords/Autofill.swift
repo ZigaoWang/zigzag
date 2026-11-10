@@ -86,12 +86,11 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 show([.contact], under: field, in: webView, frame: frame, origin: origin)
                 return
             }
-            if body["isNew"] as? Bool == true {
-                guard !(webView.owner?.isPrivate ?? false) else { hide(); return }
+            let isNew = body["isNew"] as? Bool == true
+            let isPrivate = webView.owner?.isPrivate ?? false
+            if isNew {
                 rules = PasswordGenerator.Rules(passwordRules: body["rules"] as? String ?? "", minLength: body["minLength"] as? Int ?? -1,
                                                 maxLength: body["maxLength"] as? Int ?? -1)
-                show([.generate], under: field, in: webView, frame: frame, origin: origin)
-                return
             }
             Task {
                 let all: [Credential]
@@ -100,6 +99,12 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 let logins = all.filter { $0.origin.fills(on: origin) }
                 debugLog("autofill \(origin.host): \(logins.count) of \(all.count) match")
                 guard current == self.generation else { return }
+                // A field for a new password offers a strong one first, and still your saved logins under it: a
+                // sign-in Zigzag takes for a sign-up (or a change of password) is still yours to fill.
+                if isNew {
+                    self.show(Self.menuItems(logins, on: origin, newPassword: true, isPrivate: isPrivate), under: field, in: webView, frame: frame, origin: origin)
+                    return
+                }
                 if logins.isEmpty {
                     if !all.isEmpty, self.shouldSayMissing(on: origin) {
                         self.show([.missing], under: field, in: webView, frame: frame, origin: origin)
@@ -137,15 +142,20 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     /// The rows for the logins that may fill on `origin`: those saved for this host, newest used first, then one quiet
     /// row standing for those saved for other parts of the site, which list only once you pick it. A login of
     /// another subdomain is never one click away.
-    static func menuItems(_ logins: [Credential], on origin: Origin) -> [AutofillMenu.Item] {
+    ///
+    /// On a field for a new password, "Use Strong Password" comes first and the logins follow, as in Safari; in a
+    /// private window, which keeps no new password, a row says so in its place.
+    static func menuItems(_ logins: [Credential], on origin: Origin, newPassword: Bool = false, isPrivate: Bool = false) -> [AutofillMenu.Item] {
+        let lead: [AutofillMenu.Item] = newPassword ? [isPrivate ? .note(.privateWindow) : .generate] : []
         let newest: (Credential, Credential) -> Bool = { a, b in
             if a.origin.isExact(for: origin) != b.origin.isExact(for: origin) { return a.origin.isExact(for: origin) }
             return (a.lastUsed ?? a.modified) > (b.lastUsed ?? b.modified)
         }
         let here = logins.filter { $0.origin.host == origin.host }.sorted(by: newest)
         let elsewhere = logins.filter { $0.origin.host != origin.host }.sorted(by: newest)
-        guard !elsewhere.isEmpty else { return here.map { .login($0) } }
-        return here.prefix(7).map { .login($0) } + [.elsewhere(elsewhere)]
+        let room = AutofillMenu.maxRows - lead.count
+        guard !elsewhere.isEmpty else { return lead + here.prefix(room).map { .login($0) } }
+        return lead + here.prefix(room - 1).map { .login($0) } + [.elsewhere(elsewhere)]
     }
 
     /// Where the menu showing was put: picking "other parts of the site" lists them in the same place.
@@ -155,7 +165,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         guard let overlay = Self.overlay(for: webView) else { return }
         self.field = field
         menu?.removeFromSuperview()
-        let menu = AutofillMenu(items: Array(items.prefix(8)), origin: origin)
+        let menu = AutofillMenu(items: Array(items.prefix(AutofillMenu.maxRows)), origin: origin)
         menu.onPick = { [weak self] item in self?.pick(item) }
         let fieldInOverlay = overlay.convert(webView.convert(field, to: nil), from: nil)
         let width = min(max(fieldInOverlay.width, 260), 360)
@@ -179,9 +189,13 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         return MiniWindowController.all.first { $0.tab.webView === webView }?.overlay
     }
 
-    /// The page is the one on screen in its window: the selected tab's, or Zigzag Mini's only page.
-    private static func isInFront(_ webView: WKWebView) -> Bool {
-        if let controller = WindowManager.shared.controllers.first(where: { $0.window === webView.window }) { return controller.selectedWebView === webView }
+    /// The page is the one on screen in its window: the selected tab's, the page peeked at over it (a sign-in a
+    /// site opens in a window of its own comes up there), or Zigzag Mini's only page.
+    static func isInFront(_ webView: WKWebView) -> Bool {
+        if let controller = WindowManager.shared.controllers.first(where: { $0.window === webView.window }) {
+            if controller.peek.isVisible { return controller.peek.tab?.webView === webView }
+            return controller.selectedWebView === webView
+        }
         return MiniWindowController.all.contains { $0.tab.webView === webView && $0.window === webView.window }
     }
 
@@ -279,6 +293,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             show(logins.map { .login($0) }, under: field, in: target.webView, frame: target.frame, origin: target.origin)
         case .generate: fillGenerated()
         case .contact: fillContact()
+        // Says why something isn't offered; nothing to do.
+        case .note: break
         case .importFrom:
             hide()
             ImportWindowController.show()
@@ -290,11 +306,29 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         }
     }
 
+    /// A short word in the page's window about a fill that didn't happen, so a pick never just does nothing.
+    private static func tell(_ text: String, about webView: WKWebView) {
+        if let controller = WindowManager.shared.controllers.first(where: { $0.window === webView.window }) {
+            Toast.show(text, symbol: "exclamationmark.triangle", duration: 4, in: controller)
+        } else {
+            NSSound.beep()
+        }
+    }
+
+    private static var noPasswordField: String {
+        String(localized: "Zigzag couldn’t find a password field it can see on this page. Copy the password from Passwords instead.", comment: "Toast when a login or strong password was picked but the page has no visible password field to put it in. Passwords is the window.")
+    }
+
+    private static var pageMovedOn: String {
+        String(localized: "This page changed before Zigzag could fill it. Click the field again.", comment: "Toast when a login or strong password was picked but the page went to another site, or its tab was no longer in front.")
+    }
+
     /// Fills a new strong password into the form's new-password fields, and saves it right away, so it's never
     /// lost if the sign-up's submit goes unnoticed. The username is added when the form is sent.
     private func fillGenerated() {
         // As the other fills do: only into the page the menu was for, still on that site, in the tab you're looking at.
-        guard let target, Origin(target.webView.url) == target.origin, Self.isInFront(target.webView) else { hide(); return }
+        guard let target else { hide(); return }
+        guard Origin(target.webView.url) == target.origin, Self.isInFront(target.webView) else { hide(); Self.tell(Self.pageMovedOn, about: target.webView); return }
         let origin = target.origin
         let webView = target.webView
         hide()
@@ -302,11 +336,15 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         Task {
             let arguments: [String: Any] = ["candidates": candidates.map { $0.withUnsafeString { String($0) } }]
             // Checked again right before filling: the page may have moved on while the menu was open.
-            guard Origin(webView.url) == origin, Self.isInFront(webView) else { return }
+            guard Origin(webView.url) == origin, Self.isInFront(webView) else { Self.tell(Self.pageMovedOn, about: webView); return }
             let result = try? await webView.callAsyncJavaScript(Self.generatedFiller, arguments: arguments, in: target.frame, contentWorld: .defaultClient) as? [String: Any]
             let controller = WindowManager.shared.controllers.first { $0.window === webView.window }
             guard let index = result?["index"] as? Int, candidates.indices.contains(index) else {
-                if let controller { Toast.show(String(localized: "This site’s password rules didn’t fit a strong password. Type one yourself.", comment: "Toast when Zigzag couldn't make a strong password the site accepts."), symbol: "exclamationmark.triangle", duration: 4, in: controller) }
+                if result?["noField"] as? Bool == true {
+                    Self.tell(Self.noPasswordField, about: webView)
+                } else {
+                    Self.tell(String(localized: "This site’s password rules didn’t fit a strong password. Type one yourself.", comment: "Toast when Zigzag couldn't make a strong password the site accepts."), about: webView)
+                }
                 return
             }
             let password = candidates[index]
@@ -354,7 +392,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         // The page may have moved on since the menu opened: it must still be the login's own site, in the tab
         // you're looking at. The page script checks again at the moment it fills.
         guard login.origin.fills(on: target.origin), Origin(target.webView.url) == target.origin,
-              Self.isInFront(target.webView) else { return }
+              Self.isInFront(target.webView) else { Self.tell(Self.pageMovedOn, about: target.webView); return }
         Task {
             guard let password = try? await PasswordStore.shared.password(for: login.id) else {
                 if let controller = WindowManager.shared.controllers.first(where: { $0.window === target.webView.window }) {
@@ -365,9 +403,13 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             // Passed as an argument, never pasted into the script's source, and held only for the call.
             let arguments: [String: Any] = ["username": login.username, "password": password.withUnsafeString { String($0) },
                                             "expectedOrigin": target.origin.description]
-            let filled = try? await target.webView.callAsyncJavaScript(Self.filler, arguments: arguments, in: target.frame, contentWorld: .defaultClient)
+            let filled = try? await target.webView.callAsyncJavaScript(Self.filler, arguments: arguments, in: target.frame, contentWorld: .defaultClient) as? [String: Any]
+            if filled?["moved"] as? Bool == true { Self.tell(Self.pageMovedOn, about: target.webView); return }
+            // No field it could see to put the login in: it says so, and the password is a click away in Passwords. (A
+            // first step that asks only for the username fills just that.)
+            guard filled?["password"] as? Bool == true || filled?["username"] as? Bool == true else { Self.tell(Self.noPasswordField, about: target.webView); return }
             // Private windows leave no trace, not even "last used".
-            if (filled as? Bool) != false, !(target.webView.owner?.isPrivate ?? false) { try? await PasswordStore.shared.markUsed(login.id) }
+            if !(target.webView.owner?.isPrivate ?? false) { try? await PasswordStore.shared.markUsed(login.id) }
         }
     }
 
@@ -460,10 +502,28 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     })();
     """
 
+    /// Whether what covers a field at (x, y) is only something laid over it inside its own box, as an old-style
+    /// placeholder is ("Password" in a span over the field, gone once you type): the field is still the one you see.
+    /// Anything larger, or anything you could type in or press, hides it.
+    static let placeholderCheck = """
+    const placeholderOver = (el, x, y) => {
+      const stack = document.elementsFromPoint(x, y), at = stack.indexOf(el);
+      if (at <= 0) return false;
+      const r = el.getBoundingClientRect(), m = 4;
+      return stack.slice(0, at).every((over) => {
+        if (/^(INPUT|SELECT|TEXTAREA|BUTTON|A|IFRAME|IMG|VIDEO|CANVAS|OBJECT|EMBED)$/.test(over.tagName)) return false;
+        if (over.querySelector('input, select, textarea, button, a, iframe')) return false;
+        const b = over.getBoundingClientRect();
+        return b.left >= r.left - m && b.top >= r.top - m && b.right <= r.right + m && b.bottom <= r.bottom + m;
+      });
+    };
+
+    """
+
     /// Picks the first candidate the field accepts (its `pattern` and lengths), puts it in every new-password
     /// field of the focused form (the password and its confirmation), and returns its index and the username
     /// typed so far, if any.
-    private static let generatedFiller = """
+    static let generatedFiller = placeholderCheck + """
     const active = document.activeElement;
     const scope = (active && active.form) || document;
     // Only fields a person can see: a real size, on the page, not transparent or hidden by an ancestor.
@@ -490,7 +550,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       }
       if (r.top >= 0 && r.bottom <= innerHeight) {
         const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-        if (hit && hit !== el && !el.contains(hit) && !(hit.control === el)) return false;
+        if (hit && hit !== el && !el.contains(hit) && !(hit.control === el) && !placeholderOver(el, r.left + r.width / 2, r.top + r.height / 2)) return false;
       }
       return true;
     };
@@ -500,7 +560,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     const fresh = passwords.filter((el) => el !== current && (/new-password/.test(el.autocomplete || '') || !/current-password/.test(el.autocomplete || '')));
     const targets = current || passwords.length < 3 ? fresh : fresh.slice(1);
     const field = targets.includes(active) ? active : targets[0];
-    if (!field) return { index: -1 };
+    if (!field) return { index: -1, noField: true };
     const fits = (value) => {
       if (field.minLength > 0 && value.length < field.minLength) return false;
       if (field.maxLength > 0 && value.length > field.maxLength) return false;
@@ -616,9 +676,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     """
 
     /// Fills the focused form: the username field (if there is one) and the password field, the way typing would.
-    private static let filler = """
+    static let filler = placeholderCheck + """
     // Checked here, at the moment of filling: only the exact site the login belongs to gets it.
-    if (location.origin !== expectedOrigin) return false;
+    if (location.origin !== expectedOrigin) return { moved: true };
     const active = document.activeElement;
     const scope = (active && active.form) || document;
     // Only fields a person can see: a real size, on the page, not transparent or hidden by an ancestor.
@@ -645,12 +705,17 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       }
       if (r.top >= 0 && r.bottom <= innerHeight) {
         const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-        if (hit && hit !== el && !el.contains(hit) && !(hit.control === el)) return false;
+        if (hit && hit !== el && !el.contains(hit) && !(hit.control === el) && !placeholderOver(el, r.left + r.width / 2, r.top + r.height / 2)) return false;
       }
       return true;
     };
     const inputs = [...scope.querySelectorAll('input')].filter(visible);
-    const passwordField = inputs.find((el) => el.type === 'password' && !/new-password/.test(el.autocomplete || ''));
+    // The password field you picked the login in, unless it's marked for a new password; then the current
+    // password's field; and on a form only for new passwords (a sign-up, or a sign-in that looks like one), the
+    // field you're in after all: you chose a saved login for it.
+    const yours = active && active.type === 'password' && inputs.includes(active) ? active : null;
+    const passwordField = (yours && !/new-password/.test(yours.autocomplete || '') ? yours : null)
+      || inputs.find((el) => el.type === 'password' && !/new-password/.test(el.autocomplete || '')) || yours;
     const userFields = inputs.filter((el) => ['text', 'email', 'tel', ''].includes(el.type));
     const userField = userFields.find((el) => /username|email/.test(el.autocomplete || ''))
       || (passwordField ? userFields.filter((el) => inputs.indexOf(el) < inputs.indexOf(passwordField)).pop() : null)
@@ -672,6 +737,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     } finally {
       setTimeout(() => { window.__zigzagFilling = false; }, 0);
     }
+    return { password: !!passwordField, username: !!(userField && username) };
     """
 }
 
@@ -688,7 +754,18 @@ final class AutofillMenu: FloatingPanelView {
         /// Logins saved for other parts of the site (mail.example.com, signing in on www.example.com): listed only
         /// once you ask for them.
         case elsewhere([Credential])
+        /// Something this field can't have, and why: a dimmed row that does nothing, rather than a menu that's
+        /// quietly missing a row.
+        case note(Note)
     }
+
+    enum Note {
+        /// A private window keeps no new password, so it offers no strong one.
+        case privateWindow
+    }
+
+    /// The most rows the menu lists.
+    static let maxRows = 8
 
     /// When it came up. For the first half second it takes no clicks, so a page can't bring it up just as you click
     /// (a "click here, fast" game) and catch that click on a login.
@@ -812,8 +889,14 @@ private final class AutofillRow: InteractiveView {
             detail = Label(String(localized: "Saved to your Keychain for \(origin.displayName)", comment: "Under Use Strong Password in the fill-password menu. The placeholder is a site, like github.com."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
             icon.image = Tokens.Symbol.image("key.viewfinder")
             icon.contentTintColor = Tokens.Color.accent
+        case .note(.privateWindow):
+            name = Label(String(localized: "No strong password in a private window", comment: "A dimmed row in the fill-password menu on a sign-up form in a private window, in place of Use Strong Password."), font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
+            detail = Label(String(localized: "Private windows don’t save new passwords", comment: "Under the dimmed row saying a private window offers no strong password, in the fill-password menu."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            icon.image = Tokens.Symbol.image("key.slash")
+            icon.contentTintColor = Tokens.Color.textSecondary
         }
         super.init(frame: .zero)
+        if case .note = item { isEnabled = false }
         layer?.cornerRadius = Tokens.Radius.field
         layer?.cornerCurve = .continuous
         icon.imageScaling = .scaleProportionallyUpOrDown
