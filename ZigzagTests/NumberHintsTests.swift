@@ -34,12 +34,12 @@ struct NumberHintsTests {
     }
 
     @Test func holdingCommandAloneShowsAfterTheDelay() {
-        var hold = CommandHold()
+        var hold = ModifierHold(.command)
         hold.modifiersChanged(to: .command, at: 10)
         #expect(!hold.isDue(at: 10.3))
-        #expect(hold.isDue(at: 10 + CommandHold.delay))
+        #expect(hold.isDue(at: 10 + ModifierHold.delay))
         // Caps Lock on doesn't count as another modifier.
-        var capsOn = CommandHold()
+        var capsOn = ModifierHold(.command)
         capsOn.modifiersChanged(to: [.command, .capsLock], at: 0)
         #expect(capsOn.isDue(at: 1))
         hold.modifiersChanged(to: [], at: 10.6)
@@ -47,7 +47,7 @@ struct NumberHintsTests {
     }
 
     @Test func aShortcutTypedQuicklyNeverShows() {
-        var hold = CommandHold()
+        var hold = ModifierHold(.command)
         hold.modifiersChanged(to: .command, at: 0)
         // ⌘T pressed while ⌘ is down: no numbers, even if ⌘ stays held after.
         hold.interrupted(holding: .command)
@@ -61,7 +61,7 @@ struct NumberHintsTests {
     }
 
     @Test func anotherModifierSpoilsTheHoldUntilAllAreLetGo() {
-        var hold = CommandHold()
+        var hold = ModifierHold(.command)
         hold.modifiersChanged(to: [.command, .shift], at: 0)
         #expect(hold.dueAt == nil)
         // ⇧ let go, ⌘ still down: still nothing.
@@ -76,7 +76,7 @@ struct NumberHintsTests {
     }
 
     @Test func aClickWithNothingHeldLeavesTheNextPressFree() {
-        var hold = CommandHold()
+        var hold = ModifierHold(.command)
         hold.modifiersChanged(to: .command, at: 0)
         // The window went to the back with ⌘ down; it came back with a plain click.
         hold.interrupted(holding: .command)

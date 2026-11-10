@@ -15,16 +15,21 @@ enum TabNumbers {
     }
 }
 
-/// When holding ⌘ has gone on long enough to show the numbers, as Safari does: ⌘ alone, held `delay` with no key
-/// pressed and nothing clicked meanwhile. Anything else on the way (another modifier, a key, a click) spoils it until
-/// every modifier is let go, so typing ⌘T, ⌘W or ⌘C quickly never shows them.
-struct CommandHold {
+/// When holding a modifier has gone on long enough to show the numbers it goes with, as Safari does for ⌘: that
+/// modifier alone, held `delay` with no key pressed and nothing clicked meanwhile. Anything else on the way (another
+/// modifier, a key, a click) spoils it until every modifier is let go, so typing ⌘T, ⌘W, ⌃Tab or ⌃1 quickly never
+/// shows them.
+struct ModifierHold {
     static let delay: TimeInterval = 0.5
     static let modifiers: NSEvent.ModifierFlags = [.command, .shift, .option, .control, .function]
 
-    /// When ⌘ alone went down, while it's still held and nothing else has happened.
+    /// The one modifier this hold waits for: ⌘ for the tabs' numbers, ⌃ for the spaces'.
+    let modifier: NSEvent.ModifierFlags
+    /// When the modifier alone went down, while it's still held and nothing else has happened.
     private var since: TimeInterval?
     private var spoiled = false
+
+    init(_ modifier: NSEvent.ModifierFlags) { self.modifier = modifier }
 
     /// The modifiers held changed.
     mutating func modifiersChanged(to flags: NSEvent.ModifierFlags, at time: TimeInterval) {
@@ -32,7 +37,7 @@ struct CommandHold {
         if held.isEmpty {
             spoiled = false
             since = nil
-        } else if held == .command, !spoiled {
+        } else if held == modifier, !spoiled {
             if since == nil { since = time }
         } else {
             spoiled = true
@@ -40,13 +45,16 @@ struct CommandHold {
         }
     }
 
-    /// A key, a click or a scroll, or the window going to the back: no numbers until ⌘ is pressed afresh.
+    /// A key, a click or a scroll, or the window going to the back: no numbers until the modifier is pressed afresh.
     mutating func interrupted(holding flags: NSEvent.ModifierFlags) {
         since = nil
         spoiled = !flags.intersection(Self.modifiers).isEmpty
     }
 
-    /// When the numbers are due, while ⌘ alone is held.
+    /// Whether these flags are the modifier alone, as the hold wants them.
+    func isAlone(_ flags: NSEvent.ModifierFlags) -> Bool { flags.intersection(Self.modifiers) == modifier }
+
+    /// When the numbers are due, while the modifier alone is held.
     var dueAt: TimeInterval? { since.map { $0 + Self.delay } }
     func isDue(at time: TimeInterval) -> Bool { dueAt.map { time >= $0 - 0.001 } ?? false }
 }
@@ -131,7 +139,7 @@ final class NumberHintView: NSView {
 /// tabs. Letting go, any key, a click, a scroll or the window going to the back hides them at once.
 final class NumberHints {
     private weak var controller: BrowserWindowController?
-    private var hold = CommandHold()
+    private var hold = ModifierHold(.command)
     private var monitor: Any?
     private var observers: [NSObjectProtocol] = []
     private var timer: Timer?
@@ -190,7 +198,7 @@ final class NumberHints {
                 self.timer = nil
                 // Still held: no release slipped by unseen (a menu open, another app in front).
                 guard self.hold.isDue(at: ProcessInfo.processInfo.systemUptime),
-                      NSEvent.modifierFlags.intersection(CommandHold.modifiers) == .command else { return }
+                      self.hold.isAlone(NSEvent.modifierFlags) else { return }
                 self.show()
             }
         }
