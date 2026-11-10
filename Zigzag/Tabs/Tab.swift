@@ -12,6 +12,8 @@ protocol TabHost: AnyObject {
     func tabWantsToReturnToOpener(_ tab: Tab)
     func tabDidChangeFullscreen(_ tab: Tab, isFullscreen: Bool)
     func tab(_ tab: Tab, hoveringLink url: URL?)
+    /// Its floating video's Return button: bring it on screen, so the video can go back into the page.
+    func tabWantsToBeShown(_ tab: Tab)
 }
 
 enum OpenDisposition {
@@ -1101,6 +1103,13 @@ extension Tab: WKUIDelegate {
     /// Reported by our hover script: the link under the pointer, or nil.
     func hoveredLinkChanged(_ url: URL?) {
         host?.tab(self, hoveringLink: url)
+    }
+
+    /// The floating video's Return button. WebKit puts the video back only once its page is on screen, and asks the
+    /// browser to show it here (WKUIDelegatePrivate, unpublished). Without it, Return from another tab does nothing.
+    @objc(_webViewFullscreenMayReturnToInline:)
+    func webViewFullscreenMayReturnToInline(_ webView: WKWebView) {
+        host?.tabWantsToBeShown(self)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo) async {
