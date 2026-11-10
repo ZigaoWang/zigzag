@@ -37,7 +37,7 @@ final class SitePanel: FloatingPanelView {
     private var actionTiles: [PanelTile] = []
     private let extensionsLabel = Label.section(String(localized: "Extensions", comment: "Section label over the extensions' buttons in the site panel."))
     private var extensionTiles: [PanelTile] = []
-    /// The pin on each extension's tile, beside the tile rather than in it, as it reaches past the tile's corner.
+    /// The pin button on each extension's tile: the panel's child over the tile, a control of its own.
     private var hoverPins: [(id: String, label: String, value: String?, tile: PanelTile, pin: HoverPin)] = []
     private var extensionsToken: SignalToken?
     private let siteLabel = Label.section(String(localized: "This Site", comment: "Section label over the site's settings in the site panel."))
@@ -530,25 +530,33 @@ final class SitePanel: FloatingPanelView {
             y -= Tokens.Space.x5
         }
         if !dryRun {
-            let side = Tokens.Sidebar.hoverPin, inset = Tokens.Sidebar.hoverPinInset
-            for entry in hoverPins {
-                // In a top corner, inside the tile: the right one, or the left when a count already sits on the right.
-                let tile = entry.tile.frame
-                let x = entry.tile.badge.isEmpty ? tile.maxX - side - inset : tile.minX + inset
-                entry.pin.frame = NSRect(x: x, y: tile.minY + inset, width: side, height: side)
-            }
+            for entry in hoverPins { entry.pin.frame = Self.pinFrame(on: entry.tile.frame, left: !entry.tile.badge.isEmpty) }
         }
         return y + pad
     }
+
+    /// Where a tile's pin button goes, in the panel's terms: its chip inside the tile's top-right corner, or the
+    /// top-left when the tile has a count or a dot, so the two never meet. The target around the chip is the button's
+    /// frame.
+    static func pinFrame(on tile: NSRect, left: Bool) -> NSRect {
+        let side = Tokens.Sidebar.hoverPin, chip = Tokens.Sidebar.hoverPinChip, inset = Tokens.Sidebar.hoverPinInset
+        let chipX = left ? tile.minX + inset : tile.maxX - chip - inset
+        let margin = (side - chip) / 2
+        return NSRect(x: chipX - margin, y: tile.minY + inset - margin, width: side, height: side)
+    }
 }
 
-/// The pin in a top corner of an extension's tile: a small plain glyph, no fill. Always there, a little darker, on a
-/// pinned extension; on another, only while the pointer or keyboard is on the tile, quiet, and one click pins it.
-/// At the limit it's dimmed and only explains, in its tooltip. The tile stays one thing to the keyboard and VoiceOver,
-/// which reach pinning through the tile's menu and actions.
+/// The pin button on a corner of an extension's tile, as a favorite's close is on its tile: a small round chip with a
+/// hairline and a pin glyph, inside the tile's corner. On a pinned extension it's always there, filled;
+/// on another, only while the pointer or keyboard is on the tile, and one click pins it. At the limit it's dimmed and
+/// only explains, in its tooltip. The tile stays one thing to the keyboard and VoiceOver, which reach pinning through
+/// the tile's menu and actions.
 final class HoverPin: InteractiveView {
     enum State { case unpinned, pinned, atLimit }
 
+    /// On the panel's own color, so it reads cleanly over the icon under it in dark too.
+    private let ground = ColorView(color: Tokens.Color.panelBackground)
+    private let chip = ColorView(color: Tokens.Color.controlFill)
     private let icon = NSImageView()
     private(set) var isShowing = false
     /// The pointer or keyboard is on its tile.
@@ -564,13 +572,24 @@ final class HoverPin: InteractiveView {
         }
     }
 
+    /// The glyph it shows: filled once pinned.
+    var symbol: String { state == .pinned ? "pin.fill" : "pin" }
+    /// The round chip it draws, in its own terms: the rest of it is target.
+    var chipFrame: NSRect { chip.frame }
+
     init() {
-        let side = Tokens.Sidebar.hoverPin
+        let side = Tokens.Sidebar.hoverPin, chipSide = Tokens.Sidebar.hoverPinChip
         super.init(frame: NSRect(x: 0, y: 0, width: side, height: side))
         isHidden = true
-        icon.image = Tokens.Symbol.image("pin.fill", size: Tokens.Sidebar.hoverPinGlyph)
+        chip.frame = NSRect(x: (side - chipSide) / 2, y: (side - chipSide) / 2, width: chipSide, height: chipSide)
+        ground.frame = chip.frame
+        ground.layer?.cornerRadius = chipSide / 2
+        addSubview(ground)
+        chip.layer?.cornerRadius = chipSide / 2
+        chip.layer?.borderWidth = Tokens.Metric.hairline
+        chip.edgeColor = Tokens.Color.controlEdge
+        addSubview(chip)
         icon.imageScaling = .scaleNone
-        icon.frame = bounds
         addSubview(icon)
         setAccessibilityElement(false)
         toolTipForState()
@@ -610,10 +629,16 @@ final class HoverPin: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // Only the glyph: tertiary on offer, secondary once pinned, the primary text color under the pointer.
-        icon.contentTintColor = state == .pinned || (isHovered && state == .unpinned) ? (isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary)
-            : Tokens.Color.textTertiary
-        icon.alphaValue = state == .atLimit ? Tokens.Opacity.disabled : 1
+        let glyph = Tokens.Sidebar.hoverPinGlyph
+        icon.image = Tokens.Symbol.image(symbol, size: glyph)
+        // The glyph's ink, not its image, in the chip's middle.
+        let ink = Tokens.Symbol.inkOffset(symbol, size: glyph)
+        icon.frame = chip.frame.offsetBy(dx: -ink.width, dy: ink.height)
+        // Secondary ink at rest, the primary under the pointer, over the hover wash; dimmed at the limit.
+        let hot = isHovered && isEnabled
+        icon.contentTintColor = hot ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        icon.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
+        chip.color = hot ? Tokens.Color.controlHover : Tokens.Color.controlFill
     }
 }
 
