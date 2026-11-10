@@ -233,8 +233,14 @@ enum DebugBridge {
         case "sidebar": controller.toggleBrowserSidebar(nil)
         case "reveal": controller.root.holdReveal = arg == "hold"; controller.root.reveal(true)
         case "unreveal": controller.root.holdReveal = false; controller.root.reveal(false)
-        // numbers [off]: the ⌘ number hints, as holding ⌘ shows them, even with the window not in front.
-        case "numbers": if arg == "off" { controller.numberHints?.hide() } else { controller.numberHints?.debugShow() }
+        // numbers [control|off]: the ⌘ number hints, as holding ⌘ shows them (with control, the spaces' ⌃ ones, as
+        // holding ⌃ shows them), even with the window not in front. off hides both.
+        case "numbers":
+            switch arg {
+            case "off": controller.numberHints?.hide(); controller.numberHints?.hideSpaces()
+            case "control": controller.numberHints?.debugShowSpaces()
+            default: controller.numberHints?.debugShow()
+            }
         case "lights":
             let w = controller.window as? BrowserWindow
             let b = w?.standardWindowButton(.closeButton)
