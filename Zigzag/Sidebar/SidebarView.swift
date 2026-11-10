@@ -220,31 +220,10 @@ final class SpaceDotView: InteractiveView {
         }
     }
     private var settlesFromSwipe = false
-    /// While ⌃ is held: the number that goes to this space with ⌃, on the favorites' small key, the digit alone, in
-    /// place of the dot or icon (which steps aside meanwhile), as a 16pt key is all a crowded row has room for.
-    var hint: Int? {
-        didSet {
-            guard oldValue != hint else { return }
-            if let hint {
-                let view = hintView ?? NumberHintView()
-                if hintView == nil { hintView = view; addSubview(view) }
-                view.showsCommand = false
-                view.number = hint
-                layoutHint()
-                view.show(true)
-            } else {
-                hintView?.show(false)
-            }
-            stateDidChange(animated: false)
-        }
-    }
-    private var hintView: NumberHintView?
-
-    private func layoutHint() {
-        guard let view = hintView, hint != nil else { return }
-        let height = NumberHintView.height, width = view.width
-        view.frame = NSRect(x: bounds.midX - width / 2, y: bounds.midY - height / 2, width: width, height: height).integral
-    }
+    /// While ⌃ is held: the number that goes to this space with ⌃. The sidebar shows it just above the icon
+    /// (`SidebarView.refreshSpaceNumbers`), outside this row, which clips; the icon stays in sight, since it's what
+    /// says which space is which as you choose.
+    var hint: Int? { didSet { if oldValue != hint { stateDidChange(animated: false) } } }
 
     init(spaceID: UUID) {
         self.spaceID = spaceID
@@ -265,7 +244,6 @@ final class SpaceDotView: InteractiveView {
 
     override func layout() {
         super.layout()
-        layoutHint()
         stateDidChange(animated: false)
     }
 
@@ -315,7 +293,7 @@ final class SpaceDotView: InteractiveView {
             self.dot.backgroundColor = self.cgColor(dotFill)
             self.dot.borderWidth = 0
             self.dot.shadowOpacity = 0
-            self.dot.opacity = self.hint == nil ? 1 : 0
+            self.dot.opacity = 1
             self.numberLayer.isHidden = true
             self.tick.opacity = 0
         }
@@ -323,7 +301,7 @@ final class SpaceDotView: InteractiveView {
         numberLayer.isHidden = true
         numberLayer.contentsScale = window?.backingScaleFactor ?? 2
         iconView.frame = NSRect(x: bounds.midX - iconSide / 2, y: bounds.midY - iconSide / 2, width: iconSide, height: iconSide)
-        iconView.isHidden = icon == nil || hint != nil
+        iconView.isHidden = icon == nil
         iconView.contentTintColor = tint
         // An emoji keeps its colors, so it says which space is yours by how strongly it shows.
         iconView.alphaValue = icon.map(IconChoice.isSymbol) == false ? 0.45 + 0.55 * share : 1
@@ -394,8 +372,32 @@ final class SidebarView: NSView {
     /// While ⌃ is held: each space shows the number ⌃ goes to it with. Spaces added, removed or moved meanwhile
     /// follow.
     var showsSpaceNumbers = false { didSet { if oldValue != showsSpaceNumbers { refreshSpaceNumbers() } } }
+    private var spaceHints: [NumberHintView] = []
     private func refreshSpaceNumbers() {
-        for (dot, label) in zip(dots, SpaceNumbers.labels(count: dots.count)) { dot.hint = showsSpaceNumbers ? label : nil }
+        let old = spaceHints
+        spaceHints = []
+        old.forEach { $0.show(false) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.exit) { old.forEach { $0.removeFromSuperview() } }
+        for (dot, label) in zip(dots, SpaceNumbers.labels(count: dots.count)) {
+            dot.hint = showsSpaceNumbers ? label : nil
+            guard showsSpaceNumbers, let label else { continue }
+            let view = NumberHintView()
+            view.showsCommand = false
+            view.number = label
+            addSubview(view)
+            spaceHints.append(view)
+            view.show(true)
+        }
+        layoutSpaceHints()
+    }
+    /// Each number just above its space's icon, centered on it.
+    private func layoutSpaceHints() {
+        let numbered = dots.filter { $0.hint != nil }
+        for (dot, view) in zip(numbered, spaceHints) {
+            let key = dot.convert(dot.bounds, to: self), height = NumberHintView.height, gap: CGFloat = 2
+            view.frame = NSRect(x: key.midX - view.width / 2, y: isFlipped ? key.minY - height - gap : key.maxY + gap,
+                                width: view.width, height: height).integral
+        }
     }
     /// Whether the space keys are there to show numbers on: more than one space, in a window that switches them.
     var hasSpaceKeys: Bool { !isPrivate && dots.count > 1 }
@@ -500,6 +502,7 @@ final class SidebarView: NSView {
 
     override func layout() {
         super.layout()
+        defer { if showsSpaceNumbers { layoutSpaceHints() } }
         let pad = Tokens.Sidebar.edge
         let width = bounds.width
         let rowCenter = trafficLightCenterY
