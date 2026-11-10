@@ -133,14 +133,134 @@ struct MiniPlayerTests {
         #expect(MiniPlayerLayout.frame(at: .topLeft, size: size, in: area) == CGRect(x: 252, y: 12, width: 333, height: 187))
     }
 
-    @Test func letGoItGoesToTheNearestCorner() {
+    @Test func theNearestCornerIsFoundFromAnywhere() {
         let area = CGRect(x: 240, y: 0, width: 1040, height: 805)
         #expect(MiniPlayerLayout.nearestCorner(to: CGPoint(x: 300, y: 100), in: area) == .topLeft)
         #expect(MiniPlayerLayout.nearestCorner(to: CGPoint(x: 1200, y: 100), in: area) == .topRight)
         #expect(MiniPlayerLayout.nearestCorner(to: CGPoint(x: 300, y: 700), in: area) == .bottomLeft)
         #expect(MiniPlayerLayout.nearestCorner(to: CGPoint(x: 1200, y: 700), in: area) == .bottomRight)
-        // Dragged past the page's edge, still its nearest corner.
         #expect(MiniPlayerLayout.nearestCorner(to: CGPoint(x: 5000, y: -300), in: area) == .topRight)
+    }
+
+    // MARK: Moving it anywhere
+
+    /// A 1280 by 805 window, its edges `edgeInset` in.
+    private let window = MiniPlayerLayout.movableArea(in: CGRect(x: 0, y: 0, width: 1280, height: 805), below: nil)
+    private let card = CGSize(width: 333, height: 187)
+
+    @Test func itGoesAnywhereInTheWindowOverTheSidebarToo() {
+        #expect(window == CGRect(x: 4, y: 4, width: 1272, height: 797))
+        // Over the sidebar, in the middle of nowhere: it stays where it was let go.
+        let there = CGRect(x: 60, y: 300, width: 333, height: 187)
+        #expect(MiniPlayerLayout.dropped(there, in: window) == there)
+    }
+
+    @Test func itNeverLeavesTheWindow() {
+        let out = CGRect(x: -200, y: 900, width: 333, height: 187)
+        let clamped = MiniPlayerLayout.clamp(out, in: window)
+        #expect(clamped == CGRect(x: 4, y: 805 - 4 - 187, width: 333, height: 187))
+        #expect(window.contains(MiniPlayerLayout.dropped(out, in: window)))
+    }
+
+    @Test func letGoNearAnEdgeItSettlesOnIt() {
+        // 15 points from the left edge, far from the others: onto the resting line a margin in, and no further.
+        let near = CGRect(x: 15, y: 300, width: 333, height: 187)
+        #expect(MiniPlayerLayout.dropped(near, in: window) == CGRect(x: MiniPlayerLayout.margin, y: 300, width: 333, height: 187))
+        // Near a corner: both edges.
+        let corner = CGRect(x: 1280 - 333 - 20, y: 805 - 187 - 5, width: 333, height: 187)
+        #expect(MiniPlayerLayout.dropped(corner, in: window) == CGRect(x: 1280 - 12 - 333, y: 805 - 12 - 187, width: 333, height: 187))
+        // A little further than the snap distance: it stays.
+        let away = CGRect(x: 12 + MiniPlayerLayout.snapDistance + 2, y: 300, width: 333, height: 187)
+        #expect(MiniPlayerLayout.dropped(away, in: window) == away)
+    }
+
+    @Test func itKeepsToItsCornerAsTheWindowResizes() {
+        let dropped = CGRect(x: 900, y: 580, width: 333, height: 187)
+        let anchor = MiniPlayerLayout.anchor(of: dropped, in: window)
+        #expect(anchor.corner == .bottomRight)
+        #expect(MiniPlayerLayout.frame(for: anchor, size: card, in: window) == dropped)
+        // A smaller window: the same distance from the bottom right.
+        let smaller = MiniPlayerLayout.movableArea(in: CGRect(x: 0, y: 0, width: 1000, height: 700), below: nil)
+        let moved = MiniPlayerLayout.frame(for: anchor, size: card, in: smaller)
+        #expect(1000 - moved.maxX == 1280 - dropped.maxX)
+        #expect(700 - moved.maxY == 805 - dropped.maxY)
+        // Too small for that distance: still wholly inside.
+        let tiny = MiniPlayerLayout.movableArea(in: CGRect(x: 0, y: 0, width: 400, height: 260), below: nil)
+        #expect(tiny.contains(MiniPlayerLayout.frame(for: MiniPlayerLayout.Anchor(corner: .topLeft, offset: CGSize(width: 300, height: 300)), size: card, in: tiny)))
+    }
+
+    @Test func itsPlaceIsKeptAsText() {
+        let anchor = MiniPlayerLayout.Anchor(corner: .bottomLeft, offset: CGSize(width: 51, height: 258))
+        #expect(MiniPlayerLayout.Anchor(stored: anchor.stored) == anchor)
+        #expect(MiniPlayerLayout.Anchor(stored: "middle 1 2") == nil)
+        #expect(MiniPlayerLayout.Anchor(stored: "topLeft x 2") == nil)
+    }
+
+    @Test func itStaysUnderTheBarAboveThePage() {
+        let area = MiniPlayerLayout.movableArea(in: CGRect(x: 0, y: 0, width: 1280, height: 805), below: 44)
+        #expect(area.minY == 48)
+        #expect(area.maxY == 801)
+        let dragged = MiniPlayerLayout.dropped(CGRect(x: 400, y: -100, width: 333, height: 187), in: area)
+        #expect(dragged.minY >= 44)
+    }
+
+    // MARK: Minimized
+
+    @Test func thePillTakesTheCardsCorner() {
+        let bottomRight = CGRect(x: 935, y: 606, width: 333, height: 187)
+        let pill = MiniPlayerLayout.pillFrame(for: bottomRight, in: window)
+        #expect(pill.maxX == bottomRight.maxX)
+        #expect(pill.maxY == bottomRight.maxY)
+        #expect(pill.size == MiniPlayerLayout.pillSize)
+        let topLeft = CGRect(x: 12, y: 60, width: 333, height: 187)
+        #expect(MiniPlayerLayout.pillFrame(for: topLeft, in: window).origin == topLeft.origin)
+        // Expanded, the card grows back out of the pill's corner.
+        #expect(MiniPlayerLayout.cardFrame(from: pill, size: bottomRight.size, in: window) == bottomRight)
+    }
+
+    @Test func minimizingKeepsItPlayingAndExpandingBringsItBack() {
+        var model = MiniPlayerModel()
+        // Nothing showing: nothing to minimize.
+        let nothing = model.minimize()
+        #expect(!nothing)
+        _ = model.switched(shown: [b], playing: a)
+        let minimized = model.minimize()
+        #expect(minimized)
+        #expect(model.isMinimized)
+        // Nothing stops: still its tab's.
+        #expect(model.tab == a)
+        let again = model.minimize()
+        #expect(!again)
+        let expanded = model.expand()
+        #expect(expanded)
+        #expect(!model.isMinimized)
+        let expandedAgain = model.expand()
+        #expect(!expandedAgain)
+    }
+
+    @Test func minimizedItEndsLikeTheCard() {
+        var model = MiniPlayerModel()
+        _ = model.switched(shown: [b], playing: a)
+        _ = model.minimize()
+        // Back to its tab from the pill: the video goes back in its page.
+        #expect(model.switched(shown: [a], playing: nil) == [.end(a)])
+        #expect(!model.isMinimized)
+        // The next video comes as a card.
+        _ = model.switched(shown: [b], playing: a)
+        _ = model.minimize()
+        #expect(model.switched(shown: [c], playing: b) == [.pause(a), .end(a), .show(b)])
+        #expect(!model.isMinimized)
+        _ = model.minimize()
+        #expect(model.close() == [.pause(b), .end(b)])
+        #expect(!model.isMinimized)
+    }
+
+    @Test func backToTheTabInAnotherSpaceEndsIt() {
+        var model = MiniPlayerModel()
+        _ = model.switched(shown: [b], playing: a)
+        // Selecting it (switching spaces first) shows it alone: the player lets it go, nothing paused.
+        #expect(model.switched(shown: [a], playing: nil) == [.end(a)])
+        #expect(model.tab == nil)
     }
 
     // MARK: Moving between tabs

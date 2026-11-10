@@ -149,16 +149,90 @@ nonisolated enum MiniPlayerLayout {
 
     enum Corner: String, CaseIterable, Sendable {
         case topLeft, topRight, bottomLeft, bottomRight
+        var isLeft: Bool { self == .topLeft || self == .bottomLeft }
+        var isTop: Bool { self == .topLeft || self == .topRight }
     }
 
-    /// The card in a corner of the page area (flipped: y runs down).
+    /// The card in a corner of an area, a margin in (flipped: y runs down).
     static func frame(at corner: Corner, size: CGSize, in area: CGRect) -> CGRect {
-        let x = corner == .topLeft || corner == .bottomLeft ? area.minX + margin : area.maxX - margin - size.width
-        let y = corner == .topLeft || corner == .topRight ? area.minY + margin : area.maxY - margin - size.height
-        return CGRect(x: round(x), y: round(y), width: size.width, height: size.height)
+        frame(for: Anchor(corner: corner, offset: CGSize(width: margin, height: margin)), size: size, in: area)
     }
 
-    /// Let go anywhere, the card goes to the corner nearest its middle.
+    // MARK: Where it sits
+
+    /// It never goes nearer the window's edges than this, so its rounded edge always shows whole.
+    static let edgeInset: CGFloat = 4
+    /// Let go this near an edge's resting line (`margin` from the window's edge), it settles on it; anywhere else,
+    /// it stays where it was let go.
+    static let snapDistance: CGFloat = 16
+
+    /// Where the card sits: how far its edges are from the nearest corner's edges. As the window resizes, it keeps
+    /// that distance from that corner, so a card at the bottom right stays at the bottom right.
+    struct Anchor: Equatable, Sendable {
+        var corner: Corner
+        var offset: CGSize
+
+        /// As saved: "bottomRight 8 8".
+        var stored: String { "\(corner.rawValue) \(Double(offset.width)) \(Double(offset.height))" }
+        init(corner: Corner, offset: CGSize) {
+            self.corner = corner
+            self.offset = offset
+        }
+        init?(stored: String) {
+            let parts = stored.split(separator: " ")
+            guard parts.count == 3, let corner = Corner(rawValue: String(parts[0])), let x = Double(parts[1]), let y = Double(parts[2]),
+                  x.isFinite, y.isFinite else { return nil }
+            self.init(corner: corner, offset: CGSize(width: max(0, x), height: max(0, y)))
+        }
+    }
+
+    /// The anchor of a card at `frame`: from the corner of `area` nearest its middle.
+    static func anchor(of frame: CGRect, in area: CGRect) -> Anchor {
+        let corner = nearestCorner(to: CGPoint(x: frame.midX, y: frame.midY), in: area)
+        let x = corner.isLeft ? frame.minX - area.minX : area.maxX - frame.maxX
+        let y = corner.isTop ? frame.minY - area.minY : area.maxY - frame.maxY
+        return Anchor(corner: corner, offset: CGSize(width: max(0, x), height: max(0, y)))
+    }
+
+    /// The card of this size at its anchor in `area`, kept wholly inside it.
+    static func frame(for anchor: Anchor, size: CGSize, in area: CGRect) -> CGRect {
+        let x = anchor.corner.isLeft ? area.minX + anchor.offset.width : area.maxX - anchor.offset.width - size.width
+        let y = anchor.corner.isTop ? area.minY + anchor.offset.height : area.maxY - anchor.offset.height - size.height
+        return clamp(CGRect(x: x, y: y, width: size.width, height: size.height), in: area)
+    }
+
+    /// Moved back inside `area` where it pokes out; a card bigger than the area keeps to its top left.
+    static func clamp(_ frame: CGRect, in area: CGRect) -> CGRect {
+        let x = min(max(frame.minX, area.minX), max(area.minX, area.maxX - frame.width))
+        let y = min(max(frame.minY, area.minY), max(area.minY, area.maxY - frame.height))
+        return CGRect(x: round(x), y: round(y), width: frame.width, height: frame.height)
+    }
+
+    /// Where a card let go at `frame` comes to rest: where it is, inside `area`, except near an edge, where it settles
+    /// on the line a margin in from the window's edge (two edges, at a corner).
+    static func dropped(_ frame: CGRect, in area: CGRect) -> CGRect {
+        var f = clamp(frame, in: area)
+        let inset = max(0, margin - edgeInset)
+        let rest = area.insetBy(dx: inset, dy: inset)
+        if f.minX - rest.minX <= snapDistance { f.origin.x = rest.minX }
+        else if rest.maxX - f.maxX <= snapDistance { f.origin.x = rest.maxX - f.width }
+        if f.minY - rest.minY <= snapDistance { f.origin.y = rest.minY }
+        else if rest.maxY - f.maxY <= snapDistance { f.origin.y = rest.maxY - f.height }
+        return clamp(f, in: area)
+    }
+
+    /// Where the card may go in a window this big: anywhere in it, an `edgeInset` in, over the sidebar too; under the
+    /// bar above the page when there is one (`below`, its bottom), so it never covers the address or its buttons.
+    static func movableArea(in bounds: CGRect, below bar: CGFloat?) -> CGRect {
+        var area = bounds.insetBy(dx: edgeInset, dy: edgeInset)
+        if let bar, bar + edgeInset > area.minY {
+            area.size.height = max(0, area.maxY - bar - edgeInset)
+            area.origin.y = bar + edgeInset
+        }
+        return area
+    }
+
+    /// The corner nearest a point.
     static func nearestCorner(to point: CGPoint, in area: CGRect) -> Corner {
         let left = point.x < area.midX, top = point.y < area.midY
         switch (left, top) {
@@ -167,6 +241,29 @@ nonisolated enum MiniPlayerLayout {
         case (true, false): return .bottomLeft
         case (false, false): return .bottomRight
         }
+    }
+
+    // MARK: Tucked away
+
+    /// Minimized, it's a small pill: the video live in a thumbnail at its start, then the site and two buttons.
+    static let pillSize = CGSize(width: 260, height: 44)
+    static let pillThumbnail = CGSize(width: 54, height: 32)
+
+    /// The pill in the card's place, held to the card's nearest corner: it stays where the card was, and the card
+    /// comes back there.
+    static func pillFrame(for card: CGRect, in area: CGRect) -> CGRect {
+        let corner = nearestCorner(to: CGPoint(x: card.midX, y: card.midY), in: area)
+        let x = corner.isLeft ? card.minX : card.maxX - pillSize.width
+        let y = corner.isTop ? card.minY : card.maxY - pillSize.height
+        return clamp(CGRect(origin: CGPoint(x: x, y: y), size: pillSize), in: area)
+    }
+
+    /// The card back from a pill at `pill`: grown out of the pill's corner, kept inside the area.
+    static func cardFrame(from pill: CGRect, size: CGSize, in area: CGRect) -> CGRect {
+        let corner = nearestCorner(to: CGPoint(x: pill.midX, y: pill.midY), in: area)
+        let x = corner.isLeft ? pill.minX : pill.maxX - size.width
+        let y = corner.isTop ? pill.minY : pill.maxY - size.height
+        return clamp(CGRect(origin: CGPoint(x: x, y: y), size: size), in: area)
     }
 }
 
@@ -182,7 +279,9 @@ nonisolated struct MiniPlayerModel: Equatable {
         case end(UUID)
     }
 
-    private(set) var tab: UUID?
+    private(set) var tab: UUID? { didSet { if tab != oldValue { isMinimized = false } } }
+    /// Tucked away in its pill: the video plays on, out of the way.
+    private(set) var isMinimized = false
 
     /// Tabs changed on screen. `shown`: the tabs on screen now (two in a split). `playing`: a tab that was on screen,
     /// isn't now, and is playing a video that would follow you. Coming back to the mini player's tab puts its video
@@ -200,6 +299,20 @@ nonisolated struct MiniPlayerModel: Equatable {
             steps.append(.show(playing))
         }
         return steps
+    }
+
+    /// Its minimize button: the card becomes a pill and the video plays on.
+    mutating func minimize() -> Bool {
+        guard tab != nil, !isMinimized else { return false }
+        isMinimized = true
+        return true
+    }
+
+    /// The pill's expand button, or a click on it: the card again.
+    mutating func expand() -> Bool {
+        guard tab != nil, isMinimized else { return false }
+        isMinimized = false
+        return true
     }
 
     /// Its close button: the video stops and the player goes.
