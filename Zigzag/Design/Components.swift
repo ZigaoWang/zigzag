@@ -524,7 +524,7 @@ final class DialogHeader: NSView {
     private var textX: CGFloat { hasPicture ? Tokens.Dialog.iconSide + Tokens.Space.x3 : 0 }
 
     private func titleHeight(_ width: CGFloat) -> CGFloat {
-        ceil(title.sizeThatFits(NSSize(width: max(0, width - textX - trailingRoom), height: 400)).height)
+        ceil(title.sizeThatFits(NSSize(width: max(0, width - textX - trailingRoom) + Label.inset * 2, height: 400)).height)
     }
 
     private func textHeight(_ width: CGFloat) -> CGFloat {
@@ -541,7 +541,9 @@ final class DialogHeader: NSView {
         circle.frame = NSRect(x: 0, y: round((total - side) / 2), width: side, height: side)
         picture.frame = circle.frame
         let width = max(0, bounds.width - textX - trailingRoom)
-        title.frame = NSRect(x: textX, y: round((total - text) / 2), width: width, height: titleHeight(bounds.width))
+        // The title draws its text Label.inset in from its edges, as the subtitle does: both are set that much wider, so
+        // their first letters line up where the text starts.
+        title.frame = NSRect(x: textX - Label.inset, y: round((total - text) / 2), width: width + Label.inset * 2, height: titleHeight(bounds.width))
         subtitle.isHidden = subtitle.stringValue.isEmpty
         subtitle.frame = NSRect(x: textX - Label.inset, y: title.frame.maxY + 2, width: width + Label.inset * 2, height: subtitle.lineHeight)
     }
