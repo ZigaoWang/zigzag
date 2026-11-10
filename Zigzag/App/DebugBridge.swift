@@ -896,6 +896,19 @@ enum DebugBridge {
         case "importsuccess":
             ImportWindowController.show()
             (ImportWindowController.shared?.window?.contentView as? ImportView)?.debugShowSuccess()
+        case "keyshot":
+            // keyshot <path>: the key window's own drawing, or the Import window's when no window is key, as a PNG. Never
+            // the Passwords window.
+            guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.windowController is ImportWindowController }), !(window.windowController is PasswordsWindowController),
+                  let view = window.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }
+            view.cacheDisplay(in: view.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: arg))
+        case "pwshot":
+            // pwshot <path>: the Passwords window's own drawing, on a test vault only.
+            guard PasswordStore.isTestVault, let view = PasswordsWindowController.shared?.window?.contentView?.superview,
+                  let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }
+            view.cacheDisplay(in: view.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: arg))
         case "passwordsshow":
             (PasswordsWindowController.shared?.window?.contentView as? PasswordsView)?.debugShow(arg)
         case "passwordswindow":

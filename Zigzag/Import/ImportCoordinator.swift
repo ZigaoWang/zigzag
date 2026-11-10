@@ -217,10 +217,10 @@ enum ImportCoordinator {
     /// Whether a preview says macOS has to allow reading the browser first.
     static func asksPermission(_ preview: String) -> Bool { preview == needsPermission || preview == safariNeedsPermission }
 
-    /// `extensions`: count the extensions it has that Zigzag doesn't, where they're offered.
-    static func preview(_ source: Source, extensions: Bool = false) async -> String {
+    /// `extensions`: count the extensions it has that `profile` (left out, the first) doesn't, where they're offered.
+    static func preview(_ source: Source, extensions: Bool = false, in profile: Profile? = nil) async -> String {
         let kind = source.kind
-        let installed: Set<String>? = extensions ? Set(Profiles.shared.default.installs.installedIDs) : nil
+        let installed: Set<String>? = extensions ? Set((profile ?? Profiles.shared.default).installs.installedIDs) : nil
         return await Task.detached(priority: .utility) { () -> String in
             let spaces = String(localized: "spaces", comment: "Item in the short list of what a browser holds, in the Import window: Arc's spaces.")
             let history = String(localized: "history", comment: "Item in the short list of what a browser holds, in the Import window: its browsing history.")
@@ -326,8 +326,12 @@ enum ImportCoordinator {
 
     /// Imports from one source. Reading happens off the main thread; macOS may show its own prompts on the way
     /// (allowing access to a browser's passwords).
-    static func run(_ source: Source, _ choice: Choice, primaryPassword: String = "") async -> Summary {
+    ///
+    /// `into`: the profile that gets it all (left out, the first): its history and sign-ins, and the spaces
+    /// and favorites made for what came over. Passwords go into the one vault every profile shares.
+    static func run(_ source: Source, _ choice: Choice, primaryPassword: String = "", into target: Profile? = nil) async -> Summary {
         let choice = choice.intersection(source.offers)
+        let profile = target ?? Profiles.shared.default
         var summary = Summary(source: source.name)
         let reading = choice.reading
         let isArc: Bool = { if case .chromium(let b) = source.kind { return b.name == "Arc" } else { return false } }()
@@ -337,7 +341,7 @@ enum ImportCoordinator {
         // Only the parts you chose: the sidebar for spaces and bookmarks, history for history.
         if isArc {
             if choice.contains(.tabs) || choice.contains(.bookmarks) {
-                let result = ArcImporter.importSidebar().result
+                let result = ArcImporter.importSidebar(into: profile.id).result
                 summary.spaces = result.spaces
                 summary.bookmarks = result.bookmarks
                 summary.problems += result.problems
@@ -348,7 +352,7 @@ enum ImportCoordinator {
                 }.value
                 switch read {
                 case .success(let entries):
-                    summary.history = Profiles.shared.default.history.importVisits(entries)
+                    summary.history = profile.history.importVisits(entries)
                 case .failure(let error):
                     summary.problems.append(ArcImporter.historyProblem(error))
                 }
@@ -357,13 +361,13 @@ enum ImportCoordinator {
         }
 
         if choice.contains(.extensions), case .chromium(let browser) = source.kind {
-            let installed = Set(Profiles.shared.default.installs.installedIDs), name = source.name
+            let installed = Set(profile.installs.installedIDs), name = source.name
             summary.foundExtensions = await Task.detached(priority: .userInitiated) {
                 ChromiumExtensions.toAdd(ChromiumExtensions.found(in: browser, source: name), installed: installed)
             }.value
         }
         if choice.contains(.extensions), case .orion(let browser) = source.kind {
-            let installed = Set(Profiles.shared.default.installs.installedIDs), name = source.name
+            let installed = Set(profile.installs.installedIDs), name = source.name
             summary.foundExtensions = await Task.detached(priority: .userInitiated) {
                 ChromiumExtensions.toAdd(OrionImporter.extensions(of: browser, source: name), installed: installed)
             }.value
@@ -389,15 +393,15 @@ enum ImportCoordinator {
 
         summary.problems += batch.problems
         if choice.contains(.passwords) { await savePasswords(batch.logins, into: &summary) }
-        if choice.contains(.bookmarks), !batch.bookmarks.isEmpty { summary.bookmarks += addBookmarks(batch.bookmarks, from: source.name) }
+        if choice.contains(.bookmarks), !batch.bookmarks.isEmpty { summary.bookmarks += addBookmarks(batch.bookmarks, from: source.name, into: profile.id) }
         if choice.contains(.history), !batch.history.isEmpty {
             // Only pages new here count: the same browser again brings nothing new, and says so.
-            summary.history += Profiles.shared.default.history.importVisits(batch.history)
+            summary.history += profile.history.importVisits(batch.history)
         }
-        // Only ever the default store: private windows each have their own, which nothing imported reaches.
+        // Only ever a profile's own store: private windows each have their own, which nothing imported reaches.
         if choice.contains(.signIns) {
             var applied = SignInImporter.Applied()
-            if !batch.cookies.isEmpty { applied = await SignInImporter.apply(batch.cookies, to: WKWebsiteDataStore.default().httpCookieStore) }
+            if !batch.cookies.isEmpty { applied = await SignInImporter.apply(batch.cookies, to: profile.store.httpCookieStore) }
             summary.signedInSites = applied.sites
             if let note = SignInImporter.note(unreadable: batch.unreadableCookies + applied.failed,
                                               broughtAny: applied.cookies + applied.kept > 0, from: source.name) {
@@ -478,12 +482,19 @@ enum ImportCoordinator {
         }
     }
 
-    /// Bookmarks go into a space of their own ("From Chrome"), so nothing already here gets crowded.
-    private static func addBookmarks(_ bookmarks: [ImportBatch.Bookmark], from name: String) -> Int {
+    /// Bookmarks go into a space of their own ("From Chrome"), so nothing already here gets crowded. A space made
+    /// for them is on the profile the import goes into; one already there stays where it is.
+    private static func addBookmarks(_ bookmarks: [ImportBatch.Bookmark], from name: String, into profile: UUID) -> Int {
         let spaceName = String(localized: "From \(name)", comment: "Name of the space imported bookmarks go into. The placeholder is a browser's name: From Chrome.")
         let merge = merged(bookmarks, into: Library.shared.spaces, named: spaceName)
         guard !merge.new.isEmpty else { return 0 }
-        let space = merge.space ?? Library.shared.addSpace(name: spaceName)
+        let space: SpaceInfo
+        if let existing = merge.space {
+            space = existing
+        } else {
+            space = Library.shared.addSpace(name: spaceName)
+            Library.shared.setProfile(profile, forSpace: space.id)
+        }
         // All in one change: thousands of bookmarks one at a time would redraw every window thousands of times. Their
         // folders come over as folders.
         let added = Library.shared.appendBookmarks(merge.new.map { ($0.url, $0.title) }, to: space.id, folders: merge.new.map(\.folders))

@@ -38,6 +38,14 @@ final class ImportView: NSView {
     private let rowList = FlippedView()
     private let choiceLabel = Label(String(localized: "Bring", comment: "Label in the Import window, before the choices of what to bring over: Passwords, Bookmarks…"), font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     private var choiceButtons: [(ImportCoordinator.Choice, ChoicePill)] = []
+    /// With more than one profile: which one what's imported goes into. The profile of the space you're in, to begin with.
+    private let intoLabel = Label(String(localized: "Into", comment: "Label in the Import window, with more than one profile, before the choice of the profile that what's imported goes into."), font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
+    private let intoPicker = DropdownButton()
+    private var intoProfile = WindowManager.shared.keyController?.tabManager.profile.id ?? Profile.defaultID
+    /// The profiles as the choice lists them.
+    private var intoIDs: [UUID] = []
+    /// The profile it all goes into.
+    private var target: Profile { Profiles.shared.profile(intoProfile) }
     private let chooseFile = TextButton(title: String(localized: "Choose File…", comment: "Button in the Import window: choose a passwords export or Safari export file."), font: Tokens.Font.body(.medium))
     private let primary = PrimaryButton(title: String(localized: "Import", comment: "Main button in the Import window."))
     private let secondary = TextButton(title: String(localized: "Not Now", comment: "Button in the Import window: close it without importing."), font: Tokens.Font.body(.medium))
@@ -94,7 +102,18 @@ final class ImportView: NSView {
         rowScroll.contentView = FlippedClipView()
         rowScroll.contentView.drawsBackground = false
         rowScroll.documentView = rowList
-        [title, subtitle, rowScroll, choiceLabel, signInsNote, chooseFile, primary, secondary].forEach { addSubview($0) }
+        [title, subtitle, rowScroll, choiceLabel, signInsNote, intoLabel, intoPicker, chooseFile, primary, secondary].forEach { addSubview($0) }
+        let profiles = Library.shared.profiles
+        intoPicker.options = profiles.map { DropdownButton.Option(title: $0.displayName, image: ProfileSheets.tile(for: $0)) }
+        intoPicker.selectedIndex = profiles.firstIndex { $0.id == intoProfile } ?? 0
+        intoIDs = profiles.map(\.id)
+        intoPicker.setAccessibilityLabel(intoLabel.stringValue)
+        intoPicker.onSelect = { [weak self] index in
+            guard let self, self.intoIDs.indices.contains(index) else { return }
+            self.intoProfile = self.intoIDs[index]
+            // What each browser has that this profile doesn't.
+            self.rows.forEach { $0.loadPreview(in: self.target) }
+        }
         // Sign-ins start on, as passwords do; the line under the choices says what they are.
         for (choice, name) in [(ImportCoordinator.Choice.passwords, String(localized: "Passwords", comment: "Choice in the Import window: bring passwords over.")),
                                (.bookmarks, String(localized: "Bookmarks", comment: "Choice in the Import window: bring bookmarks over.")),
@@ -128,7 +147,7 @@ final class ImportView: NSView {
         // The browser you use first and on; the rest start off so nothing comes over by surprise.
         sources = found.filter { suggested.contains($0.id) } + found.filter { !suggested.contains($0.id) }
         rows = sources.map { source in
-            let row = SourceRow(source: source, countsExtensions: presentation == .window)
+            let row = SourceRow(source: source, countsExtensions: presentation == .window, profile: target)
             row.isChosen = suggested.contains(source.id)
             row.onToggle = { [weak self] in self?.choicesChanged() }
             rowList.addSubview(row)
@@ -221,13 +240,14 @@ final class ImportView: NSView {
     /// Every browser's extensions Zigzag doesn't have, once each: got ready one by one, asked about once, then added
     /// one at a time.
     private func importExtensions() async {
-        let found = ChromiumExtensions.toAdd(summaries.flatMap(\.foundExtensions), installed: Set(Profiles.shared.default.installs.installedIDs))
+        let profile = target
+        let found = ChromiumExtensions.toAdd(summaries.flatMap(\.foundExtensions), installed: Set(profile.installs.installedIDs))
         for index in summaries.indices { summaries[index].foundExtensions = [] }
         guard !found.isEmpty else { return }
         rowList.addSubview(extensionsRow)
         extensionsRow.state = .preparing(0, of: found.count)
         needsLayout = true
-        let steps = ExtensionImport.store(in: Profiles.shared.default)
+        let steps = ExtensionImport.store(in: profile)
         let prepared = await ExtensionImport.prepare(found, with: steps) { [weak self] index in
             self?.extensionsRow.state = .preparing(index, of: found.count)
         }
@@ -308,7 +328,7 @@ final class ImportView: NSView {
     private func run(_ row: SourceRow, _ data: ImportCoordinator.Choice, primaryPassword: String = "") async {
         row.state = .working
         let choice = data.intersection(row.source.offers)
-        var summary = await ImportCoordinator.run(row.source, choice, primaryPassword: primaryPassword)
+        var summary = await ImportCoordinator.run(row.source, choice, primaryPassword: primaryPassword, into: target)
         // Trying again brings the rest; what came the first time still counts.
         summary.extensions += summaries.first { $0.source == summary.source }?.extensions ?? 0
         summaries.removeAll { $0.source == summary.source }
@@ -494,12 +514,15 @@ final class ImportView: NSView {
         }
         let pillsHeight = CGFloat(pillLines) * Tokens.Space.x8 + CGFloat(pillLines - 1) * Tokens.Space.x2
         let choicesHeight: CGFloat = showsChoices ? Tokens.Space.x4 + Tokens.Space.x2 + pillsHeight + noteHeight : 0
+        // Where it goes is asked only once there's a choice, and only before importing.
+        let showsInto = stage == .choose && Library.shared.hasManyProfiles
+        let intoHeight: CGFloat = showsInto ? Tokens.Space.x4 + intoLabel.lineHeight + Tokens.Space.x2 + Tokens.Space.x8 : 0
         let emptyHeight: CGFloat = sources.isEmpty && stage == .choose ? ceil(emptyNote.sizeThatFits(NSSize(width: width, height: 200)).height) + Tokens.Space.x4 : 0
         let showsHero = hero.superview != nil
         let heroHeight: CGFloat = showsHero ? ImportHero.height + Tokens.Space.x8 : 0
         let titleHeight = ceil(title.intrinsicContentSize.height)
         let total = heroHeight + titleHeight + Tokens.Space.x2 + subtitleHeight + Tokens.Space.x6 + rowsHeight + emptyHeight
-            + (showsChoices ? Tokens.Space.x6 + choicesHeight : 0) + Tokens.Space.x8 + Tokens.Space.x8
+            + (showsChoices ? Tokens.Space.x6 + choicesHeight : 0) + intoHeight + Tokens.Space.x8 + Tokens.Space.x8
         if presentation == .window {
             banner.frame = NSRect(x: 0, y: 0, width: bounds.width, height: 128)
             banner.contentInset = x
@@ -526,7 +549,7 @@ final class ImportView: NSView {
         }
         let fixed = (presentation == .window ? 128 + Tokens.Space.x6 : Tokens.Space.x16 * 2) + heroHeight + (title.stringValue.isEmpty ? 0 : titleHeight + Tokens.Space.x2)
             + (subtitle.stringValue.isEmpty ? 0 : subtitleHeight + Tokens.Space.x6) + emptyHeight
-            + (showsChoices ? Tokens.Space.x6 + choicesHeight : 0) + Tokens.Space.x8 * 2 + Tokens.Space.x6
+            + (showsChoices ? Tokens.Space.x6 + choicesHeight : 0) + intoHeight + Tokens.Space.x8 * 2 + Tokens.Space.x6
         let listHeight = max(120, min(rowsHeight, limit - fixed))
         var ry: CGFloat = 0
         for (row, height) in zip(visibleRows, rowHeights) {
@@ -556,6 +579,14 @@ final class ImportView: NSView {
         } else {
             signInsNote.isHidden = true
         }
+        intoLabel.isHidden = !showsInto
+        intoPicker.isHidden = !showsInto
+        if showsInto {
+            y += Tokens.Space.x4
+            place(intoLabel, height: intoLabel.lineHeight, gap: Tokens.Space.x2)
+            intoPicker.frame = NSRect(x: x, y: y, width: min(intoPicker.intrinsicContentSize.width, width), height: Tokens.Space.x8)
+            y += Tokens.Space.x8
+        }
         y += Tokens.Space.x8
         let buttonHeight = Tokens.Space.x8
         let pw = max(primary.fittingWidth, 96)
@@ -579,6 +610,8 @@ private final class SourceRow: InteractiveView, ImportListItem {
     enum State { case idle, waiting, working, done(ImportCoordinator.Summary) }
 
     let source: ImportCoordinator.Source
+    /// Whether its line counts the extensions it would bring.
+    private let countsExtensions: Bool
     var onToggle: (() -> Void)?
     var onFix: ((ImportProblem.Fix, String) -> Void)?
     /// Off while an import runs: the fixes that import again wait for it.
@@ -602,8 +635,9 @@ private final class SourceRow: InteractiveView, ImportListItem {
     /// What the browser holds, filled in once counted.
     private var preview = String(localized: "Looking…", comment: "Under a browser's name in the Import window while counting what it holds.") { didSet { refresh() } }
 
-    init(source: ImportCoordinator.Source, countsExtensions: Bool = false) {
+    init(source: ImportCoordinator.Source, countsExtensions: Bool = false, profile: Profile? = nil) {
         self.source = source
+        self.countsExtensions = countsExtensions
         name = Label(source.name, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
         layer?.cornerRadius = Tokens.Radius.group
@@ -625,9 +659,14 @@ private final class SourceRow: InteractiveView, ImportListItem {
         setAccessibilityRole(.checkBox)
         setAccessibilityLabel(source.name)
         refresh()
+        loadPreview(in: profile)
+    }
+
+    /// What it holds, in a line. `profile`: the one its extensions are counted against (left out, the first).
+    func loadPreview(in profile: Profile?) {
         Task { @MainActor [weak self] in
             guard let self else { return }
-            self.preview = await ImportCoordinator.preview(source, extensions: countsExtensions)
+            self.preview = await ImportCoordinator.preview(self.source, extensions: self.countsExtensions, in: profile)
         }
     }
 
