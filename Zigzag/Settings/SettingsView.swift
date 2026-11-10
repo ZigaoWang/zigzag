@@ -271,6 +271,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         [tile, name, detail, deleteButton, editButton].forEach { addSubview($0) }
         // The row and its Edit button both open the same editor the sidebar uses.
         onClick = { [weak self] _ in self?.openEditor() }
+        onRightClick = { [weak self] _ in self?.actionsMenu() }
         editButton.onClick = { [weak self] _ in self?.openEditor() }
         deleteButton.onClick = { [weak self] _ in
             guard let self, let host = self.host else { return }
@@ -362,7 +363,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         }
     }
 
-    override func menu(for event: NSEvent) -> NSMenu? {
+    private func actionsMenu() -> NSMenu {
         let menu = NSMenu()
         menu.addItem(SidebarMenus.Item(String(localized: "Edit Space…", comment: "Item in the menu of a space's row in Settings › Spaces.")) { [weak self] in
             self?.openEditor()

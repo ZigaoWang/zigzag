@@ -613,3 +613,28 @@ struct PageTextSubstitutionTests {
         #expect(value == typed)
     }
 }
+
+/// Every control's menu reaches the keyboard and VoiceOver, not only the mouse.
+@MainActor
+struct ControlMenuTests {
+    private func rightClick() -> NSEvent {
+        NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                           context: nil, eventNumber: 0, clickCount: 1, pressure: 0)!
+    }
+
+    @Test func aSpaceRowInSettingsOffersItsMenuEverywhere() {
+        let row = SpaceSettingsRow(space: SpaceInfo(name: "Work", color: .sky))
+        #expect(row.offersMenu)
+        #expect(row.isAccessibilitySelectorAllowed(#selector(NSView.accessibilityPerformShowMenu)))
+        let edit = String(localized: "Edit Space…", comment: "Item in the menu of a space's row in Settings › Spaces.")
+        // A right-click finds the same menu.
+        #expect(row.menu(for: rightClick())?.items.first?.title == edit)
+    }
+
+    @Test func aControlWithoutAMenuOffersNone() {
+        let button = IconButton(symbol: "trash", toolTip: "Delete")
+        #expect(!button.offersMenu)
+        #expect(!button.isAccessibilitySelectorAllowed(#selector(NSView.accessibilityPerformShowMenu)))
+        #expect(button.menu(for: rightClick()) == nil)
+    }
+}
