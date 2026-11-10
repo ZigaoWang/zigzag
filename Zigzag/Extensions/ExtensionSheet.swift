@@ -13,7 +13,21 @@ final class ExtensionSheet: FloatingPanelView {
         var report: ExtensionReport
         var confirm: String
         var cancel: String
+        /// Where it's going, when there's a choice (which profile an extension is added to): a label, the places,
+        /// and the one chosen to begin with.
+        var destination: Destination?
     }
+
+    struct Destination {
+        var label: String
+        var options: [DropdownButton.Option]
+        var selected: Int
+    }
+
+    private let destinationLabel = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+    private let destinationButton = DropdownButton()
+    /// The place chosen, when the sheet offered a choice.
+    var destinationIndex: Int { destinationButton.selectedIndex }
 
     private static weak var current: ExtensionSheet?
     /// Whether one is up, so an extension's own question never takes the place of one you're answering.
@@ -77,6 +91,13 @@ final class ExtensionSheet: FloatingPanelView {
             limitsBox.addSubview(limitsIcon)
             limitsBox.addSubview(limitsText)
         }
+        if let destination = content.destination {
+            destinationLabel.stringValue = destination.label
+            destinationButton.options = destination.options
+            destinationButton.selectedIndex = destination.selected
+            addSubview(destinationLabel)
+            addSubview(destinationButton)
+        }
         addSubview(buttons)
         buttons.trailing = [cancelButton, confirmButton]
         confirmButton.onClick = { [weak self] _ in self?.finish(confirmed: true) }
@@ -87,8 +108,9 @@ final class ExtensionSheet: FloatingPanelView {
     required init?(coder: NSCoder) { fatalError() }
 
     /// Shows the sheet over the page of a window, replacing any other one.
+    @discardableResult
     static func present(_ content: Content, in controller: BrowserWindowController,
-                        onConfirm: @escaping () -> Void, onCancel: @escaping () -> Void = {}) {
+                        onConfirm: @escaping () -> Void, onCancel: @escaping () -> Void = {}) -> ExtensionSheet {
         current?.finish(confirmed: false)
         let sheet = ExtensionSheet(content)
         sheet.onConfirm = onConfirm
@@ -101,6 +123,8 @@ final class ExtensionSheet: FloatingPanelView {
         current = sheet
         sheet.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak sheet] event in
             guard let sheet, let window = sheet.window, event.window === window else { return event }
+            // Its menu of places, while open, has the keys.
+            if MenuPanel.current != nil { return event }
             // Return goes to whatever you're typing in (a page's field, a word being composed), never to "Add".
             var view = window.firstResponder as? NSView
             while let current = view, !(current is WKWebView) { view = current.superview }
@@ -111,11 +135,13 @@ final class ExtensionSheet: FloatingPanelView {
             default: return event
             }
         }
+        return sheet
     }
 
     #if DEBUG
     static func debugCancel() { current?.finish(confirmed: false) }
     static func debugConfirm() { current?.finish(confirmed: true) }
+    static func debugChoose(destination index: Int) { current?.destinationButton.selectedIndex = index }
     #endif
 
     private func finish(confirmed: Bool) {
@@ -170,6 +196,13 @@ final class ExtensionSheet: FloatingPanelView {
             y += boxHeight + Tokens.Space.x4
         } else {
             y += Tokens.Space.x2
+        }
+        if destinationButton.superview != nil {
+            let h = Tokens.Page.controlHeight
+            let menuWidth = min(destinationButton.intrinsicContentSize.width, inner - destinationLabel.textWidth - Tokens.Space.x3)
+            place(destinationLabel, NSRect(x: pad - Label.inset, y: y + round((h - destinationLabel.lineHeight) / 2), width: inner - menuWidth, height: destinationLabel.lineHeight))
+            place(destinationButton, NSRect(x: pad + inner - menuWidth, y: y, width: menuWidth, height: h))
+            y += h + Tokens.Space.x4
         }
         place(buttons, NSRect(x: pad, y: y, width: inner, height: DialogButtons.height))
         y += DialogButtons.height + pad

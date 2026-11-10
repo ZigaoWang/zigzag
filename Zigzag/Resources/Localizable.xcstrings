@@ -1820,6 +1820,28 @@
         }
       }
     },
+    "Add to" : {
+      "comment" : "Label in the sheet that asks before adding an extension, before the choice of the profile it's added to.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加到"
+          }
+        }
+      }
+    },
+    "Add to %@" : {
+      "comment" : "Button on the bar over a Chrome Web Store page, with more than one profile: installs the extension in the profile named.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加到“%@”"
+          }
+        }
+      }
+    },
     "Add to Favorites" : {
       "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a pinned tab's context menu in the sidebar.\nItem in a tab's context menu in the sidebar.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Add to Favorites.",
       "localizations" : {

@@ -691,8 +691,20 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                     report: prepared.report,
                     confirm: String(localized: "Add Extension", comment: "Button that adds the extension, in the sheet that asks first."),
                     cancel: String(localized: "Cancel", comment: "Button that closes a sheet without doing anything."))
-                ExtensionSheet.present(content, in: self, onConfirm: {
+                // With more than one profile, the sheet says which it's added to, and lets you choose another.
+                let profiles = Library.shared.profiles
+                var asked = content
+                if profiles.count > 1 {
+                    asked.destination = ExtensionSheet.Destination(
+                        label: String(localized: "Add to", comment: "Label in the sheet that asks before adding an extension, before the choice of the profile it's added to."),
+                        options: profiles.map { DropdownButton.Option(title: $0.displayName, image: ProfileSheets.tile(for: $0)) },
+                        selected: profiles.firstIndex { $0.id == profile.id } ?? 0)
+                }
+                var sheet: ExtensionSheet?
+                sheet = ExtensionSheet.present(asked, in: self, onConfirm: {
                     report(.adding)
+                    let chosen = sheet.map { $0.destinationIndex }.flatMap { profiles.indices.contains($0) ? profiles[$0] : nil }
+                    let profile = profiles.count > 1 ? Profiles.shared.profile(chosen?.id ?? profile.id) : profile
                     Task {
                         switch await ExtensionStore.finishInstall(prepared, in: profile) {
                         case .success(let name):
