@@ -150,14 +150,22 @@ final class NumberHintView: NSView {
 }
 
 /// Holding ⌘ a moment shows, on each favorite and row, the number that goes to it with ⌘, as Safari does with its
-/// tabs. Letting go, any key, a click, a scroll or the window going to the back hides them at once.
+/// tabs; holding ⌃ shows, on each space key, the number that goes to it with ⌃. Letting go, any key, a click, a scroll
+/// or the window going to the back hides them at once.
 final class NumberHints {
+    /// The tabs' numbers with ⌘, the spaces' with ⌃: each waits on its own hold, and only one is ever held alone.
+    private enum Kind: CaseIterable {
+        case tabs, spaces
+        var modifier: NSEvent.ModifierFlags { self == .tabs ? .command : .control }
+    }
+
     private weak var controller: BrowserWindowController?
-    private var hold = ModifierHold(.command)
+    private var holds = Dictionary(uniqueKeysWithValues: Kind.allCases.map { ($0, ModifierHold($0.modifier)) })
+    private var timers: [Kind: Timer] = [:]
     private var monitor: Any?
     private var observers: [NSObjectProtocol] = []
-    private var timer: Timer?
     private(set) var isShown = false
+    private(set) var areSpacesShown = false
 
     init(controller: BrowserWindowController) {
         self.controller = controller
@@ -179,19 +187,22 @@ final class NumberHints {
         monitor = nil
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
-        timer?.invalidate()
+        timers.values.forEach { $0.invalidate() }
+        timers = [:]
         hide()
+        hideSpaces()
     }
 
     private func handle(_ event: NSEvent) {
         if event.type == .flagsChanged {
-            hold.modifiersChanged(to: event.modifierFlags, at: event.timestamp)
-            if let due = hold.dueAt {
-                if timer == nil { schedule(after: max(0, due - ProcessInfo.processInfo.systemUptime)) }
-            } else {
-                timer?.invalidate()
-                timer = nil
-                hide()
+            for kind in Kind.allCases {
+                holds[kind]?.modifiersChanged(to: event.modifierFlags, at: event.timestamp)
+                if let due = holds[kind]?.dueAt {
+                    if timers[kind] == nil { schedule(kind, after: max(0, due - ProcessInfo.processInfo.systemUptime)) }
+                } else {
+                    timers.removeValue(forKey: kind)?.invalidate()
+                    hide(kind)
+                }
             }
         } else {
             interrupt(holding: event.modifierFlags)
@@ -199,22 +210,33 @@ final class NumberHints {
     }
 
     private func interrupt(holding flags: NSEvent.ModifierFlags = NSEvent.modifierFlags) {
-        hold.interrupted(holding: flags)
-        timer?.invalidate()
-        timer = nil
-        hide()
+        for kind in Kind.allCases {
+            holds[kind]?.interrupted(holding: flags)
+            timers.removeValue(forKey: kind)?.invalidate()
+            hide(kind)
+        }
     }
 
-    private func schedule(after delay: TimeInterval) {
-        timer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+    private func schedule(_ kind: Kind, after delay: TimeInterval) {
+        timers[kind] = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                self.timer = nil
+                self.timers[kind] = nil
                 // Still held: no release slipped by unseen (a menu open, another app in front).
-                guard self.hold.isDue(at: ProcessInfo.processInfo.systemUptime),
-                      self.hold.isAlone(NSEvent.modifierFlags) else { return }
-                self.show()
+                guard let hold = self.holds[kind], hold.isDue(at: ProcessInfo.processInfo.systemUptime),
+                      hold.isAlone(NSEvent.modifierFlags) else { return }
+                switch kind {
+                case .tabs: self.show()
+                case .spaces: self.showSpaces()
+                }
             }
+        }
+    }
+
+    private func hide(_ kind: Kind) {
+        switch kind {
+        case .tabs: hide()
+        case .spaces: hideSpaces()
         }
     }
 
@@ -225,6 +247,14 @@ final class NumberHints {
         guard let controller, let window = controller.window, window.attachedSheet == nil, !controller.desk.isVisible else { return false }
         if focused, !window.isKeyWindow || !NSApp.isActive { return false }
         return controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible
+    }
+
+    /// As for the tabs' numbers, and only while there are space keys to show them on (more than one space, not in a
+    /// private window), with no switcher or command bar up: the space switcher lists its own ⌃ numbers.
+    private func canShowSpaces(focused: Bool) -> Bool {
+        guard canShow(focused: focused), let controller, controller.sidebar.hasSpaceKeys,
+              !controller.switcher.isActive, !controller.spaceSwitcher.isActive, !controller.commandBar.isVisible else { return false }
+        return true
     }
 
     func show(force: Bool = false) {
@@ -241,9 +271,17 @@ final class NumberHints {
         isShown = true
     }
 
+    func showSpaces(force: Bool = false) {
+        guard let controller, force || canShowSpaces(focused: true) else { return }
+        controller.sidebar.showsSpaceNumbers = true
+        areSpacesShown = true
+    }
+
     #if DEBUG
     /// As holding ⌘ would show them, whether or not the window is in front.
     func debugShow() { if canShow(focused: false) { show(force: true) } }
+    /// As holding ⌃ would show them, whether or not the window is in front.
+    func debugShowSpaces() { if canShowSpaces(focused: false) { showSpaces(force: true) } }
     #endif
 
     func hide() {
@@ -253,7 +291,14 @@ final class NumberHints {
         controller.sidebar.list.showNumbers([:])
     }
 
-    /// The list or the favorites changed under the numbers (a page closed on its own): they follow.
+    func hideSpaces() {
+        guard areSpacesShown, let controller else { return }
+        areSpacesShown = false
+        controller.sidebar.showsSpaceNumbers = false
+    }
+
+    /// The list or the favorites changed under the numbers (a page closed on its own): they follow. The space keys
+    /// follow on their own.
     func placesChanged() {
         if isShown { show(force: true) }
     }
