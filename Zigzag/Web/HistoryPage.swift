@@ -132,14 +132,14 @@ enum HistoryPage {
             switch action {
             case "page":
                 let before = (body["before"] as? Double).map { Date(timeIntervalSince1970: $0 / 1000) }
-                replyHandler(HistoryPage.sessions(HistoryPage.batch(before: before)), nil)
+                replyHandler(HistoryPage.sessions(HistoryPage.batch(before: before, in: HistoryPage.profile(of: message.webView).history)), nil)
             case "search":
                 let query = (body["query"] as? String) ?? ""
                 // Read and grouped off the main thread, and handed over as one string, so each letter typed shows at
                 // once however big History is. A search the same tab typed over answers nothing; the page drops it.
                 let asker = message.webView.map { ObjectIdentifier($0).hashValue } ?? 0
                 Task {
-                    let json = await HistoryStore.shared.search(query, limit: 300, asker: asker) { found in
+                    let json = await HistoryPage.profile(of: message.webView).history.search(query, limit: 300, asker: asker) { found in
                         (try? JSONSerialization.data(withJSONObject: HistoryPage.sessions(found))).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
                     }
                     replyHandler(json, nil)
@@ -150,8 +150,8 @@ enum HistoryPage {
                 let urls = strings.compactMap(URL.init(string:))
                 HistoryPage.change(urls.count == 1 ? String(localized: "Remove Page from History", comment: "Name of the undoable change in the Edit menu, as in “Undo Remove Page from History”.")
                                                      : String(localized: "Remove Pages from History", comment: "Name of the undoable change in the Edit menu, as in “Undo Remove Pages from History”."),
-                                   from: message.webView) {
-                    HistoryStore.shared.remove(urls)
+                                   from: message.webView) { [history = HistoryPage.profile(of: message.webView).history] in
+                    history.remove(urls)
                 }
                 replyHandler(true, nil)
             case "clear":
@@ -168,11 +168,11 @@ enum HistoryPage {
 
     /// The next stretch of history before `before`, ending where a session ends: a batch that stopped halfway
     /// through an afternoon would show it as two sessions, and removing one would leave the other.
-    private static func batch(before: Date?, limit: Int = 200) -> [HistoryEntry] {
-        var entries = HistoryStore.shared.page(before: before, limit: limit)
+    private static func batch(before: Date?, limit: Int = 200, in history: HistoryStore) -> [HistoryEntry] {
+        var entries = history.page(before: before, limit: limit)
         guard entries.count == limit else { return entries }
         while let last = entries.last {
-            let more = HistoryStore.shared.page(before: last.lastVisit, limit: 50)
+            let more = history.page(before: last.lastVisit, limit: 50)
             var joining = 0
             while joining < more.count, HistoryClusters.continues(joining == 0 ? last : more[joining - 1], with: more[joining]) { joining += 1 }
             entries += more.prefix(joining)
@@ -216,9 +216,10 @@ enum HistoryPage {
                            calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: now)))
         default: (clearTitle, clearMessage, nil)
         }
-        ConfirmSheet.show(in: host, title: title, message: message, confirmTitle: clearHistory, destructive: true) { confirmed in
+        let profile = profile(of: webView)
+        ConfirmSheet.show(in: host, title: title, message: message + whoseNote(profile.id), confirmTitle: clearHistory, destructive: true) { confirmed in
             if confirmed {
-                change(clearHistory, from: webView) { HistoryStore.shared.remove(since: since) }
+                change(clearHistory, from: webView) { profile.history.remove(since: since) }
                 if let controller = controller(for: webView) { clearedToast(in: controller) }
             }
             reply(confirmed, nil)
@@ -232,12 +233,24 @@ enum HistoryPage {
         ConfirmSheet.show(in: host, title: title,
                           message: String(localized: "They’re forgotten on this Mac. Tabs, pinned tabs and passwords stay.", comment: "Message of the sheet that asks before removing pages a search found from History."),
                           confirmTitle: String(localized: "Remove", comment: "Button of the sheet that asks before removing pages from History."), destructive: true) { confirmed in
-            if confirmed { change(String(localized: "Remove Pages from History", comment: "Name of the undoable change in the Edit menu, as in “Undo Remove Pages from History”."), from: webView) { HistoryStore.shared.remove(urls) } }
+            if confirmed { change(String(localized: "Remove Pages from History", comment: "Name of the undoable change in the Edit menu, as in “Undo Remove Pages from History”."), from: webView) { [history = profile(of: webView).history] in history.remove(urls) } }
             reply(confirmed, nil)
         }
     }
 
     /// Clearing all history asks the same way, and says it's done the same way, from the menu, Settings and here.
+    /// The profile a History page shows: the one its tab is in, so the space it's opened in decides whose history
+    /// it is.
+    static func profile(of webView: WKWebView?) -> Profile {
+        (webView as? BrowserWebView)?.owner?.profile ?? webView.flatMap { Profiles.shared.profile(of: $0) } ?? Profiles.shared.default
+    }
+
+    /// With more than one profile, added to what a sheet that clears history says: whose history goes.
+    static func whoseNote(_ profile: UUID) -> String {
+        guard Library.shared.hasManyProfiles, let info = Library.shared.directory.profile(profile) else { return "" }
+        return " " + String(localized: "Only \(info.displayName)’s history is cleared; other profiles keep theirs.", comment: "Added to the message of a sheet that asks before clearing History, when there's more than one profile. The placeholder is the profile's name.")
+    }
+
     static var clearTitle: String { String(localized: "Clear all history?", comment: "Title of the sheet that asks before clearing all of History, from the History page, the menu or Settings.") }
     static var clearMessage: String {
         String(localized: "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, pinned tabs and passwords stay.", comment: "Message of the sheet that asks before clearing all of History.")
@@ -278,7 +291,10 @@ enum HistoryPage {
     }
 
     static func html(for webView: WKWebView) -> String {
-        let history = String(localized: "History", comment: "Title of the History page.")
+        // With more than one profile, the heading says whose history this is.
+        let info = Library.shared.hasManyProfiles ? Library.shared.directory.profile(profile(of: webView).id) : nil
+        let history = info.map { String(localized: "History in \($0.displayName)", comment: "Title of the History page when there's more than one profile. The placeholder is the profile's name.") }
+            ?? String(localized: "History", comment: "Title of the History page.")
         let clear = escape(clearHistory)
         return template
             .replacingOccurrences(of: "%LANG%", with: Bundle.main.preferredLocalizations.first ?? "en")

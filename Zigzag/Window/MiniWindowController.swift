@@ -575,6 +575,7 @@ extension MiniWindowController: CommandBarHost {
     func commandBarAnchor(asked: NSView?) -> NSView? { strip.anchor }
     var commandBarCentersOnAnchor: Bool { true }
     var commandBarTabs: TabManager? { MiniQuickOpen.tabs }
+    var commandBarProfile: Profile { tab.profile }
     var commandBarTab: Tab? { tab }
     var commandBarSpace: SpaceInfo? { space }
     var commandBarIsPrivate: Bool { false }

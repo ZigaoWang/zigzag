@@ -18,7 +18,7 @@ final class BridgeHistory: BridgeNamespace {
     /// The extensions it answers: one profile's.
     unowned let host: ExtensionHost
     init(host: ExtensionHost) { self.host = host }
-    private let store = HistoryStore.shared
+    private var store: HistoryStore { host.profile.history }
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         switch fn {
@@ -58,7 +58,7 @@ final class BridgeHistory: BridgeNamespace {
     func startEvents() {
         guard store.onVisit == nil else { return }
         store.onVisit = { [unowned self] url in
-            guard host.bridge.isListened("history.onVisited"), let found = HistoryStore.shared.item(for: url) else { return }
+            guard host.bridge.isListened("history.onVisited"), let found = store.item(for: url) else { return }
             host.bridge.emit("history.onVisited", [Self.item(found)])
         }
         store.onRemove = { [unowned self] urls in
@@ -88,7 +88,7 @@ final class BridgeTopSites: BridgeNamespace {
         guard fn == "get" else { throw BridgeError.unsupported(Self.name, fn) }
         var seen = Set<String>(), sites: [[String: Any]] = []
         let favorites = Library.shared.favorites(in: host.profile.id).map { ($0.url, $0.title) }
-        let visited = HistoryStore.shared.mostVisited(limit: 20).map { ($0.url, $0.title) }
+        let visited = host.profile.history.mostVisited(limit: 20).map { ($0.url, $0.title) }
         for (url, title) in favorites + visited where sites.count < 10 && seen.insert(url.absoluteString).inserted {
             sites.append(["url": url.absoluteString, "title": title])
         }

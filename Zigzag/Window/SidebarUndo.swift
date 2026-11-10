@@ -236,7 +236,9 @@ extension BrowserWindowController {
         if refresh { HistoryPage.refreshOpenPages() }
         guard !removal.isEmpty else { return }
         sidebarUndo.registerUndo(withTarget: self) { controller in
-            HistoryStore.shared.restore(removal)
+            // Back into the profile it came from; one removed since has nowhere to put it.
+            guard Library.shared.directory.profile(removal.profile) != nil else { return }
+            Profiles.shared.profile(removal.profile).history.restore(removal)
             HistoryPage.refreshOpenPages()
             controller.sidebarUndo.registerUndo(withTarget: controller) { $0.historyChange(name, take) }
             controller.sidebarUndo.setActionName(name)

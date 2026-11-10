@@ -348,7 +348,7 @@ enum ImportCoordinator {
                 }.value
                 switch read {
                 case .success(let entries):
-                    summary.history = HistoryStore.shared.importVisits(entries)
+                    summary.history = Profiles.shared.default.history.importVisits(entries)
                 case .failure(let error):
                     summary.problems.append(ArcImporter.historyProblem(error))
                 }
@@ -392,7 +392,7 @@ enum ImportCoordinator {
         if choice.contains(.bookmarks), !batch.bookmarks.isEmpty { summary.bookmarks += addBookmarks(batch.bookmarks, from: source.name) }
         if choice.contains(.history), !batch.history.isEmpty {
             // Only pages new here count: the same browser again brings nothing new, and says so.
-            summary.history += HistoryStore.shared.importVisits(batch.history)
+            summary.history += Profiles.shared.default.history.importVisits(batch.history)
         }
         // Only ever the default store: private windows each have their own, which nothing imported reaches.
         if choice.contains(.signIns) {

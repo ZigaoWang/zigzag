@@ -15,20 +15,32 @@ struct HistoryRemoval {
     let pdfPlaces: [String: Any]
     /// The sites' icons, set aside rather than deleted; gone for good when Zigzag next starts.
     let icons: URL?
+    /// The profile whose history it was taken from.
+    var profile = Profile.defaultID
     var isEmpty: Bool { visits.isEmpty && archive.isEmpty }
 }
 
-/// Every page visited, kept locally in SQLite. Used by the command bar.
+/// Every page visited in one profile, kept locally in SQLite. Used by the command bar. Each profile has its own
+/// (`Profile.history`): what you visit in one is never suggested in another.
 final class HistoryStore {
-    static let shared = HistoryStore(path: Paths.history.path)
+    /// The profile it's the history of.
+    let profile: UUID
+    /// Its file's place under Zigzag's data folder, which is also its place in each update backup.
+    private var backupPath: String { profile == Profile.defaultID ? "History.sqlite" : "Profiles/\(profile.uuidString)/History.sqlite" }
+    /// Whether an archived tab is this profile's: it was in one of its spaces.
+    private var isOurs: (ArchivedTab) -> Bool {
+        let profile = profile
+        return { Library.shared.profileID(ofSpace: $0.spaceID) == profile }
+    }
 
     private var db: OpaquePointer?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     /// Where the History page's searches run; nil for a store in memory, which no second connection can see.
     private let reader: HistoryReader?
 
-    /// The one store is `shared`; tests open their own, ":memory:", so they never see your history.
-    init(path: String) {
+    /// Profiles open theirs; tests open their own, ":memory:", so they never see your history.
+    init(path: String, profile: UUID = Profile.defaultID) {
+        self.profile = profile
         reader = path == ":memory:" ? nil : HistoryReader(path: path)
         guard open(path) else {
             // A damaged file (a disk error, a half-copied restore) would leave history off for good, silently: it's
@@ -46,9 +58,9 @@ final class HistoryStore {
     }
 
     /// Runs a removal on the history in every update backup too, erasing it there as here.
-    private static func scrubBackups(_ sql: String) {
+    private func scrubBackups(_ sql: String) {
         for backup in UpdateBackup.all() {
-            let file = backup.appendingPathComponent("History.sqlite")
+            let file = backup.appendingPathComponent(backupPath)
             guard FileManager.default.fileExists(atPath: file.path) else { continue }
             var copy: OpaquePointer?
             guard sqlite3_open_v2(file.path, &copy, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else { sqlite3_close(copy); continue }
@@ -181,13 +193,14 @@ final class HistoryStore {
         }
         // The log the deleted rows passed through goes too.
         exec("PRAGMA wal_checkpoint(TRUNCATE)")
-        // What went wrong lately names its sites too.
+        // What went wrong lately names its sites too. That, where you were in PDFs and the sites' icons aren't
+        // kept by profile, so with several profiles they go for all: cleared never leaves a trace behind.
         Diagnostics.forget(since: date)
         // And the copies kept from before each update: cleared means cleared there as well.
-        Self.scrubBackups(date.map { "DELETE FROM visits WHERE last_visit >= \($0.timeIntervalSince1970)" } ?? "DELETE FROM visits")
+        scrubBackups(date.map { "DELETE FROM visits WHERE last_visit >= \($0.timeIntervalSince1970)" } ?? "DELETE FROM visits")
         onRemove?(date == nil ? nil : visits.map(\.url))
-        return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(since: date),
-                              pdfPlaces: PDFViewerView.takePlaces(since: date), icons: FaviconStore.shared.setAsideVisited(since: date))
+        return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(since: date, where: isOurs),
+                              pdfPlaces: PDFViewerView.takePlaces(since: date), icons: FaviconStore.shared.setAsideVisited(since: date), profile: profile)
     }
 
     /// Takes these pages out of History, and their archived tabs with them.
@@ -201,9 +214,9 @@ final class HistoryStore {
             sqlite3_finalize(statement)
         }
         let quoted = urls.map { "'" + $0.absoluteString.replacingOccurrences(of: "'", with: "''") + "'" }.joined(separator: ",")
-        if !urls.isEmpty { Self.scrubBackups("DELETE FROM visits WHERE url IN (\(quoted))") }
+        if !urls.isEmpty { scrubBackups("DELETE FROM visits WHERE url IN (\(quoted))") }
         if !visits.isEmpty { onRemove?(visits.map(\.url)) }
-        return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(urls), pdfPlaces: [:], icons: nil)
+        return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(urls, where: isOurs), pdfPlaces: [:], icons: nil, profile: profile)
     }
 
     /// Puts back what a removal took, as it was.

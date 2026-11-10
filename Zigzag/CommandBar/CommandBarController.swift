@@ -115,6 +115,8 @@ protocol CommandBarHost: AnyObject {
     var commandBarCentersOnAnchor: Bool { get }
     /// The browser window's tabs, for open tabs among the results and for completing what you type; nil if there's none.
     var commandBarTabs: TabManager? { get }
+    /// The profile whose history, favorites and open pages the bar suggests: the one of the space it's used in.
+    var commandBarProfile: Profile { get }
     /// The page ⌘L edits.
     var commandBarTab: Tab? { get }
     /// The space whose accent the bar takes; nil in a private window.
@@ -163,7 +165,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private var suggestions: [String] = []
     private let fetcher = SuggestionFetcher()
     /// History's pages and sites for what's typed, read off the main thread; they join the list as they arrive.
-    private let history = HistoryLookup()
+    private let history = HistoryLookup(store: Profiles.shared.default.history)
     /// What was typed when the inline completion was last asked of History, while the answer is still coming.
     private var completionAsked: String?
     /// Text the user actually typed; the field may also hold an inline completion after it.
@@ -275,7 +277,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         if !isVisible {
             host.commandBarWillShow()
             isVisible = true
-            // History may have changed since the bar was last open: nothing found then is reused.
+            // The history of the profile the bar is used in. It may have changed since the bar was last open: nothing
+            // found then is reused.
+            history.use(host.commandBarProfile.history)
             history.reset()
             completionAsked = nil
             scrim.frame = isAnchored ? host.commandBarOverlay.bounds : card
@@ -514,7 +518,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let editing = mode == .editCurrent && typed == host.commandBarTab?.url?.absoluteString
         let query = editing || scope != nil ? "" : typed
         let pages = query.isEmpty ? [] : history.pages(for: query, limit: CommandRanker.historyLimit(historyOnly: mode == .history))
-        var results = CommandRanker.results(for: query, manager: host.commandBarTabs, suggestions: suggestions, history: pages,
+        var results = CommandRanker.results(for: query, manager: host.commandBarTabs, profile: host.commandBarProfile, suggestions: suggestions, history: pages,
                                             editingCurrent: mode == .editCurrent, historyOnly: mode == .history)
         if editing { results = [] }
         // Zigzag's commands act on a browser window's tabs: outside one there's nothing for them to act on.
@@ -771,7 +775,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private func foundCompletion(for text: String) -> InlineCompletion.Match? {
         guard let bare = CommandRanker.completionPrefix(for: text) else { return nil }
         guard let sites = history.completionSites(for: bare) else { completionAsked = text; return nil }
-        return CommandRanker.inlineCompletion(for: text, manager: host?.commandBarTabs, history: sites)
+        guard let host else { return nil }
+        return CommandRanker.inlineCompletion(for: text, manager: host.commandBarTabs, profile: host.commandBarProfile, history: sites)
     }
 
     /// What you typed stays as you typed it; the rest of the completion follows, selected, so the next letter replaces it.

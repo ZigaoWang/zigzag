@@ -19,6 +19,30 @@ struct HistoryStoreTests {
         #expect(names.contains { $0.hasPrefix("History.sqlite.damaged-") })
     }
 
+    /// Each profile's history is a file of its own: what's visited in one isn't found in, or removed from, another.
+    @Test func twoProfilesHistoriesStayApart() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-history-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let work = UUID()
+        let first = HistoryStore(path: folder.appendingPathComponent("History.sqlite").path)
+        let second = HistoryStore(path: folder.appendingPathComponent("Work.sqlite").path, profile: work)
+        let shared = URL(string: "https://example.com/both")!
+        first.recordVisit(url: shared, title: "Both", at: Date(), count: 1)
+        first.recordVisit(url: URL(string: "https://example.com/home")!, title: "Home", at: Date(), count: 1)
+        second.recordVisit(url: shared, title: "Both", at: Date(), count: 1)
+        second.recordVisit(url: URL(string: "https://example.com/office")!, title: "Office", at: Date(), count: 1)
+
+        #expect(first.search("office").isEmpty && second.search("home").isEmpty)
+        #expect(first.completionSites(for: "example").count == 1)
+
+        let removal = second.remove([shared])
+        #expect(removal.profile == work && removal.visits.map(\.url) == [shared])
+        #expect(first.search("both").count == 1 && second.search("both").isEmpty)
+        second.restore(removal)
+        #expect(second.search("both").count == 1)
+    }
+
     /// The History page searches off the main thread: the same answer as the command bar's search, and a search the
     /// same tab typed over answers nothing, while another tab's goes on.
     @Test func searchesOffTheMainThreadAndTheNewestWins() async throws {

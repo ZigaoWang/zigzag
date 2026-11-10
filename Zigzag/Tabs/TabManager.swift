@@ -998,11 +998,12 @@ final class TabManager {
         return components.string ?? url.absoluteString
     }
 
-    /// An open tab (or live bookmark) already showing this address, preferring the current space.
+    /// An open tab (or live bookmark) already showing this address in the profile you're in, preferring the
+    /// current space. The same address open in another profile is another page: other sign-ins, other extensions.
     func existingTab(for url: URL) -> Tab? {
         let key = Self.normalize(url)
         let candidates = navigableTabs + allTabs
-        return candidates.first { tab in tab.url.map(Self.normalize) == key }
+        return candidates.first { tab in tab.url.map(Self.normalize) == key && (isPrivate || tab.homeProfile === profile) }
     }
 
     // MARK: Split view

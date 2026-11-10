@@ -50,13 +50,15 @@ struct CommandBarHistoryTests {
         let limit = CommandRanker.historyLimit(historyOnly: false)
         let clock = ContinuousClock()
 
+        // Taken before the clock starts: what's timed is the results, not the first use of the profile.
+        let profile = Profiles.shared.default
         var instant: [CommandResult] = []
         var onMain = Duration.zero
         let start = clock.now
         await Self.answer(lookup) {
             onMain = clock.measure {
                 let pages = lookup.pages(for: "zqfox", limit: limit)
-                instant = CommandRanker.results(for: "zqfox", manager: nil, suggestions: [], history: pages, editingCurrent: false, historyOnly: false)
+                instant = CommandRanker.results(for: "zqfox", manager: nil, profile: profile, suggestions: [], history: pages, editingCurrent: false, historyOnly: false)
             }
         }
         let read = clock.now - start
@@ -68,7 +70,7 @@ struct CommandBarHistoryTests {
         let pages = try #require(lookup.pages(for: "zqfox", limit: limit))
         let direct = clock.measure { #expect(pages.map(\.url) == store.search("zqfox", limit: limit).map(\.url)) }
         #expect(!pages.isEmpty)
-        let merged = CommandRanker.results(for: "zqfox", manager: nil, suggestions: [], history: pages, editingCurrent: false, historyOnly: false)
+        let merged = CommandRanker.results(for: "zqfox", manager: nil, profile: Profiles.shared.default, suggestions: [], history: pages, editingCurrent: false, historyOnly: false)
         #expect(merged.first?.kind == .search("zqfox"))
         #expect(merged.dropFirst().prefix(4).map(\.kind) == pages.prefix(4).map { .history($0.url) })
         print("History of \(count) pages: \(onMain) on the main thread, answer in \(read); reading it on the main thread takes \(direct)")
@@ -115,9 +117,9 @@ struct CommandBarHistoryTests {
 
     /// Searching history: no "Nothing in your history matches" while History is still being read.
     @Test func searchingHistorySaysNothingMatchesOnlyOnceItKnows() {
-        let reading = CommandRanker.results(for: "zqnothing", manager: nil, suggestions: [], history: nil, editingCurrent: false, historyOnly: true)
+        let reading = CommandRanker.results(for: "zqnothing", manager: nil, profile: Profiles.shared.default, suggestions: [], history: nil, editingCurrent: false, historyOnly: true)
         #expect(reading.isEmpty)
-        let read = CommandRanker.results(for: "zqnothing", manager: nil, suggestions: [], history: [], editingCurrent: false, historyOnly: true)
+        let read = CommandRanker.results(for: "zqnothing", manager: nil, profile: Profiles.shared.default, suggestions: [], history: [], editingCurrent: false, historyOnly: true)
         #expect(read.map(\.kind) == [.search("zqnothing")])
     }
 
