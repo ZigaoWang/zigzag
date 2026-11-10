@@ -1373,19 +1373,25 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Traffic lights
 
     private var trafficLightsPicture: NSImage?
-    /// Where the lights were last placed: docked in the sidebar or in the bar above the page, the same spot.
-    private var lightsWereDockedOrInBar = true
     /// Until this moment the sidebar is visually sliding, and the real traffic lights stay hidden.
     private var slideEndsAt = Date.distantPast
     private var isSliding: Bool { Date() < slideEndsAt }
+    /// Until this moment the sidebar slides under the bar above the page with the lights staying put: its toggle
+    /// stays put with them, in the bar, and the sidebar's own (riding with it) is out of sight.
+    private var toggleHeldUntil = Date.distantPast
+    private var holdsToggle: Bool { Date() < toggleHeldUntil }
 
     /// While the sidebar slides, the real buttons hide and their picture moves with the sidebar.
     /// Visibility is recomputed from the clock, so nothing can leave the buttons stuck hidden.
     private func sidebarSliding(_ duration: TimeInterval) {
         if !browserWindow.trafficLightsHidden, let image = browserWindow.trafficLightsImage() { trafficLightsPicture = image }
         // Docked and in the bar above the page, the lights are in the same spot: they stay put while the sidebar
-        // slides out from under them or back.
-        let stays = root.showsTopBar && !root.isSidebarFloatingVisible && lightsWereDockedOrInBar
+        // slides out from under them or back, and go straight back to it as the floating sidebar leaves.
+        let stays = root.showsTopBar && !root.isSidebarFloatingVisible
+        if stays, duration > 0 {
+            toggleHeldUntil = Date().addingTimeInterval(duration)
+            DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.01) { [weak self] in self?.layoutTrafficLights() }
+        }
         guard duration > 0, !stays else { slideEndsAt = .distantPast; layoutTrafficLights(); return }
         slideEndsAt = Date().addingTimeInterval(duration)
         layoutTrafficLights()
@@ -1411,11 +1417,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let y = (docked || inBar ? 0 : container.minY) + sidebar.trafficLightCenterY - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating || inBar, let image = window.trafficLightsImage() { trafficLightsPicture = image }
-        lightsWereDockedOrInBar = docked || inBar
         sidebar.trafficLightsWidth = fullScreen ? 0 : window.trafficLightsWidth
-        root.topBar.trafficLightsWidth = inBar && !fullScreen ? window.trafficLightsWidth : 0
-        // With the sidebar hidden its toggle goes with it, so the bar above the page has one of its own.
+        // The lights' room in the bar stays while the sidebar floats over it, so nothing in the bar moves as it does.
+        root.topBar.trafficLightsWidth = root.showsTopBar && !docked && !fullScreen ? window.trafficLightsWidth : 0
+        // With the sidebar hidden its toggle goes with it, so the bar above the page has one of its own. While the
+        // sidebar slides back in, the bar's stays where the sidebar's lands, and the sidebar's shows once it's there.
+        let held = root.showsTopBar && holdsToggle
         root.topBar.showsSidebarButton = root.showsTopBar && !docked
+        root.topBar.heldSidebarButtonX = held && docked ? sidebar.sidebarButton.frame.minX : nil
+        sidebar.sidebarButton.alphaValue = held ? 0 : 1
         sidebar.sidebarButton.toolTip = Shortcuts.tooltip(docked ? String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows.")
                                                                   : String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."),
                                                            for: #selector(toggleBrowserSidebar(_:)))
