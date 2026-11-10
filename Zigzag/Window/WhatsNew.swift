@@ -396,10 +396,10 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
         sheet.layer?.backgroundColor = sheet.cgColor(Tokens.Color.scrim)
         sheet.alphaValue = 0
         // It eases in and out even from a key, as a confirmation does (`ConfirmSheet`).
-        Tokens.Motion.animate(Tokens.Motion.feedback, evenFromKeyboard: true, { sheet.animator().alphaValue = 1 })
+        Tokens.Motion.animate(Tokens.Motion.entering, evenFromKeyboard: true, { sheet.animator().alphaValue = 1 })
         sheet.layoutSubtreeIfNeeded()
-        sheet.panel.growsFrom = CGPoint(x: 0.5, y: 0.5)
-        sheet.panel.present(always: true, arrival: .pop)
+        sheet.panel.growsFrom = Tokens.Motion.sheetOrigin
+        sheet.panel.present(arrival: .pop)
         sheet.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak sheet] event in
             guard let sheet, event.window === host.window else { return event }
             return sheet.handle(event)
@@ -456,8 +456,8 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
     private func close() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
-        panel.dismiss(always: true)
-        Tokens.Motion.animate(Tokens.Motion.feedback, evenFromKeyboard: true, { self.animator().alphaValue = 0 }, completion: { self.removeFromSuperview() })
+        panel.dismiss()
+        Tokens.Motion.animate(Tokens.Motion.leaving, evenFromKeyboard: true, { self.animator().alphaValue = 0 }, completion: { self.removeFromSuperview() })
     }
 
     /// Gone, closed or with its window: what was waiting goes ahead.
@@ -593,7 +593,7 @@ final class WhatsNewOffer: FloatingPanelView {
         offer.slidesFromTop = true
         controller.root.overlay.addSubview(offer)
         offer.place()
-        offer.present(always: true)
+        offer.present()
         offer.shownAt = Date()
         // The window resizing, the sidebar coming or going, or a split: it stays at the top of the page.
         for card in controller.promptPageViews {
@@ -675,7 +675,7 @@ final class WhatsNewOffer: FloatingPanelView {
         frameObservers = []
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
-        dismiss(always: true)
+        dismiss()
     }
 
     private func layoutContent() {

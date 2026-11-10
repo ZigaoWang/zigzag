@@ -164,7 +164,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         let x = min(max(fieldInOverlay.minX, Tokens.Space.x2), overlay.bounds.maxX - width - Tokens.Space.x2)
         menu.frame = NSRect(x: x, y: y, width: width, height: height)
         overlay.addSubview(menu)
-        menu.present(always: true)
+        menu.present()
         self.menu = menu
         target = (webView, frame, origin)
         setSuggesting(true)
@@ -199,7 +199,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         setSuggesting(false)
         self.menu = nil
         target = nil
-        menu.dismiss(always: true)
+        menu.dismiss()
     }
 
     /// A page going away (its tab closed or put to sleep, its window closed): the menu lets go of it, so nothing

@@ -92,6 +92,9 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         super.init()
         field.delegate = self
         panel.radius = Tokens.Metric.findBarHeight / 2
+        // It hangs from the top of the page it searches: ⌘F slides it those few points down from there, and it goes
+        // back up as it leaves, however fast you press it.
+        panel.attachedEdge = .minY
         glass.contentTintColor = Tokens.Color.textTertiary
         glass.imageScaling = .scaleNone
         panel.addSubview(glass)
@@ -148,14 +151,15 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         if isVisible, field.currentEditor() != nil { hide() } else { show() }
     }
 
-    func show(query newQuery: String? = nil, focus: Bool = true) {
+    /// `animated` off: it comes back with the tab it belongs to, as part of that page, not as something new.
+    func show(query newQuery: String? = nil, focus: Bool = true, animated: Bool = true) {
         guard let window else { return }
         if let newQuery { query = newQuery; field.stringValue = newQuery }
         if !isVisible {
             isVisible = true
             panel.frame = frame
             window.root.overlay.addSubview(panel)
-            panel.present()
+            panel.present(arrival: animated ? .pop : .instant)
             watchEscape()
         } else {
             panel.frame = frame
@@ -194,7 +198,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     func pageChanged() {
         let current = window?.selectedWebView
         guard isVisible else {
-            if let current, let saved = remembered.object(forKey: current) as String? { show(query: saved, focus: false) }
+            if let current, let saved = remembered.object(forKey: current) as String? { show(query: saved, focus: false, animated: false) }
             return
         }
         guard current !== searched else { return }
@@ -202,8 +206,8 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         let stillShown = searched.map { $0.window != nil && !$0.isHiddenOrHasHiddenAncestor } ?? false
         if !stillShown {
             if let searched, !query.isEmpty { remembered.setObject(query as NSString, forKey: searched) }
-            hide(keepingMemory: true, focusPage: false)
-            if let current, let saved = remembered.object(forKey: current) as String? { show(query: saved, focus: false) }
+            hide(keepingMemory: true, focusPage: false, animated: false)
+            if let current, let saved = remembered.object(forKey: current) as String? { show(query: saved, focus: false, animated: false) }
             return
         }
         clearHighlights()
@@ -214,14 +218,14 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
 
     func hide() { hide(keepingMemory: false, focusPage: true) }
 
-    private func hide(keepingMemory: Bool, focusPage: Bool) {
+    private func hide(keepingMemory: Bool, focusPage: Bool, animated: Bool = true) {
         guard isVisible else { return }
         isVisible = false
         if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
         escapeMonitor = nil
         // Closed on purpose: that tab's search is done.
         if !keepingMemory, let webView = searched ?? window?.selectedWebView { remembered.removeObject(forKey: webView) }
-        panel.dismiss()
+        panel.dismiss(instantly: !animated)
         clearHighlights()
         if focusPage, let webView = window?.selectedWebView { window?.window?.makeFirstResponder(webView) }
     }
@@ -475,24 +479,24 @@ class FloatingPanelView: NSView {
         }
     }
 
-    /// How a panel arrives. Where it lives decides how it moves:
-    /// - opened by a key, or used constantly: it's simply there (`.instant`, and any arrival during a key press);
-    /// - opened from a button: it grows out of that button (`growsFrom`), from 97%, eased out in 180ms (`.pop`, `.fade`);
-    ///   `.burst` starts from 94%, for a panel something just landed in (a download hitting its button);
-    /// - living at the page's top edge (`slidesFromTop`): it slides down from above the window and leaves back up.
-    enum Arrival { case drop, fade, instant, zoom, pop, burst }
+    /// How a panel arrives. Where it lives decides how it moves (`Tokens.Motion.present`), whether a key or the
+    /// pointer asked for it:
+    /// - opened from a button: it grows out of that button (`growsFrom`), from 96%, eased out in 180ms (`.pop`);
+    ///   `.burst` starts a touch smaller, for a panel something just landed in (a download hitting its button);
+    /// - attached to an edge (`attachedEdge`, the find bar): it slides those few points in from it;
+    /// - living at the page's top edge (`slidesFromTop`): it comes down from above the window and leaves back up;
+    /// - `.fade`: it fades where it is, standing in for what's under it (the address being edited);
+    /// - `.instant`: it's simply there, for what you summon to type in or flick through many times an hour (the
+    ///   command bar, the switchers), and for anything shown while ⌘T is handled.
+    enum Arrival { case fade, instant, pop, burst }
 
     /// Where a panel grows from, in its own bounds from the top-left: (0, 0) its top-left corner, (0.5, 0) its top
     /// middle. Set it to the side nearest what opened it.
     var growsFrom = CGPoint(x: 0.5, y: 0)
 
-    /// Scaled by `k` around `growsFrom`, in layer coordinates (a view layer scales from its own corner).
-    private func scaled(_ k: CGFloat) -> CATransform3D {
-        let w = bounds.width, h = bounds.height
-        let px = growsFrom.x * w
-        let py = (layer?.isGeometryFlipped == true || isFlipped) ? growsFrom.y * h : (1 - growsFrom.y) * h
-        return CATransform3DConcat(CATransform3DMakeScale(k, k, 1), CATransform3DMakeTranslation(px * (1 - k), py * (1 - k), 0))
-    }
+    /// For a bar that hangs from an edge rather than a button (the find bar, from the page's top): it slides in from
+    /// that edge and back toward it. `.minY` is the top as you look at it.
+    var attachedEdge: NSRectEdge?
 
     private func recede(_ on: Bool) {
         for view in recedes {
@@ -503,7 +507,7 @@ class FloatingPanelView: NSView {
             } ?? false
             if !on && held { continue }
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = on ? Tokens.Motion.enter : Tokens.Motion.highlightGlide
+                context.duration = (on ? Tokens.Motion.enter : Tokens.Motion.exit) * Tokens.Motion.debugSlowdown
                 context.timingFunction = Tokens.Motion.easeOut
                 view.animator().alphaValue = on ? Tokens.Opacity.receded : 1
             }
@@ -515,151 +519,79 @@ class FloatingPanelView: NSView {
         super.viewWillMove(toSuperview: newSuperview)
     }
 
-    /// For things that live at the top edge of the page (toasts, offers, prompts): they slide down from above the
-    /// window's edge into place and leave back up the same way, instead of growing out of nothing. Where a thing
-    /// lives decides how it moves: from its edge, or out of the button that opened it (`growsFrom`).
+    /// For things that live at the top edge of the page (offers, prompts): they slide down from above the window's
+    /// edge into place and leave back up the same way, instead of growing out of nothing. Where a thing lives decides
+    /// how it moves: from its edge, or out of the button that opened it (`growsFrom`).
     var slidesFromTop = false
     /// Above the window's top edge: where a top-edge panel comes from and goes back to.
     private var offstage: CGFloat { frame.maxY + 12 }
+
+    /// Where it comes from and goes back to.
+    private func origin(_ arrival: Arrival) -> Tokens.Motion.Origin {
+        if slidesFromTop { return .offstage(.minY, offstage) }
+        if let attachedEdge { return .edge(attachedEdge) }
+        // What came without moving leaves without moving.
+        return arrival == .fade || arrival == .instant ? .inPlace : .point(growsFrom)
+    }
+
+    /// How it last arrived, so it leaves back the same way.
+    private var arrival: Arrival = .pop
 
     /// A panel you open in Zigzag (site controls, a menu, Downloads) takes the place of an extension's popup, which
     /// would otherwise stay open beside it. Notes and toasts leave it be.
     var replacesExtensionPopup: Bool { false }
 
-    func present(always: Bool = false, arrival: Arrival = .pop) {
+    func present(arrival: Arrival = .pop) {
         if replacesExtensionPopup, #available(macOS 15.4, *) { ExtensionHost.shared.closeActionPopup() }
         layoutSubtreeIfNeeded()
         recede(true)
-        // Shown again while it was leaving: everything the exit left behind goes, so it never stays shrunk or
-        // off-screen. The shrink fills forwards, so it has to be taken off by hand.
-        layer?.removeAnimation(forKey: "dismiss")
-        layer?.removeAnimation(forKey: "dismiss.shrink")
-        Tokens.Motion.withoutAnimation { layer?.opacity = 1; layer?.transform = CATransform3DIdentity }
         alphaValue = 1
-        // A dismiss a moment ago left the layer at 0 (alphaValue alone doesn't reset it when it's already 1), and its
-        // completion would then take the panel away: shown again, it's fully back.
-        layer?.opacity = 1
         dismissing = false
-        // Opened from the keyboard it's simply there: something you summon with a key, often many times a day, should
-        // never make you wait for it (https://emilkowal.ski/ui/you-dont-need-animations). Opened with the mouse, or by
-        // something happening (`always`: a download landing, a prompt), it arrives with a short movement.
-        let instant = arrival == .instant || (Tokens.Motion.isFromKey && !always)
-        guard let layer, !instant else { return }
-        if slidesFromTop, !Tokens.Motion.reduceMotion {
-            let drop = CABasicAnimation(keyPath: "transform")
-            drop.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(0, -offstage, 0))
-            drop.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-            drop.duration = Tokens.Motion.zoom
-            drop.timingFunction = Tokens.Motion.easeOut
-            drop.fillMode = .backwards
-            let fade = CABasicAnimation(keyPath: "opacity")
-            fade.fromValue = 0
-            fade.toValue = 1
-            fade.duration = Tokens.Motion.exit
-            layer.add(drop, forKey: "present.grow")
-            layer.add(fade, forKey: "present")
-            return
-        }
-        if (arrival == .fade || arrival == .pop || arrival == .burst), !Tokens.Motion.reduceMotion {
-            // Grows out of what opened it, from a little smaller (never from nothing), eased out in under 200ms. A
-            // panel a download just landed in starts a touch smaller, so you see it come from the button.
-            let fade = CABasicAnimation(keyPath: "opacity")
-            fade.fromValue = 0
-            fade.toValue = 1
-            fade.duration = Tokens.Motion.highlightGlide
-            fade.timingFunction = Tokens.Motion.easeOut
-            let grow = CABasicAnimation(keyPath: "transform")
-            grow.fromValue = NSValue(caTransform3D: scaled(arrival == .burst ? 0.94 : 0.97))
-            grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-            grow.duration = Tokens.Motion.enter
-            grow.timingFunction = Tokens.Motion.easeOut
-            layer.add(fade, forKey: "present")
-            layer.add(grow, forKey: "present.grow")
-            return
-        }
-        // With Reduce Motion on, panels only fade in; nothing moves.
-        if arrival == .fade || arrival == .pop || arrival == .burst || Tokens.Motion.reduceMotion {
-            let fade = CABasicAnimation(keyPath: "opacity")
-            fade.fromValue = 0
-            fade.toValue = 1
-            fade.duration = Tokens.Motion.quick
-            fade.timingFunction = Tokens.Motion.easeOut
-            layer.add(fade, forKey: "present")
-            return
-        }
-        let curve = Tokens.Motion.easeOut
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 0
-        fade.toValue = 1
-        fade.duration = Tokens.Motion.highlightGlide
-        if arrival == .zoom {
-            // Grows a touch from its own middle, as Spotlight does: layers scale from their corner, so it's
-            // shifted by half the shrink to stay centered.
-            let k: CGFloat = 0.96, size = bounds.size
-            let small = CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
-                                            CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0))
-            let grow = CABasicAnimation(keyPath: "transform")
-            grow.fromValue = NSValue(caTransform3D: small)
-            grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-            let group = CAAnimationGroup()
-            group.animations = [fade, grow]
-            group.duration = Tokens.Motion.standard
-            group.timingFunction = curve
-            layer.add(group, forKey: "present")
-            return
-        }
-        let drop = CABasicAnimation(keyPath: "transform.translation.y")
-        drop.fromValue = isFlippedInSuperview ? -4 : 4
-        drop.toValue = 0
-        drop.duration = Tokens.Motion.standard
-        let group = CAAnimationGroup()
-        group.animations = [fade, drop]
-        group.duration = Tokens.Motion.standard
-        group.timingFunction = curve
-        layer.add(group, forKey: "present")
+        self.arrival = arrival
+        // Something you summon to type in, many times a day, should never make you wait for it
+        // (https://emilkowal.ski/ui/you-dont-need-animations): it's simply there. Anything else arrives with a short
+        // movement out of where it came from, and shown again while it was leaving, turns around from where it is.
+        guard arrival != .instant, !Tokens.Motion.isKeyboardDriven else { Tokens.Motion.settle(self); return }
+        let turning = layer?.animation(forKey: "presence.opacity") != nil
+        Tokens.Motion.present(self, from: origin(arrival), entering: true)
+        guard arrival == .burst, !turning, !Tokens.Motion.reduceMotion, let layer else { return }
+        // A download just landed in it: a touch smaller than a menu, so you see it come out of the button.
+        let grow = CABasicAnimation(keyPath: "transform")
+        grow.fromValue = NSValue(caTransform3D: Tokens.Motion.scale(0.94, of: layer, around: growsFrom, flipped: superview?.isFlipped ?? true))
+        grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        grow.duration = Tokens.Motion.enter * Tokens.Motion.debugSlowdown
+        grow.timingFunction = Tokens.Motion.easeOut
+        layer.add(grow, forKey: "presence.transform")
     }
 
-    private var isFlippedInSuperview: Bool { superview?.isFlipped ?? true }
-
     private(set) var dismissing = false
+    /// Counts the times it's been sent off, so only the latest going takes it away.
+    private var exits = 0
 
-    /// The one way a panel leaves: a quick fade as it eases a touch smaller, back toward where it came from.
-    func dismiss(always: Bool = false, instantly: Bool = false, completion: (() -> Void)? = nil) {
-        // Esc or a shortcut: gone at once, for the same reason it arrives at once.
-        let instantly = instantly || (Tokens.Motion.isFromKey && !always)
-        guard let layer, !instantly else { recede(false); removeFromSuperview(); completion?(); return }
-        layer.removeAnimation(forKey: "present")
-        layer.removeAnimation(forKey: "present.grow")
+    /// The one way a panel leaves: back the way it came, quicker and quieter, from wherever it is on screen.
+    /// `instantly`: gone at once, for what arrived at once (the command bar from a key, the switchers).
+    func dismiss(instantly: Bool = false, completion: (() -> Void)? = nil) {
+        guard !instantly, !Tokens.Motion.isKeyboardDriven, superview != nil else {
+            dismissing = false
+            recede(false)
+            removeFromSuperview()
+            Tokens.Motion.settle(self)
+            completion?()
+            return
+        }
         dismissing = true
         recede(false)
-        if !Tokens.Motion.reduceMotion {
-            // Back the way it came: up past the top edge for a top-edge panel, a touch smaller toward its origin else.
-            let shrink = CABasicAnimation(keyPath: "transform")
-            shrink.fromValue = NSValue(caTransform3D: layer.presentation()?.transform ?? CATransform3DIdentity)
-            shrink.toValue = NSValue(caTransform3D: slidesFromTop ? CATransform3DMakeTranslation(0, -offstage, 0) : scaled(0.98))
-            shrink.duration = slidesFromTop ? 0.2 : 0.14
-            shrink.timingFunction = Tokens.Motion.easeOut
-            shrink.fillMode = .forwards
-            shrink.isRemovedOnCompletion = false
-            layer.add(shrink, forKey: "dismiss.shrink")
-        }
-        CATransaction.begin()
-        CATransaction.setCompletionBlock { [weak self] in
-            // Shown again while fading (a repeat toast): it stays.
-            guard let self, self.layer?.opacity == 0 else { completion?(); return }
+        exits += 1
+        let exit = exits
+        Tokens.Motion.present(self, from: origin(arrival), entering: false) { [weak self] in
+            // Shown again while leaving (a repeat toast, ⌘F twice), or sent off again, which finishes the going: it
+            // stays for now.
+            guard let self, self.dismissing, self.exits == exit else { completion?(); return }
+            self.dismissing = false
             self.removeFromSuperview()
-            self.layer?.removeAnimation(forKey: "dismiss.shrink")
-            self.layer?.opacity = 1
+            Tokens.Motion.settle(self)
             completion?()
         }
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = layer.presentation()?.opacity ?? 1
-        fade.toValue = 0
-        fade.duration = slidesFromTop ? 0.2 : 0.12
-        fade.timingFunction = Tokens.Motion.easeOut
-        layer.add(fade, forKey: "dismiss")
-        layer.opacity = 0
-        CATransaction.commit()
     }
 }
 
@@ -776,7 +708,7 @@ enum Toast {
         let state = state(for: controller.root.overlay)
         guard let toast = state.toast, toast.superview === controller.root.overlay else { return }
         state.hideWork?.cancel()
-        toast.dismiss(always: true)
+        toast.dismiss()
         state.toast = nil
     }
 
@@ -853,24 +785,25 @@ enum Toast {
             toast.actionButton.onClick = { [weak toast] _ in
                 guard Toast.acceptsAction(shownAt: shownAt) else { return }
                 action.run()
-                toast?.dismiss(always: true)
+                toast?.dismiss()
             }
         }
         toast.closeButton.isHidden = !closes
         toast.closeButton.onClick = { [weak toast] _ in
             state.hideWork?.cancel()
-            toast?.dismiss(always: true)
+            toast?.dismiss()
             state.toast = nil
         }
         place(toast, in: area)
         if isNew {
             host.addSubview(toast)
-            // Springs down out of the top of the page, as a notice does, and eases back up when it goes.
-            toast.slidesFromTop = true
-            toast.present(always: true, arrival: .pop)
+            // A confirmation of something you just did, often from a key: it drops the few points from the top of the
+            // page it sits under, and lifts back as it goes. Quieter than a notice coming in from outside the window.
+            toast.attachedEdge = .minY
+            toast.present()
         } else if toast.dismissing {
-            // Caught on its way out: it comes back rather than finishing the exit and vanishing.
-            toast.present(always: true, arrival: .instant)
+            // Caught on its way out: it turns around from where it is rather than finishing the exit and vanishing.
+            toast.present()
         }
         // A repeat that's still up (zoom 90% → 80%) only changes the number: it comes from a key, so nothing moves.
         state.toast = toast
@@ -884,7 +817,7 @@ enum Toast {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak toast] in hideWhenClear(toast) }
                 return
             }
-            toast.dismiss(always: true)
+            toast.dismiss()
         }
         // A busy toast stays until what replaces it.
         guard duration < .greatestFiniteMagnitude else { return }

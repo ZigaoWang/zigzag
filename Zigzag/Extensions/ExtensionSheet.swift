@@ -122,7 +122,7 @@ final class ExtensionSheet: FloatingPanelView {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         if Self.current === self { Self.current = nil }
-        dismiss(always: true)
+        dismiss()
         confirmed ? onConfirm() : onCancel()
         onConfirm = {}
         onCancel = {}

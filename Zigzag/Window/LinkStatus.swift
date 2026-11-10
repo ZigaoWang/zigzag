@@ -41,7 +41,8 @@ final class LinkStatusController {
         if !visible {
             visible = true
             overlay.addSubview(pill)
-            pill.alphaValue = 1
+            // Pointing from link to link many times a minute: it's simply there, and caught while fading, it's back.
+            pill.present(arrival: .instant)
         }
     }
 

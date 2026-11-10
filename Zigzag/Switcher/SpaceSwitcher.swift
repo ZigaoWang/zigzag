@@ -239,7 +239,8 @@ final class SpaceSwitcher {
         let height = min(inset * 2 + CGFloat(rows.count) * rowHeight, area.height - Tokens.Space.x8)
         panel.frame = NSRect(x: round(area.midX - width / 2), y: round(area.midY - height / 2), width: width, height: height)
         controller.root.overlay.addSubview(panel)
-        panel.present()
+        // Summoned and stepped through with keys: simply there.
+        panel.present(arrival: .instant)
         updateSelection()
     }
 

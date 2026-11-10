@@ -192,7 +192,7 @@ final class PageDialogSheet: NSView {
         let x = min(max(anchor.minX, Tokens.Space.x2), bounds.maxX - width - Tokens.Space.x2)
         menu.frame = NSRect(x: x, y: max(Tokens.Space.x2, y), width: width, height: height)
         addSubview(menu)
-        menu.present(always: true)
+        menu.present()
         savedMenu = menu
     }
 
@@ -257,7 +257,7 @@ final class PageDialogSheet: NSView {
             return
         }
         needsLayout = true
-        panel.present(always: true)
+        panel.present()
         // The card puts the keyboard on the page as the tab comes in front; the dialog's field takes it after that.
         DispatchQueue.main.async { [weak self] in
             guard let self, self.window === window else { return }

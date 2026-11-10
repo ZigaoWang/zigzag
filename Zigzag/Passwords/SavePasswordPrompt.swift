@@ -175,7 +175,7 @@ final class SavePasswordPrompt: FloatingPanelView {
                 if self.isHidden {
                     self.place(in: area)
                     self.isHidden = false
-                    self.present(always: true)
+                    self.present()
                     self.scheduleHide()
                 } else {
                     self.reposition()
@@ -225,7 +225,7 @@ final class SavePasswordPrompt: FloatingPanelView {
         let card = controller.root.cardFrame
         prompt.frame.origin = NSPoint(x: card.minX + Tokens.Space.x3, y: card.minY + Tokens.Space.x3)
         controller.root.overlay.addSubview(prompt)
-        prompt.present(always: true)
+        prompt.present()
         current = prompt
     }
 
@@ -278,7 +278,7 @@ final class SavePasswordPrompt: FloatingPanelView {
         self.finish = { _ in }
         finish(saved)
         // Out of sight already (its tab is behind another): simply gone, with nothing to watch leave.
-        if isHidden { removeFromSuperview() } else { dismiss(always: true) }
+        if isHidden { removeFromSuperview() } else { dismiss() }
     }
 
     private func layoutContent() {

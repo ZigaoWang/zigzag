@@ -453,7 +453,8 @@ final class TabSwitcher {
         let height = pad * 2 + CGFloat(rows) * thumbHeight + CGFloat(rows - 1) * gap
         panel.frame = NSRect(x: round(area.midX - width / 2), y: round(area.midY - height / 2), width: width, height: height)
         controller.root.overlay.addSubview(panel)
-        panel.present()
+        // Flicked through with ⌃Tab many times an hour: simply there.
+        panel.present(arrival: .instant)
         updateSelection()
     }
 

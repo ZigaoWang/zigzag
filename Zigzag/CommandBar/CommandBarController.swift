@@ -313,9 +313,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         refreshResults(animated: false)
         panel.frame = panelFrame()
         // Arrives once; asked again while open (⌘T twice), it simply stays. From a key (⌘T, ⌘L, the thing you do
-        // most) it's simply there (`present` knows); clicked open, it grows out of the page's top, or fades in place
-        // over the address it stands in for.
-        if opening { panel.present(arrival: isAnchored ? .fade : .pop) }
+        // most) it's simply there; clicked open, it grows out of the page's top, or fades in place over the address
+        // it stands in for.
+        if opening { panel.present(arrival: Tokens.Motion.isFromKey ? .instant : isAnchored ? .fade : .pop) }
         host.window?.makeFirstResponder(field)
         applySpaceTheme()
         field.currentEditor()?.selectAll(nil)
@@ -334,7 +334,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         typingMonitor = nil
         fetcher.cancel()
         scrim.hide()
-        panel.dismiss(instantly: isAnchored) { [weak self, weak host] in
+        // Esc or Return: gone at once, as it came.
+        panel.dismiss(instantly: isAnchored || Tokens.Motion.isFromKey) { [weak self, weak host] in
             // Shown again while it was leaving: it's still here.
             guard self?.isVisible == false else { return }
             host?.commandBarDidHide()
@@ -1036,8 +1037,10 @@ final class ScrimView: ColorView {
         Tokens.Motion.animate(Tokens.Motion.feedback) { self.animator().alphaValue = 1 }
     }
 
-    func hide() {
-        Tokens.Motion.animate(Tokens.Motion.feedback, { self.animator().alphaValue = 0 }, completion: {
+    /// `evenFromKeyboard`: it fades with something that leaves even from a key (a peek), rather than going at once
+    /// with the command bar.
+    func hide(evenFromKeyboard: Bool = false) {
+        Tokens.Motion.animate(Tokens.Motion.leaving, evenFromKeyboard: evenFromKeyboard, { self.animator().alphaValue = 0 }, completion: {
             if self.alphaValue == 0 { self.removeFromSuperview() }
         })
     }
