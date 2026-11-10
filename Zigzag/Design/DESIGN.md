@@ -286,6 +286,16 @@ something came from, answers at once, and can be interrupted.
   (`Color.surface` at night) and Auto, from `Reader.Palette`. Its one control, Aa, sits on the article's paper at
   the top right, there at the top and when you scroll back up, away while you read on; its panel holds size, face,
   width and colors. Reader itself comes and goes with the address's Reader button, ⌘⇧R or Esc.
+- **Mini player** (`MiniPlayer`): leave a tab while its video plays and the video follows you in a card over the page
+  area: the tab's own live page moved in and scaled so only its video shows, never laid out again. A third of the
+  page area wide (240 to 480), the video's shape, never over half its height; `Radius.panel`, the floating layer's
+  hairline and one shadow, 12pt into a corner of the page area, never over the sidebar. It grows out of where the
+  video was (`Motion.zoom`; a fade with Reduce Motion) and fades as it closes. Pointing at it brings its controls
+  in a quick fade over an even dim, deeper at the top and bottom: back to the tab and the site's name at the top
+  left, close at the top right, back 15 seconds, play or pause and forward 15 seconds in the middle, a thin time line
+  to press or drag along the bottom (no skipping or time line for a live stream). They go 2.5 seconds after the
+  pointer stops. Drag it anywhere and it settles in the nearest corner, which it keeps; double-click it to go back
+  to the tab.
 - **Empty states** (`Tokens.EmptyState`, the same in HTML through `PageStyle`): the wordmark 120pt wide at 8%, 16pt
   to a quiet line no wider than 360, 24pt to an optional action. History, Passwords and the error page share it.
 - **Built-in pages** (History, Settings, Passwords): one plain `Color.surface` (the column of places in Settings and
