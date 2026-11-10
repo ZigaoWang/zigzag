@@ -357,13 +357,17 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         let open = BrowserWindowController.undoTarget?.tabManager.tabs(in: space.id).count ?? 0
         let pinnedTabs = String(localized: "\(pinned) pinned tabs", comment: "Under a space's name in Settings › Spaces.")
         let openTabs = String(localized: "\(open) open tabs", comment: "Under a space's name in Settings › Spaces.")
+        let holds: String
         switch (pinned, open) {
-        case (0, 0): return String(localized: "Empty", comment: "Under a space's name in Settings › Spaces: it has no tabs.")
-        case (_, 0): return pinnedTabs
-        case (0, _): return openTabs
-        default: return String(localized: "\(pinnedTabs) and \(openTabs)",
-                               comment: "Under a space's name in Settings › Spaces: its pinned tabs, then its open tabs, like “3 pinned tabs and 2 open tabs”.")
+        case (0, 0): holds = String(localized: "Empty", comment: "Under a space's name in Settings › Spaces: it has no tabs.")
+        case (_, 0): holds = pinnedTabs
+        case (0, _): holds = openTabs
+        default: holds = String(localized: "\(pinnedTabs) and \(openTabs)",
+                                comment: "Under a space's name in Settings › Spaces: its pinned tabs, then its open tabs, like “3 pinned tabs and 2 open tabs”.")
         }
+        // Which profile it's on, once there's more than one to be on.
+        guard Library.shared.hasManyProfiles, let profile = Library.shared.directory.profile(Library.shared.profileID(ofSpace: space.id)) else { return holds }
+        return String(localized: "\(holds), in \(profile.displayName)", comment: "Under a space's name in Settings › Spaces, with more than one profile: what the space holds, then the profile it's on, like “3 open tabs, in Work”.")
     }
 
     private func actionsMenu() -> NSMenu {
@@ -546,6 +550,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let alwaysGroup = FormGroup()
     private let extensionsGroup = FormGroup()
     private let developerGroup = FormGroup()
+    /// Extensions another profile has and this one doesn't, each with a way to add it here.
+    private let otherProfilesGroup = FormGroup()
+    private var otherProfilesTask: Task<Void, Never>?
     private var shortcutGroups: [(String, FormGroup)] = []
 
     private let engine = DropdownButton()
@@ -615,6 +622,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             guard let self, self.window != nil else { return }
             self.reloadSpaces()
             self.reloadProfiles()
+            self.reloadExtensions()
         }
         // An extension's engine chosen from its toast, or gone with it, while Settings is open.
         engineToken = ExtensionSearchProvider.changed.observe { [weak self] in
@@ -787,6 +795,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Spaces
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
         addProfileButton.onClick = { [weak self] _ in if let self { ProfileSheets.new(in: self) } }
+        profilePicker.onSelect = { [weak self] index in self?.choseProfile(at: index) }
 
         // Search
         refreshEngines()
@@ -1007,6 +1016,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
     /// Opens a pane.
     func show(_ pane: SettingsPane) {
+        // A profile chosen in one section isn't carried to the next: each starts on the window's own.
+        if pane != self.pane, scope != nil {
+            scope = nil
+            reloadExtensions()
+            reloadPrivacy()
+        }
         self.pane = pane
         settingSearch.stringValue = ""
         items.forEach { $0.isSelected = $0.pane == pane }
@@ -1054,8 +1069,33 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         return image
     }
 
-    /// The profile whose extensions it shows: the one of the window it's in.
-    private var profile: Profile { browser?.tabManager.profile ?? Profiles.shared.default }
+    /// The profile chosen from the menu beside a heading, until you leave the section. Nil: the window's own.
+    private var scope: UUID?
+    /// The profile whose extensions and website data it shows: the one chosen here, else the one of the space the
+    /// window is on.
+    private var profile: Profile {
+        if let scope, Library.shared.directory.profile(scope) != nil { return Profiles.shared.profile(scope) }
+        return browser?.tabManager.profile ?? Profiles.shared.default
+    }
+    /// Chooses that profile, in the sections that are about one profile. Only there once there's more than one.
+    private let profilePicker = DropdownButton()
+
+    private func refreshProfilePicker() {
+        let profiles = Library.shared.profiles
+        profilePicker.options = profiles.map { DropdownButton.Option(title: $0.displayName, image: ProfileSheets.tile(for: $0)) }
+        profilePicker.selectedIndex = profiles.firstIndex { $0.id == profile.id } ?? 0
+        profilePicker.isHidden = profiles.count < 2
+        profilePicker.setAccessibilityLabel(String(localized: "Profile", comment: "Label in a space's editor, before the choice of the profile the space is on."))
+    }
+
+    private func choseProfile(at index: Int) {
+        let profiles = Library.shared.profiles
+        guard profiles.indices.contains(index) else { return }
+        scope = profiles[index].id
+        reloadExtensions()
+        reloadPrivacy()
+        layoutDocument()
+    }
 
     /// The browser window it's in, for what it opens there (History, the Chrome Web Store).
     private var browser: BrowserWindowController? {
@@ -1081,6 +1121,26 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                         control: get))
         }
         for (id, ext) in installed { extensionsGroup.add(extensionRow(id: id, ext: ext)) }
+        // What your other profiles have that this one doesn't, to add without another trip to the store. Read from
+        // each package, not from the other profile's running extensions: looking here starts none of them.
+        otherProfilesGroup.removeAllRows()
+        let here = profile, has = Set(here.installs.installedIDs)
+        let offered = Array(Set(Profiles.shared.all.filter { $0 !== here }.flatMap { $0.installs.installedIDs }).subtracting(has)).sorted()
+        otherProfilesTask?.cancel()
+        otherProfilesTask = offered.isEmpty ? nil : Task { @MainActor [weak self] in
+            var rows: [FormRow] = []
+            for id in offered {
+                guard let folder = ExtensionStore.packageDirectory(for: id), let ext = try? await WKWebExtension(resourceBaseURL: folder) else { continue }
+                let add = PillButton(title: String(localized: "Add", comment: "Button on an extension another profile has, in Settings › Extensions: adds it to the profile shown."))
+                add.onClick = { [weak self] _ in Task { await ExtensionStore.add(id, to: here); self?.reloadExtensions() } }
+                rows.append(FormRow(title: ext.displayName ?? id,
+                                    detail: String(localized: "Starts fresh here: nothing it stored in another profile comes along.", comment: "Under an extension another profile has, in Settings › Extensions."),
+                                    icon: ext.icon(for: NSSize(width: 24, height: 24)), control: add))
+            }
+            guard let self, !Task.isCancelled else { return }
+            rows.forEach(self.otherProfilesGroup.add)
+            if self.pane == .extensions || self.isSearching { self.layoutDocument() }
+        }
         let developer = Toggle(isOn: ExtensionStore.developerMode)
         developer.onChange = { [weak self] on in
             ExtensionStore.developerMode = on
@@ -1363,6 +1423,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private static var alwaysTranslateHeading: String { String(localized: "Always Translate", comment: "A heading in Settings › Translation.") }
     private static var fillingHeading: String { String(localized: "AutoFill", comment: "A heading in Settings › Passwords: when Zigzag offers to save and fill passwords and forms.") }
     private static var installedHeading: String { String(localized: "Installed", comment: "A heading in Settings › Extensions: the extensions you have.") }
+    private static var otherProfilesHeading: String { String(localized: "In Other Profiles", comment: "A heading in Settings › Extensions: extensions your other profiles have and the one shown doesn't.") }
     /// What a button says for a moment once it has cleared something.
     private static var cleared: String { String(localized: "Cleared", comment: "Shown on a Clear button in Settings › Privacy for a moment after it clears.") }
 
@@ -1398,7 +1459,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .passwords: [(nil, passwordsWindowGroup), (Self.fillingHeading, passwordsGroup)]
         case .privacy: [(nil, blockingGroup), (Self.sitesHeading, sitesGroup), (Self.browsingDataHeading, privacyGroup), (Self.siteDataHeading, siteDataGroup)]
         case .translation: [(nil, translationGroup), (Self.alwaysTranslateHeading, alwaysGroup)]
-        case .extensions: [(Self.installedHeading, extensionsGroup), (nil, developerGroup)]
+        case .extensions: [(Self.installedHeading, extensionsGroup), (Self.otherProfilesHeading, otherProfilesGroup), (nil, developerGroup)]
         case .shortcuts: shortcutGroups.map { ($0.0, $0.1) }
         }
     }
@@ -1496,7 +1557,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .privacy:
             section(nil, blockingGroup)
             section(Self.sitesHeading, sitesGroup, accessory: sitesReset)
-            section(Self.browsingDataHeading, privacyGroup)
+            refreshProfilePicker()
+            section(Self.browsingDataHeading, privacyGroup, accessory: profilePicker.isHidden ? nil : profilePicker)
             section(Self.siteDataHeading, siteDataGroup)
         case .translation:
             section(nil, translationGroup)
@@ -1504,9 +1566,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .extensions:
             // With nothing installed, the empty row already offers Get Extensions; once said is enough.
             getExtensionsButton.isHidden = !hasExtensions
-            let buttons = NSStackView(views: [loadUnpackedButton, getExtensionsButton])
+            refreshProfilePicker()
+            let buttons = NSStackView(views: [profilePicker, loadUnpackedButton, getExtensionsButton])
             buttons.spacing = Tokens.Space.x2
             section(Self.installedHeading, extensionsGroup, accessory: buttons)
+            if !otherProfilesGroup.rows.isEmpty { section(Self.otherProfilesHeading, otherProfilesGroup) }
             section(nil, developerGroup)
         case .shortcuts:
             let resetAll = PillButton(title: String(localized: "Reset All…", comment: "Button in Settings › Shortcuts that puts every shortcut back."))
@@ -1740,13 +1804,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                  detail: String(localized: "The pages you’ve visited, used for suggestions in the command bar.", comment: "Explanation under “History” in Settings › Privacy."),
                                  control: historyButtons))
 
+        // What's cleared is the profile's shown here.
+        let store = profile.store
         let cache = PillButton(title: String(localized: "Clear Cache…", comment: "Button in Settings › Privacy."))
         cache.onClick = { [weak self, weak cache] _ in
             self?.confirm(title: String(localized: "Clear the cache for every site?", comment: "Title of the sheet that clears the cache."),
                           message: String(localized: "Pages load a little slower the first time you open them again. You stay signed in.", comment: "Message of the sheet that clears the cache."),
                           action: String(localized: "Clear Cache", comment: "Button of the sheet that clears the cache."), destructive: false) {
                 Task { @MainActor in
-                    await WebsiteData.clear(.cache)
+                    await WebsiteData.clear(.cache, in: store)
                     cache?.flash(Self.cleared)
                     self?.reloadSiteData()
                 }
@@ -1758,7 +1824,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                           message: String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that clears cookies."),
                           action: String(localized: "Clear Cookies", comment: "Button of the sheet that clears cookies.")) {
                 Task { @MainActor in
-                    await WebsiteData.clear(.cookies)
+                    await WebsiteData.clear(.cookies, in: store)
                     cookies?.flash(Self.cleared)
                     self?.reloadSiteData()
                 }
@@ -1878,8 +1944,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// with Remove for that site alone. The first 30 by name, then the rest on request.
     private func reloadSiteData() {
         siteDataTask?.cancel()
+        let store = profile.store
         siteDataTask = Task { @MainActor [weak self] in
-            let records = await WKWebsiteDataStore.default().dataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes())
+            let records = await store.dataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes())
             guard let self, !Task.isCancelled else { return }
             self.siteDataGroup.removeAllRows()
             let sorted = records.sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
@@ -1900,7 +1967,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                       : String(localized: "Its pages load fresh next time.", comment: "Message of the sheet that removes one site's data."),
                                   action: String(localized: "Remove", comment: "Button of the sheet that removes one site's data.")) {
                         Task { @MainActor in
-                            await WKWebsiteDataStore.default().removeData(ofTypes: record.dataTypes, for: [record])
+                            await store.removeData(ofTypes: record.dataTypes, for: [record])
                             self?.reloadSiteData()
                         }
                     }

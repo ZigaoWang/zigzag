@@ -613,12 +613,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// What you can change for the site you're on: right-click the address.
     /// Clearing can't be taken back, so it asks first, even for the cache, which only costs a slower first load.
     func confirmClearCache() {
+        // The profile you're in when you ask; a private window's own store.
+        let store = tabManager.privateStore ?? tabManager.profile.store
         ConfirmSheet.show(in: root.overlay, title: String(localized: "Clear the cache for every site?", comment: "Title of the sheet that asks before clearing every site's cache."),
                           message: String(localized: "Pages load a little slower the first time you open them again. You stay signed in.", comment: "Message of the sheet that asks before clearing every site's cache."),
                           confirmTitle: String(localized: "Clear Cache", comment: "Button that clears the cache, in the sheet that asks first."), destructive: false) { [weak self] confirmed in
             guard confirmed else { return }
             Task { @MainActor in
-                await WebsiteData.clear(.cache)
+                await WebsiteData.clear(.cache, in: store)
                 if let self { Toast.show(String(localized: "Cache cleared", comment: "Toast after every site's cache is cleared."), symbol: "arrow.clockwise", duration: 2, in: self) }
             }
         }
@@ -626,12 +628,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Signing out of every site is a big step, so it asks first.
     func confirmClearCookies() {
+        // The profile you're in when you ask; a private window's own store.
+        let store = tabManager.privateStore ?? tabManager.profile.store
         ConfirmSheet.show(in: root.overlay, title: String(localized: "Clear cookies for every site?", comment: "Title of the sheet that asks before clearing every site's cookies."),
                           message: String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that asks before clearing every site's cookies."),
                           confirmTitle: String(localized: "Clear Cookies", comment: "Button that clears cookies, in the sheet that asks first."), destructive: true) { [weak self] confirmed in
             guard confirmed else { return }
             Task { @MainActor in
-                await WebsiteData.clear(.cookies)
+                await WebsiteData.clear(.cookies, in: store)
                 self?.tabManager.selectedTab?.reload()
                 if let self { Toast.show(String(localized: "Cookies cleared. You’re signed out everywhere.", comment: "Toast after every site's cookies are cleared."), symbol: "trash", duration: 2.4, in: self) }
             }
