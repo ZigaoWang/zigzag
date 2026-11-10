@@ -108,6 +108,8 @@ final class Tab: NSObject {
     /// When its page last stopped unexpectedly, to tell a one-off from a page that keeps stopping.
     private var crashes: [Date] = []
     private var reloadWhenShown = false
+    /// Why its page last stopped, until it has loaded again and that's been said.
+    private var stoppedFor: PageStop?
     /// Where you were on the page and what you'd typed, read as you left it; it stays while the tab is out of sight.
     private(set) var pageState: PageState?
     /// The page is loading again after it slept or stopped: once it's here, `pageState` puts it back.
@@ -917,6 +919,13 @@ extension Tab: WKNavigationDelegate {
         Autofill.shared.hide()
         // Its dialogs start over: blocking them was for the page you blocked, not a reload of it.
         PageDialogs.pageLoaded(webView)
+        // Back after its page stopped: why, if it's something you'd otherwise wonder about.
+        if let stop = stoppedFor {
+            stoppedFor = nil
+            if let text = stop.reloadedText, webView.window != nil, let controller = host as? BrowserWindowController {
+                Toast.show(text, symbol: "memorychip", duration: 5, closes: true, in: controller)
+            }
+        }
         let fresh = pdfFreshLoad
         pdfFreshLoad = false
         // A new page: a PDF that couldn't open before gets another try.
@@ -1003,13 +1012,34 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        pageStopped(webView, reason: nil)
+    }
+
+    /// The same, with WebKit's reason (its private `_WKProcessTerminationReason`); WebKit calls this one instead
+    /// when it's here.
+    @objc(_webView:webContentProcessDidTerminateWithReason:)
+    func webView(_ webView: WKWebView, webContentProcessDidTerminateWithReason reason: Int) {
+        pageStopped(webView, reason: reason)
+    }
+
+    private func pageStopped(_ webView: WKWebView, reason: Int?) {
+        let stop = PageStop(webKitReason: reason, lowOnMemoryAgo: MemoryPressure.shared.warningAgo)
+        let site = (url ?? webView.url)?.host()
+        stoppedFor = stop
+        restoresPageState = pageState?.belongs(to: webView.url ?? url) == true
         // Out of sight, it waits until it's next shown: memory pressure doesn't reload every background tab at once.
-        guard webView.window != nil else { reloadWhenShown = true; return }
+        guard webView.window != nil else {
+            reloadWhenShown = true
+            Diagnostics.note("Page stopped", site: site, "\(stop.detail), reloads when shown", isPrivate: isPrivate)
+            return
+        }
         let now = Date()
         crashes = crashes.filter { now.timeIntervalSince($0) < 60 } + [now]
-        Diagnostics.note("Page stopped", site: (url ?? webView.url)?.host(), crashes.count >= 2 ? "twice in a minute" : "reloaded", isPrivate: isPrivate)
+        Diagnostics.note("Page stopped", site: site, "\(stop.detail), " + (crashes.count >= 2 ? "twice in a minute" : "reloaded"), isPrivate: isPrivate)
         // Twice in a minute: say so, rather than crash and reload forever.
         if crashes.count >= 2 {
+            stoppedFor = nil
+            restoresPageState = false
             ErrorPage.show(error: NSError(domain: ErrorPage.crashDomain, code: 1), url: url ?? webView.url, in: webView)
             return
         }

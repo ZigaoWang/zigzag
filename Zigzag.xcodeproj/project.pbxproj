@@ -141,6 +141,7 @@
 		95A0A278C6E484155212F812 /* FaviconRankTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888D287756137DE5F88678F5 /* FaviconRankTests.swift */; };
 		95C8F38A5DC38E15187B8AC4 /* ImportExtensionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0943F5424EE8E9EE3A714D4 /* ImportExtensionViews.swift */; };
 		9704C8BCFA0009792B8AC0FF /* PasswordGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 959ACDC16ECDF0A6CED7B431 /* PasswordGenerator.swift */; };
+		99386D7B5BB6BEAA559C1C41 /* TabSleep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C84C04C118E8E4CC241C3B6 /* TabSleep.swift */; };
 		995DC7DEF8E08A8C2ADFFE2D /* SavePasswordPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7620A6879D1A5DEB651B0A66 /* SavePasswordPrompt.swift */; };
 		99F15C29E28C9FA9B038B3A8 /* FindBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6323BAF70FFBE52DBC8D1ED6 /* FindBar.swift */; };
 		9C1698F934167B4C7F79D557 /* ExtensionSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14C20474FB5E7187A87874B1 /* ExtensionSecurityTests.swift */; };
@@ -347,6 +348,7 @@
 		7890881D589D032D70E5DC20 /* SecurityFixesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityFixesTests.swift; sourceTree = "<group>"; };
 		79F70CA73E1EF5C8460E9286 /* TabManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabManager.swift; sourceTree = "<group>"; };
 		7A6A928496FC897893B22DF7 /* BrowserWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWebView.swift; sourceTree = "<group>"; };
+		7C84C04C118E8E4CC241C3B6 /* TabSleep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSleep.swift; sourceTree = "<group>"; };
 		804A63C8F2764EC4BE20451D /* PasswordStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordStoreTests.swift; sourceTree = "<group>"; };
 		81370CCCA627CE0FAFB02E03 /* ExtensionImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionImport.swift; sourceTree = "<group>"; };
 		818D2FEE410E6D64CD17AADD /* logins.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = logins.json; sourceTree = "<group>"; };
@@ -776,6 +778,7 @@
 				B0560887D19F137BADD3B098 /* Tab.swift */,
 				17AF38DFC935177F4D6F19F5 /* TabArchive.swift */,
 				79F70CA73E1EF5C8460E9286 /* TabManager.swift */,
+				7C84C04C118E8E4CC241C3B6 /* TabSleep.swift */,
 			);
 			path = Tabs;
 			sourceTree = "<group>";
@@ -1188,6 +1191,7 @@
 				70473A9BA477CEFAB852CC91 /* TabArchive.swift in Sources */,
 				C0B6755DFC601C9C358E67DA /* TabManager.swift in Sources */,
 				36BC4DAF8C508734F781BA47 /* TabPreview.swift in Sources */,
+				99386D7B5BB6BEAA559C1C41 /* TabSleep.swift in Sources */,
 				9FEEA537DE55BC1099D8DB0D /* TabStateCache.swift in Sources */,
 				C6692ED12FCC1152B3774192 /* TabSwitcher.swift in Sources */,
 				66E5020894B420AEB3943EAC /* Tokens.swift in Sources */,

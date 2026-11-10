@@ -12344,6 +12344,28 @@
         }
       }
     },
+    "This page was reloaded because it was using a lot of memory" : {
+      "comment" : "Toast after a page loaded again because WebKit ended it for using too much memory.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此页面占用内存过多，已重新载入"
+          }
+        }
+      }
+    },
+    "This page was reloaded because your Mac was low on memory" : {
+      "comment" : "Toast after a page loaded again because macOS ended it while memory was short.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的 Mac 内存不足，此页面已重新载入"
+          }
+        }
+      }
+    },
     "This password is easy to guess. Change it on the site, and use a strong password Zigzag makes for you." : {
       "comment" : "Warning on a weak password in the Passwords window.",
       "localizations" : {
