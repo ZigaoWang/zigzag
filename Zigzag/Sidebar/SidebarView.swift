@@ -323,8 +323,9 @@ final class AddressView: InteractiveView {
         }
     }
 
-    static let moveLeftTitle = String(localized: "Move Left", comment: "VoiceOver action on a space's button at the bottom of the sidebar: moves the space one place to the left.")
-    static let moveRightTitle = String(localized: "Move Right", comment: "VoiceOver action on a space's button at the bottom of the sidebar: moves the space one place to the right.")
+    /// The same words as the space icons' actions.
+    static let moveLeftTitle = String(localized: "Move Left", comment: "Item in the menu of an extension pinned to the address bar, and VoiceOver action on its button there: moves it one place to the left.")
+    static let moveRightTitle = String(localized: "Move Right", comment: "Item in the menu of an extension pinned to the address bar, and VoiceOver action on its button there: moves it one place to the right.")
 
     override init(frame: NSRect) {
         super.init(frame: frame)

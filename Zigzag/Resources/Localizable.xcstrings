@@ -6681,7 +6681,7 @@
       }
     },
     "Move Left" : {
-      "comment" : "VoiceOver action on a space's button at the bottom of the sidebar: moves the space one place to the left.",
+      "comment" : "Item in the menu of an extension pinned to the address bar, and VoiceOver action on its button there: moves it one place to the left.\nVoiceOver action on a space's button at the bottom of the sidebar: moves the space one place to the left.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6714,7 +6714,7 @@
       }
     },
     "Move Right" : {
-      "comment" : "VoiceOver action on a space's button at the bottom of the sidebar: moves the space one place to the right.",
+      "comment" : "Item in the menu of an extension pinned to the address bar, and VoiceOver action on its button there: moves it one place to the right.\nVoiceOver action on a space's button at the bottom of the sidebar: moves the space one place to the right.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
