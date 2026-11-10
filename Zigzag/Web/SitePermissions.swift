@@ -309,6 +309,12 @@ final class PermissionPrompt: FloatingPanelView {
     /// The question on screen in each window, so it can follow the sidebar.
     private static var shown: [ObjectIdentifier: PermissionPrompt] = [:]
 
+    /// A question is on screen in this window.
+    static func isShowing(in controller: PromptHost) -> Bool {
+        guard let prompt = shown[ObjectIdentifier(controller)] else { return false }
+        return prompt.superview != nil && !prompt.isHidden
+    }
+
     /// Puts the window's question back under the address after the sidebar or the window changed. It never jumps:
     /// riding a sidebar slide (`slide` is its duration) it moves with the sidebar, on the same curve; going between
     /// the address and the top of the page, it glides there.

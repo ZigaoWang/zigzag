@@ -1,6 +1,7 @@
 import AppKit
+import WebKit
 
-/// After an update: a quiet note that Zigzag updated, and this version's notes on a sheet. The notes are this
+/// After an update: a note that Zigzag updated, and this version's notes on a sheet. The notes are this
 /// version's section of CHANGELOG.md, the same section the update window, the GitHub release and the website show.
 enum WhatsNew {
     struct Section {
@@ -47,30 +48,95 @@ enum WhatsNew {
         return text
     }
 
-    private static let lastVersionKey = "LastRunVersion"
+    /// The version whose notes are still owed: set at launch the first time a new version runs, cleared only once
+    /// the offer has been on screen. A launch with no browser window to show it in keeps it for the next one.
+    static let pendingKey = "WhatsNewPending"
 
-    /// On launch: the first time a new version runs, say so once, with the notes a click away. A fresh install
-    /// has nothing to compare against and stays quiet.
-    @discardableResult
-    static func offerIfUpdated() -> Bool {
-        let defaults = UserDefaults.standard
-        let last = defaults.string(forKey: lastVersionKey)
+    /// At launch, before anything records this version as run (`ProfileBackup` does, as it backs up): a new version
+    /// owes its notes. A fresh install has nothing to compare against and stays quiet.
+    static func noteLaunch(defaults: UserDefaults = .standard, version: String = version) {
+        let last = defaults.string(forKey: "LastRunVersion")
         // Before this was remembered, a Mac that had launched Zigzag before was updating from an older version.
         let updated = last.map { $0 != version } ?? (defaults.integer(forKey: "LaunchCount") > 0)
-        defaults.set(version, forKey: lastVersionKey)
-        guard updated, !sections.isEmpty, !WindowManager.needsOnboarding else { return false }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            guard let controller = WindowManager.shared.keyController else { return }
-            Toast.show(String(localized: "Zigzag updated to \(version)", comment: "Toast after an update, with the new version number, like 0.5.2."), symbol: "sparkles",
-                       action: (String(localized: "What’s New", comment: "Button in the toast after an update: shows the release notes."), { show(in: controller) }),
-                       duration: 10, in: controller)
+        if updated { defaults.set(version, forKey: pendingKey) }
+    }
+
+    /// This version's notes haven't been offered yet.
+    static func isPending(defaults: UserDefaults = .standard, version: String = version) -> Bool {
+        defaults.string(forKey: pendingKey) == version
+    }
+
+    static func markOffered(defaults: UserDefaults = .standard) { defaults.removeObject(forKey: pendingKey) }
+
+    private static var keyObserver: Any?
+    private static var settling: DispatchWorkItem?
+
+    /// After launch: when this version's notes are owed, they're offered once a browser window is in front, so the
+    /// offer is never lost to a window that isn't up yet. True while it's owed, so the default browser offer waits.
+    @discardableResult
+    static func offerIfUpdated() -> Bool {
+        guard isPending() else { return false }
+        // No notes for this version (a build between releases): nothing to offer.
+        guard !sections.isEmpty else { markOffered(); return false }
+        guard keyObserver == nil else { return true }
+        keyObserver = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { settle() }
         }
+        settle()
         return true
+    }
+
+    /// A moment after a window comes in front, once the restored tabs have settled, it looks again.
+    private static func settle(after delay: TimeInterval = 1.2) {
+        settling?.cancel()
+        let work = DispatchWorkItem { MainActor.assumeIsolated { offerNow() } }
+        settling = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private static func offerNow() {
+        guard isPending() else { stopWaiting(); return }
+        guard let controller = offerWindow() else {
+            // A browser window in front with something over it (a confirmation): it looks again once that's gone.
+            // Anything else waits for a browser window to come in front.
+            if let front = NSApp.keyWindow?.windowController as? BrowserWindowController, !front.tabManager.isPrivate,
+               !WindowManager.needsOnboarding { settle(after: 2) }
+            return
+        }
+        // A site's question or Save password? at the top of the page goes first; the offer comes once it's answered.
+        if PermissionPrompt.isShowing(in: controller) || SavePasswordPrompt.isShowing(in: controller.window) {
+            settle(after: 2)
+            return
+        }
+        WhatsNewOffer.show(in: controller)
+        markOffered()
+        stopWaiting()
+    }
+
+    /// The browser window in front, when it's one to offer the notes in: visible, not private, with nothing over it.
+    /// Zigzag Mini, onboarding and the other windows wait for a browser window.
+    static func offerWindow() -> BrowserWindowController? {
+        guard !WindowManager.needsOnboarding, WelcomeWindowController.shared?.window?.isVisible != true,
+              let window = NSApp.keyWindow, window.isVisible, !window.isMiniaturized, window.attachedSheet == nil,
+              let controller = window.windowController as? BrowserWindowController, !controller.tabManager.isPrivate,
+              !WhatsNewSheet.isShowing(in: window),
+              !controller.root.overlay.subviews.contains(where: { $0 is ConfirmSheet }) else { return nil }
+        return controller
+    }
+
+    private static func stopWaiting() {
+        settling?.cancel()
+        settling = nil
+        if let keyObserver { NotificationCenter.default.removeObserver(keyObserver) }
+        keyObserver = nil
     }
 
     static func show(in controller: BrowserWindowController) {
         // No notes for this version in the app (a build between releases): every release's notes, on the site.
         guard !sections.isEmpty else { controller.open(allNotes, disposition: .foregroundTab); return }
+        // Asked for before the note came up, or with it up: it has nothing more to offer.
+        markOffered()
+        WhatsNewOffer.close(in: controller)
         guard let host = controller.window?.contentView else { return }
         WhatsNewSheet.present(in: host)
     }
@@ -288,5 +354,144 @@ final class WhatsNewSheet: NSView {
         scroll.frame = NSRect(x: 0, y: headerHeight, width: width, height: max(0, scrollHeight))
         notes.frame = NSRect(x: 0, y: 0, width: scroll.contentSize.width, height: max(contentHeight, scroll.contentSize.height))
         buttons.frame = NSRect(x: pad, y: panel.bounds.height - pad - DialogButtons.height, width: inner, height: DialogButtons.height)
+    }
+}
+
+/// "Zigzag updated to 0.7.7", at the top of the page the first time a new version runs, with its notes a click away.
+/// The same panel a page's questions come in (`SavePasswordPrompt`): it slides down from the page's top edge and
+/// stays, without stopping anything, until you answer it: Not Now puts it away (Esc too), What’s New is the
+/// default (Return). The notes are in Help › What’s New in Zigzag after that.
+final class WhatsNewOffer: FloatingPanelView {
+    private let header = DialogHeader(title: String(localized: "Zigzag updated to \(WhatsNew.version)", comment: "Title of the note shown after an update, with the new version number, like 0.5.2."),
+                                      subtitle: String(localized: "See what’s new and what’s fixed in this version.", comment: "Under “Zigzag updated to 0.7.7” in the note shown after an update."))
+    private let buttons = DialogButtons()
+    private let notNow = PillButton(title: String(localized: "Not Now", comment: "Button in the note shown after an update: puts it away."), style: .plain)
+    private let open = PillButton(title: String(localized: "What’s New", comment: "Default button in the note shown after an update: shows the release notes."), style: .prominent)
+    private weak var controller: BrowserWindowController?
+    private var frameObservers: [Any] = []
+    private var keyMonitor: Any?
+    /// No click for its first half second, as on a site's question: a click meant for the page never lands on it.
+    private var shownAt = Date.distantFuture
+    private let pad = Tokens.Dialog.padding
+
+    private init(controller: BrowserWindowController) {
+        self.controller = controller
+        super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Dialog.width, height: 0))
+        radius = Tokens.Radius.panel
+        header.setImage(NSApp.applicationIconImage)
+        header.subtitle.lineBreakMode = .byTruncatingTail
+        open.tint = controller.promptAccent
+        [header, buttons].forEach { addSubview($0) }
+        buttons.trailing = [notNow, open]
+        notNow.onClick = { [weak self] _ in self?.close() }
+        open.onClick = { [weak self] _ in self?.openNotes() }
+        onLayout = { [weak self] in self?.layoutContent() }
+        setAccessibilityRole(.group)
+        setAccessibilityLabel(header.title.stringValue)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private static func offer(in controller: BrowserWindowController) -> WhatsNewOffer? {
+        controller.root.overlay.subviews.lazy.compactMap { $0 as? WhatsNewOffer }.first
+    }
+
+    static func show(in controller: BrowserWindowController) {
+        guard offer(in: controller) == nil else { return }
+        // Clear of a toast that might be up, as a page's questions come in.
+        Toast.hide(in: controller)
+        let offer = WhatsNewOffer(controller: controller)
+        offer.slidesFromTop = true
+        controller.root.overlay.addSubview(offer)
+        offer.place()
+        offer.present(always: true)
+        offer.shownAt = Date()
+        // The window resizing, the sidebar coming or going, or a split: it stays at the top of the page.
+        for card in controller.promptPageViews {
+            offer.frameObservers.append(NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: card, queue: .main) { [weak offer] _ in
+                MainActor.assumeIsolated { offer?.place() }
+            })
+        }
+        // Return and Esc answer it while the keyboard isn't anywhere else: never a Return meant for a page, a field
+        // or the command bar.
+        offer.keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak offer] event in
+            guard let offer, let window = offer.window, event.window === window, offer.takesKeys,
+                  event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty else { return event }
+            switch event.keyCode {
+            case 36, 76: offer.openNotes(); return nil
+            case 53: offer.close(); return nil
+            default: return event
+            }
+        }
+        Announcement.post(offer.header.title.stringValue + ". " + offer.header.subtitle.stringValue, priority: .high)
+    }
+
+    /// Nothing else has the keyboard: no page, field or text, and nothing floating over the window.
+    private var takesKeys: Bool {
+        guard let controller, let window, !controller.promptIsCovered, !WhatsNewSheet.isShowing(in: window) else { return false }
+        guard let responder = window.firstResponder as? NSView else { return true }
+        if responder is NSText || responder is NSTextField { return false }
+        var view: NSView? = responder
+        while let v = view {
+            if v is WKWebView { return false }
+            view = v.superview
+        }
+        return true
+    }
+
+    /// Gone with its window: it stops listening.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window == nil, let keyMonitor else { return }
+        NSEvent.removeMonitor(keyMonitor)
+        self.keyMonitor = nil
+    }
+
+    /// Put away, for a site's question to come up where it was.
+    static func close(in controller: BrowserWindowController) { offer(in: controller)?.close() }
+
+    private func openNotes() {
+        guard Toast.acceptsAction(shownAt: shownAt), let controller else { return }
+        close()
+        WhatsNew.show(in: controller)
+    }
+
+    #if DEBUG
+    /// For the debug bridge: What’s New or Not Now, as its buttons would.
+    static func debugAnswer(open: Bool, in controller: BrowserWindowController) {
+        guard let offer = offer(in: controller) else { debugLog("whatsnewoffer: none showing"); return }
+        offer.shownAt = .distantPast
+        if open { offer.openNotes() } else { offer.close() }
+    }
+
+    static func debugShowing(in controller: BrowserWindowController) -> Bool { offer(in: controller) != nil }
+    #endif
+
+    private var measuredHeight: CGFloat {
+        let inner = frame.width - pad * 2
+        return pad + header.height(for: inner) + Tokens.Dialog.gap + DialogButtons.height + pad
+    }
+
+    /// At the top of the page, in the middle.
+    private func place() {
+        guard let controller, superview != nil else { return }
+        let area = controller.root.cardFrame
+        let width = min(Tokens.Dialog.width, area.width - Tokens.Space.x6)
+        frame = NSRect(x: round(area.midX - width / 2), y: area.minY + Tokens.Space.x3, width: width, height: frame.height)
+        frame.size.height = measuredHeight
+    }
+
+    private func close() {
+        frameObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        frameObservers = []
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        keyMonitor = nil
+        dismiss(always: true)
+    }
+
+    private func layoutContent() {
+        let inner = bounds.width - pad * 2
+        header.frame = NSRect(x: pad, y: pad, width: inner, height: header.height(for: inner))
+        buttons.frame = NSRect(x: pad, y: header.frame.maxY + Tokens.Dialog.gap, width: inner, height: DialogButtons.height)
     }
 }

@@ -12,6 +12,12 @@ final class SavePasswordPrompt: FloatingPanelView {
 
     private static weak var current: SavePasswordPrompt?
 
+    /// The prompt is on screen in `window`.
+    static func isShowing(in window: NSWindow?) -> Bool {
+        guard let current, let window else { return false }
+        return current.window === window && !current.isHidden
+    }
+
     /// The site's icon, the question and exactly where the password goes: the one header every dialog has.
     private let header = DialogHeader(title: "")
     private let usernameBox = ColorView(color: Tokens.Color.fieldFill)

@@ -627,6 +627,14 @@ enum DebugBridge {
         case "closekey": WindowManager.shared.keyController?.window?.performClose(nil)
         case "reopenwindow": WindowManager.shared.reopenClosedWindow()
         case "whatsnew": WhatsNew.show(in: controller)
+        // whatsnewoffer [open|notnow|state]: the note after an update, shown as an update shows it, or answered;
+        // state logs whether it's up and whether the notes are still owed.
+        case "whatsnewoffer":
+            switch arg {
+            case "open", "notnow": WhatsNewOffer.debugAnswer(open: arg == "open", in: controller)
+            case "state": debugLog("whatsnewoffer showing=\(WhatsNewOffer.debugShowing(in: controller)) pending=\(WhatsNew.isPending()) sheet=\(WhatsNewSheet.isShowing(in: controller.window))")
+            default: WhatsNewOffer.show(in: controller)
+            }
         case "hang": Thread.sleep(forTimeInterval: Double(arg) ?? 2)
         case "problemreport": if arg == "sheet" { ProblemReport.show(in: controller) } else { Task { _ = await ProblemReport.write() } }
         case "endsheet": if let sheet = controller.window?.attachedSheet { controller.window?.endSheet(sheet, returnCode: .cancel) }

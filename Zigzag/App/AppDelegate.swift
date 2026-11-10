@@ -16,6 +16,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !Self.isHostingTests {
             // A new version backs up the profile the last one left, and a restore asked for before restarting puts
             // a backup back, both before anything reads it.
+            // A new version owes its notes: noted before the backup records this version as the one that ran.
+            WhatsNew.noteLaunch()
             let info = Bundle.main.infoDictionary
             ProfileBackup.backUpIfUpdated(build: info?["CFBundleVersion"] as? String ?? "", version: info?["CFBundleShortVersionString"] as? String ?? "")
             ProfileBackup.restoreIfAsked()

@@ -7358,7 +7358,7 @@
       }
     },
     "Not Now" : {
-      "comment" : "Answer in the welcome window’s default browser step.\nButton in the Import window: close it without importing.\nButton in the save-password prompt.\nButton that leaves an extension's update waiting.\nTooltip of the close button on a toast that offers something, like translating the page.\nTooltip of the close button on the bar over a Chrome Web Store page.\nTooltip of the × on a site's permission question.",
+      "comment" : "Answer in the welcome window’s default browser step.\nButton in the Import window: close it without importing.\nButton in the note shown after an update: puts it away.\nButton in the save-password prompt.\nButton that leaves an extension's update waiting.\nTooltip of the close button on a toast that offers something, like translating the page.\nTooltip of the close button on the bar over a Chrome Web Store page.\nTooltip of the × on a site's permission question.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10354,6 +10354,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "查看你浏览时网站所加载的内容"
+          }
+        }
+      }
+    },
+    "See what’s new and what’s fixed in this version." : {
+      "comment" : "Under “Zigzag updated to 0.7.7” in the note shown after an update.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看看这个版本的新功能和修复。"
           }
         }
       }
@@ -13499,7 +13510,7 @@
       }
     },
     "What’s New" : {
-      "comment" : "Button in the toast after an update: shows the release notes.\nTitle of the sheet with this version's release notes.",
+      "comment" : "Default button in the note shown after an update: shows the release notes.\nTitle of the sheet with this version's release notes.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14132,7 +14143,7 @@
       }
     },
     "Zigzag updated to %@" : {
-      "comment" : "Toast after an update, with the new version number, like 0.5.2.",
+      "comment" : "Title of the note shown after an update, with the new version number, like 0.5.2.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

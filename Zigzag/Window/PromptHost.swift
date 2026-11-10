@@ -67,6 +67,7 @@ extension BrowserWindowController: PromptHost {
     func clearForPrompt() {
         closeFloatingPanels()
         Toast.hide(in: self)
+        WhatsNewOffer.close(in: self)
     }
     var promptIsCovered: Bool { commandBar.isVisible }
     var promptAnchor: NSView? { sidebar.address }
