@@ -102,10 +102,8 @@ final class Tab: NSObject {
     /// The profile its page belongs in: its space's, or for a favorite, the profile the favorite is kept in,
     /// whichever of that profile's spaces it was last opened from.
     var homeProfile: Profile {
-        if isFavorite, let bookmarkID, Library.shared.isFavorite(bookmarkID) {
-            return Profiles.shared.profile(Library.shared.profileID(ofFavorite: bookmarkID))
-        }
-        return Profiles.shared.profile(forSpace: spaceID)
+        let favorite = isFavorite ? bookmarkID.flatMap { Library.shared.isFavorite($0) ? $0 : nil } : nil
+        return Profiles.shared.profile(Library.shared.directory.profileID(ofPageIn: spaceID, favorite: favorite))
     }
 
     /// Rebuilds the page in another profile: that profile's sign-ins and extensions, the same back and forward

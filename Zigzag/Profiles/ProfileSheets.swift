@@ -95,11 +95,18 @@ enum ProfileSheets {
         return String(localized: "Only in \(info.displayName); other profiles aren’t changed.", comment: "Added to the message of a sheet that asks before clearing the cache or cookies, when there's more than one profile. The placeholder is the profile's name.")
     }
 
+    /// Whether a page that moves to a space on `target` is rebuilt there, losing what it held that wasn't saved:
+    /// one that's loaded, in another profile. A private page keeps its window's own store wherever it goes, and
+    /// one that isn't loaded has nothing to lose.
+    static func isRebuilt(isPrivate: Bool, isLoaded: Bool, in profile: UUID, movingTo target: UUID) -> Bool {
+        !isPrivate && isLoaded && profile != target
+    }
+
     /// Asks, over `host`, before pages that are loaded move to a space on another profile, where they're rebuilt
     /// with that profile's sign-ins and extensions. `move` runs at once when none of them would change profile.
     static func confirmCrossing(_ tabs: [Tab], to spaceID: UUID, in host: NSView, cancelled: @escaping () -> Void = {}, then move: @escaping () -> Void) {
         let target = Library.shared.profileID(ofSpace: spaceID)
-        let crossing = tabs.filter { !$0.isPrivate && $0.webView != nil && $0.profile.id != target }
+        let crossing = tabs.filter { isRebuilt(isPrivate: $0.isPrivate, isLoaded: $0.webView != nil, in: $0.profile.id, movingTo: target) }
         guard !crossing.isEmpty, let space = Library.shared.space(spaceID), let profile = Library.shared.directory.profile(target) else { move(); return }
         let one = crossing.count == 1
         ConfirmSheet.show(in: host,

@@ -87,8 +87,10 @@ final class BridgeBookmarks: BridgeNamespace {
     private var spaces: [SpaceInfo] { library.spaces(in: host.profile.id) }
     private func isOurs(space id: UUID) -> Bool { library.profileID(ofSpace: id) == host.profile.id }
     private func isOurs(bookmark id: UUID) -> Bool {
-        if library.isFavorite(id) { return library.profileID(ofFavorite: id) == host.profile.id }
-        return library.spaceID(ofBookmark: id).map(isOurs(space:)) ?? false
+        let favorite = library.isFavorite(id) ? id : nil
+        // One that's in no space and no one's favorite is no profile's.
+        guard let space = library.spaceID(ofBookmark: id) ?? favorite else { return false }
+        return library.directory.profileID(ofPageIn: space, favorite: favorite) == host.profile.id
     }
 
     private func parse(_ id: String) -> (String, UUID)? {

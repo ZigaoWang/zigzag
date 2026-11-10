@@ -771,6 +771,16 @@ enum DebugBridge {
             if let view = WelcomeWindowController.shared?.window?.contentView as? OnboardingView,
                let step = Int(arg.prefix(1)).flatMap(OnboardingView.Step.init(rawValue:)) { view.show(step, animated: arg.hasSuffix("a")) }
         case "importwindow": ImportWindowController.show()
+        case "importfile":
+            // importfile <profile name> <path>: brings a chosen file (a Safari export, a passwords CSV) into that
+            // profile, as the Import window does. Only in a test copy, with made-up data.
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            guard isTestCopy, f.count == 2, let info = Library.shared.profiles.first(where: { $0.displayName == f[0] }) else { debugLog("importfile refused"); break }
+            let source = ImportCoordinator.Source(kind: .file(URL(fileURLWithPath: f[1])), name: "Test Browser", bundleID: nil)
+            Task {
+                let summary = await ImportCoordinator.run(source, [.passwords, .bookmarks, .history], into: Profiles.shared.profile(info.id))
+                debugLog("importfile => passwords \(summary.passwords) bookmarks \(summary.bookmarks) history \(summary.history) problems \(summary.problems.count)")
+            }
         case "importchoice", "onboardchoice":
             // importchoice <name> <on|off>: a choice in the Import window ("Sign-ins"), as a click would set it;
             // onboardchoice the same on the welcome's import step.
