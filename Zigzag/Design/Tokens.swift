@@ -539,6 +539,17 @@ enum Tokens {
         static let enter: TimeInterval = 0.18
         static let exit: TimeInterval = 0.12
         static let exitScale: CGFloat = 0.98
+        /// A notice coming in from beyond the window's edge (a site's question, an offer): it travels further than a
+        /// menu grows, so it takes a little longer, and leaves in about two thirds of that.
+        static let noticeIn: TimeInterval = 0.25
+        static let noticeOut: TimeInterval = 0.17
+        /// How far a bar attached to an edge (the find bar, a toast) slides in from it; it leaves half as far.
+        static let edgeOffset: CGFloat = 6
+        /// Reduce Motion: what moved or grew only crossfades in place, this quickly.
+        static let crossfade: TimeInterval = 0.12
+        /// A sheet (a confirmation, the notes) grows from a little below its middle, so it settles up into place over
+        /// its scrim rather than swelling out of a point.
+        static let sheetOrigin = CGPoint(x: 0.5, y: 0.7)
         /// One shared highlight gliding from row to row in a menu, and a selection gliding between a list's places
         /// or a filter's segments.
         static let highlightGlide: TimeInterval = 0.14
@@ -546,10 +557,127 @@ enum Tokens {
         /// A layer's transform scaling it by `k` around `point` (0 to 1 across its bounds, from its top left), whatever
         /// its anchor: what a press or a growing menu uses.
         static func scale(_ k: CGFloat, of layer: CALayer, around point: CGPoint = CGPoint(x: 0.5, y: 0.5), flipped: Bool = true) -> CATransform3D {
-            let size = layer.bounds.size
-            let px = (point.x - layer.anchorPoint.x) * size.width
-            let py = ((flipped ? point.y : 1 - point.y) - layer.anchorPoint.y) * size.height
+            scale(k, size: layer.bounds.size, anchor: layer.anchorPoint, around: point, flipped: flipped)
+        }
+
+        static func scale(_ k: CGFloat, size: CGSize, anchor: CGPoint, around point: CGPoint, flipped: Bool) -> CATransform3D {
+            let px = (point.x - anchor.x) * size.width
+            let py = ((flipped ? point.y : 1 - point.y) - anchor.y) * size.height
             return CATransform3DConcat(CATransform3DMakeScale(k, k, 1), CATransform3DMakeTranslation(px * (1 - k), py * (1 - k), 0))
+        }
+
+        // MARK: Showing up and going
+
+        /// Where something comes from as it shows up, and goes back to as it leaves.
+        enum Origin: Equatable {
+            /// Grows out of this point of its bounds (0 to 1 from its top left): the control that opened it.
+            case point(CGPoint)
+            /// Slides `edgeOffset` in from the edge it's attached to: the find bar from the page's top.
+            case edge(NSRectEdge)
+            /// Comes in from beyond the window's edge, this far, and leaves back out: a notice at the page's top.
+            case offstage(NSRectEdge, CGFloat)
+            /// Only fades, where it is: something that stands in for what's under it.
+            case inPlace
+        }
+
+        /// How long showing up or going takes. With Reduce Motion, only a short crossfade.
+        static func presenceDuration(_ origin: Origin, entering: Bool, reduceMotion: Bool) -> TimeInterval {
+            if reduceMotion { return crossfade }
+            if case .offstage = origin { return entering ? noticeIn : noticeOut }
+            return entering ? enter : exit
+        }
+
+        /// The pose it's hidden in, in its superview's coordinates (`flipped`: y runs down): a little smaller around its
+        /// origin, or a little way toward its edge. Leaving is subtler than arriving, except back offstage.
+        static func hiddenTransform(_ origin: Origin, entering: Bool, size: CGSize, anchor: CGPoint, flipped: Bool) -> CATransform3D {
+            func toward(_ edge: NSRectEdge, _ d: CGFloat) -> CATransform3D {
+                switch edge {
+                case .minX: return CATransform3DMakeTranslation(-d, 0, 0)
+                case .maxX: return CATransform3DMakeTranslation(d, 0, 0)
+                case .minY: return CATransform3DMakeTranslation(0, -d, 0)
+                case .maxY: return CATransform3DMakeTranslation(0, d, 0)
+                @unknown default: return CATransform3DIdentity
+                }
+            }
+            switch origin {
+            case .point(let point):
+                return scale(entering ? enterScale : exitScale, size: size, anchor: anchor, around: point, flipped: flipped)
+            case .edge(let edge):
+                return toward(screenEdge(edge, flipped: flipped), entering ? edgeOffset : edgeOffset / 2)
+            case .offstage(let edge, let distance):
+                return toward(screenEdge(edge, flipped: flipped), distance)
+            case .inPlace:
+                return CATransform3DIdentity
+            }
+        }
+
+        /// `.minY` is the top as you look at it: in an unflipped view that's toward larger y.
+        private static func screenEdge(_ edge: NSRectEdge, flipped: Bool) -> NSRectEdge {
+            guard !flipped else { return edge }
+            switch edge {
+            case .minY: return .maxY
+            case .maxY: return .minY
+            default: return edge
+            }
+        }
+
+        /// Turned around partway (closed while still arriving, opened again while leaving), it carries on from what's on
+        /// screen over the part of the way that's left, so a quick open and close never waits or jumps. How far along
+        /// it is reads from its opacity, which runs the whole way from 0 to 1.
+        static func remainingDuration(_ full: TimeInterval, shownOpacity: Float, entering: Bool) -> TimeInterval {
+            let left = Double(entering ? 1 - shownOpacity : shownOpacity)
+            guard left > 0.02 else { return 0 }
+            return max(full * min(left, 1), 0.04)
+        }
+
+        /// Shows `view` arriving from `origin`, or leaving toward it, on the render server: fading as it grows or slides
+        /// (the fade a touch quicker coming in, so it's solid before it settles), from wherever it's drawn right now.
+        /// Leaving, it stays hidden (opacity 0) until it's shown again or taken away; `completion` runs when the
+        /// movement ends, or when it's turned around, or at once when there's nothing to move.
+        static func present(_ view: NSView, from origin: Origin, entering: Bool, completion: (() -> Void)? = nil) {
+            guard let layer = view.layer else { completion?(); return }
+            let reduce = reduceMotion
+            let flipped = view.superview?.isFlipped ?? true
+            let hidden = reduce ? CATransform3DIdentity
+                : hiddenTransform(origin, entering: entering, size: layer.bounds.size, anchor: layer.anchorPoint, flipped: flipped)
+            // Mid-way through the last change: start from what's drawn, not from where that change began.
+            let moving = layer.animation(forKey: "presence.opacity") != nil || layer.animation(forKey: "presence.transform") != nil
+            let shown = moving ? layer.presentation() : nil
+            let fromOpacity = shown?.opacity ?? (entering ? 0 : layer.opacity)
+            let fromTransform = shown?.transform ?? (entering ? hidden : CATransform3DIdentity)
+            let full = presenceDuration(origin, entering: entering, reduceMotion: reduce)
+            let time = (moving ? remainingDuration(full, shownOpacity: fromOpacity, entering: entering) : full) * debugSlowdown
+            layer.removeAnimation(forKey: "presence.opacity")
+            layer.removeAnimation(forKey: "presence.transform")
+            withoutAnimation {
+                layer.opacity = entering ? 1 : 0
+                layer.transform = CATransform3DIdentity
+            }
+            guard time > 0 else { completion?(); return }
+            CATransaction.begin()
+            CATransaction.setCompletionBlock(completion)
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = fromOpacity
+            fade.toValue = entering ? 1 : 0
+            fade.duration = entering && !reduce ? time * 0.7 : time
+            fade.timingFunction = easeOut
+            fade.fillMode = .both
+            layer.add(fade, forKey: "presence.opacity")
+            let move = CABasicAnimation(keyPath: "transform")
+            move.fromValue = NSValue(caTransform3D: fromTransform)
+            move.toValue = NSValue(caTransform3D: entering ? CATransform3DIdentity : hidden)
+            move.duration = time
+            move.timingFunction = easeOut
+            // Leaving, it lands back in place the moment its fade reaches nothing, so nothing has to hold the pose.
+            layer.add(move, forKey: "presence.transform")
+            CATransaction.commit()
+        }
+
+        /// Takes away what `present(_:from:entering:)` left on `view`, so it shows plainly where it is.
+        static func settle(_ view: NSView) {
+            view.layer?.removeAnimation(forKey: "presence.opacity")
+            view.layer?.removeAnimation(forKey: "presence.transform")
+            withoutAnimation { view.layer?.opacity = 1; view.layer?.transform = CATransform3DIdentity }
         }
 
         /// A motion style: how long, and which curve. Every curve is a fast-out, no-overshoot spring shape,
@@ -579,6 +707,9 @@ enum Tokens {
         static let swipeSettle = Curve(duration: 0.15, bounce: 0)
         static let gentle = Curve(duration: large)
         static let feedback = Curve(duration: quick)
+        /// A scrim or a wash coming with something that shows up, and going with it.
+        static let entering = Curve(duration: enter)
+        static let leaving = Curve(duration: exit)
 
         /// True while handling ⌘T: a new tab is for typing at once, so it appears instantly. Every other shortcut
         /// (⌘W, switching tabs and spaces) animates like the same action done with the pointer, so you see what changed.
