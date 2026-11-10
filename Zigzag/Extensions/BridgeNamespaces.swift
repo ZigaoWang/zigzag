@@ -849,9 +849,10 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
             if let streamID = options.string("streamId") {
                 // A tab getMediaStreamId named: good once, for a few seconds, for the extension it was given to.
                 // Still on the site it was named on.
-                guard let named = pending.removeValue(forKey: streamID), named.extensionID == extensionID, named.expires > Date(),
-                      let namedTab = named.tab, let owner = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === namedTab } }),
-                      !owner.tabManager.isPrivate, named.origin != nil, SiteOrigin.of(namedTab.webView?.url ?? namedTab.url) == named.origin
+                guard let named = pending.removeValue(forKey: streamID), let namedTab = named.tab,
+                      let owner = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === namedTab } }),
+                      Self.namedStreamHolds(givenTo: named.extensionID, askedBy: extensionID, expires: named.expires, namedOrigin: named.origin,
+                                            origin: SiteOrigin.of(namedTab.webView?.url ?? namedTab.url), isPrivate: owner.tabManager.isPrivate || namedTab.isPrivate)
                 else { throw BridgeError("Invalid stream ID") }
                 try ensureReachable(namedTab, in: owner, by: extensionID)
                 (tab, controller) = (namedTab, owner)
@@ -937,6 +938,14 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
                               hasAccess: context.hasAccess(to: url, in: tab), allSites: ExtensionStore.siteAccess(extensionID) == .all) else {
             throw BridgeError("Extension manifest must request permission to access this host.")
         }
+    }
+
+    /// Whether a stream ID from getMediaStreamId still names a tab to hear: asked for by the extension it was given to
+    /// (from any of its pages, its offscreen one included, as Sound Booster does), within its few seconds, with the
+    /// tab still on the site it was named on, and never a private one.
+    static func namedStreamHolds(givenTo: String, askedBy: String, expires: Date, namedOrigin: String?, origin: String?,
+                                 isPrivate: Bool, now: Date = Date()) -> Bool {
+        givenTo == askedBy && expires > now && !isPrivate && namedOrigin != nil && origin == namedOrigin
     }
 
     /// Whether site settings let an extension capture a page there: never where extensions are off; else where it has

@@ -182,6 +182,45 @@ struct ExtensionSecurityTests {
         #expect(BridgeTabCapture.siteAllows(URL(string: "https://notmusic.example/")!, offSites: ["music.example"], hasAccess: true, allSites: true))
     }
 
+    /// The ways real extensions capture, step by step (#45): Shazam captures from its popup the moment it opens;
+    /// Sound Booster's popup or background names the tab with getMediaStreamId and its offscreen page asks for it.
+    @Test func captureFlowsOfRealExtensions() {
+        let shazam = "mmioliijnhnoblpgimnlajmefafdfilb", booster = "plmlopfeeobajiecodiggabcihohcnge"
+        let tab = UUID(), site = "https://music.example"
+        let click = Date()
+        let closed: (ObjectIdentifier) -> Bool = { _ in false }
+        var use = ExtensionUse()
+        use.invoked(shazam, tabID: tab, origin: site, at: click)
+        use.invoked(booster, tabID: tab, origin: site, at: click)
+        // Shazam's popup page runs before Zigzag has shown it: the click alone counts.
+        #expect(use.mayCapture(shazam, tabID: tab, origin: site, popupShown: false, windowOpen: closed, now: click.addingTimeInterval(0.1)))
+        // Sound Booster's slider, moved a minute later in its popup that's still open: its background names the tab.
+        let slider = click.addingTimeInterval(60)
+        #expect(use.mayCapture(booster, tabID: tab, origin: site, popupShown: true, windowOpen: closed, now: slider))
+        #expect(!use.mayCapture(booster, tabID: tab, origin: site, popupShown: false, windowOpen: closed, now: slider))
+        // Its offscreen page asks for the named tab a moment later: the stream ID is what counts there, not the popup.
+        let expires = slider.addingTimeInterval(10)
+        #expect(BridgeTabCapture.namedStreamHolds(givenTo: booster, askedBy: booster, expires: expires, namedOrigin: site, origin: site,
+                                                  isPrivate: false, now: slider.addingTimeInterval(1)))
+        // Never another extension's, a late one, a tab gone to another site, or a private one.
+        #expect(!BridgeTabCapture.namedStreamHolds(givenTo: booster, askedBy: shazam, expires: expires, namedOrigin: site, origin: site,
+                                                   isPrivate: false, now: slider.addingTimeInterval(1)))
+        #expect(!BridgeTabCapture.namedStreamHolds(givenTo: booster, askedBy: booster, expires: expires, namedOrigin: site, origin: site,
+                                                   isPrivate: false, now: expires.addingTimeInterval(1)))
+        #expect(!BridgeTabCapture.namedStreamHolds(givenTo: booster, askedBy: booster, expires: expires, namedOrigin: site, origin: "https://bank.example",
+                                                   isPrivate: false, now: slider.addingTimeInterval(1)))
+        #expect(!BridgeTabCapture.namedStreamHolds(givenTo: booster, askedBy: booster, expires: expires, namedOrigin: nil, origin: nil,
+                                                   isPrivate: false, now: slider.addingTimeInterval(1)))
+        #expect(!BridgeTabCapture.namedStreamHolds(givenTo: booster, askedBy: booster, expires: expires, namedOrigin: site, origin: site,
+                                                   isPrivate: true, now: slider.addingTimeInterval(1)))
+        // Shazam asks for no sites at all: on every site you let it reach, its capture goes ahead (Chrome's needs no
+        // host permission). An extension with only activeTab has the site once you click it, as WebKit grants it.
+        let url = URL(string: "https://www.music.example/song")!
+        #expect(BridgeTabCapture.siteAllows(url, offSites: [], hasAccess: false, allSites: true))
+        #expect(BridgeTabCapture.siteAllows(url, offSites: [], hasAccess: true, allSites: false))
+        #expect(!BridgeTabCapture.siteAllows(url, offSites: ["music.example"], hasAccess: true, allSites: true))
+    }
+
     /// The page sees the tap's message handler only while a capture of it is live; with none, it goes again.
     @Test func pagesSeeTheTapHandlerOnlyWhileCapturing() async throws {
         let webView = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
