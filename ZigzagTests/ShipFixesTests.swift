@@ -457,3 +457,13 @@ struct ProfileBackupTests {
         #expect(try !atLeast("0.5.0", "0.5.1"))
     }
 }
+
+/// A link Zigzag hands to macOS comes back as its own, so it opens in a tab rather than Zigzag Mini.
+@MainActor
+struct LinksFromZigzagTests {
+    @Test func onlyZigzagsOwnLinksCountAsItsOwn() {
+        #expect(AppDelegate.isZigzag(senderPID: ProcessInfo.processInfo.processIdentifier))
+        #expect(!AppDelegate.isZigzag(senderPID: 1))
+        #expect(!AppDelegate.isZigzag(senderPID: nil))
+    }
+}
