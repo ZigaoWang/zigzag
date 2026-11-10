@@ -369,14 +369,32 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                minLength: el.minLength, maxLength: el.maxLength, rect: { x: r.left, y: r.top, w: r.width, h: r.height } });
       };
       const wanted = (el) => signIn(el) || isNew(el) || formField(el);
-      // The menu opens only for something you did: a click on the field (or its label), or Tab to it. A page can put
-      // the cursor in a field by itself, and mustn't get the menu up under a click you were about to make elsewhere.
-      let pressed = null, pressedAt = -Infinity;
-      document.addEventListener('mousedown', (e) => { if (e.isTrusted) { pressed = e.target; pressedAt = performance.now(); } }, true);
-      const byYou = (el) => performance.now() - pressedAt < 1000
-        && (pressed === 'Tab' || pressed === el || [...(el.labels || [])].some((label) => label === pressed || label.contains(pressed)));
+      // The menu opens only for something you did: a click on the field, or Tab to it. A page can put the cursor in a
+      // field by itself, and mustn't get the menu up under a click you were about to make elsewhere.
+      let pressed = null, pressedAt = -Infinity, pressX = 0, pressY = 0;
+      // A click on the field's own box counts, whatever the page put there: its label, the box around it (a field
+      // with an icon in it, whose page focuses it for you), or a placeholder laid over it until you type.
+      const onField = (el) => {
+        if (pressed === el || [...(el.labels || [])].some((label) => label === pressed || label.contains(pressed))) return true;
+        const r = el.getBoundingClientRect(), m = 8;
+        if (pressX >= r.left - m && pressX <= r.right + m && pressY >= r.top - m && pressY <= r.bottom + m) return true;
+        if (!(pressed instanceof Element) || !pressed.contains(el)) return false;
+        const b = pressed.getBoundingClientRect();
+        return b.width <= r.width + 120 && b.height <= r.height * 2 + 24;
+      };
+      const byYou = (el) => performance.now() - pressedAt < 1000 && (pressed === 'Tab' || onField(el));
+      // Pointer down first: a page that handles presses itself can stop the mouse events that follow, never this one.
+      const press = (e) => {
+        if (!e.isTrusted || e.button !== 0) return;
+        const again = e.type === 'mousedown' && pressed === e.target && performance.now() - pressedAt < 500;
+        pressed = e.target; pressedAt = performance.now(); pressX = e.clientX; pressY = e.clientY;
+        // A click on a field the cursor is already in (one the page put it in when it opened) brings the menu too.
+        const active = document.activeElement;
+        if (!again && !window.__zigzagFilling && active && wanted(active) && onField(active)) report(active);
+      };
+      document.addEventListener('pointerdown', press, true);
+      document.addEventListener('mousedown', press, true);
       document.addEventListener('focusin', (e) => { if (!window.__zigzagFilling && wanted(e.target) && byYou(e.target)) report(e.target); }, true);
-      document.addEventListener('mousedown', (e) => { if (e.isTrusted && e.target === document.activeElement && wanted(e.target)) report(e.target); }, true);
       document.addEventListener('focusout', (e) => { if (wanted(e.target)) post({ kind: 'blur' }); }, true);
       document.addEventListener('input', (e) => { if (window.__zigzagSuggesting && wanted(e.target)) post({ kind: 'blur' }); }, true);
       window.addEventListener('scroll', () => { if (window.__zigzagSuggesting) post({ kind: 'blur' }); }, true);
