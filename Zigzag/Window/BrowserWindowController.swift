@@ -1634,6 +1634,12 @@ extension BrowserWindowController: TabHost {
         if !opener.isClosed { tabManager.select(opener) }
     }
 
+    func tabWantsToBeShown(_ tab: Tab) {
+        NSApp.activate()
+        window?.makeKeyAndOrderFront(nil)
+        if tabManager.selectedTab !== tab { tabManager.select(tab) }
+    }
+
     func tabDidChangeFullscreen(_ tab: Tab, isFullscreen: Bool) {}
 
     func tab(_ tab: Tab, hoveringLink url: URL?) {
