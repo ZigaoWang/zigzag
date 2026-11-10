@@ -1085,7 +1085,8 @@ enum DebugBridge {
             for tab in controller.tabManager.allTabs where !tab.isSuspended {
                 let state: String
                 if let w = tab.webView, w.responds(to: NSSelectorFromString("_isPlayingAudio")) { state = "\(w.value(forKey: "_isPlayingAudio") ?? "?")" } else { state = "n/a" }
-                debugLog("audio \(tab.displayTitle.prefix(30)) playing=\(tab.isPlayingAudio) kvo=\(state)")
+                let muted = tab.webView.flatMap { $0.responds(to: NSSelectorFromString("_mediaMutedState")) ? $0.value(forKey: "_mediaMutedState") : nil }
+                debugLog("audio \(tab.displayTitle.prefix(30)) playing=\(tab.isPlayingAudio) kvo=\(state) muted=\(tab.isMuted) webkitMuted=\(muted.map { "\($0)" } ?? "n/a")")
             }
         case "closeurl":
             for tab in controller.tabManager.allTabs where tab.url?.absoluteString.contains(arg) == true { controller.tabManager.close(tab) }
