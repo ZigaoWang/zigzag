@@ -1405,7 +1405,7 @@ final class Library {
     /// at the next start.
     ///
     /// False, with nothing changed, when that couldn't be written (a full disk): erasing its data then would leave
-    /// a profile that comes back at the next start with its passwords and history gone.
+    /// a profile that comes back at the next start with its extensions and history gone.
     @discardableResult
     func removeProfile(_ id: UUID) -> Bool {
         guard directory.profile(id)?.isDefault == false else { return false }

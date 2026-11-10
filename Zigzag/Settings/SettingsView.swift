@@ -1249,7 +1249,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                         toolTip: String(localized: "Delete", comment: "Tooltip of the trash button in Settings › Profiles, on data left by a profile that's no longer listed."))
                 delete.onClick = { [weak self] _ in
                     self?.confirm(title: String(localized: "Delete this profile’s data?", comment: "Title of the sheet that asks before deleting data left by a profile that's no longer listed."),
-                                  message: String(localized: "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins, saved passwords and history. Make sure you have your recovery phrases. This can’t be undone.", comment: "Message of the sheet that asks before deleting data left by a profile that's no longer listed."),
+                                  message: String(localized: "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins and history. Make sure you have your recovery phrases. This can’t be undone.", comment: "Message of the sheet that asks before deleting data left by a profile that's no longer listed."),
                                   action: String(localized: "Delete", comment: "Button of the sheet that deletes data left by a profile that's no longer listed.")) {
                         Task { @MainActor in
                             await Profiles.shared.eraseOrphan(id)
@@ -1562,7 +1562,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
         case .profiles:
             section(Self.profilesHeading, profilesGroup, accessory: addProfileButton)
-            let hint = Label(String(localized: "Each profile has its own extensions, sign-ins, passwords, history and favorites. Spaces on the same profile share them.", comment: "Under the list in Settings › Profiles."),
+            let hint = Label(String(localized: "Each profile has its own extensions, sign-ins, history and favorites. Spaces on the same profile share them.", comment: "Under the list in Settings › Profiles."),
                              font: Tokens.Font.detail(), color: Tokens.Color.textTertiary)
             hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y - Tokens.Page.groupGap + Tokens.Space.x2,
                                 width: contentWidth - Tokens.Page.groupPad, height: hint.lineHeight)

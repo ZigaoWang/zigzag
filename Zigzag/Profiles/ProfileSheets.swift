@@ -59,8 +59,8 @@ final class ColorDots: NSView {
     }
 }
 
-/// The profiles as a dropdown's choices, wherever one is chosen: Settings, a space's editor, the Passwords window,
-/// Import, adding an extension.
+/// The profiles as a dropdown's choices, wherever one is chosen: Settings, a space's editor, Import,
+/// adding an extension.
 enum ProfileChoice {
     /// Fills a dropdown with the profiles, each with its tile, and selects one. Returns their IDs in the order
     /// shown: the choice is read back from these, not from the list as it is later, which may have changed while
@@ -130,7 +130,7 @@ enum ProfileSheets {
             .note(String(localized: "Extensions are added fresh. Nothing they’ve stored in another profile comes along.", comment: "Note in the sheet that makes a profile, under the choice of which extensions it starts with.")),
         ]
         return FormSheet.show(in: host, title: String(localized: "New Profile", comment: "Title of the sheet that makes a profile."), symbol: "person",
-                       message: String(localized: "A profile has its own extensions, sign-ins, passwords, history and favorites. Spaces on the same profile share them.", comment: "Under the title of the sheet that makes a profile."),
+                       message: String(localized: "A profile has its own extensions, sign-ins, history and favorites. Spaces on the same profile share them.", comment: "Under the title of the sheet that makes a profile."),
                        rows: rows, confirmTitle: String(localized: "Create", comment: "Button that makes the profile, in the sheet that asks for its name."),
                        canConfirm: { [weak name] in !(name?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) }) { confirmed in
             guard confirmed else { return }
