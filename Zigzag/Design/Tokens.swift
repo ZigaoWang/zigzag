@@ -559,8 +559,6 @@ enum Tokens {
         static let glyphFrom: CGFloat = 0.7
         /// A button joining or leaving the address field grows from, or shrinks to, this scale.
         static let pinFrom: CGFloat = 0.6
-        /// How much a pinned button grows while it's carried along the address field.
-        static let dragLift: CGFloat = 1.04
         /// One shared highlight gliding from row to row in a menu, and a selection gliding between a list's places
         /// or a filter's segments.
         static let highlightGlide: TimeInterval = 0.14

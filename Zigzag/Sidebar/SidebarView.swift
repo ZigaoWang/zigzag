@@ -117,8 +117,7 @@ final class AddressView: InteractiveView {
         entry.pin = pin
         let button = entry.button
         button.image = pin.image
-        // Carried, it keeps the card it was picked up with, whatever its popup does.
-        if pinDrag?.entry !== entry { button.isSelected = pin.isActive }
+        button.isSelected = pin.isActive
         button.toolTip = pin.needsAttention ? String(localized: "\(pin.label): needs attention", comment: "Tooltip of an extension's button in the site panel when the extension asks for attention. The name is the extension's.") : pin.label
         // VoiceOver reads the extension's name, then what its badge says.
         button.setAccessibilityLabel(pin.label)
@@ -146,12 +145,6 @@ final class AddressView: InteractiveView {
     /// From one button in the field to the next.
     private static let pinStep = buttonSide + 2
 
-    /// The place a pin carried from `from` is over after moving `dx` along `count` pins: it takes a neighbor's place
-    /// once it's halfway there.
-    static func pinSlot(from: Int, dx: CGFloat, count: Int) -> Int {
-        min(max(from + Int((dx / pinStep).rounded()), 0), count - 1)
-    }
-
     // MARK: Reordering pins
 
     /// The showing pins in the order they were dropped in.
@@ -159,80 +152,107 @@ final class AddressView: InteractiveView {
     /// A pinned button was picked up.
     var onPinDragBegan: (() -> Void)?
 
-    /// A pin being carried along the field: the showing pins when it was picked up, their places, and the one it's over.
+    /// A pin being carried along the field: the showing pins when it was picked up, its copy (none outside a window),
+    /// and the gap it would drop into (nil: off the field).
     private struct PinDrag {
         let entry: PinEntry
         let order: [PinEntry]
         let from: Int
-        /// Each place's frame, left to right.
-        let places: [NSRect]
-        let startX: CGFloat
-        var to: Int
-        var dx: CGFloat = 0
+        let copy: CarriedCopy?
+        var slot: Int?
     }
     private var pinDrag: PinDrag?
     private var pendingPins: (pins: [Pin], animated: Bool)?
+    /// Where a carried pin would go, between two others: the space icons' line, at the field's buttons' size.
+    private let pinDropLine: ColorView = {
+        let line = ColorView(color: Tokens.Color.accent)
+        line.wantsLayer = true
+        line.layer?.cornerRadius = 1
+        line.isHidden = true
+        return line
+    }()
 
     private var showingEntries: [PinEntry] { Array(pinEntries.suffix(visiblePinIDs.count)) }
 
+    /// Picks a pin up, as a space icon is: it stays in its place, faint, a see-through copy follows the pointer, and a
+    /// line between two pins shows where it would go. Let go on the field, it moves there; off it, or with Esc, it
+    /// goes back.
     private func dragPin(_ entry: PinEntry, event: NSEvent) -> Bool {
-        guard let window, beginPinDrag(entry.pin.id, atX: event.locationInWindow.x) else { return false }
-        if let current = NSApp.currentEvent, current.type == .leftMouseDragged { movePinDrag(toX: current.locationInWindow.x) }
-        let released = CarriedCopy.track(in: window) { self.movePinDrag(toX: $0.locationInWindow.x) }
+        guard let window, beginPinDrag(entry.pin.id, at: event.locationInWindow) else { return false }
+        let released = CarriedCopy.track(in: window) { self.movePinDrag(to: $0.locationInWindow) }
         endPinDrag(drop: released != nil)
         return true
     }
 
-    /// Picks up a showing pin, with the pointer at `x` in the window.
+    /// Picks up a showing pin, the pointer at `point` in the window.
     @discardableResult
-    func beginPinDrag(_ id: String, atX x: CGFloat) -> Bool {
+    func beginPinDrag(_ id: String, at point: NSPoint) -> Bool {
         let order = showingEntries
         guard pinDrag == nil, order.count > 1, let from = order.firstIndex(where: { $0.pin.id == id }) else { return false }
         let entry = order[from]
         onPinDragBegan?()
-        pinDrag = PinDrag(entry: entry, order: order, from: from, places: order.map(\.button.frame), startX: x, to: from)
-        lift(entry.button)
+        let button = entry.button
+        var copy: CarriedCopy?
+        if let window {
+            copy = CarriedCopy(of: button, picture: CarriedCopy.picture(of: button), grabbedAt: window.convertPoint(toScreen: point),
+                               ground: Tokens.Color.panelBackground, radius: button.radius)
+        }
+        button.isPressed = false
+        button.isHovered = false
+        button.alphaValue = CarriedCopy.faint
+        copy?.lift()
+        pinDrag = PinDrag(entry: entry, order: order, from: from, copy: copy, slot: nil)
         return true
     }
 
-    /// The carried button follows the pointer sideways, only within the pins, and a neighbor it passes the middle of
-    /// glides into the place it left.
-    func movePinDrag(toX x: CGFloat) {
-        guard var drag = pinDrag else { return }
-        let step = Self.pinStep
-        drag.dx = min(max(x - drag.startX, -CGFloat(drag.from) * step), CGFloat(drag.order.count - 1 - drag.from) * step)
-        let to = Self.pinSlot(from: drag.from, dx: drag.dx, count: drag.order.count)
-        let moved = to != drag.to
-        drag.to = to
-        pinDrag = drag
-        if let layer = drag.entry.button.layer {
-            Tokens.Motion.withoutAnimation { layer.transform = carriedTransform(of: layer, dx: drag.dx) }
-        }
-        guard moved else { return }
-        for (index, entry) in drag.order.enumerated() where entry !== drag.entry {
-            let shift = drag.from < index && index <= to ? -1 : to <= index && index < drag.from ? 1 : 0
-            Tokens.Motion.glide(entry.button, to: drag.places[index + shift], timing: Tokens.Motion.easeOut)
-        }
+    /// Whether a pointer at this window point is on the field: anywhere along it, a little above and below it too;
+    /// past either end of the pins is the first or last place.
+    private func isOnField(_ point: NSPoint) -> Bool {
+        bounds.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(convert(point, from: nil))
     }
 
-    /// Lets go: dropped (`drop`) the pin takes the place it's over; called off, everything goes back.
+    /// The copy follows the pointer; nothing in the field moves, only the line shows where the pin would go.
+    func movePinDrag(to point: NSPoint) {
+        guard var drag = pinDrag else { return }
+        if let window { drag.copy?.follow(window.convertPoint(toScreen: point)) }
+        drag.slot = isOnField(point) ? SpaceReorder.slot(at: convert(point, from: nil).x, middles: drag.order.map(\.button.frame.midX)) : nil
+        pinDrag = drag
+        let from = drag.from
+        placePinDropLine(drag.slot.flatMap { SpaceReorder.destination(slot: $0, from: from) == nil ? nil : $0 }, among: drag.order)
+    }
+
+    /// Where the drag would drop the pin now; nil where it would stay.
+    var pinDropDestination: Int? {
+        guard let drag = pinDrag, let slot = drag.slot else { return nil }
+        return SpaceReorder.destination(slot: slot, from: drag.from)
+    }
+
+    /// The line in the gap before pin `slot` (after the last for the end); nil hides it.
+    private func placePinDropLine(_ slot: Int?, among order: [PinEntry]) {
+        guard let slot, let first = order.first?.button, let last = order.last?.button else { pinDropLine.isHidden = true; return }
+        // The middle of the gap between two buttons.
+        let x = slot < order.count ? order[slot].button.frame.minX - 1 : last.frame.maxX + 1
+        let width: CGFloat = 2, height = max(Tokens.Space.x2, first.frame.height - 12)
+        if pinDropLine.superview == nil { addSubview(pinDropLine) }
+        Tokens.Motion.withoutAnimation {
+            pinDropLine.frame = NSRect(x: x - width / 2, y: first.frame.midY - height / 2, width: width, height: height)
+        }
+        pinDropLine.isHidden = false
+    }
+
+    /// Lets go: dropped on the field (`drop`) the pin moves to the gap the line showed and the copy lands in its new
+    /// place; called off, it lands back where it was.
     func endPinDrag(drop: Bool) {
         guard let drag = pinDrag else { return }
+        let to = drop ? pinDropDestination : nil
         pinDrag = nil
-        let to = drop ? drag.to : drag.from
+        placePinDropLine(nil, among: [])
         var order = drag.order
-        order.remove(at: drag.from)
-        order.insert(drag.entry, at: to)
-        let instant = Tokens.Motion.isFromKey
-        for (index, entry) in order.enumerated() where entry !== drag.entry {
-            if instant {
-                Tokens.Motion.withoutAnimation { entry.button.frame = drag.places[index] }
-            } else {
-                Tokens.Motion.glide(entry.button, to: drag.places[index], timing: Tokens.Motion.easeOut)
-            }
+        if let to {
+            order.remove(at: drag.from)
+            order.insert(drag.entry, at: to)
+            pinEntries = pinEntries.dropLast(order.count) + order
         }
-        settle(drag, at: drag.places[to], instant: instant)
-        pinEntries = pinEntries.dropLast(order.count) + order
         let dropped = order.map(\.pin.id)
         // What waited for the drop lands now, in the dropped order, whatever the store goes on to say.
         if let pending = pendingPins {
@@ -240,46 +260,36 @@ final class AddressView: InteractiveView {
             let ids = ExtensionPins(ids: pending.pins.map(\.id)).reordered(visible: dropped).ids
             setPins(ids.compactMap { id in pending.pins.first { $0.id == id } }, animated: pending.animated)
         }
-        if to != drag.from { onPinsReordered?(dropped) }
+        if to != nil { onPinsReordered?(dropped) }
         reflow(animated: true)
-    }
-
-    private func carriedTransform(of layer: CALayer, dx: CGFloat) -> CATransform3D {
-        CATransform3DConcat(Tokens.Motion.scale(Tokens.Motion.dragLift, of: layer), CATransform3DMakeTranslation(dx, 0, 0))
-    }
-
-    /// Picked up: above its neighbors, a touch bigger, on the shared lifted card.
-    private func lift(_ button: IconButton) {
-        addSubview(button, positioned: .above, relativeTo: nil)
-        button.selectsAsCard = true
-        button.isSelected = true
-        guard let layer = button.layer else { return }
-        // Picking it up ended the press: its spring back would pull against the lift.
-        layer.removeAnimation(forKey: "press")
-        let lifted = carriedTransform(of: layer, dx: 0)
-        Tokens.Motion.withoutAnimation { layer.transform = lifted }
-        guard !Tokens.Motion.reduceMotion else { return }
-        Tokens.Motion.animateTransform(of: layer, from: CATransform3DIdentity, to: lifted, duration: Tokens.Motion.pressIn, forKey: "lift")
-    }
-
-    /// Set down in its place, shrinking back on the way from wherever the pointer left it.
-    private func settle(_ drag: PinDrag, at place: NSRect, instant: Bool) {
         let button = drag.entry.button
-        // In this order: only the card's look takes the shadow away.
-        button.isSelected = false
-        button.selectsAsCard = false
-        button.isSelected = drag.entry.pin.isActive
-        guard let layer = button.layer else { button.frame = place; return }
-        let origin = drag.places[drag.from].minX + drag.dx
-        let carried = CATransform3DConcat(Tokens.Motion.scale(Tokens.Motion.dragLift, of: layer), CATransform3DMakeTranslation(origin - place.minX, 0, 0))
-        layer.removeAnimation(forKey: "lift")
-        Tokens.Motion.withoutAnimation {
-            layer.transform = CATransform3DIdentity
-            button.frame = place
+        button.alphaValue = 1
+        if let copy = drag.copy {
+            copy.land(on: button.superview === self && !button.isHidden ? button : nil)
         }
-        guard !instant, !Tokens.Motion.reduceMotion else { return }
-        Tokens.Motion.animateTransform(of: layer, from: carried, to: CATransform3DIdentity, duration: Tokens.Motion.standard, forKey: "glide", fillsBackwards: true)
     }
+
+    #if DEBUG
+    /// pindrag begin <id> | move <x> [y] (window points, top-left; y defaults to the field's middle) | drop | cancel:
+    /// the drag a pointer would make, through the same steps.
+    func debugPinDrag(_ arg: String) {
+        guard let window else { return }
+        let f = arg.split(separator: " ").map(String.init)
+        let middle = convert(NSPoint(x: 0, y: bounds.midY), to: nil).y
+        switch f.first {
+        case "begin":
+            guard f.count >= 2, let button = pinButton(for: f[1]) else { return }
+            _ = beginPinDrag(f[1], at: button.convert(NSPoint(x: button.bounds.midX, y: button.bounds.midY), to: nil))
+        case "move":
+            guard f.count >= 2, let x = Double(f[1]) else { return }
+            let y = f.count >= 3 ? Double(f[2]).map { window.frame.height - $0 } ?? middle : middle
+            movePinDrag(to: NSPoint(x: x, y: y))
+        case "drop": endPinDrag(drop: true)
+        case "cancel": endPinDrag(drop: false)
+        default: break
+        }
+    }
+    #endif
 
     /// Moves a showing pin one place, as a drag does: Move Left and Move Right, by menu or VoiceOver.
     func movePin(_ id: String, by offset: Int) {

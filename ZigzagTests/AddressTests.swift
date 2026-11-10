@@ -102,16 +102,50 @@ struct AddressTests {
         #expect(address.pinButton(for: "a")?.isHidden == true)
     }
 
-    @Test(arguments: [(1, 13.0, 1), (1, 14.0, 2), (1, -14.0, 0), (0, -100.0, 0), (2, 100.0, 2), (0, 56.0, 2)])
-    func aCarriedPinTakesAPlaceOnceHalfwayThere(from: Int, dx: Double, slot: Int) {
-        #expect(AddressView.pinSlot(from: from, dx: dx, count: 3) == slot)
+    /// On a 224pt field the pins sit at 112, 140 and 168 (middles 125, 153, 181), Site Controls at 196.
+    private func at(_ x: CGFloat, _ y: CGFloat = 15) -> NSPoint { NSPoint(x: x, y: y) }
+
+    @Test func aCarriedPinStaysFaintInItsPlaceAndNothingElseMoves() {
+        let address = field()
+        address.setPins([pin("a"), pin("b"), pin("c")], animated: false)
+        let frames = ["a", "b", "c"].map { address.pinButton(for: $0)?.frame }
+        #expect(address.beginPinDrag("a", at: at(125)))
+        address.movePinDrag(to: at(190))
+        #expect(["a", "b", "c"].map { address.pinButton(for: $0)?.frame } == frames)
+        #expect(address.pinButton(for: "a")?.alphaValue == CarriedCopy.faint)
+        #expect(address.pinButton(for: "b")?.alphaValue == 1)
+        #expect(address.pinDropDestination == 2)
+        address.endPinDrag(drop: false)
+        #expect(address.pinButton(for: "a")?.alphaValue == 1)
+    }
+
+    @Test(arguments: [(100.0, nil), (130.0, nil), (150.0, nil), (160.0, 1), (190.0, 2), (215.0, 2), (230.0, nil)] as [(Double, Int?)])
+    func aPinDropsIntoTheGapUnderThePointer(x: Double, destination: Int?) {
+        let address = field()
+        address.setPins([pin("a"), pin("b"), pin("c")], animated: false)
+        address.beginPinDrag("a", at: at(125))
+        address.movePinDrag(to: at(x))
+        #expect(address.pinDropDestination == destination)
+    }
+
+    @Test func offTheFieldAPinGoesBack() {
+        let address = field()
+        address.setPins([pin("a"), pin("b")], animated: false)
+        var order: [String]?
+        address.onPinsReordered = { order = $0 }
+        address.beginPinDrag("a", at: at(153))
+        address.movePinDrag(to: at(190, 60))
+        #expect(address.pinDropDestination == nil)
+        address.endPinDrag(drop: true)
+        #expect(order == nil)
+        #expect(address.visiblePinIDs == ["a", "b"])
     }
 
     @Test func whileAPinIsCarriedContentChangesAndStructureWaits() {
         let address = field()
         address.setPins([pin("a"), pin("b")], animated: false)
         let button = address.pinButton(for: "a")
-        #expect(address.beginPinDrag("b", atX: 100))
+        #expect(address.beginPinDrag("b", at: at(181)))
         address.setPins([pin("b", badge: "3")], animated: false)
         #expect(address.pinButton(for: "a") === button)
         #expect(address.pinButton(for: "b")?.subviews.compactMap { $0 as? BadgeView }.first?.text == "3")
@@ -124,8 +158,8 @@ struct AddressTests {
         address.setPins([pin("a"), pin("b")], animated: false)
         var order: [String]?
         address.onPinsReordered = { order = $0 }
-        address.beginPinDrag("a", atX: 100)
-        address.movePinDrag(toX: 130)
+        address.beginPinDrag("a", at: at(153))
+        address.movePinDrag(to: at(190))
         address.endPinDrag(drop: true)
         #expect(order == ["b", "a"])
     }
@@ -135,8 +169,8 @@ struct AddressTests {
         address.setPins([pin("a"), pin("b")], animated: false)
         var order: [String]?
         address.onPinsReordered = { order = $0 }
-        address.beginPinDrag("a", atX: 100)
-        address.movePinDrag(toX: 130)
+        address.beginPinDrag("a", at: at(153))
+        address.movePinDrag(to: at(190))
         address.endPinDrag(drop: false)
         #expect(order == nil)
         #expect(address.visiblePinIDs == ["a", "b"])
@@ -158,8 +192,8 @@ struct AddressTests {
     @Test func aPinRemovedDuringADragGoesEvenIfTheStoreSaysNothing() {
         let address = field()
         address.setPins([pin("a"), pin("b")], animated: false)
-        address.beginPinDrag("a", atX: 100)
-        address.movePinDrag(toX: 130)
+        address.beginPinDrag("a", at: at(153))
+        address.movePinDrag(to: at(190))
         address.setPins([pin("a")], animated: false)
         address.endPinDrag(drop: true)
         #expect(address.pinButton(for: "b") == nil)
@@ -169,8 +203,8 @@ struct AddressTests {
     @Test func aDropWithPendingChangesKeepsTheDroppedOrder() {
         let address = field()
         address.setPins([pin("a"), pin("b"), pin("c")], animated: false)
-        address.beginPinDrag("a", atX: 100)
-        address.movePinDrag(toX: 130)
+        address.beginPinDrag("a", at: at(125))
+        address.movePinDrag(to: at(170))
         address.setPins([pin("a"), pin("b", badge: "2"), pin("c")], animated: false)
         address.endPinDrag(drop: true)
         #expect(address.visiblePinIDs == ["b", "a", "c"])
