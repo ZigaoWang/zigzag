@@ -104,6 +104,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.backButton.onRightClick = { [weak self] _ in self?.historyMenu(back: true) }
         sidebar.forwardButton.onRightClick = { [weak self] _ in self?.historyMenu(back: false) }
         sidebar.sidebarButton.onClick = { [weak self] _ in self?.toggleBrowserSidebar(nil) }
+        root.topBar.sidebarButton.onClick = { [weak self] _ in self?.toggleBrowserSidebar(nil) }
         sidebar.forwardButton.onClick = { [weak self] _ in self?.goForward(nil) }
         sidebar.address.onRightClick = { [weak self] _ in
             if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
@@ -1413,9 +1414,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         lightsWereDockedOrInBar = docked || inBar
         sidebar.trafficLightsWidth = fullScreen ? 0 : window.trafficLightsWidth
         root.topBar.trafficLightsWidth = inBar && !fullScreen ? window.trafficLightsWidth : 0
+        // With the sidebar hidden its toggle goes with it, so the bar above the page has one of its own.
+        root.topBar.showsSidebarButton = root.showsTopBar && !docked
         sidebar.sidebarButton.toolTip = Shortcuts.tooltip(docked ? String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows.")
                                                                   : String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."),
                                                            for: #selector(toggleBrowserSidebar(_:)))
+        root.topBar.sidebarButton.toolTip = Shortcuts.tooltip(String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."),
+                                                              for: #selector(toggleBrowserSidebar(_:)))
         sidebar.backButton.toolTip = Shortcuts.tooltip(String(localized: "Back", comment: "Tooltip of the sidebar's back button."), for: #selector(goBack(_:)))
         sidebar.forwardButton.toolTip = Shortcuts.tooltip(String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."), for: #selector(goForward(_:)))
         sidebar.reloadButton.toolTip = SidebarView.reloadTip(loading: selectedTab?.isLoading ?? false)
