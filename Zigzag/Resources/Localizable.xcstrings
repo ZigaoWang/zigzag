@@ -1623,13 +1623,13 @@
         }
       }
     },
-    "A profile has its own extensions, sign-ins, passwords, history and favorites. Spaces on the same profile share them." : {
+    "A profile has its own extensions, sign-ins, history and favorites. Spaces on the same profile share them." : {
       "comment" : "Under the title of the sheet that makes a profile.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "描述文件有自己的扩展、登录状态、密码、历史记录和收藏。同一描述文件中的空间共用这些内容。"
+            "value" : "描述文件有自己的扩展、登录状态、历史记录和收藏。同一描述文件中的空间共用这些内容。"
           }
         }
       }
@@ -5035,13 +5035,13 @@
         }
       }
     },
-    "Each profile has its own extensions, sign-ins, passwords, history and favorites. Spaces on the same profile share them." : {
+    "Each profile has its own extensions, sign-ins, history and favorites. Spaces on the same profile share them." : {
       "comment" : "Under the list in Settings › Profiles.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "每个描述文件都有自己的扩展、登录状态、密码、历史记录和收藏。同一描述文件中的空间共用这些内容。"
+            "value" : "每个描述文件都有自己的扩展、登录状态、历史记录和收藏。同一描述文件中的空间共用这些内容。"
           }
         }
       }
@@ -6465,13 +6465,13 @@
         }
       }
     },
-    "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins, saved passwords and history. Make sure you have your recovery phrases. This can’t be undone." : {
+    "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins and history. Make sure you have your recovery phrases. This can’t be undone." : {
       "comment" : "Message of the sheet that asks before deleting data left by a profile that's no longer listed.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "它的扩展及其保存的所有内容（包括钱包）都会被删除，登录状态、已存储的密码和历史记录也会一并删除。请确认你已保存好恢复短语。此操作不可撤销。"
+            "value" : "它的扩展及其保存的所有内容（包括钱包）都会被删除，登录状态和历史记录也会一并删除。请确认你已保存好恢复短语。此操作不可撤销。"
           }
         }
       }

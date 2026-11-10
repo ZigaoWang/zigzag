@@ -44,7 +44,7 @@ nonisolated struct ProfileDirectory: Codable, Equatable {
         spaces = try values.decodeIfPresent([String: UUID].self, forKey: .spaces) ?? [:]
         favorites = try values.decodeIfPresent([String: UUID].self, forKey: .favorites) ?? [:]
         // Never the first profile: a file that named it here (damaged, or edited by hand) would have its
-        // passwords and extensions erased at the next start.
+        // extensions and history erased at the next start.
         deleting = (try values.decodeIfPresent([ProfileInfo].self, forKey: .deleting) ?? []).filter { !$0.isDefault }
     }
 
