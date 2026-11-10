@@ -10,14 +10,19 @@ import Foundation
 nonisolated enum FirefoxImporter {
     struct Browser: Sendable, Hashable {
         let name: String
-        let bundleID: String
+        /// Its app, then others keeping their profiles in the same folder.
+        let bundleIDs: [String]
         /// Under ~/Library/Application Support.
         let root: String
+
+        /// The app on this Mac, for its icon.
+        var bundleID: String { BrowserFolders.installedApp(bundleIDs) }
     }
 
     static let browsers: [Browser] = [
-        Browser(name: "Firefox", bundleID: "org.mozilla.firefox", root: "Firefox"),
-        Browser(name: "Zen", bundleID: "app.zen-browser.zen", root: "zen"),
+        // Developer Edition and Nightly list their own profiles in Firefox's profiles.ini: one source brings all.
+        Browser(name: "Firefox", bundleIDs: ["org.mozilla.firefox", "org.mozilla.firefoxdeveloperedition", "org.mozilla.nightly"], root: "Firefox"),
+        Browser(name: "Zen", bundleIDs: ["app.zen-browser.zen"], root: "zen"),
     ]
 
     static func rootURL(of browser: Browser) -> URL {
