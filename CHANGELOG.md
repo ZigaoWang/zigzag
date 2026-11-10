@@ -8,10 +8,18 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [0.7.9] - 2026-11-10
 
 ### New
+- Bring everything over from more browsers: Orion, Helium, Comet, Yandex, Naver Whale, Chromium, Thorium, Chrome Beta, Dev and Canary, Brave Beta and Nightly, and Firefox Developer Edition and Nightly. Only the browsers on your Mac are listed. ([#41](https://github.com/ZigaoWang/zigzag/issues/41), [#46](https://github.com/ZigaoWang/zigzag/issues/46))
+- Settings › Appearance › Address bar above the page: back, forward, reload and the address move into a slim bar above the page. Thanks to [philigrin](https://github.com/philigrin) for the idea. ([#20](https://github.com/ZigaoWang/zigzag/issues/20))
+- Pin up to three extensions next to the address: hover an extension in Site Controls and click its pin. Thanks to [vandenbulckjean](https://github.com/vandenbulckjean) for building it. ([#22](https://github.com/ZigaoWang/zigzag/issues/22))
+- Hold ⌃ to see each space's number for ⌃1–9, as holding ⌘ shows the tabs'. ([#43](https://github.com/ZigaoWang/zigzag/issues/43))
 - Hold ⌥⌘ and drag anywhere on a page to move the window, handy with a borderless page and the sidebar hidden. ⌥⌘ double-click zooms it. ([#40](https://github.com/ZigaoWang/zigzag/issues/40))
 
 ### Fixed
+- Rabby unlocks and reaches websites. Thanks to [vandenbulckjean](https://github.com/vandenbulckjean) for the fix. ([#12](https://github.com/ZigaoWang/zigzag/issues/12))
 - Error pages say what happened in plain words, keep the site's name whole, and offer what fits: Try Again, Go Back, or Reload for a page that stopped. Details holds the exact error, ready to copy, and a page that failed while you were offline loads again once you're back online. ([#39](https://github.com/ZigaoWang/zigzag/issues/39))
+- Clear keeps the tabs from what you're working on now. What counts as recent follows your own pace, so it no longer leaves only one or two tabs. ([#42](https://github.com/ZigaoWang/zigzag/issues/42))
+- Hovering a tab shows and hides its highlight at once, and the find bar (⌘F) drops down from the top and goes back up. ([#44](https://github.com/ZigaoWang/zigzag/issues/44))
+- Extensions see each tab's site icon, as in Sound Booster's list of tabs, and an extension that can't hear a streamed tab, as on YouTube, says so instead of failing quietly. ([#45](https://github.com/ZigaoWang/zigzag/issues/45))
 
 ## [0.7.8] - 2026-11-10
 
