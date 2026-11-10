@@ -555,10 +555,6 @@ enum Tokens {
         /// A sheet (a confirmation, the notes) grows from a little below its middle, so it settles up into place over
         /// its scrim rather than swelling out of a point.
         static let sheetOrigin = CGPoint(x: 0.5, y: 0.7)
-        /// A small glyph popping in where another was: from this scale with a fade, in `enter`.
-        static let glyphFrom: CGFloat = 0.7
-        /// A button joining or leaving the address field grows from, or shrinks to, this scale.
-        static let pinFrom: CGFloat = 0.6
         /// One shared highlight gliding from row to row in a menu, and a selection gliding between a list's places
         /// or a filter's segments.
         static let highlightGlide: TimeInterval = 0.14
@@ -573,18 +569,6 @@ enum Tokens {
             let px = (point.x - anchor.x) * size.width
             let py = ((flipped ? point.y : 1 - point.y) - anchor.y) * size.height
             return CATransform3DConcat(CATransform3DMakeScale(k, k, 1), CATransform3DMakeTranslation(px * (1 - k), py * (1 - k), 0))
-        }
-
-        /// Runs a layer's transform from one value to another, eased out. The layer's own value is the caller's to set.
-        static func animateTransform(of layer: CALayer, from: CATransform3D, to: CATransform3D, duration: TimeInterval,
-                                     forKey key: String, fillsBackwards: Bool = false) {
-            let animation = CABasicAnimation(keyPath: "transform")
-            animation.fromValue = NSValue(caTransform3D: from)
-            animation.toValue = NSValue(caTransform3D: to)
-            animation.duration = duration * debugSlowdown
-            animation.timingFunction = easeOut
-            if fillsBackwards { animation.fillMode = .backwards }
-            layer.add(animation, forKey: key)
         }
 
         // MARK: Showing up and going

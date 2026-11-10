@@ -493,11 +493,13 @@ final class AddressView: InteractiveView {
             }
             return
         }
-        button.layer?.removeAnimation(forKey: "address.leave")
         button.isHidden = false
         Tokens.Motion.withoutAnimation { button.frame = frame }
-        if animated, let layer = button.layer { layer.add(appearance(of: layer, arriving: true), forKey: "address.arrive") }
+        // Shows up the shared way, out of its own middle; or, all at once, takes away what a going left on it.
+        if animated { Tokens.Motion.present(button, from: Self.buttonOrigin, entering: true) } else { Tokens.Motion.settle(button) }
     }
+
+    private static let buttonOrigin = Tokens.Motion.Origin.point(CGPoint(x: 0.5, y: 0.5))
 
     /// Takes a button out of the field, if it's in it. `removing`: its pin is gone for good, so the button goes
     /// whether or not it was showing.
@@ -507,38 +509,14 @@ final class AddressView: InteractiveView {
         button.isPressed = false
         button.isHovered = false
         let finish = { [weak self, weak button] in
+            // Back in the field meanwhile: it stays.
             guard let self, let button, !self.drawn.contains(ObjectIdentifier(button)) else { return }
-            button.layer?.removeAnimation(forKey: "address.leave")
             button.isHidden = true
+            Tokens.Motion.settle(button)
             if removing { button.removeFromSuperview() }
         }
-        guard wasDrawn, animated, let layer = button.layer else { finish(); return }
-        CATransaction.begin()
-        CATransaction.setCompletionBlock { MainActor.assumeIsolated(finish) }
-        layer.add(appearance(of: layer, arriving: false), forKey: "address.leave")
-        CATransaction.commit()
-    }
-
-    /// A button coming or going: its fade, and, unless Reduce Motion is on, its growth from `Motion.pinFrom`.
-    private func appearance(of layer: CALayer, arriving: Bool) -> CAAnimation {
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = arriving ? 0 : 1
-        fade.toValue = arriving ? 1 : 0
-        let group = CAAnimationGroup()
-        group.animations = [fade]
-        if !Tokens.Motion.reduceMotion {
-            let small = NSValue(caTransform3D: Tokens.Motion.scale(Tokens.Motion.pinFrom, of: layer)), full = NSValue(caTransform3D: CATransform3DIdentity)
-            let scale = CABasicAnimation(keyPath: "transform")
-            scale.fromValue = arriving ? small : full
-            scale.toValue = arriving ? full : small
-            group.animations?.append(scale)
-        }
-        group.duration = Tokens.Motion.standard
-        group.timingFunction = Tokens.Motion.easeOut
-        // Leaving, it stays gone until its button is hidden.
-        group.fillMode = arriving ? .backwards : .forwards
-        group.isRemovedOnCompletion = arriving
-        return group
+        guard wasDrawn, animated else { finish(); return }
+        Tokens.Motion.present(button, from: Self.buttonOrigin, entering: false, completion: finish)
     }
 
     /// The field's trailing end belongs to its buttons (`pressOutset`): a press on the rim around one presses it

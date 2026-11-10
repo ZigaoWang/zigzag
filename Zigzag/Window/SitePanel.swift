@@ -556,7 +556,6 @@ final class HoverPin: InteractiveView {
         super.init(frame: NSRect(x: 0, y: 0, width: side, height: side))
         pressScales = true
         isHidden = true
-        alphaValue = 0
         layer?.cornerRadius = side / 2
         icon.image = Tokens.Symbol.image("pin.fill", size: Tokens.Symbol.inline)
         icon.imageScaling = .scaleNone
@@ -575,7 +574,7 @@ final class HoverPin: InteractiveView {
         toolTip = state == .pinned ? SitePanel.unpinTitle : state == .atLimit ? SitePanel.pinLimitTip : SitePanel.pinTitle
     }
 
-    /// Fades in, growing from `Motion.glyphFrom`, and fades out; from the keyboard it's simply there.
+    /// Shows up and goes the shared way, out of its own middle; from the keyboard it's simply there.
     func setShowing(_ showing: Bool) {
         guard showing != isShowing else { return }
         isShowing = showing
@@ -584,13 +583,17 @@ final class HoverPin: InteractiveView {
             // A pointer already over it, when the tile brought it up, gets no "entered".
             if let window { isHovered = bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)) }
         }
-        Tokens.Motion.animate(Tokens.Motion.feedback, { self.animator().alphaValue = showing ? 1 : 0 }, completion: { [weak self] in
+        guard window != nil, !Tokens.Motion.isFromKey else {
+            Tokens.Motion.settle(self)
+            isHidden = !showing
+            return
+        }
+        Tokens.Motion.present(self, from: .point(CGPoint(x: 0.5, y: 0.5)), entering: showing) { [weak self] in
+            // Shown again while going: it stays.
             guard let self, !self.isShowing else { return }
             self.isHidden = true
-        })
-        guard showing, !Tokens.Motion.isFromKey, !Tokens.Motion.reduceMotion, let layer else { return }
-        Tokens.Motion.animateTransform(of: layer, from: Tokens.Motion.scale(Tokens.Motion.glyphFrom, of: layer), to: CATransform3DIdentity,
-                                       duration: Tokens.Motion.enter, forKey: "appear")
+            Tokens.Motion.settle(self)
+        }
     }
 
     override func stateDidChange(animated: Bool) {
