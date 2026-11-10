@@ -18,8 +18,10 @@ final class EnergyWatch {
     /// Busy, as a share of one core, for long enough to be more than a page finishing its load.
     private static let busy = 0.7
     private static let interval: TimeInterval = 10
-    /// A minute busy: long past a load, and long enough to be the page's habit.
-    private static let rounds = 6
+    /// Three minutes busy out of sight: long past a load or a burst of live updates (a forum, a feed), long enough to
+    /// be the page's habit. Pages out of sight already have their timers slowed by WebKit, so one still this busy is
+    /// stuck, not merely live.
+    private static let rounds = 18
     /// A page you left this recently stays awake, so a reply you were writing in it isn't lost.
     private static let recentlySeen: TimeInterval = 2 * 60
 
@@ -108,8 +110,9 @@ final class EnergyWatch {
             for tab in owner.tabManager.allTabs where tab.webView.flatMap(Self.processID) == pid && !Self.isOnScreen(tab, in: owner)
                 && !kept.contains(where: { $0 === tab }) {
                 let mustStay = url.scheme == "webkit-extension" || tab.isPlayingAudio || tab.isInUse || tab.notifiesUser
+                    || tab.pageState?.hasTypedText == true
                 if mustStay { awake.append(tab) } else if now.timeIntervalSince(tab.lastActivated) <= Self.recentlySeen { soon = true } else {
-                    tab.suspend()
+                    tab.suspend(because: "using a lot of energy")
                     slept.append(tab)
                 }
             }
