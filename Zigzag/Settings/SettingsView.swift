@@ -696,7 +696,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Appearance
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
         appearanceGroup.add(FormRow(title: String(localized: "Borderless page", comment: "A setting in Settings › Appearance."),
-                                    detail: String(localized: "The page meets the window’s edges instead of floating inside it.", comment: "Explanation under “Borderless page” in Settings › Appearance."),
+                                    detail: String(localized: "The page meets the window’s edges instead of floating inside it. Hold ⌥⌘ and drag anywhere on the page to move the window.", comment: "Explanation under “Borderless page” in Settings › Appearance. ⌥⌘ are the Option and Command keys."),
                                     control: borderlessToggle))
         largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
         appearanceGroup.add(FormRow(title: String(localized: "Large space names", comment: "A setting in Settings › Appearance."),

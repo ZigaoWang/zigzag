@@ -131,7 +131,7 @@ final class BrowserWindow: NSWindow {
     private static func isInPage(_ view: NSView) -> Bool {
         var view: NSView? = view
         while let current = view {
-            if current is WKWebView { return true }
+            if current is WKWebView || current is ZigzagPDFView { return true }
             view = current.superview
         }
         return false
@@ -156,9 +156,48 @@ final class BrowserWindow: NSWindow {
             UndoClock.lastPageInput = Date()
         }
         if let eventInterceptor, eventInterceptor(event) { return }
+        if movesWindow(for: event) { return }
         if event.type == .scrollWheel, pdfView(at: event.locationInWindow)?.takesSwipe(event) == true { return }
         if routeTitlebarEvent(event) { return }
         super.sendEvent(event)
+    }
+
+    // MARK: Moving the window from the page
+
+    /// ⌥⌘ held over a page: the window moves from anywhere on it, as a title bar would, since a borderless page
+    /// leaves nothing else to hold. Both keys sit side by side, and no page or macOS gesture uses them for dragging.
+    static func isMoveChord(_ flags: NSEvent.ModifierFlags) -> Bool {
+        flags.intersection([.command, .option, .control, .shift]) == [.command, .option]
+    }
+
+    private var showsMoveHand = false
+
+    private func movesWindow(for event: NSEvent) -> Bool {
+        switch event.type {
+        case .flagsChanged, .mouseMoved:
+            updateMoveHand(flags: event.modifierFlags, at: event.locationInWindow)
+            return false
+        case .leftMouseDown:
+            guard Self.isMoveChord(event.modifierFlags), isOverPage(event.locationInWindow) else { return false }
+            // Twice, as on a title bar: the window zooms.
+            if event.clickCount == 2 { performZoom(nil) } else { performDrag(with: event) }
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func isOverPage(_ point: NSPoint) -> Bool {
+        guard let content = contentView, let hit = content.hitTest(content.convert(point, from: nil)) else { return false }
+        return Self.isInPage(hit)
+    }
+
+    /// The open hand while ⌥⌘ is held over a page, so it's clear a drag will move the window.
+    private func updateMoveHand(flags: NSEvent.ModifierFlags, at point: NSPoint) {
+        let wanted = isKeyWindow && Self.isMoveChord(flags) && isOverPage(point)
+        guard wanted != showsMoveHand else { if wanted { NSCursor.openHand.set() }; return }
+        showsMoveHand = wanted
+        if wanted { NSCursor.openHand.push() } else { NSCursor.pop() }
     }
 
     /// The PDF under the pointer, when one is: its scrolls go to its swipe before PDFKit's scroll view.

@@ -580,3 +580,16 @@ struct SiteNameShorteningTests {
         #expect(AddressView.lineBreak(forName: "Settings") == .byTruncatingTail)
     }
 }
+
+/// ⌥⌘ and nothing else moves the window from the page, so ⌘-clicks and other shortcuts still reach it.
+@MainActor
+struct MoveWindowChordTests {
+    @Test func onlyOptionCommandMovesTheWindow() {
+        #expect(BrowserWindow.isMoveChord([.command, .option]))
+        #expect(BrowserWindow.isMoveChord([.command, .option, .capsLock, .function]))
+        #expect(!BrowserWindow.isMoveChord([.command]))
+        #expect(!BrowserWindow.isMoveChord([.option]))
+        #expect(!BrowserWindow.isMoveChord([.command, .option, .shift]))
+        #expect(!BrowserWindow.isMoveChord([.command, .option, .control]))
+    }
+}

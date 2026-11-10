@@ -11959,13 +11959,13 @@
         }
       }
     },
-    "The page meets the window’s edges instead of floating inside it." : {
-      "comment" : "Explanation under “Borderless page” in Settings › Appearance.",
+    "The page meets the window’s edges instead of floating inside it. Hold ⌥⌘ and drag anywhere on the page to move the window." : {
+      "comment" : "Explanation under “Borderless page” in Settings › Appearance. ⌥⌘ are the Option and Command keys.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "页面直接贴合窗口边缘，而不是浮在窗口中。"
+            "value" : "页面直接贴合窗口边缘，而不是浮在窗口中。按住 ⌥⌘ 在网页任意位置拖动，即可移动窗口。"
           }
         }
       }
