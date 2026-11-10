@@ -308,13 +308,16 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     /// Where the row's text starts, for the divider under it.
     var textInset: CGFloat { Tokens.Page.groupPad + Tokens.Metric.favicon + Tokens.Space.x3 }
 
-    private static func tile(for space: SpaceInfo) -> NSImage {
+    private static func tile(for space: SpaceInfo) -> NSImage { tile(name: space.name, swatch: space.swatch, icon: space.icon) }
+
+    /// A color as a tile with a name's first letter, or an icon: a space's, and a profile's.
+    static func tile(name: String, swatch: NSColor, icon: String?) -> NSImage {
         let side = Tokens.Metric.favicon
-        let letter = space.name.trimmingCharacters(in: .whitespaces).first.map { String($0).uppercased() } ?? ""
+        let letter = name.trimmingCharacters(in: .whitespaces).first.map { String($0).uppercased() } ?? ""
         return NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
             let radius = Tokens.Radius.control
             let shape = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
-            let base = space.swatch.usingColorSpace(.sRGB) ?? space.swatch
+            let base = swatch.usingColorSpace(.sRGB) ?? swatch
             NSGradient(starting: base.highlight(withLevel: 0.12) ?? base, ending: base)?.draw(in: shape, angle: -90)
             // A fine edge, so a white or pale space still shows its tile.
             Tokens.Color.keyCapEdge.setStroke()
@@ -325,7 +328,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
             // White on a color, dark on a pale one.
             let ink = Tokens.Color.ink(on: base)
             // Its icon if it has one, white on the color like the letter; an emoji in its own colors.
-            if let icon = space.icon {
+            if let icon {
                 let image = IconChoice.image(icon, size: Tokens.Symbol.inline)
                 let size = image.size
                 let spot = NSRect(x: (side - size.width) / 2, y: (side - size.height) / 2, width: size.width, height: size.height)
@@ -438,7 +441,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
 /// its name in the page's address (zigzag://settings/privacy), which a tab keeps with the session: a pane can be
 /// added anywhere in the column, but a name never changes.
 enum SettingsPane: String, CaseIterable {
-    case general, appearance, tabs, spaces, search, mini, passwords, privacy, translation, extensions, shortcuts
+    case general, appearance, tabs, spaces, profiles, search, mini, passwords, privacy, translation, extensions, shortcuts
 
     var title: String {
         switch self {
@@ -446,6 +449,7 @@ enum SettingsPane: String, CaseIterable {
         case .appearance: String(localized: "Appearance", comment: "A section of Settings: how the window and sidebar look.")
         case .tabs: String(localized: "Tabs", comment: "A section of Settings.")
         case .spaces: String(localized: "Spaces", comment: "A section of Settings.")
+        case .profiles: String(localized: "Profiles", comment: "A section of Settings: profiles, each with its own extensions and sign-ins.")
         case .search: String(localized: "Search", comment: "A section of Settings: the search engine and suggestions.")
         case .mini: MiniWindowController.name
         case .passwords: String(localized: "Passwords", comment: "A section of Settings.")
@@ -462,6 +466,7 @@ enum SettingsPane: String, CaseIterable {
         case .appearance: "paintbrush"
         case .tabs: "square.on.square"
         case .spaces: "square.stack"
+        case .profiles: "person"
         case .search: "magnifyingglass"
         case .mini: "macwindow"
         case .passwords: "key"
@@ -518,6 +523,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let searchGroup = FormGroup()
     private let blockingGroup = FormGroup()
     private let spacesGroup = FormGroup()
+    private let profilesGroup = FormGroup()
     private let appearanceGroup = FormGroup()
     private let miniGroup = FormGroup()
     /// Zigzag Mini's shortcut, as the menu has it now.
@@ -586,6 +592,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let translateInto = DropdownButton()
     private var languages: [(id: String, name: String)] = []
     private let addSpaceButton = PillButton(title: String(localized: "New Space", comment: "Button beside Your Spaces in Settings › Spaces."))
+    private let addProfileButton = PillButton(title: String(localized: "New Profile", comment: "Button beside Your Profiles in Settings › Profiles."))
     private let getExtensionsButton = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens the Chrome Web Store."))
     private let loadUnpackedButton = PillButton(title: String(localized: "Load Unpacked…", comment: "Button in Settings › Extensions, in developer mode: loads an extension from a folder."))
     private var spaceRows: [SpaceSettingsRow] = []
@@ -604,6 +611,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         token = Library.shared.changed.observe { [weak self] in
             guard let self, self.window != nil else { return }
             self.reloadSpaces()
+            self.reloadProfiles()
         }
         // An extension's engine chosen from its toast, or gone with it, while Settings is open.
         engineToken = ExtensionSearchProvider.changed.observe { [weak self] in
@@ -756,6 +764,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
         // Spaces
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
+        addProfileButton.onClick = { [weak self] _ in if let self { ProfileSheets.new(in: self) } }
 
         // Search
         refreshEngines()
@@ -853,6 +862,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         scroll.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: scroll.contentView)
         reloadSpaces()
+        reloadProfiles()
         reloadExtensions()
         show(pane)
     }
@@ -1005,6 +1015,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         refresh()
         reloadSpaces()
+        reloadProfiles()
         reloadExtensions()
         reloadPasswords()
         reloadTranslation()
@@ -1129,6 +1140,34 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 }
             }
         }
+    }
+
+    /// The profiles there are, each with what it holds and the ways to change it. The first has no trash: there's
+    /// always one profile.
+    private func reloadProfiles() {
+        profilesGroup.removeAllRows()
+        let library = Library.shared
+        for profile in library.profiles {
+            var controls: [NSView] = []
+            if !profile.isDefault {
+                let delete = IconButton(symbol: "trash", size: .compact,
+                                        toolTip: String(localized: "Delete Profile", comment: "Button of the sheet that deletes a profile, and tooltip of the trash button on a profile's row in Settings › Profiles."))
+                delete.onClick = { [weak self] _ in if let self { ProfileSheets.confirmDelete(profile.id, in: self) } }
+                controls.append(delete)
+            }
+            let edit = PillButton(title: String(localized: "Edit", comment: "Button on a profile's row in Settings › Profiles."))
+            edit.onClick = { [weak self] _ in if let self { ProfileSheets.edit(profile.id, in: self) } }
+            controls.append(edit)
+            let stack = NSStackView(views: controls)
+            stack.spacing = Tokens.Space.x2
+            let spaces = library.spaces(in: profile.id).count
+            let extensions = Profiles.shared.profile(profile.id).installs.installedIDs.count
+            let detail = Words.list([String(localized: "\(spaces) spaces", comment: "Under a profile's name in Settings › Profiles: how many spaces are on it."),
+                                     String(localized: "\(extensions) extensions", comment: "Under a profile's name in Settings › Profiles: how many extensions it has.")])
+            profilesGroup.add(FormRow(title: profile.displayName, detail: detail, icon: ProfileSheets.tile(for: profile), control: stack))
+        }
+        layoutSubtreeIfNeeded()
+        if pane == .profiles || isSearching { layoutDocument() }
     }
 
     private func reloadSpaces() {
@@ -1295,6 +1334,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private static var updatesHeading: String { String(localized: "Updates", comment: "A heading in Settings › General: Zigzag's version and how it updates.") }
     private static var automationHeading: String { String(localized: "Automation", comment: "A heading in Settings › General: what scripts and Shortcuts may do in Zigzag.") }
     private static var spacesHeading: String { String(localized: "Your Spaces", comment: "A heading in Settings › Spaces.") }
+    private static var profilesHeading: String { String(localized: "Your Profiles", comment: "A heading in Settings › Profiles.") }
     private static var browsingDataHeading: String { String(localized: "Clear Browsing Data", comment: "A heading in Settings › Privacy: buttons that clear history, cache and cookies.") }
     private static var siteDataHeading: String { String(localized: "Stored by Websites", comment: "A heading in Settings › Privacy: what each site keeps on this Mac, with a Remove button each.") }
     private static var sitesHeading: String { String(localized: "Site Permissions", comment: "A heading in Settings › Privacy: camera, location, pop-ups and other choices made for single sites.") }
@@ -1332,6 +1372,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .search: [(nil, searchGroup)]
         case .mini: [(nil, miniGroup)]
         case .spaces: [(Self.spacesHeading, spacesGroup)]
+        case .profiles: [(Self.profilesHeading, profilesGroup)]
         case .passwords: [(nil, passwordsWindowGroup), (Self.fillingHeading, passwordsGroup)]
         case .privacy: [(nil, blockingGroup), (Self.sitesHeading, sitesGroup), (Self.browsingDataHeading, privacyGroup), (Self.siteDataHeading, siteDataGroup)]
         case .translation: [(nil, translationGroup), (Self.alwaysTranslateHeading, alwaysGroup)]
@@ -1419,6 +1460,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 documentView.addSubview(hint)
                 y = hint.frame.maxY + Tokens.Page.groupGap
             }
+        case .profiles:
+            section(Self.profilesHeading, profilesGroup, accessory: addProfileButton)
+            let hint = Label(String(localized: "Each profile has its own extensions, sign-ins and website data. Spaces on the same profile share them.", comment: "Under the list in Settings › Profiles."),
+                             font: Tokens.Font.detail(), color: Tokens.Color.textTertiary)
+            hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y - Tokens.Page.groupGap + Tokens.Space.x2,
+                                width: contentWidth - Tokens.Page.groupPad, height: hint.lineHeight)
+            documentView.addSubview(hint)
+            y = hint.frame.maxY + Tokens.Page.groupGap
         case .passwords:
             section(nil, passwordsWindowGroup)
             section(Self.fillingHeading, passwordsGroup)

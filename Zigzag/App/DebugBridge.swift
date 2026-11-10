@@ -320,6 +320,26 @@ enum DebugBridge {
             // spaceprofile [name]: puts the space you're in on that profile; with no name, on the first.
             let id = Library.shared.profiles.first { $0.name == arg }?.id ?? Profile.defaultID
             Library.shared.setProfile(id, forSpace: controller.tabManager.currentSpaceID)
+        case "profilesheet":
+            // profilesheet new | edit <name> | delete <name>: the sheet, over this window.
+            guard let host = controller.window?.contentView else { break }
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            let named = Library.shared.profiles.first { $0.displayName == (f.count > 1 ? f[1] : "") }
+            switch f.first {
+            case "new": ProfileSheets.new(in: host)
+            case "edit": if let named { ProfileSheets.edit(named.id, in: host) }
+            case "delete": if let named { ProfileSheets.confirmDelete(named.id, in: host) }
+            default: break
+            }
+        case "formsheet":
+            // formsheet type <text> | confirm | cancel: the form that's up, in any window.
+            func find(_ view: NSView?) -> FormSheet? { view?.subviews.lazy.compactMap { ($0 as? FormSheet) ?? find($0) }.first }
+            guard let sheet = NSApp.windows.lazy.compactMap({ find($0.contentView) }).first else { debugLog("formsheet: none up"); break }
+            if arg.hasPrefix("type ") {
+                (sheet.window?.firstResponder as? NSTextView)?.insertText(String(arg.dropFirst(5)), replacementRange: NSRange(location: 0, length: (sheet.window?.firstResponder as? NSTextView)?.string.count ?? 0))
+            } else {
+                sheet.debugAnswer(arg == "confirm")
+            }
         case "delprofile":
             // delprofile <name>: removes the profile and its data, without asking.
             if let id = Library.shared.profiles.first(where: { $0.name == arg && !$0.isDefault })?.id {

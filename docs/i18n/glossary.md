@@ -35,6 +35,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | English | 简体中文 | Not used | Why |
 |---|---|---|---|
 | Space | 空间 | 工作区 | Arc's Chinese users say 空间, and macOS calls Mission Control's Spaces 空间. 工作区 was clearer next to Mission Control but colder, and not what Arc users know. |
+| Profile | 描述文件 | 个人资料, 配置文件, 用户 | Safari's Profiles are 描述文件 (新建描述文件). Chrome's 个人资料 reads as a page about you; 配置文件 as a settings file; 用户 as an account. The first profile, until it's named, is 默认. |
 | Tab | 标签页 | | Safari and Chrome. |
 | New Tab | 新建标签页 | | Safari's button and menu item. |
 | Pinned (the section) | 已固定 | 固定标签页 | Safari's Pin Tab is 固定标签页; as a heading 已固定 is shorter. |
