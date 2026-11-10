@@ -81,6 +81,31 @@ struct TopBarTests {
         #expect(ends.leading == hidden.minX && hiddenBar.maxX - ends.trailing == hidden.maxX)
     }
 
+    @Test func asTheSidebarGoesTheControlsStartWhereTheyWere() {
+        // The sidebar hides: the bar holds still over the whole width, and its controls start from where they were.
+        let parent = NSView(frame: window)
+        let topBar = TopBarView(frame: NSRect(x: 240, y: 0, width: 1040, height: bar))
+        parent.addSubview(topBar)
+        let buttons = (0..<3).map { _ in NSView() }, address = NSView()
+        topBar.hold(buttons: buttons, address: address)
+        topBar.layoutSubtreeIfNeeded()
+        let before = topBar.controlPositions
+        #expect(before[ObjectIdentifier(buttons[0])]?.minX == 240 + Tokens.Sidebar.edge)
+        topBar.frame = NSRect(x: 0, y: 0, width: 1280, height: bar)
+        topBar.trafficLightsWidth = 52
+        topBar.showsSidebarButton = true
+        topBar.slideControls(from: before, curve: Tokens.Motion.slide)
+        for view in buttons + [address] {
+            #expect(view.frame.offsetBy(dx: topBar.frame.minX, dy: 0) == before[ObjectIdentifier(view)])
+        }
+        // The toggle, new, appears where it goes and stays there: by the lights, as in the sidebar.
+        let frames = TopBarView.frames(width: 1280, buttons: 3, sidebarButton: true, trafficLightsWidth: 52, trailingInset: Tokens.Sidebar.edge)
+        #expect(!topBar.sidebarButton.isHidden && topBar.sidebarButton.frame == frames.sidebarButton)
+        // Layout leaves them to the slide until it ends.
+        topBar.layoutSubtreeIfNeeded()
+        #expect(buttons[0].frame.minX == 240 + Tokens.Sidebar.edge)
+    }
+
     @Test func narrowBarNeverGivesTheAddressANegativeWidth() {
         let frames = TopBarView.frames(width: 40, buttons: 3, trafficLightsWidth: 52, trailingInset: 6)
         #expect(frames.address.width == 0)

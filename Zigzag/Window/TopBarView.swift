@@ -21,12 +21,14 @@ final class TopBarView: NSView {
     /// The sidebar's toggle, first after the traffic lights while the sidebar is hidden: the sidebar's own is out of
     /// sight with it then. Shown, the sidebar keeps it in its own top row.
     let sidebarButton = SidebarView.chromeButton("sidebar.left", toolTip: String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."))
-    var showsSidebarButton = false {
-        didSet {
-            guard showsSidebarButton != oldValue else { return }
-            sidebarButton.isHidden = !showsSidebarButton
-            needsLayout = true
-        }
+    var showsSidebarButton = false { didSet { if showsSidebarButton != oldValue { refreshSidebarButton() } } }
+    /// While the sidebar slides back in, its toggle stays here where the sidebar's own will land (this far from the
+    /// window's left edge), still as the traffic lights, until the sidebar arrives with its own. Takes no room.
+    var heldSidebarButtonX: CGFloat? { didSet { if heldSidebarButtonX != oldValue { refreshSidebarButton() } } }
+
+    private func refreshSidebarButton() {
+        sidebarButton.isHidden = !showsSidebarButton && heldSidebarButtonX == nil
+        needsLayout = true
     }
 
     private var buttons: [NSView] = []
@@ -87,12 +89,59 @@ final class TopBarView: NSView {
         return (page.minX - bar.minX + inset, bar.maxX - page.maxX + inset)
     }
 
-    override func layout() {
-        super.layout()
+    /// Each control showing here and where it goes.
+    private var places: [(view: NSView, frame: NSRect)] {
         let frames = Self.frames(width: bounds.width, buttons: buttons.count, sidebarButton: showsSidebarButton,
                                  trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset, trailingInset: trailingInset)
-        if let toggle = frames.sidebarButton { sidebarButton.frame = toggle }
-        for (button, frame) in zip(buttons, frames.buttons) where button.superview === self { button.frame = frame }
-        if let address, address.superview === self { address.frame = frames.address }
+        var places: [(view: NSView, frame: NSRect)] = []
+        if let toggle = frames.sidebarButton {
+            places.append((sidebarButton, toggle))
+        } else if let x = heldSidebarButtonX {
+            let b = Tokens.Sidebar.button
+            places.append((sidebarButton, NSRect(x: x - frame.minX, y: Self.height / 2 - b / 2, width: b, height: b)))
+        }
+        for (button, rect) in zip(buttons, frames.buttons) where button.superview === self { places.append((button, rect)) }
+        if let address, address.superview === self { places.append((address, frames.address)) }
+        return places
+    }
+
+    override func layout() {
+        super.layout()
+        guard !isSliding else { return }
+        for place in places { place.view.frame = place.frame }
+    }
+
+    /// While the controls glide (`slideControls`), layout leaves them to it.
+    private var isSliding = false
+
+    /// Where each control showing is now, in the superview's terms: taken before the sidebar comes or goes.
+    var controlPositions: [ObjectIdentifier: NSRect] {
+        Dictionary(uniqueKeysWithValues: ([sidebarButton] + buttons + [address].compactMap { $0 })
+            .filter { $0.superview === self && !$0.isHidden }
+            .map { (ObjectIdentifier($0), $0.frame.offsetBy(dx: frame.minX, dy: frame.minY)) })
+    }
+
+    /// In an animation, with the bar where it stays for it: each control glides from where it was (`old`, from
+    /// `controlPositions`) to its new place, so none jumps as the sidebar comes or goes. One that wasn't showing
+    /// (the sidebar's toggle) appears where it goes, and stays put there as the traffic lights do.
+    func slideControls(from old: [ObjectIdentifier: NSRect], curve: Tokens.Motion.Curve) {
+        isSliding = true
+        let places = places
+        for place in places {
+            let start = old[ObjectIdentifier(place.view)]?.offsetBy(dx: -frame.minX, dy: -frame.minY) ?? place.frame
+            Tokens.Motion.withoutAnimation { place.view.frame = start }
+        }
+        // From the next turn of the run loop, once they're drawn where they start: an animation begun in the same one
+        // starts from where they were last drawn instead, in the bar's old place.
+        DispatchQueue.main.async {
+            Tokens.Motion.animate(curve, evenFromKeyboard: true, moves: true) {
+                for place in places { place.view.animator().frame = place.frame }
+            }
+        }
+    }
+
+    func endSlide() {
+        isSliding = false
+        needsLayout = true
     }
 }

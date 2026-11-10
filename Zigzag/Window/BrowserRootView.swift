@@ -691,7 +691,7 @@ final class BrowserRootView: SpaceFrameView {
         layoutCards()
         layoutTopBar()
         sidebarContainer.frame = sidebarFrame
-        sidebarContainer.isFloating = !sidebarVisible
+        sidebarContainer.isFloating = !sidebarVisible && !leavesDocked
         let handleWidth = Tokens.Metric.resizeHandleWidth
         resizeHandle.frame = NSRect(x: sidebarWidth - handleWidth / 2, y: 0, width: handleWidth, height: bounds.height)
         resizeHandle.isHidden = !sidebarVisible && !isDraggingSidebarEdge
@@ -701,22 +701,40 @@ final class BrowserRootView: SpaceFrameView {
 
     private func layoutTopBar() {
         guard showsTopBar else { return }
-        let bar = topBarFrame, page = pageAreaFrame
-        topBar.frame = bar
-        // The bar's controls run from the page's left edge to its right: at the frame's inset, or just inside the
-        // window's edges when the page meets them.
-        (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: page, window: bounds)
+        let page = pageAreaFrame
+        placeTopBar()
         // Beside it, the sidebar's favorites and tabs start where the page does.
         if sidebarVisible { sidebarContainer.sidebar.contentTop = page.minY - sidebarFrame.minY }
     }
 
+    /// The bar's controls run from the page's left edge to its right: at the frame's inset, or just inside the
+    /// window's edges when the page meets them.
+    private func placeTopBar() {
+        let bar = topBarSlideFrame ?? topBarFrame
+        topBar.frame = bar
+        (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: pageAreaFrame, window: bounds)
+    }
+
+    /// While the sidebar slides, the bar holds still over both where it was and where it's going, and only its
+    /// controls move: a view gliding inside one that's moving too can't keep them in step.
+    private var topBarSlideFrame: NSRect?
+    private var topBarSlides = 0
+
+    /// Under the bar above the page, the sidebar leaves as it sat, part of the window's frame like the bar, rather
+    /// than as a floating card whose edge would cut across the bar; it floats once it's out of sight.
+    private var leavesDocked = false
+
     func setSidebarVisible(_ visible: Bool, animated: Bool) {
         guard visible != sidebarVisible else { return }
         let oldSidebar = sidebarContainer.frame
+        let oldBar = topBar.frame, oldControls = topBar.controlPositions
+        topBarSlides += 1
+        let slide = topBarSlides
         sidebarVisible = visible
         sidebarRevealed = false
         watchPointer(false)
-        sidebarContainer.isFloating = !visible
+        leavesDocked = !visible && showsTopBar && animated && !Tokens.Motion.reduceMotion
+        sidebarContainer.isFloating = !visible && !leavesDocked
         // It slides however it was asked for, the keyboard included: where the sidebar went is worth seeing.
         guard animated, !Tokens.Motion.reduceMotion else {
             needsLayout = true
@@ -727,6 +745,10 @@ final class BrowserRootView: SpaceFrameView {
         let targetSidebar = visible ? sidebarFrame : NSRect(x: -sidebarWidth, y: 0, width: sidebarWidth, height: bounds.height)
         Tokens.Motion.withoutAnimation { sidebarContainer.frame = targetSidebar }
         let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: oldSidebar.minX - targetSidebar.minX, curve: Tokens.Motion.slide, fromKeyboard: true)
+        if showsTopBar, duration > 0 {
+            topBarSlideFrame = (topBarSlideFrame ?? oldBar).union(topBarFrame)
+            placeTopBar()
+        }
         onSlide?(duration)
         // Borderless: the corners square off as the page grows to the window's edges, and round again as it shrinks.
         // Beside the sidebar, borderless, the page rounds like the window's corner; floating, like a card.
@@ -738,12 +760,20 @@ final class BrowserRootView: SpaceFrameView {
         card.setEdgeToEdge(isEdgeToEdge, duration: duration)
         secondCard.setEdgeToEdge(isEdgeToEdge, duration: duration)
         refreshGlassOcclusion()
+        // The bar's controls and the page move as one: nothing in the bar jumps to its new place.
+        if topBarSlideFrame != nil { topBar.slideControls(from: oldControls, curve: Tokens.Motion.slide) }
         Tokens.Motion.animate(Tokens.Motion.slide, evenFromKeyboard: true, moves: true, {
-            if self.showsTopBar { self.topBar.animator().frame = self.topBarFrame }
+            if self.topBarSlideFrame == nil, self.showsTopBar { self.topBar.animator().frame = self.topBarFrame }
             self.card.animator().frame = self.paneFrames.left
             self.emptyHint.animator().frame = Self.markFrame(in: self.paneFrames.left)
             if let right = self.paneFrames.right { self.secondCard.animator().frame = right }
         }, completion: {
+            self.leavesDocked = false
+            // Not if another slide took over meanwhile: that one ends it.
+            if self.topBarSlideFrame != nil, self.topBarSlides == slide {
+                self.topBarSlideFrame = nil
+                self.topBar.endSlide()
+            }
             self.needsLayout = true
         })
     }
