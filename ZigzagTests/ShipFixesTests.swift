@@ -593,3 +593,23 @@ struct MoveWindowChordTests {
         #expect(!BrowserWindow.isMoveChord([.command, .option, .control]))
     }
 }
+
+/// Text typed into a page stays as typed: `--` never becomes `—`, so GitHub's upload placeholders survive.
+@MainActor
+struct PageTextSubstitutionTests {
+    @Test func dashesAndQuotesStayAsTyped() async throws {
+        UserDefaults.standard.register(defaults: AppDelegate.pageTextDefaults)
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
+        let window = NSWindow(contentRect: webView.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = webView
+        webView.loadHTMLString("<textarea id=t></textarea>", baseURL: URL(string: "https://example.com"))
+        for _ in 0..<100 where webView.isLoading { try await Task.sleep(for: .milliseconds(20)) }
+        try await Task.sleep(for: .milliseconds(100))
+        window.makeFirstResponder(webView)
+        let typed = #"<!-- Uploading "a.png"... --> and "quotes""#
+        let value = try await webView.evaluateJavaScript("""
+            (() => { const t = document.getElementById('t'); t.focus(); document.execCommand('insertText', false, \(String(reflecting: typed))); return t.value })()
+            """) as? String
+        #expect(value == typed)
+    }
+}

@@ -6,7 +6,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var launched = false
     private var blockerToken: SignalToken?
 
+    /// What you type into a web page stays as you typed it, as in Chrome and Safari: WebKit would otherwise follow
+    /// the Mac's text substitutions, turning `--` into `—` (breaking GitHub's `<!-- Uploading … -->` placeholders
+    /// and every pasted command) and straight quotes into curly ones. Edit › Substitutions still turns each back on.
+    static let pageTextDefaults: [String: Any] = [
+        "WebAutomaticDashSubstitutionEnabled": false,
+        "WebAutomaticQuoteSubstitutionEnabled": false,
+        "WebAutomaticTextReplacementEnabled": false,
+    ]
+
     func applicationWillFinishLaunching(_ notification: Notification) {
+        UserDefaults.standard.register(defaults: Self.pageTextDefaults)
         // A second copy (one opened from the disk image while the installed one runs) would load the same profile
         // and save over it: it hands over to the one already running and goes, before reading anything.
         if !Self.isHostingTests, !SingleCopy.claim() {
