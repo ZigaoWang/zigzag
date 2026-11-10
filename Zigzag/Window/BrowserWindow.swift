@@ -180,10 +180,23 @@ final class BrowserWindow: NSWindow {
         case .leftMouseDown:
             guard Self.isMoveChord(event.modifierFlags), isOverPage(event.locationInWindow) else { return false }
             // Twice, as on a title bar: the window zooms.
-            if event.clickCount == 2 { performZoom(nil) } else { performDrag(with: event) }
+            if event.clickCount == 2 { performZoom(nil) } else { trackMove(from: event) }
             return true
         default:
             return false
+        }
+    }
+
+    /// Moves the window with the pointer until the button comes up. Not `performDrag`: the system's drag sees ⌥
+    /// held and turns the move into window tiling, which only goes left or right.
+    private func trackMove(from down: NSEvent) {
+        let start = NSEvent.mouseLocation, origin = frame.origin
+        NSCursor.closedHand.push()
+        defer { NSCursor.pop() }
+        while let event = nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
+            if event.type == .leftMouseUp { break }
+            let now = NSEvent.mouseLocation
+            setFrameOrigin(NSPoint(x: origin.x + now.x - start.x, y: origin.y + now.y - start.y))
         }
     }
 
