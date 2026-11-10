@@ -2,4 +2,4 @@ blank_issues_enabled: false
 contact_links:
   - name: Report a security vulnerability
     url: https://github.com/ZigaoWang/zigzag/blob/main/SECURITY.md
-    about: Please report vulnerabilities privately by email to a@zigao.wang, not as a public issue.
+    about: Please don't open a public issue. SECURITY.md says how to report it privately.
