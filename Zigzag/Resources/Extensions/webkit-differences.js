@@ -50,6 +50,17 @@
     }
   }
 
+  // An <svg> with no width of its own in a flex row: Chrome sizes it as 100% wide, as an outer <svg>'s width is, and
+  // WebKit gives it none at all. Sound Booster's mute button showed an empty square for its speaker. Pages get that
+  // width as a rule of no weight, so any width the extension sets itself still wins.
+  if (!isWorker && typeof document !== 'undefined' && document.documentElement && typeof location !== 'undefined' && location.protocol === 'webkit-extension:') {
+    try {
+      const style = document.createElement('style');
+      style.textContent = ':where(svg:not([width])) { width: 100%; }';
+      document.documentElement.prepend(style);
+    } catch (e) {}
+  }
+
   // An extension's pages and its background service worker posting to each other (navigator.serviceWorker and the
   // worker's clients): in Chrome the worker controls its extension's pages and they reach it, in WebKit nothing the
   // pages post arrives, and the worker's clients don't include them. Violentmonkey's popup and dashboard ask its

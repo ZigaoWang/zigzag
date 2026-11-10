@@ -227,6 +227,15 @@ struct ExtensionScriptTests {
         return context
     }
 
+    @Test func extensionPagesSizeUnsizedIconsAsChromeDoes() {
+        // Sound Booster's mute button: an <svg> with no width in a flex row, which WebKit draws at no size (#45).
+        let context = Self.workerWorld(worker: false, setup: """
+        var __styles = [];
+        var document = { createElement: () => ({ textContent: '' }), documentElement: { prepend: (node) => __styles.push(node.textContent) } };
+        """)
+        #expect(context.evaluateScript("__styles.join()").toString() == ":where(svg:not([width])) { width: 100%; }")
+    }
+
     @Test func tabsComeWithTheirSiteIcons() {
         // WebKit's tabs have no favIconUrl; Sound Booster's popup drew an empty square for each (#45).
         let context = Self.workerWorld(worker: false, setup: """
