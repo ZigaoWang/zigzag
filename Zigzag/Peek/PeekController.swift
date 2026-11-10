@@ -107,7 +107,8 @@ final class PeekController {
         let inset = Self.inset
         content.frame = NSRect(x: inset, y: headerHeight, width: panel.bounds.width - inset * 2, height: panel.bounds.height - headerHeight - inset)
         content.layer?.cornerRadius = panel.radius - inset
-        tab?.webView?.frame = content.bounds
+        // Not while a video of the page is in full screen: WebKit has the page in its own window then, and sizes it.
+        if let webView = tab?.webView, webView.superview === content { webView.frame = content.bounds }
     }
 
     /// Shows a URL in peek. With a configuration (from window.open), the page keeps its opener.
