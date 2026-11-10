@@ -5,7 +5,7 @@ import WebKit
 final class Profile {
     /// The profile everything was in before there were profiles. Its extensions' storage has always been kept under
     /// this identifier, so it stays the one their controller is made with.
-    static let defaultID = UUID(uuidString: "6F1E2D6A-5B0C-4C1B-9E1A-2A7B5D3C9E10")!
+    nonisolated static let defaultID = UUID(uuidString: "6F1E2D6A-5B0C-4C1B-9E1A-2A7B5D3C9E10")!
 
     let id: UUID
     var isDefault: Bool { id == Self.defaultID }

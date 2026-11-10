@@ -8173,6 +8173,17 @@
         }
       }
     },
+    "Only in %@; other profiles aren’t changed." : {
+      "comment" : "Added to the message of a sheet that asks before clearing the cache or cookies, when there's more than one profile. The placeholder is the profile's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅针对“%@”，其他描述文件不受影响。"
+          }
+        }
+      }
+    },
     "Only on %@" : {
       "comment" : "Site Access choice: the extension works only on this site. The site is a domain.",
       "localizations" : {

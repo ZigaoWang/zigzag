@@ -606,8 +606,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func confirmClearCache() {
         // The profile you're in when you ask; a private window's own store.
         let store = tabManager.privateStore ?? tabManager.profile.store
+        let only = tabManager.isPrivate ? "" : ProfileSheets.onlyNote(tabManager.profile.id)
         ConfirmSheet.show(in: root.overlay, title: String(localized: "Clear the cache for every site?", comment: "Title of the sheet that asks before clearing every site's cache."),
-                          message: String(localized: "Pages load a little slower the first time you open them again. You stay signed in.", comment: "Message of the sheet that asks before clearing every site's cache."),
+                          message: String(localized: "Pages load a little slower the first time you open them again. You stay signed in.", comment: "Message of the sheet that asks before clearing every site's cache.") + only,
                           confirmTitle: String(localized: "Clear Cache", comment: "Button that clears the cache, in the sheet that asks first."), destructive: false) { [weak self] confirmed in
             guard confirmed else { return }
             Task { @MainActor in
@@ -621,8 +622,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func confirmClearCookies() {
         // The profile you're in when you ask; a private window's own store.
         let store = tabManager.privateStore ?? tabManager.profile.store
+        let only = tabManager.isPrivate ? "" : ProfileSheets.onlyNote(tabManager.profile.id)
         ConfirmSheet.show(in: root.overlay, title: String(localized: "Clear cookies for every site?", comment: "Title of the sheet that asks before clearing every site's cookies."),
-                          message: String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that asks before clearing every site's cookies."),
+                          message: String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that asks before clearing every site's cookies.") + only,
                           confirmTitle: String(localized: "Clear Cookies", comment: "Button that clears cookies, in the sheet that asks first."), destructive: true) { [weak self] confirmed in
             guard confirmed else { return }
             Task { @MainActor in

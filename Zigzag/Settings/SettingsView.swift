@@ -1783,10 +1783,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
         // What's cleared is the profile's shown here.
         let store = profile.store
+        let only = ProfileSheets.onlyNote(profile.id)
         let cache = PillButton(title: String(localized: "Clear Cache…", comment: "Button in Settings › Privacy."))
         cache.onClick = { [weak self, weak cache] _ in
             self?.confirm(title: String(localized: "Clear the cache for every site?", comment: "Title of the sheet that clears the cache."),
-                          message: String(localized: "Pages load a little slower the first time you open them again. You stay signed in.", comment: "Message of the sheet that clears the cache."),
+                          message: String(localized: "Pages load a little slower the first time you open them again. You stay signed in.", comment: "Message of the sheet that clears the cache.") + only,
                           action: String(localized: "Clear Cache", comment: "Button of the sheet that clears the cache."), destructive: false) {
                 Task { @MainActor in
                     await WebsiteData.clear(.cache, in: store)
@@ -1798,7 +1799,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let cookies = PillButton(title: String(localized: "Clear Cookies…", comment: "Button in Settings › Privacy."))
         cookies.onClick = { [weak self, weak cookies] _ in
             self?.confirm(title: String(localized: "Clear cookies for every site?", comment: "Title of the sheet that clears cookies."),
-                          message: String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that clears cookies."),
+                          message: String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that clears cookies.") + only,
                           action: String(localized: "Clear Cookies", comment: "Button of the sheet that clears cookies.")) {
                 Task { @MainActor in
                     await WebsiteData.clear(.cookies, in: store)

@@ -92,6 +92,13 @@ enum ProfileSheets {
         SpaceSettingsRow.tile(name: profile.displayName, swatch: Library.shared.color(of: profile).swatch, icon: nil)
     }
 
+    /// With more than one profile, added to what a sheet says before clearing one profile's cache or cookies: whose
+    /// they are.
+    static func onlyNote(_ profile: UUID) -> String {
+        guard Library.shared.hasManyProfiles, let info = Library.shared.directory.profile(profile) else { return "" }
+        return " " + String(localized: "Only in \(info.displayName); other profiles aren’t changed.", comment: "Added to the message of a sheet that asks before clearing the cache or cookies, when there's more than one profile. The placeholder is the profile's name.")
+    }
+
     /// Asks for a new profile's name and color, and what extensions it starts with. `done` hears the profile made.
     @discardableResult
     static func new(in host: NSView, done: ((ProfileInfo) -> Void)? = nil) -> FormSheet {
