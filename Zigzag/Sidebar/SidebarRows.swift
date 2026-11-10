@@ -721,6 +721,17 @@ final class SpaceHeaderView: InteractiveView {
     }
     private let chevron = NSImageView()
     private let iconView = NSImageView()
+    /// The profile the space is on, quiet at the end of the line, once there's more than one profile to tell apart.
+    /// It gives way to the name: where the two don't both fit, it isn't shown.
+    private let profileLabel = Label("", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
+    var profileName: String? {
+        didSet {
+            guard profileName != oldValue else { return }
+            profileLabel.stringValue = profileName ?? ""
+            stateDidChange(animated: false)
+            needsLayout = true
+        }
+    }
     /// The space's icon, before its name. Nil: the name alone.
     var icon: String? {
         didSet {
@@ -747,6 +758,9 @@ final class SpaceHeaderView: InteractiveView {
         addSubview(iconView)
         addSubview(label)
         addSubview(chevron)
+        profileLabel.lineBreakMode = .byTruncatingTail
+        profileLabel.alignment = .right
+        addSubview(profileLabel)
         setAccessibilityRole(.button)
     }
 
@@ -782,7 +796,19 @@ final class SpaceHeaderView: InteractiveView {
         label.frame = NSRect(x: x, y: y, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
         let side = Tokens.Space.x4
         chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x2, y: xMiddle - side / 2, width: side, height: side)
+        // The profile's name, at the line's end where Clear ends on the row below, standing on the name's baseline.
+        // It has what the name and its chevron leave, and under a few letters' room it isn't there at all.
+        let room = bounds.width - SidebarRowView.inset - (chevron.frame.maxX + Tokens.Space.x2)
+        let width = min(ceil(profileLabel.textWidth), room)
+        profileLabel.isHidden = profileName == nil || room < Self.profileRoom
+        let small = profileLabel.font ?? Tokens.Font.sidebarLabel()
+        let lh = profileLabel.lineHeight
+        let labelY = isFlipped ? baseline - (lh + small.ascender + small.descender) / 2 : baseline - (lh - small.ascender - small.descender) / 2
+        profileLabel.frame = NSRect(x: bounds.width - SidebarRowView.inset + Label.inset - width, y: round(labelY), width: width, height: lh)
     }
+
+    /// The least room worth showing a profile's name in: a few letters before it's cut short.
+    static let profileRoom: CGFloat = 28
 
     /// The icon before a space's name: about the name's x-height and a little more, so the two read as one.
     static let iconSide: CGFloat = 20
@@ -802,6 +828,7 @@ final class SpaceHeaderView: InteractiveView {
             : NSAttributedString(string: label.stringValue, attributes: [.font: Self.nameFont, .foregroundColor: color])
         // A symbol takes the name's own ink; an emoji keeps its colors.
         iconView.contentTintColor = ink.withAlphaComponent(0.86)
+        profileLabel.textColor = Brand.Theme.for(self).quietInk
         chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.TypeSize.body)
         // The chevron shows on hover, and stays while folded so you know something is tucked away.
         chevron.isHidden = !canCollapse || !(isHovered || isCollapsed)

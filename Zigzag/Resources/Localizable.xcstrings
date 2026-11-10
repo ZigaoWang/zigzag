@@ -6205,6 +6205,17 @@
         }
       }
     },
+    "Its open tabs reload in %@, with that profile’s sign-ins and extensions. Pages you were filling in may lose what you typed." : {
+      "comment" : "Message of the sheet that asks before a space with open tabs is put on another profile. The placeholder is the profile's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它打开的标签页会在“%@”中重新载入，使用该描述文件的登录状态和扩展。你正在填写的页面可能会丢失已输入的内容。"
+          }
+        }
+      }
+    },
     "Its own tabs and pinned tabs, in its own color" : {
       "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window.",
       "localizations" : {
@@ -6768,6 +6779,34 @@
         }
       }
     },
+    "Move" : {
+      "comment" : "Button of the sheet that asks before a space is put on another profile.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移动"
+          }
+        }
+      }
+    },
+    "Move %@ to %@?" : {
+      "comment" : "Title of the sheet that asks before a space with open tabs is put on another profile. First the space's name, then the profile's.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Move %1$@ to %2$@?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要将“%1$@”移到“%2$@”吗？"
+          }
+        }
+      }
+    },
     "Move %lld to Space" : {
       "comment" : "Menu item for several picked sidebar rows",
       "localizations" : {
@@ -7243,6 +7282,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新建描述文件"
+          }
+        }
+      }
+    },
+    "New Profile…" : {
+      "comment" : "Item at the end of the Profile menu in a space's editor: makes a profile and puts the space on it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建描述文件…"
           }
         }
       }
@@ -9138,6 +9188,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无痕浏览"
+          }
+        }
+      }
+    },
+    "Profile" : {
+      "comment" : "Label in a space's editor, before the choice of the profile the space is on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描述文件"
           }
         }
       }

@@ -36,6 +36,8 @@ final class SitePanel: FloatingPanelView {
     private let moreButton = IconButton(symbol: "ellipsis", toolTip: String(localized: "More", comment: "Tooltip of the … button in the site panel."))
     private var actionTiles: [PanelTile] = []
     private let extensionsLabel = Label.section(String(localized: "Extensions", comment: "Section label over the extensions' buttons in the site panel."))
+    /// Whose extensions these are, at the label's end, once there's more than one profile.
+    private let extensionsProfileLabel = Label("", font: Tokens.Font.label(), color: Tokens.Color.textTertiary)
     private var extensionTiles: [PanelTile] = []
     /// The pin button on each extension's tile: the panel's child over the tile, a control of its own.
     private var hoverPins: [(id: String, label: String, value: String?, tile: PanelTile, pin: HoverPin)] = []
@@ -275,6 +277,9 @@ final class SitePanel: FloatingPanelView {
         addSubview(add)
         extensionTiles.append(add)
         addSubview(extensionsLabel)
+        extensionsProfileLabel.alignment = .right
+        extensionsProfileLabel.lineBreakMode = .byTruncatingTail
+        addSubview(extensionsProfileLabel)
         // Over its tile.
         for entry in hoverPins {
             addSubview(entry.pin)
@@ -532,7 +537,14 @@ final class SitePanel: FloatingPanelView {
             y += Tokens.Space.x5
         }
         if !extensionTiles.isEmpty {
-            place(extensionsLabel, NSRect(x: pad - Label.inset, y: y, width: inner + Label.inset * 2, height: extensionsLabel.lineHeight))
+            let profile = Library.shared.hasManyProfiles && !tab.isPrivate ? Library.shared.directory.profile(tab.profile.id)?.displayName : nil
+            extensionsProfileLabel.stringValue = profile ?? ""
+            extensionsProfileLabel.isHidden = profile == nil
+            let profileWidth = profile == nil ? 0 : min(ceil(extensionsProfileLabel.textWidth), inner / 2)
+            place(extensionsLabel, NSRect(x: pad - Label.inset, y: y, width: inner + Label.inset * 2 - profileWidth, height: extensionsLabel.lineHeight))
+            if profile != nil {
+                place(extensionsProfileLabel, NSRect(x: pad + inner + Label.inset - profileWidth, y: y, width: profileWidth, height: extensionsLabel.lineHeight))
+            }
             y += extensionsLabel.lineHeight + Tokens.Space.x2
             grid(extensionTiles, columns: columns)
             y += Tokens.Space.x5

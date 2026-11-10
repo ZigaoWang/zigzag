@@ -93,7 +93,8 @@ enum ProfileSheets {
     }
 
     /// Asks for a new profile's name and color, and what extensions it starts with. `done` hears the profile made.
-    static func new(in host: NSView, done: ((ProfileInfo) -> Void)? = nil) {
+    @discardableResult
+    static func new(in host: NSView, done: ((ProfileInfo) -> Void)? = nil) -> FormSheet {
         let library = Library.shared
         let name = FilledField(placeholder: String(localized: "Name this profile", comment: "Placeholder of the name field in the sheet that makes or edits a profile."))
         let used = Set(library.profiles.map { library.color(of: $0) })
@@ -109,7 +110,7 @@ enum ProfileSheets {
             FormSheet.Row(label: String(localized: "Extensions", comment: "Label in the sheet that makes a profile: which extensions it starts with."), view: start),
             .note(String(localized: "Extensions are added fresh. Nothing they’ve stored in another profile comes along.", comment: "Note in the sheet that makes a profile, under the choice of which extensions it starts with.")),
         ]
-        FormSheet.show(in: host, title: String(localized: "New Profile", comment: "Title of the sheet that makes a profile."), symbol: "person",
+        return FormSheet.show(in: host, title: String(localized: "New Profile", comment: "Title of the sheet that makes a profile."), symbol: "person",
                        message: String(localized: "A profile has its own extensions, sign-ins and website data. Spaces on the same profile share them.", comment: "Under the title of the sheet that makes a profile."),
                        rows: rows, confirmTitle: String(localized: "Create", comment: "Button that makes the profile, in the sheet that asks for its name."),
                        canConfirm: { [weak name] in !(name?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) }) { confirmed in
