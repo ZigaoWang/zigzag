@@ -324,6 +324,17 @@ enum DebugBridge {
                 debugLog("readerjs => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
             }
         case "find": controller.findBar.show(query: arg)
+        case "findclose": controller.findBar.hide()
+        // motionsheet, motionmenu [close]: a confirmation and a menu to watch show up and go (cancelsheet closes the sheet).
+        case "motionsheet":
+            if let host = controller.window?.contentView {
+                ConfirmSheet.show(in: host, title: "Close 3 Tabs?", message: "They stay in History.", confirmTitle: "Close") { _ in }
+            }
+        case "motionmenu":
+            if arg == "close" { MenuPanel.current?.close() } else {
+                MenuPanel.show([.item(.init(title: "Copy Link") {}), .item(.init(title: "Share…") {}), .separator,
+                                .item(.init(title: "Close Tab") {})], from: controller.sidebar.address)
+            }
         case "peek": if let url = URL(string: arg) { controller.open(url, disposition: .peek) }
         case "peekclose": controller.peek.close()
         case "switcher": controller.debugSwitcher()
