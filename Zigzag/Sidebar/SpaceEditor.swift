@@ -1230,7 +1230,7 @@ final class SpaceLookEditor: NSView {
 
     override var isFlipped: Bool { true }
 
-    private static func rowLabel(_ text: String) -> Label {
+    static func rowLabel(_ text: String) -> Label {
         Label(text, font: Tokens.Font.body(.light), color: Tokens.Color.textSecondary)
     }
 
@@ -1401,7 +1401,7 @@ final class SpaceLookEditor: NSView {
     }
 
     /// Wide enough for the longest name, so every control starts at the same line.
-    private var labelWidth: CGFloat {
+    var labelWidth: CGFloat {
         let widest = [colorsLabel, shadeLabel, clearLabel, glassLabel, grainLabel].map { ceil($0.intrinsicContentSize.width) }.max() ?? 0
         return max(72, widest + Tokens.Space.x3)
     }
@@ -1468,6 +1468,12 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     /// The space's icon, at the start of its name; click it to choose one in place of the colors.
     private let iconButton = IconButton(symbol: "circle.dashed", size: .compact, toolTip: String(localized: "Choose Icon", comment: "Tooltip of the icon button before the space's name, in the space editor."))
     private var iconGrid: IconGrid?
+    /// The profile the space is on: its sign-ins, extensions and website data.
+    private let profileLabel = SpaceLookEditor.rowLabel(String(localized: "Profile", comment: "Label in a space's editor, before the choice of the profile the space is on."))
+    private let profileButton = DropdownButton()
+    /// While a question it asked is up (moving the space's tabs to another profile, a new profile's name), clicks
+    /// and keys are that question's: the editor stays as it is under it.
+    private var isAsking = false
     private var monitor: Any?
     static let width: CGFloat = 300
 
@@ -1485,7 +1491,12 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         nameBackground.wantsLayer = true
         nameBackground.layer?.cornerCurve = .continuous
         nameBackground.layer?.cornerRadius = Tokens.Radius.row
-        [nameBackground, nameField, editor, iconButton].forEach { addSubview($0) }
+        [nameBackground, nameField, editor, iconButton, profileLabel, profileButton].forEach { addSubview($0) }
+        refreshProfiles()
+        profileButton.onSelect = { [weak self] index in self?.chooseProfile(at: index) }
+        profileButton.actions = [DropdownButton.Action(title: String(localized: "New Profile…", comment: "Item at the end of the Profile menu in a space's editor: makes a profile and puts the space on it."), symbol: "plus") { [weak self] in
+            self?.newProfile()
+        }]
         refreshIconButton(space.icon)
         iconButton.onClick = { [weak self] _ in self?.toggleIcons() }
         editor.onPreview = { [weak self] look in
@@ -1512,7 +1523,10 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private let pad = Tokens.Space.x3
     private let nameHeight = Tokens.Metric.rowHeight
 
-    var contentHeight: CGFloat { pad + nameHeight + Tokens.Space.x3 + (iconGrid != nil ? IconGrid.height : editor.preferredHeight) + pad }
+    /// The Profile row, with the space under it.
+    private var profileRowHeight: CGFloat { Tokens.Page.controlHeight + Tokens.Space.x3 }
+
+    var contentHeight: CGFloat { pad + nameHeight + Tokens.Space.x3 + profileRowHeight + (iconGrid != nil ? IconGrid.height : editor.preferredHeight) + pad }
 
     private func refreshIconButton(_ icon: String?) {
         iconButton.glyph = icon.map { IconChoice.image($0, size: Tokens.Symbol.compactGlyph) }
@@ -1572,8 +1586,15 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         iconButton.frame.origin = NSPoint(x: pad + (nameHeight - ib) / 2, y: pad + (nameHeight - ib) / 2)
         let textX = pad + nameHeight
         nameField.frame = NSRect(x: textX, y: pad + (nameHeight - fh) / 2, width: pad + width - textX - Tokens.Space.x2, height: fh)
-        editor.frame = NSRect(x: pad, y: pad + nameHeight + Tokens.Space.x3, width: width, height: editor.preferredHeight)
-        iconGrid?.frame = NSRect(x: pad, y: pad + nameHeight + Tokens.Space.x3, width: width, height: IconGrid.height)
+        // The profile, under the name: its label in the column the look's labels share, its menu after it.
+        let rowY = pad + nameHeight + Tokens.Space.x3, rowH = Tokens.Page.controlHeight
+        let lh = ceil(profileLabel.intrinsicContentSize.height)
+        profileLabel.frame = NSRect(x: pad, y: rowY + round((rowH - lh) / 2), width: editor.labelWidth, height: lh)
+        let menuWidth = min(profileButton.intrinsicContentSize.width, width - editor.labelWidth)
+        profileButton.frame = NSRect(x: pad + width - menuWidth, y: rowY, width: menuWidth, height: rowH)
+        let below = rowY + profileRowHeight
+        editor.frame = NSRect(x: pad, y: below, width: width, height: editor.preferredHeight)
+        iconGrid?.frame = NSRect(x: pad, y: below, width: width, height: IconGrid.height)
     }
 
     func show(from anchor: NSView? = nil) {
@@ -1644,6 +1665,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private func startMonitoring() {
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             guard let self else { return event }
+            // The Profile menu, and a question asked from it, sit outside the panel: a click or key there is theirs.
+            if MenuPanel.current != nil || self.isAsking { return event }
             if event.type == .keyDown {
                 // Esc in another window (Settings, a second browser window) is that window's; mid-word in a
                 // Chinese or Japanese input method, it belongs to the input method.
@@ -1654,6 +1677,55 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
             if event.window === self.window, !self.bounds.contains(self.convert(event.locationInWindow, from: nil)) { self.close() }
             return event
         }
+    }
+
+    // MARK: Profile
+
+    private func refreshProfiles() {
+        let library = Library.shared
+        profileButton.options = library.profiles.map { DropdownButton.Option(title: $0.displayName, image: ProfileSheets.tile(for: $0)) }
+        profileButton.selectedIndex = library.profiles.firstIndex { $0.id == library.profileID(ofSpace: spaceID) } ?? 0
+        needsLayout = true
+    }
+
+    /// Where a question is asked from here: over the whole window, the editor under it.
+    private var sheetHost: NSView? { (controller?.window ?? window)?.contentView }
+
+    private func chooseProfile(at index: Int) {
+        let library = Library.shared
+        guard library.profiles.indices.contains(index), let space = library.space(spaceID) else { return }
+        let profile = library.profiles[index]
+        guard profile.id != library.profileID(ofSpace: spaceID) else { return }
+        // Pages that are loaded are rebuilt in the other profile, which is worth a question; a space with none
+        // open just changes.
+        let open = WindowManager.shared.controllers.flatMap { $0.tabManager.allTabs }.contains { $0.spaceID == spaceID && !$0.isPrivate && $0.webView != nil }
+        guard open, let host = sheetHost else { move(to: profile.id); return }
+        isAsking = true
+        ConfirmSheet.show(in: host, title: String(localized: "Move \(space.name) to \(profile.displayName)?", comment: "Title of the sheet that asks before a space with open tabs is put on another profile. First the space's name, then the profile's."),
+                          message: String(localized: "Its open tabs reload in \(profile.displayName), with that profile’s sign-ins and extensions. Pages you were filling in may lose what you typed.", comment: "Message of the sheet that asks before a space with open tabs is put on another profile. The placeholder is the profile's name."),
+                          confirmTitle: String(localized: "Move", comment: "Button of the sheet that asks before a space is put on another profile.")) { [weak self] confirmed in
+            guard let self else { return }
+            self.isAsking = false
+            if confirmed { self.move(to: profile.id) } else { self.refreshProfiles() }
+        }
+    }
+
+    private func move(to profile: UUID) {
+        Library.shared.setProfile(profile, forSpace: spaceID)
+        edited = true
+        refreshProfiles()
+    }
+
+    private func newProfile() {
+        guard let host = sheetHost else { return }
+        isAsking = true
+        let sheet = ProfileSheets.new(in: host) { [weak self] made in
+            guard let self else { return }
+            self.isAsking = false
+            self.refreshProfiles()
+            if let index = Library.shared.profiles.firstIndex(where: { $0.id == made.id }) { self.chooseProfile(at: index) }
+        }
+        sheet.onCancel = { [weak self] in self?.isAsking = false }
     }
 
     /// The space as it was when the editor opened; closing registers one ⌘Z for everything changed.

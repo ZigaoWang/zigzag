@@ -33,6 +33,8 @@ final class FormSheet: NSView, NSTextFieldDelegate {
     private let isDestructive: Bool
     private let canConfirm: () -> Bool
     private var completion: (Bool) -> Void
+    /// Hears that it closed without being confirmed, for whoever needs to know either way.
+    var onCancel: (() -> Void)?
     private var monitor: Any?
     private weak var previousResponder: NSResponder?
 
@@ -166,6 +168,7 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         panel.dismiss()
         Tokens.Motion.animate(Tokens.Motion.leaving, evenFromKeyboard: true, { self.animator().alphaValue = 0 }, completion: { self.removeFromSuperview() })
         completion(confirmed)
+        if !confirmed { onCancel?() }
     }
 
     private func giveBackKeyboard() {

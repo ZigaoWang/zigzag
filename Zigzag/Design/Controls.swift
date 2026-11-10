@@ -1206,9 +1206,17 @@ final class DropdownButton: InteractiveView {
     private let label = Label("", font: Tokens.Font.control(), color: Tokens.Color.textPrimary)
     private let icon = NSImageView()
     private let chevron = NSImageView()
+    /// Something its menu offers to do, after the choices: it runs, and the choice stays what it was.
+    struct Action {
+        var title: String
+        var symbol: String?
+        var run: () -> Void
+    }
     var options: [Option] = [] { didSet { refresh() } }
     var selectedIndex = 0 { didSet { refresh() } }
     var onSelect: ((Int) -> Void)?
+    /// Under the choices, after a line: making a new thing to choose ("New Profile…").
+    var actions: [Action] = []
     private var openedAt: TimeInterval = 0
     private var menuOpen = false { didSet { stateDidChange(animated: false) } }
 
@@ -1268,12 +1276,16 @@ final class DropdownButton: InteractiveView {
 
     func openMenu() {
         guard !options.isEmpty, MenuPanel.current?.anchor !== self else { return }
-        let items: [MenuPanel.Entry] = options.enumerated().map { index, option in
+        var items: [MenuPanel.Entry] = options.enumerated().map { index, option in
             .item(MenuPanel.Item(title: option.title, image: option.image, isChecked: index == selectedIndex) { [weak self] in
                 guard let self else { return }
                 self.selectedIndex = index
                 self.onSelect?(index)
             })
+        }
+        if !actions.isEmpty {
+            items.append(.separator)
+            items += actions.map { action in .item(MenuPanel.Item(title: action.title, symbol: action.symbol, action: action.run)) }
         }
         openedAt = ProcessInfo.processInfo.systemUptime
         menuOpen = true
