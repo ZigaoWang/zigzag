@@ -107,7 +107,8 @@ final class ExtensionInstalls {
     /// Installed since Zigzag started, until the extension's background has heard so (BridgeRuntime).
     var newlyInstalled: Set<String> = []
 
-    /// The profile is being removed: every answer it kept goes, and its pins.
+    /// The profile is being removed: its pins go from the preferences. What it decided about each extension is in
+    /// its folder, which goes whole (Profiles.remove).
     func removeAll() {
         UserDefaults.standard.removeObject(forKey: pinsKey)
     }
