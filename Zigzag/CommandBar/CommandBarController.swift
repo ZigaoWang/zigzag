@@ -162,6 +162,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private(set) var mode: Mode = .newTab
     private var suggestions: [String] = []
     private let fetcher = SuggestionFetcher()
+    /// History's pages and sites for what's typed, read off the main thread; they join the list as they arrive.
+    private let history = HistoryLookup()
+    /// What was typed when the inline completion was last asked of History, while the answer is still coming.
+    private var completionAsked: String?
     /// Text the user actually typed; the field may also hold an inline completion after it.
     private var typed = ""
     /// The site what you typed completes to. The rest of its address sits selected after what you typed, unless
@@ -229,6 +233,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         [chip, chipRule, hint, hintKey].forEach { panel.addSubview($0) }
         panel.onLayout = { [weak self] in self?.layoutPanel() }
         scrim.onClick = { [weak self] in self?.dismiss() }
+        history.onPages = { [weak self] in self?.mergeArrived() }
+        history.onSites = { [weak self] in self?.completionArrived() }
     }
 
     // MARK: Showing
@@ -269,6 +275,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         if !isVisible {
             host.commandBarWillShow()
             isVisible = true
+            // History may have changed since the bar was last open: nothing found then is reused.
+            history.reset()
+            completionAsked = nil
             scrim.frame = isAnchored ? host.commandBarOverlay.bounds : card
             host.commandBarOverlay.addSubview(scrim)
             host.commandBarOverlay.addSubview(panel)
@@ -480,10 +489,29 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     // MARK: Results
 
     private func refreshResults(animated: Bool) {
-        guard let host else { return }
+        guard let fresh = currentResults() else { return }
+        display(fresh, animated: animated)
+    }
+
+    /// Something read in the background arrived (History's pages, web suggestions) and joins the list. A row you've
+    /// moved to stays the one picked; when it would go, the list waits for your next letter instead, so the selection
+    /// never jumps under you and Return does what's showing.
+    private func mergeArrived() {
+        guard isVisible, let fresh = currentResults() else { return }
+        guard selectedIndex != 0, results.indices.contains(selectedIndex) else { display(fresh, animated: true); return }
+        guard let index = fresh.firstIndex(of: results[selectedIndex]) else { return }
+        display(fresh, animated: true)
+        select(index)
+    }
+
+    /// The rows for what's typed now, from what's at hand: History's part as far as it's been read.
+    private func currentResults() -> [CommandResult]? {
+        guard let host else { return nil }
         let editing = mode == .editCurrent && typed == host.commandBarTab?.url?.absoluteString
-        results = CommandRanker.results(for: editing ? "" : typed, manager: host.commandBarTabs, suggestions: suggestions,
-                                        editingCurrent: mode == .editCurrent, historyOnly: mode == .history)
+        let query = editing || scope != nil ? "" : typed
+        let pages = query.isEmpty ? [] : history.pages(for: query, limit: CommandRanker.historyLimit(historyOnly: mode == .history))
+        var results = CommandRanker.results(for: query, manager: host.commandBarTabs, suggestions: suggestions, history: pages,
+                                            editingCurrent: mode == .editCurrent, historyOnly: mode == .history)
         if editing { results = [] }
         // Zigzag's commands act on a browser window's tabs: outside one there's nothing for them to act on.
         if controller == nil { results.removeAll { if case .action = $0.kind { true } else { false } } }
@@ -501,7 +529,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
                 var seen = Set([TabManager.normalize(scope.home)])
                 results = [CommandResult(kind: .open(scope.home), title: scope.name, detail: CommandRanker.displayURL(scope.home),
                                          icon: FaviconStore.shared.cachedIcon(for: scope.home), symbol: "globe")]
-                for entry in HistoryStore.shared.search(domain, limit: 12) where results.count < 6 {
+                for entry in history.pages(for: domain, limit: 12) ?? [] where results.count < 6 {
                     let key = TabManager.normalize(entry.url)
                     guard entry.url.host()?.hasSuffix(domain) == true, entry.url.path.count > 1, !SearchFolding.isSearchResultsPage(entry.url),
                           seen.insert(key).inserted else { continue }
@@ -526,7 +554,11 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             }
         }
         // A short window shows fewer rows rather than letting the list run off its bottom edge.
-        results = Array(results.prefix(rowsThatFit))
+        return Array(results.prefix(rowsThatFit))
+    }
+
+    private func display(_ fresh: [CommandResult], animated: Bool) {
+        results = fresh
         while rows.count < results.count {
             let row = CommandRowView()
             row.onClick = { [weak self, weak row] event in
@@ -710,17 +742,15 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
                                                caretAtEnd: caretAtEnd, hasMarkedText: editor.hasMarkedText())
         typed = text
         completion = nil
+        completionAsked = nil
         // Not in a site search or history, and never while an input method is still composing.
-        if allowed, scope == nil, let host, mode != .history {
-            // A letter that agrees with the completion keeps it, unless it finished a host you've been to. One lookup per keystroke.
-            completion = InlineCompletion.next(previous: previous, found: CommandRanker.inlineCompletion(for: text, manager: host.commandBarTabs),
-                                               typed: text)
-            if let completion, completion.text.count > text.count {
-                // What you typed stays as you typed it; the rest follows, selected, so the next letter replaces it.
-                let rest = String(completion.text.dropFirst(text.count))
-                editor.replaceCharacters(in: NSRange(location: length, length: 0), with: rest)
-                editor.selectedRange = NSRange(location: length, length: (rest as NSString).length)
-            }
+        if allowed, scope == nil, host != nil, mode != .history {
+            // A letter that agrees with the completion keeps it, unless it finished a host you've been to. One lookup per
+            // keystroke, off the main thread: until History answers, only the completion already showing can stay.
+            completion = InlineCompletion.next(previous: previous, found: foundCompletion(for: text), typed: text)
+            fillCompletion(editor)
+        } else {
+            history.stopSites()
         }
         refreshHint()
         refreshResults(animated: true)
@@ -729,10 +759,40 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         fetcher.fetch(text) { [weak self] list in
             guard let self, self.isVisible, self.typed == text else { return }
             self.suggestions = list
-            let selected = self.results.indices.contains(self.selectedIndex) ? self.results[self.selectedIndex] : nil
-            self.refreshResults(animated: true)
-            if let selected, let index = self.results.firstIndex(of: selected) { self.select(index) }
+            self.mergeArrived()
         }
+    }
+
+    /// What History's sites complete the text to, once they're read; nil meanwhile (`completionArrived` follows up).
+    private func foundCompletion(for text: String) -> InlineCompletion.Match? {
+        guard let bare = CommandRanker.completionPrefix(for: text) else { return nil }
+        guard let sites = history.completionSites(for: bare) else { completionAsked = text; return nil }
+        return CommandRanker.inlineCompletion(for: text, manager: host?.commandBarTabs, history: sites)
+    }
+
+    /// What you typed stays as you typed it; the rest of the completion follows, selected, so the next letter replaces it.
+    private func fillCompletion(_ editor: NSTextView) {
+        guard let completion, completion.text.count > typed.count else { return }
+        let length = (typed as NSString).length
+        let rest = String(completion.text.dropFirst(typed.count))
+        editor.replaceCharacters(in: NSRange(location: length, length: 0), with: rest)
+        editor.selectedRange = NSRange(location: length, length: (rest as NSString).length)
+    }
+
+    /// History's sites arrived for what you typed: the completion they give fills in now, as if it had come at once,
+    /// unless you've moved on since (the caret moved, a row picked with the arrows; another letter asks afresh).
+    private func completionArrived() {
+        guard isVisible, let asked = completionAsked, asked == typed, scope == nil, mode != .history, selectedIndex == 0,
+              let editor = field.currentEditor() as? NSTextView, !editor.hasMarkedText() else { return }
+        let atEnd = field.stringValue == typed && editor.selectedRange == NSRange(location: (typed as NSString).length, length: 0)
+        guard atEnd || completionIsSelected(editor) else { return }
+        completionAsked = nil
+        let next = InlineCompletion.next(previous: completion, found: foundCompletion(for: typed), typed: typed)
+        guard next != completion else { return }
+        takeBackCompletion()
+        completion = next
+        fillCompletion(editor)
+        refreshResults(animated: true)
     }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {

@@ -95,14 +95,11 @@ enum CommandRanker {
 
     /// The address what you typed completes to, e.g. "wiki" → "wikipedia.org": sites from your history, weighed by
     /// how often and how lately you went, and the ones you keep at hand (open tabs, favorites, pinned tabs).
-    /// `manager`: the browser window whose open tabs count, if there is one.
-    static func inlineCompletion(for text: String, manager: TabManager?) -> InlineCompletion.Match? {
-        let lower = text.lowercased()
-        let bare = lower.hasPrefix("www.") ? String(lower.dropFirst(4)) : lower
-        guard !bare.isEmpty, InlineCompletion.looksLikeHost(lower) else { return nil }
-        var found = HistoryStore.shared.completionSites(for: bare)
-        if found.isEmpty { found = HistoryStore.shared.completionSites(for: bare, afterSubdomain: true) }
-        var sites: [InlineCompletion.Site] = found.compactMap { entry, score in
+    /// `manager`: the browser window whose open tabs count, if there is one. `history`: the sites History has for
+    /// `completionPrefix(for: text)`, read off the main thread (`HistoryLookup`).
+    static func inlineCompletion(for text: String, manager: TabManager?, history: [(entry: HistoryEntry, score: Double)]) -> InlineCompletion.Match? {
+        guard let bare = completionPrefix(for: text) else { return nil }
+        var sites: [InlineCompletion.Site] = history.compactMap { entry, score in
             InlineCompletion.target(entry.url, wholePage: true).map { InlineCompletion.Site(url: $0, score: score) }
         }
         // Each place a site is kept at hand counts as much as a visit this week.
@@ -112,6 +109,13 @@ enum CommandRanker {
             if let site = InlineCompletion.target(url, wholePage: false) { sites.append(InlineCompletion.Site(url: site, score: 1)) }
         }
         return InlineCompletion.best(for: text, among: InlineCompletion.merge(sites))
+    }
+
+    /// What History is asked for to complete the text: it lowercased and without "www.", or nil when it can't complete.
+    static func completionPrefix(for text: String) -> String? {
+        let lower = text.lowercased()
+        let bare = lower.hasPrefix("www.") ? String(lower.dropFirst(4)) : lower
+        return !bare.isEmpty && InlineCompletion.looksLikeHost(lower) ? bare : nil
     }
 
     struct Action {
@@ -286,9 +290,14 @@ enum CommandRanker {
         }
     }
 
+    /// How many pages `results` wants from History: twice what it shows, as some are already a tab or a bookmark.
+    static func historyLimit(historyOnly: Bool) -> Int { historyOnly ? 20 : 8 }
+
     /// `manager`: the browser window whose tabs and commands are offered; with none (Zigzag Mini on its own), only
-    /// pages to open and searches.
-    static func results(for text: String, manager: TabManager?, suggestions: [String], editingCurrent: Bool, historyOnly: Bool) -> [CommandResult] {
+    /// pages to open and searches. `history`: the pages History has for the text, read off the main thread
+    /// (`HistoryLookup`, asked for `historyLimit` of them; nil while it still is), so these results never wait on History.
+    static func results(for text: String, manager: TabManager?, suggestions: [String], history: [HistoryEntry]?,
+                        editingCurrent: Bool, historyOnly: Bool) -> [CommandResult] {
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
         var results: [CommandResult] = []
         var seen = Set<String>()
@@ -385,8 +394,8 @@ enum CommandRanker {
         }
 
         var historyCount = 0
-        let historyLimit = historyOnly ? 10 : 4
-        for entry in HistoryStore.shared.search(query, limit: historyLimit * 2) where historyCount < historyLimit {
+        let shown = historyOnly ? 10 : 4
+        for entry in history ?? [] where historyCount < shown {
             let key = TabManager.normalize(entry.url)
             guard !seen.contains(key), !SearchFolding.isSearchResultsPage(entry.url) else { continue }
             add(CommandResult(kind: .history(entry.url), title: entry.title.isEmpty ? displayURL(entry.url) : entry.title,
@@ -394,8 +403,9 @@ enum CommandRanker {
             historyCount += 1
         }
 
-        // Searching history and nothing matches: never a blank bar. Say so, with the web search one Return away.
-        if historyOnly, results.isEmpty {
+        // Searching history and nothing matches: never a blank bar. Say so, with the web search one Return away. Still
+        // being read: nothing yet, rather than saying nothing matches a beat before it does.
+        if historyOnly, results.isEmpty, history != nil {
             add(CommandResult(kind: .search(query), title: String(localized: "Search the web for “\(query)”", comment: "Command bar result when nothing in history matches. The query is what was typed."),
                               detail: String(localized: "Nothing in your history matches", comment: "Under the command bar's search-the-web result, when nothing in history matches."),
                               symbol: "magnifyingglass"), key: "search:\(query)")
