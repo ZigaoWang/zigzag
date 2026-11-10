@@ -165,6 +165,7 @@ final class ConfirmSheet: NSView {
 
     #if DEBUG
     func debugCancel() { finish(.cancel) }
+    func debugConfirm() { finish(.confirm) }
     #endif
 
     private func finish(_ choice: Choice) {

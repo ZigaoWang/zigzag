@@ -1318,6 +1318,12 @@ final class Library {
     func profileID(ofSpace id: UUID) -> UUID { directory.profileID(ofSpace: id) }
     func spaces(in profile: UUID) -> [SpaceInfo] { spaces.filter { directory.profileID(ofSpace: $0.id) == profile } }
 
+    /// The spaces under their profiles, in the profiles' order, for a list of places to go: a profile with none of
+    /// them isn't there, and `excluding` (the space you're in) is left out.
+    func spaceGroups(excluding: UUID? = nil) -> [(profile: ProfileInfo, spaces: [SpaceInfo])] {
+        profiles.map { profile in (profile, spaces(in: profile.id).filter { $0.id != excluding }) }.filter { !$0.spaces.isEmpty }
+    }
+
     @discardableResult
     func addProfile(name: String, color: SpaceColor? = nil) -> ProfileInfo {
         let info = directory.add(name: name, color: color)

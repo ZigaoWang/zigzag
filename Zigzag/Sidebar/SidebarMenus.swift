@@ -9,6 +9,16 @@ enum SidebarMenus {
         @objc func runAction(_ sender: Any?) { run() }
     }
 
+    /// The spaces to move something to, as a submenu's items: under their profiles' names once there's more than
+    /// one profile, since moving to another profile's space is a bigger step.
+    static func addSpaces(to menu: NSMenu, excluding current: UUID?, _ move: @escaping (SpaceInfo) -> Void) {
+        let groups = Library.shared.spaceGroups(excluding: current)
+        for group in groups {
+            if Library.shared.hasManyProfiles { menu.addItem(.sectionHeader(title: group.profile.displayName)) }
+            for space in group.spaces { menu.addItem(Item(space.name) { move(space) }) }
+        }
+    }
+
     static func Item(_ title: String, symbol: String? = nil, enabled: Bool = true, _ handler: @escaping () -> Void) -> NSMenuItem {
         let target = Handler(handler)
         let item = NSMenuItem(title: title, action: #selector(Handler.runAction(_:)), keyEquivalent: "")
@@ -52,9 +62,7 @@ enum SidebarMenus {
         if Library.shared.spaces.count > 1, !(isPrivate && !pins.isEmpty) {
             let move = NSMenuItem(title: String(localized: "Move \(count) to Space", comment: "Menu item for several picked sidebar rows"), action: nil, keyEquivalent: "")
             let sub = NSMenu()
-            for space in Library.shared.spaces where space.id != manager.currentSpaceID {
-                sub.addItem(Item(space.name) { controller.moveMarked(items, to: space.id) })
-            }
+            addSpaces(to: sub, excluding: manager.currentSpaceID) { controller.moveMarked(items, to: $0.id) }
             move.submenu = sub
             menu.addItem(move)
         }
@@ -136,9 +144,7 @@ enum SidebarMenus {
         if Library.shared.spaces.count > 1 {
             let move = NSMenuItem(title: String(localized: "Move to Space", comment: "Item in a tab's context menu in the sidebar. Opens a list of spaces."), action: nil, keyEquivalent: "")
             let sub = NSMenu()
-            for space in Library.shared.spaces where space.id != tab.spaceID {
-                sub.addItem(Item(space.name) { controller.moveToSpaceWithToast(tab, spaceID: space.id) })
-            }
+            addSpaces(to: sub, excluding: tab.spaceID) { controller.moveToSpaceWithToast(tab, spaceID: $0.id) }
             move.submenu = sub
             menu.addItem(move)
         }
@@ -205,10 +211,11 @@ enum SidebarMenus {
             let move = NSMenuItem(title: String(localized: "Move to Space", comment: "Item in a pinned tab's context menu in the sidebar. Opens a list of spaces."), action: nil, keyEquivalent: "")
             let sub = NSMenu()
             let current = Library.shared.spaceID(ofBookmark: bookmark.id)
-            for space in Library.shared.spaces where space.id != current {
-                sub.addItem(Item(space.name) {
+            addSpaces(to: sub, excluding: current) { space in
+                // Its open page goes with it: to another profile's space, that's asked first.
+                controller.confirmProfileCrossing([live].compactMap { $0 }, to: space.id) {
                     controller.libraryChange(String(localized: "Move to Space", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.moveBookmark(bookmark.id, to: Int.max, in: space.id) }
-                })
+                }
             }
             move.submenu = sub
             menu.addItem(move)
@@ -538,6 +545,11 @@ extension BrowserWindowController {
         guard let name = Library.shared.space(spaceID)?.name else { return }
         let tabs = markedTabRows(items)
         let pins = markedPinRows(items)
+        let open = tabs + pins.compactMap { tabManager.bookmarkTab(for: $0) }
+        confirmProfileCrossing(open, to: spaceID) { [weak self] in self?.moveMarkedNow(items, tabs: tabs, pins: pins, to: spaceID, name: name) }
+    }
+
+    private func moveMarkedNow(_ items: [SidebarItem], tabs: [Tab], pins: [UUID], to spaceID: UUID, name: String) {
         pageChange(String(localized: "Move to Space", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
             Library.shared.together {
                 for tab in tabs.reversed() { tabManager.moveTabToSpace(tab, spaceID: spaceID, at: 0) }
