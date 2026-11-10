@@ -113,6 +113,17 @@
         }
       }
     },
+    "%@ can’t be deleted yet" : {
+      "comment" : "Title of the sheet shown instead of the one that deletes a profile, while an import into that profile is still running. The placeholder is the profile's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂时无法删除“%@”"
+          }
+        }
+      }
+    },
     "%@ can’t hear this tab. Its sound is protected or can’t be reached." : {
       "comment" : "Toast when an extension asks to hear a tab whose sound Zigzag can't hand it (protected video, or sound it can't reach). The placeholder is the extension's name.",
       "localizations" : {
@@ -6476,13 +6487,13 @@
         }
       }
     },
-    "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins, saved passwords, history and favorites. Make sure you have your recovery phrases. This can’t be undone." : {
+    "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins, history and favorites. Make sure you have your recovery phrases. This can’t be undone." : {
       "comment" : "Message of the sheet that deletes a profile.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "它的扩展及其保存的所有内容（包括钱包）都会被删除，登录状态、已存储的密码、历史记录和收藏也会一并删除。请确认你已保存好恢复短语。此操作不可撤销。"
+            "value" : "它的扩展及其保存的所有内容（包括钱包）都会被删除，登录状态、历史记录和收藏也会一并删除。请确认你已保存好恢复短语。此操作不可撤销。"
           }
         }
       }
@@ -12786,6 +12797,17 @@
         }
       }
     },
+    "The profile this was going into has been deleted. Choose another and import again." : {
+      "comment" : "Problem in the Import window, when the profile chosen under Into was deleted before the import ran.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要导入到的描述文件已被删除。请选取其他描述文件，然后重新导入。"
+          }
+        }
+      }
+    },
     "The result can’t be given as text. For a promise, put await before it and return its value." : {
       "comment" : "Error a script gets when its JavaScript ends on a value like a promise or a page element.",
       "localizations" : {
@@ -15092,6 +15114,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzag 由 Zigao Wang 制作，依据 Apache License, Version 2.0 开源。它建立在他人的成果之上，下面列出了这些作品及其许可证。谢谢你们。"
+          }
+        }
+      }
+    },
+    "Zigzag is still importing into it. Try again when the import is done." : {
+      "comment" : "Message of the sheet shown instead of the one that deletes a profile, while an import into that profile is still running.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 仍在向其中导入。请在导入完成后再试。"
           }
         }
       }

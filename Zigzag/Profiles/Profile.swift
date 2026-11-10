@@ -91,6 +91,30 @@ final class Profiles {
         (webView as? BrowserWebView)?.owner?.profile ?? webView.flatMap { profile(of: $0) } ?? `default`
     }
 
+    // MARK: Profiles in use
+
+    /// The profiles something is writing into for a while (an import), each with how many are. One of these isn't
+    /// removed until they're done (`remove`): what's being written would land in data that's being erased.
+    private var writers: [UUID: Int] = [:]
+    var inUse: Set<UUID> { Set(writers.keys) }
+
+    /// Says a profile is being written into, until `done` is called with it. False, with nothing held, for one
+    /// that's no longer listed: there's nowhere to write.
+    func hold(_ id: UUID) -> Bool {
+        guard id == Profile.defaultID || Library.shared.directory.profile(id) != nil else { return false }
+        writers[id, default: 0] += 1
+        return true
+    }
+
+    func done(_ id: UUID) {
+        guard let count = writers[id] else { return }
+        writers[id] = count > 1 ? count - 1 : nil
+    }
+
+    /// Whether a profile may be removed now, and if not, why: asked before the question is put, and again by
+    /// `remove` itself.
+    func removalBlock(_ id: UUID) -> ProfileDirectory.RemovalBlock? { Library.shared.directory.removalBlock(id, inUse: inUse) }
+
     // MARK: Removing a profile
 
     /// Removes a profile and everything it kept: its extensions and what they stored, its sign-ins and website
@@ -99,15 +123,18 @@ final class Profiles {
     /// The removal is written down before anything is erased (the library's `deleting` list), so one that's cut
     /// short is finished the next time Zigzag starts. That's also when WebKit lets go of the store: it won't remove
     /// one this run has opened.
-    func remove(_ id: UUID) async {
-        guard id != Profile.defaultID, Library.shared.directory.profile(id) != nil else { return }
+    ///
+    /// False, with nothing changed, when it can't be removed now (`removalBlock`).
+    @discardableResult
+    func remove(_ id: UUID) async -> Bool {
+        guard removalBlock(id) == nil else { return false }
         let profile = profile(id)
         // Never the first profile, whatever was asked for: its folder is all of Zigzag's data.
-        guard !profile.isDefault else { return }
+        guard !profile.isDefault else { return false }
         let had = profile.installs.installedIDs
         // From here it's in no list: its spaces are on the first profile, and their pages are rebuilt there. Nothing
         // is erased unless that's on disk.
-        guard Library.shared.removeProfile(id) else { return }
+        guard Library.shared.removeProfile(id) else { return false }
         others[id] = nil
         for popup in PopupWindowController.all where popup.webView.configuration.websiteDataStore === profile.storeIfMade { popup.window?.close() }
         for mini in MiniWindowController.all { mini.settleProfile() }
@@ -120,6 +147,7 @@ final class Profiles {
             try? FileManager.default.removeItem(at: ExtensionStore.folder(for: id))
         }
         await Self.eraseStore(id)
+        return true
     }
 
     /// At launch, before anything has opened their stores: the profiles whose removal isn't finished.

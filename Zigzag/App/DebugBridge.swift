@@ -409,8 +409,16 @@ enum DebugBridge {
             // delprofile <name>: removes the profile and its data, without asking. Only in a test copy.
             guard isTestCopy else { debugLog("delprofile refused: not a test copy"); break }
             if let id = Library.shared.profiles.first(where: { $0.name == arg && !$0.isDefault })?.id {
-                Task { await Profiles.shared.remove(id); debugLog("delprofile \(arg) => deleting \(Library.shared.directory.deleting.count)") }
+                Task {
+                    let removed = await Profiles.shared.remove(id)
+                    debugLog("delprofile \(arg) => \(removed ? "removed" : "refused") deleting \(Library.shared.directory.deleting.count)")
+                }
             }
+        case "holdprofile", "releaseprofile":
+            // holdprofile <name> / releaseprofile <name>: as an import does while it writes into the profile, so a
+            // removal meanwhile can be checked. Only in a test copy.
+            guard isTestCopy, let id = Library.shared.profiles.first(where: { $0.name == arg })?.id else { debugLog("\(name) refused"); break }
+            if name == "holdprofile" { debugLog("holdprofile \(arg) => \(Profiles.shared.hold(id))") } else { Profiles.shared.done(id); debugLog("releaseprofile \(arg) => in use \(Profiles.shared.inUse.count)") }
         case "profiles":
             // profiles <path>: each profile with its spaces and extensions, and for each tab in this window the
             // profile its page is in and the store that page uses (JSON).

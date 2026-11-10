@@ -44,6 +44,7 @@ final class ImportView: NSView {
     private var intoProfile = WindowManager.shared.keyController?.tabManager.profile.id ?? Profile.defaultID
     /// The profiles as the choice lists them.
     private var intoIDs: [UUID] = []
+    private var profilesToken: SignalToken?
     /// The profile it all goes into.
     private var target: Profile { Profiles.shared.profile(intoProfile) }
     private let chooseFile = TextButton(title: String(localized: "Choose File…", comment: "Button in the Import window: choose a passwords export or Safari export file."), font: Tokens.Font.body(.medium))
@@ -110,6 +111,16 @@ final class ImportView: NSView {
             self.intoProfile = self.intoIDs[index]
             // What each browser has that this profile doesn't.
             self.rows.forEach { $0.loadPreview(in: self.target) }
+        }
+        // A profile made, renamed or removed while the window is open: the choice shows what there is now, and one
+        // that's gone gives way to the first, where you can see it.
+        profilesToken = Library.shared.changed.observe { [weak self] in
+            guard let self else { return }
+            let wasGone = Library.shared.directory.profile(self.intoProfile) == nil
+            if wasGone { self.intoProfile = Profile.defaultID }
+            self.intoIDs = ProfileChoice.fill(self.intoPicker, selected: self.intoProfile)
+            if wasGone { self.rows.forEach { $0.loadPreview(in: self.target) } }
+            self.needsLayout = true
         }
         // Sign-ins start on, as passwords do; the line under the choices says what they are.
         for (choice, name) in [(ImportCoordinator.Choice.passwords, String(localized: "Passwords", comment: "Choice in the Import window: bring passwords over.")),
@@ -238,6 +249,9 @@ final class ImportView: NSView {
     /// one at a time.
     private func importExtensions() async {
         let profile = target
+        // Held while they're added, as while the rest came over, so the profile isn't removed under them.
+        guard Profiles.shared.hold(profile.id) else { return }
+        defer { Profiles.shared.done(profile.id) }
         let found = ChromiumExtensions.toAdd(summaries.flatMap(\.foundExtensions), installed: Set(profile.installs.installedIDs))
         for index in summaries.indices { summaries[index].foundExtensions = [] }
         guard !found.isEmpty else { return }

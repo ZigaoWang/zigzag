@@ -175,8 +175,15 @@ enum ProfileSheets {
         let library = Library.shared
         guard let profile = library.directory.profile(id), !profile.isDefault else { return }
         let name = profile.displayName
+        // Not while something is still being brought into it: that would be erased half written.
+        let tellInUse = { [weak host] in
+            guard let host else { return }
+            ConfirmSheet.notice(in: host, title: String(localized: "\(name) can’t be deleted yet", comment: "Title of the sheet shown instead of the one that deletes a profile, while an import into that profile is still running. The placeholder is the profile's name."),
+                                message: String(localized: "Zigzag is still importing into it. Try again when the import is done.", comment: "Message of the sheet shown instead of the one that deletes a profile, while an import into that profile is still running."))
+        }
+        if Profiles.shared.removalBlock(id) == .inUse { tellInUse(); return }
         let typed = FilledField(placeholder: name)
-        var message = String(localized: "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins, saved passwords, history and favorites. Make sure you have your recovery phrases. This can’t be undone.",
+        var message = String(localized: "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins, history and favorites. Make sure you have your recovery phrases. This can’t be undone.",
                              comment: "Message of the sheet that deletes a profile.")
         if !library.spaces(in: id).isEmpty {
             let first = library.profiles[0].displayName
@@ -192,7 +199,10 @@ enum ProfileSheets {
                        destructive: true,
                        canConfirm: { [weak typed] in typed?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(name) == .orderedSame }) { confirmed in
             guard confirmed else { return }
-            Task { await Profiles.shared.remove(id) }
+            Task {
+                // An import begun while the question was open: nothing is removed, and it says so.
+                if await !Profiles.shared.remove(id), Profiles.shared.removalBlock(id) == .inUse { tellInUse() }
+            }
         }
     }
 }
