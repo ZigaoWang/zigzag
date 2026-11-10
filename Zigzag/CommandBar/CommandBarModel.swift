@@ -369,8 +369,9 @@ enum CommandRanker {
             }
             var bookmarkCount = 0
             // Favorites first: they're the sites you go to most.
-            let favorites = Set(Library.shared.favorites.map(\.id))
-            for bookmark in Library.shared.favorites + Library.shared.allBookmarks.map(\.0) where bookmarkCount < 3 {
+            let shown = Library.shared.favorites(in: manager?.profile.id ?? Profile.defaultID)
+            let favorites = Set(shown.map(\.id))
+            for bookmark in shown + Library.shared.allBookmarks.map(\.0) where bookmarkCount < 3 {
                 guard matches(words, bookmark.title, bookmark.url.absoluteString) else { continue }
                 let key = TabManager.normalize(bookmark.url)
                 guard !seen.contains(key) else { continue }

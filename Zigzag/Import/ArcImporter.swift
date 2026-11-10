@@ -75,7 +75,7 @@ enum ArcImporter {
         }
         var newSpaces = spaces
         // Arc's Favorites are global, like ours.
-        let addedFavorites = Library.shared.appendFavorites(favorites)
+        let addedFavorites = Library.shared.appendFavorites(favorites, in: Profile.defaultID)
         for favorite in favorites { FaviconStore.shared.prefetch(for: favorite.url) }
         result.spaces = newSpaces.count
         result.bookmarks = newSpaces.map(\.bookmarks.count).reduce(0, +)

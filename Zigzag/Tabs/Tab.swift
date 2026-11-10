@@ -46,7 +46,7 @@ final class Tab: NSObject {
     /// Set when this tab is the live page behind a bookmark. Such tabs live in the bookmark row, not the tab list.
     var bookmarkID: UUID?
     /// Set when this tab is the live page behind a favorite tile.
-    var isFavorite = false
+    var isFavorite = false { didSet { if isFavorite != oldValue { settleProfile() } } }
     /// The tab this one sits under in the list (nested tabs); nil at the top level. Pinned pages and favorites never
     /// have one. TabManager keeps it right (see TabTree).
     var parentID: UUID?
@@ -105,8 +105,17 @@ final class Tab: NSObject {
     /// changed space. A private tab's page is in its window's own store, whatever the space.
     func settleProfile() {
         guard !isPrivate else { return }
-        let wanted = Profiles.shared.profile(forSpace: spaceID)
+        let wanted = homeProfile
         if wanted !== profile { rehome(to: wanted) }
+    }
+
+    /// The profile its page belongs in: its space's, or for a favorite, the profile the favorite is kept in,
+    /// whichever of that profile's spaces it was last opened from.
+    var homeProfile: Profile {
+        if isFavorite, let bookmarkID, Library.shared.isFavorite(bookmarkID) {
+            return Profiles.shared.profile(Library.shared.profileID(ofFavorite: bookmarkID))
+        }
+        return Profiles.shared.profile(forSpace: spaceID)
     }
 
     /// Rebuilds the page in another profile: that profile's sign-ins and extensions, the same back and forward

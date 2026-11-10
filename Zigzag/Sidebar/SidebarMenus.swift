@@ -182,7 +182,7 @@ enum SidebarMenus {
         }
         menu.addItem(Item(String(localized: "Copy Link", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.copyLink(bookmark.url) })
         menu.addItem(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar.")) {
-            controller.libraryChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.makeFavorite(bookmark.id) }
+            controller.libraryChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.makeFavorite(bookmark.id, in: manager.profile.id) }
             live?.isFavorite = true
         })
         // Beside the tab you're on, as a tab opens; not loaded yet, it opens at its pinned address.
@@ -530,7 +530,7 @@ extension BrowserWindowController {
                     switch item {
                     case .tab(let id): if let tab = tabManager.tab(with: id) { tabManager.favoriteTab(tab) }
                     case .bookmark(let id):
-                        Library.shared.makeFavorite(id)
+                        Library.shared.makeFavorite(id, in: tabManager.profile.id)
                         tabManager.bookmarkTab(for: id)?.isFavorite = true
                     default: break
                     }

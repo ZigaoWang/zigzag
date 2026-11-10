@@ -327,8 +327,16 @@ final class TabManager {
         // A tab closed since (one an old undo step or a stale button still points at) never comes back from here.
         guard !tab.isClosed else { return }
         Autofill.shared.hide()
-        // Favorites belong to every space: they open in the one you're in.
-        if tab.isFavorite { tab.setSpace(currentSpaceID) }
+        // Favorites belong to every space of their profile: they open in the one you're in. Reached from a space
+        // on another profile (the command bar, an extension), one opens in a space of its own profile.
+        if tab.isFavorite {
+            let home = tab.homeProfile
+            if profile === home {
+                tab.setSpace(currentSpaceID)
+            } else if Profiles.shared.profile(forSpace: tab.spaceID) !== home, let space = space(for: home) {
+                tab.setSpace(space)
+            }
+        }
         if tab.spaceID != currentSpaceID {
             currentSpaceID = tab.spaceID
             changed.send(.space)
@@ -377,7 +385,7 @@ final class TabManager {
 
     /// Favorites, bookmarks, then tabs, in sidebar order: what Cmd+Option+Up/Down walk.
     var navigableTabs: [Tab] {
-        let favoriteLive = Library.shared.favorites.compactMap { bookmarkTabs[$0.id] }
+        let favoriteLive = Library.shared.favorites(in: profile.id).compactMap { bookmarkTabs[$0.id] }
         let bookmarkLive = Library.shared.bookmarks(in: currentSpaceID).compactMap { bookmarkTabs[$0.id] }
         return favoriteLive + bookmarkLive + currentTabs
     }
@@ -392,7 +400,7 @@ final class TabManager {
             unsplit(tab, notify: false)
         }
         if let bookmarkID = tab.bookmarkID {
-            Library.shared.makeFavorite(bookmarkID, at: index)
+            Library.shared.makeFavorite(bookmarkID, at: index, in: profile.id)
             tab.isFavorite = true
             return
         }
@@ -401,12 +409,12 @@ final class TabManager {
         tab.bookmarkID = id
         tab.isFavorite = true
         bookmarkTabs[id] = tab
-        Library.shared.addFavorite(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), at: index, id: id)
+        Library.shared.addFavorite(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), at: index, id: id, in: profile.id)
     }
 
     /// A pinned page into the favorites at a tile's place, open or not; open, a split it's in comes along.
     func favoriteBookmark(_ bookmarkID: UUID, at index: Int?) {
-        if let tab = bookmarkTabs[bookmarkID] { favoriteTab(tab, at: index) } else { Library.shared.makeFavorite(bookmarkID, at: index) }
+        if let tab = bookmarkTabs[bookmarkID] { favoriteTab(tab, at: index) } else { Library.shared.makeFavorite(bookmarkID, at: index, in: profile.id) }
     }
 
     /// Where a page is, or, for a pinned page not loaded yet, where it's pinned to.
@@ -446,7 +454,7 @@ final class TabManager {
             if Library.shared.isFavorite(l) {
                 if let index { Library.shared.moveFavorite(l, to: index) }
             } else {
-                Library.shared.makeFavorite(l, at: index)
+                Library.shared.makeFavorite(l, at: index, in: profile.id)
             }
             left.isFavorite = true
             right.isFavorite = true
@@ -466,7 +474,7 @@ final class TabManager {
             }
             half.isFavorite = true
         }
-        Library.shared.addFavoriteSplit(marks[0], marks[1], at: index, ratio: pair.ratio, vertical: pair.vertical)
+        Library.shared.addFavoriteSplit(marks[0], marks[1], at: index, ratio: pair.ratio, vertical: pair.vertical, in: profile.id)
         changed.send(.structure)
         return true
     }
@@ -607,8 +615,18 @@ final class TabManager {
             changed.send(.space)
             changed.send(.selection)
         }
-        // A space put on another profile takes its open pages there.
+        // A space put on another profile takes its open pages there. Not a favorite that was open in it: that
+        // stays its own profile's, in another of that profile's spaces, and the space shows a page of its own.
+        var reselected = false
+        for tab in bookmarkTabs.values where tab.isFavorite && Profiles.shared.profile(forSpace: tab.spaceID) !== tab.homeProfile {
+            for (space, id) in selectedBySpace where id == tab.id && Profiles.shared.profile(forSpace: space) !== tab.homeProfile {
+                selectedBySpace[space] = tabs(in: space).first?.id
+                reselected = reselected || space == currentSpaceID
+            }
+            if let space = space(for: tab.homeProfile) { tab.setSpace(space) }
+        }
         for tab in allTabs { tab.settleProfile() }
+        if reselected { changed.send(.selection) }
         changed.send(.structure)
         if splits.count != splitCount { changed.send(.selection) }
     }

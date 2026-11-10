@@ -1814,7 +1814,7 @@ final class SitesPicker: StepContent {
 
     override func commit(_ done: @escaping () -> Void) {
         let have = Set(Library.shared.favorites.map { TabManager.normalize($0.url) })
-        for bookmark in order where !have.contains(TabManager.normalize(bookmark.url)) { _ = Library.shared.addFavorite(url: bookmark.url, title: bookmark.title) }
+        for bookmark in order where !have.contains(TabManager.normalize(bookmark.url)) { _ = Library.shared.addFavorite(url: bookmark.url, title: bookmark.title, in: Profile.defaultID) }
         done()
     }
 

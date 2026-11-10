@@ -17,6 +17,16 @@ struct FavoriteTests {
         #expect(Library.placing([ids[0]], atSlot: 99, in: ids, splits: []).last == ids[0])
     }
 
+    @Test func arrangingOneProfilesFavoritesLeavesTheOthersAlone() {
+        let marks = ids.map { Bookmark(id: $0, url: URL(string: "https://example.com/\($0)")!, title: "") }
+        // 0, 2 and 4 are one profile's; 1 and 3 another's, which gains a new one and is put in a new order.
+        let new = Bookmark(url: URL(string: "https://example.org/")!, title: "")
+        let arranged = Library.arranging(marks, as: [ids[3], new.id, ids[1]], adding: [new])
+        #expect(arranged.map(\.id) == [ids[0], ids[2], ids[4], ids[3], new.id, ids[1]])
+        // One that isn't there and isn't new is left out.
+        #expect(Library.arranging(marks, as: [UUID(), ids[0]]).map(\.id) == [ids[1], ids[2], ids[3], ids[4], ids[0]])
+    }
+
     @Test func aSplitCountsAsOneTile() {
         // Tiles: [0], [1|2], [3]. Slot 2 is the tile of 3, after the split's right page.
         let split = PinnedSplit(left: ids[1], right: ids[2])

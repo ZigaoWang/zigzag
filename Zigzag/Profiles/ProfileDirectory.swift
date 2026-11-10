@@ -22,6 +22,9 @@ struct ProfileDirectory: Codable, Equatable {
     private(set) var others: [ProfileInfo] = []
     /// The spaces that aren't on the first profile: a space's ID, and its profile's. A space not here is on the first.
     private(set) var spaces: [String: UUID] = [:]
+    /// The favorites that aren't the first profile's: a favorite's ID, and its profile's. The favorites themselves
+    /// stay in the library, all together, so a Zigzag from before profiles still shows and keeps every one.
+    private(set) var favorites: [String: UUID] = [:]
     /// Profiles being removed: gone from every list, their data still to be erased. A removal that was interrupted
     /// is finished from here the next time Zigzag starts.
     private(set) var deleting: [ProfileInfo] = []
@@ -39,6 +42,7 @@ struct ProfileDirectory: Codable, Equatable {
         // The first profile is listed once, as the first.
         others = (try values.decodeIfPresent([ProfileInfo].self, forKey: .others) ?? []).filter { !$0.isDefault }
         spaces = try values.decodeIfPresent([String: UUID].self, forKey: .spaces) ?? [:]
+        favorites = try values.decodeIfPresent([String: UUID].self, forKey: .favorites) ?? [:]
         deleting = try values.decodeIfPresent([ProfileInfo].self, forKey: .deleting) ?? []
     }
 
@@ -49,6 +53,12 @@ struct ProfileDirectory: Codable, Equatable {
     /// The profile a space is on. A space whose profile is gone is on the first.
     func profileID(ofSpace space: UUID) -> UUID {
         guard let id = spaces[space.uuidString], others.contains(where: { $0.id == id }) else { return Profile.defaultID }
+        return id
+    }
+
+    /// The profile a favorite belongs to. One whose profile is gone is the first's.
+    func profileID(ofFavorite favorite: UUID) -> UUID {
+        guard let id = favorites[favorite.uuidString], others.contains(where: { $0.id == id }) else { return Profile.defaultID }
         return id
     }
 
@@ -73,6 +83,10 @@ struct ProfileDirectory: Codable, Equatable {
         spaces[space.uuidString] = profile == Profile.defaultID || !others.contains { $0.id == profile } ? nil : profile
     }
 
+    mutating func assign(favorite: UUID, to profile: UUID) {
+        favorites[favorite.uuidString] = profile == Profile.defaultID || !others.contains { $0.id == profile } ? nil : profile
+    }
+
     /// Takes a profile out of the list and notes that its data is still to be erased. Its spaces go to the first
     /// profile; they're returned. The first profile can't be removed.
     @discardableResult
@@ -81,6 +95,7 @@ struct ProfileDirectory: Codable, Equatable {
         deleting.append(others.remove(at: index))
         let moved = spaces.filter { $0.value == id }.keys
         for key in moved { spaces[key] = nil }
+        favorites = favorites.filter { $0.value != id }
         return moved.compactMap(UUID.init(uuidString:))
     }
 
@@ -89,18 +104,27 @@ struct ProfileDirectory: Codable, Equatable {
         deleting.removeAll { $0.id == id }
     }
 
-    /// Which space is on which profile, to keep with an undo step.
-    var assignments: [String: UUID] { spaces }
-
-    /// Puts back which space was on which profile. A profile removed since isn't brought back: its spaces stay on
-    /// the first.
-    mutating func restore(assignments: [String: UUID]) {
-        spaces = assignments.filter { entry in others.contains { $0.id == entry.value } }
+    /// Which space is on which profile and which favorite is whose, to keep with an undo step.
+    struct Assignments: Equatable {
+        var spaces: [String: UUID] = [:]
+        var favorites: [String: UUID] = [:]
+        var isEmpty: Bool { spaces.isEmpty && favorites.isEmpty }
     }
 
-    /// Forgets spaces that are gone. Not done as they go: undoing a space's removal brings it back to its profile.
-    mutating func prune(keeping live: Set<UUID>) {
+    var assignments: Assignments { Assignments(spaces: spaces, favorites: favorites) }
+
+    /// Puts back which space was on which profile, and which favorite was whose. A profile removed since isn't
+    /// brought back: what was its is the first's.
+    mutating func restore(assignments: Assignments) {
+        spaces = assignments.spaces.filter { entry in others.contains { $0.id == entry.value } }
+        favorites = assignments.favorites.filter { entry in others.contains { $0.id == entry.value } }
+    }
+
+    /// Forgets spaces and favorites that are gone. Not done as they go: undoing a removal brings one back to its
+    /// profile.
+    mutating func prune(keeping live: Set<UUID>, favorites liveFavorites: Set<UUID>) {
         spaces = spaces.filter { UUID(uuidString: $0.key).map(live.contains) ?? false }
+        favorites = favorites.filter { UUID(uuidString: $0.key).map(liveFavorites.contains) ?? false }
     }
 
     /// Stores WebKit has on disk that belong to no profile here and aren't being removed. Never erased without

@@ -402,7 +402,8 @@ final class Library {
     }
 
     private(set) var spaces: [SpaceInfo]
-    /// Favorites: tiles at the top of the sidebar, the same in every space.
+    /// Favorites: tiles at the top of the sidebar, the same in every space of a profile. Every profile's are here,
+    /// each profile's in its own order; whose a favorite is, is in `directory`. `favorites(in:)` is one profile's.
     private(set) var favorites: [Bookmark] = []
     /// Favorites kept together as a split view: one tile, two pages side by side. In `favorites` the right page
     /// follows the left.
@@ -621,8 +622,17 @@ final class Library {
         Set(favorites.map(\.id) + spaces.flatMap { $0.bookmarks.map(\.id) })
     }
 
-    /// The favorites as the grid shows them: one tile each, a split's two pages in one (its left page leads).
-    var favoriteTiles: [(Bookmark, partner: Bookmark?)] {
+    /// A profile's favorites, in its order.
+    func favorites(in profile: UUID) -> [Bookmark] {
+        // With one profile every favorite is its own: nothing to look up.
+        hasManyProfiles ? favorites.filter { directory.profileID(ofFavorite: $0.id) == profile } : favorites
+    }
+
+    func profileID(ofFavorite id: UUID) -> UUID { directory.profileID(ofFavorite: id) }
+
+    /// A profile's favorites as the grid shows them: one tile each, a split's two pages in one (its left page leads).
+    func favoriteTiles(in profile: UUID) -> [(Bookmark, partner: Bookmark?)] {
+        let favorites = favorites(in: profile)
         let rights = Set(favoriteSplits.map(\.right))
         let byID = Dictionary(favorites.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         return favorites.filter { !rights.contains($0.id) }.map { favorite in
@@ -630,19 +640,19 @@ final class Library {
         }
     }
 
-    /// `slot` counts tiles, as the grid shows them; nil: at the end.
+    /// `slot` counts the profile's tiles, as the grid shows them; nil: at the end.
     @discardableResult
-    func addFavorite(url: URL, title: String, at slot: Int? = nil, id: UUID = UUID()) -> Bookmark {
+    func addFavorite(url: URL, title: String, at slot: Int? = nil, id: UUID = UUID(), in profile: UUID) -> Bookmark {
         let favorite = Bookmark(id: id, url: url, title: title)
-        arrangeFavorites(Self.placing([id], atSlot: slot, in: favorites.map(\.id), splits: favoriteSplits), adding: [favorite])
+        arrangeFavorites(Self.placing([id], atSlot: slot, in: favorites(in: profile).map(\.id), splits: favoriteSplits), adding: [favorite], in: profile)
         commit()
         return favorite
     }
 
     /// Two pages as one favorite, side by side, at a tile's place.
-    func addFavoriteSplit(_ left: Bookmark, _ right: Bookmark, at slot: Int? = nil, ratio: Double = 0.5, vertical: Bool = false) {
+    func addFavoriteSplit(_ left: Bookmark, _ right: Bookmark, at slot: Int? = nil, ratio: Double = 0.5, vertical: Bool = false, in profile: UUID) {
         favoriteSplits.removeAll { $0.contains(left.id) || $0.contains(right.id) }
-        arrangeFavorites(Self.placing([left.id, right.id], atSlot: slot, in: favorites.map(\.id), splits: favoriteSplits), adding: [left, right])
+        arrangeFavorites(Self.placing([left.id, right.id], atSlot: slot, in: favorites(in: profile).map(\.id), splits: favoriteSplits), adding: [left, right], in: profile)
         var split = PinnedSplit(left: left.id, right: right.id)
         split.ratio = ratio
         split.vertical = vertical
@@ -652,12 +662,13 @@ final class Library {
     }
 
     /// A page (a favorite, or one becoming one) joins the favorite `targetID`: the two become one split favorite where
-    /// that favorite's tile is, the page on the right or the left.
+    /// that favorite's tile is, the page on the right or the left. The page is then that favorite's profile's.
     func joinFavorite(_ page: Bookmark, onto targetID: UUID, onRight: Bool) {
         guard let target = favorites.first(where: { $0.id == targetID }), page.id != targetID else { return }
         let (left, right) = onRight ? (target, page) : (page, target)
+        let profile = profileID(ofFavorite: targetID)
         favoriteSplits.removeAll { $0.contains(left.id) || $0.contains(right.id) }
-        arrangeFavorites(Self.placing([left.id, right.id], at: targetID, in: favorites.map(\.id)), adding: [page])
+        arrangeFavorites(Self.placing([left.id, right.id], at: targetID, in: favorites(in: profile).map(\.id)), adding: [page], in: profile)
         favoriteSplits.append(PinnedSplit(left: left.id, right: right.id))
         tidyFavorites()
         commit()
@@ -667,14 +678,24 @@ final class Library {
     func moveFavorite(_ id: UUID, to slot: Int) {
         guard isFavorite(id) else { return }
         let ids = favoriteSplits.first { $0.contains(id) }.map { [$0.left, $0.right] } ?? [id]
-        arrangeFavorites(Self.placing(ids, atSlot: slot, in: favorites.map(\.id), splits: favoriteSplits))
+        let profile = profileID(ofFavorite: id)
+        arrangeFavorites(Self.placing(ids, atSlot: slot, in: favorites(in: profile).map(\.id), splits: favoriteSplits), in: profile)
         commit()
     }
 
-    /// Puts the favorites (and any new ones) in this order.
-    private func arrangeFavorites(_ order: [UUID], adding new: [Bookmark] = []) {
+    /// Puts a profile's favorites (and any new ones, or ones that become its) in this order. The other profiles'
+    /// keep theirs.
+    private func arrangeFavorites(_ order: [UUID], adding new: [Bookmark] = [], in profile: UUID) {
+        favorites = Self.arranging(favorites, as: order, adding: new)
+        for id in order { directory.assign(favorite: id, to: profile) }
+    }
+
+    /// Every profile's favorites with one profile's put in `order` (its own, and any in `new`); the rest stay as
+    /// they were, ahead of them.
+    nonisolated static func arranging(_ favorites: [Bookmark], as order: [UUID], adding new: [Bookmark] = []) -> [Bookmark] {
         let byID = Dictionary((favorites + new).map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
-        favorites = order.compactMap { byID[$0] }
+        let ordered = Set(order)
+        return favorites.filter { !ordered.contains($0.id) } + order.compactMap { byID[$0] }
     }
 
     /// The favorites' ids with `moving` (one tile's pages) put before the tile at `slot` among the rest, or after the
@@ -698,7 +719,7 @@ final class Library {
 
     /// Turns a space bookmark into a favorite at a tile's place (nil: the end), keeping its id (and so its live page).
     /// Half of a pinned split brings the other half: they stay one split, now a favorite.
-    func makeFavorite(_ bookmarkID: UUID, at slot: Int? = nil) {
+    func makeFavorite(_ bookmarkID: UUID, at slot: Int? = nil, in profile: UUID) {
         guard let bookmark = bookmark(bookmarkID), !isFavorite(bookmarkID) else { return }
         if let pinned = pinnedSplit(containing: bookmarkID), let left = self.bookmark(pinned.left), let right = self.bookmark(pinned.right) {
             for s in spaces.indices {
@@ -707,14 +728,14 @@ final class Library {
                 if spaces[s].pinnedSplits?.isEmpty == true { spaces[s].pinnedSplits = nil }
                 tidyFolders(s)
             }
-            arrangeFavorites(Self.placing([left.id, right.id], atSlot: slot, in: favorites.map(\.id), splits: favoriteSplits), adding: [left, right])
+            arrangeFavorites(Self.placing([left.id, right.id], atSlot: slot, in: favorites(in: profile).map(\.id), splits: favoriteSplits), adding: [left, right], in: profile)
             favoriteSplits.append(pinned)
             tidyFavorites()
             commit()
             return
         }
         for s in spaces.indices { spaces[s].bookmarks.removeAll { $0.id == bookmarkID }; tidyFolders(s) }
-        arrangeFavorites(Self.placing([bookmarkID], atSlot: slot, in: favorites.map(\.id), splits: favoriteSplits), adding: [bookmark])
+        arrangeFavorites(Self.placing([bookmarkID], atSlot: slot, in: favorites(in: profile).map(\.id), splits: favoriteSplits), adding: [bookmark], in: profile)
         commit()
     }
 
@@ -728,6 +749,7 @@ final class Library {
         guard !moving.isEmpty else { return }
         favorites.removeAll { ids.contains($0.id) }
         favoriteSplits.removeAll { $0.contains(id) }
+        for id in ids { directory.assign(favorite: id, to: Profile.defaultID) }
         spaces[s].bookmarks.insert(contentsOf: moving, at: min(max(index, 0), spaces[s].bookmarks.count))
         if let pair { spaces[s].pinnedSplits = (spaces[s].pinnedSplits ?? []) + [pair] }
         tidyFolders(s)
@@ -758,12 +780,13 @@ final class Library {
         }
     }
 
-    /// Adds the ones not already here; returns how many that was.
+    /// Adds to a profile's favorites the ones it doesn't already have; returns how many that was.
     @discardableResult
-    func appendFavorites(_ new: [Bookmark]) -> Int {
-        let known = Set(favorites.map { $0.url.absoluteString })
+    func appendFavorites(_ new: [Bookmark], in profile: UUID) -> Int {
+        let known = Set(favorites(in: profile).map { $0.url.absoluteString })
         let added = new.filter { !known.contains($0.url.absoluteString) }
         favorites += added
+        for favorite in added { directory.assign(favorite: favorite.id, to: profile) }
         commit()
         return added.count
     }
@@ -1292,7 +1315,7 @@ final class Library {
         fileprivate let favoriteSplits: [PinnedSplit]
         /// Which space was on which profile: moving a space to another profile can be undone. The profiles
         /// themselves aren't kept: making or removing one isn't undone.
-        fileprivate let spaceProfiles: [String: UUID]
+        fileprivate let spaceProfiles: ProfileDirectory.Assignments
         var spaceIDs: Set<UUID> { Set(spaces.map(\.id)) }
     }
 
@@ -1344,9 +1367,13 @@ final class Library {
     }
 
     /// Takes a profile out of the list, leaving its data to be erased (Profiles). Its spaces move to the first
-    /// profile. Written at once: from here on, a removal that's interrupted is finished at the next start.
+    /// profile; its favorites go with it. Written at once: from here on, a removal that's interrupted is finished
+    /// at the next start.
     func removeProfile(_ id: UUID) {
         guard directory.profile(id)?.isDefault == false else { return }
+        let gone = Set(favorites(in: id).map(\.id))
+        favorites.removeAll { gone.contains($0.id) }
+        tidyFavorites()
         directory.remove(id)
         saveNow()
         changed.send()
@@ -1360,7 +1387,7 @@ final class Library {
 
     /// At launch: spaces that are gone are forgotten.
     func pruneProfileAssignments() {
-        directory.prune(keeping: Set(spaces.map(\.id)))
+        directory.prune(keeping: Set(spaces.map(\.id)), favorites: Set(favorites.map(\.id)))
         save()
     }
 
