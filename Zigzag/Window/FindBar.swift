@@ -92,9 +92,9 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         super.init()
         field.delegate = self
         panel.radius = Tokens.Metric.findBarHeight / 2
-        // It hangs from the top of the page it searches: ⌘F slides it those few points down from there, and it goes
-        // back up as it leaves, however fast you press it.
-        panel.attachedEdge = .minY
+        // It drops down from the top of the page it searches, as the notices do, and goes back up the same way as it
+        // leaves, however fast you press ⌘F.
+        panel.slidesFromTop = true
         glass.contentTintColor = Tokens.Color.textTertiary
         glass.imageScaling = .scaleNone
         panel.addSubview(glass)
