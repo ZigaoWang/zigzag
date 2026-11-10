@@ -53,7 +53,7 @@ enum ArcImporter {
         var (result, first) = importSidebar()
         do {
             let entries = try readHistory()
-            HistoryStore.shared.importVisits(entries)
+            Profiles.shared.default.history.importVisits(entries)
             result.historyEntries = entries.count
         } catch { result.problems.append(historyProblem(error)) }
         return (result, first)

@@ -717,7 +717,7 @@ final class Tab: NSObject {
         // Zigzag's own pages (History, Settings) aren't visits, and neither is a page that failed to load.
         guard !isPrivate, url != lastRecorded, url != errorShownFor, !HistoryPage.isInternal(url) else { return }
         lastRecorded = url
-        HistoryStore.shared.recordVisit(url: url, title: title)
+        profile.history.recordVisit(url: url, title: title)
     }
 
     // MARK: Observation
@@ -735,7 +735,8 @@ final class Tab: NSObject {
                     // write every second.
                     if let url = self.url, !self.isPrivate {
                         self.titleWrite?.cancel()
-                        let write = DispatchWorkItem { HistoryStore.shared.updateTitle(title, for: url) }
+                        let history = self.profile.history
+                        let write = DispatchWorkItem { history.updateTitle(title, for: url) }
                         self.titleWrite = write
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: write)
                     }

@@ -147,6 +147,7 @@ extension MiniQuickOpen: CommandBarHost {
     var commandBarPageFrame: NSRect { content.bounds }
     func commandBarAnchor(asked: NSView?) -> NSView? { nil }
     var commandBarTabs: TabManager? { Self.tabs }
+    var commandBarProfile: Profile { Profiles.shared.profile(forSpace: Self.space.id) }
     var commandBarTab: Tab? { nil }
     var commandBarSpace: SpaceInfo? { Self.space }
     var commandBarIsPrivate: Bool { false }

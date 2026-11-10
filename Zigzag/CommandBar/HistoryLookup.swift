@@ -3,7 +3,7 @@ import Foundation
 /// The command bar's reads of History, off the main thread, so a letter typed never waits on them however big History
 /// grows. What's typed now is asked for; an answer for text since typed over is dropped, or never read at all.
 final class HistoryLookup {
-    private let store: HistoryStore
+    private var store: HistoryStore
     /// Told when pages arrive for what was last asked.
     var onPages: (() -> Void)?
     /// Told when sites for inline completion arrive for what was last asked.
@@ -15,7 +15,14 @@ final class HistoryLookup {
     // The bar's own, so its reads only ever stop each other, never a History tab's; pages and sites don't stop each other.
     private let pagesAsker = UUID().hashValue, sitesAsker = UUID().hashValue
 
-    init(store: HistoryStore = .shared) { self.store = store }
+    init(store: HistoryStore) { self.store = store }
+
+    /// The bar is used in a profile: its history is the one read from now on. Another's answers are dropped.
+    func use(_ store: HistoryStore) {
+        guard store !== self.store else { return }
+        self.store = store
+        reset()
+    }
 
     /// A fresh bar: History may have changed since it was last open.
     func reset() {

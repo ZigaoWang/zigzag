@@ -84,9 +84,10 @@ final class TabArchive {
     }
 
     /// Clearing history clears archived tabs too (the address bar suggests them): all of them, or those archived
-    /// since `date`. Handed back so ⌘Z can put them back.
-    func take(since date: Date?) -> [ArchivedTab] {
-        let goes = { (entry: ArchivedTab) in date.map { entry.archivedAt >= $0 } ?? true }
+    /// since `date`. Handed back so ⌘Z can put them back. `belongs`: which ones the history being cleared covers
+    /// (one profile's).
+    func take(since date: Date?, where belongs: (ArchivedTab) -> Bool = { _ in true }) -> [ArchivedTab] {
+        let goes = { (entry: ArchivedTab) in belongs(entry) && (date.map { entry.archivedAt >= $0 } ?? true) }
         let taken = entries.filter(goes)
         guard !taken.isEmpty else { return [] }
         entries.removeAll(where: goes)
@@ -95,11 +96,12 @@ final class TabArchive {
     }
 
     /// Pages taken out of History take their archived tabs with them.
-    func take(_ urls: [URL]) -> [ArchivedTab] {
+    func take(_ urls: [URL], where belongs: (ArchivedTab) -> Bool = { _ in true }) -> [ArchivedTab] {
         let gone = Set(urls.map(TabManager.normalize))
-        let taken = entries.filter { gone.contains(TabManager.normalize($0.url)) }
+        let goes = { (entry: ArchivedTab) in belongs(entry) && gone.contains(TabManager.normalize(entry.url)) }
+        let taken = entries.filter(goes)
         guard !taken.isEmpty else { return [] }
-        entries.removeAll { gone.contains(TabManager.normalize($0.url)) }
+        entries.removeAll(where: goes)
         save()
         return taken
     }
@@ -113,9 +115,9 @@ final class TabArchive {
         save()
     }
 
-    func search(_ words: [String], limit: Int) -> [ArchivedTab] {
+    func search(_ words: [String], limit: Int, where belongs: (ArchivedTab) -> Bool = { _ in true }) -> [ArchivedTab] {
         var found: [ArchivedTab] = []
-        for entry in entries where found.count < limit {
+        for entry in entries where found.count < limit && belongs(entry) {
             let haystack = (entry.title + " " + entry.url.absoluteString).lowercased()
             if words.allSatisfy({ haystack.contains($0) }) { found.append(entry) }
         }

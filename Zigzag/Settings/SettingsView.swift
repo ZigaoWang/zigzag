@@ -1785,10 +1785,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         sitesGroup.removeAllRows()
         let history = PillButton(title: String(localized: "Clear History…", comment: "Button in Settings › Privacy."))
         history.onClick = { [weak self, weak history] _ in
-            self?.confirm(title: HistoryPage.clearTitle, message: HistoryPage.clearMessage,
+            guard let profile = self?.profile else { return }
+            self?.confirm(title: HistoryPage.clearTitle, message: HistoryPage.clearMessage + HistoryPage.whoseNote(profile.id),
                           action: String(localized: "Clear History", comment: "Button of the sheet that clears history.")) {
                 BrowserWindowController.historyChange(String(localized: "Clear History", comment: "What Edit › Undo undoes after history is cleared.")) {
-                    HistoryStore.shared.remove()
+                    profile.history.remove()
                 }
                 if let controller = self?.browser { HistoryPage.clearedToast(in: controller) } else { history?.flash(Self.cleared) }
             }

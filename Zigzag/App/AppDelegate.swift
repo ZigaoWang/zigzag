@@ -64,7 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             GuidedTour.start(in: controller)
         }
         _ = Library.shared
-        _ = HistoryStore.shared
+        _ = Profiles.shared.default.history
         // Icons clearing history set aside, if Zigzag didn't get to remove them when it quit.
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
         // Copies an import read through, if Zigzag stopped before removing them: they can hold passwords.

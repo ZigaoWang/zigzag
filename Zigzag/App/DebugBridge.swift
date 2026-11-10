@@ -403,6 +403,7 @@ enum DebugBridge {
                         "extensionsUp": profile.isDefault || profile.startedExtensions != nil,
                         "loaded": (profile.isDefault ? profile.extensions : profile.startedExtensions)?.contexts.map(\.uniqueIdentifier).sorted() ?? [],
                         "favorites": library.favorites(in: info.id).map(\.title),
+                        "history": profile.history.recent(limit: 6).map(\.url.absoluteString),
                         "installed": profile.installs.installedIDs]
             }
             let tabs = controller.tabManager.allTabs.map { tab -> [String: Any] in
@@ -777,6 +778,9 @@ enum DebugBridge {
         case "quit": NSApp.terminate(nil)
         case "materials": MaterialsShowcase.debug(arg)
         case "history": HistoryPage.open(in: controller)
+        case "clearhistory":
+            // Clears the history of the profile you're in, undoably, as the menu's Clear History does once confirmed.
+            controller.historyChange(HistoryPage.clearHistory) { [tabManager = controller.tabManager] in tabManager.profile.history.remove() }
         case "seedhistory": seedHistory(Int(arg) ?? 50_000)
         case "newwindow": WindowManager.shared.newWindow(url: URL(string: arg), showCommandBar: false)
         case "closekey": WindowManager.shared.keyController?.window?.performClose(nil)
@@ -1496,7 +1500,7 @@ enum DebugBridge {
             }
             time.addTimeInterval(-Double.random(in: 3600...30000, using: &rng))
         }
-        HistoryStore.shared.importVisits(entries)
+        Profiles.shared.default.history.importVisits(entries)
         debugLog("seedhistory => \(entries.count) visits back to \(time)")
     }
 

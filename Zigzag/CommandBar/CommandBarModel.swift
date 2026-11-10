@@ -97,13 +97,15 @@ enum CommandRanker {
     /// how often and how lately you went, and the ones you keep at hand (open tabs, favorites, pinned tabs).
     /// `manager`: the browser window whose open tabs count, if there is one. `history`: the sites History has for
     /// `completionPrefix(for: text)`, read off the main thread (`HistoryLookup`).
-    static func inlineCompletion(for text: String, manager: TabManager?, history: [(entry: HistoryEntry, score: Double)]) -> InlineCompletion.Match? {
+    static func inlineCompletion(for text: String, manager: TabManager?, profile: Profile, history: [(entry: HistoryEntry, score: Double)]) -> InlineCompletion.Match? {
         guard let bare = completionPrefix(for: text) else { return nil }
         var sites: [InlineCompletion.Site] = history.compactMap { entry, score in
             InlineCompletion.target(entry.url, wholePage: true).map { InlineCompletion.Site(url: $0, score: score) }
         }
         // Each place a site is kept at hand counts as much as a visit this week.
-        let kept = (manager?.allTabs ?? []).compactMap(\.url) + Library.shared.favorites.map(\.url) + Library.shared.allBookmarks.map(\.0.url)
+        // What you keep at hand in this profile: another's open pages, favorites and pinned tabs aren't suggested here.
+        let kept = (manager?.allTabs ?? []).filter { $0.homeProfile === profile }.compactMap(\.url) + Library.shared.favorites(in: profile.id).map(\.url)
+            + Library.shared.allBookmarks.filter { Library.shared.profileID(ofSpace: $0.1.id) == profile.id }.map(\.0.url)
         // Whether its host or a shorter form of it matches is for `best` to say.
         for url in kept where HistoryStore.normalizedHost(url).contains(bare) {
             if let site = InlineCompletion.target(url, wholePage: false) { sites.append(InlineCompletion.Site(url: site, score: 1)) }
@@ -296,7 +298,7 @@ enum CommandRanker {
     /// `manager`: the browser window whose tabs and commands are offered; with none (Zigzag Mini on its own), only
     /// pages to open and searches. `history`: the pages History has for the text, read off the main thread
     /// (`HistoryLookup`, asked for `historyLimit` of them; nil while it still is), so these results never wait on History.
-    static func results(for text: String, manager: TabManager?, suggestions: [String], history: [HistoryEntry]?,
+    static func results(for text: String, manager: TabManager?, profile: Profile, suggestions: [String], history: [HistoryEntry]?,
                         editingCurrent: Bool, historyOnly: Bool) -> [CommandResult] {
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
         var results: [CommandResult] = []
@@ -309,7 +311,7 @@ enum CommandRanker {
 
         if query.isEmpty {
             if historyOnly {
-                for entry in HistoryStore.shared.recent(limit: 8) {
+                for entry in profile.history.recent(limit: 8) {
                     add(CommandResult(kind: .history(entry.url), title: entry.title.isEmpty ? displayURL(entry.url) : entry.title,
                                       detail: displayURL(entry.url), icon: FaviconStore.shared.cachedIcon(for: entry.url)),
                         key: TabManager.normalize(entry.url))
@@ -323,7 +325,7 @@ enum CommandRanker {
                 return results
             }
             // Nothing typed yet: recent tabs, so switching is one keystroke away.
-            for tab in (manager?.recentTabs ?? []).prefix(6) where tab !== manager?.selectedTab {
+            for tab in (manager?.recentTabs ?? []).filter({ $0.homeProfile === profile }).prefix(6) where tab !== manager?.selectedTab {
                 guard let url = tab.url else { continue }
                 add(CommandResult(kind: .switchTo(tab.id), title: tab.displayTitle, detail: displayURL(url), icon: tab.favicon),
                     key: TabManager.normalize(url))
@@ -360,7 +362,8 @@ enum CommandRanker {
 
         if !historyOnly {
             var tabCount = 0
-            for tab in (manager?.recentTabs ?? []) + (manager?.allTabs ?? []) where tabCount < 3 {
+            // Open pages of this profile: one typed for here never lands you in another profile's.
+            for tab in (manager?.recentTabs ?? []) + (manager?.allTabs ?? []) where tabCount < 3 && tab.homeProfile === profile {
                 guard let url = tab.url, matches(words, tab.displayTitle, url.absoluteString) else { continue }
                 let key = TabManager.normalize(url)
                 guard !seen.contains(key) else { continue }
@@ -369,9 +372,10 @@ enum CommandRanker {
             }
             var bookmarkCount = 0
             // Favorites first: they're the sites you go to most.
-            let shown = Library.shared.favorites(in: manager?.profile.id ?? Profile.defaultID)
+            let shown = Library.shared.favorites(in: profile.id)
             let favorites = Set(shown.map(\.id))
-            for bookmark in shown + Library.shared.allBookmarks.map(\.0) where bookmarkCount < 3 {
+            let pinned = Library.shared.allBookmarks.filter { Library.shared.profileID(ofSpace: $0.1.id) == profile.id }.map(\.0)
+            for bookmark in shown + pinned where bookmarkCount < 3 {
                 guard matches(words, bookmark.title, bookmark.url.absoluteString) else { continue }
                 let key = TabManager.normalize(bookmark.url)
                 guard !seen.contains(key) else { continue }
@@ -383,7 +387,7 @@ enum CommandRanker {
 
         // Tabs that tidied themselves away: still a few letters from coming back.
         if !historyOnly {
-            for entry in TabArchive.shared.search(words, limit: 2) {
+            for entry in TabArchive.shared.search(words, limit: 2, where: { Library.shared.profileID(ofSpace: $0.spaceID) == profile.id }) {
                 let key = TabManager.normalize(entry.url)
                 guard !seen.contains(key) else { continue }
                 let space = Library.shared.space(entry.spaceID)?.name

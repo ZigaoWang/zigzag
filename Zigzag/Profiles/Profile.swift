@@ -27,6 +27,13 @@ final class Profile {
     var folder: URL {
         isDefault ? Paths.support : Paths.directory("Profiles").appendingPathComponent(id.uuidString, isDirectory: true)
     }
+    /// The pages visited in it. The first profile's is the file History has always been.
+    private(set) lazy var history: HistoryStore = {
+        guard !isDefault else { return HistoryStore(path: Paths.history.path) }
+        // Its folder may not be there yet: a profile that has no extensions has had nothing to keep in it.
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return HistoryStore(path: folder.appendingPathComponent("History.sqlite").path, profile: id)
+    }()
     /// What it decided about its extensions: which it has, on or off, what each is allowed.
     private(set) lazy var installs = ExtensionInstalls(profile: self)
     private var host: ExtensionHost?
@@ -97,6 +104,7 @@ final class Profiles {
         if let host = profile.startedExtensions { await host.shutDown() }
         profile.installs.removeAll()
         try? FileManager.default.removeItem(at: profile.folder)
+        UpdateBackup.forget(profile: id)
         // A package no profile has any more goes too.
         for id in had where ExtensionStore.profiles(with: id).isEmpty && !ExtensionStore.isUnpacked(id) {
             try? FileManager.default.removeItem(at: ExtensionStore.folder(for: id))
@@ -111,6 +119,7 @@ final class Profiles {
         Task {
             for id in waiting {
                 try? FileManager.default.removeItem(at: Paths.directory("Profiles").appendingPathComponent(id.uuidString, isDirectory: true))
+                UpdateBackup.forget(profile: id)
                 UserDefaults.standard.removeObject(forKey: "ExtensionsPinned.\(id.uuidString)")
                 await eraseStore(id)
             }

@@ -548,6 +548,64 @@ struct UpdateBackupTests {
         #expect(read(root.appendingPathComponent("Profiles.json")) == "profiles then")
     }
 
+    /// Each profile's history is backed up in its own folder, put back with the rest, and goes from the backups
+    /// when its profile is removed.
+    @Test func otherProfilesHistoriesAreBackedUpRestoredAndForgotten() throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let manager = FileManager.default
+        let kept = UUID(), made = UUID()
+        func history(_ id: UUID, in base: URL) -> URL { base.appendingPathComponent("Profiles/\(id.uuidString)/History.sqlite") }
+        try "library".write(to: root.appendingPathComponent("Library.json"), atomically: true, encoding: .utf8)
+        try "profiles".write(to: root.appendingPathComponent("Profiles.json"), atomically: true, encoding: .utf8)
+        try manager.createDirectory(at: history(kept, in: root).deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "then".write(to: history(kept, in: root), atomically: true, encoding: .utf8)
+
+        let backup = try #require(UpdateBackup.make(from: "0.9.0", in: root))
+        #expect(read(history(kept, in: backup)) == "then")
+
+        // Since the backup: more history in that profile, and a profile the backup has never heard of.
+        try "now".write(to: history(kept, in: root), atomically: true, encoding: .utf8)
+        try manager.createDirectory(at: history(made, in: root).deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "new".write(to: history(made, in: root), atomically: true, encoding: .utf8)
+        try backup.lastPathComponent.write(to: root.appendingPathComponent("Backups/Restore"), atomically: true, encoding: .utf8)
+        UpdateBackup.restoreIfAsked(root: root)
+
+        #expect(read(history(kept, in: root)) == "then")
+        #expect(!manager.fileExists(atPath: history(made, in: root).path))
+        let before = try #require(UpdateBackup.all(in: root).first { $0.lastPathComponent.hasSuffix("before restore") })
+        #expect(read(history(kept, in: before)) == "now")
+        #expect(read(history(made, in: before)) == "new")
+        let leftovers = try manager.contentsOfDirectory(atPath: history(kept, in: root).deletingLastPathComponent().path).filter { $0.hasSuffix(".restoring") }
+        #expect(leftovers.isEmpty)
+
+        UpdateBackup.forget(profile: kept, in: root)
+        #expect(!manager.fileExists(atPath: history(kept, in: backup).path))
+        #expect(!manager.fileExists(atPath: history(kept, in: before).path))
+        #expect(read(history(made, in: before)) == "new")
+    }
+
+    /// A backup from before profiles says nothing of the other profiles' histories: they stay.
+    @Test func restoreLeavesOtherProfilesHistoriesWhenTheBackupHasNoProfiles() throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let id = UUID()
+        let history = root.appendingPathComponent("Profiles/\(id.uuidString)/History.sqlite")
+        try FileManager.default.createDirectory(at: history.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "kept".write(to: history, atomically: true, encoding: .utf8)
+        try "now".write(to: root.appendingPathComponent("Library.json"), atomically: true, encoding: .utf8)
+        let folder = root.appendingPathComponent("Backups", isDirectory: true)
+        let old = "2026-10-02T09-00-00Z 0.4.0"
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent(old), withIntermediateDirectories: true)
+        try "then".write(to: folder.appendingPathComponent(old).appendingPathComponent("Library.json"), atomically: true, encoding: .utf8)
+        try old.write(to: folder.appendingPathComponent("Restore"), atomically: true, encoding: .utf8)
+
+        UpdateBackup.restoreIfAsked(root: root)
+
+        #expect(read(root.appendingPathComponent("Library.json")) == "then")
+        #expect(read(history) == "kept")
+    }
+
     @Test func restoreKeepsWhatWasThereAndSwapsWholeFiles() throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }

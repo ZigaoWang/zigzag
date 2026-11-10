@@ -71,7 +71,22 @@ nonisolated enum UpdateBackup {
     /// Left as it is when a backup from before there were profiles is put back: without it every space would land
     /// on the first profile, away from the sign-ins and extensions it had.
     private static let keptWhenNotInBackup: Set<String> = ["Profiles.json"]
+    private static let historyFiles = ["History.sqlite", "History.sqlite-wal", "History.sqlite-shm"]
     private static let kept = 3
+
+    /// The histories of the profiles made since the first, as paths under `root` (the data folder, or a backup of
+    /// it): each is kept in its profile's folder.
+    private static func profileFiles(in root: URL) -> [String] {
+        let ids = (try? FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("Profiles", isDirectory: true).path)) ?? []
+        return ids.filter { UUID(uuidString: $0) != nil }.sorted().flatMap { id in historyFiles.map { "Profiles/\(id)/\($0)" } }
+    }
+
+    /// A removed profile's history goes from every backup too.
+    static func forget(profile: UUID, in root: URL = Paths.support) {
+        for backup in all(in: root) {
+            try? FileManager.default.removeItem(at: backup.appendingPathComponent("Profiles/\(profile.uuidString)", isDirectory: true))
+        }
+    }
     private static let restoreMarker = "Restore"
     private static let lastBuildKey = "LastRunBuild"
     private static let lastVersionKey = "LastRunVersion"
@@ -143,10 +158,12 @@ nonisolated enum UpdateBackup {
         let target = folder(in: root).appendingPathComponent(name, isDirectory: true)
         let manager = FileManager.default
         guard (try? manager.createDirectory(at: target, withIntermediateDirectories: true)) != nil else { return nil }
-        for name in files {
+        for name in files + profileFiles(in: root) {
             let source = root.appendingPathComponent(name)
             guard manager.fileExists(atPath: source.path) else { continue }
-            guard (try? manager.copyItem(at: source, to: target.appendingPathComponent(name))) != nil else {
+            let copy = target.appendingPathComponent(name)
+            try? manager.createDirectory(at: copy.deletingLastPathComponent(), withIntermediateDirectories: true)
+            guard (try? manager.copyItem(at: source, to: copy)) != nil else {
                 try? manager.removeItem(at: target)
                 return nil
             }
@@ -191,14 +208,16 @@ nonisolated enum UpdateBackup {
         guard make(from: version, beforeRestoring: true, in: root) != nil else { return }
         // Each file is copied in beside the one it replaces, then swapped in whole.
         var staged: [(temp: URL, target: URL)] = []
-        for file in files where manager.fileExists(atPath: source.appendingPathComponent(file).path) {
-            let temp = root.appendingPathComponent(".\(file).restoring")
+        for file in files + profileFiles(in: source) where manager.fileExists(atPath: source.appendingPathComponent(file).path) {
+            let place = root.appendingPathComponent(file)
+            let temp = place.deletingLastPathComponent().appendingPathComponent(".\(place.lastPathComponent).restoring")
+            try? manager.createDirectory(at: temp.deletingLastPathComponent(), withIntermediateDirectories: true)
             try? manager.removeItem(at: temp)
             guard (try? manager.copyItem(at: source.appendingPathComponent(file), to: temp)) != nil else {
                 for item in staged { try? manager.removeItem(at: item.temp) }
                 return
             }
-            staged.append((temp, root.appendingPathComponent(file)))
+            staged.append((temp, place))
         }
         var replacedAll = true
         for item in staged {
@@ -211,6 +230,12 @@ nonisolated enum UpdateBackup {
         // once everything else is in place.
         guard replacedAll else { return }
         for file in files where !keptWhenNotInBackup.contains(file) && !manager.fileExists(atPath: source.appendingPathComponent(file).path) {
+            try? manager.removeItem(at: root.appendingPathComponent(file))
+        }
+        // The other profiles' histories too, when the backup knows of profiles; one from before them leaves the
+        // profiles as they are, history and all.
+        guard manager.fileExists(atPath: source.appendingPathComponent("Profiles.json").path) else { return }
+        for file in profileFiles(in: root) where !manager.fileExists(atPath: source.appendingPathComponent(file).path) {
             try? manager.removeItem(at: root.appendingPathComponent(file))
         }
     }

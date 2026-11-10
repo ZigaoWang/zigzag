@@ -6129,6 +6129,17 @@
         }
       }
     },
+    "History in %@" : {
+      "comment" : "Title of the History page when there's more than one profile. The placeholder is the profile's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”的历史记录"
+          }
+        }
+      }
+    },
     "If it’s a server on your Mac, check that it’s running, then try again." : {
       "comment" : "Message on the page Zigzag shows when a server on this Mac (localhost) refuses the connection.",
       "localizations" : {
@@ -8279,6 +8290,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已为此网站打开"
+          }
+        }
+      }
+    },
+    "Only %@’s history is cleared; other profiles keep theirs." : {
+      "comment" : "Added to the message of a sheet that asks before clearing History, when there's more than one profile. The placeholder is the profile's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只会清除“%@”的历史记录，其他描述文件的不受影响。"
           }
         }
       }
