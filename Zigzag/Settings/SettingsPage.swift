@@ -20,7 +20,8 @@ enum SettingsPage {
     }
 
     /// ⌘,: the Settings tab this window already has (in this space first, then any other), or a new one; at `pane`
-    /// when one is asked for.
+    /// when one is asked for. What it shows of one profile is the profile of the space it was asked for in, also
+    /// when the tab it finds is in a space on another.
     static func open(_ pane: SettingsPane? = nil, in controller: BrowserWindowController) {
         // Settings belong to your everyday windows, never a private one: the frontmost normal window, or a new one.
         if controller.tabManager.isPrivate {
@@ -33,8 +34,12 @@ enum SettingsPage {
             return
         }
         let manager = controller.tabManager
+        let asked = manager.profile.id
         if let existing = (manager.currentTabs + manager.allTabs).first(where: { isSettings($0.url) }) {
+            // Already in front, Settings keeps the profile chosen there.
+            let wasInFront = manager.selectedTab === existing
             manager.select(existing)
+            if !wasInFront { existing.showSettings(of: asked) }
             if let pane { existing.showSettings(pane) }
         } else {
             controller.open(url(for: pane ?? .general), disposition: .foregroundTab, allowSwitch: false)

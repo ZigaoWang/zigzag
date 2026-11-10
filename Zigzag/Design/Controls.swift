@@ -1243,8 +1243,14 @@ final class DropdownButton: InteractiveView {
 
     private var current: Option? { options.indices.contains(selectedIndex) ? options[selectedIndex] : nil }
 
+    /// Where there's little room, only the choice's picture shows; its name is in the tooltip and for VoiceOver.
+    /// For choices that each have a picture.
+    var showsPictureOnly = false { didSet { if showsPictureOnly != oldValue { refresh() } } }
+
     private func refresh() {
         label.stringValue = current?.title ?? ""
+        label.isHidden = showsPictureOnly
+        toolTip = showsPictureOnly ? current?.title : nil
         // A neutral globe where a site's icon is missing, so the column of pictures never has a gap.
         let pictured = options.contains { $0.image != nil }
         icon.image = current?.image ?? (pictured ? MenuPanel.placeholder : nil)
@@ -1259,6 +1265,7 @@ final class DropdownButton: InteractiveView {
     override var intrinsicContentSize: NSSize {
         let widest = options.map { ($0.title as NSString).size(withAttributes: [.font: Tokens.Font.control()]).width }.max() ?? 0
         let iconWidth: CGFloat = options.contains { $0.image != nil } ? Self.iconSide + Tokens.Space.x2 : 0
+        if showsPictureOnly { return NSSize(width: ceil(Self.textInset + iconWidth + 10 + Self.textInset), height: Tokens.Page.controlHeight) }
         return NSSize(width: ceil(Self.textInset + iconWidth + widest + Tokens.Space.x3 + 10 + Self.textInset), height: Tokens.Page.controlHeight)
     }
 

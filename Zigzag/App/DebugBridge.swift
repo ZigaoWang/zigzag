@@ -428,6 +428,7 @@ enum DebugBridge {
                 return ["id": info.id.uuidString, "name": info.name ?? "", "first": info.isDefault,
                         "spaces": library.spaces(in: info.id).map(\.name),
                         "extensionsUp": profile.isDefault || profile.startedExtensions != nil,
+                        "storeMade": profile.isDefault || profile.storeIfMade != nil,
                         "loaded": (profile.isDefault ? profile.extensions : profile.startedExtensions)?.contexts.map(\.uniqueIdentifier).sorted() ?? [],
                         "favorites": library.favorites(in: info.id).map(\.title),
                         "history": profile.history.recent(limit: 6).map(\.url.absoluteString),
@@ -1125,6 +1126,17 @@ enum DebugBridge {
             if f.count == 2 { Task { await WebsiteData.clear(f[0] == "cache" ? .cache : .cookies, site: f[1], in: controller.tabManager.profile.store); debugLog("cleared \(f[0]) for \(f[1])") } }
         case "cmd": controller.commandBar.runAction(arg)
         case "settingsfind": controller.tabManager.selectedTab?.settingsView?.debugFind(arg)
+        case "settingsstate":
+            // settingsstate <path>: what the Settings tab in front shows (JSON).
+            guard let state = controller.tabManager.selectedTab?.settingsView?.debugState,
+                  let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) else { debugLog("settingsstate: no Settings in front"); break }
+            try? data.write(to: URL(fileURLWithPath: arg))
+        case "settingsprofile":
+            // settingsprofile <name>: chooses a profile in the Settings tab in front, as its menu does.
+            if let id = Library.shared.profiles.first(where: { $0.displayName == arg })?.id { controller.tabManager.selectedTab?.settingsView?.choose(profile: id) }
+        case "savepasswords":
+            // savepasswords on|off: the choice for the profile of the space in front, as Settings › Passwords makes it.
+            PasswordCapture.setOffersToSave(arg == "on", in: controller.tabManager.profile)
         case "settingsbottom":
             if let root = controller.tabManager.selectedTab?.settingsView,
                let scroll = root.subviews.compactMap({ $0 as? NSScrollView }).first, let document = scroll.documentView {
