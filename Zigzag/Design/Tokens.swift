@@ -223,6 +223,8 @@ enum Tokens {
         static let addressGlyph: CGFloat = glyph
         /// The room the site's name always keeps: pinned extensions give way before it gets narrower.
         static let addressMinText: CGFloat = 72
+        /// An extension's icon in the address: a site's icon's size, so it reads as big as the field's glyphs.
+        static let addressIcon: CGFloat = 16
         /// The pin in a top corner of an extension's tile in Site Controls: its box, its glyph, and how far in it sits.
         static let hoverPin: CGFloat = 14
         static let hoverPinGlyph: CGFloat = 9
@@ -395,8 +397,8 @@ enum Tokens {
         static let title: CGFloat = 17
         /// Display headings in heavy type (`Brand.display`): a window's or a card's one big line.
         static let display: CGFloat = 22
-        /// The count on an extension's button: the one place text has to fit a 10pt capsule.
-        static let badge: CGFloat = 8
+        /// The count on an extension's button: semibold figures in a 12pt pill.
+        static let badge: CGFloat = 9
     }
 
     enum Font {
@@ -996,8 +998,9 @@ enum Tokens {
         /// Passwords, Import, About, the welcome) take the brand's, `Brand.Theme.brand`. This is the front browser
         /// window's; a view that can show in either kind of window asks `Brand.Theme.for(self)` instead.
         @MainActor static var accent: NSColor { Brand.Theme.current.accent }
-        /// Counts on extension buttons: quiet, never competing with the page.
-        static let badge = dynamic(light: hex(0x6E6E73), dark: hex(0x8E8E93))
+        /// Counts on extension buttons: a neutral dark pill under white figures, a step lighter in dark so it still
+        /// stands off the field.
+        static let badge = dynamic(light: hex(0x48484A), dark: hex(0x636366))
 
         /// A page's one surface (History, Settings), the same as the page card's.
         static let surface = cardBackground

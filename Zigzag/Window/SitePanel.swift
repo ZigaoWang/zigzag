@@ -630,7 +630,9 @@ final class PanelTile: GlassTile {
             badgeView?.removeFromSuperview()
             badgeView = nil
             guard !badge.isEmpty else { return }
+            // The same pill as on a pinned button in the address, in the tile's corner.
             let view = BadgeView(text: badge, attention: isAttention)
+            view.inset = Self.badgeInset
             addSubview(view)
             badgeView = view
         }
@@ -676,11 +678,11 @@ final class PanelTile: GlassTile {
         } else {
             iconView.frame = NSRect(x: (bounds.width - side) / 2, y: (bounds.height - side) / 2, width: side, height: side)
         }
-        if let badgeView {
-            let size = badgeView.fittingSize
-            badgeView.frame = NSRect(x: bounds.width - size.width - 3, y: bounds.height - size.height - 3, width: size.width, height: size.height)
-        }
+        badgeView?.needsLayout = true
     }
+
+    /// From the tile's edges to its count: inside its rounded corner.
+    static let badgeInset: CGFloat = 3
 
     override func stateDidChange(animated: Bool) {
         let accent = Brand.Theme.for(self).accent

@@ -107,8 +107,8 @@ final class AddressView: InteractiveView {
         button.onClick = { [weak entry, weak button] _ in if let entry, let button { entry.pin.action(button) } }
         button.onRightClick = { [weak entry] _ in entry?.pin.menu() }
         button.dragsHorizontally = true
-        // The size of the field's own glyphs, so a row of them reads as one set.
-        button.imageSide = Tokens.Sidebar.addressGlyph
+        // A site's icon's size, in the middle, so it reads as big as Reader's and Site Controls' glyphs beside it.
+        button.imageSide = Tokens.Sidebar.addressIcon
         addSubview(button)
         return entry
     }
@@ -129,14 +129,11 @@ final class AddressView: InteractiveView {
         } else if let badge = entry.badge {
             badge.update(text: text, attention: pin.needsAttention)
         } else {
+            // The count in the button's bottom-right corner, over the icon's, inside the button.
             let badge = BadgeView(text: text, attention: pin.needsAttention)
-            badge.isCompact = true
             button.addSubview(badge)
             entry.badge = badge
         }
-        // A count takes the button's bottom-right corner, inside it; the icon moves up and left out of its way.
-        let nudge = text.isEmpty || pin.needsAttention ? 0 : Self.badgeNudge
-        button.imageOffset = CGSize(width: -nudge, height: -nudge)
     }
 
     /// How many of `count` pins can show when `otherButtons` share the end of a field with `room` for text and
@@ -146,9 +143,6 @@ final class AddressView: InteractiveView {
         let spare = room - max(Tokens.Sidebar.addressMinText, ceil(text)) - CGFloat(otherButtons) * pinStep
         return max(0, min(count, Int(floor(spare / pinStep))))
     }
-
-    /// How far a pinned icon moves up and left to make room for its count.
-    private static let badgeNudge: CGFloat = 3
 
     /// From one button in the field to the next.
     private static let pinStep = buttonSide + 2
@@ -1939,22 +1933,46 @@ enum SpaceSwipe {
     }
 }
 
-/// The little capsule on an extension's button: a blocked count, a word, or "!" when it needs you.
+/// The count on an extension's button, the same in the address and in Site Controls: a small dark pill with white
+/// figures in the button's bottom-right corner, over the icon's corner and inside the button, as Chrome and Safari
+/// draw it. "!" when the extension needs you is a small dot in the top-right corner instead.
 final class BadgeView: NSView {
-    private let label: Label
+    private(set) var text: String
     private var attention: Bool
-    var text: String { label.stringValue }
-    /// Smaller, for a button in the address field: it stays inside the button, clear of its neighbors.
-    var isCompact = false { didSet { needsLayout = true } }
+    /// From the button's bottom and right edges to the pill (top and right to the dot).
+    var inset: CGFloat = BadgeView.buttonInset { didSet { needsLayout = true } }
+
+    /// The pill: 12pt tall, 9pt semibold figures, 3pt either side, never narrower than it's tall.
+    static let height: CGFloat = 12
+    static let padding: CGFloat = 3
+    static let dot: CGFloat = 7
+    /// In an address button: a point in from its edges, inside its rounded corner.
+    static let buttonInset: CGFloat = 1
+    /// At most this many characters, as Chrome shows.
+    static let maxLength = 4
+    static var font: NSFont { .systemFont(ofSize: Tokens.TypeSize.badge, weight: .semibold) }
+
+    /// The pill's size for `text`, no wider than `limit`.
+    static func size(for text: String, limit: CGFloat = .greatestFiniteMagnitude) -> NSSize {
+        let ink = ceil((text as NSString).size(withAttributes: [.font: font]).width)
+        return NSSize(width: min(limit, max(height, ink + padding * 2)), height: height)
+    }
+
+    /// Where the pill for `text` sits in a button of `bounds` (top-left origin): its bottom-right corner, `inset` in.
+    static func frame(for text: String, in bounds: NSRect, inset: CGFloat) -> NSRect {
+        let size = size(for: text, limit: bounds.width - inset * 2)
+        return NSRect(x: bounds.maxX - inset - size.width, y: bounds.maxY - inset - size.height, width: size.width, height: size.height)
+    }
+
+    /// Where the attention dot sits: the top-right corner, `inset` in.
+    static func dotFrame(in bounds: NSRect, inset: CGFloat) -> NSRect {
+        NSRect(x: bounds.maxX - inset - dot, y: bounds.minY + inset, width: dot, height: dot)
+    }
 
     init(text: String, attention: Bool) {
+        self.text = String(text.prefix(Self.maxLength))
         self.attention = attention
-        // Needing attention is a small dot, not a shout: the tooltip and the click say what's needed.
-        label = Label(attention ? "" : String(text.prefix(4)), font: .systemFont(ofSize: Tokens.TypeSize.badge, weight: .bold), color: .white)
         super.init(frame: .zero)
-        wantsLayer = true
-        label.alignment = .center
-        addSubview(label)
         setAccessibilityElement(false)
     }
 
@@ -1962,9 +1980,10 @@ final class BadgeView: NSView {
 
     /// What it says now, in place.
     func update(text: String, attention: Bool) {
+        self.text = String(text.prefix(Self.maxLength))
         self.attention = attention
-        label.stringValue = attention ? "" : String(text.prefix(4))
         needsLayout = true
+        needsDisplay = true
     }
 
     override var isFlipped: Bool { true }
@@ -1975,27 +1994,32 @@ final class BadgeView: NSView {
         needsLayout = true
     }
 
+    /// Places itself in its button, so whoever holds it never has to.
     override func layout() {
         super.layout()
         guard let superview else { return }
-        // A ring in the address field's color keeps the badge apart from the icon under it.
-        let ring: CGFloat = isCompact ? 1 : 1.5
-        let height: CGFloat = (attention ? (isCompact ? 5 : 6) : (isCompact ? 8 : 10)) + ring * 2
-        let text = (label.stringValue as NSString).size(withAttributes: [.font: label.font ?? NSFont.systemFont(ofSize: Tokens.TypeSize.badge)]).width
-        let width = attention ? height : max(height, ceil(text) + (isCompact ? 4 : 6) + ring * 2)
-        // A count sits bottom-right, like Safari's; the attention dot top-right, clear of the icon's artwork.
-        let y = attention ? 1 : superview.bounds.height - height
-        frame = NSRect(x: superview.bounds.width - width - (attention ? 1 : 0), y: y, width: width, height: height)
-        label.frame = NSRect(x: 0, y: (height - label.lineHeight) / 2, width: width, height: label.lineHeight)
-        layer?.cornerRadius = height / 2
-        layer?.borderWidth = ring
-        layer?.borderColor = cgColor(Tokens.Color.fieldFill)
-        layer?.backgroundColor = cgColor(attention ? .systemOrange : Tokens.Color.badge)
+        // In the button's own top-left terms, whichever way it counts.
+        var rect = attention ? Self.dotFrame(in: superview.bounds, inset: inset) : Self.frame(for: text, in: superview.bounds, inset: inset)
+        if !superview.isFlipped { rect.origin.y = superview.bounds.height - rect.maxY }
+        if frame != rect { frame = rect; needsDisplay = true }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let rect = bounds
+        (attention ? NSColor.systemOrange : Tokens.Color.badge).setFill()
+        NSBezierPath(roundedRect: rect, xRadius: rect.height / 2, yRadius: rect.height / 2).fill()
+        guard !attention, !text.isEmpty else { return }
+        let font = Self.font
+        let string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: NSColor.white])
+        let width = string.size().width
+        // The figures' cap height centered in the pill, not the line box, so they sit in its optical middle.
+        let baseline = ((rect.height + font.capHeight) / 2).rounded()
+        string.draw(at: NSPoint(x: (rect.width - width) / 2, y: baseline - font.ascender))
     }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
-        needsLayout = true
+        needsDisplay = true
     }
 }
 

@@ -424,8 +424,6 @@ final class IconButton: InteractiveView {
     }
     /// How big a full-color image is drawn; a site's icon by default.
     var imageSide = Tokens.Metric.favicon { didSet { needsLayout = true } }
-    /// Moves a full-color image off the middle: up and left, to make room for a count in the corner.
-    var imageOffset = CGSize.zero { didSet { needsLayout = true } }
     var tint: NSColor = Tokens.Color.icon { didSet { stateDidChange(animated: false) } }
     var radius: CGFloat = Tokens.Radius.control { didSet { layer?.cornerRadius = radius } }
     var showsFillAtRest = false { didSet { stateDidChange(animated: false) } }
@@ -478,8 +476,7 @@ final class IconButton: InteractiveView {
         super.layout()
         if image != nil {
             let side = imageSide
-            imageView.frame = NSRect(x: (bounds.width - side) / 2 + imageOffset.width, y: (bounds.height - side) / 2 + imageOffset.height,
-                                     width: side, height: side)
+            imageView.frame = NSRect(x: (bounds.width - side) / 2, y: (bounds.height - side) / 2, width: side, height: side)
         } else if glyph == nil {
             // The symbol's ink, not its image, in the middle.
             let ink = Tokens.Symbol.inkOffset(symbol, size: symbolSize)
