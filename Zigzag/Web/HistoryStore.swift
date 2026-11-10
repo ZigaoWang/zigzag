@@ -241,22 +241,12 @@ final class HistoryStore {
 
     /// Ranked matches: every word must appear in the URL or title.
     func search(_ query: String, limit: Int = 12) -> [HistoryEntry] {
-        let words = Self.words(query)
-        guard !words.isEmpty else { return [] }
-        // Asked again for the same text with nothing recorded since (the command bar does, when suggestions
-        // arrive): the last answer, rather than reading every visit once more.
-        let key = "\(limit)|\(words.joined(separator: " "))|\(sqlite3_total_changes(db))"
-        if let last = lastSearch, last.key == key { return last.results }
-        let results = Self.runSearch(words, limit: limit, in: db)
-        lastSearch = (key, results)
-        return results
+        Self.runSearch(Self.words(query), limit: limit, in: db)
     }
 
-    private var lastSearch: (key: String, results: [HistoryEntry])?
-
-    /// The same search, off the main thread, for the History page: typing there never waits on reading every visit,
-    /// however big History grows. `then` shapes the answer there too. Nil when a newer search from the same `asker`
-    /// took over: it's stopped where it was, as its answer would only be dropped.
+    /// The same search, off the main thread, for the History page and the command bar: typing there never waits on
+    /// reading every visit, however big History grows. `then` shapes the answer there too. Nil when a newer search
+    /// from the same `asker` took over: it's stopped where it was, as its answer would only be dropped.
     func search<T: Sendable>(_ query: String, limit: Int, asker: Int, then: @escaping @Sendable ([HistoryEntry]) -> T) async -> T? {
         guard let reader else { return then(search(query, limit: limit)) }
         return await reader.search(Self.words(query), limit: limit, asker: asker, then: then)
@@ -282,9 +272,27 @@ final class HistoryStore {
     /// `afterSubdomain`, hosts where it starts a later label instead ("wiki" in en.wikipedia.org); that can't use the
     /// index, so it's only asked when no host starts with it.
     func completionSites(for prefix: String, afterSubdomain: Bool = false, limit: Int = 8) -> [(entry: HistoryEntry, score: Double)] {
+        Self.runCompletionSites(prefix, afterSubdomain: afterSubdomain, limit: limit, in: db)
+    }
+
+    /// The command bar's inline completion, off the main thread: hosts starting with the text, or failing that hosts
+    /// where it starts a later label. Nil when a newer lookup from the same `asker` took over.
+    func completionSites(for prefix: String, asker: Int) async -> [(entry: HistoryEntry, score: Double)]? {
+        let lookup: @Sendable (OpaquePointer?) -> [(entry: HistoryEntry, score: Double)] = { db in
+            let found = Self.runCompletionSites(prefix, afterSubdomain: false, limit: 8, in: db)
+            return found.isEmpty ? Self.runCompletionSites(prefix, afterSubdomain: true, limit: 8, in: db) : found
+        }
+        guard let reader else { return lookup(db) }
+        return await reader.read(asker: asker, lookup) { $0 }
+    }
+
+    nonisolated fileprivate static func runCompletionSites(_ prefix: String, afterSubdomain: Bool, limit: Int,
+                                                           in db: OpaquePointer?) -> [(entry: HistoryEntry, score: Double)] {
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
         let lower = prefix.lowercased()
         let match = afterSubdomain ? "host LIKE ?3 ESCAPE '\\'" : "host >= ?1 AND host < ?2"
-        guard !lower.isEmpty, !lower.contains(" "), let statement = prepare("""
+        var statement: OpaquePointer?
+        guard !lower.isEmpty, !lower.contains(" "), sqlite3_prepare_v2(db, """
         SELECT url, title, visit_count, last_visit, score FROM (
             SELECT url, title, visit_count, last_visit,
                 SUM(visit_count) OVER site * 1.0 / (1 + (strftime('%s','now') - MAX(last_visit) OVER site) / 604800.0) AS score,
@@ -300,7 +308,7 @@ final class HistoryStore {
             )
             WINDOW site AS (PARTITION BY origin)
         ) WHERE rank = 1 ORDER BY score DESC LIMIT \(limit)
-        """) else { return [] }
+        """, -1, &statement, nil) == SQLITE_OK, let statement else { return [] }
         defer { sqlite3_finalize(statement) }
         // Hosts are stored lowercase, so a plain range finds the prefix through the index instead of a full scan.
         sqlite3_bind_text(statement, 1, lower, -1, transient)
@@ -387,14 +395,14 @@ final class HistoryStore {
     }
 }
 
-/// History's searches for the History page, on a connection of their own and a queue of their own. The file is in WAL
+/// History's searches for the History page and the command bar, on a connection of their own and a queue of their own. The file is in WAL
 /// mode, so reading here never waits on a visit being written on the main thread, nor holds one up.
 nonisolated final class HistoryReader: @unchecked Sendable {
     private let path: String
     private let queue = DispatchQueue(label: "app.zigzag.history.search", qos: .userInitiated)
     // Only touched on `queue`.
     private var db: OpaquePointer?
-    // Under `lock`: the newest search each asker (a History tab) has made, and which one is running now.
+    // Under `lock`: the newest search each asker (a History tab, a command bar) has made, and which one is running now.
     private let lock = NSLock()
     private var newest: [Int: Int] = [:]
     private var running: (asker: Int, ticket: Int)?
@@ -405,31 +413,39 @@ nonisolated final class HistoryReader: @unchecked Sendable {
     deinit { sqlite3_close(db) }
 
     func search<T: Sendable>(_ words: [String], limit: Int, asker: Int, then: @escaping @Sendable ([HistoryEntry]) -> T) async -> T? {
+        await read(asker: asker, { HistoryStore.runSearch(words, limit: limit, in: $0) }, then: then)
+    }
+
+    /// Any read, the same way: `lookup` on this connection (nil when the file can't be opened), then `then` on its answer.
+    func read<R, T: Sendable>(asker: Int, _ lookup: @escaping @Sendable (OpaquePointer?) -> R, then: @escaping @Sendable (R) -> T) async -> T? {
         let ticket: Int = lock.withLock {
             tickets += 1
             newest[asker] = tickets
-            // The same tab's last search, still reading: stopped, since the page drops what it would find.
+            // The same asker's last read, still going: stopped, since its answer would be dropped.
             if let running, running.asker == asker { sqlite3_interrupt(db) }
             return tickets
         }
         return await withCheckedContinuation { continuation in
             queue.async {
-                continuation.resume(returning: self.run(words, limit: limit, asker: asker, ticket: ticket, then: then))
+                continuation.resume(returning: self.run(lookup, asker: asker, ticket: ticket, then: then))
             }
         }
     }
 
-    private func run<T>(_ words: [String], limit: Int, asker: Int, ticket: Int, then: ([HistoryEntry]) -> T) -> T? {
+    private func run<R, T>(_ lookup: (OpaquePointer?) -> R, asker: Int, ticket: Int, then: (R) -> T) -> T? {
         // Typed over before it started: never run at all.
         guard isNewest(asker, ticket) else { return nil }
         if db == nil {
             var opened: OpaquePointer?
-            guard sqlite3_open_v2(path, &opened, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { sqlite3_close(opened); return then([]) }
-            sqlite3_busy_timeout(opened, 2000)
-            lock.withLock { db = opened }
+            if sqlite3_open_v2(path, &opened, SQLITE_OPEN_READONLY, nil) == SQLITE_OK {
+                sqlite3_busy_timeout(opened, 2000)
+                lock.withLock { db = opened }
+            } else {
+                sqlite3_close(opened)
+            }
         }
         lock.withLock { running = (asker, ticket) }
-        let found = HistoryStore.runSearch(words, limit: limit, in: db)
+        let found = lookup(db)
         lock.withLock { running = nil }
         guard isNewest(asker, ticket) else { return nil }
         let shaped = then(found)
