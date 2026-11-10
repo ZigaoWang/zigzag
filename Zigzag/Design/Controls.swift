@@ -1572,51 +1572,15 @@ final class MenuPanel: FloatingPanelView {
     }
 
     /// Grows out of the control that opened it: from `Motion.enterScale` with a fade, anchored at that control, eased
-    /// out. From the keyboard it's simply there; with Reduce Motion it only fades.
+    /// out, whether a click or a key opened it. With Reduce Motion it only fades.
     private func arrive() {
-        guard let layer, !Tokens.Motion.isFromKey else { return }
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 0
-        fade.toValue = 1
-        fade.duration = Tokens.Motion.enter * 0.7
-        fade.timingFunction = Tokens.Motion.easeOut
-        layer.add(fade, forKey: "arrive.fade")
-        guard !Tokens.Motion.reduceMotion else { return }
-        let grow = CABasicAnimation(keyPath: "transform")
-        grow.fromValue = NSValue(caTransform3D: Tokens.Motion.scale(Tokens.Motion.enterScale, of: layer, around: growsFrom, flipped: layer.isGeometryFlipped || isFlipped))
-        grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        grow.duration = Tokens.Motion.enter
-        grow.timingFunction = Tokens.Motion.easeOut
-        layer.add(grow, forKey: "arrive.grow")
+        Tokens.Motion.present(self, from: .point(growsFrom), entering: true)
     }
 
     /// Leaves quicker and subtler than it came: a fade as it eases a touch smaller toward its control, from wherever
     /// it is, so a quick open and close never jumps.
     private func leave() {
-        guard let layer, !Tokens.Motion.isFromKey else { removeFromSuperview(); return }
-        let shownOpacity = layer.presentation()?.opacity ?? 1
-        let shownTransform = layer.presentation()?.transform ?? CATransform3DIdentity
-        layer.removeAllAnimations()
-        CATransaction.begin()
-        CATransaction.setCompletionBlock { [weak self] in self?.removeFromSuperview() }
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = shownOpacity
-        fade.toValue = 0
-        fade.duration = Tokens.Motion.exit
-        fade.timingFunction = Tokens.Motion.easeOut
-        layer.add(fade, forKey: "leave.fade")
-        layer.opacity = 0
-        if !Tokens.Motion.reduceMotion {
-            let shrink = CABasicAnimation(keyPath: "transform")
-            shrink.fromValue = NSValue(caTransform3D: shownTransform)
-            shrink.toValue = NSValue(caTransform3D: Tokens.Motion.scale(Tokens.Motion.exitScale, of: layer, around: growsFrom, flipped: layer.isGeometryFlipped || isFlipped))
-            shrink.duration = Tokens.Motion.exit
-            shrink.timingFunction = Tokens.Motion.easeOut
-            shrink.fillMode = .forwards
-            shrink.isRemovedOnCompletion = false
-            layer.add(shrink, forKey: "leave.grow")
-        }
-        CATransaction.commit()
+        Tokens.Motion.present(self, from: .point(growsFrom), entering: false) { [weak self] in self?.removeFromSuperview() }
     }
 
     private func choose(_ index: Int) {
