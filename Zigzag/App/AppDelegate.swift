@@ -291,6 +291,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if WindowManager.shared.controllers.isEmpty { WindowManager.shared.reopenClosedWindow() } else { frontBrowserWindow()?.tabManager.reopenClosedTab() }
     }
     @objc func showHistory(_ sender: Any?) { frontBrowserWindow().map(HistoryPage.open) }
+    /// From Zigzag Mini or with no window open too: in the browser window, which comes forward.
+    @objc func showWhatsNew(_ sender: Any?) { frontBrowserWindow().map { WhatsNew.show(in: $0) } }
 
     @objc func sendFeedback(_ sender: Any?) { frontBrowserWindow().map(Feedback.show) }
     @objc func reportProblem(_ sender: Any?) { frontBrowserWindow().map(ProblemReport.show) }
