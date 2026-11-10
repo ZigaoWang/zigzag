@@ -1,7 +1,7 @@
 import Foundation
 
 /// What's saved about a profile: who it is, and how it's shown.
-struct ProfileInfo: Codable, Identifiable, Equatable {
+nonisolated struct ProfileInfo: Codable, Identifiable, Equatable {
     var id: UUID
     /// Nil for the first profile until it's given a name: it's then shown as "Default", in your language.
     var name: String?
@@ -15,7 +15,7 @@ struct ProfileInfo: Codable, Identifiable, Equatable {
 /// The profiles there are, and which space is on which. Kept in a file of its own (Profiles.json), not in the
 /// library: a Zigzag from before profiles rewrites the library without what it doesn't know, and would drop every
 /// space's profile. It never writes this file, so going back to it and forward again loses nothing.
-struct ProfileDirectory: Codable, Equatable {
+nonisolated struct ProfileDirectory: Codable, Equatable {
     /// The first profile, which holds what Zigzag kept before there were profiles. Always there, never removed.
     private(set) var first = ProfileInfo(id: Profile.defaultID)
     /// The profiles made since, in the order they're listed.
@@ -101,6 +101,13 @@ struct ProfileDirectory: Codable, Equatable {
         return moved.compactMap(UUID.init(uuidString:))
     }
 
+    /// Notes that what's on disk under an ID that's no profile's is to be erased, as a removed profile's is. Never
+    /// the first profile's, nor one that's listed.
+    mutating func markForErasing(_ id: UUID) {
+        guard id != Profile.defaultID, profile(id) == nil, !deleting.contains(where: { $0.id == id }) else { return }
+        deleting.append(ProfileInfo(id: id))
+    }
+
     /// A removed profile's data is erased: nothing of it is left to finish.
     mutating func finishedDeleting(_ id: UUID) {
         deleting.removeAll { $0.id == id }
@@ -132,7 +139,8 @@ struct ProfileDirectory: Codable, Equatable {
     /// Stores WebKit has on disk that belong to no profile here and aren't being removed. Never erased without
     /// asking: a Profiles.json put back from a backup, or set aside as unreadable, makes a profile in use look like one.
     func orphans(amongStores stores: [UUID]) -> [UUID] {
-        let known = Set(others.map(\.id) + deleting.map(\.id))
-        return stores.filter { !known.contains($0) }
+        let known = Set(others.map(\.id) + deleting.map(\.id) + [Profile.defaultID])
+        var seen: Set<UUID> = []
+        return stores.filter { !known.contains($0) && seen.insert($0).inserted }
     }
 }

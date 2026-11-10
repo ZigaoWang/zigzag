@@ -25,7 +25,7 @@ final class Profile {
     private var madeStore: WKWebsiteDataStore?
     /// Where its own files are kept. The first profile's are where Zigzag's have always been.
     var folder: URL {
-        isDefault ? Paths.support : Paths.directory("Profiles").appendingPathComponent(id.uuidString, isDirectory: true)
+        isDefault ? Paths.support : Profiles.folder(of: id)
     }
     /// The pages visited in it. The first profile's is the file History has always been.
     private(set) lazy var history: HistoryStore = {
@@ -128,17 +128,45 @@ final class Profiles {
         let waiting = Library.shared.directory.deleting.map(\.id).filter { $0 != Profile.defaultID && Library.shared.directory.profile($0) == nil }
         guard !waiting.isEmpty else { return }
         Task {
-            for id in waiting {
-                try? FileManager.default.removeItem(at: Paths.directory("Profiles").appendingPathComponent(id.uuidString, isDirectory: true))
-                UpdateBackup.forget(profile: id)
-                UserDefaults.standard.removeObject(forKey: "ExtensionsPinned.\(id.uuidString)")
-                await eraseStore(id)
-            }
+            for id in waiting { await erase(id) }
             // A removal cut short didn't get to the packages only that profile had.
             for id in ExtensionStore.packageIDs where ExtensionStore.profiles(with: id).isEmpty && !ExtensionStore.isUnpacked(id) {
                 try? FileManager.default.removeItem(at: ExtensionStore.folder(for: id))
             }
         }
+    }
+
+    /// Erases what's on disk and in the backups under an ID that's written down as being removed
+    /// and that no page has opened in this run.
+    private static func erase(_ id: UUID) async {
+        guard id != Profile.defaultID, Library.shared.directory.profile(id) == nil else { return }
+        try? FileManager.default.removeItem(at: folder(of: id))
+        UpdateBackup.forget(profile: id)
+        UserDefaults.standard.removeObject(forKey: "ExtensionsPinned.\(id.uuidString)")
+        await eraseStore(id)
+    }
+
+    /// Where a profile other than the first keeps its files.
+    static func folder(of id: UUID) -> URL {
+        Paths.support.appendingPathComponent("Profiles", isDirectory: true).appendingPathComponent(id.uuidString, isDirectory: true)
+    }
+
+    // MARK: Data that's no profile's
+
+    /// What's on disk under an ID that's neither a profile's nor being removed: a store WebKit keeps, or a profile's
+    /// folder. It's left by a Profiles.json put back from a backup made before the profile was, or one that
+    /// couldn't be read and was set aside. Never erased without asking: it may be a profile you still want.
+    func orphans() async -> [UUID] {
+        let stores = await WKWebsiteDataStore.allDataStoreIdentifiers
+        let folders = (try? FileManager.default.contentsOfDirectory(atPath: Paths.support.appendingPathComponent("Profiles", isDirectory: true).path)) ?? []
+        return Library.shared.directory.orphans(amongStores: stores + folders.compactMap(UUID.init(uuidString:)))
+    }
+
+    /// Erases what's on disk under an ID that's no profile's, once that's written down, so it's finished at the
+    /// next start if it can't be now.
+    func eraseOrphan(_ id: UUID) async {
+        guard Library.shared.markForErasing(id) else { return }
+        await Self.erase(id)
     }
 
     /// Has WebKit remove a profile's store, then removes what WebKit leaves of its extensions' storage. Only then

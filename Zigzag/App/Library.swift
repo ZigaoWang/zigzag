@@ -768,22 +768,29 @@ final class Library {
 
     /// Each favorite split keeps two different favorites, in no other split, its right page just after its left.
     private func tidyFavorites() {
+        (favorites, favoriteSplits) = Self.tidied(favorites, splits: favoriteSplits, directory: directory)
+    }
+
+    /// The favorites and their pairs as they may be kept: each pair two different favorites of one profile, in no
+    /// other pair, its right page just after its left. An older Zigzag, which shows every profile's favorites
+    /// together, can pair two that aren't one profile's; half of such a pair would show in neither, so it's undone.
+    nonisolated static func tidied(_ favorites: [Bookmark], splits: [PinnedSplit], directory: ProfileDirectory) -> ([Bookmark], [PinnedSplit]) {
+        var favorites = favorites
         let ids = Set(favorites.map(\.id))
         var paired: Set<UUID> = []
-        favoriteSplits = favoriteSplits.filter { split in
-            // Both of one profile: an older Zigzag, which shows every profile's favorites together, can pair two
-            // that aren't, and half of such a pair would show in neither profile.
+        let splits = splits.filter { split in
             guard split.left != split.right, ids.contains(split.left), ids.contains(split.right),
                   directory.profileID(ofFavorite: split.left) == directory.profileID(ofFavorite: split.right),
                   !paired.contains(split.left), !paired.contains(split.right) else { return false }
             paired.formUnion([split.left, split.right])
             return true
         }
-        for split in favoriteSplits {
+        for split in splits {
             guard let from = favorites.firstIndex(where: { $0.id == split.right }) else { continue }
             let right = favorites.remove(at: from)
             favorites.insert(right, at: (favorites.firstIndex { $0.id == split.left } ?? favorites.count - 1) + 1)
         }
+        return (favorites, splits)
     }
 
     /// Adds to a profile's favorites the ones it doesn't already have; returns how many that was.
@@ -1358,6 +1365,27 @@ final class Library {
         let info = directory.add(name: name, color: color)
         commit()
         return info
+    }
+
+    /// Lists again a profile whose data is on disk under `id` but which is in no list (Profiles.orphans): it's a
+    /// profile once more, with what it kept.
+    @discardableResult
+    func restoreProfile(_ id: UUID, name: String) -> ProfileInfo? {
+        guard id != Profile.defaultID, directory.profile(id) == nil, !directory.deleting.contains(where: { $0.id == id }) else { return nil }
+        let info = directory.add(name: name, id: id)
+        commit()
+        return info
+    }
+
+    /// Writes down that the data on disk under `id`, which is no profile's, is to be erased. False when that
+    /// couldn't be written, or it's a profile's after all: nothing is then erased.
+    func markForErasing(_ id: UUID) -> Bool {
+        let before = directory
+        directory.markForErasing(id)
+        guard directory != before else { return false }
+        saveNow()
+        guard savedDirectory == directory else { directory = before; return false }
+        return true
     }
 
     func updateProfile(_ id: UUID, name: String?, color: SpaceColor?) {

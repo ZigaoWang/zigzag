@@ -422,7 +422,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     var debugState: [String: Any] {
         ["editing": commandBar.isVisible, "titleShown": !strip.title.isHidden, "title": strip.title.text,
-         "space": space.name, "open": strip.openButton.title, "openEnabled": strip.openButton.isEnabled, "webViewHere": tab.webView?.window === window, "movedOut": movedOut,
+         "space": space.name, "profile": Library.shared.directory.profile(tab.profile.id)?.name ?? "",
+         "store": tab.webView?.configuration.websiteDataStore.identifier?.uuidString ?? (tab.webView == nil ? "no page" : "default"),
+         "open": strip.openButton.title, "openEnabled": strip.openButton.isEnabled, "webViewHere": tab.webView?.window === window, "movedOut": movedOut,
          "loading": tab.isLoading, "alpha": window?.alphaValue ?? 0,
          "fullScreenAuxiliary": window?.collectionBehavior.contains(.fullScreenAuxiliary) == true, "glass": root.debugGlass]
     }

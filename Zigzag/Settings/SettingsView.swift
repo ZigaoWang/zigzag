@@ -552,6 +552,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let developerGroup = FormGroup()
     /// Extensions another profile has and this one doesn't, each with a way to add it here.
     private let otherProfilesGroup = FormGroup()
+    /// What's on disk from a profile that's in no list, to bring back or delete. Only there when there's any.
+    private let unlistedGroup = FormGroup()
     private var otherProfilesTask: Task<Void, Never>?
     private var shortcutGroups: [(String, FormGroup)] = []
 
@@ -1249,6 +1251,43 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         layoutSubtreeIfNeeded()
         if pane == .profiles || isSearching { layoutDocument() }
+        reloadUnlisted()
+    }
+
+    /// Data on this Mac from a profile that's in no list: a Profiles.json put back from an older backup, or one
+    /// that couldn't be read, leaves it. Shown so it can be made a profile again or deleted, never deleted unasked.
+    private func reloadUnlisted() {
+        Task { @MainActor [weak self] in
+            let found = await Profiles.shared.orphans()
+            guard let self else { return }
+            self.unlistedGroup.removeAllRows()
+            for id in found {
+                let restore = PillButton(title: String(localized: "Restore", comment: "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again."))
+                restore.onClick = { [weak self] _ in
+                    Library.shared.restoreProfile(id, name: String(localized: "Restored Profile", comment: "Name a profile gets when it's made again from data left on this Mac. People can rename it."))
+                    self?.reloadProfiles()
+                }
+                let delete = IconButton(symbol: "trash", size: .compact,
+                                        toolTip: String(localized: "Delete", comment: "Tooltip of the trash button in Settings › Profiles, on data left by a profile that's no longer listed."))
+                delete.onClick = { [weak self] _ in
+                    self?.confirm(title: String(localized: "Delete this profile’s data?", comment: "Title of the sheet that asks before deleting data left by a profile that's no longer listed."),
+                                  message: String(localized: "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins, saved passwords and history. Make sure you have your recovery phrases. This can’t be undone.", comment: "Message of the sheet that asks before deleting data left by a profile that's no longer listed."),
+                                  action: String(localized: "Delete", comment: "Button of the sheet that deletes data left by a profile that's no longer listed.")) {
+                        Task { @MainActor in
+                            await Profiles.shared.eraseOrphan(id)
+                            self?.reloadUnlisted()
+                        }
+                    }
+                }
+                let stack = NSStackView(views: [delete, restore])
+                stack.spacing = Tokens.Space.x2
+                self.unlistedGroup.add(FormRow(title: String(localized: "Data from a profile that’s no longer listed", comment: "Title of a row in Settings › Profiles, for data left on this Mac by a profile that's in no list."),
+                                               detail: String(localized: "Extensions, sign-ins and history kept on this Mac", comment: "Under the title of a row in Settings › Profiles, for data left by a profile that's in no list."),
+                                               icon: NSImage(systemSymbolName: "questionmark.folder", accessibilityDescription: nil), control: stack))
+            }
+            self.layoutSubtreeIfNeeded()
+            if self.pane == .profiles || self.isSearching { self.layoutDocument() }
+        }
     }
 
     private func reloadSpaces() {
@@ -1416,6 +1455,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private static var automationHeading: String { String(localized: "Automation", comment: "A heading in Settings › General: what scripts and Shortcuts may do in Zigzag.") }
     private static var spacesHeading: String { String(localized: "Your Spaces", comment: "A heading in Settings › Spaces.") }
     private static var profilesHeading: String { String(localized: "Your Profiles", comment: "A heading in Settings › Profiles.") }
+    private static var unlistedHeading: String { String(localized: "Not Listed", comment: "A heading in Settings › Profiles, over data left on this Mac by profiles that are no longer in the list.") }
     private static var browsingDataHeading: String { String(localized: "Clear Browsing Data", comment: "A heading in Settings › Privacy: buttons that clear history, cache and cookies.") }
     private static var siteDataHeading: String { String(localized: "Stored by Websites", comment: "A heading in Settings › Privacy: what each site keeps on this Mac, with a Remove button each.") }
     private static var sitesHeading: String { String(localized: "Site Permissions", comment: "A heading in Settings › Privacy: camera, location, pop-ups and other choices made for single sites.") }
@@ -1454,7 +1494,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .search: [(nil, searchGroup)]
         case .mini: [(nil, miniGroup)]
         case .spaces: [(Self.spacesHeading, spacesGroup)]
-        case .profiles: [(Self.profilesHeading, profilesGroup)]
+        case .profiles: [(Self.profilesHeading, profilesGroup), (Self.unlistedHeading, unlistedGroup)]
         case .passwords: [(nil, passwordsWindowGroup), (Self.fillingHeading, passwordsGroup)]
         case .privacy: [(nil, blockingGroup), (Self.sitesHeading, sitesGroup), (Self.browsingDataHeading, privacyGroup), (Self.siteDataHeading, siteDataGroup)]
         case .translation: [(nil, translationGroup), (Self.alwaysTranslateHeading, alwaysGroup)]
@@ -1550,6 +1590,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                 width: contentWidth - Tokens.Page.groupPad, height: hint.lineHeight)
             documentView.addSubview(hint)
             y = hint.frame.maxY + Tokens.Page.groupGap
+            if !unlistedGroup.rows.isEmpty { section(Self.unlistedHeading, unlistedGroup) }
         case .passwords:
             section(nil, passwordsWindowGroup)
             section(Self.fillingHeading, passwordsGroup)
