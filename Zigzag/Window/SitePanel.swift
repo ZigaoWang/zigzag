@@ -545,6 +545,8 @@ final class HoverPin: InteractiveView {
         didSet {
             guard state != oldValue else { return }
             toolTipForState()
+            // At the limit it only explains, in its tooltip: dimmed, and a click does nothing.
+            isEnabled = state != .atLimit
             stateDidChange(animated: window != nil)
         }
     }
@@ -605,6 +607,7 @@ final class HoverPin: InteractiveView {
             layer.shadowOpacity = state == .atLimit ? 0 : 1
         }
         icon.contentTintColor = pinned ? theme.onAccent : state == .atLimit ? Tokens.Color.textTertiary : isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        icon.alphaValue = state == .atLimit ? Tokens.Opacity.disabled : 1
     }
 }
 

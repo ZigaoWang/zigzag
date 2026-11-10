@@ -176,6 +176,20 @@ struct AddressTests {
         #expect(address.visiblePinIDs == ["a", "b"])
     }
 
+    @Test func atTheLimitThePinOnATileOnlyExplains() {
+        let pin = HoverPin()
+        var clicks = 0
+        pin.onClick = { _ in clicks += 1 }
+        pin.state = .atLimit
+        #expect(!pin.isEnabled)
+        #expect(pin.toolTip == SitePanel.pinLimitTip)
+        #expect(!pin.accessibilityPerformPress())
+        pin.state = .unpinned
+        #expect(pin.isEnabled)
+        #expect(pin.accessibilityPerformPress())
+        #expect(clicks == 1)
+    }
+
     @Test func keepingDropsOnlyWhatIsNoLongerKept() {
         #expect(ExtensionPins(ids: ["a", "b", "c"]).keeping { $0 != "b" }.ids == ["a", "c"])
     }
