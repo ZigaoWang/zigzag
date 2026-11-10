@@ -838,7 +838,7 @@
       }
     },
     "%lld extensions" : {
-      "comment" : "Item in a list of what a browser holds or what came over, in the Import window.",
+      "comment" : "Item in a list of what a browser holds or what came over, in the Import window.\nUnder a profile's name in Settings › Profiles: how many extensions it has.",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -1404,7 +1404,7 @@
       }
     },
     "%lld spaces" : {
-      "comment" : "Item in the list of what came over, in the Import window.",
+      "comment" : "Item in the list of what came over, in the Import window.\nUnder a profile's name in Settings › Profiles: how many spaces are on it.",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -1568,6 +1568,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在播放的视频会在小播放器里跟着你。"
+          }
+        }
+      }
+    },
+    "A profile has its own extensions, sign-ins and website data. Spaces on the same profile share them." : {
+      "comment" : "Under the title of the sheet that makes a profile.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描述文件有自己的扩展、登录状态和网站数据。同一描述文件中的空间共用这些内容。"
           }
         }
       }
@@ -3918,7 +3929,7 @@
       }
     },
     "Color" : {
-      "comment" : "Accessibility label of the chip of the space's color, in the space editor.\nAccessibility label of the color wheel in the space editor.\nVoiceOver, in the space editor's color wheel: the knob of the space's color.",
+      "comment" : "Accessibility label of the chip of the space's color, in the space editor.\nAccessibility label of the color wheel in the space editor.\nLabel of the row of colors in the sheet that makes or edits a profile.\nVoiceOver, in the space editor's color wheel: the knob of the space's color.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4401,6 +4412,17 @@
         }
       }
     },
+    "Create" : {
+      "comment" : "Button that makes the profile, in the sheet that asks for its name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建"
+          }
+        }
+      }
+    },
     "Custom" : {
       "comment" : "A search engine choice in Settings: one you give an address for.",
       "localizations" : {
@@ -4511,6 +4533,17 @@
         }
       }
     },
+    "Default" : {
+      "comment" : "The name of the first profile, which holds what Zigzag kept before there were profiles, until it's renamed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认"
+          }
+        }
+      }
+    },
     "Default browser" : {
       "comment" : "A setting in Settings › General.",
       "localizations" : {
@@ -4529,6 +4562,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "删除"
+          }
+        }
+      }
+    },
+    "Delete %@?" : {
+      "comment" : "Title of the sheet that deletes a profile. The placeholder is the profile's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要删除“%@”吗？"
+          }
+        }
+      }
+    },
+    "Delete Profile" : {
+      "comment" : "Button of the sheet that deletes a profile, and tooltip of the trash button on a profile's row in Settings › Profiles.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除描述文件"
           }
         }
       }
@@ -4874,13 +4929,35 @@
         }
       }
     },
+    "Each profile has its own extensions, sign-ins and website data. Spaces on the same profile share them." : {
+      "comment" : "Under the list in Settings › Profiles.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每个描述文件都有自己的扩展、登录状态和网站数据。同一描述文件中的空间共用这些内容。"
+          }
+        }
+      }
+    },
     "Edit" : {
-      "comment" : "A menu in the menu bar.\nButton on a saved login in the Passwords window.\nButton on a space's row in Settings › Spaces.",
+      "comment" : "A menu in the menu bar.\nButton on a profile's row in Settings › Profiles.\nButton on a saved login in the Passwords window.\nButton on a space's row in Settings › Spaces.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "编辑"
+          }
+        }
+      }
+    },
+    "Edit Profile" : {
+      "comment" : "Title of the sheet that renames a profile and changes its color.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑描述文件"
           }
         }
       }
@@ -5237,12 +5314,23 @@
       }
     },
     "Extensions" : {
-      "comment" : "A section of Settings.\nChoice in the Import window: bring extensions over from the Chrome Web Store.\nHeading in the site panel, in the welcome window’s picture of Zigzag.\nRow in the site panel's This Site group.\nSection label over the extensions' buttons in the site panel.",
+      "comment" : "A section of Settings.\nChoice in the Import window: bring extensions over from the Chrome Web Store.\nHeading in the site panel, in the welcome window’s picture of Zigzag.\nLabel in the sheet that makes a profile: which extensions it starts with.\nRow in the site panel's This Site group.\nSection label over the extensions' buttons in the site panel.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "扩展"
+          }
+        }
+      }
+    },
+    "Extensions are added fresh. Nothing they’ve stored in another profile comes along." : {
+      "comment" : "Note in the sheet that makes a profile, under the choice of which extensions it starts with.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扩展会全新添加，它们在其他描述文件中存储的内容不会带过来。"
           }
         }
       }
@@ -6227,6 +6315,17 @@
         }
       }
     },
+    "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins and website data. Make sure you have your recovery phrases. This can’t be undone." : {
+      "comment" : "Message of the sheet that deletes a profile.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的扩展及其保存的所有内容（包括钱包）都会被删除，登录状态和网站数据也会一并删除。请确认你已保存好恢复短语。此操作不可撤销。"
+          }
+        }
+      }
+    },
     "Its own tabs and pinned tabs, in its own color" : {
       "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window.",
       "localizations" : {
@@ -6278,6 +6377,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它在这台 Mac 上的设置和数据也会被删除。你可以从 Chrome 网上应用店重新添加它。"
+          }
+        }
+      }
+    },
+    "Its spaces move to %@." : {
+      "comment" : "Added to the message of the sheet that deletes a profile, when the profile has spaces. The placeholder is the first profile's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的空间会移到“%@”。"
           }
         }
       }
@@ -7082,6 +7192,17 @@
         }
       }
     },
+    "Name this profile" : {
+      "comment" : "Placeholder of the name field in the sheet that makes or edits a profile.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为此描述文件命名"
+          }
+        }
+      }
+    },
     "Name this space" : {
       "comment" : "Placeholder of the name field in the space editor.",
       "localizations" : {
@@ -7232,6 +7353,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新建无痕浏览窗口"
+          }
+        }
+      }
+    },
+    "New Profile" : {
+      "comment" : "Button beside Your Profiles in Settings › Profiles.\nTitle of the sheet that makes a profile.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建描述文件"
           }
         }
       }
@@ -9181,7 +9313,18 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "个人资料 %lld"
+            "value" : "描述文件 %lld"
+          }
+        }
+      }
+    },
+    "Profiles" : {
+      "comment" : "A section of Settings: profiles, each with its own extensions and sign-ins.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描述文件"
           }
         }
       }
@@ -10198,6 +10341,17 @@
         }
       }
     },
+    "Same as %@" : {
+      "comment" : "Choice in the sheet that makes a profile: it starts with the extensions another profile has. The placeholder is that profile's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与“%@”相同"
+          }
+        }
+      }
+    },
     "Sand" : {
       "comment" : "Name of a curated space color, in the space editor.",
       "localizations" : {
@@ -10221,7 +10375,7 @@
       }
     },
     "Save" : {
-      "comment" : "Button in the save-password prompt.\nButton in the toast after taking a screenshot: saves it as a file.\nButton that saves the changes to a login in the Passwords window.",
+      "comment" : "Button in the save-password prompt.\nButton in the toast after taking a screenshot: saves it as a file.\nButton that saves a profile's new name and color.\nButton that saves the changes to a login in the Passwords window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11689,6 +11843,17 @@
         }
       }
     },
+    "Start Empty" : {
+      "comment" : "Choice in the sheet that makes a profile: it starts with no extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从空白开始"
+          }
+        }
+      }
+    },
     "Start Speaking" : {
       "comment" : "Edit › Speech menu item.",
       "localizations" : {
@@ -13136,6 +13301,17 @@
         }
       }
     },
+    "Type %@ to confirm" : {
+      "comment" : "Over the field in the sheet that deletes a profile. The placeholder is the profile's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入“%@”以确认"
+          }
+        }
+      }
+    },
     "Type a shortcut" : {
       "comment" : "In Settings › Shortcuts while recording a new shortcut.",
       "localizations" : {
@@ -14193,6 +14369,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的 Mac 不允许 Zigzag 打开它。"
+          }
+        }
+      }
+    },
+    "Your Profiles" : {
+      "comment" : "A heading in Settings › Profiles.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的描述文件"
           }
         }
       }

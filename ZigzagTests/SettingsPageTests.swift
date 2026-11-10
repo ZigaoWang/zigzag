@@ -38,7 +38,7 @@ struct SettingsPageTests {
     }
 
     @Test func theColumnKeepsItsOrder() {
-        #expect(SettingsPane.allCases == [.general, .appearance, .tabs, .spaces, .search, .mini, .passwords, .privacy,
+        #expect(SettingsPane.allCases == [.general, .appearance, .tabs, .spaces, .profiles, .search, .mini, .passwords, .privacy,
                                           .translation, .extensions, .shortcuts])
     }
 
