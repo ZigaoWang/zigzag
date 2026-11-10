@@ -383,7 +383,9 @@ class InteractiveView: NSView {
     }
     var onMiddleClick: (() -> Void)?
 
-    override func menu(for event: NSEvent) -> NSMenu? {
+    /// A control's menu always comes from `onRightClick`, so a right-click, Control-Return and VoiceOver's Show Menu
+    /// all find the same one. Final, so no control can give a menu that only the mouse reaches.
+    override final func menu(for event: NSEvent) -> NSMenu? {
         onRightClick?(event)
     }
 
