@@ -144,7 +144,7 @@ private final class AboutRow: CardRow {
         arrow.contentTintColor = Tokens.Color.textTertiary
         addSubview(arrow)
         onClick = { _ in
-            if let url { NSWorkspace.shared.open(url) }
+            if let url { WindowManager.shared.openFromZigzag(url) }
             run?()
         }
     }

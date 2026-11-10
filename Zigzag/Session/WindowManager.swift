@@ -170,10 +170,19 @@ final class WindowManager {
 
     /// Opens a URL from outside (another app, Finder, the Dock) in the frontmost window. Never a private one: a link
     /// from elsewhere doesn't get to choose that.
-    func openExternal(_ url: URL) {
+    func openExternal(_ url: URL) { open(url, fromAnotherApp: true) }
+
+    /// A page Zigzag itself opens (About's links, Send Feedback, release notes): a tab in the front window, as any
+    /// link inside Zigzag, never Zigzag Mini, which is for links from other apps.
+    func openFromZigzag(_ url: URL) {
+        open(url, fromAnotherApp: false)
+        NSApp.activate()
+    }
+
+    private func open(_ url: URL, fromAnotherApp: Bool) {
         // Settings › Zigzag Mini can send links to a Zigzag Mini of their own instead; files and links before onboarding
         // still open here. Zigzag Mini is never saved, so nothing about the session changes.
-        if opensInMini(url) {
+        if fromAnotherApp, opensInMini(url) {
             MiniWindowController.open(url: url, fromAnotherApp: true)
             return
         }

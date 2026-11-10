@@ -195,7 +195,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A link another app hands over (or a script's `open location`) is a web address: never one of Zigzag's own
         // pages, an extension's, or a file.
         guard let string = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue, let url = Scripting.webAddress(string) else { return }
+        // Zigzag handing a link to macOS (as the default browser) gets it straight back: that's a link from inside
+        // Zigzag, so it opens in a tab here, not in Zigzag Mini as one from another app would.
+        if launched, Self.isFromZigzag(event) { WindowManager.shared.openFromZigzag(url); return }
         open(url)
+    }
+
+    /// Whether the app that sent this event is Zigzag itself.
+    static func isFromZigzag(_ event: NSAppleEventDescriptor) -> Bool {
+        isZigzag(senderPID: event.attributeDescriptor(forKeyword: AEKeyword(keySenderPIDAttr))?.int32Value)
+    }
+
+    /// An event macOS delivers says which process sent it; one without a sender is never taken for Zigzag's own.
+    static func isZigzag(senderPID: Int32?) -> Bool {
+        senderPID == ProcessInfo.processInfo.processIdentifier
     }
 
     /// Files opened with Zigzag, and links handed over as a document: web addresses and local files only.

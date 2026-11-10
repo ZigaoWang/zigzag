@@ -14,7 +14,7 @@ enum Feedback {
                             alternateTitle: String(localized: "GitHub Issues", comment: "Button of the Send Feedback sheet: open GitHub's issue page. A product name.")) { choice in
             switch choice {
             case .confirm: if let url = emailURL { NSWorkspace.shared.open(url) }
-            case .alternate: NSWorkspace.shared.open(issuesURL)
+            case .alternate: WindowManager.shared.openFromZigzag(issuesURL)
             case .cancel: break
             }
         }
