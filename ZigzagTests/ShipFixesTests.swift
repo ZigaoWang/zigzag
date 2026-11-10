@@ -1,4 +1,5 @@
 import Foundation
+import JavaScriptCore
 import WebKit
 import Testing
 @testable import Zigzag
@@ -179,8 +180,9 @@ struct BookmarkFolderTests {
 
     private func decide(dx: CGFloat, dy: CGFloat = 0, back: Bool = true, forward: Bool = false,
                         scrolls: (left: Bool, right: Bool)? = (false, false), page: SwipeDecision.Page = .left,
-                        waited: TimeInterval = 0.02) -> SwipeDecision {
-        SwipeDecision.decide(dx: dx, dy: dy, canGoBack: back, canGoForward: forward, pageScrolls: scrolls, page: page, waited: waited)
+                        waited: TimeInterval = 0.02, overFrame: Bool = false) -> SwipeDecision {
+        SwipeDecision.decide(dx: dx, dy: dy, canGoBack: back, canGoForward: forward, pageScrolls: scrolls, page: page,
+                             waited: waited, overFrame: overFrame)
     }
 
     @Test func swipeGoesBackOnAPlainPage() {
@@ -194,6 +196,11 @@ struct BookmarkFolderTests {
         // A page that scrolls sideways that way keeps it.
         #expect(decide(dx: 14, scrolls: (true, false)) == .ignore)
         #expect(decide(dx: 14, scrolls: (false, true)) == .track(-1))
+        // Without natural scrolling, fingers to the right scroll toward the page's right edge instead.
+        #expect(SwipeDecision.decide(dx: 14, dy: 0, canGoBack: true, canGoForward: false, pageScrolls: (false, true),
+                                     page: .left, waited: 0.02, natural: false) == .ignore)
+        #expect(SwipeDecision.decide(dx: 14, dy: 0, canGoBack: true, canGoForward: false, pageScrolls: (true, false),
+                                     page: .left, waited: 0.02, natural: false) == .track(-1))
     }
 
     @Test func swipeLeavesPagesThatPanThemselves() {
@@ -212,6 +219,100 @@ struct BookmarkFolderTests {
         #expect(decide(dx: 14, page: .left, waited: 0.001) == .track(-1))
         // Nothing to wait for when the swipe couldn't go anyway.
         #expect(decide(dx: -14, page: .unknown, waited: 0.001) == .ignore)
+    }
+
+    @Test func swipeOverAFrameWaitsForTheFramesAnswer() {
+        // Excel's sheet is in a frame the page around it can't see into: the frame's answer decides, and a busy
+        // web app gets a little longer to give it than a plain page.
+        #expect(decide(dx: 14, page: .unknown, waited: SwipeDecision.answerWait, overFrame: true) == .undecided)
+        #expect(decide(dx: 14, page: .unknown, waited: SwipeDecision.frameWait, overFrame: true) == .track(-1))
+        // The frame kept it (its sheet scrolls there, or it asked for no overscroll), or left it.
+        #expect(decide(dx: 14, page: .took, waited: 0.001, overFrame: true) == .ignore)
+        #expect(decide(dx: 14, page: .left, waited: 0.001, overFrame: true) == .track(-1))
+        // Not yet known what's under the pointer: the longer wait too.
+        #expect(decide(dx: 14, scrolls: nil, page: .unknown, waited: SwipeDecision.answerWait) == .undecided)
+        #expect(decide(dx: 14, scrolls: nil, page: .left, waited: 0.001) == .track(-1))
+    }
+
+    @Test func swipeAnswersBelongToTheirGesture() {
+        let began = 1_000_000.0
+        // The first answer decides; one about the last gesture's momentum, answered late, doesn't count.
+        #expect(SwipeDecision.page(.unknown, answered: true, at: began - 30, began: began) == .unknown)
+        #expect(SwipeDecision.page(.unknown, answered: false, at: began + 8, began: began) == .left)
+        #expect(SwipeDecision.page(.unknown, answered: true, at: began + 8, began: began) == .took)
+        // Kept once, kept for the rest: a sheet that had room when the gesture started stays the page's after the
+        // gesture scrolls it to its edge.
+        #expect(SwipeDecision.page(.took, answered: false, at: began + 200, began: began) == .took)
+        // Left at first, kept later (a page that cancels the scrolls after a few, or answers late while the arrow
+        // shows): the page has it, and the arrow goes.
+        #expect(SwipeDecision.page(.left, answered: true, at: began + 60, began: began) == .took)
+    }
+
+    /// Runs the swipe script's own decision in JavaScriptCore over made-up elements: `chain` from the one under the
+    /// pointer outward, each a JavaScript object literal with its style.
+    private func keeps(_ chain: [String], root: String = "null", ends: String = "[]", deltaX: Double,
+                       prevented: Bool = false) throws -> Bool {
+        let context = try #require(JSContext())
+        let result = context.evaluateScript("""
+        const chain = [\(chain.joined(separator: ", "))];
+        chain.forEach((el, i) => { el.parentElement = chain[i + 1] || null; });
+        const style = (el) => Object.assign({ overflowX: 'visible', overflowY: 'visible', overscrollBehaviorX: 'auto', direction: 'ltr' }, el.style);
+        const room = (\(SwipeAnswers.sideways))(chain[0], style, \(root), \(ends));
+        (\(SwipeAnswers.keeps))(room, \(deltaX), \(prevented))
+        """)
+        #expect(context.exception == nil)
+        return try #require(result?.toBool())
+    }
+
+    private func grid(scrollLeft: Double, overscroll: String = "auto") -> String {
+        "{ scrollWidth: 3000, clientWidth: 800, scrollHeight: 600, clientHeight: 600, scrollLeft: \(scrollLeft), style: { overflowX: 'auto', overscrollBehaviorX: '\(overscroll)' } }"
+    }
+    private let cell = "{ scrollWidth: 80, clientWidth: 80, style: {} }"
+
+    @Test func swipeScriptKeepsWhatScrollsThatWay() throws {
+        // Fingers to the right (back) move the content toward its left edge: the page's deltaX is negative, and the
+        // sheet needs room on its left.
+        #expect(try keeps([cell, grid(scrollLeft: 300)], deltaX: -12))
+        #expect(try !keeps([cell, grid(scrollLeft: 0)], deltaX: -12))
+        // At its left edge it still scrolls right, the other way.
+        #expect(try keeps([cell, grid(scrollLeft: 0)], deltaX: 12))
+        #expect(try !keeps([cell, grid(scrollLeft: 2200)], deltaX: 12))
+        // Right to left, the start is at the right: scrollLeft runs from 0 down to minus the overflow.
+        let rtl = "{ scrollWidth: 3000, clientWidth: 800, scrollLeft: 0, style: { overflowX: 'auto', direction: 'rtl' } }"
+        #expect(try keeps([cell, rtl], deltaX: -12))
+        #expect(try !keeps([cell, rtl], deltaX: 12))
+        // A page a little too wide by accident doesn't count; a really wide one does.
+        #expect(try !keeps([cell], root: "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 20, style: {} }", deltaX: -12))
+        #expect(try keeps([cell], root: "{ scrollWidth: 3000, clientWidth: 1000, scrollLeft: 20, style: {} }", deltaX: -12))
+        // Nothing scrolls: a plain page leaves it to the swipe.
+        #expect(try !keeps([cell, "{ scrollWidth: 1000, clientWidth: 1000, style: {} }"], deltaX: -12))
+    }
+
+    @Test func swipeScriptKeepsWhatAskedForNoOverscroll() throws {
+        // A sheet at its edge that asked to keep its overscroll (Excel): no going back past it, either way.
+        #expect(try keeps([cell, grid(scrollLeft: 0, overscroll: "none")], deltaX: -12))
+        #expect(try keeps([cell, grid(scrollLeft: 0, overscroll: "contain")], deltaX: -12))
+        // Only something that scrolls passes its overscroll on: the setting on a box that doesn't is nothing.
+        #expect(try !keeps([cell, "{ scrollWidth: 800, clientWidth: 800, style: { overflowX: 'auto', overscrollBehaviorX: 'none' } }"], deltaX: -12))
+        // The page's root or body asking for it turns off going back and forward there.
+        #expect(try keeps([cell], ends: "[{ style: { overscrollBehaviorX: 'none' } }, null]", deltaX: -12))
+        #expect(try keeps([cell], ends: "[{ style: {} }, { style: { overscrollBehaviorX: 'contain' } }]", deltaX: 12))
+        #expect(try !keeps([cell], ends: "[{ style: {} }, { style: {} }]", deltaX: -12))
+        // A page that cancels the scrolls itself (Canva) keeps them, whatever scrolls.
+        #expect(try keeps([cell], deltaX: -12, prevented: true))
+    }
+
+    @Test func swipeScriptLooksPastShadowRoots() throws {
+        // A sheet inside a web component: the cell's parent chain goes through the shadow root to its host.
+        let context = try #require(JSContext())
+        let result = context.evaluateScript("""
+        const host = { scrollWidth: 3000, clientWidth: 800, scrollLeft: 300, style: { overflowX: 'auto' }, parentElement: null };
+        const cell = { scrollWidth: 80, clientWidth: 80, style: {}, parentElement: null, parentNode: { host } };
+        const style = (el) => Object.assign({ overflowX: 'visible', overflowY: 'visible', overscrollBehaviorX: 'auto' }, el.style);
+        (\(SwipeAnswers.sideways))(cell, style, null, []).left
+        """)
+        #expect(context.exception == nil)
+        #expect(result?.toBool() == true)
     }
 
     // MARK: Swiping between spaces
