@@ -879,15 +879,17 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
                 ExtensionLog.write("tab capture for \(host.displayName(for: extensionID)): the page's own audio, \(routed) source(s)")
             } else {
                 let result = try await webView.callAsyncJavaScript(Self.elementScript, arguments: ["tap": id, "stop": false], in: nil, contentWorld: Self.world) as? [String: Any]
+                // Streamed sound (YouTube, most video sites) never reaches Web Audio, and WebKit's shared audio
+                // process also plays other tabs and private windows: refused, with nothing in the tab touched, and
+                // you're told why rather than the extension just not working.
+                if result?["streamed"] as? Bool == true {
+                    ExtensionLog.write("tab capture for \(host.displayName(for: extensionID)) refused: the tab's sound is streamed, out of reach within the tab")
+                    tellUnreachable(extensionID, in: controller)
+                    throw BridgeError("This tab’s streamed audio cannot be captured without recording other tabs.")
+                }
                 guard let elements = (result?["tapped"] as? NSNumber)?.intValue else { throw BridgeError("Play something in the tab first, then try again") }
                 taps[id] = Tap(extensionID: extensionID, webView: webView, tabID: tab.id, world: Self.world, script: Self.elementScript, page: page, opening: currentOpening(extensionID))
                 ExtensionLog.write("tab capture for \(host.displayName(for: extensionID)): \(elements) media element(s)")
-                // Never widen a tab capture to WebKit's shared audio process: it also plays other tabs,
-                // including private windows. Stop and restore this tab's sound instead.
-                if result?["streamed"] as? Bool == true {
-                    stop(id, because: "streamed audio cannot be captured within this tab")
-                    throw BridgeError("This tab’s streamed audio cannot be captured without recording other tabs.")
-                }
             }
             Toast.show(String(localized: "\(host.displayName(for: extensionID)) is listening to this tab", comment: "Toast when an extension starts hearing a tab's sound. The placeholder is the extension's name."), symbol: "waveform", duration: 3, in: controller)
             return ["id": id, "tabId": tab.id.hashValue & 0x7fffffff]
@@ -992,7 +994,15 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     /// Web Audio cannot capture some streamed or protected media. Failing here keeps the original tab's sound
     /// playing without exposing audio from other tabs through WebKit's shared GPU process.
     private func stopUnavailableCapture(_ id: String) {
+        let tap = taps[id]
         stop(id, because: "audio cannot be captured within this tab")
+        if let tap, let controller = tab(tap.tabID)?.1 { tellUnreachable(tap.extensionID, in: controller) }
+    }
+
+    /// Says where you're looking that the extension can't hear this tab, and why, instead of it seeming broken.
+    private func tellUnreachable(_ extensionID: String, in controller: BrowserWindowController) {
+        Toast.show(String(localized: "\(ExtensionHost.shared.displayName(for: extensionID)) can’t hear this tab. Streamed sound, as on YouTube, can’t reach extensions in Zigzag yet.", comment: "Toast when an extension asks to hear a tab whose sound Zigzag can't hand it on its own. The placeholder is the extension's name. YouTube is a product name."),
+                   symbol: "waveform.slash", duration: 5, in: controller)
     }
 
     nonisolated func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {

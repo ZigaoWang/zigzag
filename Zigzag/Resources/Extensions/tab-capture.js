@@ -6,9 +6,11 @@
 // extension plays it if it wants to). Stopping puts the sound back. Elements whose sound comes from another site
 // without permission are left alone: Web Audio would silence them. Encrypted (DRM) media gives only silence.
 // Answers how many elements it tapped and whether what plays is streamed, or null when the page can't play sound yet.
-// Reject before routing or muting anything. A process tap would also record other tabs and private windows.
+// Streamed media (Media Source, a blob: address, as on YouTube) reaches Web Audio as silence, and routing it would
+// silence it for good: it's left alone, answered as streamed with nothing tapped, and Zigzag refuses the capture. A
+// process tap would also record other tabs and private windows.
 const streamed = [...document.querySelectorAll('video, audio')].some((element) => !element.paused && (element.currentSrc || '').startsWith('blob:'));
-if (!stop && streamed) throw new Error("This tab's streamed audio cannot be captured without recording other tabs.");
+if (!stop && streamed) return { tapped: 0, streamed: true };
 const state = (window.__zigzagTap = window.__zigzagTap || { ctx: null, sources: new WeakMap(), taps: new Map() });
 if (stop) {
   const current = state.taps.get(tap);

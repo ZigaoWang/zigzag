@@ -35,15 +35,16 @@ extension ExtensionScriptTests {
         let source = try String(contentsOf: url, encoding: .utf8)
         let context = JSContext()!
         context.evaluateScript("""
-        var window = {}, __contexts = 0, __failure = '';
+        var window = {}, __contexts = 0, __answer = '';
         var document = { querySelectorAll: () => [{ paused: false, currentSrc: 'blob:https://example.com/media' }] };
         var AudioContext = function () { __contexts++; };
         const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
         new AsyncFunction('tap', 'stop', \(Self.quoted(source)))('test', false)
-          .then(() => { __failure = 'unexpected success'; }, (e) => { __failure = e.message; });
+          .then((answer) => { __answer = JSON.stringify(answer); }, (e) => { __answer = 'failed: ' + e.message; });
         """)
         #expect(context.exception == nil)
-        #expect(context.objectForKeyedSubscript("__failure")?.toString().contains("cannot be captured without recording other tabs") == true)
+        // Answered as streamed, with nothing tapped, so Zigzag refuses it and says why (#45).
+        #expect(context.objectForKeyedSubscript("__answer")?.toString() == "{\"tapped\":0,\"streamed\":true}")
         #expect(context.objectForKeyedSubscript("__contexts")?.toInt32() == 0)
         #expect(context.evaluateScript("window.__zigzagTap === undefined")?.toBool() == true)
     }

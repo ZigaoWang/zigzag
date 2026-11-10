@@ -113,6 +113,17 @@
         }
       }
     },
+    "%@ can’t hear this tab. Streamed sound, as on YouTube, can’t reach extensions in Zigzag yet." : {
+      "comment" : "Toast when an extension asks to hear a tab whose sound Zigzag can't hand it on its own. The placeholder is the extension's name. YouTube is a product name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 无法收听此标签页。在 Zigzag 中，流媒体声音（如 YouTube）暂时还无法交给扩展。"
+          }
+        }
+      }
+    },
     "%@ evening" : {
       "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”.",
       "localizations" : {
