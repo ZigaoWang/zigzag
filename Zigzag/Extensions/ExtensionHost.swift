@@ -411,7 +411,6 @@ final class ExtensionHost: NSObject {
         weak var controller: BrowserWindowController?
     }
     private var popupRequest: PopupRequest?
-    private var actionUpdatePending = false
     private static var toldAboutVerification = false
     private var popupShownAt: Date?
     static let log = Logger(subsystem: "wang.zigao.zigzag", category: "extensions")
@@ -852,13 +851,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, didUpdate action: WKWebExtension.Action, forExtensionContext context: WKWebExtensionContext) {
-        // A busy extension updates its badge many times at once: every window draws that once.
-        guard !actionUpdatePending else { return }
-        actionUpdatePending = true
-        DispatchQueue.main.async { [weak self] in
-            self?.actionUpdatePending = false
-            self?.changed.send()
-        }
+        changed.send()
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, presentActionPopup action: WKWebExtension.Action,
