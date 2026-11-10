@@ -229,6 +229,7 @@ enum DebugBridge {
         if name == "pindump" { controller.sidebar.address.debugDump(to: arg); return }
         // pintoggle <extension id>: pins or unpins it, as the pin on its tile in Site Controls does.
         if name == "pintoggle" { ExtensionStore.togglePin(arg); return }
+        if name == "pinhover" { SitePanel.shown?.debugHover(arg); return }
         NSApp.activate()
         controller.window?.makeKeyAndOrderFront(nil)
         switch name {

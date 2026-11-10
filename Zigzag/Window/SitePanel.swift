@@ -296,6 +296,23 @@ final class SitePanel: FloatingPanelView {
         pin.hoverChanged = update
     }
 
+    #if DEBUG
+    /// pinhover <extension id> [pin] [limit] | none: the pointer on that extension's tile, or on its pin button, as a
+    /// real pointer would put it there; none takes it off every tile. limit shows the tile's pin as it is at the limit,
+    /// for a look without three extensions to pin.
+    func debugHover(_ arg: String) {
+        let f = arg.split(separator: " ").map(String.init)
+        for entry in hoverPins where entry.id != f.first {
+            entry.pin.isHovered = false
+            entry.tile.isHovered = false
+        }
+        guard let entry = hoverPins.first(where: { $0.id == f.first }) else { return }
+        if f.contains("limit") { entry.pin.state = .atLimit }
+        entry.tile.isHovered = true
+        if f.contains("pin") { entry.pin.isHovered = true }
+    }
+    #endif
+
     /// What each pin says now. Runs on every change, from here or another window, so the limit is always the truth.
     private func refreshHoverPins() {
         // A count that came or went moves the pin to the other corner.
