@@ -244,8 +244,9 @@ final class BridgeFavicons: BridgeNamespace {
         guard fn == "forPages", let asked = args.first as? [Any] else { throw BridgeError.unsupported(Self.name, fn) }
         guard let context = host.context(for: extensionID) else { return [] }
         let readsAll = context.hasPermission(.tabs)
+        // Its own profile's tabs: the only ones it's told about.
         let open = WindowManager.shared.controllers.filter { !$0.tabManager.isPrivate }.flatMap(\.tabManager.allTabs).compactMap { tab -> OpenTab? in
-            guard let url = tab.webView?.url ?? tab.url else { return nil }
+            guard tab.profile === host.profile, let url = tab.webView?.url ?? tab.url else { return nil }
             return OpenTab(url: url.absoluteString, icon: tab.favicon, isPrivate: tab.isPrivate,
                            mayRead: readsAll || context.hasAccess(to: url, in: tab))
         }
