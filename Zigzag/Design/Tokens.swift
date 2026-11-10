@@ -503,8 +503,8 @@ enum Tokens {
     enum Motion {
         /// Hover and press feedback.
         static let quick: TimeInterval = 0.1
-        /// A sidebar row's hover wash going as the pointer leaves: a soft trail down the list instead of a flicker.
-        /// Arriving, it shows at once.
+        /// Something that shows after you've held a key a while (the ⌘ and ⌃ numbers): a short fade, since it was
+        /// waited for. Hover itself never fades.
         static let hoverFade: TimeInterval = 0.15
         /// A change of selection in a list: the card settling onto the chosen row.
         static let selection: TimeInterval = 0.15
