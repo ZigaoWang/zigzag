@@ -5,6 +5,14 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.7.9] - 2026-11-10
+
+### New
+- Hold ⌥⌘ and drag anywhere on a page to move the window, handy with a borderless page and the sidebar hidden. ⌥⌘ double-click zooms it. ([#40](https://github.com/ZigaoWang/zigzag/issues/40))
+
+### Fixed
+- Error pages say what happened in plain words, keep the site's name whole, and offer what fits: Try Again, Go Back, or Reload for a page that stopped. Details holds the exact error, ready to copy, and a page that failed while you were offline loads again once you're back online. ([#39](https://github.com/ZigaoWang/zigzag/issues/39))
+
 ## [0.7.8] - 2026-11-10
 
 ### New
