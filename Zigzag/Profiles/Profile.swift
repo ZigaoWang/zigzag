@@ -112,7 +112,7 @@ final class Profiles {
         for popup in PopupWindowController.all where popup.webView.configuration.websiteDataStore === profile.storeIfMade { popup.window?.close() }
         for mini in MiniWindowController.all { mini.settleProfile() }
         if let host = profile.startedExtensions { await host.shutDown() }
-        profile.installs.removeAll()
+        ProfileKey.forget(id)
         try? FileManager.default.removeItem(at: profile.folder)
         UpdateBackup.forget(profile: id)
         // A package no profile has any more goes too.
@@ -142,7 +142,7 @@ final class Profiles {
         guard id != Profile.defaultID, Library.shared.directory.profile(id) == nil else { return }
         try? FileManager.default.removeItem(at: folder(of: id))
         UpdateBackup.forget(profile: id)
-        UserDefaults.standard.removeObject(forKey: "ExtensionsPinned.\(id.uuidString)")
+        ProfileKey.forget(id)
         await eraseStore(id)
     }
 

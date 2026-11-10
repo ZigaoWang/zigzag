@@ -144,3 +144,26 @@ nonisolated struct ProfileDirectory: Codable, Equatable {
         return stores.filter { !known.contains($0) && seen.insert($0).inserted }
     }
 }
+
+/// The choices a profile makes for itself that are kept in the preferences, each under a name of its own. The first
+/// profile's is the plain name Zigzag has always used, so what was chosen before there were profiles is its.
+nonisolated enum ProfileKey: String, CaseIterable {
+    case extensionsPinned = "ExtensionsPinned"
+    case offersToSavePasswords = "PasswordsOfferToSave"
+    case fillsPasswords = "PasswordsAutofill"
+
+    func name(in profile: UUID) -> String {
+        profile == Profile.defaultID ? rawValue : "\(rawValue).\(profile.uuidString)"
+    }
+
+    /// What was chosen in a profile, for the ones that are a yes or no; nil until something is.
+    func choice(in profile: UUID, defaults: UserDefaults = .standard) -> Bool? {
+        defaults.object(forKey: name(in: profile)) as? Bool
+    }
+
+    /// A profile that's gone leaves none of them behind. Never the first profile's: they're Zigzag's own.
+    static func forget(_ profile: UUID, in defaults: UserDefaults = .standard) {
+        guard profile != Profile.defaultID else { return }
+        for key in allCases { defaults.removeObject(forKey: key.name(in: profile)) }
+    }
+}

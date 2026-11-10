@@ -13,10 +13,14 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
     static let shared = PasswordCapture()
     static let messageName = "zigzagPassword"
 
-    /// Offer to save passwords. On by default, unless a password-manager extension is handling them.
-    static var offersToSave: Bool {
-        get { UserDefaults.standard.object(forKey: "PasswordsOfferToSave") as? Bool ?? !PasswordManagers.isActive }
-        set { UserDefaults.standard.set(newValue, forKey: "PasswordsOfferToSave") }
+    /// Offer to save passwords, chosen for each profile. On by default, unless a password-manager extension is
+    /// handling them there.
+    static func offersToSave(in profile: Profile) -> Bool {
+        PasswordManagers.zigzagHandles(chosen: ProfileKey.offersToSavePasswords.choice(in: profile.id), managerOn: PasswordManagers.active(in: profile) != nil)
+    }
+
+    static func setOffersToSave(_ on: Bool, in profile: Profile) {
+        UserDefaults.standard.set(on, forKey: ProfileKey.offersToSavePasswords.name(in: profile.id))
     }
 
     /// For logins split over two pages: the username from the first step, per tab, for a couple of minutes.
@@ -113,7 +117,7 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
             username = pending.username
         }
         pendingUsernames[key] = nil
-        guard Self.offersToSave else { return }
+        guard Self.offersToSave(in: tab.profile) else { return }
         let framed = !message.frameInfo.isMainFrame && tab.url?.host()?.lowercased() != origin.host
         hold(HeldLogin(origin: origin, username: username, password: password, isChange: kind == "change", tab: tab,
                        framedOn: framed ? tab.url : nil), key: key)
@@ -183,7 +187,7 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
             release(key)
         case .offer:
             release(key)
-            guard let tab = login.tab, !tab.isClosed, Self.offersToSave else { return }
+            guard let tab = login.tab, !tab.isClosed, Self.offersToSave(in: tab.profile) else { return }
             Task { await self.consider(origin: login.origin, username: login.username, password: login.password, isChange: login.isChange, in: tab) }
         }
     }
@@ -316,30 +320,36 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
     """
 }
 
-/// Password-manager extensions. When one is installed and on, it handles passwords and Zigzag stays out of the way.
+/// Password-manager extensions. Where one is installed and on, it handles passwords and Zigzag stays out of the way:
+/// in that profile, since each profile has its own extensions.
 enum PasswordManagers {
-    static let extensionIDs: Set<String> = [
-        "aeblfdkhhhdcdjpifhhbdiojplfjncoa",  // 1Password
-        "nngceckbapebfimnlniiiahkandclblb",  // Bitwarden
-        "hdokiejnpimakedhajhdlcegeplioahd",  // LastPass
-        "fdjamakpfbbddfjaooikfcpapjohcfmg",  // Dashlane
-        "ghmbeldphafepmbegfdlkpapadhbakde",  // Proton Pass
-        "bfogiafebfohielmmehodmfbbebbbpei",  // Keeper
-        "eiaeiblijfjekdanodkjadfinkhbfgcd",  // NordPass
-        "pejdijmoenmkgeppbflobdenhhabjlaj",  // iCloud Passwords
+    /// Each by the ID the Chrome Web Store gives it, with the name people know it by.
+    static let known: [String: String] = [
+        "aeblfdkhhhdcdjpifhhbdiojplfjncoa": "1Password",
+        "nngceckbapebfimnlniiiahkandclblb": "Bitwarden",
+        "hdokiejnpimakedhajhdlcegeplioahd": "LastPass",
+        "fdjamakpfbbddfjaooikfcpapjohcfmg": "Dashlane",
+        "ghmbeldphafepmbegfdlkpapadhbakde": "Proton Pass",
+        "bfogiafebfohielmmehodmfbbebbbpei": "Keeper",
+        "eiaeiblijfjekdanodkjadfinkhbfgcd": "NordPass",
+        "pejdijmoenmkgeppbflobdenhhabjlaj": "iCloud Passwords",
     ]
 
-    /// Whether any profile has one: until you choose otherwise, Zigzag then leaves saving and filling to it.
-    static var isActive: Bool { Profiles.shared.all.contains { active(in: $0) != nil } }
-
-    /// The installed, turned-on password manager's name.
+    /// The password manager installed and turned on in a profile, by name. Read from what the profile has
+    /// installed, not from what's running: asking never starts a profile's extensions, and pages restored at
+    /// launch, before extensions finish loading, already get it right.
     static func active(in profile: Profile) -> String? {
         guard #available(macOS 15.4, *) else { return nil }
-        // "1Password – Password Manager" reads as "1Password".
-        let name = profile.extensions.contexts.first { extensionIDs.contains($0.uniqueIdentifier) }?.webExtension.displayName
-        return name.map { full in
-            let cut = [" –", " -", ":"].compactMap { full.range(of: $0)?.lowerBound }.min() ?? full.endIndex
-            return String(full[..<cut]).trimmingCharacters(in: .whitespaces)
-        }
+        return active(among: known.keys.filter { profile.installs.isEnabled($0) && profile.installs.isInstalled($0) })
+    }
+
+    /// With several on, the first by name, so the answer doesn't change from one time to the next.
+    static func active(among ids: [String]) -> String? { ids.compactMap { known[$0] }.sorted().first }
+
+    /// Whether Zigzag itself saves or fills in a profile: what you chose there; until you choose, yes, unless a
+    /// password manager is on there. `imported`: passwords were brought over from another browser, which are
+    /// there to be filled even so.
+    static func zigzagHandles(chosen: Bool?, managerOn: Bool, imported: Bool = false) -> Bool {
+        chosen ?? (!managerOn || imported)
     }
 }

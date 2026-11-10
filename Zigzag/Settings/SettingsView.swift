@@ -848,15 +848,17 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
         // Passwords
         saveToggle.onChange = { [weak self] on in
-            PasswordCapture.offersToSave = on
-            self?.reloadPasswords()
-            self?.layoutDocument()
+            guard let self else { return }
+            PasswordCapture.setOffersToSave(on, in: self.profile)
+            self.reloadPasswords()
+            self.layoutDocument()
         }
         fillToggle.onChange = { [weak self] on in
-            Autofill.isOn = on
+            guard let self else { return }
+            Autofill.setOn(on, in: self.profile)
             if !on { Autofill.shared.hide() }
-            self?.reloadPasswords()
-            self?.layoutDocument()
+            self.reloadPasswords()
+            self.layoutDocument()
         }
         reloadPasswords()
 
@@ -1310,16 +1312,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func reloadPasswords() {
         passwordsGroup.removeAllRows()
         passwordsWindowGroup.removeAllRows()
-        saveToggle.isOn = PasswordCapture.offersToSave
-        fillToggle.isOn = Autofill.isOn
+        // Saving and filling are chosen for each profile: a password manager is an extension, and those are a profile's.
+        let profile = profile
+        let saves = PasswordCapture.offersToSave(in: profile), fills = Autofill.isOn(in: profile)
+        saveToggle.isOn = saves
+        fillToggle.isOn = fills
         let manager = PasswordManagers.active(in: profile)
         let managerNote = manager.map {
             String(localized: "Off while \($0) handles passwords. Turn on to use both.",
                    comment: "Under a password setting in Settings › Passwords, while a password manager extension (its name, like 1Password) is on.")
         }
-        let saveNote = manager != nil && !PasswordCapture.offersToSave ? managerNote!
+        let saveNote = manager != nil && !saves ? managerNote!
             : String(localized: "After you sign in. Kept in your Keychain, synced with iCloud.", comment: "Explanation under “Offer to save passwords” in Settings › Passwords.")
-        let fillNote = manager != nil && !Autofill.isOn ? managerNote!
+        let fillNote = manager != nil && !fills ? managerNote!
             : String(localized: "Under sign-in fields, only on the site each was saved for.", comment: "Explanation under “Fill saved passwords” in Settings › Passwords.")
         passwordsGroup.add(FormRow(title: String(localized: "Offer to save passwords", comment: "A setting in Settings › Passwords."),
                                    detail: saveNote,
@@ -1726,8 +1731,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         favoritesPerRow.selectedIndex = FavoritesView.perRowChoices.firstIndex(of: FavoritesView.perRow) ?? 0
         darkPages.selectedIndex = DarkPages.Mode.allCases.firstIndex(of: DarkPages.mode) ?? 0
-        saveToggle.isOn = PasswordCapture.offersToSave
-        fillToggle.isOn = Autofill.isOn
+        saveToggle.isOn = PasswordCapture.offersToSave(in: profile)
+        fillToggle.isOn = Autofill.isOn(in: profile)
         translateOffer.isOn = PageTranslator.offers
         generalGroup.rows.forEach { $0.needsLayout = true }
     }

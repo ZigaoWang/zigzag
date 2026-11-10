@@ -46,10 +46,7 @@ enum Passkeys {
 
     /// Read from what's installed and turned on rather than what's loaded, so pages restored at launch, before
     /// extensions finish loading, already get it right.
-    private static func passwordManagerOn(in profile: Profile) -> Bool {
-        guard #available(macOS 15.4, *) else { return false }
-        return PasswordManagers.extensionIDs.contains { profile.installs.isEnabled($0) && profile.installs.isInstalled($0) }
-    }
+    private static func passwordManagerOn(in profile: Profile) -> Bool { PasswordManagers.active(in: profile) != nil }
 
     private static func has(_ controller: WKUserContentController) -> Bool {
         controller.userScripts.contains { $0.source.hasPrefix(marker) }
