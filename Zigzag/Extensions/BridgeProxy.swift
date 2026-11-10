@@ -125,7 +125,8 @@ final class BridgeProxy: BridgeNamespace {
         // each time its background starts) changes nothing.
         guard key != applied else { return }
         applied = key
-        WKWebsiteDataStore.default().proxyConfigurations = configurations
+        // Only its own profile's pages go through it.
+        host.profile.store.proxyConfigurations = configurations
     }
 
     private static func configuration(for server: ProxyServer) -> ProxyConfiguration {

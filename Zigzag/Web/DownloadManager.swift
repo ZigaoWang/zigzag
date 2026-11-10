@@ -70,6 +70,9 @@ final class DownloadManager: NSObject {
         /// A paused download that replaces a file goes on into a hidden one beside it; this is the file it takes the
         /// place of once done. Missing in lists saved before it was kept.
         var replaces: URL?
+        /// The profile it was started in, when that isn't the first: it goes on with that profile's sign-ins.
+        /// Missing in lists saved before there were profiles.
+        var profile: UUID?
     }
 
     override init() {
@@ -84,6 +87,8 @@ final class DownloadManager: NSObject {
                 item.state = .paused
                 item.resumeData = entry.resumeData
                 item.replaces = entry.replaces
+                // Back on its profile's store, if the profile is still there; else the first's, as before profiles.
+                if let id = entry.profile, Library.shared.directory.profile(id) != nil { item.dataStore = Profiles.shared.profile(id).store }
                 item.completedBytes = entry.completedBytes ?? 0
                 item.fractionCompleted = entry.totalBytes > 0 ? Double(item.completedBytes) / Double(entry.totalBytes) : 0
             } else {
@@ -106,7 +111,8 @@ final class DownloadManager: NSObject {
             item.destination.map {
                 Saved(filename: item.filename, destination: $0, sourceURL: item.sourceURL, started: item.started, totalBytes: item.totalBytes,
                       completedBytes: item.completedBytes, paused: item.state == .paused ? true : nil, resumeData: item.state == .paused ? item.resumeData : nil,
-                      replaces: item.state == .paused ? item.replaces : nil)
+                      replaces: item.state == .paused ? item.replaces : nil,
+                      profile: item.state == .paused ? item.dataStore.flatMap { Profiles.shared.profile(ofStore: $0) }.flatMap { $0.isDefault ? nil : $0.id } : nil)
             }
         }
         JSONStore.save(Array(kept), to: Paths.downloads)

@@ -22,9 +22,9 @@ enum NetworkChanges {
         watch = NetworkWatch(settle: settle) { Task { @MainActor in await forget() } }
     }
 
-    /// Clears the records from the store your windows use and from each private window's own.
+    /// Clears the records from the store of every profile in use and from each private window's own.
     static func forget() async {
-        let stores = [WKWebsiteDataStore.default()] + WindowManager.shared.controllers.compactMap(\.tabManager.privateStore)
+        let stores = Profiles.shared.opened.map(\.store) + WindowManager.shared.controllers.compactMap(\.tabManager.privateStore)
         for store in stores {
             await store.removeData(ofTypes: [alternativeServices], modifiedSince: .distantPast)
         }
