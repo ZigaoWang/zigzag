@@ -139,6 +139,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Plugged in or on battery, Low Power Mode on or off: clear glass comes and goes with it.
         PowerSaving.start()
         NotificationCenter.default.addObserver(self, selector: #selector(displayOptionsChanged), name: PowerSaving.changed, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(placeAddress), name: BrowserRootView.addressPlaceChanged, object: nil)
+        placeAddress()
         tokens.append(DownloadManager.shared.changed.observe { [weak self] _ in self?.downloadsChanged() })
         tokens.append(DownloadManager.shared.started.observe { [weak self] item, window in
             guard let self, window == nil || window === self.window else { return }
@@ -463,6 +465,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func displayOptionsChanged() { applySpaceColor(animated: false) }
+
+    /// Settings › Appearance › Address bar above the page: the sidebar's own back, forward, reload and address move
+    /// to the bar above the page, or back. The same views, so everything that hangs from them follows; what was open
+    /// from them is put away first. At once: a setting you change, not a layout you watch.
+    @objc func placeAddress() {
+        let above = BrowserRootView.addressAbovePage
+        guard sidebar.holdsAddress == above else { return }
+        if window?.isVisible == true { closeFloatingPanels() }
+        sidebar.holdsAddress = !above
+        if above { root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address) }
+        root.showsTopBar = above
+        root.needsLayout = true
+        root.layoutSubtreeIfNeeded()
+        layoutTrafficLights()
+    }
 
     /// Handoff, as in Safari: the web page you're on, offered to your iPhone, iPad or other Mac. Never a private
     /// window's, and never Zigzag's own pages or a local file.
@@ -816,6 +833,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Where popovers that belong to the address bar (extension popups) open from: the address bar while the sidebar
     /// shows, or the top left of the page while it's hidden, so they never open off screen.
     var addressAnchor: (view: NSView, rect: NSRect) {
+        // Above the page, from the address's end, where the Site Controls and the extensions are.
+        if root.showsTopBar {
+            if let button = sidebar.address.actionButtons.last { return (button, button.bounds) }
+            return (sidebar.address, sidebar.address.bounds)
+        }
         if root.sidebarVisible || root.isSidebarFloatingVisible { return (sidebar.address, sidebar.address.bounds) }
         let card = root.cardFrame
         return (root.overlay, NSRect(x: card.minX + Tokens.Space.x3, y: card.minY + Tokens.Space.x2, width: 1, height: 1))
@@ -1287,6 +1309,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Traffic lights
 
     private var trafficLightsPicture: NSImage?
+    /// Where the lights were last placed: docked in the sidebar or in the bar above the page, the same spot.
+    private var lightsWereDockedOrInBar = true
     /// Until this moment the sidebar is visually sliding, and the real traffic lights stay hidden.
     private var slideEndsAt = Date.distantPast
     private var isSliding: Bool { Date() < slideEndsAt }
@@ -1295,7 +1319,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Visibility is recomputed from the clock, so nothing can leave the buttons stuck hidden.
     private func sidebarSliding(_ duration: TimeInterval) {
         if !browserWindow.trafficLightsHidden, let image = browserWindow.trafficLightsImage() { trafficLightsPicture = image }
-        guard duration > 0 else { slideEndsAt = .distantPast; layoutTrafficLights(); return }
+        // Docked and in the bar above the page, the lights are in the same spot: they stay put while the sidebar
+        // slides out from under them or back.
+        let stays = root.showsTopBar && !root.isSidebarFloatingVisible && lightsWereDockedOrInBar
+        guard duration > 0, !stays else { slideEndsAt = .distantPast; layoutTrafficLights(); return }
         slideEndsAt = Date().addingTimeInterval(duration)
         layoutTrafficLights()
         DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.01) { [weak self] in self?.layoutTrafficLights() }
@@ -1310,15 +1337,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Not in full screen: the lights live in the title bar that comes down with the menu bar there, so a picture of
         // them on the sliding sidebar would only flash and vanish.
         let fullScreen = window.styleMask.contains(.fullScreen)
+        // With the sidebar hidden, the bar above the page keeps them at its leading end, where they'd be docked.
+        let inBar = root.showsTopBar && !docked && !floating
         sidebar.showTrafficLightsPicture(sliding && !fullScreen ? trafficLightsPicture : nil)
-        window.trafficLightsHidden = sliding || !(docked || floating)
+        window.trafficLightsHidden = sliding || !(docked || floating || inBar)
         let container = root.sidebarContainer.frame
         let lightHeight = window.trafficLightHeight
-        let x = (docked ? 0 : container.minX) + SidebarView.trafficLightsX
-        let y = (docked ? 0 : container.minY) + sidebar.trafficLightCenterY - lightHeight / 2
+        let x = (docked || inBar ? 0 : container.minX) + SidebarView.trafficLightsX
+        let y = (docked || inBar ? 0 : container.minY) + sidebar.trafficLightCenterY - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
-        if !sliding, docked || floating, let image = window.trafficLightsImage() { trafficLightsPicture = image }
+        if !sliding, docked || floating || inBar, let image = window.trafficLightsImage() { trafficLightsPicture = image }
+        lightsWereDockedOrInBar = docked || inBar
         sidebar.trafficLightsWidth = fullScreen ? 0 : window.trafficLightsWidth
+        root.topBar.trafficLightsWidth = inBar && !fullScreen ? window.trafficLightsWidth : 0
         sidebar.sidebarButton.toolTip = Shortcuts.tooltip(docked ? String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows.")
                                                                   : String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."),
                                                            for: #selector(toggleBrowserSidebar(_:)))
@@ -1857,11 +1888,13 @@ extension BrowserWindowController: SidebarDelegate {
             favorites.isDropTarget = false
             return false
         }
-        // An empty grid still takes drops in the band under the address.
+        // An empty grid still takes drops in the band under the address, or under the top row with the address above
+        // the page.
         var zone = favorites.convert(favorites.bounds, to: nil)
         if favorites.isHidden {
-            let address = sidebar.address.convert(sidebar.address.bounds, to: nil)
-            zone = NSRect(x: address.minX, y: address.minY - Tokens.Space.x10, width: address.width, height: Tokens.Space.x10)
+            let above: NSView = sidebar.holdsAddress ? sidebar.address : favorites
+            let edge = above.convert(above.bounds, to: nil)
+            zone = NSRect(x: edge.minX, y: edge.minY - Tokens.Space.x10, width: edge.width, height: Tokens.Space.x10)
         }
         let over = !tabManager.isPrivate && zone.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(windowPoint)
         favorites.isDropTarget = over
@@ -2047,9 +2080,11 @@ extension BrowserWindowController {
 extension BrowserWindowController: CommandBarHost {
     var commandBarOverlay: NSView { root.overlay }
     var commandBarPageFrame: NSRect { root.cardFrame }
-    /// A split pane's address when asked for; else the sidebar's, while the sidebar shows docked.
+    /// A split pane's address when asked for; else the address above the page, or the sidebar's while the sidebar
+    /// shows docked.
     func commandBarAnchor(asked: NSView?) -> NSView? {
         if let asked { return asked }
+        if root.showsTopBar { return sidebar.address }
         return root.sidebarVisible && !root.isSidebarFloatingVisible ? sidebar.address : nil
     }
     var commandBarTabs: TabManager? { tabManager }

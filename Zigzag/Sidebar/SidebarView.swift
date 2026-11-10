@@ -410,6 +410,18 @@ final class SidebarView: NSView {
     /// Width reserved on the left of the top row for the traffic lights.
     var trafficLightsWidth: CGFloat = 52 { didSet { needsLayout = true } }
     var showsTrafficLights = true { didSet { needsLayout = true } }
+    /// Back, forward, reload and the address are here, under the traffic lights; false while they're in the bar above
+    /// the page (`TopBarView`), and the favorites and tabs move up into the address's place.
+    var holdsAddress = true {
+        didSet {
+            guard holdsAddress != oldValue else { return }
+            if holdsAddress { addressViews.forEach(addSubview) }
+            needsLayout = true
+        }
+    }
+    /// What moves to the bar above the page: the three buttons in order, then the address.
+    var addressButtons: [IconButton] { [backButton, forwardButton, reloadButton] }
+    private var addressViews: [NSView] { addressButtons + [address] }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -496,7 +508,7 @@ final class SidebarView: NSView {
         // sidebar's edge as the lights' from the other.
         let reloadInk = Tokens.Symbol.inkSize("arrow.clockwise", size: Tokens.Sidebar.glyph).width
         var x = round(width - Self.trafficLightsX - reloadInk / 2 - button / 2)
-        for b in [reloadButton, forwardButton, backButton] {
+        for b in [reloadButton, forwardButton, backButton] where holdsAddress {
             b.frame = NSRect(x: x, y: rowCenter - button / 2, width: button, height: button)
             x -= button
         }
@@ -507,7 +519,11 @@ final class SidebarView: NSView {
         let lead = trafficLightsWidth > 0
             ? round(Self.trafficLightsX + trafficLightsWidth + Tokens.Sidebar.lightsGap - (button - glyphWidth) / 2) : pad
         sidebarButton.frame = NSRect(x: lead, y: rowCenter - button / 2, width: button, height: button)
-        address.frame = NSRect(x: pad, y: Tokens.Sidebar.addressTop, width: width - pad * 2, height: Tokens.Sidebar.addressHeight)
+        if holdsAddress {
+            address.frame = NSRect(x: pad, y: Tokens.Sidebar.addressTop, width: width - pad * 2, height: Tokens.Sidebar.addressHeight)
+        }
+        // With the address above the page, the favorites take its place, and the tabs follow them up.
+        let topEdge = holdsAddress ? address.frame.maxY + Tokens.Space.x2 : Tokens.Sidebar.addressTop
 
         let bottomHeight = Tokens.Sidebar.bottomBarHeight
         // Its buttons sit as far from the bottom edge as from the side.
@@ -515,8 +531,8 @@ final class SidebarView: NSView {
         bottomBar.frame = NSRect(x: 0, y: bounds.height - bottomHeight + buttonInset - pad, width: width, height: bottomHeight)
         let favoritesHeight = favorites.preferredHeight(for: width - pad * 2)
         favorites.isHidden = favoritesHeight == 0
-        favorites.frame = NSRect(x: pad, y: address.frame.maxY + Tokens.Space.x2, width: width - pad * 2, height: favoritesHeight)
-        let listTop = (favoritesHeight > 0 ? favorites.frame.maxY : address.frame.maxY) + Tokens.Sidebar.sectionGap
+        favorites.frame = NSRect(x: pad, y: topEdge, width: width - pad * 2, height: favoritesHeight)
+        let listTop = (favoritesHeight > 0 ? favorites.frame.maxY : topEdge - Tokens.Space.x2) + Tokens.Sidebar.sectionGap
         let frames = bottomFrames()
         nowPlaying.frame = frames.nowPlaying
         let listBottom = frames.listBottom

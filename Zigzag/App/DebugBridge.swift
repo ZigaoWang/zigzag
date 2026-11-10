@@ -231,6 +231,8 @@ enum DebugBridge {
         case "bg": if let url = URL(string: arg) { controller.open(url, disposition: .backgroundTab, allowSwitch: false) }
         case "load": if let url = URL(string: arg) { controller.open(url, disposition: .currentTab) }
         case "sidebar": controller.toggleBrowserSidebar(nil)
+        // topbar on|off: Settings › Appearance › Address bar above the page.
+        case "topbar": BrowserRootView.addressAbovePage = arg == "on"
         case "reveal": controller.root.holdReveal = arg == "hold"; controller.root.reveal(true)
         case "unreveal": controller.root.holdReveal = false; controller.root.reveal(false)
         // numbers [control|off]: the ⌘ number hints, as holding ⌘ shows them (with control, the spaces' ⌃ ones, as
