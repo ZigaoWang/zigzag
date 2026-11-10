@@ -106,19 +106,23 @@ struct KeptByActivityTests {
         #expect(kept(minutes: burst + older) == 10)
     }
 
-    @Test func steadyBrowsingKeepsWhatWasSeenInTheLastHalfHour() {
-        // Every four minutes: the seven seen in the last half hour stay.
-        #expect(kept(minutes: (1...30).map { Double($0) * 4 }) == 7)
-        // Every minute: no more than a dozen at once.
-        #expect(kept(minutes: (1...30).map { Double($0) }) == 12)
-        // Every hour: no break and nothing recent, so the newest five.
+    @Test func steadyBrowsingKeepsTheNewestFive() {
+        #expect(kept(minutes: (1...30).map { Double($0) * 4 }) == 5)
+        #expect(kept(minutes: (1...30).map { Double($0) }) == 5)
         #expect(kept(minutes: (1...30).map { Double($0) * 60 }) == 5)
     }
 
-    @Test func aFewMinutesApartIsNeverABreak() {
-        // Two tabs, then one seen eight minutes ago: before, that was a break that kept only two.
+    @Test func everythingWithinTwoMinutesHasNoBreak() {
+        #expect(kept(minutes: (0..<20).map { Double($0) * 0.1 }) == 5)
+    }
+
+    @Test func whatCountsAsABreakFollowsYourPace() {
+        // Back after hours away: tabs a few minutes apart are one session, and the hours-old ones go.
         #expect(kept(minutes: [1, 2, 8, 9, 600, 700]) == 4)
-        #expect(kept(minutes: (0..<20).map { Double($0) * 0.1 }) == 12)
+        // A quick hour: three tabs from the last few minutes, the rest from half an hour ago. That's a break.
+        #expect(kept(minutes: [1, 2, 3, 30, 40, 50]) == 3)
+        // Steady through the hour: no break, the newest five.
+        #expect(kept(minutes: [1, 2, 15, 20, 40, 60]) == 5)
     }
 
     @Test func twoTabs() {
@@ -144,7 +148,7 @@ struct KeptByActivityTests {
     }
 
     @Test func noMoreThanADozenAtOnce() {
-        #expect(kept(minutes: (1...20).map { Double($0) } + [600, 700]) == 12)
+        #expect(kept(minutes: (1...20).map { Double($0) } + [600, 700]) == 5)
     }
 
     @Test func none() {
