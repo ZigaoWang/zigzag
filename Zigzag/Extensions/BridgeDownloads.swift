@@ -3,7 +3,7 @@ import WebKit
 
 /// `chrome.downloads`, over Zigzag's own Downloads. What an extension starts shows in Downloads like any other file,
 /// is fetched with your cookies as a page's would be, and lands in your Downloads folder (or where you choose, when
-/// it asks to). Private windows' downloads never show to extensions.
+/// it asks to). An extension sees only its own profile's downloads, and private windows' never.
 @available(macOS 15.4, *)
 @MainActor
 final class BridgeDownloads: BridgeNamespace {
@@ -123,13 +123,19 @@ final class BridgeDownloads: BridgeNamespace {
         return numbers[item.id]!
     }
 
+    /// Whether an extension in this profile may see a download: one made in the same profile, outside private windows.
+    static func sees(_ item: DownloadItem, in profile: UUID) -> Bool { !item.isPrivate && item.profile == profile }
+
+    /// The downloads this profile's extensions see, newest first.
+    private var visible: [DownloadItem] { manager.items.filter { Self.sees($0, in: host.profile.id) } }
+
     private func item(_ number: Int) -> DownloadItem? {
         guard let id = numbers.first(where: { $0.value == number })?.key else { return nil }
-        return manager.items.first { $0.id == id && !$0.isPrivate }
+        return visible.first { $0.id == id }
     }
 
     private func search(_ query: [String: Any]) -> [DownloadItem] {
-        var found = manager.items.filter { !$0.isPrivate }
+        var found = visible
         if let id = query.number("id").map(Int.init) { found = found.filter { number(for: $0) == id } }
         if let state = query.string("state") { found = found.filter { Self.state($0) == state } }
         if let url = query.string("url") { found = found.filter { $0.sourceURL?.absoluteString == url } }
@@ -181,13 +187,13 @@ final class BridgeDownloads: BridgeNamespace {
 
     func startEvents() {
         guard watching == nil else { return }
-        for item in manager.items where !item.isPrivate { lastSeen[item.id] = describe(item) }
+        for item in visible { lastSeen[item.id] = describe(item) }
         watching = manager.changed.observe { [weak self] _ in self?.announceChanges() }
     }
 
     private func announceChanges() {
         let bridge = host.bridge
-        let current = manager.items.filter { !$0.isPrivate }
+        let current = visible
         let ids = Set(current.map(\.id))
         for item in current {
             let now = describe(item)

@@ -41,11 +41,14 @@ final class DownloadItem {
     fileprivate weak var dataStore: WKWebsiteDataStore?
     /// From a private window: listed only in private windows, and forgotten when the last one closes.
     let isPrivate: Bool
+    /// The profile it was downloaded in: only that profile's extensions see it (BridgeDownloads).
+    let profile: UUID
 
-    init(filename: String, sourceURL: URL?, isPrivate: Bool) {
+    init(filename: String, sourceURL: URL?, isPrivate: Bool, profile: UUID = Profile.defaultID) {
         self.filename = filename
         self.sourceURL = sourceURL
         self.isPrivate = isPrivate
+        self.profile = profile
     }
 }
 
@@ -70,8 +73,8 @@ final class DownloadManager: NSObject {
         /// A paused download that replaces a file goes on into a hidden one beside it; this is the file it takes the
         /// place of once done. Missing in lists saved before it was kept.
         var replaces: URL?
-        /// The profile it was started in, when that isn't the first: it goes on with that profile's sign-ins.
-        /// Missing in lists saved before there were profiles.
+        /// The profile it was downloaded in, when that isn't the first: a paused one goes on with that profile's
+        /// sign-ins, and only that profile's extensions see it. Missing in lists saved before there were profiles.
         var profile: UUID?
     }
 
@@ -79,7 +82,9 @@ final class DownloadManager: NSObject {
         super.init()
         let saved = JSONStore.load([Saved].self, from: Paths.downloads) ?? []
         items = saved.filter { FileManager.default.fileExists(atPath: $0.destination.path) }.map { entry in
-            let item = DownloadItem(filename: entry.filename, sourceURL: entry.sourceURL, isPrivate: false)
+            // One whose profile is gone is the first's, as its spaces are.
+            let profile = entry.profile.flatMap { Library.shared.directory.profile($0) != nil ? $0 : nil } ?? Profile.defaultID
+            let item = DownloadItem(filename: entry.filename, sourceURL: entry.sourceURL, isPrivate: false, profile: profile)
             item.destination = entry.destination
             item.totalBytes = entry.totalBytes
             item.started = entry.started
@@ -89,7 +94,7 @@ final class DownloadManager: NSObject {
                 item.replaces = entry.replaces
                 // One paused before there were profiles, or in the first, goes on in the first: never in whichever
                 // profile's page happens to be in front.
-                item.dataStore = (entry.profile.flatMap { Library.shared.directory.profile($0) != nil ? Profiles.shared.profile($0) : nil } ?? Profiles.shared.default).store
+                item.dataStore = Profiles.shared.profile(profile).store
                 item.completedBytes = entry.completedBytes ?? 0
                 item.fractionCompleted = entry.totalBytes > 0 ? Double(item.completedBytes) / Double(entry.totalBytes) : 0
             } else {
@@ -113,7 +118,7 @@ final class DownloadManager: NSObject {
                 Saved(filename: item.filename, destination: $0, sourceURL: item.sourceURL, started: item.started, totalBytes: item.totalBytes,
                       completedBytes: item.completedBytes, paused: item.state == .paused ? true : nil, resumeData: item.state == .paused ? item.resumeData : nil,
                       replaces: item.state == .paused ? item.replaces : nil,
-                      profile: item.state == .paused ? item.dataStore.flatMap { Profiles.shared.profile(ofStore: $0) }.flatMap { $0.isDefault ? nil : $0.id } : nil)
+                      profile: item.profile == Profile.defaultID ? nil : item.profile)
             }
         }
         JSONStore.save(Array(kept), to: Paths.downloads)
@@ -173,7 +178,7 @@ final class DownloadManager: NSObject {
         if let window { windows[ObjectIdentifier(download)] = window }
         let isPrivate = download.webView.map { !$0.configuration.websiteDataStore.isPersistent } ?? false
         let item = DownloadItem(filename: download.originalRequest?.url?.lastPathComponent ?? "Download", sourceURL: download.originalRequest?.url,
-                                isPrivate: isPrivate)
+                                isPrivate: isPrivate, profile: Profiles.shared.profile(ofPage: download.webView).id)
         item.dataStore = download.webView?.configuration.websiteDataStore
         attach(download, to: item)
         items.insert(item, at: 0)
@@ -500,7 +505,7 @@ extension DownloadManager: WKDownloadDelegate {
     /// choose with that setting on; marked as downloaded; listed; and flown into the Downloads button. Nil when you
     /// cancel the save sheet.
     @discardableResult
-    func save(_ data: Data, named name: String, from source: URL?, isPrivate: Bool, window: NSWindow?) async throws -> DownloadItem? {
+    func save(_ data: Data, named name: String, from source: URL?, isPrivate: Bool, profile: UUID = Profile.defaultID, window: NSWindow?) async throws -> DownloadItem? {
         var destination = Self.uniqueDestination(for: name)
         if Self.asksWhereToSave {
             guard let chosen = await askWhere(name: destination.lastPathComponent, in: window) else { return nil }
@@ -508,7 +513,7 @@ extension DownloadManager: WKDownloadDelegate {
         }
         try data.write(to: destination, options: .atomic)
         Self.markDownloaded(destination, from: source, page: source, isPrivate: isPrivate)
-        let item = DownloadItem(filename: destination.lastPathComponent, sourceURL: source, isPrivate: isPrivate)
+        let item = DownloadItem(filename: destination.lastPathComponent, sourceURL: source, isPrivate: isPrivate, profile: profile)
         item.destination = destination
         item.state = .finished
         item.fractionCompleted = 1

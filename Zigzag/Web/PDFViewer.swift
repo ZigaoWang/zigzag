@@ -17,6 +17,8 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     /// The title the PDF gives itself, once it's loaded and if it has one.
     var documentTitle: String?
     private let isPrivate: Bool
+    /// The profile of the tab it's in: a copy downloaded from it is that profile's.
+    private let profile: UUID
     let pdfView = ZigzagPDFView()
     private let spinner = NSProgressIndicator()
 
@@ -60,9 +62,10 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     }
 
     /// Shown at once, blank while the PDF loads; `show(_:data:)` puts the pages in.
-    init(url: URL, isPrivate: Bool) {
+    init(url: URL, isPrivate: Bool, profile: UUID = Profile.defaultID) {
         self.url = url
         self.isPrivate = isPrivate
+        self.profile = profile
         super.init(frame: .zero)
         wantsLayer = true
         layer?.backgroundColor = cgColor(Self.backdrop)
@@ -444,7 +447,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         Task { @MainActor [weak self] in
             guard let self else { return }
             do {
-                guard let item = try await DownloadManager.shared.save(data, named: name, from: self.url, isPrivate: self.isPrivate, window: window),
+                guard let item = try await DownloadManager.shared.save(data, named: name, from: self.url, isPrivate: self.isPrivate, profile: self.profile, window: window),
                       let file = item.destination else { return }
                 // The saved copy, opened later, opens on the same page.
                 if !self.isPrivate { Self.setPlace(page, for: file) }

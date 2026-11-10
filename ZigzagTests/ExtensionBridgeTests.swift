@@ -60,6 +60,22 @@ extension ExtensionBridgeTests {
         #expect(BridgeDownloads.safeName(".hidden") == "hidden")
         #expect(BridgeDownloads.safeName("a:b.txt") == "a-b.txt")
     }
+
+    /// `chrome.downloads` in one profile sees that profile's downloads only, and never a private window's: what it
+    /// can't see it can't erase, open or trash either.
+    @Test func downloadsAreSeenOnlyInTheirOwnProfile() {
+        let other = UUID()
+        let first = DownloadItem(filename: "a.pdf", sourceURL: nil, isPrivate: false)
+        let second = DownloadItem(filename: "b.pdf", sourceURL: nil, isPrivate: false, profile: other)
+        let hidden = DownloadItem(filename: "c.pdf", sourceURL: nil, isPrivate: true)
+        #expect(first.profile == Profile.defaultID)
+        #expect(BridgeDownloads.sees(first, in: Profile.defaultID))
+        #expect(!BridgeDownloads.sees(first, in: other))
+        #expect(BridgeDownloads.sees(second, in: other))
+        #expect(!BridgeDownloads.sees(second, in: Profile.defaultID))
+        #expect(!BridgeDownloads.sees(hidden, in: Profile.defaultID))
+        #expect(!BridgeDownloads.sees(hidden, in: other))
+    }
 }
 
 /// An extension's notification is named so a click on it finds the extension again, in its own profile.
