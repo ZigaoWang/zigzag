@@ -255,3 +255,58 @@ struct ImportAgainTests {
         #expect(!ImportWindowController.startsOver(nil))
     }
 }
+
+/// The table of browsers Zigzag reads: each one once, and passwords only where the Keychain item is known (#41).
+struct BrowserTableTests {
+    static var chromium: [ChromiumImporter.Browser] { ChromiumImporter.browsers }
+    static var firefox: [FirefoxImporter.Browser] { FirefoxImporter.browsers }
+
+    /// Two entries for one app or one folder would list a browser twice and import it twice.
+    @Test func everyBrowserOnce() {
+        let bundleIDs = Self.chromium.flatMap(\.bundleIDs) + Self.firefox.flatMap(\.bundleIDs)
+        #expect(Set(bundleIDs).count == bundleIDs.count)
+        let roots = Self.chromium.map(\.root) + Self.firefox.map(\.root)
+        #expect(Set(roots).count == roots.count)
+        // A source is known by its name.
+        let names = Self.chromium.map(\.name) + Self.firefox.map(\.name)
+        #expect(Set(names).count == names.count)
+    }
+
+    /// A folder under Application Support, never a path out of it, and a bundle id shaped like one.
+    @Test func plausibleFoldersAndBundleIDs() {
+        let entries = Self.chromium.map { ($0.root, $0.bundleIDs) } + Self.firefox.map { ($0.root, $0.bundleIDs) }
+        for (root, bundleIDs) in entries {
+            #expect(!root.isEmpty && !root.hasPrefix("/") && !root.hasSuffix("/") && !root.split(separator: "/").contains(".."), "\(root)")
+            #expect(!bundleIDs.isEmpty)
+            for id in bundleIDs { #expect(id.split(separator: ".").count >= 3 && !id.contains(" "), "\(id)") }
+        }
+    }
+
+    @Test func newBrowsersReadFromTheirOwnFolders() throws {
+        func entry(_ name: String) throws -> ChromiumImporter.Browser { try #require(Self.chromium.first { $0.name == name }) }
+        let helium = try entry("Helium")
+        #expect(helium.root == "net.imput.helium" && helium.bundleIDs == ["net.imput.helium"])
+        #expect(helium.safeStorage == ChromiumImporter.SafeStorage(service: "Helium Storage Key", account: "Helium"))
+        let comet = try entry("Comet")
+        #expect(comet.root == "Comet" && comet.bundleIDs == ["ai.perplexity.comet"])
+        #expect(try entry("Chromium").bundleIDs.contains("io.ungoogled-software.ungoogled-chromium"))
+        #expect(try entry("Chrome Canary").safeStorage == entry("Chrome").safeStorage)
+        #expect(try entry("Brave Nightly").root == "BraveSoftware/Brave-Browser-Nightly")
+        #expect(try entry("Yandex").safeStorage?.service == "Yandex Safe Storage")
+        let firefox = try #require(Self.firefox.first { $0.name == "Firefox" })
+        #expect(firefox.bundleIDs.first == "org.mozilla.firefox" && firefox.bundleIDs.contains("org.mozilla.firefoxdeveloperedition"))
+    }
+
+    /// Only these have no known Keychain item: their passwords and sign-ins stay behind, the rest still comes.
+    @Test func unknownKeychainItemsBringNoPasswords() throws {
+        #expect(Set(Self.chromium.filter { $0.safeStorage == nil }.map(\.name)) == ["Comet", "Thorium"])
+        let comet = try #require(Self.chromium.first { $0.name == "Comet" })
+        let offers = ImportCoordinator.Source(kind: .chromium(comet), name: comet.name, bundleID: comet.bundleID).offers
+        #expect(!offers.contains(.passwords) && !offers.contains(.signIns))
+        #expect(offers.contains(.bookmarks) && offers.contains(.history) && offers.contains(.extensions))
+        // Never asks the Keychain for an item it only guessed.
+        guard case .failure(.missing) = ChromiumImporter.safeStorageKey(comet) else { Issue.record("asked the Keychain for Comet"); return }
+        let chrome = try #require(Self.chromium.first { $0.name == "Chrome" })
+        #expect(ImportCoordinator.Source(kind: .chromium(chrome), name: chrome.name, bundleID: chrome.bundleID).offers.contains(.passwords))
+    }
+}
