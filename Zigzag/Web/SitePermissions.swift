@@ -470,49 +470,17 @@ final class PermissionPrompt: FloatingPanelView {
         frame = NSRect(x: round(area.midX - width / 2), y: area.minY + Tokens.Space.x3, width: width, height: height(for: width))
     }
 
-    /// How far above its place it starts and leaves to: fully above the window's top edge, so it comes in from
-    /// outside and goes back out, never fading up out of the page.
-    private var offstage: CGFloat { frame.maxY + 12 }
-
-    /// In from above the page's top edge, eased to a stop: something new arriving, seen now and then, not a key.
+    /// In from above the page's top edge, eased to a stop, as every notice comes (`slidesFromTop`): something new
+    /// arriving, seen now and then, not a key. It never fades up out of the page.
     private func slideIn() {
         shownAt = Date()
-        guard let layer, !Tokens.Motion.reduceMotion else { present(arrival: .fade); return }
-        let drop = CABasicAnimation(keyPath: "transform")
-        drop.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(0, -offstage, 0))
-        drop.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        drop.duration = Tokens.Motion.large
-        drop.timingFunction = Tokens.Motion.easeOut
-        drop.fillMode = .backwards
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 0
-        fade.toValue = 1
-        fade.duration = Tokens.Motion.exit
-        layer.add(drop, forKey: "slideIn")
-        layer.add(fade, forKey: "fadeIn")
+        slidesFromTop = true
+        present()
     }
 
     /// Back up the way it came, then gone.
     private func slideOut() {
-        guard let layer, !Tokens.Motion.reduceMotion else { dismiss(); return }
-        CATransaction.begin()
-        CATransaction.setCompletionBlock { [weak self] in self?.removeFromSuperview() }
-        let rise = CABasicAnimation(keyPath: "transform")
-        rise.fromValue = NSValue(caTransform3D: layer.presentation()?.transform ?? CATransform3DIdentity)
-        rise.toValue = NSValue(caTransform3D: CATransform3DMakeTranslation(0, -offstage, 0))
-        rise.duration = Tokens.Motion.standard
-        rise.timingFunction = Tokens.Motion.easeOut
-        rise.fillMode = .forwards
-        rise.isRemovedOnCompletion = false
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.toValue = 0
-        fade.beginTime = CACurrentMediaTime() + 0.08
-        fade.duration = Tokens.Motion.exit
-        fade.fillMode = .forwards
-        fade.isRemovedOnCompletion = false
-        layer.add(rise, forKey: "slideOut")
-        layer.add(fade, forKey: "fadeOut")
-        CATransaction.commit()
+        dismiss()
     }
 
     override init(frame: NSRect) {
