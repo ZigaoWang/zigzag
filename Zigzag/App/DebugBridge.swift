@@ -213,7 +213,7 @@ enum DebugBridge {
     }
 
     /// The mini player, without bringing the window forward: mpstate <path> (JSON), mphover on|off (its controls, as
-    /// the pointer brings them), mppress back|close|play|rewind|forward, mpdrag <dx> <dy> (dragged that far and let
+    /// the pointer brings them), mppress back|site|double|minimize|expand|close|play|rewind|forward, mpdrag <dx> <dy> (dragged that far and let
     /// go), mpselect <index> (as `select`), mpwindow <path> (window number and process), mpeval <index> <path> <script>
     /// (the script's result in that tab's page, which it may await, written to the file).
     private static func runMiniPlayer(_ name: String, _ arg: String, in controller: BrowserWindowController) {

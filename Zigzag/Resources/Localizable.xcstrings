@@ -2480,6 +2480,17 @@
         }
       }
     },
+    "Back to %@" : {
+      "comment" : "Tooltip of the mini player's site name: goes back to the tab its video is from. The placeholder is a domain, like youtube.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回到 %@"
+          }
+        }
+      }
+    },
     "Back to Favorite’s Page" : {
       "comment" : "Item in a favorite's context menu. Goes back to the page the favorite was saved with.",
       "localizations" : {
@@ -2509,17 +2520,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "回到固定的页面"
-          }
-        }
-      }
-    },
-    "Back to Tab" : {
-      "comment" : "Tooltip of the mini player's button that takes you back to the tab its video is from.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "回到标签页"
           }
         }
       }
@@ -5045,6 +5045,17 @@
         }
       }
     },
+    "Expand" : {
+      "comment" : "Tooltip of the minimized mini player's button that makes it a full card again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "展开"
+          }
+        }
+      }
+    },
     "Export" : {
       "comment" : "Button in the Passwords window that exports passwords to a file.\nButton in the sheet that confirms exporting passwords.",
       "localizations" : {
@@ -6681,7 +6692,7 @@
       }
     },
     "Minimize" : {
-      "comment" : "Window menu item.",
+      "comment" : "Tooltip of the mini player's button that shrinks it to a small pill; the video keeps playing.\nWindow menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
