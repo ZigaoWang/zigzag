@@ -56,6 +56,24 @@ struct ShipFixesTests {
         card.layoutSubtreeIfNeeded()
         #expect(webView.frame == screen.bounds)
     }
+
+    @Test func aPageBackFromFullScreenBehindAnotherLeavesTheCard() throws {
+        let card = PageCardView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        let video = WKWebView(frame: .zero), other = WKWebView(frame: .zero)
+        card.show(video)
+        let clip = try #require(video.superview)
+        // In full screen, in WebKit's window, while you switch to another tab in the browser window.
+        NSView().addSubview(video)
+        card.show(other)
+        // Its full screen ends: WebKit puts it back where it was, under the page now shown.
+        clip.addSubview(video, positioned: .below, relativeTo: other)
+        card.pageLeftFullScreen(video)
+        #expect(video.superview == nil)
+        #expect(other.superview === clip)
+        // The page shown is never taken out.
+        card.pageLeftFullScreen(other)
+        #expect(other.superview === clip)
+    }
 }
 
 /// Passwords across one site's parts, never across sites, by the Public Suffix List.

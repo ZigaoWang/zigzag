@@ -20,6 +20,8 @@ final class PageCardView: NSView {
     /// What covers the shown tab's page: its PDF viewer, over WebKit's own, or Settings.
     private weak var document: NSView?
     private var documentToken: SignalToken?
+    /// A page that left the card while its video was in full screen: WebKit puts it back here when that ends.
+    private var fullScreenWatch: NSKeyValueObservation?
 
     /// No corners, edge or shadow: the page fills the window.
     var isEdgeToEdge: Bool {
@@ -305,7 +307,12 @@ final class PageCardView: NSView {
             clip.addSubview(newWebView, positioned: .below, relativeTo: placeholder)
         }
         webView = newWebView
-        if let old, old.superview === clip { old.removeFromSuperview() }
+        if let old, old.superview === clip { old.removeFromSuperview() } else if let old, old.fullscreenState != .notInFullscreen {
+            fullScreenWatch = old.observe(\.fullscreenState) { [weak self] page, _ in
+                // WebKit puts the page back as its full screen finishes: looked at once it has.
+                DispatchQueue.main.async { MainActor.assumeIsolated { self?.pageLeftFullScreen(page) } }
+            }
+        }
         let owner = (newWebView as? BrowserWebView)?.owner
         documentToken = owner?.changed.observe { [weak self] change in if change == .pdf || change == .settings { self?.refreshDocument() } }
         refreshDocument()
@@ -313,6 +320,15 @@ final class PageCardView: NSView {
         placeholder.isHidden = placeholderImage == nil
         edge.removeFromSuperlayer()
         clip.layer?.addSublayer(edge)
+    }
+
+    /// A page's full screen ended: put back here by WebKit while another page is shown, it goes, rather than staying
+    /// under that one, still on screen to itself; the one shown is sized to the card again.
+    func pageLeftFullScreen(_ page: WKWebView) {
+        guard page.fullscreenState == .notInFullscreen else { return }
+        fullScreenWatch = nil
+        if page !== webView, page.superview === clip { page.removeFromSuperview() }
+        needsLayout = true
     }
 
     /// Puts the shown tab's PDF viewer (or Settings) over its page, or takes it away. Typing goes to it, as it did to
