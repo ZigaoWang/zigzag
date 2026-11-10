@@ -5,6 +5,17 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-11-10
+
+### New
+- Bring your extensions over from Chrome, Arc, Brave, Edge and other Chromium browsers. In Import (⇧⌘I), choose Extensions: you see each one with what they'll be able to do together, confirm once, and Zigzag adds them from the Chrome Web Store one at a time. ([#23](https://github.com/ZigaoWang/zigzag/issues/23))
+- AppleScript: scripts, Shortcuts and AI agents can list windows and tabs, read a page's title, address and text, open, switch and close tabs, and go back, forward or reload, written the way Safari and Chrome take them. Running JavaScript in pages is off until you turn on Settings › General › Allow JavaScript from Apple Events, and private windows are never reachable. Examples are in [docs/automation.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/automation.md). ([#26](https://github.com/ZigaoWang/zigzag/issues/26))
+
+### Fixed
+- Kondo works: its web app reaches the extension, and adding a LinkedIn account finishes. ([#25](https://github.com/ZigaoWang/zigzag/issues/25))
+- Extensions that listen for cookie changes are told which cookie changed, and cookies saved by a Chrome-based browser can be set again.
+- An extension's own page inside a website can reach its background, as in Chrome.
+
 ## [0.7.5] - 2026-11-10
 
 ### New
