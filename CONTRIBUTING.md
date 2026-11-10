@@ -18,18 +18,22 @@ open Zigzag.xcodeproj
 Run the **Zigzag** scheme. Debug builds are a separate app, "Zigzag Dev", with their own bundle ID, settings,
 data and saved logins, so they never touch the Zigzag you use every day.
 
-`project.yml` is the source of truth. `Zigzag.xcodeproj` is generated from it: after adding, removing or
-renaming files, run `xcodegen generate` again, and change build settings in `project.yml`, not in Xcode.
+`project.yml` is the source of truth. `Zigzag.xcodeproj` is generated from it: run `xcodegen generate` after
+cloning and after adding, removing or renaming files, and change build settings in `project.yml`, not in Xcode.
 
 ## Tests
 
 ```sh
-xcodebuild test -scheme Zigzag
+xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 ```
 
-Add or update tests in `ZigzagTests` for logic you change, especially importing, passwords and anything that
-parses data from outside. Test fixtures must be made up: never commit real logins, browsing data or
+Logic you add or change needs tests in `ZigzagTests`, especially importing, passwords, extensions and anything
+that parses data from outside. Test fixtures must be made up: never commit real logins, browsing data or
 profiles.
+
+A few `CRXPackageTests` use a real Chrome Web Store package, `ZigzagTests/Fixtures/custom-progress-bar.crx`, that
+isn't in the repository (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)). Without it they're skipped and
+everything else runs.
 
 ## Code style
 
@@ -43,14 +47,29 @@ profiles.
 - Keep debug-only code inside `#if DEBUG`, so it never ships in a release build.
 - Privacy first: nothing a person browses, types or saves leaves their Mac unless they ask for it.
 
+## Localization
+
+Zigzag speaks English and Simplified Chinese. Every word people read goes through
+`String(localized: "…", comment: "…")`, with a comment that says where it appears. After adding or changing
+strings, build, bring the catalog in step and add the Chinese in `Zigzag/Resources/Localizable.xcstrings`:
+
+```sh
+xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -derivedDataPath build/dev build
+scripts/sync-strings.sh build/dev
+```
+
+`LocalizationTests` fails while any string has no Chinese. [docs/i18n/glossary.md](docs/i18n/glossary.md) has
+the words to use and the typography rules. If you can't write the Chinese, say so in the pull request.
+
 ## Commits and pull requests
 
-- [Conventional Commits](https://www.conventionalcommits.org): `feat: …`, `fix: …`, `docs: …`, `chore: …`,
-  without a scope.
-- **Small commits**, one logical change each, with a message that says what changed for the person using
-  Zigzag.
-- Make sure the app builds and the tests pass before you open a pull request, and say in it how you checked
-  your change (including in light and dark, for UI).
+- [Conventional Commits](https://www.conventionalcommits.org) without a scope: `feat: …`, `fix: …`, `docs: …`,
+  `chore: …`. Subjects are short and plain, and say what changed for the person using Zigzag.
+- Add `(#N)` to the subject when the commit is for an issue, as in `fix: scripts check the page again once it has loaded (#26)`.
+- **Small commits**, one logical change each, and one change per pull request.
+- Write `Fixes #N` in the pull request so the issue closes with it.
+- Make sure the app builds and the tests pass, and say in the pull request how you checked your change. For UI,
+  add screenshots in light and dark.
 
 ## License of contributions
 
