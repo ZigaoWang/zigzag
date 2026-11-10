@@ -275,6 +275,17 @@ something came from, answers at once, and can be interrupted.
 - **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window. Beside the sidebar and
   meeting the window's edges it meets the frame cleanly: all four corners at the window's radius
   (`Radius.attached`), no outline, no shadow.
+- **Reader** (`Reader.swift`): the article on the page card, scripts off, crossfading in and out in `crossfade`. One
+  column of 34em (the text's own size, so about 70 characters a line; Narrow 29em, Wide 40em), and everything in it
+  on that column's left edge: the header (the site's icon and name at 14pt, the title in the body face at 2.1em,
+  bold, balanced, then the author and the day it was published if the page says), generous space, no rule, then the
+  text. New York at 20px with 1.6 leading by default (SF as Sans); Chinese, Japanese and Korean in PingFang, Hiragino
+  Sans or Apple SD Gothic Neo at 1.8 in either face, never italic. Pictures at their own size or the column's,
+  never larger; captions 14pt in the soft ink under them. Links in the text's color with a quiet underline, the link
+  color on hover; quotes behind a 2pt rule; code and tables scroll sideways. Light (warm off-white), Sepia, Dark
+  (`Color.surface` at night) and Auto, from `Reader.Palette`. Its one control, Aa, sits on the article's paper at
+  the top right, there at the top and when you scroll back up, away while you read on; its panel holds size, face,
+  width and colors. Reader itself comes and goes with the address's Reader button, ⌘⇧R or Esc.
 - **Empty states** (`Tokens.EmptyState`, the same in HTML through `PageStyle`): the wordmark 120pt wide at 8%, 16pt
   to a quiet line no wider than 360, 24pt to an optional action. History, Passwords and the error page share it.
 - **Built-in pages** (History, Settings, Passwords): one plain `Color.surface` (the column of places in Settings and
