@@ -1155,10 +1155,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// ⌘+, ⌘− and ⌘0 while Reader is up size its text instead of the page underneath. False when it isn't up.
     func zoomReader(_ delta: Int) -> Bool {
         guard let reader, readerTab === tabManager.selectedTab else { return false }
-        let size = reader.stepTextSize(delta)
-        let percent = Int((Double(size) / 19 * 100).rounded())
+        let percent = reader.stepTextSize(delta).percent
         Toast.show(String(localized: "Text \(percent)%", comment: "Toast when Reader's text size changes, like Text 120%."), symbol: delta < 0 ? "textformat.size.smaller" : "textformat.size.larger", in: self)
         return true
+    }
+
+    /// What Find searches: the article while Reader covers the page you're on, otherwise the page.
+    var findableWebView: WKWebView? {
+        if let reader, readerTab === tabManager.selectedTab { return reader.webView }
+        return selectedWebView
     }
 
     /// What Print and Export as PDF take: the peek in front, the article Reader shows, or the page.
@@ -1183,7 +1188,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab) }
             view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab) }
             view.onForegroundLink = { [weak self] link in self?.open(link, disposition: .foregroundTab, opener: tab, allowSwitch: false) }
-            view.show(article, from: url)
+            view.show(article, from: url, icon: tab.favicon)
             self.reader = view
             self.readerTab = tab
             self.readerURL = url
@@ -1205,6 +1210,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 return nil
             }
             self.updateReaderButton()
+            // An open Find follows the article in, and back out to the page.
+            self.findBar.pageChanged()
         }
     }
 
@@ -1223,15 +1230,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         if let webView = tabManager.selectedTab?.webView { window?.makeFirstResponder(webView) }
         updateReaderButton()
+        findBar.pageChanged()
     }
 
-    /// Reader fades over the page while its text rises into place (that part is the reading page's own CSS);
-    /// leaving is a quicker fade. Only opacity is animated here: moving or transforming a view that hosts web
-    /// content stops WebKit drawing into it, and so does a fully transparent start (hence 0.01).
+    /// Reader stands in for the page in place, so it only crossfades, quickly both ways: nothing rises or zooms.
+    /// Moving or transforming a view that hosts web content stops WebKit drawing into it, and so does a fully
+    /// transparent start (hence 0.01).
     private static func readerTransition(_ view: NSView, entering: Bool, completion: (() -> Void)? = nil) {
         if entering { view.alphaValue = 0.01 }
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = (entering ? 0.24 : 0.16) * Tokens.Motion.debugSlowdown
+            ctx.duration = Tokens.Motion.crossfade * Tokens.Motion.debugSlowdown
             ctx.timingFunction = Tokens.Motion.easeOut
             view.animator().alphaValue = entering ? 1 : 0.01
         }, completionHandler: completion)

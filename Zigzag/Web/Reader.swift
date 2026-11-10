@@ -44,16 +44,25 @@ enum Reader {
               const copy = document.cloneNode(true);
               // Wikipedia and other MediaWiki sites: the fact box, notes about other pages, edit links and footnote
               // markers are page furniture, and would otherwise open the article.
-              if (copy.querySelector('.mw-parser-output')) {
-                copy.querySelectorAll('.infobox, .navbox, .vertical-navbox, .sidebar, .metadata, .ambox, .hatnote, .shortdescription, ' +
-                  '.mw-editsection, sup.reference, .mw-jump-link, #toc, .toc, .noprint, .mw-empty-elt').forEach(el => el.remove());
+              const wiki = !!copy.querySelector('.mw-parser-output');
+              if (wiki) {
+                copy.querySelectorAll('.infobox, .navbox, .navbox-styles, .vertical-navbox, .sidebar, .metadata, .ambox, .hatnote, ' +
+                  '.shortdescription, .mw-editsection, sup.reference, .mw-jump-link, #toc, .toc, .noprint, .mw-empty-elt, ' +
+                  '.side-box, .sistersitebox, .portalbox, .catlinks, .authority-control, .navigation-not-searchable').forEach(el => el.remove());
                 // The little ⓘ after a pronunciation plays a sound on the page; in reading it's just a mark.
                 copy.querySelectorAll('a, span, sup').forEach(el => { if (el.childElementCount === 0 && el.textContent.trim() === 'ⓘ') el.remove(); });
+                // A picture floats beside the paragraph after it on the page; in one column it follows that paragraph,
+                // so an article opens with its words, not a stack of pictures. Last first, so a run keeps its order.
+                [...copy.querySelectorAll('.mw-parser-output figure')].reverse().forEach(figure => {
+                  let next = figure.nextElementSibling;
+                  while (next && next.tagName === 'FIGURE') next = next.nextElementSibling;
+                  if (next && next.tagName === 'P' && next.textContent.trim()) next.after(figure);
+                });
               }
-              // Icons and spacers aren't pictures; big pictures get the full measure.
+              // Icons and spacers aren't pictures.
               copy.querySelectorAll('img').forEach(img => {
                 const w = parseInt(img.getAttribute('width') || '0', 10), h = parseInt(img.getAttribute('height') || '0', 10);
-                if ((w && w < 48) || (h && h < 48)) img.remove(); else if (w >= 480) img.classList.add('wide'); else if (w) img.classList.add('inset');
+                if ((w && w < 32 && h && h < 32) || (w && w <= 2) || (h && h <= 2)) img.remove();
               });
               // What the site calls itself, when it says so briefly; otherwise its address. Never a company's legal name.
               const siteName = () => {
@@ -63,29 +72,29 @@ enum Reader {
                 return own && own.length <= 28 && !/\\b(inc|llc|ltd|foundation|corporation)\\b/i.test(own) ? own : host;
               };
               const meta = n => (document.querySelector(`meta[property="${n}"], meta[name="${n}"]`) || {}).content || '';
-              const article = new Readability(copy, { classesToPreserve: ['wide', 'inset', 'lead'] }).parse();
+              const article = new Readability(copy).parse();
               if (!article) return null;
               const body = document.createElement('div');
               body.innerHTML = article.content || '';
-              // The opening paragraph gets the drop cap: the first one that's a real paragraph, not a dateline.
-              const lead = [...body.querySelectorAll('p')].find(p => p.textContent.trim().length > 120 && !p.closest('figure, blockquote, li, table'));
-              if (lead) lead.classList.add('lead');
-              // The site's own summary, unless it's just the opening paragraph again.
-              const squash = t => (t || '').replace(/\\s+/g, ' ').trim().toLowerCase();
-              let dek = squash(article.excerpt) ? (article.excerpt || '').replace(/\\s+/g, ' ').trim() : '';
-              if (!dek || dek.length > 320 || (lead && squash(lead.textContent).startsWith(squash(dek).slice(0, 60)))) dek = '';
-              // A lead picture from the page's own card, unless the article already opens with it.
-              let image = meta('og:image') || meta('twitter:image');
-              try { image = image ? new URL(image, location.href).href : ''; } catch (e) { image = ''; }
-              const firstImage = body.querySelector('img');
-              if (image && firstImage && body.innerHTML.indexOf(firstImage.outerHTML) < 400) image = '';
-              if (!/^https:/.test(image)) image = '';
-              // The address says where it's from better than a publisher's legal name; a long byline is metadata, not an author.
-              const byline = (article.byline || '').trim();
-              return JSON.stringify({ title: article.title || document.title, byline: byline.length <= 60 ? byline : '',
-                site: siteName(),
-                content: body.innerHTML, length: article.length || 0, lang: article.lang || document.documentElement.lang || '',
-                dek: dek, image: image, url: location.href });
+              // A heading's own link marker (¶, #, §) is for sharing the spot on the page; in reading it's noise.
+              body.querySelectorAll(':is(h1, h2, h3, h4, h5, h6) a, a.headerlink').forEach(a => {
+                if (a.classList.contains('headerlink') || /^[¶#§]?$/.test(a.textContent.trim()) && !a.querySelector('img')) a.remove();
+              });
+              // A picture in a line of text (a formula, an emoji) stays in the line; every other one is a block.
+              body.querySelectorAll('img').forEach(img => {
+                const block = img.closest('p, li, td, th, dd');
+                if (block && !img.closest('figure') && block.textContent.trim().length > 0) img.classList.add('inline');
+              });
+              // A wiki's date is when the page was started, not when what you read was written.
+              const time = wiki ? null : document.querySelector('article time[datetime], main time[datetime], header time[datetime]');
+              const published = wiki ? '' : article.publishedTime || meta('article:published_time') || (time ? time.getAttribute('datetime') : '') || '';
+              return JSON.stringify({ title: article.title || document.title, byline: (article.byline || '').trim(),
+                site: siteName(), siteTitle: (meta('og:site_name') || meta('application-name') || '').trim(),
+                content: body.innerHTML, length: article.length || 0,
+                lang: article.lang || document.documentElement.lang || '',
+                sample: (article.textContent || '').replace(/\\s+/g, ' ').slice(0, 600),
+                published: published,
+                url: location.href });
             } catch (e) { return null; }
           }
         };
@@ -98,29 +107,10 @@ enum Reader {
         return try? String(contentsOf: url, encoding: .utf8)
     }
 
-    /// Reads the article ahead of time, while the page is idle, and fetches its lead picture, so Reader opens
-    /// complete instead of with a gap that fills in later.
+    /// Reads the article ahead of time, while the page is idle, so Reader opens at once.
     static func prepare(_ webView: WKWebView) {
         webView.evaluateJavaScript("window.__zigzagReader && window.__zigzagReader.prepare(); 0", in: nil, in: .defaultClient, completionHandler: nil)
-        let script = "(document.querySelector('meta[property=\"og:image\"]')||document.querySelector('meta[name=\"twitter:image\"]')||{}).content || ''"
-        webView.evaluateJavaScript(script, in: nil, in: .defaultClient) { result in
-            guard case .success(let value) = result, let text = value as? String, let url = URL(string: text, relativeTo: webView.url)?.absoluteURL,
-                  url.scheme == "https", leadPictures[url.absoluteString] == nil else { return }
-            Task {
-                guard let (data, response) = try? await pictureSession.data(from: url), data.count < 3_000_000,
-                      let type = (response as? HTTPURLResponse)?.mimeType, type.hasPrefix("image/") else { return }
-                leadPictures[url.absoluteString] = "data:\(type);base64," + data.base64EncodedString()
-                if leadPictures.count > 12 { leadPictures.removeValue(forKey: leadPictures.keys.first!) }
-            }
-        }
     }
-
-    /// Fetches lead pictures with no cookies and nothing kept on disk, so a private page's picture leaves no trace
-    /// and none is tied to your everyday browsing.
-    private static let pictureSession = URLSession(configuration: .ephemeral)
-
-    /// Lead pictures fetched ahead, by address, as data the reading page can show at once.
-    private static var leadPictures: [String: String] = [:]
 
     /// Whether the page in a web view looks like an article.
     static func isArticle(_ webView: WKWebView) async -> Bool {
@@ -135,8 +125,12 @@ enum Reader {
         let content: String
         let length: Int
         let lang: String
-        var dek: String? = nil
-        var image: String? = nil
+        /// The opening words, plain, to tell the language by when the page doesn't say or says wrong.
+        var sample: String? = nil
+        /// When it was published, as the page gives it.
+        var published: String? = nil
+        /// What the site calls itself in full, to take off the end of a title.
+        var siteTitle: String? = nil
         var url: String? = nil
     }
 
@@ -146,153 +140,348 @@ enum Reader {
         return try? JSONDecoder().decode(Article.self, from: data)
     }
 
-    /// How you like to read, remembered: text size, typeface and colours.
-    struct Preferences {
+    // MARK: The header's facts
+
+    /// The title without the site's name tacked on its end ("Make 命令教程 - 阮一峰的网络日志" → "Make 命令教程"): the
+    /// part after the last separator goes when it's one of the site's names, or the author's own blog.
+    static func title(_ raw: String, siteNames: [String], author: String) -> String {
+        let title = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let names = siteNames.map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty }
+        for separator in [" - ", " | ", " – ", " — ", " · ", " :: ", "_"] {
+            guard let range = title.range(of: separator, options: .backwards) else { continue }
+            let head = title[..<range.lowerBound].trimmingCharacters(in: .whitespaces)
+            let tail = title[range.upperBound...].trimmingCharacters(in: .whitespaces).lowercased()
+            guard head.count >= 2, !tail.isEmpty else { continue }
+            let isSite = names.contains { tail == $0 || ($0.count >= 4 && tail.contains($0)) }
+            let isAuthors = author.count >= 2 && tail.contains(author.lowercased()) && tail.count > author.count
+            if isSite || isAuthors { return head }
+        }
+        return title
+    }
+
+    /// Who wrote it, as a byline reads: "By" and the like trimmed off. Empty when the page's credit names no one
+    /// ("Contributors to Wikimedia projects"), is just the site again, or is too long to be a name.
+    static func author(from byline: String, site: String) -> String {
+        var name = byline.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+        name = name.replacingOccurrences(of: #"^\s*(?:(?:written|posted|words|story)\s+)?by\s+|^\s*作者\s*[:：]?\s*"#, with: "", options: [.regularExpression, .caseInsensitive])
+        name = name.trimmingCharacters(in: CharacterSet(charactersIn: " |-–—·•,:：/"))
+        let lower = name.lowercased()
+        if name.isEmpty || name.count > 60 || lower.contains("contributors") || lower.contains("http") || lower.contains("@")
+            || lower == site.lowercased() { return "" }
+        return name
+    }
+
+    /// The day it was published, written out in the reader's language ("March 3, 2024", "2024年3月3日"). The day
+    /// is the publisher's own, whatever the time zone here. Empty when the page's date can't be read, or is in the
+    /// future, which a real one never is.
+    static func publishedDate(_ raw: String?, locale: Locale = .current, now: Date = Date()) -> String {
+        let text = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        var day: Date?
+        // "2024-03-03", "2024-03-03T10:00:00-05:00": the calendar day as written.
+        if let match = text.firstMatch(of: /^(\d{4})-(\d{2})-(\d{2})/), let y = Int(match.1), let m = Int(match.2), let d = Int(match.3) {
+            day = utc.date(from: DateComponents(year: y, month: m, day: d))
+        } else {
+            // RSS and HTTP's "Sun, 03 Mar 2024 10:00:00 +0000".
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            for format in ["EEE, dd MMM yyyy HH:mm:ss Z", "dd MMM yyyy HH:mm:ss Z", "MMMM d, yyyy"] {
+                formatter.dateFormat = format
+                if let date = formatter.date(from: text) {
+                    let parts = Calendar(identifier: .gregorian).dateComponents(in: formatter.timeZone, from: date)
+                    day = utc.date(from: DateComponents(year: parts.year, month: parts.month, day: parts.day))
+                    break
+                }
+            }
+        }
+        guard let day, day < now.addingTimeInterval(86_400), utc.component(.year, from: day) > 1990 else { return "" }
+        return day.formatted(Date.FormatStyle(date: .long, time: .omitted, locale: locale, calendar: utc, timeZone: utc.timeZone))
+    }
+
+    /// The article's language, for hyphenation and the right typeface: what the page says, unless its words are
+    /// plainly Chinese, Japanese or Korean and it says otherwise (or nothing), as many sites do.
+    static func language(declared: String, sample: String) -> String {
+        var letters = 0, han = 0, kana = 0, hangul = 0
+        for scalar in sample.unicodeScalars where scalar.properties.isAlphabetic {
+            letters += 1
+            switch scalar.value {
+            case 0x3040...0x30FF: kana += 1
+            case 0xAC00...0xD7AF, 0x1100...0x11FF: hangul += 1
+            case 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF: han += 1
+            default: break
+            }
+        }
+        let code = declared.lowercased().split(separator: "-").first.map(String.init) ?? ""
+        guard letters >= 20 else { return declared }
+        if kana * 10 > letters { return code == "ja" ? declared : "ja" }
+        if hangul * 3 > letters { return code == "ko" ? declared : "ko" }
+        if (han + kana) * 3 > letters { return code == "zh" || code == "ja" ? declared : "zh" }
+        return declared
+    }
+
+    /// A site's icon, small, as the header shows it beside the site's name.
+    static func iconSource(_ image: NSImage?) -> String? {
+        guard let image, image.size.width > 0,
+              let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 32, pixelsHigh: 32, bitsPerSample: 8, samplesPerPixel: 4,
+                                         hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        image.draw(in: NSRect(x: 0, y: 0, width: 32, height: 32))
+        NSGraphicsContext.restoreGraphicsState()
+        return rep.representation(using: .png, properties: [:]).map { "data:image/png;base64," + $0.base64EncodedString() }
+    }
+
+    // MARK: How it reads
+
+    /// One theme's paper and inks. Light and Dark are Zigzag's own page colors, warmed a touch for long reading.
+    struct Palette: Equatable {
+        let paper: UInt32
+        let ink: UInt32
+        let soft: UInt32
+        let link: UInt32
+        /// Hairlines, code's soft ground and the selection, as see-through washes of the ink or the link.
+        let rule: String
+        let code: String
+        let select: String
+        let isDark: Bool
+
+        static let light = Palette(paper: 0xFBFAF8, ink: 0x1F1E1C, soft: 0x6D6A64, link: 0x2F5E98,
+                                   rule: "rgba(31,30,28,.12)", code: "rgba(31,30,28,.05)", select: "rgba(47,94,152,.18)", isDark: false)
+        static let sepia = Palette(paper: 0xF4ECDE, ink: 0x3B2F24, soft: 0x806B57, link: 0x8A5326,
+                                   rule: "rgba(80,55,25,.16)", code: "rgba(80,55,25,.07)", select: "rgba(138,83,38,.2)", isDark: false)
+        static let dark = Palette(paper: 0x1E1E20, ink: 0xE6E4DF, soft: 0x9A9893, link: 0x9DBDEB,
+                                  rule: "rgba(255,255,255,.12)", code: "rgba(255,255,255,.06)", select: "rgba(157,189,235,.25)", isDark: true)
+
+        /// The page's colors as CSS custom properties.
+        var css: String {
+            func hex(_ v: UInt32) -> String { String(format: "#%06X", v) }
+            return "--paper: \(hex(paper)); --ink: \(hex(ink)); --soft: \(hex(soft)); --link: \(hex(link)); " +
+                "--rule: \(rule); --code: \(code); --select: \(select); color-scheme: \(isDark ? "dark" : "light");"
+        }
+    }
+
+    /// How you like to read, remembered for every article: text size, typeface, column width and colors.
+    struct Preferences: Equatable {
         enum Face: String, CaseIterable { case serif, sans }
-        enum Theme: String, CaseIterable { case auto, light, sepia, dark }
-        /// How wide the column of text runs. Medium is a comfortable book's measure; wide fills more of a big window.
+        enum Theme: String, CaseIterable {
+            case auto, light, sepia, dark
+            /// Auto's are Light's; the page takes Dark's itself while the Mac is dark.
+            var palette: Palette { switch self { case .auto, .light: .light; case .sepia: .sepia; case .dark: .dark } }
+        }
+        /// How wide the column runs, in the text's own size, so a line holds about the same number of characters at
+        /// any size: Medium is the book's 66 to 72, Narrow a column's, Wide fills more of a big window.
         enum Width: String, CaseIterable {
             case narrow, medium, wide
-            var measure: String { switch self { case .narrow: "34em"; case .medium: "40em"; case .wide: "48em" } }
+            var measure: String { switch self { case .narrow: "29em"; case .medium: "34em"; case .wide: "40em" } }
         }
-        static let sizes = 13...32
-        var size: Int
-        var face: Face
-        var theme: Theme
-        var width: Width = .medium
+        static let sizes = 14...32
+        static let defaultSize = 20
+        /// One step of ⌘+ or the larger A: big enough to see, small enough to land where you want.
+        static let step = 2
+        var size = defaultSize
+        var face = Face.serif
+        var theme = Theme.auto
+        var width = Width.medium
+
+        /// A step bigger or smaller (0 back to the usual), never past the ends.
+        func stepped(_ delta: Int) -> Preferences {
+            var next = self
+            next.size = delta == 0 ? Self.defaultSize : min(max(size + delta * Self.step, Self.sizes.lowerBound), Self.sizes.upperBound)
+            return next
+        }
+
+        /// The size as against the usual one, as a whole percent: what the toast says.
+        var percent: Int { Int((Double(size) / Double(Self.defaultSize) * 100).rounded()) }
+
+        static func load(from defaults: UserDefaults) -> Preferences {
+            let size = defaults.integer(forKey: "ReaderSize")
+            return Preferences(size: sizes.contains(size) ? size : defaultSize,
+                               face: Face(rawValue: defaults.string(forKey: "ReaderFace") ?? "") ?? .serif,
+                               theme: Theme(rawValue: defaults.string(forKey: "ReaderTheme") ?? "") ?? .auto,
+                               width: Width(rawValue: defaults.string(forKey: "ReaderWidth") ?? "") ?? .medium)
+        }
+
+        func save(to defaults: UserDefaults) {
+            defaults.set(size, forKey: "ReaderSize")
+            defaults.set(face.rawValue, forKey: "ReaderFace")
+            defaults.set(theme.rawValue, forKey: "ReaderTheme")
+            defaults.set(width.rawValue, forKey: "ReaderWidth")
+        }
 
         static var saved: Preferences {
-            get {
-                let d = UserDefaults.standard
-                let size = d.integer(forKey: "ReaderSize")
-                return Preferences(size: sizes.contains(size) ? size : 19,
-                                   face: Face(rawValue: d.string(forKey: "ReaderFace") ?? "") ?? .sans,
-                                   theme: Theme(rawValue: d.string(forKey: "ReaderTheme") ?? "") ?? .auto,
-                                   width: Width(rawValue: d.string(forKey: "ReaderWidth") ?? "") ?? .medium)
-            }
-            set {
-                let d = UserDefaults.standard
-                d.set(newValue.size, forKey: "ReaderSize")
-                d.set(newValue.face.rawValue, forKey: "ReaderFace")
-                d.set(newValue.theme.rawValue, forKey: "ReaderTheme")
-                d.set(newValue.width.rawValue, forKey: "ReaderWidth")
-            }
+            get { load(from: .standard) }
+            set { newValue.save(to: .standard) }
         }
+
+        /// The size and measure, as the page's root element carries them.
+        var rootStyle: String { "--size: \(size)px; --measure: \(width.measure)" }
 
         /// Applies these to an open reading page, without reloading it (and losing your place).
         var script: String {
             "document.documentElement.dataset.theme='\(theme.rawValue)';document.documentElement.dataset.face='\(face.rawValue)';" +
-            "document.documentElement.style.setProperty('--size','\(size)px');" +
-            "document.documentElement.style.setProperty('--measure','\(width.measure)');"
+            "document.documentElement.setAttribute('style','\(rootStyle)');"
         }
     }
 
-    /// The reading page, set like a well-made magazine: a masthead (where it's from, the title, the site's own
-    /// summary, who wrote it), the lead picture, then the text at a book's measure. On a wide window small pictures
-    /// sit in a margin beside the text with their captions, and wide ones span both; narrower, it's one column.
-    static func html(for article: Article, preferences: Preferences = .saved) -> String {
-        // A credit that names no one ("Contributors to Wikimedia projects") says nothing; leave it out.
-        let author = article.byline.lowercased().contains("contributors") ? "" : article.byline
-        // Where it's from, and who wrote it when the page says.
-        let meta = escape(author.isEmpty ? article.site : String(localized: "\(article.site), by \(author)", comment: "Under an article's title in Reader: the site it's from, then who wrote it."))
-        let dek = (article.dek ?? "").isEmpty ? "" : "<p class=\"dek\">\(escape(article.dek ?? ""))</p>"
-        let heroSource = article.image.map { leadPictures[$0] ?? $0 } ?? ""
-        let hero = heroSource.isEmpty ? "" : "<figure class=\"hero\"><img src=\"\(escape(heroSource))\" alt=\"\"></figure>"
+    /// The reading page: one column at a book's measure, and everything in it (the header, text, pictures, captions,
+    /// quotes, code, tables) on that column's left edge. The header is where it's from, the title, and who wrote it
+    /// and when, if the page says; then the text.
+    static func html(for article: Article, preferences: Preferences = .saved, icon: String? = nil, locale: Locale = .current) -> String {
+        let author = author(from: article.byline, site: article.site)
+        let title = Self.title(article.title, siteNames: [article.site, article.siteTitle ?? ""], author: author)
+        let date = publishedDate(article.published, locale: locale)
+        let lang = language(declared: article.lang, sample: article.sample ?? "")
+        let iconTag = icon.map { "<img src=\"\(escape($0))\" alt=\"\">" } ?? ""
+        var byline = ""
+        if !author.isEmpty || !date.isEmpty {
+            byline = "<p class=\"byline\">" + (author.isEmpty ? "" : "<span class=\"author\">\(escape(author))</span>") +
+                (date.isEmpty ? "" : "<time>\(escape(date))</time>") + "</p>"
+        }
         let source = (article.url ?? "").isEmpty ? "" :
             "<footer class=\"end\"><a href=\"\(escape(article.url ?? ""))\">\(escape(String(localized: "Read the original on \(article.site)", comment: "Link at the end of an article in Reader, to the page it came from. The placeholder is the site's name.")))</a></footer>"
         return """
-        <!doctype html><html lang="\(escape(article.lang))" data-theme="\(preferences.theme.rawValue)" data-face="\(preferences.face.rawValue)" style="--size: \(preferences.size)px; --measure: \(preferences.width.measure)">
+        <!doctype html><html lang="\(escape(lang))" data-theme="\(preferences.theme.rawValue)" data-face="\(preferences.face.rawValue)" style="\(preferences.rootStyle)">
         <head><meta charset="utf-8">
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src * data:; media-src *; style-src 'unsafe-inline'; font-src *">
-        <title>\(escape(article.title))</title>
-        <style>
-        :root { --text: #1d1d1f; --soft: #6e6e73; --faint: rgba(0,0,0,.42); --rule: rgba(0,0,0,.1); --bg: #fbfaf7; --link: #2f5d9a;
-                --code: rgba(0,0,0,.05); --select: rgba(47,93,154,.18);
-                --serif: "New York", ui-serif, Georgia, serif; --sans: -apple-system, "SF Pro Text", system-ui, sans-serif;
-                --measure: 32em; --margin: 12em; --gap: 2em; }
-        :root[data-theme="sepia"] { --text: #3f3226; --soft: #86705a; --faint: rgba(70,45,20,.45); --rule: rgba(90,60,20,.16); --bg: #f4ecdd;
-                --link: #8a5326; --code: rgba(90,60,20,.07); --select: rgba(138,83,38,.2); }
-        :root[data-theme="dark"] { --text: #e8e6e1; --soft: #9d9b97; --faint: rgba(255,255,255,.4); --rule: rgba(255,255,255,.12); --bg: #161618;
-                --link: #9cbcec; --code: rgba(255,255,255,.07); --select: rgba(156,188,236,.25); color-scheme: dark; }
-        @media (prefers-color-scheme: dark) {
-          :root[data-theme="auto"] { --text: #e8e6e1; --soft: #9d9b97; --faint: rgba(255,255,255,.4); --rule: rgba(255,255,255,.12); --bg: #161618;
-                --link: #9cbcec; --code: rgba(255,255,255,.07); --select: rgba(156,188,236,.25); color-scheme: dark; }
-        }
-        html { background: var(--bg); transition: background .2s cubic-bezier(.23, 1, .32, 1); }
-        ::selection { background: var(--select); }
-        body { margin: 0; padding: 112px 48px 160px; color: var(--text); font-family: var(--serif); font-size: var(--size); line-height: 1.65;
-               -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; font-kerning: normal; hanging-punctuation: first;
-               transition: color .2s cubic-bezier(.23, 1, .32, 1); animation: rise .3s cubic-bezier(.23, 1, .32, 1) both; }
-        :root[data-face="sans"] body { font-family: var(--sans); line-height: 1.6; letter-spacing: -0.003em; }
-        @keyframes rise { from { transform: translateY(14px); } to { transform: none; } }
-        @media (prefers-reduced-motion: reduce) { body { animation: none; } html, body { transition: none; } }
-
-        /* One centered column at a book's measure: nothing to the side, nothing competing. */
-        main { max-width: var(--measure, 40em); margin: 0 auto; transition: max-width .2s cubic-bezier(.23, 1, .32, 1); }
-
-        /* The title page: the headline, the site's summary, then where it's from in small type. */
-        header { margin: 0 0 3em; }
-        h1.title { font-family: var(--serif); font-size: 2.05em; font-weight: 600; line-height: 1.14; letter-spacing: -0.012em;
-                   margin: 0; text-wrap: balance; }
-        :root[data-face="sans"] h1.title { font-family: var(--sans); font-weight: 700; letter-spacing: -0.022em; }
-        .dek { font-size: 1.12em; line-height: 1.45; color: var(--soft); margin: .6em 0 0; text-wrap: pretty; }
-        .meta { font: 13px/1.4 var(--sans); color: var(--soft); margin: 1.4em 0 0; }
-        .meta .dot { margin: 0 .5em; color: var(--faint); }
-        figure.hero { margin: 2.2em 0 0; }
-        /* Its room is kept from the start, so the text never jumps when the picture arrives. */
-        figure.hero { aspect-ratio: 16 / 9; max-height: 22em; width: 100%; border-radius: 8px; overflow: hidden; background: var(--code); }
-        figure.hero img { width: 100%; height: 100%; max-height: none; object-fit: cover; border-radius: 0; margin: 0; }
-
-        h1, h2, h3, h4 { line-height: 1.25; margin: 2em 0 .5em; letter-spacing: -0.01em; text-wrap: balance; font-weight: 600; }
-        h2 { font-size: 1.3em; } h3 { font-size: 1.08em; } h4 { font-size: 1em; }
-        h3, h4 { font-family: var(--sans); letter-spacing: -0.004em; }
-        p, ul, ol, blockquote, figure, pre, table, dl { margin: 0 0 1.05em; }
-        p { text-wrap: pretty; }
-        li { margin: .3em 0; } ul, ol { padding-left: 1.15em; } li::marker { color: var(--soft); }
-
-        /* Links read as part of the sentence; the underline is barely there until you point at it. */
-        a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .22em;
-            text-decoration-color: color-mix(in srgb, var(--text) 22%, transparent); }
-        a:hover { color: var(--link); text-decoration-color: currentColor; }
-        h1 a, h2 a, h3 a, figcaption a { text-decoration: none; }
-
-        /* Pictures sit in the column at their own size, centered; captions small and quiet beneath. */
-        img, video, svg, picture { display: block; max-width: 100%; height: auto; margin: 1.8em auto; border-radius: 6px; }
-        figure { margin: 2em 0; text-align: center; } figure img, figure picture, figure video { margin: 0 auto; }
-        img.wide, figure:has(img.wide) img { width: 100%; }
-        /* Picture galleries come as lists: no bullets, just the pictures. */
-        ul:has(> li img), ol:has(> li img) { list-style: none; padding: 0; }
-        li:has(img) { margin: 0; } li:has(img)::marker { content: none; }
-        figcaption { font: 13px/1.5 var(--sans); color: var(--soft); margin: 10px auto 0; max-width: 30em; text-wrap: pretty; }
-
-        blockquote { margin: 1.6em 0; padding: 0 0 0 1em; border-left: 2px solid var(--rule); color: var(--soft); }
-        blockquote p:last-child { margin-bottom: 0; }
-        pre, code, kbd { font: .84em/1.55 ui-monospace, "SF Mono", Menlo, monospace; }
-        code { background: var(--code); padding: .12em .36em; border-radius: 4px; }
-        pre { overflow-x: auto; padding: 16px 18px; border-radius: 8px; background: var(--code); } pre code { background: none; padding: 0; }
-        hr { border: 0; border-top: 1px solid var(--rule); margin: 2.4em auto; width: 4em; }
-        table { border-collapse: collapse; width: 100%; font: 14px/1.5 var(--sans); margin: 1.6em 0; }
-        td, th { border-bottom: 1px solid var(--rule); padding: 8px 12px 8px 0; text-align: left; vertical-align: top; }
-        th { font-weight: 600; }
-        sup, sub { line-height: 0; font-size: .68em; }
-
-        .end { margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--rule); font: 13px/1.4 var(--sans); color: var(--soft); }
-        .end a { text-decoration-color: var(--rule); }
-
-        /* Leftovers from the page that don't belong in reading. */
-        button, input, select, textarea, form, iframe, nav, aside, [role="button"], [aria-hidden="true"] { display: none !important; }
-        </style></head><body><main>
+        <title>\(escape(title))</title>
+        <style>\(css)</style></head><body><main>
         <header>
-        <h1 class="title">\(escape(article.title))</h1>
-        \(dek)
-        <p class="meta">\(meta)</p>
-        \(hero)
+        <p class="site">\(iconTag)<span>\(escape(article.site))</span></p>
+        <h1 class="title">\(escape(title))</h1>
+        \(byline)
         </header>
+        <article>
         \(article.content)
+        </article>
         \(source)
         </main></body></html>
         """
     }
+
+    /// A face per script, regular and bold, made of the Mac's own fonts and limited to that script's characters
+    /// (and its full-width punctuation), so it can lead a stack without taking over Latin text.
+    private static let cjkFaces: String = {
+        let ranges = "U+1100-11FF, U+2E80-2FDF, U+3000-30FF, U+3130-318F, U+3400-4DBF, U+4E00-9FFF, U+AC00-D7AF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF"
+        let faces = [("Reader SC", "PingFangSC-Regular", "PingFangSC-Semibold"), ("Reader TC", "PingFangTC-Regular", "PingFangTC-Semibold"),
+                     ("Reader JA", "HiraginoSans-W3", "HiraginoSans-W6"), ("Reader KO", "AppleSDGothicNeo-Regular", "AppleSDGothicNeo-SemiBold")]
+        return faces.map { family, regular, bold in
+            "@font-face { font-family: \"\(family)\"; src: local(\"\(regular)\"); font-weight: 100 499; unicode-range: \(ranges); }\n" +
+            "@font-face { font-family: \"\(family)\"; src: local(\"\(bold)\"); font-weight: 500 900; unicode-range: \(ranges); }"
+        }.joined(separator: "\n")
+    }()
+
+    /// The reading page's style sheet: its colors come from the palettes above.
+    static let css = """
+    /* Chinese, Japanese and Korean read in the Mac's own gothic faces (PingFang, Hiragino Sans, Apple SD Gothic Neo)
+       in either typeface: these take only their scripts' characters, so Latin words among them stay New York or SF. */
+    \(cjkFaces)
+    :root { \(Palette.light.css)
+            --serif: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
+            --sans: system-ui, -apple-system, "Helvetica Neue", sans-serif;
+            --mono: ui-monospace, "SF Mono", Menlo, monospace;
+            --face: var(--serif); --leading: 1.6; }
+    :root[data-theme="sepia"] { \(Palette.sepia.css) }
+    :root[data-theme="dark"] { \(Palette.dark.css) }
+    @media (prefers-color-scheme: dark) { :root[data-theme="auto"] { \(Palette.dark.css) } }
+    :root[data-face="sans"] { --face: var(--sans); --leading: 1.58; }
+    /* Their own faces (there are no italics to fake), and more air between lines. */
+    :root:lang(zh) { --serif: "Reader SC", ui-serif, serif; --sans: "Reader SC", system-ui, sans-serif; }
+    :root:is(:lang(zh-Hant), :lang(zh-TW), :lang(zh-HK)) { --serif: "Reader TC", ui-serif, serif; --sans: "Reader TC", system-ui, sans-serif; }
+    :root:lang(ja) { --serif: "Reader JA", ui-serif, serif; --sans: "Reader JA", system-ui, sans-serif; }
+    :root:lang(ko) { --serif: "Reader KO", ui-serif, serif; --sans: "Reader KO", system-ui, sans-serif; }
+    :root:is(:lang(zh), :lang(ja), :lang(ko)) { --leading: 1.8; }
+    :is(:lang(zh), :lang(ja), :lang(ko)) :is(em, i, cite, dfn) { font-style: normal; font-weight: 600; }
+
+    html { background: var(--paper); }
+    ::selection { background: var(--select); }
+    body { margin: 0; padding: 80px 40px 120px; color: var(--ink); font-family: var(--face); font-size: var(--size, 20px);
+           line-height: var(--leading); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+           font-kerning: normal; hanging-punctuation: first allow-end last; overflow-wrap: break-word;
+           -webkit-hyphens: auto; hyphens: auto; }
+    main { max-width: var(--measure, 34em); margin: 0 auto; }
+
+    /* The header: where it's from, the title, who and when. Space below it, no rule. */
+    header { margin: 0 0 2.2em; }
+    .site { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font: 500 14px/1.4 var(--sans); color: var(--soft); }
+    .site img { display: block; width: 16px; height: 16px; margin: 0; border-radius: 3px; flex: none; }
+    h1.title { margin: 0; font-size: 2.1em; line-height: 1.12; font-weight: 700; letter-spacing: -0.016em; text-wrap: balance; -webkit-hyphens: manual; hyphens: manual; }
+    :root:is(:lang(zh), :lang(ja), :lang(ko)) h1.title { line-height: 1.3; letter-spacing: 0; }
+    .byline { display: flex; flex-wrap: wrap; column-gap: 14px; margin: 14px 0 0; font: 14px/1.45 var(--sans); color: var(--soft); }
+    .byline .author { color: var(--ink); font-weight: 500; }
+
+    /* The text's rhythm: a line of space between paragraphs, headings closer to what follows than to what came before. */
+    article > :first-child { margin-top: 0; }
+    p, ul, ol, dl, blockquote, pre, table, figure, details { margin: 0 0 1em; }
+    p { text-wrap: pretty; }
+    h2, h3, h4, h5, h6 { margin: 1.8em 0 .5em; line-height: 1.25; font-weight: 700; letter-spacing: -0.008em; text-wrap: balance;
+                         -webkit-hyphens: manual; hyphens: manual; }
+    h2 { font-size: 1.4em; } h3 { font-size: 1.15em; } h4, h5, h6 { font-size: 1em; }
+    :is(h2, h3, h4) + :is(h3, h4, h5) { margin-top: .9em; }
+    article h1 { font-size: 1.4em; margin: 1.8em 0 .5em; line-height: 1.25; }
+
+    /* Links read as part of the sentence: the text's own color, a quiet underline, the link color when pointed at. */
+    a { color: inherit; text-decoration: underline 1px; text-underline-offset: .2em;
+        text-decoration-color: color-mix(in srgb, currentColor 24%, transparent); }
+    a:hover { color: var(--link); text-decoration-color: currentColor; }
+    :is(h1, h2, h3, h4, h5, h6) a, figure a { text-decoration: none; }
+
+    /* Pictures at their own size, never bigger, on the column's edge; a caption small and quiet under each. */
+    img, video, picture, svg, canvas { max-width: 100%; height: auto; }
+    img, video { display: block; margin: 1.6em 0; border-radius: 3px; }
+    img.inline { display: inline; margin: 0; vertical-align: middle; border-radius: 0; }
+    figure { margin: 1.8em 0; }
+    figure img, figure video, figure picture { margin: 0; }
+    figure > a, picture { display: block; }
+    figcaption { max-width: 36em; margin: .6em 0 0; font: 14px/1.45 var(--sans); color: var(--soft); text-wrap: pretty; -webkit-hyphens: manual; hyphens: manual; }
+    :root:is(:lang(zh), :lang(ja), :lang(ko)) figcaption { line-height: 1.6; }
+    figcaption p { margin: 0; }
+    /* Picture galleries come as lists: no bullets, just the pictures. */
+    :is(ul, ol):has(> li img) { list-style: none; padding: 0; }
+    li:has(> img, > figure, > a > img) { margin: 0; }
+
+    blockquote { margin: 1.4em 0; padding: 0 0 0 1.1em; border-left: 2px solid var(--rule); color: var(--soft); }
+    blockquote > :last-child { margin-bottom: 0; }
+
+    code, kbd, samp, pre { font-family: var(--mono); font-size: .84em; -webkit-hyphens: none; hyphens: none; }
+    code, kbd { padding: .1em .32em; border-radius: 4px; background: var(--code); }
+    pre { padding: 14px 16px; border-radius: 8px; background: var(--code); line-height: 1.55; overflow-x: auto; white-space: pre; tab-size: 4; }
+    pre code { padding: 0; background: none; font-size: inherit; }
+
+    table { display: block; width: max-content; max-width: 100%; overflow-x: auto; margin: 1.6em 0; border-collapse: collapse;
+            font: 15px/1.5 var(--sans); }
+    th, td { padding: 7px 16px 7px 0; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+    th { font-weight: 600; }
+    caption { caption-side: bottom; margin-top: .6em; text-align: left; font-size: 14px; color: var(--soft); }
+
+    ul, ol { padding-left: 1.4em; }
+    li { margin: .3em 0; } li > :is(p, ul, ol) { margin: .3em 0; }
+    li::marker { color: var(--soft); }
+    dt { font-weight: 600; } dd { margin: 0 0 .6em 1.4em; }
+    hr { height: 1px; margin: 2em 0; border: 0; background: var(--rule); }
+    sup, sub { line-height: 0; font-size: .7em; }
+    abbr[title] { text-decoration: none; }
+
+    .end { margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--rule); font: 14px/1.45 var(--sans); color: var(--soft); }
+    .end a { color: inherit; }
+
+    /* Leftovers from the page that don't belong in reading. */
+    button, input, select, textarea, form, iframe, nav, aside, [role="button"], [aria-hidden="true"] { display: none !important; }
+
+    /* On paper: black on white whatever the theme, the page's margins, nothing split across a page break. */
+    @page { margin: 18mm 20mm; }
+    @media print {
+      :root, :root[data-theme] { \(Palette.light.css) --ink: #000; }
+      html, body { background: #fff; }
+      body { padding: 0; font-size: 11.5pt; }
+      main { max-width: none; }
+      a { text-decoration: none; }
+      pre { white-space: pre-wrap; overflow: visible; }
+      table { overflow: visible; }
+      img, figure, pre, blockquote, tr { break-inside: avoid; }
+      h2, h3, h4 { break-after: avoid; }
+    }
+    """
 
     private static func escape(_ s: String) -> String {
         s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
@@ -300,7 +489,8 @@ enum Reader {
     }
 }
 
-/// The reading surface shown over a page card, with its controls at the top right.
+/// The reading surface shown over a page card. Its one control, Aa, sits quietly at the top right: there at the top
+/// of the article and whenever you scroll back up, out of the way while you read on.
 final class ReaderView: NSView {
     let webView: WKWebView
     var onClose: (() -> Void)?
@@ -312,6 +502,7 @@ final class ReaderView: NSView {
     private let controls = ReaderControls()
     /// The page the article came from: the reading page's own address, the one load it makes by itself.
     private var articleURL: URL?
+    private var scrollMonitor: Any?
 
     override init(frame: NSRect) {
         webView = WKWebView(frame: .zero, configuration: Self.configuration())
@@ -320,26 +511,27 @@ final class ReaderView: NSView {
         webView.setValue(false, forKey: "drawsBackground")
         addSubview(webView)
         addSubview(controls)
-        controls.onChange = { [weak self] preferences in
-            Reader.Preferences.saved = preferences
-            // The page's own scripts are off; this runs in Zigzag's world, so the change is instant.
-            self?.webView.evaluateJavaScript(preferences.script, in: nil, in: .defaultClient, completionHandler: nil)
-        }
-        controls.onClose = { [weak self] in self?.onClose?() }
+        controls.onChange = { [weak self] preferences in self?.apply(preferences) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    /// ⌘+ and ⌘−: the text a size bigger or smaller (0 back to the usual), kept for every article. Returns the new size.
+    /// ⌘+ and ⌘−: the text a step bigger or smaller (0 back to the usual), kept for every article. Returns the new
+    /// choices.
     @discardableResult
-    func stepTextSize(_ delta: Int) -> Int {
-        var preferences = controls.preferences
-        preferences.size = delta == 0 ? 19 : min(max(preferences.size + delta * 2, Reader.Preferences.sizes.lowerBound), Reader.Preferences.sizes.upperBound)
+    func stepTextSize(_ delta: Int) -> Reader.Preferences {
+        let preferences = controls.preferences.stepped(delta)
         controls.preferences = preferences
+        apply(preferences)
+        return preferences
+    }
+
+    private func apply(_ preferences: Reader.Preferences) {
         Reader.Preferences.saved = preferences
+        // The page's own scripts are off; this runs in Zigzag's world, so the change is instant.
         webView.evaluateJavaScript(preferences.script, in: nil, in: .defaultClient, completionHandler: nil)
-        return preferences.size
+        controls.theme = preferences.theme
     }
 
     /// One private store for every reading page: a fresh one each time starts a new web process, which is most of
@@ -364,71 +556,108 @@ final class ReaderView: NSView {
     override func layout() {
         super.layout()
         webView.frame = bounds
-        let size = controls.barSize
-        controls.frame = NSRect(x: bounds.width - size.width - Tokens.Space.x4, y: Tokens.Space.x4, width: size.width, height: size.height)
+        let side = ReaderControls.side
+        controls.frame = NSRect(x: bounds.width - side - Tokens.Space.x4, y: Tokens.Space.x4, width: side, height: side)
     }
 
-    func show(_ article: Reader.Article, from url: URL) {
+    func show(_ article: Reader.Article, from url: URL, icon: NSImage? = nil) {
         articleURL = url
         webView.navigationDelegate = self
-        webView.loadHTMLString(Reader.html(for: article), baseURL: url)
-        controls.preferences = .saved
-        controls.growsFrom = CGPoint(x: 1, y: 0)
-        controls.present(arrival: .pop)
+        let preferences = Reader.Preferences.saved
+        webView.loadHTMLString(Reader.html(for: article, preferences: preferences, icon: Reader.iconSource(icon)), baseURL: url)
+        controls.preferences = preferences
+        controls.theme = preferences.theme
     }
 
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { onClose?() } else { super.keyDown(with: event) }
     }
 
+    /// Scrolling on through the article puts Aa away; scrolling back up brings it back.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
+        scrollMonitor = nil
+        guard window != nil else { return }
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            guard let self, event.window === self.window, self.bounds.contains(self.convert(event.locationInWindow, from: nil)) else { return event }
+            if event.scrollingDeltaY < -1 { self.controls.setShown(false) } else if event.scrollingDeltaY > 1 { self.controls.setShown(true) }
+            return event
+        }
+    }
 }
 
-/// Two quiet buttons at the top right: Aa for how it reads, and done. Aa opens a small panel underneath.
-final class ReaderControls: FloatingPanelView {
+/// Aa, alone at the top right on the article's own paper: how it reads opens in a small panel underneath. Reader
+/// itself goes with the address's Reader button, Esc or ⌘⇧R, as it came.
+final class ReaderControls: NSView {
     var onChange: ((Reader.Preferences) -> Void)?
-    var onClose: (() -> Void)?
     var preferences = Reader.Preferences.saved { didSet { options.preferences = preferences } }
+    /// The article's colors: the button sits on its paper, in its ink, so it reads as part of the page.
+    var theme = Reader.Preferences.Theme.auto { didSet { refreshColors() } }
 
     private let style = IconButton(symbol: "textformat.size", toolTip: String(localized: "Text and Colors", comment: "Tooltip of the button in Reader's bar that shows its text and color choices."))
-    private let close = IconButton(symbol: "xmark", toolTip: String(localized: "Hide Reader", comment: "Tooltip of the button in Reader's bar that closes Reader."))
     private let options = ReaderOptions()
     private var monitor: Any?
+    private var isShown = true
 
-    /// Buttons with the same small gap all round: top, bottom and sides.
-    static let inset: CGFloat = 4
-    static var height: CGFloat { Tokens.Metric.iconButton + inset * 2 }
+    static var side: CGFloat { Tokens.Metric.iconButton }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        radius = Self.height / 2
-        [style, close].forEach { addSubview($0) }
+        wantsLayer = true
+        layer?.cornerRadius = Tokens.Radius.control
+        layer?.cornerCurve = .continuous
+        addSubview(style)
         style.onClick = { [weak self] _ in self?.toggleOptions() }
-        close.onClick = { [weak self] _ in self?.onClose?() }
         options.onChange = { [weak self] preferences in
             self?.preferences = preferences
             self?.onChange?(preferences)
         }
-        onLayout = { [weak self] in self?.layoutContent() }
+        refreshColors()
     }
 
     required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
 
-    var barSize: NSSize {
-        NSSize(width: Tokens.Metric.iconButton * 2 + 2 + Self.inset * 2, height: Self.height)
+    override func layout() {
+        super.layout()
+        style.frame = bounds
     }
 
-    private func layoutContent() {
-        let b = Tokens.Metric.iconButton, h = bounds.height
-        style.frame = NSRect(x: Self.inset, y: (h - b) / 2, width: b, height: b)
-        close.frame = NSRect(x: style.frame.maxX + 2, y: (h - b) / 2, width: b, height: b)
+    /// Put away, it takes no clicks: the article under it does.
+    override func hitTest(_ point: NSPoint) -> NSView? { isShown ? super.hitTest(point) : nil }
+
+    /// Shown at the top and on the way back up, put away on the way down; never while its panel is open.
+    func setShown(_ shown: Bool) {
+        guard shown != isShown, options.superview == nil else { return }
+        isShown = shown
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = Tokens.Motion.quick * Tokens.Motion.debugSlowdown
+            ctx.timingFunction = Tokens.Motion.easeOut
+            animator().alphaValue = shown ? 1 : 0
+        }
+    }
+
+    private func refreshColors() {
+        // Light, Sepia and Dark are the page's whatever the Mac's look; Auto follows the Mac, as the page does.
+        appearance = theme == .auto ? nil : NSAppearance(named: theme == .dark ? .darkAqua : .aqua)
+        let paper = theme == .auto ? (effectiveAppearance.isDark ? Reader.Palette.dark : .light).paper : theme.palette.paper
+        Tokens.Motion.withoutAnimation { layer?.backgroundColor = Tokens.Color.hex(paper).cgColor }
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshColors()
     }
 
     func toggleOptions() {
         if options.superview != nil { hideOptions(); return }
         guard let host = superview else { return }
+        setShown(true)
         options.preferences = preferences
         let size = options.panelSize
         options.frame = NSRect(x: frame.maxX - size.width, y: frame.maxY + 6, width: size.width, height: size.height)
+        options.growsFrom = CGPoint(x: 1, y: 0)
         host.addSubview(options)
         options.present()
         style.isSelected = true
@@ -490,9 +719,7 @@ private final class ReaderOptions: FloatingPanelView {
             addSubview(tile)
             tiles.append((theme, tile))
         }
-        size.onPick = { [weak self] larger in
-            self?.change { $0.size = larger ? min(Reader.Preferences.sizes.upperBound, $0.size + 1) : max(Reader.Preferences.sizes.lowerBound, $0.size - 1) }
-        }
+        size.onPick = { [weak self] larger in self?.change { $0 = $0.stepped(larger ? 1 : -1) } }
         face.onChange = { [weak self] index in self?.change { $0.face = index == 0 ? .serif : .sans } }
         measure.onChange = { [weak self] index in self?.change { $0.width = Reader.Preferences.Width.allCases[index] } }
         onLayout = { [weak self] in self?.layoutContent() }
@@ -602,12 +829,9 @@ private final class ThemeTile: InteractiveView {
     private let darkInk = CATextLayer()
     private let ring = CAShapeLayer()
 
+    /// The article's own paper and ink.
     private static func colors(_ theme: Reader.Preferences.Theme) -> (paper: NSColor, ink: NSColor) {
-        switch theme {
-        case .auto, .light: return (Tokens.Color.hex(0xFDFCFA), Tokens.Color.hex(0x1F1F21))
-        case .sepia: return (Tokens.Color.hex(0xF3E9D6), Tokens.Color.hex(0x45372A))
-        case .dark: return (Tokens.Color.hex(0x1B1B1D), Tokens.Color.hex(0xE6E4E0))
-        }
+        (Tokens.Color.hex(theme.palette.paper), Tokens.Color.hex(theme.palette.ink))
     }
 
     private static func name(_ theme: Reader.Preferences.Theme) -> String {
@@ -631,10 +855,10 @@ private final class ThemeTile: InteractiveView {
         layer?.borderWidth = Tokens.Metric.hairline
         layer?.borderColor = NSColor.black.withAlphaComponent(0.1).cgColor
         if theme == .auto {
-            darkHalf.backgroundColor = Tokens.Color.hex(0x1B1B1D).cgColor
+            darkHalf.backgroundColor = Tokens.Color.hex(Reader.Palette.dark.paper).cgColor
             layer?.addSublayer(darkHalf)
         }
-        for (text, color) in [(lightInk, ink), (darkInk, Tokens.Color.hex(0xE6E4E0))] {
+        for (text, color) in [(lightInk, ink), (darkInk, Tokens.Color.hex(Reader.Palette.dark.ink))] {
             text.string = "Aa"
             text.font = NSFont(descriptor: Tokens.Font.body(.semibold).fontDescriptor.withDesign(.serif)!, size: Tokens.TypeSize.body)
             text.fontSize = Tokens.TypeSize.body
