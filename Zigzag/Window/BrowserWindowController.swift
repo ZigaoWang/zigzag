@@ -851,8 +851,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     var addressAnchor: (view: NSView, rect: NSRect) {
         // Above the page, from the address's end, where the Site Controls and the extensions are.
         if root.showsTopBar {
-            if let button = sidebar.address.actionButtons.last { return (button, button.bounds) }
-            return (sidebar.address, sidebar.address.bounds)
+            let button = sidebar.address.siteControlsButton
+            return (button, button.bounds)
         }
         if root.sidebarVisible || root.isSidebarFloatingVisible { return (sidebar.address, sidebar.address.bounds) }
         let card = root.cardFrame
