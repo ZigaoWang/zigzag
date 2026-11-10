@@ -57,6 +57,8 @@ enum WebKitSetup {
             configuration.userContentController.add(Autofill.shared, contentWorld: .defaultClient, name: Autofill.messageName)
             configuration.userContentController.addUserScript(PageFrames.script)
             configuration.userContentController.add(PageFrames.shared, contentWorld: .defaultClient, name: PageFrames.messageName)
+            configuration.userContentController.addUserScript(PageVideos.script)
+            configuration.userContentController.add(PageVideos.shared, contentWorld: .defaultClient, name: PageVideos.messageName)
             configuration.userContentController.addUserScript(SwipeAnswers.script)
             configuration.userContentController.addUserScript(PageState.script)
             configuration.userContentController.add(SwipeAnswers.shared, contentWorld: .defaultClient, name: SwipeAnswers.messageName)
