@@ -113,17 +113,6 @@
         }
       }
     },
-    "%@ can’t prove it is who it says it is, so Zigzag didn’t open it." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 无法证明自己的身份，所以 Zigzag 没有打开它。"
-          }
-        }
-      }
-    },
     "%@ evening" : {
       "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”.",
       "localizations" : {
@@ -191,17 +180,6 @@
         }
       }
     },
-    "%@ is on a port kept for other things, like email, so browsers don’t open it." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 使用的端口留作电子邮件等其他用途，所以浏览器不会打开它。"
-          }
-        }
-      }
-    },
     "%@ isn’t a Safari export Zigzag can open. In Safari, choose File › Export Browsing Data, then choose the zip it makes." : {
       "comment" : "Problem in the Import window. The placeholder is the file's name; File › Export Browsing Data is Safari's own menu wording.",
       "localizations" : {
@@ -237,17 +215,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ 的 %2$lld 个密码使用了 Zigzag 暂时无法读取的新格式。请在 %3$@ 的“密码”页面将它们导出为 CSV 文件，然后在这里选择。"
-          }
-        }
-      }
-    },
-    "%@ keeps sending you around" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 一直在来回跳转"
           }
         }
       }
@@ -397,17 +364,6 @@
         }
       }
     },
-    "%@ sent a broken page" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 发来的页面已损坏"
-          }
-        }
-      }
-    },
     "%@ side panel" : {
       "comment" : "What VoiceOver calls an extension's side panel. The placeholder is the extension's name.",
       "localizations" : {
@@ -443,28 +399,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ 至 %2$@"
-          }
-        }
-      }
-    },
-    "%@ took too long" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 响应时间过长"
-          }
-        }
-      }
-    },
-    "%@ wants a certificate" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 要求提供证书"
           }
         }
       }
@@ -1546,6 +1480,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1Password 正在它的 App 中等你。请解锁它；如果它询问，请允许 Zigzag。"
+          }
+        }
+      }
+    },
+    "A blocker stopped this page" : {
+      "comment" : "Title of the page Zigzag shows when a content blocker kept a page from loading.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内容拦截器拦下了此页面"
+          }
+        }
+      }
+    },
+    "A content blocker doesn’t let this page load. If you trust the site, allow it in the blocker, then try again." : {
+      "comment" : "Message on the page Zigzag shows when a content blocker kept a page from loading.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内容拦截器不允许载入此页面。如果你信任这个网站，请在拦截器中允许它，然后再试一次。"
           }
         }
       }
@@ -2922,35 +2878,35 @@
         }
       }
     },
-    "Can’t connect securely to %@" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
+    "Can’t connect securely" : {
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法安全连接到 %@"
+            "value" : "无法建立安全连接"
           }
         }
       }
     },
-    "Can’t connect to %@" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
+    "Can’t connect to this site" : {
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法连接到 %@"
+            "value" : "无法连接到此网站"
           }
         }
       }
     },
-    "Can’t find %@" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
+    "Can’t find this site" : {
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "找不到 %@"
+            "value" : "找不到此网站"
           }
         }
       }
@@ -3109,13 +3065,13 @@
         }
       }
     },
-    "Check your internet connection, then try again." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load.",
+    "Check your Wi-Fi or network connection. Zigzag tries again by itself once you’re back online." : {
+      "comment" : "Message on the page Zigzag shows when a page can't load because the Mac is offline.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请检查你的互联网连接，然后再试一次。"
+            "value" : "请检查你的 Wi-Fi 或网络连接。恢复联网后，Zigzag 会自动再试一次。"
           }
         }
       }
@@ -3972,6 +3928,17 @@
         }
       }
     },
+    "Copied" : {
+      "comment" : "The Copy button under Details on an error page, once it has copied the error.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已拷贝"
+          }
+        }
+      }
+    },
     "Copied what’s on screen: this page scrolls inside itself" : {
       "comment" : "Toast after taking a screenshot of the whole page. Only the visible part could be taken.",
       "localizations" : {
@@ -3984,7 +3951,7 @@
       }
     },
     "Copy" : {
-      "comment" : "Edit menu item.",
+      "comment" : "Button under Details on the page Zigzag shows when a page can't load: copies the error.\nEdit menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4485,6 +4452,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已删除“%@”"
+          }
+        }
+      }
+    },
+    "Details" : {
+      "comment" : "Disclosure on the page Zigzag shows when a page can't load: the error as the system reports it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "详细信息"
           }
         }
       }
@@ -5572,6 +5550,17 @@
         }
       }
     },
+    "Go Back" : {
+      "comment" : "Button on the page Zigzag shows when a page can't load: back to the page before.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回"
+          }
+        }
+      }
+    },
     "Go back to your first space" : {
       "comment" : "A step's title in the getting-started guide, a card in the window.",
       "localizations" : {
@@ -5803,6 +5792,17 @@
         }
       }
     },
+    "If it’s a server on your Mac, check that it’s running, then try again." : {
+      "comment" : "Message on the page Zigzag shows when a server on this Mac (localhost) refuses the connection.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果这是你 Mac 上的服务器，请检查它是否正在运行，然后再试一次。"
+          }
+        }
+      }
+    },
     "Import" : {
       "comment" : "Main button in the Import window.\nTitle of the Import window.",
       "localizations" : {
@@ -5974,6 +5974,17 @@
         }
       }
     },
+    "It may be busy or down right now. Try again in a moment." : {
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它现在可能很忙或无法访问。请稍后再试。"
+          }
+        }
+      }
+    },
     "It may have been moved, renamed or deleted." : {
       "comment" : "Message on the page Zigzag shows when a page can't load.",
       "localizations" : {
@@ -6007,13 +6018,13 @@
         }
       }
     },
-    "It redirected the page in a loop. Clearing this site’s cookies often fixes it." : {
+    "It sends Zigzag around in a loop. Clearing this site’s cookies often fixes it." : {
       "comment" : "Message on the page Zigzag shows when a page can't load.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "它让页面陷入了循环重定向。清除此网站的 Cookie 通常可以解决。"
+            "value" : "它让 Zigzag 陷入了循环跳转。清除此网站的 Cookie 通常可以解决。"
           }
         }
       }
@@ -7595,6 +7606,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "没有可导入的内容"
+          }
+        }
+      }
+    },
+    "Nothing’s answering at this address" : {
+      "comment" : "Title of the page Zigzag shows when a server on this Mac (localhost) refuses the connection.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此地址没有响应"
           }
         }
       }
@@ -9275,7 +9297,7 @@
       }
     },
     "Reload Page" : {
-      "comment" : "Item in a tab's context menu in the sidebar.\nView menu item.",
+      "comment" : "Button on the page Zigzag shows when a page keeps stopping.\nItem in a tab's context menu in the sidebar.\nView menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10116,6 +10138,17 @@
         }
       }
     },
+    "Screen Time or a content filter on this Mac doesn’t allow it." : {
+      "comment" : "Message on the page Zigzag shows when Screen Time or a content filter blocks a site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 上的“屏幕使用时间”或内容过滤器不允许访问它。"
+          }
+        }
+      }
+    },
     "Screenshot copied" : {
       "comment" : "Toast after taking a screenshot of the whole page.",
       "localizations" : {
@@ -10827,17 +10860,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示标签页"
-          }
-        }
-      }
-    },
-    "Show details" : {
-      "comment" : "Disclosure on the page Zigzag shows for a site whose certificate can't be trusted.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "显示详细信息"
           }
         }
       }
@@ -11871,6 +11893,28 @@
         }
       }
     },
+    "The address may have a typo, or your Mac may not be connected to the internet. Check both, then try again." : {
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地址可能有误，或者你的 Mac 可能没有连接到互联网。请检查这两项，然后再试一次。"
+          }
+        }
+      }
+    },
+    "The address uses a port kept for other things, like email, so browsers don’t open it." : {
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此地址使用的端口留作电子邮件等其他用途，所以浏览器不会打开它。"
+          }
+        }
+      }
+    },
     "The cache makes pages load faster. Cookies keep you signed in." : {
       "comment" : "Explanation under “Website data” in Settings › Privacy.",
       "localizations" : {
@@ -12010,17 +12054,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "网站无法发送该文件"
-          }
-        }
-      }
-    },
-    "The site didn’t respond in time. Try again in a moment." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "网站没有及时响应。请稍后再试。"
           }
         }
       }
@@ -12355,6 +12388,17 @@
         }
       }
     },
+    "This page keeps redirecting" : {
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此页面一直在重定向"
+          }
+        }
+      }
+    },
     "This page keeps stopping" : {
       "comment" : "Title of the page Zigzag shows when a page can't load.",
       "localizations" : {
@@ -12410,6 +12454,28 @@
         }
       }
     },
+    "This site can’t prove it is who it says it is, so Zigzag didn’t open it. Someone could be pretending to be it to see what you send." : {
+      "comment" : "Message on the page Zigzag shows for a site whose certificate can't be trusted.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此网站无法证明自己的身份，所以 Zigzag 没有打开它。可能有人在冒充它，想看到你发送的内容。"
+          }
+        }
+      }
+    },
+    "This site is blocked on this Mac" : {
+      "comment" : "Title of the page Zigzag shows when Screen Time or a content filter blocks a site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此网站在这台 Mac 上受到限制"
+          }
+        }
+      }
+    },
     "This site needs a name and password." : {
       "comment" : "Message in the sheet a site's HTTP sign-in asks with.",
       "localizations" : {
@@ -12417,6 +12483,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此网站需要名称和密码。"
+          }
+        }
+      }
+    },
+    "This site sent a broken page" : {
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此网站发来的页面已损坏"
+          }
+        }
+      }
+    },
+    "This site took too long to answer" : {
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此网站响应时间过长"
+          }
+        }
+      }
+    },
+    "This site wants a certificate" : {
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此网站要求提供证书"
           }
         }
       }
@@ -13742,17 +13841,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的 Mac 不允许 Zigzag 打开它。"
-          }
-        }
-      }
-    },
-    "Your Mac may not be connected to the internet, or the address may have a typo. Check both, then try again." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的 Mac 可能没有连接到互联网，或者地址可能有误。请检查这两项，然后再试一次。"
           }
         }
       }
