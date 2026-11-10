@@ -108,6 +108,10 @@ final class Tab: NSObject {
     /// When its page last stopped unexpectedly, to tell a one-off from a page that keeps stopping.
     private var crashes: [Date] = []
     private var reloadWhenShown = false
+    /// Where you were on the page and what you'd typed, read as you left it; it stays while the tab is out of sight.
+    private(set) var pageState: PageState?
+    /// The page is loading again after it slept or stopped: once it's here, `pageState` puts it back.
+    private var restoresPageState = false
     /// The host whose certificate warning this tab last showed: the only one its "Visit anyway" link may trust.
     private var certificateWarningHost: String?
     /// The certificate that warning was about: the one "Visit anyway" trusts.
@@ -224,6 +228,7 @@ final class Tab: NSObject {
         } else if let state = pendingInteractionState {
             restoreState(state, in: webView)
             pendingInteractionState = nil
+            restoresPageState = pageState?.belongs(to: webView.url ?? url) == true
             // Interaction state restores history but may not start a load on its own.
             if webView.url == nil, let url { loadOwn(url, in: webView) }
         } else if let url, !fromWebKit {
@@ -237,21 +242,51 @@ final class Tab: NSObject {
         return webView
     }
 
-    /// Releases the web view but keeps everything needed to bring it back.
-    func suspend() {
+    /// Releases the web view but keeps everything needed to bring it back. Not while something you typed is in it.
+    /// `because`: why, for Help › Report a Problem.
+    func suspend(because reason: String? = nil) {
         guard let webView, !isPlayingAudio else { return }
-        captureSnapshot { [weak self] in
-            guard let self, self.webView === webView else { return }
-            self.pendingInteractionState = webView.interactionState as? Data
-            self.tearDown(webView)
-            self.changed.send(.webView)
+        readPageState { [weak self] state in
+            guard let self, self.webView === webView, state?.hasTypedText != true else { return }
+            self.captureSnapshot { [weak self] in
+                guard let self, self.webView === webView else { return }
+                self.pendingInteractionState = webView.interactionState as? Data
+                self.tearDown(webView)
+                self.changed.send(.webView)
+                if let reason { Diagnostics.note("Tab put to sleep", site: self.url?.host(), reason, isPrivate: self.isPrivate) }
+            }
         }
+    }
+
+    /// Reads where you are on the page and what you've typed (`pageState`), as you leave it and before it sleeps.
+    func readPageState(_ completion: ((PageState?) -> Void)? = nil) {
+        guard let webView, hasLoadedOnce, !Self.isExtensionPage(url), pdfViewer == nil, settingsView == nil else { completion?(pageState); return }
+        webView.evaluateJavaScript(PageState.reader, in: nil, in: .defaultClient) { [weak self, weak webView] result in
+            guard let self, let webView, self.webView === webView else { completion?(nil); return }
+            // A page that won't say (still loading, or its process gone) keeps what was read before.
+            if case .success(let value) = result, let state = PageState(value, url: webView.url) { self.pageState = state }
+            completion?(self.pageState)
+        }
+    }
+
+    /// Shown again: unless its page is loading back, what was read as you left it isn't needed.
+    func shown() {
+        if !restoresPageState { pageState = nil }
+    }
+
+    private func restorePageState(in webView: WKWebView) {
+        guard restoresPageState else { return }
+        restoresPageState = false
+        defer { pageState = nil }
+        guard let state = pageState, state.belongs(to: webView.url) else { return }
+        webView.callAsyncJavaScript(PageState.restorer, arguments: state.restoreArguments, in: nil, in: .defaultClient) { _ in }
     }
 
     /// `keepingSnapshot`: its window closed but the tab may come back (reopening the last window), so its
     /// thumbnail stays until the next save prunes what isn't kept.
     func close(keepingSnapshot: Bool = false) {
         isClosed = true
+        pageState = nil
         for tab in openedHere.allObjects where !tab.canGoBack { tab.changed.send(.navigation) }
         // Sound stops the moment it closes, whatever may still hold the page for a moment.
         webView?.pauseAllMediaPlayback(completionHandler: nil)
@@ -918,6 +953,7 @@ extension Tab: WKNavigationDelegate {
         if let until = landingUntil, Date() < until, let url = webView.url { pinnedLanding = url }
         checkForPDF(webView)
         refreshFavicon()
+        restorePageState(in: webView)
         // A tab without a picture yet gets one once its page has drawn.
         if snapshot == nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in

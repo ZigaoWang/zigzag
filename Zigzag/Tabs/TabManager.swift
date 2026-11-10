@@ -286,6 +286,8 @@ final class TabManager {
         }
         let previous = selectedTab
         previous?.captureSnapshot()
+        // Where you were and what you'd typed, in case its page has to load again while you're away.
+        if previous !== tab { previous?.readPageState() }
         // Idle counts from when you last saw a tab, not when you first opened it: a page you read for an hour
         // and just left isn't unloaded the moment you look away.
         if previous !== tab { previous?.markActivated() }
@@ -294,6 +296,7 @@ final class TabManager {
         promote(tab)
         tab.ensureWebView()
         tab.reloadIfItStopped()
+        tab.shown()
         if #available(macOS 15.4, *), previous !== tab { ExtensionHost.shared.tabActivated(tab, previous: previous) }
         changed.send(.selection)
     }

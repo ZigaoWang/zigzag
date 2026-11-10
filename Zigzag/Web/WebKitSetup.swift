@@ -58,6 +58,7 @@ enum WebKitSetup {
             configuration.userContentController.addUserScript(PageFrames.script)
             configuration.userContentController.add(PageFrames.shared, contentWorld: .defaultClient, name: PageFrames.messageName)
             configuration.userContentController.addUserScript(SwipeAnswers.script)
+            configuration.userContentController.addUserScript(PageState.script)
             configuration.userContentController.add(SwipeAnswers.shared, contentWorld: .defaultClient, name: SwipeAnswers.messageName)
             ContentBlocker.attach(to: configuration)
             ContentBlocker.attachYouTube(to: configuration)
