@@ -288,14 +288,21 @@ something came from, answers at once, and can be interrupted.
   width and colors. Reader itself comes and goes with the address's Reader button, ⌘⇧R or Esc.
 - **Mini player** (`MiniPlayer`): leave a tab while its video plays and the video follows you in a card over the page
   area: the tab's own live page moved in and scaled so only its video shows, never laid out again. A third of the
-  page area wide (240 to 480), the video's shape, never over half its height; `Radius.panel`, the floating layer's
-  hairline and one shadow, 12pt into a corner of the page area, never over the sidebar. It grows out of where the
-  video was (`Motion.zoom`; a fade with Reduce Motion) and fades as it closes. Pointing at it brings its controls
-  in a quick fade over an even dim, deeper at the top and bottom: back to the tab and the site's name at the top
-  left, close at the top right, back 15 seconds, play or pause and forward 15 seconds in the middle, a thin time line
-  to press or drag along the bottom (no skipping or time line for a live stream). They go 2.5 seconds after the
-  pointer stops. Drag it anywhere and it settles in the nearest corner, which it keeps; double-click it to go back
-  to the tab.
+  page area wide (240 to 480), the video's shape, never over half its height; `Radius.panel` (the page clipped to it
+  with `clipsToBounds`, which a web view's layers obey), the floating layer's hairline and one shadow, first 12pt
+  into the page area's bottom right. It sits over the page and the sidebar, under everything floating. It grows out
+  of where the video was (`Motion.zoom`; a fade with Reduce Motion) and fades as it closes. Pointing at it brings its
+  controls in a quick fade over a 38% dim, deeper at the top and bottom, so white reads over any picture, words in
+  it too: the arrow and the site's name at the top left (one button back to the tab), minimize and close at the top
+  right, back 15 seconds, play or pause and forward 15 seconds in the middle (36pt, semibold 20 to 24pt white glyphs
+  on a soft shadow), a thin time line to press or drag along the bottom (no skipping or time line for a live
+  stream). They go 2.5 seconds after the pointer stops. Drag it anywhere in the window, 4pt in from its edges and
+  under the bar above the page; it stays where it's let go, settling a margin in only within 16pt of an edge, and
+  keeps its distance from the nearest corner as the window resizes. Double-click it, or its arrow or site name, to go
+  back to the tab, in its own space. Minimize makes it a pill in the card's corner, `Radius.tile`, on
+  `panelBackground`: the video live in a 54 by 32 thumbnail, the tab's title, play or pause, and expand; a click
+  brings the card back there. The video plays on all the while. (Not the sidebar's Now Playing row: that shows only
+  for a tab you can hear, and a silent video plays on too.)
 - **Empty states** (`Tokens.EmptyState`, the same in HTML through `PageStyle`): the wordmark 120pt wide at 8%, 16pt
   to a quiet line no wider than 360, 24pt to an optional action. History, Passwords and the error page share it.
 - **Built-in pages** (History, Settings, Passwords): one plain `Color.surface` (the column of places in Settings and
