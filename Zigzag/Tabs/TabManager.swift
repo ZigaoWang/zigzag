@@ -1215,7 +1215,9 @@ final class TabManager {
     /// and at once when macOS says memory is short.
     func sleepIdleTabs() {
         // Kept awake: what's on screen (both halves of a split), anything in a call or floating, and sites that notify.
-        // Other spaces' pages sleep like any tab once idle; their snapshots still show while you swipe to them.
+        // Favorites too, as in Arc: they're the pages you keep coming back to, so they stay as you left them; only a
+        // Mac short of memory puts them to sleep. Other spaces' pages sleep like any tab once idle; their snapshots
+        // still show while you swipe to them.
         var selectedIDs = Set([selectedTab?.id].compactMap { $0 })
         for id in Array(selectedIDs) { if let tab = tab(with: id), let other = partner(of: tab) { selectedIDs.insert(other.id) } }
         let live = allTabs.filter { !$0.isSuspended }
@@ -1223,7 +1225,8 @@ final class TabManager {
         let lowOnMemory = MemoryPressure.shared.isLow
         let candidates = live.map {
             TabSleep.Candidate(id: $0.id, unseen: now.timeIntervalSince($0.lastActivated),
-                               mustStay: selectedIDs.contains($0.id) || $0.isPlayingAudio || $0.isInUse || $0.notifiesUser,
+                               mustStay: selectedIDs.contains($0.id) || $0.isPlayingAudio || $0.isInUse || $0.notifiesUser
+                                   || ($0.isFavorite && !lowOnMemory),
                                hasTypedText: $0.pageState?.hasTypedText == true)
         }
         for id in TabSleep.sleepers(candidates, awake: live.count, lowOnMemory: lowOnMemory) {
