@@ -914,7 +914,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         switch fn {
         case "getMediaStreamId":
             let (tab, _) = try invokedTab(for: extensionID)
-            try ensureNotCaptured(tab)
+            try ensureNotCaptured(tab, by: extensionID)
             pending = pending.filter { $0.value.expires > Date() }
             let id = UUID().uuidString
             pending[id] = Pending(extensionID: extensionID, tab: tab, origin: SiteOrigin.of(tab.webView?.url ?? tab.url), expires: Date().addingTimeInterval(10))
@@ -938,7 +938,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
                 (tab, controller) = try invokedTab(for: extensionID)
             }
             guard let webView = tab.webView else { throw BridgeError("Cannot capture a tab here") }
-            try ensureNotCaptured(tab)
+            try ensureNotCaptured(tab, by: extensionID)
             // Counted as captured from here: a second request while this one starts is refused, not run alongside.
             starting.insert(tab.id)
             // A capture that doesn't start takes the handler away again.
@@ -1053,7 +1053,9 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     /// As in Chrome, a tab is captured once at a time: a second capture is refused until the first stops (extensions
     /// expect this, and check before asking again). A capture whose page has gone, or whose extension stopped
     /// listening, no longer counts.
-    private func ensureNotCaptured(_ tab: Tab) throws {
+    /// Another extension refused this way is told so where you're looking, naming the one that has the tab: it
+    /// would otherwise just seem broken.
+    private func ensureNotCaptured(_ tab: Tab, by extensionID: String) throws {
         if starting.contains(tab.id) { throw BridgeError("Cannot capture a tab with an active stream.") }
         for (id, tap) in taps where tap.tabID == tab.id {
             // Its page collects every few hundredths of a second: one that's stopped (its popup closed) has ended,
@@ -1062,9 +1064,22 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
             if tap.webView == nil || tap.webView !== tab.webView || !collecting {
                 stop(id, because: "its page closed")
             } else {
+                if tap.extensionID != extensionID, let controller = self.tab(tab.id)?.1 {
+                    tellBusy(extensionID, holder: tap.extensionID, in: controller)
+                }
                 throw BridgeError("Cannot capture a tab with an active stream.")
             }
         }
+    }
+
+    static func busyText(_ name: String, holder: String) -> String {
+        String(localized: "\(name) can’t listen to this tab while \(holder) is. Turn \(holder) off for this tab, then try again.",
+               comment: "Toast when an extension asks to hear a tab another extension is already listening to; only one can at a time, as in Chrome. The first placeholder is the extension that asked, the other two the one listening, like Sound Booster.")
+    }
+
+    private func tellBusy(_ extensionID: String, holder: String, in controller: BrowserWindowController) {
+        let host = ExtensionHost.shared
+        Toast.show(Self.busyText(host.displayName(for: extensionID), holder: host.displayName(for: holder)), symbol: "waveform", duration: 5, in: controller)
     }
 
     /// Whether the capture's extension still hears it. Just after a capture starts, its page is still saying it
@@ -1112,7 +1127,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
 
     /// Says where you're looking that the extension can't hear this tab, and why, instead of it seeming broken.
     private func tellUnreachable(_ extensionID: String, in controller: BrowserWindowController) {
-        Toast.show(String(localized: "\(ExtensionHost.shared.displayName(for: extensionID)) can’t hear this tab. Streamed sound, as on YouTube, can’t reach extensions in Zigzag yet.", comment: "Toast when an extension asks to hear a tab whose sound Zigzag can't hand it on its own. The placeholder is the extension's name. YouTube is a product name."),
+        Toast.show(String(localized: "\(ExtensionHost.shared.displayName(for: extensionID)) can’t hear this tab. Its sound is protected or can’t be reached.", comment: "Toast when an extension asks to hear a tab whose sound Zigzag can't hand it (protected video, or sound it can't reach). The placeholder is the extension's name."),
                    symbol: "waveform.slash", duration: 5, in: controller)
     }
 
