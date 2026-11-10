@@ -48,8 +48,6 @@ final class PeekController {
     private let panel = FloatingPanelView()
     /// Clips the strip and the page to the card's rounded corners.
     private let clip = FlippedView()
-    /// Where the peek came from (the link you clicked), in the overlay: it grows out of there and goes back.
-    private var origin: NSPoint?
     /// The peek's window, for pointing at it (the Getting started guide).
     var panelView: NSView { panel }
     private let header = PeekHeaderView()
@@ -185,76 +183,29 @@ final class PeekController {
         return controller.root.cardFrame.contains(point) ? point : nil
     }
 
-    /// The card at a fraction of its size, centred on where it came from.
-    private func shrunk(toward point: NSPoint, scale: CGFloat) -> CATransform3D {
+    /// Where the link you clicked is on the card (0 to 1 from its top left), for the card to open out of; its middle
+    /// when the pointer isn't over the page.
+    private func growPoint() -> CGPoint {
+        let b = panel.bounds
+        guard let point = clickPoint(), b.width > 0, b.height > 0 else { return CGPoint(x: 0.5, y: 0.5) }
         let local = panel.convert(point, from: panel.superview)
-        let center = NSPoint(x: panel.bounds.midX, y: panel.bounds.midY)
-        // Layers scale from their corner; move so the centre lands on the click.
-        let dx = local.x - center.x * scale, dy = local.y - center.y * scale
-        return CATransform3DConcat(CATransform3DMakeScale(scale, scale, 1), CATransform3DMakeTranslation(dx, dy, 0))
+        let y = panel.isFlipped ? local.y : b.height - local.y
+        return CGPoint(x: min(max(local.x / b.width, 0), 1), y: min(max(y / b.height, 0), 1))
     }
 
-    /// Opens out of the link with a little spring, so you see where it came from.
+    /// Opens out of the link, so you see where it came from: from a little smaller, never from nothing, as a menu
+    /// grows out of its button.
     private func grow() {
-        // Peeked again while the last one was still leaving: start from a clean, opaque card.
-        panel.layer?.removeAnimation(forKey: "shrink")
-        panel.layer?.opacity = 1
-        panel.alphaValue = 1
         panel.layoutSubtreeIfNeeded()
-        origin = clickPoint()
-        guard let layer = panel.layer, !Tokens.Motion.isKeyboardDriven, !Tokens.Motion.reduceMotion else {
-            panel.present()
-            return
-        }
-        // From a little smaller, toward where you clicked, never from nothing; over in 220ms.
-        let start = shrunk(toward: origin ?? NSPoint(x: panel.frame.midX, y: panel.frame.midY), scale: 0.95)
-        let spring = CABasicAnimation(keyPath: "transform")
-        spring.fromValue = NSValue(caTransform3D: origin == nil ? CATransform3DMakeScale(0.97, 0.97, 1) : start)
-        spring.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        spring.duration = Tokens.Motion.standard
-        spring.timingFunction = Tokens.Motion.easeOut
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 0
-        fade.toValue = 1
-        fade.duration = Tokens.Motion.enter
-        fade.timingFunction = Tokens.Motion.easeOut
-        layer.add(spring, forKey: "grow")
-        layer.add(fade, forKey: "fade")
+        panel.growsFrom = growPoint()
+        panel.present()
     }
 
-    /// Steps back and fades.
+    /// Settles back a touch, in place, and fades: quick and quiet, nothing flying across the page. Peeked again
+    /// meanwhile, the card turns around and stays.
     private func shrink(_ done: @escaping () -> Void) {
-        // Esc puts it away at once, the way a key closes any panel; Reduce Motion just fades it.
-        guard let layer = panel.layer, !Tokens.Motion.isFromKey, !Tokens.Motion.reduceMotion else {
-            panel.dismiss(completion: done)
-            return
-        }
-        // Settles back a touch, in place, and fades: quick and quiet, nothing flying across the page.
-        let end = shrunk(toward: NSPoint(x: panel.frame.midX, y: panel.frame.midY), scale: 0.96)
-        CATransaction.begin()
-        CATransaction.setCompletionBlock { [weak self] in
-            guard let self else { return }
-            // Peeked again meanwhile: the card is in use, so it stays.
-            if !self.isVisible { self.panel.removeFromSuperview() }
-            layer.removeAnimation(forKey: "shrink")
-            layer.transform = CATransform3DIdentity
-            layer.opacity = 1
-            done()
-        }
-        let move = CABasicAnimation(keyPath: "transform")
-        move.fromValue = NSValue(caTransform3D: layer.presentation()?.transform ?? CATransform3DIdentity)
-        move.toValue = NSValue(caTransform3D: end)
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = layer.presentation()?.opacity ?? 1
-        fade.toValue = 0
-        let both = CAAnimationGroup()
-        both.animations = [move, fade]
-        both.duration = Tokens.Motion.enter
-        both.timingFunction = Tokens.Motion.easeOut
-        both.fillMode = .forwards
-        both.isRemovedOnCompletion = false
-        layer.add(both, forKey: "shrink")
-        CATransaction.commit()
+        panel.growsFrom = CGPoint(x: 0.5, y: 0.5)
+        panel.dismiss(completion: done)
     }
 
     func reposition() {
@@ -267,7 +218,8 @@ final class PeekController {
         guard isVisible else { return }
         isVisible = false
         token = nil
-        if Tokens.Motion.isFromKey { scrim.removeFromSuperview() } else { scrim.hide() }
+        // Esc too: the dimming goes with the card, as the card leaves.
+        scrim.hide(evenFromKeyboard: true)
         let closing = tab
         tab = nil
         shrink { closing?.close() }
