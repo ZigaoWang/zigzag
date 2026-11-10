@@ -554,6 +554,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Shown in a pane some other way (split beside the page you're on): the mini player lets it go.
         miniPlayer.tabsChanged()
         sidebar.update(tab: tab)
+        paintTopBar()
         // A collapsed pinned section shows the pinned page you're on, so it changes with the selection.
         if SidebarListView.isCollapsed(tabManager.currentSpaceID) { sidebar.list.reload(animated: true) } else { sidebar.list.refreshRows() }
         reloadFavorites()
@@ -840,6 +841,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         floatingDownloads.dismiss()
     }
 
+    /// The bar above the page in the shown page's color: its background (a site's theme color can be its header's,
+    /// and stay light on a page that turned dark), else its theme color.
+    private func paintTopBar() {
+        root.paintTopBar(shownTab?.webView?.underPageBackgroundColor ?? shownTab?.themeColor)
+    }
+
     /// Where popovers that belong to the address bar (extension popups) open from: the address bar while the sidebar
     /// shows, or the top left of the page while it's hidden, so they never open off screen.
     var addressAnchor: (view: NSView, rect: NSRect) {
@@ -1007,6 +1014,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 if tab.bookmarkID != nil { sidebar.list.refreshRows() }
             }
             sidebar.update(tab: tab)
+            paintTopBar()
             updateWindowTitle()
             offerWebStoreExtension()
         case .title:
@@ -1019,6 +1027,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             updateReaderButton()
         case .language:
             offerTranslation()
+        case .themeColor:
+            paintTopBar()
         default:
             break
         }
@@ -1416,7 +1426,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let container = root.sidebarContainer.frame
         let lightHeight = window.trafficLightHeight
         let x = (docked || inBar ? 0 : container.minX) + SidebarView.trafficLightsX
-        let y = (docked || inBar ? 0 : container.minY) + sidebar.trafficLightCenterY - lightHeight / 2
+        // In the bar, on its middle line, wherever the bar starts.
+        let y = (docked ? 0 : inBar ? root.topBarFrame.minY : container.minY) + sidebar.trafficLightCenterY - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating || inBar, let image = window.trafficLightsImage() { trafficLightsPicture = image }
         sidebar.trafficLightsWidth = fullScreen ? 0 : window.trafficLightsWidth

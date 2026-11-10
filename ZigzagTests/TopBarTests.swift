@@ -118,6 +118,24 @@ struct TopBarTests {
         #expect(hidden == NSRect(x: 0, y: 0, width: 1280, height: bar))
     }
 
+    @Test func framedTheBarIsTheTopOfThePagesCard() {
+        // Its buttons and address sit in the card's middle: the bar starts the inset down, the page right under it.
+        let barFrame = BrowserRootView.topBarFrame(in: window, sidebarVisible: true, sidebarWidth: 240, inset: inset)
+        #expect(barFrame == NSRect(x: 240, y: inset, width: 1040, height: bar))
+        #expect(BrowserRootView.pageArea(in: window, sidebarVisible: true, sidebarWidth: 240, edgeToEdge: false, borderless: false, topBar: true, barInset: inset).minY
+                == barFrame.maxY)
+    }
+
+    @Test func thePagesColorTurnsTheBarsIconsToMatch() {
+        let topBar = TopBarView()
+        topBar.pageColor = .black
+        #expect(topBar.appearance?.name == .darkAqua)
+        topBar.pageColor = .white
+        #expect(topBar.appearance?.name == .aqua)
+        topBar.pageColor = nil
+        #expect(topBar.appearance == nil)
+    }
+
     @Test func offTheLayoutIsUnchanged() {
         #expect(BrowserRootView.pageArea(in: window, sidebarVisible: true, sidebarWidth: 240, edgeToEdge: false, borderless: true, topBar: false)
                 == NSRect(x: 240, y: 0, width: 1040, height: 800))
@@ -155,7 +173,7 @@ struct TopBarTests {
         #expect(sidebar.addressButtons.allSatisfy { $0.superview === root.topBar })
         #expect(!root.topBar.isHidden)
         #expect(root.topBar.frame.minX == root.sidebarWidth)
-        #expect(root.card.frame.minY == bar)
+        #expect(root.card.frame.minY == root.topBar.frame.maxY)
         // The favorites start where the page does: as far under the top row as the page.
         #expect(sidebar.favorites.frame.minY == root.card.frame.minY)
         // The back button starts and the address ends the same inset in from the page's edges.

@@ -31,6 +31,19 @@ final class TopBarView: NSView {
         needsLayout = true
     }
 
+    /// The page's own color, over the page below it, as in Arc, so the bar and the page read as one card; nil lets the
+    /// window's frame show through. Icons and text turn light or dark to match.
+    var pageColor: NSColor? {
+        didSet {
+            guard pageColor != oldValue else { return }
+            appearance = pageColor.map { NSAppearance(named: Tokens.Color.luminance(of: $0) < 0.5 ? .darkAqua : .aqua) } ?? nil
+            needsDisplay = true
+        }
+    }
+    /// Where the page's color goes (right above the page) and how round its top corners are.
+    var pageSpan: NSRect = .zero { didSet { if pageSpan != oldValue { needsDisplay = true } } }
+    var pageRadius: CGFloat = 0 { didSet { if pageRadius != oldValue { needsDisplay = true } } }
+
     private var buttons: [NSView] = []
     private weak var address: NSView?
 
@@ -44,6 +57,18 @@ final class TopBarView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
+    override func draw(_ dirtyRect: NSRect) {
+        guard let pageColor, !pageSpan.isEmpty else { return }
+        NSGraphicsContext.saveGraphicsState()
+        pageSpan.clip()
+        pageColor.setFill()
+        // Round at the top only: the shape runs a radius past the bottom, where the clip cuts it square.
+        var shape = pageSpan
+        shape.size.height += pageRadius
+        NSBezierPath(roundedRect: shape, xRadius: pageRadius, yRadius: pageRadius).fill()
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
     override var mouseDownCanMoveWindow: Bool { true }
     override func mouseDown(with event: NSEvent) { window?.titleBarMouseDown(event) }
 
