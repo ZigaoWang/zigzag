@@ -541,13 +541,34 @@ final class Tab: NSObject {
 
     // MARK: Audio
 
+    /// Mutes or unmutes everything the page plays. A sleeping tab remembers it for when its page loads again. What
+    /// shows (the speaker, the menu's Mute or Unmute) is what WebKit says the page is now, not only what was asked.
     func setMuted(_ muted: Bool) {
-        guard let webView else { return }
-        if !webView.setPageAudioMuted(muted) {
-            webView.evaluateJavaScript("document.querySelectorAll('audio,video').forEach(m => m.muted = \(muted))")
+        if let webView {
+            if let now = webView.setPageAudioMuted(muted) {
+                isMuted = now
+            } else {
+                // No page muting in this WebKit: each sound the page plays, now and later, is muted instead.
+                webView.evaluateJavaScript(Self.elementMuting(muted))
+                isMuted = muted
+            }
+        } else {
+            isMuted = muted
         }
-        isMuted = muted
         changed.send(.audio)
+    }
+
+    /// Mutes (or unmutes) the page's audio and video, and any it plays later, where WebKit can't mute the page.
+    static func elementMuting(_ muted: Bool) -> String {
+        """
+        (() => {
+          window.__zigzagMuted = \(muted);
+          document.querySelectorAll('audio,video').forEach(m => m.muted = \(muted));
+          if (window.__zigzagMuteWatch) return;
+          window.__zigzagMuteWatch = true;
+          document.addEventListener('play', (e) => { if (window.__zigzagMuted && e.target instanceof HTMLMediaElement) e.target.muted = true; }, true);
+        })()
+        """
     }
 
     /// Pauses (or resumes) everything the page is playing, through WebKit's own media control.
@@ -1274,14 +1295,36 @@ extension Tab {
 }
 
 extension WKWebView {
-    /// Mutes everything the page plays, Web Audio included, as WebKit's own tab muting does. False where WebKit
-    /// doesn't offer it.
+    /// Mutes everything the page plays, Web Audio included, as WebKit's own tab muting does, and answers whether the
+    /// page's sound is muted now. Nil where WebKit doesn't offer it.
+    ///
+    /// WebKit keeps one set of muted flags for the page (`_WKMediaMutedState`): its sound, and the camera, microphone
+    /// and screen it's capturing. Setting it replaces them all, so only the sound's flag changes here: muting a tab
+    /// in a call must never turn its muted microphone back on, nor unmuting it the camera.
     @discardableResult
-    func setPageAudioMuted(_ muted: Bool) -> Bool {
-        let selector = NSSelectorFromString("_setPageMuted:")
-        guard responds(to: selector) else { return false }
-        typealias SetMuted = @convention(c) (AnyObject, Selector, UInt) -> Void
-        unsafeBitCast(method(for: selector), to: SetMuted.self)(self, selector, muted ? 1 : 0)
-        return true
+    func setPageAudioMuted(_ muted: Bool) -> Bool? {
+        let set = NSSelectorFromString("_setPageMuted:")
+        guard responds(to: set) else { return nil }
+        let flags = Self.mutedFlags(pageMutedState ?? 0, audioMuted: muted)
+        typealias SetMuted = @convention(c) (AnyObject, Selector, Int) -> Void
+        unsafeBitCast(method(for: set), to: SetMuted.self)(self, set, flags)
+        return pageMutedState.map(Self.isAudioMuted) ?? muted
     }
+
+    /// WebKit's muted flags for the page, when it says.
+    var pageMutedState: Int? {
+        let get = NSSelectorFromString("_mediaMutedState")
+        guard responds(to: get) else { return nil }
+        typealias MutedState = @convention(c) (AnyObject, Selector) -> Int
+        return unsafeBitCast(method(for: get), to: MutedState.self)(self, get)
+    }
+
+    /// `_WKMediaAudioMuted`: the page's sound. The other flags are its capture devices and screen capture.
+    nonisolated static let audioMutedFlag = 1
+
+    nonisolated static func mutedFlags(_ current: Int, audioMuted: Bool) -> Int {
+        audioMuted ? current | audioMutedFlag : current & ~audioMutedFlag
+    }
+
+    nonisolated static func isAudioMuted(_ flags: Int) -> Bool { flags & audioMutedFlag != 0 }
 }
