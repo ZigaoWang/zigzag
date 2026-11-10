@@ -55,15 +55,36 @@ nonisolated struct PageState: Equatable, Sendable {
     @MainActor static let script = WKUserScript(source: """
     (() => {
       const typed = window.__zigzagTyped = new Set();
-      addEventListener('input', (e) => { if (e.isTrusted && e.target instanceof Element) typed.add(e.target); }, true);
+      // A field that was a password while you typed stays secret once "Show password" makes it plain text.
+      const secret = window.__zigzagSecret = new WeakSet();
+      addEventListener('input', (e) => {
+        if (!e.isTrusted || !(e.target instanceof Element)) return;
+        if (e.target instanceof HTMLInputElement && e.target.type === 'password') secret.add(e.target);
+        typed.add(e.target);
+      }, true);
     })();
     """, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .defaultClient)
+
+    /// Which fields' text may be kept: a text area, or a plain text field, that isn't a password (or wasn't one while
+    /// you typed), a card's details, a one-time code or the like, by its type, its autocomplete, its name and label,
+    /// or text the page hides as it's typed.
+    static let fieldRules = """
+      const kinds = new Set(['text', 'search', 'email', 'url', 'tel', 'number']);
+      const secretWords = /pass|pwd|cc-|card|cvc|cvv|csc|security.?code|one.?time|otp|totp|2fa|mfa|verif|pin(?![a-z])|ssn|social.?security|iban|routing|account.?num|secret|token/i;
+      const keepable = (el) => {
+        const plain = el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && kinds.has(el.type));
+        if (!plain || window.__zigzagSecret?.has(el)) return false;
+        const said = [el.autocomplete, el.name, el.id, el.getAttribute('aria-label'), el.placeholder].join(' ');
+        if (secretWords.test(said)) return false;
+        const hidden = getComputedStyle(el).getPropertyValue('-webkit-text-security');
+        return !hidden || hidden === 'none';
+      };
+    """
 
     /// Reads the page's scroll and what you typed, as an object `init?(_:url:)` reads.
     static let reader = """
     (() => {
-      const kinds = new Set(['text', 'search', 'email', 'url', 'tel', 'number']);
-      const secret = /cc-|one-time-code|password/i;
+    \(fieldRules)
       const path = (el) => {
         const parts = [];
         for (let e = el; e && e !== document.documentElement; e = e.parentElement) {
@@ -79,8 +100,7 @@ nonisolated struct PageState: Equatable, Sendable {
       for (const el of window.__zigzagTyped || []) {
         if (!el.isConnected) continue;
         if (el.isContentEditable) { if (el.innerText.trim()) editing = true; continue; }
-        const plain = el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && kinds.has(el.type));
-        if (!plain || secret.test(el.autocomplete || '') || !el.value || el.value === el.defaultValue) continue;
+        if (!keepable(el) || !el.value || el.value === el.defaultValue) continue;
         if (fields.length >= 30 || size + el.value.length > 200000) break;
         size += el.value.length;
         fields.push([path(el), el.value]);
@@ -92,6 +112,7 @@ nonisolated struct PageState: Equatable, Sendable {
     /// Puts the page back: what you typed into fields that are empty again, and the scroll, unless the page has put
     /// itself somewhere or you've scrolled or typed since. Tried again as the page builds, for up to five seconds.
     static let restorer = """
+    \(fieldRules)
     let moved = false;
     const stop = () => { moved = true; };
     for (const kind of ['wheel', 'keydown', 'mousedown', 'touchstart']) addEventListener(kind, stop, { capture: true, once: true });
@@ -102,6 +123,8 @@ nonisolated struct PageState: Equatable, Sendable {
         let el = null;
         try { el = document.querySelector(selector); } catch (e) { return false; }
         if (!el) return true;
+        // The page changed since and something else is there now (a password field, a card number): left alone.
+        if (!keepable(el)) return false;
         if (el.value === '' || el.value === el.defaultValue) {
           setter(el)?.call(el, value);
           el.dispatchEvent(new Event('input', { bubbles: true }));
