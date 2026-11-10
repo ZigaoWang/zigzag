@@ -15,6 +15,20 @@ enum TabNumbers {
     }
 }
 
+/// ⌃1–⌃9 count the spaces in their order along the bottom of the sidebar: each number goes to its own space, ⌃9 to the
+/// ninth (not the last, as ⌘9 does with tabs), and a number with no space goes nowhere.
+enum SpaceNumbers {
+    static func index(for number: Int, count: Int) -> Int? {
+        guard (1...9).contains(number), number <= count else { return nil }
+        return number - 1
+    }
+
+    /// The number each space shows while ⌃ is held: the first nine theirs, none past them.
+    static func labels(count: Int) -> [Int?] {
+        (0..<max(0, count)).map { $0 < 9 ? $0 + 1 : nil }
+    }
+}
+
 /// When holding a modifier has gone on long enough to show the numbers it goes with, as Safari does for ⌘: that
 /// modifier alone, held `delay` with no key pressed and nothing clicked meanwhile. Anything else on the way (another
 /// modifier, a key, a click) spoils it until every modifier is let go, so typing ⌘T, ⌘W, ⌃Tab or ⌃1 quickly never

@@ -448,8 +448,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func showSpaceSwitcher(_ sender: Any?) { spaceSwitcher.toggle() }
     @objc func selectSpaceByNumber(_ sender: NSMenuItem) {
         let spaces = Library.shared.spaces
-        let index = sender.tag - 1
-        guard spaces.indices.contains(index) else { return }
+        guard let index = SpaceNumbers.index(for: sender.tag, count: spaces.count) else { return }
         tabManager.switchToSpace(spaces[index].id)
     }
     /// Help › Getting Started: the guide, from the first step.
@@ -558,9 +557,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(closeOtherTabs(_:)): return !otherTabs.isEmpty
         case #selector(closeTabsBelow(_:)): return !tabsBelow.isEmpty
         case #selector(selectSpaceByNumber(_:)):
-            let spaces = Library.shared.spaces
-            let index = item.tag - 1
-            return spaces.indices.contains(index)
+            return SpaceNumbers.index(for: item.tag, count: Library.shared.spaces.count) != nil
         case #selector(nextSpace(_:)), #selector(previousSpace(_:)): return Library.shared.spaces.count > 1
         case #selector(showSpaceSwitcher(_:)): return Library.shared.spaces.count > 1 && !tabManager.isPrivate
         default: return true
