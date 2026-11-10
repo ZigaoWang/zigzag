@@ -1,4 +1,4 @@
-// navigator.locks for an extension's own pages and workers. zigzag.webLocks
+// navigator.locks for an extension's own pages and workers.
 // WebKit takes a lock request from an extension's address for an invalid message and kills its process
 // (WebLockRegistryProxy_RequestLock), background and popup together. Rabby asks as its wallet unlocks. This keeps the
 // API's rules, shared and exclusive, ifAvailable, abort and query, within this page or worker: it can't hold a lock
