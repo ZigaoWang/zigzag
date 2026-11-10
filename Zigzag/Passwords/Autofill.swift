@@ -51,9 +51,13 @@ final class Autofill: NSObject, WKScriptMessageHandler {
 
     /// Offer saved logins in sign-in fields. On by default, unless a password-manager extension is handling them
     /// and Zigzag has no passwords brought over from another browser.
-    static var isOn: Bool {
-        get { UserDefaults.standard.object(forKey: "PasswordsAutofill") as? Bool ?? (!PasswordManagers.isActive || UserDefaults.standard.bool(forKey: importedKey)) }
-        set { UserDefaults.standard.set(newValue, forKey: "PasswordsAutofill") }
+    static func isOn(in profile: Profile) -> Bool {
+        PasswordManagers.zigzagHandles(chosen: ProfileKey.fillsPasswords.choice(in: profile.id), managerOn: PasswordManagers.active(in: profile) != nil,
+                                       imported: UserDefaults.standard.bool(forKey: importedKey))
+    }
+
+    static func setOn(_ on: Bool, in profile: Profile) {
+        UserDefaults.standard.set(on, forKey: ProfileKey.fillsPasswords.name(in: profile.id))
     }
 
     static var script: WKUserScript {
@@ -66,9 +70,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         switch kind {
         case "focus":
             generation += 1
-            debugLog("autofill focus main=\(message.frameInfo.isMainFrame) on=\(Self.isOn) form=\(body["isForm"] ?? "-") new=\(body["isNew"] ?? "-")")
+            debugLog("autofill focus main=\(message.frameInfo.isMainFrame) on=\(Self.isOn(in: Profiles.shared.profile(ofPage: webView))) form=\(body["isForm"] ?? "-") new=\(body["isNew"] ?? "-")")
             // Fields inside frames are positioned relative to the frame, which the page can't tell us reliably.
-            guard message.frameInfo.isMainFrame, Self.isOn,
+            guard message.frameInfo.isMainFrame, Self.isOn(in: Profiles.shared.profile(ofPage: webView)),
                   let rect = body["rect"] as? [String: Double], let x = rect["x"], let y = rect["y"], let w = rect["w"], let h = rect["h"] else { hide(); return }
             let security = message.frameInfo.securityOrigin
             let origin = Origin(scheme: security.protocol, host: security.host.lowercased(), port: security.port == 0 ? nil : security.port)

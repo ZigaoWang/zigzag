@@ -174,3 +174,54 @@ struct ProfileDirectoryTests {
         #expect(try JSONDecoder().decode(ProfileDirectory.self, from: Data(json.utf8)).all.count == 1)
     }
 }
+
+/// What a profile chooses for itself in the preferences, and when Zigzag's own passwords step aside for a
+/// password manager.
+@MainActor
+struct ProfileChoiceTests {
+    @Test func theFirstProfileKeepsThePlainNamesAndOthersGetTheirOwn() {
+        let work = UUID()
+        #expect(ProfileKey.offersToSavePasswords.name(in: Profile.defaultID) == "PasswordsOfferToSave")
+        #expect(ProfileKey.fillsPasswords.name(in: Profile.defaultID) == "PasswordsAutofill")
+        #expect(ProfileKey.extensionsPinned.name(in: Profile.defaultID) == "ExtensionsPinned")
+        #expect(ProfileKey.extensionsPinned.name(in: work) == "ExtensionsPinned.\(work.uuidString)")
+    }
+
+    @Test func aRemovedProfileLeavesNoChoiceBehindAndTheFirstKeepsIts() throws {
+        let suite = "ProfileChoiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let work = UUID()
+        for key in ProfileKey.allCases {
+            defaults.set(true, forKey: key.name(in: work))
+            defaults.set(true, forKey: key.name(in: Profile.defaultID))
+        }
+        #expect(ProfileKey.offersToSavePasswords.choice(in: work, defaults: defaults) == true)
+        ProfileKey.forget(work, in: defaults)
+        ProfileKey.forget(Profile.defaultID, in: defaults)
+        for key in ProfileKey.allCases {
+            #expect(defaults.object(forKey: key.name(in: work)) == nil)
+            #expect(defaults.object(forKey: key.name(in: Profile.defaultID)) != nil)
+        }
+        #expect(ProfileKey.offersToSavePasswords.choice(in: work, defaults: defaults) == nil)
+    }
+
+    @Test func zigzagStepsAsideForAPasswordManagerUntilYouChoose() {
+        // Nothing chosen: on, unless a manager is on in that profile.
+        #expect(PasswordManagers.zigzagHandles(chosen: nil, managerOn: false))
+        #expect(!PasswordManagers.zigzagHandles(chosen: nil, managerOn: true))
+        // Passwords brought over from another browser are there to be filled even so.
+        #expect(PasswordManagers.zigzagHandles(chosen: nil, managerOn: true, imported: true))
+        // What you chose stands, either way.
+        #expect(PasswordManagers.zigzagHandles(chosen: true, managerOn: true))
+        #expect(!PasswordManagers.zigzagHandles(chosen: false, managerOn: false, imported: true))
+    }
+
+    @Test func thePasswordManagerIsNamedFromWhatIsInstalled() {
+        #expect(PasswordManagers.active(among: []) == nil)
+        #expect(PasswordManagers.active(among: ["not-a-password-manager"]) == nil)
+        #expect(PasswordManagers.active(among: ["nngceckbapebfimnlniiiahkandclblb"]) == "Bitwarden")
+        // Several on: always the same one.
+        #expect(PasswordManagers.active(among: ["nngceckbapebfimnlniiiahkandclblb", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"]) == "1Password")
+    }
+}
