@@ -612,4 +612,8 @@ struct PageTextSubstitutionTests {
             """) as? String
         #expect(value == typed)
     }
+
+    @Test func yourOwnTextReplacementsStillApply() {
+        #expect(AppDelegate.pageTextDefaults["WebAutomaticTextReplacementEnabled"] as? Bool == true)
+    }
 }

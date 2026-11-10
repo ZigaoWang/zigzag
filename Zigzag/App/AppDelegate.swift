@@ -8,11 +8,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// What you type into a web page stays as you typed it, as in Chrome and Safari: WebKit would otherwise follow
     /// the Mac's text substitutions, turning `--` into `—` (breaking GitHub's `<!-- Uploading … -->` placeholders
-    /// and every pasted command) and straight quotes into curly ones. Edit › Substitutions still turns each back on.
+    /// and every pasted command) and straight quotes into curly ones. Your own Text Replacements (System Settings ›
+    /// Keyboard) do apply, as in Safari: they only ever change a shortcut you set up yourself. Edit › Substitutions
+    /// turns each on or off.
     static let pageTextDefaults: [String: Any] = [
         "WebAutomaticDashSubstitutionEnabled": false,
         "WebAutomaticQuoteSubstitutionEnabled": false,
-        "WebAutomaticTextReplacementEnabled": false,
+        "WebAutomaticTextReplacementEnabled": true,
     ]
 
     func applicationWillFinishLaunching(_ notification: Notification) {
