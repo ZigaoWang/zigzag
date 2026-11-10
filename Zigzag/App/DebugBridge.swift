@@ -7,6 +7,7 @@ enum DebugBridge {
     #if DEBUG
     static var hovered: [NSView] = []
     private static var scrollLog: [String] = []
+    private static var dragTimer: Timer?
 
     static func recordScroll(_ event: NSEvent) {
         scrollLog.append(String(format: "%.3f phase=%lu mom=%lu dx=%.1f dy=%.1f precise=%d swipeEnabled=%d",
@@ -1103,6 +1104,50 @@ enum DebugBridge {
             }
             if let root = controller.window?.contentView { walk(root) }
             try? out.write(toFile: arg, atomically: true, encoding: .utf8)
+        case "seldrag", "seldragdirect":
+            // seldrag x y toY seconds: presses at x,y (window points, top left) and drags straight down to toY,
+            // then holds there, as selecting text past the page's bottom does: 60 drags a second, sent through the
+            // window in this process (seldragdirect: straight to the web view, past everything of Zigzag's). Logs
+            // each frame the web view and its card had along the way, then lets go.
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            guard n.count == 4, let window = controller.window else { break }
+            let height = window.frame.height
+            let direct = name == "seldragdirect"
+            func send(_ type: NSEvent.EventType, _ y: Double) {
+                if let event = NSEvent.mouseEvent(with: type, location: NSPoint(x: n[0], y: height - y), modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                  windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1) {
+                    if direct, let webView = controller.selectedWebView {
+                        switch type {
+                        case .leftMouseDown: webView.mouseDown(with: event)
+                        case .leftMouseUp: webView.mouseUp(with: event)
+                        default: webView.mouseDragged(with: event)
+                        }
+                    } else {
+                        window.sendEvent(event)
+                    }
+                }
+            }
+            BrowserWebView.takesFirstMouse = true
+            send(.leftMouseDown, n[1])
+            let start = Date()
+            var frames: [String] = []
+            dragTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { _ in
+                MainActor.assumeIsolated {
+                    let t = Date().timeIntervalSince(start)
+                    let y = t < 0.4 ? n[1] + (n[2] - n[1]) * t / 0.4 : n[2]
+                    if t > n[3] {
+                        dragTimer?.invalidate()
+                        send(.leftMouseUp, y)
+                        BrowserWebView.takesFirstMouse = false
+                        debugLog("seldrag frames " + Set(frames).sorted().joined(separator: " | "))
+                        return
+                    }
+                    send(.leftMouseDragged, y)
+                    if let webView = controller.selectedWebView {
+                        frames.append("\(webView.frame) in \(webView.superview?.frame ?? .zero)")
+                    }
+                }
+            }
         case "hit":
             let n = arg.split(separator: " ").compactMap { Double($0) }
             if n.count == 2, let window = controller.window, let frameView = window.contentView?.superview {

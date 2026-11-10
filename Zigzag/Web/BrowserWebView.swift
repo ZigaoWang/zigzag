@@ -27,6 +27,13 @@ final class BrowserWebView: WKWebView {
         return super.becomeFirstResponder()
     }
 
+    #if DEBUG
+    /// Debug commands that click into a page from a test copy in the background, where the first click would
+    /// otherwise only bring the window forward.
+    nonisolated(unsafe) static var takesFirstMouse = false
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { Self.takesFirstMouse || super.acceptsFirstMouse(for: event) }
+    #endif
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         // Its tab went to the back mid-swipe: the swipe can't finish here any more.
