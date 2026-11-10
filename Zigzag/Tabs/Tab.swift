@@ -83,11 +83,14 @@ final class Tab: NSObject {
     /// Set for tabs in a private window: their own throwaway storage, and nothing remembered.
     var privateStore: WKWebsiteDataStore?
     var isPrivate: Bool { privateStore != nil }
-    /// In a call (camera or microphone on, even muted) or floating in Picture in Picture: not to be put to sleep.
+    /// In a call (camera or microphone on, even muted), floating in Picture in Picture, or playing in the mini
+    /// player: not to be put to sleep.
     var isInUse: Bool {
         guard let webView else { return false }
-        return webView.cameraCaptureState != .none || webView.microphoneCaptureState != .none || webView.isPictureInPictureActive
+        return isInMiniPlayer || webView.cameraCaptureState != .none || webView.microphoneCaptureState != .none || webView.isPictureInPictureActive
     }
+    /// Its video is playing in the window's mini player, its page with it.
+    var isInMiniPlayer = false
     /// From a site you've let send notifications: kept awake and out of the archive, so they keep coming.
     var notifiesUser: Bool {
         guard !isPrivate, let origin = SiteOrigin.of(url) else { return false }
@@ -249,7 +252,7 @@ final class Tab: NSObject {
     /// Releases the web view but keeps everything needed to bring it back. Not while something you typed is in it.
     /// `because`: why, for Help › Report a Problem.
     func suspend(because reason: String? = nil) {
-        guard let webView, !isPlayingAudio else { return }
+        guard let webView, !isPlayingAudio, !isInMiniPlayer else { return }
         sleepTicket += 1
         let ticket = sleepTicket
         readPageState { [weak self] state in self?.sleep(webView, ticket: ticket, state: state, because: reason) }
@@ -375,9 +378,6 @@ final class Tab: NSObject {
     private(set) var foreignLanguage: Locale.Language?
     /// The page's text is shown translated.
     var isTranslated = false
-
-    /// Set when switching away floated this tab's video, so switching back can put it back.
-    var floatedOnSwitch = false
 
     /// True while the web view was built for an extension's own pages (settings, dashboards).
     private var showsExtensionPage = false

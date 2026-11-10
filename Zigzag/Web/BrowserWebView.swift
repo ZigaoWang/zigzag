@@ -207,7 +207,8 @@ extension WKWebView {
 
 enum PictureInPicture {
     private static let key = "PictureInPictureFollowsTabs"
-    /// Float a playing video when you switch to another tab. On unless turned off in Settings.
+    /// A playing video follows you in the window's mini player when you switch to another tab (`MiniPlayer`). On
+    /// unless turned off in Settings. The key is from when it floated in Picture in Picture, kept so the choice stays.
     static var followsTabs: Bool {
         get { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: key) }

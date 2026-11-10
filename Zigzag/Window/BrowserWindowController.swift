@@ -42,6 +42,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     var isInPageChange = false
     lazy var linkStatus = LinkStatusController(overlay: root.overlay)
     lazy var peek = PeekController(controller: self)
+    /// A playing video you've left, in a small card over the page.
+    lazy var miniPlayer = MiniPlayer(controller: self)
     var peekController: PeekController? { peek }
 
     init(tabManager: TabManager, frame: NSRect?, sidebarVisible: Bool = true, sidebarWidth: CGFloat = Tokens.Metric.sidebarWidth) {
@@ -62,6 +64,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.commandBar.reposition()
             self.findBar.reposition()
             self.peek.reposition()
+            self.miniPlayer.place()
             PermissionPrompt.reposition(in: self)
             Toast.reposition(in: self)
             if self.floatingDownloads.superview != nil {
@@ -279,8 +282,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             reloadFavorites()
             numberHints?.placesChanged()
             desk.tabsChanged()
-            // A playing tab closed in the background: Now Playing lets it go.
+            // A playing tab closed in the background: Now Playing lets it go, and so does the mini player.
             updateNowPlaying()
+            miniPlayer.tabsChanged()
         case .selection:
             showSelectedTab()
             // "Translating…" belongs to its tab; the translation goes on there, quietly.
@@ -536,7 +540,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // Reader stays over its pane when you click into the other half of the split; anywhere else, it goes.
             let readerStillShown = readerTab != nil && tab.flatMap { tabManager.partner(of: $0) } === readerTab
             if !readerStillShown { closeReader() }
-            floatVideoOnSwitch(from: shownTab, to: tab)
+            // A video playing in a page you're leaving follows you in the mini player; coming back puts it in its page.
+            let before = [root.card.webView, root.secondCard.isHidden ? nil : root.secondCard.webView].compactMap { ($0 as? BrowserWebView)?.owner }
+            miniPlayer.switched(from: before, to: [tab, tab.flatMap(tabManager.partner(of:))].compactMap { $0 })
             shownTab = tab
             selectedTabToken = tab?.changed.observe { [weak self] change in self?.selectedTabChanged(change) }
             if let webView = tab?.ensureWebView(), window?.isKeyWindow == true, !commandBar.isVisible {
@@ -544,6 +550,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
         }
         showPages()
+        // Shown in a pane some other way (split beside the page you're on): the mini player lets it go.
+        miniPlayer.tabsChanged()
         sidebar.update(tab: tab)
         // A collapsed pinned section shows the pinned page you're on, so it changes with the selection.
         if SidebarListView.isCollapsed(tabManager.currentSpaceID) { sidebar.list.reload(animated: true) } else { sidebar.list.refreshRows() }
@@ -733,23 +741,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private weak var nowPlayingTab: Tab?
-
-    /// Leaving a tab while its video plays keeps the video with you, floating; coming back puts it in the page.
-    private func floatVideoOnSwitch(from old: Tab?, to new: Tab?) {
-        guard PictureInPicture.followsTabs else { return }
-        // Into the other pane of a split: both pages stay on screen, so the video stays in its page.
-        if let old, let new, tabManager.partner(of: old) === new { return }
-        if let webView = new?.webView, webView.isPictureInPictureActive, new?.floatedOnSwitch == true {
-            webView.togglePictureInPicture()
-        }
-        // Back on the tab, whether its floating video is still up or you closed it yourself: a later one you float
-        // by hand is yours, and stays.
-        new?.floatedOnSwitch = false
-        if let old, old.isPlayingAudio, let webView = old.webView, webView.canTogglePictureInPicture, !webView.isPictureInPictureActive {
-            webView.togglePictureInPicture()
-            old.floatedOnSwitch = true
-        }
-    }
 
     /// Puts the selected tab in the page card, or both halves of its split side by side.
     private func showPages() {

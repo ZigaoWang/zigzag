@@ -646,6 +646,11 @@ final class BrowserRootView: SpaceFrameView {
         }
     }
 
+    /// The mini player's card: over the pages, under the sidebar sliding out over them and everything floating.
+    func showMiniPlayer(_ view: NSView) {
+        addSubview(view, positioned: .below, relativeTo: resizeHandle)
+    }
+
     var sidebarFrame: NSRect {
         let inset = Tokens.Metric.cardInset
         if sidebarVisible { return NSRect(x: 0, y: 0, width: sidebarWidth, height: bounds.height) }
