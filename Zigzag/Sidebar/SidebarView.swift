@@ -69,7 +69,7 @@ final class AddressView: InteractiveView {
         lock.imageScaling = .scaleNone
         lock.contentTintColor = Tokens.Color.textTertiary
         addSubview(lock)
-        // A long host loses its start, never its end: the end is what says whose site it is.
+        // Set with each name (`lineBreak(forName:)`): a long host never loses the end that says whose site it is.
         label.lineBreakMode = .byTruncatingHead
         addSubview(label)
         captureButton.isHidden = true
@@ -125,8 +125,17 @@ final class AddressView: InteractiveView {
         return ""
     }
 
+    /// How a site's name too long for its room is shortened. Its subdomains go first, from the start, so the domain
+    /// that says whose site it is stays whole ("…mail.google.com"). A domain that alone is too long keeps its start and
+    /// its end ("physicsandm…tutor.com"), so it reads as itself and its ending still shows.
+    static func lineBreak(forName name: String) -> NSLineBreakMode {
+        guard name.contains("."), let domain = PublicSuffix.registrableDomain(name.lowercased()) else { return .byTruncatingTail }
+        return domain == name.lowercased() ? .byTruncatingMiddle : .byTruncatingHead
+    }
+
     func show(url: URL?, isSecure: Bool) {
         label.stringValue = Self.name(of: url)
+        label.lineBreakMode = Self.lineBreak(forName: label.stringValue)
         // The host crisp, in the text's own color; the prompt quiet.
         label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textPrimary
         if label.stringValue.isEmpty { label.stringValue = String(localized: "Search or enter address", comment: "Placeholder of the address in the sidebar, on a new tab.") }

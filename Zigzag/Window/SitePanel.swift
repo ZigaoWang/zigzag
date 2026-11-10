@@ -392,15 +392,15 @@ final class SitePanel: FloatingPanelView {
     private func layoutContent() { _ = layoutContent(dryRun: false) }
 
     @discardableResult
-    /// The site's name at its size, a little smaller when it's long, and past that cut with an ellipsis, never
-    /// clipped mid-letter.
+    /// The site's name at its size, a little smaller when it's long, and past that cut the way the address cuts it,
+    /// never clipped mid-letter.
     private static func fitted(_ name: String, in width: CGFloat) -> NSAttributedString {
         for size in stride(from: CGFloat(20), through: 15, by: -1) {
             let text = Tokens.Font.voiceText(name, size: size)
             if text.size().width <= width || size == 15 {
                 guard text.size().width > width else { return text }
                 let paragraph = NSMutableParagraphStyle()
-                paragraph.lineBreakMode = .byTruncatingTail
+                paragraph.lineBreakMode = AddressView.lineBreak(forName: name)
                 return Tokens.Font.voiceText(name, size: size, paragraph: paragraph)
             }
         }

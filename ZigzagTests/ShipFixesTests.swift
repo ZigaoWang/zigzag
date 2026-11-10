@@ -467,3 +467,15 @@ struct LinksFromZigzagTests {
         #expect(!AppDelegate.isZigzag(senderPID: nil))
     }
 }
+
+/// A long site name keeps the end that says whose site it is, the same way in the address and Site Controls.
+@MainActor
+struct SiteNameShorteningTests {
+    @Test func subdomainsGoFirstAndADomainKeepsItsEnds() {
+        #expect(AddressView.lineBreak(forName: "physicsandmathstutor.com") == .byTruncatingMiddle)
+        #expect(AddressView.lineBreak(forName: "www.physicsandmathstutor.com") == .byTruncatingHead)
+        #expect(AddressView.lineBreak(forName: "paypal.com.secure-login.example.co.uk") == .byTruncatingHead)
+        #expect(AddressView.lineBreak(forName: "example.co.uk") == .byTruncatingMiddle)
+        #expect(AddressView.lineBreak(forName: "Settings") == .byTruncatingTail)
+    }
+}
