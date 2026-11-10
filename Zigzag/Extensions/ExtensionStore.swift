@@ -215,6 +215,13 @@ enum ExtensionStore {
             .appendingPathComponent("Library/WebKit/\(Bundle.main.bundleIdentifier ?? "")/WebsiteData/Default", isDirectory: true)
     }
 
+    /// Where WebKit keeps what the extensions of a controller made for an identifier stored (another profile's),
+    /// under the identifier in capitals. WebKit empties it on request but never removes it.
+    nonisolated static func extensionData(ofController id: UUID) -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/WebKit/\(Bundle.main.bundleIdentifier ?? "")/WebExtensions/\(id.uuidString.uppercased())", isDirectory: true)
+    }
+
     /// Where WebKit keeps the files of a store made for an identifier (another profile's): the same layout, under
     /// the identifier in lowercase.
     nonisolated static func websiteData(ofStore id: UUID) -> URL {
