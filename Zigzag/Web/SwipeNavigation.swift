@@ -26,6 +26,8 @@ final class SwipeNavigator {
     private var dy: CGFloat = 0
     /// -1: back, 1: forward, once the swipe has a direction.
     private var direction = 0
+    /// Natural scrolling: fingers to the right move the content right, toward its left edge.
+    private var natural = true
     /// What the page can scroll sideways under the pointer, once the page has answered.
     private var pageScrolls: (left: Bool, right: Bool)?
     /// The pointer is over a frame: only the page inside can say whether it keeps the swipe.
@@ -103,7 +105,8 @@ final class SwipeNavigator {
             // What covers the page knows its room as it scrolls: it's kept up to date through the gesture.
             if let room { pageScrolls = room }
             // Fingers to the right go back; scrolling direction settings don't change that.
-            let fingerX = event.isDirectionInvertedFromDevice ? event.scrollingDeltaX : -event.scrollingDeltaX
+            natural = event.isDirectionInvertedFromDevice
+            let fingerX = natural ? event.scrollingDeltaX : -event.scrollingDeltaX
             dx += fingerX
             dy += event.scrollingDeltaY
             samples.append((event.timestamp, dx))
@@ -112,7 +115,7 @@ final class SwipeNavigator {
             case .deciding:
                 switch SwipeDecision.decide(dx: dx, dy: dy, canGoBack: webView.owner?.canGoBackOrReturn ?? webView.canGoBack,
                                             canGoForward: webView.canGoForward, pageScrolls: pageScrolls, page: page,
-                                            waited: event.timestamp - began, overFrame: overFrame) {
+                                            waited: event.timestamp - began, overFrame: overFrame, natural: natural) {
                 case .undecided:
                     return false
                 case .ignore:
@@ -208,7 +211,7 @@ final class SwipeNavigator {
 
     private func pageTakes(_ direction: Int) -> Bool {
         guard let pageScrolls else { return false }
-        return direction < 0 ? pageScrolls.left : pageScrolls.right
+        return (direction < 0) == natural ? pageScrolls.left : pageScrolls.right
     }
 
     /// Asks the page, before the gesture's first scroll reaches it, whether anything under the pointer (or the page
@@ -229,7 +232,6 @@ final class SwipeNavigator {
         webView.evaluateJavaScript(script, in: nil, in: .defaultClient) { [weak self] result in
             guard let self, self.gesture == gesture, !self.covered,
                   case .success(let value) = result, let answer = value as? [Bool], answer.count == 4 else { return }
-            // Swiping toward "back" moves the view left, so it's the page's room to the left that matters.
             self.pageScrolls = (answer[0], answer[1])
             self.overFrame = answer[2]
             // The page asked for no overscroll: like a page that cancels the scrolls, it keeps the gesture.
@@ -336,10 +338,11 @@ enum SwipeDecision: Equatable {
     }
 
     /// `pageScrolls` is the room the page (or what covers it) can still scroll sideways under the pointer, once known;
-    /// `waited`, the time since the gesture began; `overFrame`, that the pointer is over a frame in the page.
+    /// `waited`, the time since the gesture began; `overFrame`, that the pointer is over a frame in the page; `natural`,
+    /// that the Mac scrolls naturally.
     static func decide(dx: CGFloat, dy: CGFloat, canGoBack: Bool, canGoForward: Bool,
                        pageScrolls: (left: Bool, right: Bool)?, page: Page, waited: TimeInterval,
-                       overFrame: Bool = false) -> SwipeDecision {
+                       overFrame: Bool = false, natural: Bool = true) -> SwipeDecision {
         // A page that pans with its own code (a canvas, a map), scrolls there, or asked for no overscroll has the
         // gesture, as in Safari and Chrome.
         if page == .took { return .ignore }
@@ -348,8 +351,9 @@ enum SwipeDecision: Equatable {
         let sideways = abs(dx) > abs(dy) * 1.2
         let wanted = dx > 0 ? -1 : 1
         let canGo = wanted < 0 ? canGoBack : canGoForward
-        // Swiping toward "back" moves the view left, so it's the page's room to the left that matters.
-        let pageTakes = pageScrolls.map { wanted < 0 ? $0.left : $0.right } ?? false
+        // Swiping toward "back" scrolls naturally toward the page's left edge, so it's the room there that matters;
+        // without natural scrolling it's the other way round.
+        let pageTakes = pageScrolls.map { (wanted < 0) == natural ? $0.left : $0.right } ?? false
         guard sideways, canGo, !pageTakes else { return .ignore }
         if page == .unknown, waited < (overFrame || pageScrolls == nil ? frameWait : answerWait) { return .undecided }
         return .track(wanted)
