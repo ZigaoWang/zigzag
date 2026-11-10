@@ -473,12 +473,14 @@ final class TabManager {
     /// How many tabs to keep as the ones you're working with now, given how long ago each was last looked at (or
     /// opened, for one never looked at), newest first. People work in bursts: the tabs of what you're doing now were
     /// all seen within a short while of each other, and the rest much longer ago. That break shows as the biggest
-    /// jump in age from one tab to the next, measured as a ratio, so 2 minutes against 10 counts as much as 1 hour
-    /// against 5. Ages under a couple of minutes count as equal, so switching back and forth is never a break. The
-    /// break is looked for among the newest dozen, since no one works with more at once; a jump of less than 3 times
-    /// is just steady browsing, with no break, and then the newest five stay.
+    /// jump in age from one tab to the next, measured as a ratio, so 15 minutes against 45 counts as much as 1 hour
+    /// against 3. Ages under ten minutes count as equal, so a few minutes on one tab is never a break, and anything
+    /// seen in the last half hour stays whatever the break says: Clear tidies what you've left, not what you were
+    /// just reading. The break is looked for among the newest dozen, since no one works with more at once; a jump of
+    /// less than 3 times is just steady browsing, with no break, and then the newest five stay.
     nonisolated static func keptByActivity(_ ages: [TimeInterval]) -> Int {
-        let floor: TimeInterval = 2 * 60, clearJump = 3.0, mostAtOnce = 12, keptWithoutBreak = 5
+        let floor: TimeInterval = 10 * 60, recent: TimeInterval = 30 * 60
+        let clearJump = 3.0, mostAtOnce = 12, keptWithoutBreak = 5
         let a = ages.map { max($0, floor) }
         var best = (ratio: clearJump, kept: -1)
         for i in 0..<min(mostAtOnce, max(a.count - 1, 0)) {
@@ -486,7 +488,9 @@ final class TabManager {
             // The bigger jump wins; between equal ones, the later, keeping more.
             if ratio >= best.ratio { best = (ratio, i + 1) }
         }
-        return best.kept >= 0 ? best.kept : min(keptWithoutBreak, a.count)
+        let byBreak = best.kept >= 0 ? best.kept : min(keptWithoutBreak, a.count)
+        let seenLately = min(ages.prefix { $0 < recent }.count, mostAtOnce)
+        return max(byBreak, seenLately)
     }
 
     /// Ends a drag that opened another space and was dropped there: it becomes the space you're in, its colors and
