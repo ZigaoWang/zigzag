@@ -13,6 +13,8 @@ final class PaneHeaderView: NSView {
     let orientation = PaneHeaderView.button("rectangle.split.1x2", toolTip: String(localized: "Stack Vertically", comment: "Tooltip of a button in the strip on top of each page of a split view: stacks the two pages one above the other."))
     let swap = PaneHeaderView.button("arrow.left.arrow.right", toolTip: String(localized: "Swap Sides", comment: "Tooltip of a button in the strip on top of each page of a split view: swaps the two pages."))
     let close = PaneHeaderView.button("rectangle.split.2x1.slash", toolTip: String(localized: "Separate Tabs", comment: "Tooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs."))
+    /// Closes this pane's page; the other one fills the window, as closing either half from the sidebar does.
+    let closeTab = PaneHeaderView.button("xmark", toolTip: String(localized: "Close Tab", comment: "Tooltip of a button in the strip on top of each page of a split view: closes that page's tab, leaving the other page."))
     /// The page's address: click it to edit it, as the sidebar's address does for the page you're in.
     let address = PaneAddressView()
     private let line = ColorView(color: Tokens.Color.separator)
@@ -28,7 +30,7 @@ final class PaneHeaderView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [back, forward, reload, address, swap, orientation, close, line].forEach { addSubview($0) }
+        [back, forward, reload, address, swap, orientation, close, closeTab, line].forEach { addSubview($0) }
         back.onClick = { [weak self] _ in self?.tab?.goBack() }
         forward.onClick = { [weak self] _ in self?.tab?.goForward() }
         reload.onClick = { [weak self] _ in
@@ -86,10 +88,12 @@ final class PaneHeaderView: NSView {
             button.frame = NSRect(x: x, y: y, width: b, height: b)
             x += b
         }
-        close.frame = NSRect(x: bounds.width - edge - b, y: y, width: b, height: b)
+        closeTab.frame = NSRect(x: bounds.width - edge - b, y: y, width: b, height: b)
+        // A little room between the split's own buttons and the one that closes the page, so it isn't hit by mistake.
+        close.frame = NSRect(x: closeTab.frame.minX - Tokens.Space.x2 - b, y: y, width: b, height: b)
         orientation.frame = NSRect(x: close.frame.minX - b, y: y, width: b, height: b)
         swap.frame = NSRect(x: orientation.frame.minX - b, y: y, width: b, height: b)
-        [back, forward, reload, swap, orientation, close].forEach { $0.radius = Tokens.Radius.control }
+        [back, forward, reload, swap, orientation, close, closeTab].forEach { $0.radius = Tokens.Radius.control }
         // The address pill is centered on the pane, and as wide as its text, within the room the buttons leave.
         let room = max(0, min(bounds.midX - x, swap.frame.minX - bounds.midX) - Tokens.Space.x2) * 2
         let pillWidth = min(room, address.fittingWidth)

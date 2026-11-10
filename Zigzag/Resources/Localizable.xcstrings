@@ -3749,7 +3749,7 @@
       }
     },
     "Close Tab" : {
-      "comment" : "Button in the toast about a tab using a lot of energy: closes that tab.\nFile menu item\nFile menu item.\nItem in a tab's context menu in the sidebar.\nMenu item\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.\nUndo action name, shown in the Edit menu as Undo Close Tab.",
+      "comment" : "Button in the toast about a tab using a lot of energy: closes that tab.\nFile menu item\nFile menu item.\nItem in a tab's context menu in the sidebar.\nMenu item\nTooltip of a button in the strip on top of each page of a split view: closes that page's tab, leaving the other page.\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.\nUndo action name, shown in the Edit menu as Undo Close Tab.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

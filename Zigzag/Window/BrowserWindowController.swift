@@ -775,6 +775,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.secondCard.showLoading(of: right)
             root.card.header.close.onClick = { [weak self] _ in self?.unsplitWithUndo(left, keep: right) }
             root.secondCard.header.close.onClick = { [weak self] _ in self?.unsplitWithUndo(right, keep: left) }
+            root.card.header.closeTab.onClick = { [weak self] _ in self?.closeWithUndo(left) }
+            root.secondCard.header.closeTab.onClick = { [weak self] _ in self?.closeWithUndo(right) }
             for card in [root.card, root.secondCard] {
                 card.header.onEditAddress = { [weak self, weak card] tab in
                     guard let self, let card else { return }
