@@ -560,7 +560,8 @@
     // Content scripts an extension registers: WebKit refuses file: match patterns, and one it refuses loses the whole
     // registration, so Rabby's provider reached no site at all for the file://*/* beside its http and https. Asked as
     // written first, so nothing is lost on a WebKit that takes them. If that fails for any reason it's asked once more
-    // without them, and if that fails too the extension hears the first answer. WebKit's words aren't relied on.
+    // without them, unless nothing would be left to ask for, and if that fails too the extension hears the first
+    // answer, by promise or callback alike. WebKit's words aren't relied on.
     if (api.scripting && typeof api.scripting.registerContentScripts === 'function') {
       const patternKeys = ['matches', 'excludeMatches'];
       const isFile = (pattern) => String(pattern).startsWith('file:');
@@ -575,6 +576,18 @@
       const note = (name) => {
         try { const sent = api.runtime.sendNativeMessage('zigzag.diagnostics', { where: 'scripting', kind: 'note', text: `${name}: registered without its file: patterns` }); if (sent && sent.catch) sent.catch(() => {}); } catch (e) {}
       };
+      // A callback hears a failure through runtime.lastError, as from WebKit, for as long as it runs.
+      const callWithError = (callback, error) => {
+        const lastError = { message: String((error && error.message) || error) };
+        const runtimes = [...new Set(roots.map((root) => root.runtime))].filter(Boolean);
+        const before = runtimes.map((runtime) => Object.getOwnPropertyDescriptor(runtime, 'lastError'));
+        for (const runtime of runtimes) { try { Object.defineProperty(runtime, 'lastError', { get: () => lastError, configurable: true }); } catch (e) {} }
+        try { callback(); } finally {
+          runtimes.forEach((runtime, index) => {
+            try { if (before[index]) Object.defineProperty(runtime, 'lastError', before[index]); else delete runtime.lastError; } catch (e) {}
+          });
+        }
+      };
       for (const name of ['registerContentScripts', 'updateContentScripts']) {
         if (typeof api.scripting[name] !== 'function') continue;
         const original = api.scripting[name].bind(api.scripting);
@@ -582,19 +595,13 @@
           if (!Array.isArray(scripts) || !scripts.some(namesFiles)) return original(scripts, ...rest);
           const kept = scripts.map(withoutFiles).filter(stillMatches);
           const callback = rest.find((argument) => typeof argument === 'function');
-          const asked = new Promise((resolve) => resolve(original(scripts)));
-          if (callback) {
-            // The last try keeps the callback, so a failure reaches it through runtime.lastError as usual.
-            asked.then(() => callback(), () => {
-              if (!kept.length) { original(scripts, callback); return; }
-              original(kept, (...results) => { if (!api.runtime.lastError) note(name); callback(...results); });
-            });
-            return undefined;
-          }
-          return asked.catch((error) => {
+          const answer = new Promise((resolve) => resolve(original(scripts))).catch((error) => {
             if (!kept.length) throw error;
-            return Promise.resolve(original(kept)).then((result) => { note(name); return result; }, () => { throw error; });
+            return Promise.resolve().then(() => original(kept)).then((result) => { note(name); return result; }, () => { throw error; });
           });
+          if (!callback) return answer;
+          answer.then(() => callback(), (error) => callWithError(callback, error));
+          return undefined;
         });
       }
     }

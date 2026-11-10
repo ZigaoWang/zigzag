@@ -367,6 +367,35 @@ struct ExtensionScriptTests {
         // A callback hears once, after the retry.
         worker.evaluateScript("__calls = []; globalThis.__heard = 0; chrome.scripting.registerContentScripts([__script('p')], () => { globalThis.__heard += 1; })")
         #expect(worker.evaluateScript("__calls.length + ' ' + __calls[1][0].matches.length + ' ' + __heard").toString() == "2 2 1")
+        #expect(worker.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+    }
+
+    @Test func aRegistrationCallbackHearsTheFirstFailure() {
+        let worker = Self.workerWorld(worker: true, setup: """
+        var __calls = [];
+        chrome.runtime.sendNativeMessage = () => Promise.resolve();
+        chrome.scripting = {
+          registerContentScripts: (scripts, callback) => {
+            __calls.push(scripts);
+            const files = scripts.some((s) => (s.matches || []).some((m) => m.startsWith('file:')));
+            const answer = Promise.reject(new Error(files ? "Script has an invalid match pattern 'file://*/*'." : 'Script with ID already exists'));
+            if (!callback) return answer;
+            answer.catch(() => callback());
+          },
+        };
+        var __heard = [];
+        var __listen = () => { __heard.push(chrome.runtime.lastError && chrome.runtime.lastError.message); };
+        """)
+        // Both tries refused: the callback hears why the first was, as the promise does.
+        worker.evaluateScript("chrome.scripting.registerContentScripts([{ id: 'p', matches: ['file://*/*', 'https://*/*'] }], __listen)")
+        #expect(worker.evaluateScript("__calls.length").toInt32() == 2)
+        #expect(worker.evaluateScript("__heard.join()").toString() == "Script has an invalid match pattern 'file://*/*'.")
+        // Only local files: refused straight away, never asked a second time.
+        worker.evaluateScript("__calls = []; __heard = []; chrome.scripting.registerContentScripts([{ id: 'local', matches: ['file:///*'] }], __listen)")
+        #expect(worker.evaluateScript("__calls.length").toInt32() == 1)
+        #expect(worker.evaluateScript("__heard.join()").toString() == "Script has an invalid match pattern 'file://*/*'.")
+        // The error is there only while the callback runs.
+        #expect(worker.evaluateScript("chrome.runtime.lastError === undefined").toBool())
     }
 
     @Test func scriptsNamingLocksBringTheStandIn() throws {
