@@ -71,8 +71,20 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         return controller
     }
 
-    /// The app a link came from, to go back to when this closes, if you're still only here.
-    private var returnTo: NSRunningApplication?
+    /// The app a link came from, to go back to when this closes, if you're still only here. Using a browser window
+    /// in between means you're in Zigzag now, so closing this stays in Zigzag.
+    private var returnTo: NSRunningApplication? {
+        didSet {
+            browserKeyToken.map(NotificationCenter.default.removeObserver)
+            browserKeyToken = nil
+            guard returnTo != nil else { return }
+            browserKeyToken = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { [weak self] note in
+                guard let window = note.object as? NSWindow, window is BrowserWindow else { return }
+                MainActor.assumeIsolated { self?.returnTo = nil }
+            }
+        }
+    }
+    private var browserKeyToken: NSObjectProtocol?
 
     private init(url: URL, origin: NSRect?, overFullScreen: Bool) {
         let spaceID = MiniQuickOpen.space.id
@@ -498,6 +510,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        returnTo = nil
         isClosing = true
         pageGone.send()
         linkStatus.hide()
