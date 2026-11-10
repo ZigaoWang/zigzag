@@ -577,7 +577,15 @@ enum DebugBridge {
         case "autofillhint":
             if let webView = controller.selectedWebView as? BrowserWebView { Autofill.shared.debugShow(arg, in: webView) }
         case "autofillmenu":
-            debugLog("autofillmenu => \(Autofill.shared.isShowing)")
+            debugLog("autofillmenu => \(Autofill.shared.isShowing) \(Autofill.shared.debugRows)")
+        case "autofillclick":
+            // autofillclick <css selector>: a click on that element of the page, sent to the window in-process.
+            // autofillclick peek <css selector>: the same, in the page peeked at.
+            if arg.hasPrefix("peek "), let webView = controller.peek.tab?.webView { Autofill.debugClick(String(arg.dropFirst(5)), in: webView) }
+            else if let webView = controller.selectedWebView { Autofill.debugClick(arg, in: webView) }
+        case "autofillpick":
+            // autofillpick <row>: a click on that row of the password menu, sent to the window in-process.
+            Autofill.shared.debugPick(Int(arg) ?? 0)
         case "importprobe":
             // Lists the browsers found and how many bookmarks and history pages each has; imports nothing.
             Task {
