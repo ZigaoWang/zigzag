@@ -7,8 +7,8 @@
 // without permission are left alone: Web Audio would silence them. Encrypted (DRM) media gives only silence.
 // Answers how many elements it tapped and whether what plays is streamed, or null when the page can't play sound yet.
 // Streamed media (Media Source, a blob: address, as on YouTube) reaches Web Audio as silence, and routing it would
-// silence it for good: it's left alone, answered as streamed with nothing tapped, and Zigzag refuses the capture. A
-// process tap would also record other tabs and private windows.
+// silence it for good: it's left alone, answered as streamed with nothing tapped, and Zigzag hears it where WebKit
+// plays it instead, only while this tab is the one page with sound (SharedSoundGate.swift).
 const streamed = [...document.querySelectorAll('video, audio')].some((element) => !element.paused && (element.currentSrc || '').startsWith('blob:'));
 if (!stop && streamed) return { tapped: 0, streamed: true };
 const state = (window.__zigzagTap = window.__zigzagTap || { ctx: null, sources: new WeakMap(), taps: new Map() });

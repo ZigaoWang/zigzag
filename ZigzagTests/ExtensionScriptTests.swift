@@ -30,6 +30,48 @@ extension ExtensionScriptTests {
         #expect(context.evaluateScript("__track.readyState")?.toString() == "ended")
     }
 
+    /// A shared capture of a streamed tab says when it hears the tab and when it pauses (#45): the extension's own
+    /// sound goes through Zigzag only meanwhile, and back to the speakers when it pauses or the stream ends, so you
+    /// never lose the tab's sound or hear it twice.
+    @Test func sharedCaptureRoutesTheExtensionsSoundOnlyWhileItHears() throws {
+        let source = ExtensionBridgeScript.source
+        let relay = try #require(source.range(of: "  const hearing = new Set();"))
+        let relayEnd = try #require(source.range(of: "  // Chrome hands a capture over only after", range: relay.upperBound..<source.endIndex))
+        let start = try #require(source.range(of: "  const captureStream = (id) => {"))
+        let end = try #require(source.range(of: "  tabStream = (streamId)", range: start.upperBound..<source.endIndex))
+        let context = JSContext()!
+        context.evaluateScript("""
+        var __track = { readyState: 'live', stop: () => { __track.readyState = 'ended'; } };
+        var AudioContext = function () {
+          this.sampleRate = 48000;
+          this.createMediaStreamDestination = () => ({ stream: { getAudioTracks: () => [__track] } });
+          this.createScriptProcessor = () => ({ connect: () => {}, disconnect: () => {} });
+          this.close = () => Promise.resolve();
+        };
+        var asked = new Set(), __timers = [];
+        var __replies = [[{ hearing: true }], [[48000, '', 0, true]], [{ hearing: false }], [{ hearing: true }], null];
+        var send = (namespace, fn) => Promise.resolve(fn === 'read' ? __replies.shift() : null);
+        var setTimeout = (run) => { __timers.push(run); };
+        \(source[relay.lowerBound..<relayEnd.lowerBound])
+        \(source[start.lowerBound..<end.lowerBound])
+        captureStream('test');
+        """)
+        #expect(context.exception == nil)
+        #expect(context.evaluateScript("hearing.has('test')")?.toBool() == true)
+        context.evaluateScript("__timers.shift()()")
+        #expect(context.evaluateScript("hearing.has('test')")?.toBool() == true)
+        // Paused: another tab has sound.
+        context.evaluateScript("__timers.shift()()")
+        #expect(context.evaluateScript("hearing.has('test')")?.toBool() == false)
+        context.evaluateScript("__timers.shift()()")
+        #expect(context.evaluateScript("hearing.has('test')")?.toBool() == true)
+        // Ended: back to the speakers, for good.
+        context.evaluateScript("__timers.shift()()")
+        #expect(context.exception == nil)
+        #expect(context.evaluateScript("hearing.has('test')")?.toBool() == false)
+        #expect(context.evaluateScript("__track.readyState")?.toString() == "ended")
+    }
+
     @Test func streamedTabAudioIsRejectedBeforeRoutingOrMuting() throws {
         let url = try #require(Bundle.main.url(forResource: "tab-capture", withExtension: "js"))
         let source = try String(contentsOf: url, encoding: .utf8)
@@ -43,7 +85,7 @@ extension ExtensionScriptTests {
           .then((answer) => { __answer = JSON.stringify(answer); }, (e) => { __answer = 'failed: ' + e.message; });
         """)
         #expect(context.exception == nil)
-        // Answered as streamed, with nothing tapped, so Zigzag refuses it and says why (#45).
+        // Answered as streamed, with nothing tapped, so Zigzag hears it through its guarded shared capture (#45).
         #expect(context.objectForKeyedSubscript("__answer")?.toString() == "{\"tapped\":0,\"streamed\":true}")
         #expect(context.objectForKeyedSubscript("__contexts")?.toInt32() == 0)
         #expect(context.evaluateScript("window.__zigzagTap === undefined")?.toBool() == true)

@@ -353,6 +353,17 @@
         }
       }
     },
+    "%@ paused: another tab is playing" : {
+      "comment" : "Toast when an extension hearing a streamed tab (YouTube) pauses because another tab, a private window or a video in Picture in Picture has sound; it carries on when that stops. The placeholder is the extension's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 已暂停：另一个标签页正在播放声音"
+          }
+        }
+      }
+    },
     "%@ playing audio" : {
       "comment" : "Spoken by VoiceOver after a tab row's name, for one page of a split: that page's title, then that it plays sound.",
       "localizations" : {

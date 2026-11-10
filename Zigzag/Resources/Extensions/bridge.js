@@ -415,6 +415,72 @@
     }, configurable: true });
   }
 
+  // A capture of a streamed tab hears WebKit's own sound (SharedSoundGate.swift), muted at the source meanwhile, as
+  // Chrome mutes a captured tab. What the extension then plays (Shazam passing the sound on, a booster's louder copy)
+  // goes to Zigzag, which plays it itself (NativeAudioOut.swift): heard, and never captured again. So each audio
+  // context in the page plays through a router: straight to the speakers normally, to Zigzag while such a capture
+  // hears the tab (Zigzag says when it pauses and carries on). However the extension builds its sound, all of it
+  // passes there.
+  const hearing = new Set();   // captures hearing WebKit's sound right now
+  const routes = [];           // one per audio context: { context, router, speakers, relay, source }
+  const relayOn = (route) => {
+    if (route.relay) return;
+    const { context } = route;
+    const relay = context.createScriptProcessor(1024, 1, 1);
+    relay.onaudioprocess = (event) => {
+      event.outputBuffer.getChannelData(0).fill(0);
+      const id = hearing.values().next().value;
+      if (!id) return;
+      const input = event.inputBuffer.getChannelData(0);
+      const samples = new Int16Array(input.length);
+      for (let i = 0; i < input.length; i++) { const v = Math.max(-1, Math.min(1, input[i])); samples[i] = v < 0 ? v * 0x8000 : v * 0x7fff; }
+      const bytes = new Uint8Array(samples.buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      send('tabCapture', 'play', [id, route.source, context.sampleRate, btoa(binary)]).catch(() => {});
+    };
+    try { route.router.disconnect(); } catch (e) {}
+    route.connect.call(route.router, relay);
+    // A processor runs only while it leads somewhere; it writes silence.
+    route.connect.call(relay, route.speakers);
+    route.relay = relay;
+  };
+  const relayOff = (route) => {
+    if (!route.relay) return;
+    try { route.router.disconnect(); route.relay.disconnect(); } catch (e) {}
+    route.relay.onaudioprocess = null;
+    route.relay = null;
+    route.connect.call(route.router, route.speakers);
+  };
+  const startHearing = (id) => { hearing.add(id); routes.forEach(relayOn); };
+  const stopHearing = (id) => { hearing.delete(id); if (!hearing.size) routes.forEach(relayOff); };
+  if (typeof BaseAudioContext !== 'undefined' && typeof AudioContext !== 'undefined' && asked.has('tabCapture')) {
+    const destination = Object.getOwnPropertyDescriptor(BaseAudioContext.prototype, 'destination');
+    const connect = AudioNode.prototype.connect;
+    const routeOf = new WeakMap();
+    if (destination && destination.get) {
+      Object.defineProperty(BaseAudioContext.prototype, 'destination', {
+        configurable: true, enumerable: destination.enumerable,
+        get() {
+          const speakers = destination.get.call(this);
+          // Rendering offline plays nothing.
+          if (!(this instanceof AudioContext)) return speakers;
+          let route = routeOf.get(this);
+          if (!route) {
+            const router = this.createGain();
+            try { Object.defineProperty(router, 'maxChannelCount', { value: speakers.maxChannelCount }); } catch (e) {}
+            route = { context: this, router, speakers, relay: null, connect, source: 'c' + routes.length };
+            connect.call(router, speakers);
+            routeOf.set(this, route);
+            routes.push(route);
+            if (hearing.size) relayOn(route);
+          }
+          return route.router;
+        },
+      });
+    }
+  }
+
   // Chrome hands a capture over only after the messages the page had already sent were delivered, the page's own
   // included. Extensions rely on that order: Shazam's popup sends itself "stopRecording" each time it redraws, and
   // in Chrome that arrives before its recording exists. Zigzag's capture can come back sooner, so it waits for
@@ -493,11 +559,20 @@
         queued -= dropped.length - dropped.offset;
       }
     };
+    // While a capture of a streamed tab hears it, what this page plays goes through Zigzag (above); paused (another
+    // tab has sound), it plays to the speakers again, and the stream carries silence.
+    let heard = false;
+    const hear = (on) => {
+      if (on === heard) return;
+      heard = on;
+      if (on) startHearing(id); else stopHearing(id);
+    };
     // Collected from Zigzag about fifty times a second while the stream lives.
     let collecting = true;
     const ended = () => {
       if (!collecting) return;
       collecting = false;
+      hear(false);
       for (const track of destination.stream.getAudioTracks()) track.stop();
       player.disconnect();
       context.close().catch(() => {});
@@ -508,7 +583,10 @@
         const chunks = await send('tabCapture', 'read', [id]);
         // Nothing at all (not even an empty list): the capture has ended.
         if (chunks == null) { ended(); return; }
-        for (const chunk of chunks) receive(id, ...chunk);
+        for (const chunk of chunks) {
+          if (Array.isArray(chunk)) receive(id, ...chunk);
+          else if (chunk && typeof chunk.hearing === 'boolean') hear(chunk.hearing);
+        }
       } catch (e) {}
       setTimeout(collect, 20);
     };

@@ -816,8 +816,9 @@ final class BridgeSidePanel: BridgeNamespace {
 /// (Shazam, a recorder). Zigzag taps the page's sound and streams the samples to the extension, which plays them into
 /// a normal MediaStream. Two halves: the page's own Web Audio when it uses it (Resources/Extensions/
 /// tab-capture-page.js, over the routes audio-routes.js noted), else its media elements, from a script world of
-/// Zigzag's own (tab-capture.js). As in Chrome the tab goes quiet while captured, and the extension plays it back if
-/// it wants. Only the tab you used the extension on (its button, menu item or shortcut), while it shows the same site,
+/// Zigzag's own (tab-capture.js). A streamed tab (YouTube), whose sound neither can reach, is heard where WebKit
+/// plays it, only while it's the one page in Zigzag with sound (SharedSoundCapture). As in Chrome the tab goes quiet
+/// while captured, and the extension plays it back if it wants. Only the tab you used the extension on (its button, menu item or shortcut), while it shows the same site,
 /// never a private window's, and only while the popup or window of that use is open or soon after; a note says it's
 /// listening, and it stops when the extension stops listening or goes away.
 /// `getMediaStreamId` is the same, in two steps (Sound Booster): it names that tab, and the extension's
@@ -842,20 +843,29 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         weak var webView: WKWebView?
         let tabID: UUID
         /// Which half is listening: the page's Web Audio, or its media elements.
-        let world: WKContentWorld
-        let script: String
+        var world: WKContentWorld
+        var script: String
         /// Its extension needs a moment to start listening after a capture begins.
         var started = Date()
         /// Whether the page's own sound has come through yet (streamed video gives Web Audio only silence).
         var heard = false
-        /// Sound waiting for the extension's page to collect it, and when it last did.
-        var waiting: [[Any]] = []
+        /// Sound waiting for the extension's page to collect it (and, for a shared capture, word of it pausing or
+        /// carrying on), and when it last did.
+        var waiting: [Any] = []
         var lastRead = Date()
         var hasRead = false
         /// The extension's page that asked (its popup, its offscreen page): the capture is that page's, as in Chrome.
         var page = ""
         /// Which opening of the extension's popup was showing when it began.
         var opening = 0
+        /// A streamed tab, heard where WebKit plays it while it's the only page with sound; and the site it showed
+        /// when the capture began, which it ends on leaving.
+        var shared: SharedSoundCapture?
+        var origin: String?
+        /// Its page's own sound gave only silence, and Zigzag is looking whether it's streamed.
+        var switching = false
+        /// Paused at some point (another page had sound), so carrying on again is worth a word.
+        var paused = false
     }
     /// Each extension's popup openings, counted, so closing one ends only what that one started.
     private var openings: [String: Int] = [:]
@@ -948,17 +958,22 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
                 ExtensionLog.write("tab capture for \(host.displayName(for: extensionID)): the page's own audio, \(routed) source(s)")
             } else {
                 let result = try await webView.callAsyncJavaScript(Self.elementScript, arguments: ["tap": id, "stop": false], in: nil, contentWorld: Self.world) as? [String: Any]
-                // Streamed sound (YouTube, most video sites) never reaches Web Audio, and WebKit's shared audio
-                // process also plays other tabs and private windows: refused, with nothing in the tab touched, and
-                // you're told why rather than the extension just not working.
+                // Streamed sound (YouTube, most video sites) never reaches Web Audio, and nothing in the tab was
+                // touched: it's heard where WebKit plays it, which plays other tabs and private windows too, so only
+                // while this tab is the one page with sound.
                 if result?["streamed"] as? Bool == true {
-                    ExtensionLog.write("tab capture for \(host.displayName(for: extensionID)) refused: the tab's sound is streamed, out of reach within the tab")
-                    tellUnreachable(extensionID, in: controller)
-                    throw BridgeError("This tab’s streamed audio cannot be captured without recording other tabs.")
+                    taps[id] = Tap(extensionID: extensionID, webView: webView, tabID: tab.id, world: Self.world, script: Self.elementScript, page: page, opening: currentOpening(extensionID))
+                    ExtensionLog.write("tab capture for \(host.displayName(for: extensionID)): streamed, so WebKit's sound, only while this tab is the one with sound")
+                    // Another page already has sound: it begins paused, and says so.
+                    if !startShared(id) {
+                        Toast.show(Self.pausedText(host.displayName(for: extensionID)), symbol: "pause.circle", duration: 3, in: controller)
+                        return ["id": id, "tabId": tab.id.hashValue & 0x7fffffff]
+                    }
+                } else {
+                    guard let elements = (result?["tapped"] as? NSNumber)?.intValue else { throw BridgeError("Play something in the tab first, then try again") }
+                    taps[id] = Tap(extensionID: extensionID, webView: webView, tabID: tab.id, world: Self.world, script: Self.elementScript, page: page, opening: currentOpening(extensionID))
+                    ExtensionLog.write("tab capture for \(host.displayName(for: extensionID)): \(elements) media element(s)")
                 }
-                guard let elements = (result?["tapped"] as? NSNumber)?.intValue else { throw BridgeError("Play something in the tab first, then try again") }
-                taps[id] = Tap(extensionID: extensionID, webView: webView, tabID: tab.id, world: Self.world, script: Self.elementScript, page: page, opening: currentOpening(extensionID))
-                ExtensionLog.write("tab capture for \(host.displayName(for: extensionID)): \(elements) media element(s)")
             }
             Toast.show(String(localized: "\(host.displayName(for: extensionID)) is listening to this tab", comment: "Toast when an extension starts hearing a tab's sound. The placeholder is the extension's name."), symbol: "waveform", duration: 3, in: controller)
             return ["id": id, "tabId": tab.id.hashValue & 0x7fffffff]
@@ -966,13 +981,25 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
             // The page collects what's arrived since it last asked: steadier than pushing to it, since WebKit can
             // drop a page's port without telling it.
             // Gone (stopped, or its popup closed): nothing more to collect, quietly.
-            guard let id = args.string(0), var tap = taps[id], tap.extensionID == extensionID else { return nil }
+            guard let id = args.string(0), taps[id]?.extensionID == extensionID else { return nil }
+            // A shared capture takes a fresh look at every page's sound before handing anything over.
+            if taps[id]?.shared != nil { checkShared(id) }
+            guard var tap = taps[id] else { return nil }
             let chunks = tap.waiting
             tap.waiting = []
             tap.lastRead = Date()
             tap.hasRead = true
             taps[id] = tap
             return chunks
+        case "play":
+            // What the extension plays while a shared capture hears the tab (WebKit's sound is muted meanwhile, as a
+            // captured tab is in Chrome): played from Zigzag itself, so it's heard, and never captured again.
+            guard let id = args.string(0), let source = args.string(1), let tap = taps[id], tap.extensionID == extensionID,
+                  tap.shared?.isHearing == true, let rate = args.number(2), let pcm = args.string(3),
+                  let data = Data(base64Encoded: pcm) else { return nil }
+            let samples = data.withUnsafeBytes { raw in raw.bindMemory(to: Int16.self).map { Float($0) / 32768 } }
+            NativeAudioOut.shared.feed(id + "|" + source, samples: samples, rate: rate)
+            return nil
         case "stop":
             if let id = args.string(0), taps[id]?.extensionID == extensionID { stop(id) }
             return nil
@@ -1047,16 +1074,23 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     }
 
     /// Keeps a chunk for the page to collect; never more than about a second, the oldest going first.
-    private func keep(_ chunk: [Any], for id: String) {
+    private func keep(_ chunk: Any, for id: String) {
         guard var tap = taps[id] else { return }
         tap.waiting.append(chunk)
-        if tap.waiting.count > 60 { tap.waiting.removeFirst(tap.waiting.count - 60) }
+        // Sound goes, never word of a shared capture pausing or carrying on.
+        while tap.waiting.filter({ $0 is [Any] }).count > 60, let oldest = tap.waiting.firstIndex(where: { $0 is [Any] }) {
+            tap.waiting.remove(at: oldest)
+        }
         taps[id] = tap
     }
 
     private func stop(_ id: String, because reason: String = "the extension stopped it") {
         guard let tap = taps.removeValue(forKey: id) else { return }
         ExtensionLog.write("tab capture for \(ExtensionHost.shared.displayName(for: tap.extensionID)) ended after \(Int(Date().timeIntervalSince(tap.started))) s: \(reason)")
+        // A shared capture's tap goes with it (WebKit's sound comes back), and so does what the extension played.
+        tap.shared?.end()
+        NativeAudioOut.shared.end(sourcesStartingWith: id)
+        if !taps.values.contains(where: { $0.shared != nil }) { sharedTimer?.invalidate(); sharedTimer = nil }
         tap.webView?.callAsyncJavaScript(tap.script, arguments: ["tap": id, "stop": true], in: nil, in: tap.world, completionHandler: nil)
         stopListeningWhereDone()
     }
@@ -1082,6 +1116,127 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
                    symbol: "waveform.slash", duration: 5, in: controller)
     }
 
+    // MARK: A streamed tab, through WebKit's shared sound
+
+    /// Looks at every shared capture's tab and every page's sound, often, while one is live: the tap must go the
+    /// moment another page has sound, even when the extension isn't collecting.
+    private var sharedTimer: Timer?
+
+    static func pausedText(_ name: String) -> String {
+        String(localized: "\(name) paused: another tab is playing", comment: "Toast when an extension hearing a streamed tab (YouTube) pauses because another tab, a private window or a video in Picture in Picture has sound; it carries on when that stops. The placeholder is the extension's name.")
+    }
+
+    /// Hears a streamed tab where WebKit plays it, guarded (SharedSoundCapture): the tap runs, muting WebKit's
+    /// sound while the extension plays it back through Zigzag, only while the tab is the one page with sound.
+    /// False when another page has sound already, so it begins paused.
+    @discardableResult
+    private func startShared(_ id: String) -> Bool {
+        guard var tap = taps[id], let webView = tap.webView else { return false }
+        let name = ExtensionHost.shared.displayName(for: tap.extensionID)
+        let host = ExtensionHost.shared.context(for: tap.extensionID)?.baseURL.host()
+        let shared = SharedSoundCapture(SoundSource.all(capturing: webView, extensionHost: host), now: SystemAudioTap.now()) { [weak webView] receive in
+            let chunks = SharedSoundChunks(send: receive)
+            chunks.report = { peak in
+                ExtensionLog.write("tab capture for \(name): WebKit's sound over its first 3 s peaked at \(String(format: "%.2g", peak))\(peak == 0 ? " (silence: macOS may not be letting Zigzag hear it)" : "")")
+            }
+            #if DEBUG
+            // Silence at the real pace, without macOS's capture, to test everything around it.
+            if UserDefaults.standard.bool(forKey: "DebugFakeSystemAudio") { return FakeSharedTap(into: chunks) }
+            #endif
+            guard let webView else { throw SystemAudioTap.Failure.noAudioProcess }
+            let system = SystemAudioTap()
+            try system.start(pids: SystemAudioTap.audioProcesses(of: webView), muting: true) { samples, rate, captured in
+                chunks.add(samples, rate: rate, capturedAt: captured)
+            }
+            return system
+        }
+        tap.shared = shared
+        tap.origin = SiteOrigin.of(webView.url)
+        let alone = shared.gate.aloneSince != nil
+        tap.paused = !alone
+        taps[id] = tap
+        if sharedTimer == nil {
+            let timer = Timer(timeInterval: 0.03, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.checkAllShared() } }
+            RunLoop.main.add(timer, forMode: .common)
+            sharedTimer = timer
+        }
+        if !alone { ExtensionLog.write("tab capture for \(name): paused from the start, another page has sound") }
+        return alone
+    }
+
+    private func checkAllShared() {
+        for id in taps.filter({ $0.value.shared != nil }).map(\.key) { checkShared(id) }
+    }
+
+    /// A fresh look at a shared capture: it ends when its tab closes, leaves the site, or its extension may no
+    /// longer hear it or stops listening; it pauses the moment another page has sound, and carries on once the tab
+    /// has been alone a moment. Then what's due goes to the extension, each buffer on this look.
+    private func checkShared(_ id: String) {
+        guard let tap = taps[id], let shared = tap.shared else { return }
+        guard let webView = tap.webView, let (tab, controller) = tab(tap.tabID), tab.webView === webView else { stop(id, because: "its tab closed"); return }
+        guard tap.origin != nil, SiteOrigin.of(webView.url) == tap.origin else { stop(id, because: "its tab went to another site"); return }
+        guard (try? ensureReachable(tab, in: controller, by: tap.extensionID)) != nil else { stop(id, because: "it may no longer hear this site"); return }
+        guard isListening(tap) else { stop(id, because: "it stopped listening"); return }
+        let name = ExtensionHost.shared.displayName(for: tap.extensionID)
+        let now = SystemAudioTap.now()
+        let host = ExtensionHost.shared.context(for: tap.extensionID)?.baseURL.host()
+        let change = shared.update(SoundSource.all(capturing: webView, extensionHost: host), now: now)
+        if let failure = shared.failure {
+            ExtensionLog.write("tab capture for \(name): hearing WebKit's sound failed: \(failure)")
+            stopUnavailableCapture(id)
+            return
+        }
+        switch change {
+        case .paused:
+            // The extension's page plays to the speakers again, and the tab is heard as usual.
+            keep(["hearing": false], for: id)
+            NativeAudioOut.shared.end(sourcesStartingWith: id)
+            taps[id]?.paused = true
+            ExtensionLog.write("tab capture for \(name): paused, another page has sound")
+            Toast.show(Self.pausedText(name), symbol: "pause.circle", duration: 3, in: controller)
+        case .resumed:
+            // What the extension plays goes through Zigzag, since WebKit's sound is muted while the tap runs.
+            keep(["hearing": true], for: id)
+            ExtensionLog.write("tab capture for \(name): hearing the tab, the only one with sound")
+            if tap.paused {
+                taps[id]?.paused = false
+                Toast.show(String(localized: "\(name) is listening to this tab", comment: "Toast when an extension starts hearing a tab's sound. The placeholder is the extension's name."), symbol: "waveform", duration: 3, in: controller)
+            }
+        case nil:
+            break
+        }
+        let wallNow = Date().timeIntervalSince1970 * 1000
+        for chunk in shared.take(now: now) {
+            keep([chunk.rate, chunk.pcm, wallNow - (now - chunk.until) * 1000, true] as [Any], for: id)
+        }
+    }
+
+    private static let streamedCheck = "return [...document.querySelectorAll('video, audio')].some((element) => !element.paused && (element.currentSrc || '').startsWith('blob:'));"
+
+    /// The page's own Web Audio gave only silence while the tab plays. Streamed sound is heard where WebKit plays it
+    /// instead, guarded; anything else (protected video) is out of reach, and you're told so.
+    private func fallBackToShared(_ id: String) {
+        guard var tap = taps[id], tap.shared == nil, !tap.switching, let webView = tap.webView else { return }
+        tap.switching = true
+        taps[id] = tap
+        Task { @MainActor [weak self] in
+            let streamed = (try? await webView.callAsyncJavaScript(Self.streamedCheck, arguments: [:], in: nil, contentWorld: Self.world)) as? Bool == true
+            guard let self, var tap = self.taps[id], tap.webView === webView else { return }
+            guard streamed else { self.stopUnavailableCapture(id); return }
+            // The page's sound goes back the way it was; the tap quiets the tab instead.
+            webView.callAsyncJavaScript(tap.script, arguments: ["tap": id, "stop": true], in: nil, in: tap.world, completionHandler: nil)
+            tap.world = Self.world
+            tap.script = Self.elementScript
+            tap.switching = false
+            self.taps[id] = tap
+            let name = ExtensionHost.shared.displayName(for: tap.extensionID)
+            ExtensionLog.write("tab capture for \(name): the page's own audio is silent and streamed, so WebKit's sound, only while this tab is the one with sound")
+            if !self.startShared(id), let controller = self.tab(tap.tabID)?.1 {
+                Toast.show(Self.pausedText(name), symbol: "pause.circle", duration: 3, in: controller)
+            }
+        }
+    }
+
     nonisolated func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any], let id = body["tap"] as? String, let pcm = body["pcm"] as? String,
               let rate = body["rate"] as? Double else { return }
@@ -1094,13 +1249,13 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         let world = message.world
         MainActor.assumeIsolated {
             // Only from the half that's listening, in the tab it's listening to.
-            guard var tap = taps[id], tap.webView === message.webView, tap.world == world else { return }
+            guard var tap = taps[id], tap.shared == nil, !tap.switching, tap.webView === message.webView, tap.world == world else { return }
             // The extension stopped listening (its popup closed): the tap goes too, and the tab's sound comes back.
             guard isListening(tap) else { stop(id, because: "it stopped listening"); return }
             if level > 0.0001, !tap.heard { tap.heard = true; taps[id]?.heard = true }
             // A second of silence while the tab is playing sound: the page's sound is out of Web Audio's reach.
             if !tap.heard, Date().timeIntervalSince(tap.started) > 1.2, tab(tap.tabID)?.0.isPlayingAudio == true {
-                stopUnavailableCapture(id)
+                fallBackToShared(id)
                 return
             }
             keep([rate, pcm, at, false], for: id)
@@ -1119,3 +1274,20 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         pending = pending.filter { $0.value.extensionID != extensionID }
     }
 }
+
+#if DEBUG
+/// Silence at the real pace, on a queue of its own, as the system tap would send it, without macOS's capture
+/// (DebugFakeSystemAudio): to test everything around a shared capture.
+nonisolated private final class FakeSharedTap: SharedSoundCapture.Tap, @unchecked Sendable {
+    private let timer = DispatchSource.makeTimerSource(queue: .global())
+
+    init(into chunks: SharedSoundChunks) {
+        let silence = [Float](repeating: 0, count: 480)
+        timer.schedule(deadline: .now(), repeating: .milliseconds(10))
+        timer.setEventHandler { silence.withUnsafeBufferPointer { chunks.add($0, rate: 48000, capturedAt: SystemAudioTap.now() - 0.01) } }
+        timer.resume()
+    }
+
+    func stop() { timer.cancel() }
+}
+#endif
