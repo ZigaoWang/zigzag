@@ -51,8 +51,8 @@ body:
     id: zigzag-version
     attributes:
       label: Zigzag version
-      description: From Zigzag › About Zigzag.
-      placeholder: 0.1.2 (3) beta
+      description: The version and build from Zigzag › About Zigzag.
+      placeholder: 0.7.6 (70)
     validations:
       required: true
   - type: input
@@ -63,3 +63,14 @@ body:
       placeholder: "26.0"
     validations:
       required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: |
+        Optional. Help › Report a Problem… › Show Report writes a plain text report: Zigzag's version, your Mac, your
+        extensions, what went wrong lately and on which sites, and crash reports. It never holds the pages' addresses,
+        your tabs or history. Read it first, then paste the parts that help here.
+      render: text
+    validations:
+      required: false
