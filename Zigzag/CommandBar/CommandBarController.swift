@@ -386,9 +386,12 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             // The same 12pt on both sides of the text as the resting field, and a hair for the caret.
             let needed = textWidth + Tokens.Space.x3 * 2 - 1
             let wanted = results.isEmpty ? needed : max(needed, Tokens.Metric.commandBarWidth * 0.7)
-            let wide = min(max(wanted, address.width), Tokens.Metric.commandBarWidth, bounds.width - Tokens.Space.x2 - Tokens.Space.x4)
+            // A field wider than the bar (the address above the page) opens at its own width, never narrower.
+            let wide = min(max(wanted, address.width), max(Tokens.Metric.commandBarWidth, address.width), bounds.width - Tokens.Space.x2 - Tokens.Space.x4)
             let start = host.commandBarCentersOnAnchor ? round(address.midX - wide / 2) : address.minX
-            let x = max(Tokens.Space.x2, min(start, bounds.maxX - Tokens.Space.x4 - wide))
+            // A field that itself reaches nearer the edge keeps its place.
+            let margin = min(Tokens.Space.x4, max(0, bounds.maxX - address.maxX))
+            let x = max(Tokens.Space.x2, min(start, bounds.maxX - margin - wide))
             return NSRect(x: x, y: address.minY, width: wide, height: fieldHeight + listHeight)
         }
         let card = host.commandBarPageFrame
