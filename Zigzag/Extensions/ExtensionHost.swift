@@ -269,6 +269,15 @@ final class ExtensionHost: NSObject {
         changed.send()
     }
 
+    /// Stops every extension and deletes what each stored here, when the profile is removed.
+    func shutDown() async {
+        for context in contexts { unload(context.uniqueIdentifier) }
+        let types = WKWebExtensionController.allExtensionDataTypes
+        let records = await controller.dataRecords(ofTypes: types)
+        if !records.isEmpty { await controller.removeData(ofTypes: types, from: records) }
+        controller.delegate = nil
+    }
+
     /// Deletes what an extension stored (its storage, registered scripts, rule cache), for removal.
     func removeData(for id: String) {
         controller.fetchDataRecords(ofTypes: WKWebExtensionController.allExtensionDataTypes) { [weak self] records in

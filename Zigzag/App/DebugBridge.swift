@@ -367,6 +367,11 @@ enum DebugBridge {
             // spaceprofile [name]: puts the space you're in on that profile; with no name, on the first.
             let id = Library.shared.profiles.first { $0.name == arg }?.id ?? Profile.defaultID
             Library.shared.setProfile(id, forSpace: controller.tabManager.currentSpaceID)
+        case "delprofile":
+            // delprofile <name>: removes the profile and its data, without asking.
+            if let id = Library.shared.profiles.first(where: { $0.name == arg && !$0.isDefault })?.id {
+                Task { await Profiles.shared.remove(id); debugLog("delprofile \(arg) => deleting \(Library.shared.directory.deleting.count)") }
+            }
         case "profiles":
             // profiles <path>: each profile with its spaces and extensions, and for each tab in this window the
             // profile its page is in and the store that page uses (JSON).

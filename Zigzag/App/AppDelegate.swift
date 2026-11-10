@@ -42,6 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 ExtensionStore.forgetServiceWorkerRegistrations(in: ExtensionStore.websiteData(ofStore: profile.id))
             }
             Library.shared.pruneProfileAssignments()
+            Profiles.finishRemovals()
         }
         NSApp.mainMenu = MainMenu.build()
         Shortcuts.apply()
