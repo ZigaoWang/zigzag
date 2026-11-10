@@ -54,6 +54,7 @@ Zigzag connects to on its own.
 |---|---|
 | **Spaces** | Each with its own color, icon, pinned tabs and folders. Swipe on the sidebar, or nudge the mouse wheel sideways, to switch. |
 | **Favorites** | Your most used sites as tiles, above every space. |
+| **Profiles** | Keep work and personal apart. Each profile has its own extensions, sign-ins, history and favorites, and every space is on one. |
 | **Command bar** | ⌘T or ⌘L. Finds open tabs, history and sites. Type `you`, press Tab, and you're searching YouTube. |
 | **Split view** | Drag a tab onto the page. Pin a split and it stays one. |
 | **Peek** | Shift-click a link to read it over the page you're on. |
@@ -73,7 +74,6 @@ Zigzag connects to on its own.
 Zigzag is a beta. It's my everyday browser, but you'll find bugs. Things Arc users will notice:
 
 - No sync between Macs or to iPhone. Passwords sync through iCloud Keychain; spaces and tabs don't.
-- No separate profiles. Every space shares the same logins.
 - Space icons don't come over from Arc; pick them again in Zigzag. Space colors come over as the nearest Zigzag color.
 - No Boosts, Easels, Notes, or AI features.
 - A few Chrome extension APIs aren't there yet: tab groups, debugger settings, Chrome's own Google account sign-in (`identity.getAuthToken`), and the old request-blocking webRequest. Proxy extensions can set a fixed HTTP, HTTPS or SOCKS5 proxy but not a PAC script, so FoxyProxy's Proxy by Patterns mode doesn't work.
@@ -93,7 +93,7 @@ with macOS updates rather than from me.
 | **Ad blocking** | EasyList, EasyPrivacy and EasyList China converted ahead of time with SafariConverterLib into content rule lists (`WKContentRuleListStore`), compiled once and cached. |
 | **Passwords** | Saved as Keychain items, so iCloud Keychain syncs them and Touch ID unlocks them. Passkeys go through Apple's browser passkey entitlement. Autofill is a small content script that only fills fields you can see. |
 | **Import** | Reads each browser's own files: Arc's `StorableSidebar.json`, Chromium's bookmarks and SQLite history, Safari's `Bookmarks.plist`, Firefox's `places.sqlite`, Orion's `favourites.plist` and `history`. Chromium passwords are decrypted with the key from that browser's Keychain item, after macOS asks you. |
-| **Your data** | Spaces, pins and favorites in `Library.json`, open tabs in `Session.json`, history in SQLite, all under `~/Library/Application Support/Zigzag`. Writes are debounced and atomic, and a file that can't be read is set aside, never overwritten. |
+| **Your data** | Spaces, pins and favorites in `Library.json`, profiles in `Profiles.json`, open tabs in `Session.json`, history in SQLite (one file per profile), all under `~/Library/Application Support/Zigzag`. Writes are debounced and atomic, and a file that can't be read is set aside, never overwritten. |
 | **Reader** | Mozilla's Readability, run in the page, shown in Zigzag's own typography. |
 | **Updates** | Sparkle 2, with EdDSA-signed updates from zigzagbrowser.com. Releases are signed with Developer ID and notarized. |
 

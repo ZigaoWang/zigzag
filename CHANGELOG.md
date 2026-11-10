@@ -5,6 +5,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Profiles keep things apart, like work and personal: each has its own extensions, sign-ins, history and favorites, and every space is on one. Saved passwords are shared by all of them. Make one in Settings › Profiles, and choose a space's profile where you edit the space. Two spaces on different profiles can each run their own copy of the same extension, a wallet say.
+- Moving a tab to a space on another profile asks first, since the page reloads there with that profile's sign-ins.
+- With more than one profile, adding an extension and importing from another browser let you choose which profile, and Settings ends with the sections that are about one profile, Extensions and Website Data, under a menu that chooses it. Whether Zigzag offers to save and fill passwords is chosen for each profile, so it can step aside where a password manager is on and not elsewhere.
+
 ## [0.7.9] - 2026-11-10
 
 ### New
