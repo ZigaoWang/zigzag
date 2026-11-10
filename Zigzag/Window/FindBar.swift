@@ -196,7 +196,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     /// Another page came to the front. The other pane of a split: the bar moves over it and searches there. Another
     /// tab: the bar goes with the tab it was opened in, and comes back when you return to a tab you were finding in.
     func pageChanged() {
-        let current = window?.selectedWebView
+        let current = window?.findableWebView
         guard isVisible else {
             if let current, let saved = remembered.object(forKey: current) as String? { show(query: saved, focus: false, animated: false) }
             return
@@ -224,10 +224,10 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
         escapeMonitor = nil
         // Closed on purpose: that tab's search is done.
-        if !keepingMemory, let webView = searched ?? window?.selectedWebView { remembered.removeObject(forKey: webView) }
+        if !keepingMemory, let webView = searched ?? window?.findableWebView { remembered.removeObject(forKey: webView) }
         panel.dismiss(instantly: !animated)
         clearHighlights()
-        if focusPage, let webView = window?.selectedWebView { window?.window?.makeFirstResponder(webView) }
+        if focusPage, let webView = window?.findableWebView { window?.window?.makeFirstResponder(webView) }
     }
 
     func next(backwards: Bool) {
@@ -258,7 +258,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     private func search(backwards: Bool, fromStart: Bool = false) {
         // A PDF is searched in its own viewer, which knows its pages and counts the matches itself.
         if let pdf = window?.selectedTab?.pdfViewer {
-            searched = window?.selectedWebView
+            searched = window?.findableWebView
             searchedPDF = pdf
             pdfSearch?.cancel()
             let query = query
@@ -275,7 +275,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
             if fromStart { DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work) } else { work.perform() }
             return
         }
-        guard let webView = window?.selectedWebView, !query.isEmpty else { return }
+        guard let webView = window?.findableWebView, !query.isEmpty else { return }
         searched = webView
         let config = WKFindConfiguration()
         config.backwards = backwards
@@ -298,7 +298,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     }
 
     private func updateCount(found: Bool) {
-        guard let webView = window?.selectedWebView else { return }
+        guard let webView = window?.findableWebView else { return }
         // WebKit's public find API doesn't count; a quick text scan does. It runs in Zigzag's own script world with
         // the query passed in, so the page can't see what you search for or change how it's counted.
         // Counted over the same text twice, the whole page and the part before the match WebKit just selected, so
@@ -336,7 +336,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         pdfSearch?.cancel()
         (searchedPDF ?? window?.selectedTab?.pdfViewer)?.clearFind()
         searchedPDF = nil
-        if let webView = searched ?? window?.selectedWebView {
+        if let webView = searched ?? window?.findableWebView {
             webView.evaluateJavaScript("window.getSelection().removeAllRanges()")
             // WebKit draws its own highlight over the match, apart from the selection; it stays until told to go.
             if webView.responds(to: Self.hideFindUI) { webView.perform(Self.hideFindUI) }
