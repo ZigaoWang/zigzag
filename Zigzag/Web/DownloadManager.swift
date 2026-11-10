@@ -87,8 +87,9 @@ final class DownloadManager: NSObject {
                 item.state = .paused
                 item.resumeData = entry.resumeData
                 item.replaces = entry.replaces
-                // Back on its profile's store, if the profile is still there; else the first's, as before profiles.
-                if let id = entry.profile, Library.shared.directory.profile(id) != nil { item.dataStore = Profiles.shared.profile(id).store }
+                // One paused before there were profiles, or in the first, goes on in the first: never in whichever
+                // profile's page happens to be in front.
+                item.dataStore = (entry.profile.flatMap { Library.shared.directory.profile($0) != nil ? Profiles.shared.profile($0) : nil } ?? Profiles.shared.default).store
                 item.completedBytes = entry.completedBytes ?? 0
                 item.fractionCompleted = entry.totalBytes > 0 ? Double(item.completedBytes) / Double(entry.totalBytes) : 0
             } else {

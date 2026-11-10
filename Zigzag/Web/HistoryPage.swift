@@ -242,7 +242,7 @@ enum HistoryPage {
     /// The profile a History page shows: the one its tab is in, so the space it's opened in decides whose history
     /// it is.
     static func profile(of webView: WKWebView?) -> Profile {
-        (webView as? BrowserWebView)?.owner?.profile ?? webView.flatMap { Profiles.shared.profile(of: $0) } ?? Profiles.shared.default
+        Profiles.shared.profile(ofPage: webView)
     }
 
     /// With more than one profile, added to what a sheet that clears history says: whose history goes.

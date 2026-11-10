@@ -43,7 +43,9 @@ struct ProfileDirectory: Codable, Equatable {
         others = (try values.decodeIfPresent([ProfileInfo].self, forKey: .others) ?? []).filter { !$0.isDefault }
         spaces = try values.decodeIfPresent([String: UUID].self, forKey: .spaces) ?? [:]
         favorites = try values.decodeIfPresent([String: UUID].self, forKey: .favorites) ?? [:]
-        deleting = try values.decodeIfPresent([ProfileInfo].self, forKey: .deleting) ?? []
+        // Never the first profile: a file that named it here (damaged, or edited by hand) would have its
+        // passwords and extensions erased at the next start.
+        deleting = (try values.decodeIfPresent([ProfileInfo].self, forKey: .deleting) ?? []).filter { !$0.isDefault }
     }
 
     var all: [ProfileInfo] { [first] + others }

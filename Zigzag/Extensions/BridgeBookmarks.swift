@@ -75,11 +75,20 @@ final class BridgeBookmarks: BridgeNamespace {
         if [Self.root, Self.favorites, Self.spaces].contains(id) { return true }
         guard let (kind, uuid) = parse(id) else { return false }
         switch kind {
-        case "b": return library.bookmark(uuid) != nil
-        case "f": return library.folder(uuid) != nil
-        case "s": return library.space(uuid) != nil
+        case "b": return library.bookmark(uuid) != nil && isOurs(bookmark: uuid)
+        case "f": return library.folder(uuid) != nil && spaceID(ofFolder: uuid) != nil
+        case "s": return library.space(uuid) != nil && isOurs(space: uuid)
         default: return false
         }
+    }
+
+    /// The spaces an extension is shown, with their pinned pages and folders: its own profile's. Another
+    /// profile's are not its to list, change or hear about.
+    private var spaces: [SpaceInfo] { library.spaces(in: host.profile.id) }
+    private func isOurs(space id: UUID) -> Bool { library.profileID(ofSpace: id) == host.profile.id }
+    private func isOurs(bookmark id: UUID) -> Bool {
+        if library.isFavorite(id) { return library.profileID(ofFavorite: id) == host.profile.id }
+        return library.spaceID(ofBookmark: id).map(isOurs(space:)) ?? false
     }
 
     private func parse(_ id: String) -> (String, UUID)? {
@@ -93,12 +102,12 @@ final class BridgeBookmarks: BridgeNamespace {
         switch id {
         case Self.root: return [Self.favorites, Self.spaces]
         case Self.favorites: return library.favorites(in: host.profile.id).map { "b:\($0.id)" }
-        case Self.spaces: return library.spaces.map { "s:\($0.id)" }
+        case Self.spaces: return spaces.map { "s:\($0.id)" }
         default: break
         }
         guard let (kind, uuid) = parse(id) else { return [] }
         if kind == "s" { return listed(in: uuid, folder: nil) }
-        if kind == "f", let folder = library.folder(uuid), let space = library.spaces.first(where: { $0.folders?.contains { $0.id == uuid } == true }) {
+        if kind == "f", let folder = library.folder(uuid), let space = spaces.first(where: { $0.folders?.contains { $0.id == uuid } == true }) {
             return listed(in: space.id, folder: folder.id)
         }
         return []
@@ -132,7 +141,7 @@ final class BridgeBookmarks: BridgeNamespace {
         case "f":
             guard let folder = library.folder(uuid) else { return nil }
             if let up = folder.parentID { return "f:\(up)" }
-            return library.spaces.first { $0.folders?.contains { $0.id == uuid } == true }.map { "s:\($0.id)" }
+            return spaces.first { $0.folders?.contains { $0.id == uuid } == true }.map { "s:\($0.id)" }
         case "b":
             if library.isFavorite(uuid) { return Self.favorites }
             if let folder = library.folderID(containing: uuid) { return "f:\(folder)" }
@@ -174,7 +183,7 @@ final class BridgeBookmarks: BridgeNamespace {
     }
 
     private func allPages() -> [String] {
-        library.favorites(in: host.profile.id).map { "b:\($0.id)" } + library.spaces.flatMap { $0.bookmarks.map { "b:\($0.id)" } }
+        library.favorites(in: host.profile.id).map { "b:\($0.id)" } + spaces.flatMap { $0.bookmarks.map { "b:\($0.id)" } }
     }
 
     /// `search("text")` matches title or address, every word; `search({ query, url, title })` as Chrome does.
@@ -213,10 +222,10 @@ final class BridgeBookmarks: BridgeNamespace {
             case Self.favorites:
                 return "b:\(library.addFavorite(url: url, title: name, at: index, in: host.profile.id).id)"
             case Self.root, Self.spaces:
-                guard let first = library.spaces.first, let page = library.addBookmark(url: url, title: name, to: first.id, at: index) else { throw BridgeError("Couldn't add the bookmark") }
+                guard let first = spaces.first, let page = library.addBookmark(url: url, title: name, to: first.id, at: index) else { throw BridgeError("Couldn't add the bookmark") }
                 return "b:\(page.id)"
             default:
-                guard let (kind, uuid) = parse(parentID) else { throw BridgeError("Can't find parent bookmark node") }
+                guard let (kind, uuid) = parse(parentID), exists(parentID) else { throw BridgeError("Can't find parent bookmark node") }
                 if kind == "s", let page = library.addBookmark(url: url, title: name, to: uuid, at: index) { return "b:\(page.id)" }
                 if kind == "f", let space = spaceID(ofFolder: uuid), let page = library.addBookmark(url: url, title: name, to: space) {
                     library.setFolder(of: page.id, to: uuid)
@@ -228,10 +237,14 @@ final class BridgeBookmarks: BridgeNamespace {
         // A folder.
         let name = title.isEmpty ? String(localized: "New Folder", comment: "Name of a folder an extension makes without giving it one.") : title
         switch parentID {
-        case Self.spaces, Self.root: return "s:\(library.addSpace(name: name).id)"
+        case Self.spaces, Self.root:
+            // A space an extension makes is on its own profile.
+            let space = library.addSpace(name: name)
+            library.setProfile(host.profile.id, forSpace: space.id)
+            return "s:\(space.id)"
         case Self.favorites: throw BridgeError("Favorites hold pages, not folders")
         default:
-            guard let (kind, uuid) = parse(parentID) else { throw BridgeError("Can't find parent bookmark node") }
+            guard let (kind, uuid) = parse(parentID), exists(parentID) else { throw BridgeError("Can't find parent bookmark node") }
             if kind == "s", let folder = library.addFolder(named: name, with: [], in: uuid, parent: .some(nil)) { return "f:\(folder.id)" }
             if kind == "f", let space = spaceID(ofFolder: uuid), let folder = library.addFolder(named: name, with: [], in: space, parent: .some(uuid)) { return "f:\(folder.id)" }
             throw BridgeError("Can't find parent bookmark node")
@@ -263,7 +276,7 @@ final class BridgeBookmarks: BridgeNamespace {
         case ("b", Self.favorites):
             if library.isFavorite(uuid) { library.moveFavorite(uuid, to: index ?? library.favorites(in: host.profile.id).count) } else { library.makeFavorite(uuid, at: index, in: host.profile.id) }
         case ("b", _):
-            guard let (parentKind, parentID) = parse(target) else { throw BridgeError("Can't find parent bookmark node") }
+            guard let (parentKind, parentID) = parse(target), exists(target) else { throw BridgeError("Can't find parent bookmark node") }
             if parentKind == "s" {
                 if library.isFavorite(uuid) { library.pinFavorite(uuid, in: parentID, at: index ?? library.bookmarks(in: parentID).count) }
                 else { library.moveBookmark(uuid, to: index ?? library.bookmarks(in: parentID).count, in: parentID, folder: .some(nil)) }
@@ -274,7 +287,7 @@ final class BridgeBookmarks: BridgeNamespace {
                 throw BridgeError("Can't find parent bookmark node")
             }
         case ("f", _):
-            guard let (parentKind, parentID) = parse(target) else { throw BridgeError("Folders go in a space or a folder") }
+            guard let (parentKind, parentID) = parse(target), exists(target) else { throw BridgeError("Folders go in a space or a folder") }
             if parentKind == "s" { library.moveFolder(uuid, to: index ?? library.bookmarks(in: parentID).count, in: parentID, parent: .some(nil)) }
             else if parentKind == "f", let space = spaceID(ofFolder: parentID), !library.subfolderIDs(of: uuid).contains(parentID), parentID != uuid {
                 library.moveFolder(uuid, to: index ?? library.bookmarks(in: space).count, in: space, parent: .some(parentID))
@@ -300,7 +313,7 @@ final class BridgeBookmarks: BridgeNamespace {
     }
 
     private func spaceID(ofFolder id: UUID) -> UUID? {
-        library.spaces.first { $0.folders?.contains { $0.id == id } == true }?.id
+        spaces.first { $0.folders?.contains { $0.id == id } == true }?.id
     }
 
     // MARK: Events

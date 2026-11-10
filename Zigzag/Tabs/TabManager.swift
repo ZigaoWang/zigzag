@@ -212,7 +212,10 @@ final class TabManager {
     func newTab(url: URL?, spaceID: UUID? = nil, select: Bool = true, configuration: WKWebViewConfiguration? = nil,
                 opener: Tab? = nil, title: String? = nil) -> Tab {
         // A page another page opened stays with it: WebKit made it in that page's profile.
-        let space = spaceID ?? (configuration != nil ? opener?.spaceID : nil) ?? currentSpaceID
+        // One WebKit made for a page with no tab of its own here (a Zigzag Mini's, a sign-in window's) goes to a
+        // space on that page's profile, not to whichever space this window happens to show.
+        let made = configuration.flatMap { Profiles.shared.profile(ofStore: $0.websiteDataStore) }
+        let space = spaceID ?? (configuration != nil ? opener?.spaceID : nil) ?? made.flatMap { self.space(for: $0) } ?? currentSpaceID
         let tab = Tab(url: url, title: title, spaceID: space, configuration: configuration)
         tab.host = host
         watch(tab)

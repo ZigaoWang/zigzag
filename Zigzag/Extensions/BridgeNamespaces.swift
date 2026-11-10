@@ -188,7 +188,7 @@ final class BridgeContexts: BridgeNamespace {
         add("BACKGROUND", background.flatMap { URL(string: $0, relativeTo: context.baseURL)?.absoluteURL })
         if let url = host.bridge.offscreen.pageURL(for: extensionID) { add("OFFSCREEN_DOCUMENT", url) }
         if let page = host.shownPopupPage(for: extensionID) { add("POPUP", URL(string: page, relativeTo: context.baseURL)?.absoluteURL) }
-        for controller in WindowManager.shared.controllers where controller.root.showsSidePanel && controller.root.sidePanel.extensionID == extensionID {
+        for controller in WindowManager.shared.controllers where controller.root.showsSidePanel && host.showsSidePanel(of: extensionID, in: controller) {
             add("SIDE_PANEL", controller.root.sidePanel.webView?.url)
         }
         // Chrome's filter: each field given narrows the answer.
@@ -805,7 +805,7 @@ final class BridgeSidePanel: BridgeNamespace {
         lastClick = Date()
         guard !disabled.contains(extensionID), path(for: extensionID) != nil,
               opensOnClick.contains(extensionID) || !hasPopup else { return false }
-        if let controller, controller.root.showsSidePanel, controller.root.sidePanel.extensionID == extensionID {
+        if let controller, controller.root.showsSidePanel, host.showsSidePanel(of: extensionID, in: controller) {
             hide(in: controller)
         } else {
             _ = open(extensionID, in: controller)
@@ -819,7 +819,7 @@ final class BridgeSidePanel: BridgeNamespace {
               let context = host.context(for: extensionID), let configuration = context.webViewConfiguration,
               let url = URL(string: path, relativeTo: context.baseURL)?.absoluteURL, url.host() == context.baseURL.host() else { return false }
         let root = controller.root
-        if root.showsSidePanel, root.sidePanel.extensionID == extensionID, root.sidePanel.webView?.url?.path == url.path { return true }
+        if root.showsSidePanel, host.showsSidePanel(of: extensionID, in: controller), root.sidePanel.webView?.url?.path == url.path { return true }
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.load(URLRequest(url: url))
         let image = context.webExtension.icon(for: NSSize(width: 32, height: 32))
@@ -839,7 +839,7 @@ final class BridgeSidePanel: BridgeNamespace {
     }
 
     private func close(_ extensionID: String) {
-        for controller in WindowManager.shared.controllers where controller.root.sidePanel.extensionID == extensionID { hide(in: controller) }
+        for controller in WindowManager.shared.controllers where host.showsSidePanel(of: extensionID, in: controller) { hide(in: controller) }
     }
 
     func release(_ extensionID: String) {
