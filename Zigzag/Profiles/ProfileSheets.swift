@@ -149,11 +149,14 @@ enum ProfileSheets {
         }
     }
 
-    /// A new profile gets the extensions another has, each as if just added: on as it is there, with nothing it
-    /// stored and nothing it was allowed carried over.
+    /// A new profile gets the extensions another has: on or off as there, allowed what they are there and on the same
+    /// sites, with nothing they stored.
     static func copyExtensions(from source: UUID, to target: UUID) {
         let from = Profiles.shared.profile(source).installs, to = Profiles.shared.profile(target).installs
-        for id in from.installedIDs { to.save(ExtensionInstalls.State(enabled: from.isEnabled(id)), for: id) }
+        for id in from.installedIDs {
+            guard let state = from.state(id) else { continue }
+            to.save(state.carried(enabled: state.enabled), for: id)
+        }
     }
 
     static func edit(_ id: UUID, in host: NSView) {

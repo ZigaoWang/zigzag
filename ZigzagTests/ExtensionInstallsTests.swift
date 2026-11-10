@@ -55,3 +55,34 @@ struct ExtensionRecordTests {
         #expect(ExtensionStore.read(ExtensionInstalls.State.self, from: file) == nil)
     }
 }
+
+/// An extension added to another profile (In Other Profiles, or a new profile Same as another) starts allowed what it
+/// is in the profile it comes from, never everything it asks for on every site without the install sheet.
+struct CarriedExtensionStateTests {
+    @Test func approvalsAndSiteAccessComeAlong() {
+        let there = ExtensionInstalls.State(enabled: false, grantedPermissions: ["storage"], grantedMatchPatterns: ["https://github.com/*"],
+                                            siteAccess: .sites, accessSites: ["github.com"])
+        let here = there.carried(enabled: true)
+        #expect(here.enabled)
+        #expect(here.grantedPermissions == ["storage"])
+        #expect(here.grantedMatchPatterns == ["https://github.com/*"])
+        #expect(here.siteAccess == .sites && here.accessSites == ["github.com"])
+        #expect(!there.carried(enabled: false).enabled)
+    }
+
+    /// On click: it still waits for a click, but the sites it was clicked on there stay there.
+    @Test func sitesClickedOnStayInTheirProfile() {
+        let there = ExtensionInstalls.State(grantedPermissions: [], grantedMatchPatterns: ["<all_urls>"], siteAccess: .click, accessSites: ["bank.example"])
+        let here = there.carried(enabled: true)
+        #expect(here.siteAccess == .click)
+        #expect(here.accessSites == nil)
+        #expect(here.grantedMatchPatterns == ["<all_urls>"])
+    }
+
+    /// Unlike a blank state, which `restoreGrants` reads as everything the extension asks for.
+    @Test func aCarriedStateIsNeverBlank() {
+        let there = ExtensionInstalls.State(grantedPermissions: ["tabs"], grantedMatchPatterns: [])
+        let here = there.carried(enabled: true)
+        #expect(here.grantedPermissions != nil && here.grantedMatchPatterns != nil)
+    }
+}

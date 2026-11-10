@@ -22,6 +22,16 @@ final class ExtensionInstalls {
         var accessSites: [String]?
 
         fileprivate static let keys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "siteAccess", "accessSites"]
+
+        /// What another profile starts with when it gets this extension too: what was approved here and where it
+        /// may run, so it gets nothing it wasn't allowed without the install sheet. Sites it was clicked on stay
+        /// this profile's: they'd tell the other profile where you've been.
+        func carried(enabled: Bool) -> State {
+            var next = self
+            next.enabled = enabled
+            if siteAccess == .click { next.accessSites = nil }
+            return next
+        }
     }
 
     enum SiteAccess: String, Codable {
