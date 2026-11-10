@@ -289,7 +289,7 @@ something came from, answers at once, and can be interrupted.
 - **Space editor** (`SpaceEditorPanel`, `SpaceLookEditor`): the space's name, then one row of curated colors (one tap
   each, a live preview on hover), the wheel and Shade for a color of your own, and Effects folded under a disclosure
   (`DisclosureRow`): a second color and its direction, See-through, Grain. Effects opens by itself when the space
-  uses any of them.
+  uses any of them. Then Profile: a dropdown of the profiles, with New Profile… at its end.
 - **Menu** (`MenuPanel`): Zigzag draws its own; only right-click menus are the system's. The floating panel's
   surface and its one shadow, `Radius.panel`, a hairline `panelEdge`. `body` items
   `Metric.controlHeight` tall with `Radius.row`, inset 4pt; every item has its picture slot, a neutral globe where a
@@ -301,7 +301,9 @@ something came from, answers at once, and can be interrupted.
   choice with its picture, and the up-down chevron. Its menu opens with the chosen item right over the button and
   its text lined up with the button's, as macOS places it; below the button when there's no room, scrolled when the
   list is taller than the window. Press and drag to an item to choose in one movement. With the keyboard, Space,
-  Return, Up or Down opens it. VoiceOver: a pop-up button whose value is the choice.
+  Return, Up or Down opens it. VoiceOver: a pop-up button whose value is the choice. `actions` are items after a
+  separator that do something and choose nothing ("New Profile…"). A choice of profile is filled by
+  `ProfileChoice`, each profile with its tile, wherever one is asked for.
 - **Card**: the chosen thing in a list (`applyRowStyle`, `GlassTile` when selected).
 - **Row** (`CardRow`): icon, title, quiet trailing detail; states above.
 - **Tile** (`GlassTile`): soft glass, `Radius.tile`; a fine darker edge (`openEdge`) when its page is open.
@@ -311,6 +313,10 @@ something came from, answers at once, and can be interrupted.
 - **Dialog** (`Tokens.Dialog`): `DialogHeader` (a picture, the question in the heading's weight, a quiet line under
   it), the explaining text, then `DialogButtons` (the answers at the trailing end, the main one last and filled; a
   quiet choice alone at the leading end). Confirmations, page dialogs, extension and save-password prompts use it.
+  A form (`FormSheet`) is the same dialog with rows between the text and the buttons: a field, or a control after
+  its label, the labels sharing a column. For what needs more than yes or no: a profile's name and color (the
+  space editor's `LookSwatch`), or its name typed to remove it. Return confirms once it can be, never what's
+  destructive; Tab stays within it.
 - **Buttons** (`ButtonLook`, `applyButtonLook`), capsules `Metric.controlHeight` (28) tall, `Font.control()`:
   - Secondary (`PillButton` `.plain`, `TextButton.form`): `controlFill` (white; a lighter step of the surface in
     dark mode), a hairline `controlEdge` and a faint `controlShadow` (1.5pt, 0.5 down). A symbol may lead the title.
