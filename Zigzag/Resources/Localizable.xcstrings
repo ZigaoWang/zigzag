@@ -1533,13 +1533,13 @@
         }
       }
     },
-    "A playing video floats in its own window until you come back." : {
+    "A playing video follows you in a small player." : {
       "comment" : "Explanation under “Keep videos playing when you switch tabs” in Settings › Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在播放的视频会浮在单独的窗口中，直到你回来。"
+            "value" : "正在播放的视频会在小播放器里跟着你。"
           }
         }
       }
@@ -2452,6 +2452,17 @@
         }
       }
     },
+    "Back 15 Seconds" : {
+      "comment" : "Tooltip of the mini player's button that skips the video back 15 seconds.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后退 15 秒"
+          }
+        }
+      }
+    },
     "Back to Favorite’s Page" : {
       "comment" : "Item in a favorite's context menu. Goes back to the page the favorite was saved with.",
       "localizations" : {
@@ -2481,6 +2492,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "回到固定的页面"
+          }
+        }
+      }
+    },
+    "Back to Tab" : {
+      "comment" : "Tooltip of the mini player's button that takes you back to the tab its video is from.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回到标签页"
           }
         }
       }
@@ -3545,6 +3567,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "点按以更改"
+          }
+        }
+      }
+    },
+    "Close" : {
+      "comment" : "Tooltip of the mini player's close button: stops the video and closes the player.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
           }
         }
       }
@@ -5380,6 +5413,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "前进"
+          }
+        }
+      }
+    },
+    "Forward 15 Seconds" : {
+      "comment" : "Tooltip of the mini player's button that skips the video ahead 15 seconds.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前进 15 秒"
           }
         }
       }
@@ -8557,7 +8601,7 @@
       }
     },
     "Pause" : {
-      "comment" : "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of a download's button in the downloads panel: pauses the download.",
+      "comment" : "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of a download's button in the downloads panel: pauses the download.\nTooltip of the mini player's play button while the video plays.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8807,7 +8851,7 @@
       }
     },
     "Play" : {
-      "comment" : "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.",
+      "comment" : "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of the mini player's play button while the video is paused.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12635,6 +12679,17 @@
         }
       }
     },
+    "Time" : {
+      "comment" : "VoiceOver's name for the mini player's progress bar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "时间"
+          }
+        }
+      }
+    },
     "To always translate a language, choose it in a page’s site controls." : {
       "comment" : "Under Always Translate in Settings › Translation.",
       "localizations" : {
@@ -13560,6 +13615,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "版本 %@，来自 Chrome 网上应用店"
+          }
+        }
+      }
+    },
+    "Video from %@" : {
+      "comment" : "VoiceOver's name for the mini player. The site is a domain, like youtube.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自 %@ 的视频"
           }
         }
       }

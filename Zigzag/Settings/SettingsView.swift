@@ -744,7 +744,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                               control: energyToggle))
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
         tabsGroup.add(FormRow(title: String(localized: "Keep videos playing when you switch tabs", comment: "A setting in Settings › Tabs."),
-                              detail: String(localized: "A playing video floats in its own window until you come back.", comment: "Explanation under “Keep videos playing when you switch tabs” in Settings › Tabs."),
+                              detail: String(localized: "A playing video follows you in a small player.", comment: "Explanation under “Keep videos playing when you switch tabs” in Settings › Tabs."),
                               control: pipToggle))
         swipeToggle.onChange = { on in SwipeNavigator.isOn = on }
         tabsGroup.add(FormRow(title: String(localized: "Swipe to go back and forward", comment: "A setting in Settings › Tabs: two fingers sideways on the trackpad go back or forward."),
