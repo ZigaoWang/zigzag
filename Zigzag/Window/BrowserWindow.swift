@@ -335,6 +335,19 @@ final class BrowserWindow: NSWindow {
     var trafficLightHeight: CGFloat { standardWindowButton(.closeButton)?.frame.height ?? 14 }
 }
 
+extension NSWindow {
+    /// A press on chrome that stands in for the title bar (the sidebar, the bar above the page): a drag moves the
+    /// window, and a double-click zooms it, or does whatever the Mac's title bar double-click is set to do.
+    func titleBarMouseDown(_ event: NSEvent) {
+        guard event.clickCount == 2 else { performDrag(with: event); return }
+        switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
+        case "Minimize": miniaturize(nil)
+        case "None": break
+        default: zoom(nil)
+        }
+    }
+}
+
 /// Keys no one took go by without AppKit's beep, except a ⌘ shortcut that matches nothing. Pages pass back keys they
 /// use too (YouTube seeks on ← and →), so without this every arrow on a video would beep.
 enum QuietKeys {
