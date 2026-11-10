@@ -58,3 +58,23 @@ struct FaviconSignInTests {
         #expect(!FaviconStore.isSignIn(try #require(URL(string: "https://example.com/login")), from: try #require(URL(string: "https://example.com/"))))
     }
 }
+
+/// Which icon a tab wears as a new page commits in it.
+struct TabIconOnCommitTests {
+    private func url(_ s: String) -> URL { URL(string: s)! }
+
+    @Test func anotherSiteDropsTheLastOnesIcon() {
+        // YouTube, then a page with no icon of its own: never YouTube's icon over it.
+        #expect(!Tab.keepsIcon(from: url("https://www.youtube.com/watch?v=x"), to: url("http://127.0.0.1:8917/video.html")))
+        #expect(!Tab.keepsIcon(from: url("https://example.com/"), to: url("https://example.org/")))
+    }
+
+    @Test func theSameSiteKeepsItsIcon() {
+        #expect(Tab.keepsIcon(from: url("https://www.youtube.com/"), to: url("https://youtube.com/watch?v=x")))
+        #expect(Tab.keepsIcon(from: url("https://example.com/a"), to: url("https://EXAMPLE.com/b")))
+    }
+
+    @Test func theFirstPageKeepsTheIconItWasRestoredWith() {
+        #expect(Tab.keepsIcon(from: nil, to: url("https://example.com/")))
+    }
+}

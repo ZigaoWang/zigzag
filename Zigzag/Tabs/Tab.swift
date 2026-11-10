@@ -729,6 +729,19 @@ final class Tab: NSObject {
     private var iconSource: (page: URL, links: [[String: String]])?
     /// The site whose page was last committed here, so a private tab keeps its zoom from page to page on it.
     private var zoomHost: String?
+    /// The page last committed here: the site the tab's icon belongs to.
+    private var committedURL: URL?
+
+    /// Whether the icon stays as a new page commits: only on the same site (www. or not). The first page committed
+    /// in a tab keeps the icon it was restored with.
+    nonisolated static func keepsIcon(from previous: URL?, to committed: URL) -> Bool {
+        guard let previous else { return true }
+        func site(_ url: URL) -> String {
+            let host = url.host()?.lowercased() ?? url.scheme ?? ""
+            return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        }
+        return site(previous) == site(committed)
+    }
     /// The title waiting to go into History, a moment after the page last changed it.
     private var titleWrite: DispatchWorkItem?
 
@@ -978,6 +991,14 @@ extension Tab: WKNavigationDelegate {
             changed.send(.snapshot)
         }
         if let url = webView.url {
+            // A new page from another site never wears the last one's icon, even where the address showed it before
+            // it came (Zigzag's own loads): the site's own if it's known, otherwise the globe until the page offers one.
+            if !Self.keepsIcon(from: committedURL, to: url) {
+                favicon = FaviconStore.shared.cachedIcon(for: url)
+                iconSource = nil
+                changed.send(.favicon)
+            }
+            committedURL = url
             // A private window's zoom isn't saved for the site, so it lasts while you stay on that site in this tab.
             let host = HistoryStore.normalizedHost(url)
             if !(isPrivate && host == zoomHost) {
