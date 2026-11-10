@@ -701,9 +701,13 @@ final class BrowserRootView: SpaceFrameView {
 
     private func layoutTopBar() {
         guard showsTopBar else { return }
-        topBar.frame = topBarFrame
-        // The address ends where the page does: at the frame's inset, or near the window's edge when it meets it.
-        topBar.trailingInset = max(Tokens.Sidebar.edge, bounds.maxX - pageAreaFrame.maxX)
+        let bar = topBarFrame, page = pageAreaFrame
+        topBar.frame = bar
+        // The bar's controls run from the page's left edge to its right: at the frame's inset, or just inside the
+        // window's edges when the page meets them.
+        (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: page, window: bounds)
+        // Beside it, the sidebar's favorites and tabs start where the page does.
+        if sidebarVisible { sidebarContainer.sidebar.contentTop = page.minY - sidebarFrame.minY }
     }
 
     func setSidebarVisible(_ visible: Bool, animated: Bool) {

@@ -34,6 +34,53 @@ struct TopBarTests {
         #expect(frames.buttons[0].minX < Tokens.Sidebar.lightsX + lights + Tokens.Sidebar.lightsGap)
     }
 
+    @Test func withTheSidebarHiddenItsToggleComesFirstAfterTheLights() throws {
+        let lights: CGFloat = 52
+        let frames = TopBarView.frames(width: 1000, buttons: 3, sidebarButton: true, trafficLightsWidth: lights, trailingInset: 6)
+        let toggle = try #require(frames.sidebarButton)
+        // Spaced from the lights exactly as the sidebar's own toggle is in its top row.
+        let ink = Tokens.Symbol.inkSize("sidebar.left", size: Tokens.Sidebar.glyph).width
+        let b = Tokens.Sidebar.button
+        #expect(toggle.minX == round(Tokens.Sidebar.lightsX + lights + Tokens.Sidebar.lightsGap - (b - ink) / 2))
+        #expect(toggle.midY == Tokens.Sidebar.lightsCenter && toggle.width == b && toggle.height == b)
+        #expect(frames.buttons[0].minX == toggle.maxX)
+        // Without the lights (full screen), it starts the row.
+        let fullScreen = TopBarView.frames(width: 1000, buttons: 3, sidebarButton: true, trafficLightsWidth: 0, leadingInset: inset, trailingInset: inset)
+        #expect(fullScreen.sidebarButton?.minX == inset)
+        // With the sidebar shown, the sidebar keeps its own: none here.
+        #expect(TopBarView.frames(width: 1000, buttons: 3, trafficLightsWidth: 0, trailingInset: 6).sidebarButton == nil)
+    }
+
+    @Test func theSidebarsToggleIsInTheBarOnlyWhileTheSidebarIsHidden() {
+        let topBar = TopBarView()
+        #expect(topBar.sidebarButton.superview === topBar && topBar.sidebarButton.isHidden)
+        topBar.showsSidebarButton = true
+        #expect(!topBar.sidebarButton.isHidden)
+        topBar.showsSidebarButton = false
+        #expect(topBar.sidebarButton.isHidden)
+    }
+
+    @Test func theControlsRunFromThePagesLeftEdgeToItsRight() {
+        let shown = BrowserRootView.topBarFrame(in: window, sidebarVisible: true, sidebarWidth: 240)
+        // Framed: the back button's edge on the page's left edge, the address's end on its right.
+        let framed = BrowserRootView.pageArea(in: window, sidebarVisible: true, sidebarWidth: 240, edgeToEdge: false, borderless: false, topBar: true)
+        var ends = TopBarView.insets(bar: shown, page: framed, window: window)
+        var frames = TopBarView.frames(width: shown.width, buttons: 3, trafficLightsWidth: 0, leadingInset: ends.leading, trailingInset: ends.trailing)
+        #expect(shown.minX + frames.buttons[0].minX == framed.minX)
+        #expect(shown.minX + frames.address.maxX == framed.maxX)
+        // Borderless, the page meets the window: the same inset in from both of its edges, clear of the window's.
+        let borderless = BrowserRootView.pageArea(in: window, sidebarVisible: true, sidebarWidth: 240, edgeToEdge: false, borderless: true, topBar: true)
+        ends = TopBarView.insets(bar: shown, page: borderless, window: window)
+        frames = TopBarView.frames(width: shown.width, buttons: 3, trafficLightsWidth: 0, leadingInset: ends.leading, trailingInset: ends.trailing)
+        let lead = shown.minX + frames.buttons[0].minX - borderless.minX, trail = borderless.maxX - (shown.minX + frames.address.maxX)
+        #expect(lead == trail && lead == Tokens.Sidebar.edge)
+        // The sidebar hidden, framed: the same rule with the page a frame's inset in on both sides.
+        let hiddenBar = BrowserRootView.topBarFrame(in: window, sidebarVisible: false, sidebarWidth: 240)
+        let hidden = BrowserRootView.pageArea(in: window, sidebarVisible: false, sidebarWidth: 240, edgeToEdge: false, borderless: false, topBar: true)
+        ends = TopBarView.insets(bar: hiddenBar, page: hidden, window: window)
+        #expect(ends.leading == hidden.minX && hiddenBar.maxX - ends.trailing == hidden.maxX)
+    }
+
     @Test func narrowBarNeverGivesTheAddressANegativeWidth() {
         let frames = TopBarView.frames(width: 40, buttons: 3, trafficLightsWidth: 52, trailingInset: 6)
         #expect(frames.address.width == 0)
@@ -84,11 +131,15 @@ struct TopBarTests {
         #expect(!root.topBar.isHidden)
         #expect(root.topBar.frame.minX == root.sidebarWidth)
         #expect(root.card.frame.minY == bar)
-        // The favorites and tabs take the address's place.
-        #expect(sidebar.favorites.frame.minY == Tokens.Sidebar.addressTop)
-        // The address ends where the page does.
+        // The favorites start where the page does: as far under the top row as the page.
+        #expect(sidebar.favorites.frame.minY == root.card.frame.minY)
+        // The back button starts and the address ends the same inset in from the page's edges.
         let address = sidebar.address.convert(sidebar.address.bounds, to: root)
+        let back = sidebar.backButton.convert(sidebar.backButton.bounds, to: root)
+        #expect(back.minX - root.cardFrame.minX == root.cardFrame.maxX - address.maxX)
         #expect(address.maxX == root.bounds.maxX - max(Tokens.Sidebar.edge, root.bounds.maxX - root.cardFrame.maxX))
+        // All of the top row on the traffic lights' line.
+        #expect(back.midY == Tokens.Sidebar.lightsCenter && address.midY == Tokens.Sidebar.lightsCenter)
 
         sidebar.holdsAddress = true
         root.showsTopBar = false

@@ -779,6 +779,9 @@ final class SidebarView: NSView {
             needsLayout = true
         }
     }
+    /// Where the favorites start while the address is above the page: the page's top, so the two line up under the
+    /// top row (set by the window as it lays out the page).
+    var contentTop: CGFloat = TopBarView.height { didSet { if contentTop != oldValue { needsLayout = true } } }
     /// What moves to the bar above the page: the three buttons in order, then the address.
     var addressButtons: [IconButton] { [backButton, forwardButton, reloadButton] }
     private var addressViews: [NSView] { addressButtons + [address] }
@@ -883,8 +886,8 @@ final class SidebarView: NSView {
         if holdsAddress {
             address.frame = NSRect(x: pad, y: Tokens.Sidebar.addressTop, width: width - pad * 2, height: Tokens.Sidebar.addressHeight)
         }
-        // With the address above the page, the favorites take its place, and the tabs follow them up.
-        let topEdge = holdsAddress ? address.frame.maxY + Tokens.Space.x2 : Tokens.Sidebar.addressTop
+        // With the address above the page, the favorites (or the tabs, without any) start where the page does.
+        let topEdge = holdsAddress ? address.frame.maxY + Tokens.Space.x2 : contentTop
 
         let bottomHeight = Tokens.Sidebar.bottomBarHeight
         // Its buttons sit as far from the bottom edge as from the side.
@@ -893,7 +896,8 @@ final class SidebarView: NSView {
         let favoritesHeight = favorites.preferredHeight(for: width - pad * 2)
         favorites.isHidden = favoritesHeight == 0
         favorites.frame = NSRect(x: pad, y: topEdge, width: width - pad * 2, height: favoritesHeight)
-        let listTop = (favoritesHeight > 0 ? favorites.frame.maxY : topEdge - Tokens.Space.x2) + Tokens.Sidebar.sectionGap
+        let listTop = favoritesHeight > 0 ? favorites.frame.maxY + Tokens.Sidebar.sectionGap
+            : holdsAddress ? topEdge - Tokens.Space.x2 + Tokens.Sidebar.sectionGap : topEdge
         let frames = bottomFrames()
         nowPlaying.frame = frames.nowPlaying
         let listBottom = frames.listBottom
