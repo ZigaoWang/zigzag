@@ -311,6 +311,9 @@ enum SidebarMenus {
         if !manager.isPrivate { menu.addItem(Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite back into a pinned tab.")) { controller.unfavoriteWithUndo(favorite.id, to: 0) }) }
         if live != nil || !manager.isPrivate { menu.addItem(.separator()) }
         if let live {
+            if live.isPlayingAudio || live.isMuted {
+                menu.addItem(Item(live.isMuted ? String(localized: "Unmute Tab", comment: "Item in a favorite's context menu.") : String(localized: "Mute Tab", comment: "Item in a favorite's context menu.")) { live.setMuted(!live.isMuted) })
+            }
             menu.addItem(Item(String(localized: "Unload Page", comment: "Item in a favorite's context menu. Unloads the page; the favorite stays.")) { manager.close(live) })
         }
         if !manager.isPrivate { menu.addItem(Item(String(localized: "Remove from Favorites", comment: "Item in a favorite's context menu.")) { controller.removeFavoriteWithUndo(favorite.id) }) }

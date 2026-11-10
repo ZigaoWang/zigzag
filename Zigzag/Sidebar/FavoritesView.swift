@@ -380,6 +380,37 @@ final class FavoriteTile: InteractiveView {
         addSubview(button)
         return button
     }()
+    /// While its page plays sound, or is muted: a speaker in the top-left corner, the chip the × is, as a tab's row
+    /// has one beside its title. Clicking it mutes the page, or unmutes it.
+    private lazy var audioButton: IconButton = {
+        let button = IconButton(symbol: "speaker.wave.2", size: Self.closeSide, symbolSize: Tokens.Sidebar.favoriteCloseGlyph,
+                                toolTip: String(localized: "Mute Tab", comment: "Tooltip of the speaker on a favorite whose page plays sound."))
+        button.tint = Tokens.Color.textSecondary
+        button.wantsLayer = true
+        button.radius = Self.closeSide / 2
+        button.showsFillAtRest = true
+        button.layer?.borderWidth = Tokens.Metric.hairline
+        button.layer?.borderColor = cgColor(Tokens.Color.controlEdge)
+        button.onClick = { [weak self] _ in
+            guard let tab = self?.tab else { return }
+            tab.setMuted(!tab.isMuted)
+        }
+        button.isHidden = true
+        addSubview(button)
+        return button
+    }()
+
+    private func refreshAudio() {
+        let shows = tab.map { $0.isPlayingAudio || $0.isMuted } ?? false
+        guard shows || !audioButton.isHidden else { return }
+        audioButton.isHidden = !shows
+        let muted = tab?.isMuted == true
+        audioButton.symbol = muted ? "speaker.slash" : "speaker.wave.2"
+        audioButton.toolTip = muted ? String(localized: "Unmute Tab", comment: "Tooltip of the speaker on a favorite whose page is muted.")
+            : String(localized: "Mute Tab", comment: "Tooltip of the speaker on a favorite whose page plays sound.")
+        needsLayout = true
+    }
+
     /// While ⌘ is held: the number that opens it with ⌘, in the corner its × uses (the × steps aside meanwhile).
     var number: Int? {
         didSet {
@@ -451,8 +482,10 @@ final class FavoriteTile: InteractiveView {
         self.tab = tab
         tabToken = tab?.changed.observe { [weak self] change in
             if change == .loading || change == .favicon { self?.refreshLoading() }
+            if change == .audio || change == .webView { self?.refreshAudio() }
         }
         refreshLoading()
+        refreshAudio()
     }
 
     private func refreshLoading() {
@@ -499,6 +532,7 @@ final class FavoriteTile: InteractiveView {
         }
         let side = Self.closeSide, edge = Self.closeInset
         closeButton.frame = NSRect(x: bounds.width - side - edge, y: isFlipped ? edge : bounds.height - side - edge, width: side, height: side)
+        if !audioButton.isHidden { audioButton.frame = NSRect(x: edge, y: isFlipped ? edge : bounds.height - side - edge, width: side, height: side) }
         layoutNumber()
     }
 

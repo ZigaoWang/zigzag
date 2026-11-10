@@ -6973,7 +6973,7 @@
       }
     },
     "Mute Tab" : {
-      "comment" : "Item in a tab's context menu in the sidebar.\nMenu bar item: silences the tab.\nTooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.\nView menu item.",
+      "comment" : "Item in a favorite's context menu.\nItem in a tab's context menu in the sidebar.\nMenu bar item: silences the tab.\nTooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.\nTooltip of the speaker on a favorite whose page plays sound.\nView menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13139,7 +13139,7 @@
       }
     },
     "Unmute Tab" : {
-      "comment" : "Item in a tab's context menu in the sidebar.\nMenu bar item: turns the tab's sound back on.\nTooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.",
+      "comment" : "Item in a favorite's context menu.\nItem in a tab's context menu in the sidebar.\nMenu bar item: turns the tab's sound back on.\nTooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.\nTooltip of the speaker on a favorite whose page is muted.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
