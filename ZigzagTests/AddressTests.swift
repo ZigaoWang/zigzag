@@ -209,6 +209,80 @@ struct AddressTests {
         #expect(clicks == 1)
     }
 
+    /// A pinned extension is one more of the field's buttons: Reader's and Site Controls' size, corners and press
+    /// area, the same 2pt between every pair, its icon a site icon's 16pt in the middle.
+    @Test func aPinnedButtonIsTheFieldsOwnButton() {
+        let address = AddressView(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Sidebar.addressHeight))
+        address.setReader(available: true, active: false)
+        address.setPins([pin("a", badge: "18"), pin("b")], animated: false)
+        guard let a = address.pinButton(for: "a"), let b = address.pinButton(for: "b") else { Issue.record("no pins"); return }
+        let row = [address.readerButton, a, b, address.siteControlsButton]
+        for button in row {
+            #expect(button.frame.size == NSSize(width: AddressView.buttonSide, height: AddressView.buttonSide))
+            #expect(button.frame.minY == AddressView.buttonInset)
+            #expect(button.radius == address.siteControlsButton.radius)
+        }
+        let gaps = zip(row, row.dropFirst()).map { $1.frame.minX - $0.frame.maxX }
+        #expect(Set(gaps) == [2])
+        #expect(address.bounds.maxX - address.siteControlsButton.frame.maxX == AddressView.buttonInset)
+        #expect(a.imageSide == 16 && b.imageSide == Tokens.Sidebar.addressIcon)
+    }
+
+    /// The count is a 12pt pill in the button's bottom-right corner, never past the button's edges, however long.
+    @Test(arguments: ["1", "18", "999", "9999", "new"])
+    func theCountPillStaysInsideTheButton(text: String) {
+        let button = NSRect(x: 0, y: 0, width: AddressView.buttonSide, height: AddressView.buttonSide)
+        let pill = BadgeView.frame(for: text, in: button, inset: BadgeView.buttonInset)
+        #expect(button.contains(pill))
+        #expect(pill.height == BadgeView.height)
+        #expect(pill.width >= pill.height)
+        #expect(pill.maxX == button.maxX - BadgeView.buttonInset && pill.maxY == button.maxY - BadgeView.buttonInset)
+    }
+
+    /// Placed by the badge itself, in the address's button (top-left origin) and a Site Controls tile alike.
+    @Test func theCountIsPlacedTheSameInTheAddressAndATile() {
+        let address = field()
+        address.setPins([pin("a", badge: "18")], animated: false)
+        guard let button = address.pinButton(for: "a"), let badge = button.subviews.compactMap({ $0 as? BadgeView }).first else {
+            Issue.record("no badge"); return
+        }
+        badge.layout()
+        #expect(badge.frame == BadgeView.frame(for: "18", in: button.bounds, inset: BadgeView.buttonInset))
+        let tile = PanelTile(image: nil, symbol: "puzzlepiece.extension", caption: nil)
+        tile.frame = NSRect(x: 0, y: 0, width: 40, height: 40)
+        tile.badge = "18"
+        guard let tileBadge = tile.subviews.compactMap({ $0 as? BadgeView }).first else { Issue.record("no tile badge"); return }
+        tileBadge.layout()
+        #expect(tileBadge.frame.size == badge.frame.size)
+        #expect(tile.bounds.contains(tileBadge.frame))
+    }
+
+    /// The pin button on a tile: a 16pt chip inside the tile's top-right corner (top-left beside a count), a 20pt
+    /// target around it.
+    @Test func aTilesPinButtonIsEasyToHitAndInsideTheTile() {
+        let tile = NSRect(x: 100, y: 50, width: 40, height: 40)
+        for left in [false, true] {
+            let frame = SitePanel.pinFrame(on: tile, left: left)
+            #expect(frame.width >= 20 && frame.height >= 20)
+            let pin = HoverPin()
+            let chip = pin.chipFrame.offsetBy(dx: frame.minX, dy: frame.minY)
+            #expect(chip.width == Tokens.Sidebar.hoverPinChip)
+            #expect(tile.contains(chip))
+            #expect(chip.minY == tile.minY + Tokens.Sidebar.hoverPinInset)
+            #expect(left ? chip.minX == tile.minX + Tokens.Sidebar.hoverPinInset : chip.maxX == tile.maxX - Tokens.Sidebar.hoverPinInset)
+        }
+    }
+
+    @Test func aTilesPinIsFilledOnlyOncePinned() {
+        let pin = HoverPin()
+        #expect(pin.symbol == "pin")
+        pin.state = .pinned
+        #expect(pin.symbol == "pin.fill")
+        #expect(pin.toolTip == SitePanel.unpinTitle)
+        pin.state = .unpinned
+        #expect(pin.toolTip == SitePanel.pinTitle)
+    }
+
     @Test func aPopupOpeningClosesTheOtherOneInItsWindowOnly() {
         let windows = (NSObject(), NSObject())
         let window = ObjectIdentifier(windows.0), other = ObjectIdentifier(windows.1)
