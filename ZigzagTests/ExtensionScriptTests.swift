@@ -132,6 +132,21 @@ struct ExtensionScriptTests {
     };
     """
 
+    @Test func chromesNamedConstantsAreThere() {
+        // Coupert's background reads chrome.tabs.TabStatus.LOADING first thing; WebKit has none of these.
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("var __background = true, __page = null, __backgroundPort = null; var __toBackground = () => {}, __connectToBackground = () => {};")
+        context.evaluateScript(Self.fakeWorld)
+        context.evaluateScript("chrome.windows = {};")
+        context.evaluateScript(ExtensionBridgeScript.differences)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("chrome.tabs.TabStatus.LOADING")?.toString() == "loading")
+        #expect(context.evaluateScript("chrome.tabs.TAB_ID_NONE")?.toInt32() == -1)
+        #expect(context.evaluateScript("chrome.windows.WINDOW_ID_CURRENT")?.toInt32() == -2)
+        #expect(context.evaluateScript("chrome.runtime.OnInstalledReason.INSTALL")?.toString() == "install")
+    }
+
     @Test func tabMessagesReachTheExtensionsOwnFramesInThatTab() throws {
         // WebKit sends tabs.sendMessage to content scripts only; Chrome also to the extension's own pages in that
         // tab, which is how 1Password tells its sign-in banner on a site to close.

@@ -248,6 +248,42 @@
       extras.set(standIn, own);
       return setMemberIn(root, path.slice(0, -1), path[path.length - 1], standIn);
     };
+
+    // Chrome's named constants for its tabs and windows (chrome.tabs.TabStatus.LOADING and the like): WebKit's objects
+    // have none of them, so code that reads one stops at once (Coupert's background, so its popup never loaded). Each
+    // is the plain value Chrome answers with; any WebKit already has stays its own.
+    const constants = {
+      tabs: {
+        TabStatus: { UNLOADED: 'unloaded', LOADING: 'loading', COMPLETE: 'complete' },
+        MutedInfoReason: { USER: 'user', CAPTURE: 'capture', EXTENSION: 'extension' },
+        WindowType: { NORMAL: 'normal', POPUP: 'popup', PANEL: 'panel', APP: 'app', DEVTOOLS: 'devtools' },
+        ZoomSettingsMode: { AUTOMATIC: 'automatic', MANUAL: 'manual', DISABLED: 'disabled' },
+        ZoomSettingsScope: { PER_ORIGIN: 'per-origin', PER_TAB: 'per-tab' },
+        TAB_ID_NONE: -1,
+        TAB_INDEX_NONE: -1,
+      },
+      windows: {
+        WindowType: { NORMAL: 'normal', POPUP: 'popup', PANEL: 'panel', APP: 'app', DEVTOOLS: 'devtools' },
+        WindowState: { NORMAL: 'normal', MINIMIZED: 'minimized', MAXIMIZED: 'maximized', FULLSCREEN: 'fullscreen', LOCKED_FULLSCREEN: 'locked-fullscreen' },
+        CreateType: { NORMAL: 'normal', POPUP: 'popup', PANEL: 'panel' },
+        WINDOW_ID_NONE: -1,
+        WINDOW_ID_CURRENT: -2,
+      },
+      runtime: {
+        OnInstalledReason: { INSTALL: 'install', UPDATE: 'update', CHROME_UPDATE: 'chrome_update', SHARED_MODULE_UPDATE: 'shared_module_update' },
+        OnRestartRequiredReason: { APP_UPDATE: 'app_update', OS_UPDATE: 'os_update', PERIODIC: 'periodic' },
+        PlatformOs: { MAC: 'mac', WIN: 'win', ANDROID: 'android', CROS: 'cros', LINUX: 'linux', OPENBSD: 'openbsd', FUCHSIA: 'fuchsia' },
+        PlatformArch: { ARM: 'arm', ARM64: 'arm64', X86_32: 'x86-32', X86_64: 'x86-64', MIPS: 'mips', MIPS64: 'mips64' },
+        ContextType: { TAB: 'TAB', POPUP: 'POPUP', BACKGROUND: 'BACKGROUND', OFFSCREEN_DOCUMENT: 'OFFSCREEN_DOCUMENT', SIDE_PANEL: 'SIDE_PANEL' },
+      },
+    };
+    for (const [namespace, members] of Object.entries(constants)) {
+      if (!api[namespace]) continue;
+      for (const [key, value] of Object.entries(members)) {
+        if (api[namespace][key] === undefined) setMember([namespace], key, value);
+      }
+    }
+
     Object.defineProperty(globalThis, '__zigzagSetMember', { value: setMember, configurable: true });
 
     // A page asked to connect to its worker (below), when the worker looks for its clients.
