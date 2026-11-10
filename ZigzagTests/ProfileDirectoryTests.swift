@@ -242,3 +242,33 @@ struct ProfileRemovalRuleTests {
         #expect(directory.removalBlock(Profile.defaultID, inUse: [Profile.defaultID]) == .first)
     }
 }
+
+/// Which profile a page belongs in, and when moving one rebuilds it.
+@MainActor
+struct PageProfileTests {
+    @Test func aPageIsItsSpacesAndAFavoritesPageIsTheFavorites() {
+        var directory = ProfileDirectory()
+        let work = directory.add(name: "Work"), play = directory.add(name: "Play")
+        let office = UUID(), home = UUID(), favorite = UUID()
+        directory.assign(space: office, to: work.id)
+        // A page in a space is that space's profile's; a space on no other profile is the first's.
+        #expect(directory.profileID(ofPageIn: office) == work.id)
+        #expect(directory.profileID(ofPageIn: home) == Profile.defaultID)
+        // A favorite's page is the favorite's profile's, whichever space it's open in.
+        directory.assign(favorite: favorite, to: play.id)
+        #expect(directory.profileID(ofPageIn: office, favorite: favorite) == play.id)
+        #expect(directory.profileID(ofPageIn: home, favorite: favorite) == play.id)
+        // A favorite that was never given to another profile is the first's, also when open in a space on Work.
+        #expect(directory.profileID(ofPageIn: office, favorite: UUID()) == Profile.defaultID)
+    }
+
+    @Test func onlyALoadedPageMovingToAnotherProfileIsRebuilt() {
+        let work = UUID(), play = UUID()
+        #expect(ProfileSheets.isRebuilt(isPrivate: false, isLoaded: true, in: work, movingTo: play))
+        // Within a profile nothing changes for the page.
+        #expect(!ProfileSheets.isRebuilt(isPrivate: false, isLoaded: true, in: work, movingTo: work))
+        // A page that isn't loaded has nothing to lose, and a private one keeps its window's store.
+        #expect(!ProfileSheets.isRebuilt(isPrivate: false, isLoaded: false, in: work, movingTo: play))
+        #expect(!ProfileSheets.isRebuilt(isPrivate: true, isLoaded: true, in: work, movingTo: play))
+    }
+}

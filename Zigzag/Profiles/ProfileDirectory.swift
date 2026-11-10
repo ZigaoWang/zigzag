@@ -81,6 +81,13 @@ nonisolated struct ProfileDirectory: Codable, Equatable {
         return id
     }
 
+    /// The profile a page belongs in. A favorite's is the profile the favorite is kept in, whichever space it was
+    /// opened from; any other page's is its space's. What a tab is built in, what the command bar counts as this
+    /// profile's, and what an extension may see of your pinned pages all follow from it.
+    func profileID(ofPageIn space: UUID, favorite: UUID? = nil) -> UUID {
+        favorite.map(profileID(ofFavorite:)) ?? profileID(ofSpace: space)
+    }
+
     @discardableResult
     mutating func add(name: String, color: SpaceColor? = nil, id: UUID = UUID(), created: Date = Date()) -> ProfileInfo {
         let info = ProfileInfo(id: id, name: name, color: color, created: created)
