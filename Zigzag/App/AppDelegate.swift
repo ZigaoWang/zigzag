@@ -52,7 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ContentBlocker.prepare()
         // A page stuck working hard (an extension in a loop, usually) gets named, with a way out.
         EnergyWatch.shared.start()
-        // macOS saying memory is short, so a page that stops then is put down to it.
+        // macOS saying memory is short: background tabs sleep sooner, Zigzag's pick rather than macOS's.
         MemoryPressure.shared.start()
         // Crash and freeze reports from macOS, kept here for Help › Report a Problem.
         CrashReports.shared.start()

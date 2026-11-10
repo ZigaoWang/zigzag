@@ -87,7 +87,7 @@ final class TabManager {
             Brand.themeChanged.send(())
         }
         suspendTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.suspendIdleTabs() }
+            MainActor.assumeIsolated { self?.sleepIdleTabs() }
         }
         // Slack, so the system can fold it into other wake-ups instead of waking the Mac for it.
         suspendTimer?.tolerance = 10
@@ -1207,41 +1207,41 @@ final class TabManager {
 
     // MARK: Suspension
 
-    /// Background tabs nobody has looked at in a while give their memory back.
-    private func suspendIdleTabs() {
+    /// Background tabs nobody has looked at in a while give their memory back (TabSleep says when): every minute,
+    /// and at once when macOS says memory is short.
+    func sleepIdleTabs() {
         // Kept awake: what's on screen (both halves of a split), anything in a call or floating, and sites that notify.
         // Other spaces' pages sleep like any tab once idle; their snapshots still show while you swipe to them.
         var selectedIDs = Set([selectedTab?.id].compactMap { $0 })
         for id in Array(selectedIDs) { if let tab = tab(with: id), let other = partner(of: tab) { selectedIDs.insert(other.id) } }
         let live = allTabs.filter { !$0.isSuspended }
-        let idleLimit: TimeInterval = 15 * 60
-        let maxLive = 10
         let now = Date()
-        let candidates = live
-            .filter { !selectedIDs.contains($0.id) && !$0.isPlayingAudio && !$0.isInUse && !$0.notifiesUser }
-            .sorted { $0.lastActivated < $1.lastActivated }
-        var liveCount = live.count
-        for tab in candidates {
-            // Over the cap a tab still gets five minutes: a half-written message in one you just left survives.
-            let idle = now.timeIntervalSince(tab.lastActivated)
-            if idle > idleLimit || (liveCount > maxLive && idle > 5 * 60) {
-                tab.suspend()
-                liveCount -= 1
-            }
+        let lowOnMemory = MemoryPressure.shared.isLow
+        let candidates = live.map {
+            TabSleep.Candidate(id: $0.id, unseen: now.timeIntervalSince($0.lastActivated),
+                               mustStay: selectedIDs.contains($0.id) || $0.isPlayingAudio || $0.isInUse || $0.notifiesUser,
+                               hasTypedText: $0.pageState?.hasTypedText == true)
+        }
+        for id in TabSleep.sleepers(candidates, awake: live.count, lowOnMemory: lowOnMemory) {
+            guard let tab = live.first(where: { $0.id == id }) else { continue }
+            let unseen = now.timeIntervalSince(tab.lastActivated)
+            tab.suspend(because: unseen > TabSleep.idle ? "unseen for an hour"
+                        : lowOnMemory ? "Mac low on memory" : "more than \(TabSleep.crowd) tabs awake")
         }
         // Each space keeps the page it shows out of the archive, as before.
         archiveStaleTabs(keeping: selectedIDs.union(selectedBySpace.values))
     }
 
     /// Ordinary tabs unseen for longer than the setting move to the archive. Never pinned pages or favorites,
-    /// what's on screen, a split, anything playing or in a call, a site that sends notifications, or a private window's tabs.
+    /// what's on screen, a split, anything playing or in a call, a site that sends notifications, one with something you
+    /// typed still in it, or a private window's tabs.
     private func archiveStaleTabs(keeping onScreen: Set<UUID>) {
         if !isPrivate { TabArchive.offerIfCrowded(tabCount: tabsBySpace.values.map(\.count).max() ?? 0) }
         guard !isPrivate, let limit = TabArchive.after.interval else { return }
         let now = Date()
         let stale = tabsBySpace.values.flatMap { $0 }.filter {
             $0.bookmarkID == nil && !onScreen.contains($0.id) && partner(of: $0) == nil && !$0.isPlayingAudio && !$0.isInUse && !$0.notifiesUser
-                && now.timeIntervalSince($0.lastActivated) > limit && $0.url != nil
+                && $0.pageState?.hasTypedText != true && now.timeIntervalSince($0.lastActivated) > limit && $0.url != nil
         }
         guard !stale.isEmpty else { return }
         var archived: [ArchivedTab] = []
