@@ -20,10 +20,10 @@
 ## Coming from Arc
 
 **Your Arc comes with you.** File › Import from Another Browser…, pick Arc, and your spaces, pinned tabs, pinned folders, Favorites,
-history and passwords come over. The pile of open tabs stays behind, so you start clean.
+history, passwords, sign-ins and extensions come over. The pile of open tabs stays behind, so you start clean.
 
 **1Password works.** Install it from the Chrome Web Store inside Zigzag, like you would in Arc. It talks to the
-1Password app. The first time, add Zigzag in 1Password › Settings › Browser.
+1Password app. The first time, add Zigzag in 1Password › Settings › Browser. Bitwarden works too.
 
 **It can't be switched off.** There's no account, and Zigzag doesn't depend on a server of mine. The only thing I
 host is the update feed, and if that went away, Zigzag would keep working. [Privacy](#privacy) lists everything
@@ -52,18 +52,21 @@ Zigzag connects to on its own.
 
 | | |
 |---|---|
-| **Spaces** | Each with its own color, pinned tabs and folders. Swipe on the sidebar, or nudge the mouse wheel sideways, to switch. |
+| **Spaces** | Each with its own color, icon, pinned tabs and folders. Swipe on the sidebar, or nudge the mouse wheel sideways, to switch. |
 | **Favorites** | Your most used sites as tiles, above every space. |
 | **Command bar** | ⌘T or ⌘L. Finds open tabs, history and sites. Type `you`, press Tab, and you're searching YouTube. |
 | **Split view** | Drag a tab onto the page. Pin a split and it stays one. |
 | **Peek** | Shift-click a link to read it over the page you're on. |
 | **All tabs** | ⇧⌘\ shows every space at once. Type to filter, drag a tab to another space. |
-| **Clear** | Closes tabs you haven't looked at in a while first, and keeps today's. |
+| **Clear** | Closes the tabs you've drifted away from and keeps the ones you're working with. Undo brings them back. |
+| **Zigzag Mini** | ⌃⌘N opens a small window for one quick page, and ⌘O moves it into your browser window. Links from other apps can open in it, like Little Arc. |
 | **Passwords** | In your Mac's Keychain, synced by iCloud Keychain. Touch ID, a generator, and a check for weak and reused ones. Passkeys work. |
 | **Ad blocking** | Built in and on: about 130,000 EasyList, EasyPrivacy and EasyList China rules, compiled into WebKit content rule lists. |
-| **Extensions** | From the Chrome Web Store, with an Add to Zigzag button on each listing. 1Password, Dark Reader, Tampermonkey and most popular ones work; see below for what doesn't. |
-| **Import** | Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Firefox and Zen. |
-| **And** | Reader, PDF viewer, full-page screenshots (⇧⌘2), translation, picture in picture, private windows, Web Inspector. |
+| **Extensions** | From the Chrome Web Store, with an Add to Zigzag button on each listing. 1Password, Bitwarden, Dark Reader, Tampermonkey and most popular ones work; see below for what doesn't. |
+| **Import** | Bookmarks, history, passwords, sign-ins and extensions from Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Firefox and Zen. |
+| **Automation** | AppleScript, Shortcuts and `osascript` can list and open tabs and read pages, written the way Safari and Chrome take them. See [docs/automation.md](docs/automation.md). |
+| **Languages** | English and Simplified Chinese. |
+| **And** | Reader, PDF viewer, full-page screenshots (⇧⌘2), on-device translation, Picture in Picture, private windows, Web Inspector. |
 
 ## What's missing
 
@@ -71,8 +74,7 @@ Zigzag is a beta. It's my everyday browser, but you'll find bugs. Things Arc use
 
 - No sync between Macs or to iPhone. Passwords sync through iCloud Keychain; spaces and tabs don't.
 - No separate profiles. Every space shares the same logins.
-- Space icons and emoji don't exist yet, so they don't come over from Arc. Space colors come over as the nearest Zigzag color.
-- No Little Arc. Links from other apps open as a tab in your window.
+- Space icons don't come over from Arc; pick them again in Zigzag. Space colors come over as the nearest Zigzag color.
 - No Boosts, Easels, Notes, or AI features.
 - A few Chrome extension APIs aren't there yet: tab groups, debugger settings, Chrome's own Google account sign-in (`identity.getAuthToken`), and the old request-blocking webRequest. Proxy extensions can set a fixed HTTP, HTTPS or SOCKS5 proxy but not a PAC script, so FoxyProxy's Proxy by Patterns mode doesn't work.
 - The ad blocking lists update with Zigzag, not on their own.
@@ -80,14 +82,14 @@ Zigzag is a beta. It's my everyday browser, but you'll find bugs. Things Arc use
 
 ## How it's built
 
-Zigzag is about 56,000 lines of Swift 6 and AppKit around `WKWebView`. There's no Chromium and no Electron: the
+Zigzag is about 65,000 lines of Swift 6 and AppKit around `WKWebView`. There's no Chromium and no Electron: the
 engine is the WebKit that ships with macOS, which is why the app is small and why engine security fixes arrive
 with macOS updates rather than from me.
 
 | Part | How |
 |---|---|
 | **Pages** | One `WKWebView` per tab. Tabs you haven't used in a while can be suspended: the web view is released and the tab keeps its snapshot and state, then reloads when you come back. Private windows use a non-persistent data store. |
-| **Extensions** | WebKit's web extension support (`WKWebExtensionController`, the reason for the macOS 15.4 minimum). Zigzag downloads the CRX3 package from the Chrome Web Store, checks its signatures, and loads it. Chrome APIs WebKit doesn't have (history, bookmarks, downloads, notifications, side panels, offscreen pages, web sign-in, tab audio, new tab pages, user scripts, proxies and more) are answered by Zigzag itself through a small bridge, checked against each extension's own permissions. A search engine an extension gives (`search_provider`) joins the choices in Settings, used only once you pick it. Native messaging connects 1Password's helper. |
+| **Extensions** | WebKit's web extension support (`WKWebExtensionController`, the reason for the macOS 15.4 minimum). Zigzag downloads the CRX3 package from the Chrome Web Store, checks its signatures, and loads it. Chrome APIs WebKit doesn't have (history, bookmarks, downloads, notifications, side panels, offscreen pages, web sign-in, tab audio, new tab pages, user scripts, proxies and more) are answered by Zigzag itself through a small bridge, checked against each extension's own permissions. A search engine an extension gives (`search_provider`) joins the choices in Settings, used only once you pick it. Native messaging connects the helper apps of 1Password and other extensions. |
 | **Ad blocking** | EasyList, EasyPrivacy and EasyList China converted ahead of time with SafariConverterLib into content rule lists (`WKContentRuleListStore`), compiled once and cached. |
 | **Passwords** | Saved as Keychain items, so iCloud Keychain syncs them and Touch ID unlocks them. Passkeys go through Apple's browser passkey entitlement. Autofill is a small content script that only fills fields you can see. |
 | **Import** | Reads each browser's own files: Arc's `StorableSidebar.json`, Chromium's bookmarks and SQLite history, Safari's `Bookmarks.plist`, Firefox's `places.sqlite`. Chromium passwords are decrypted with the key from that browser's Keychain item, after macOS asks you. |
@@ -96,8 +98,9 @@ with macOS updates rather than from me.
 | **Updates** | Sparkle 2, with EdDSA-signed updates from zigzagbrowser.com. Releases are signed with Developer ID and notarized. |
 
 The source is organized by feature: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`,
-`CommandBar`, `Desk` (every tab at once), `Peek`, `Window` and `Design` (Zigzag's own drawn controls and design
-tokens). About 190 tests cover importing, passwords, address handling, history and the security fixes.
+`CommandBar`, `Desk` (every tab at once), `Peek`, `Settings`, `Window` and `Design` (Zigzag's own drawn controls
+and design tokens). About 400 tests cover importing, passwords, extensions, address handling, history and the
+security fixes.
 
 ## Privacy
 
@@ -161,7 +164,7 @@ Signing is set up for my team. To build on your Mac, change two things in `proje
 Run the tests:
 
 ```sh
-xcodebuild test -scheme Zigzag
+xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 ```
 
 ## Contributing
