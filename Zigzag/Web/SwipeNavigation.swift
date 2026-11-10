@@ -66,7 +66,9 @@ final class SwipeNavigator {
     /// Returns true when it took the event, so the page doesn't also scroll with it. `room`, from something
     /// covering the page (a zoomed-in PDF), is which way it can still scroll sideways, in place of asking the page.
     func handle(_ event: NSEvent, room: (left: Bool, right: Bool)? = nil) -> Bool {
-        guard let webView, event.hasPreciseScrollingDeltas, NSEvent.isSwipeTrackingFromScrollEventsEnabled, Self.isOn else { return false }
+        // A video in full screen keeps every swipe: going back there would leave the page from under it.
+        guard let webView, event.hasPreciseScrollingDeltas, NSEvent.isSwipeTrackingFromScrollEventsEnabled, Self.isOn,
+              webView.fullscreenState == .notInFullscreen else { return false }
         // Momentum after a swipe that navigated (or was abandoned) is part of it, not a scroll.
         if !event.momentumPhase.isEmpty {
             if event.momentumPhase == .ended || event.momentumPhase == .cancelled { if state == .finishing { state = .idle } }
