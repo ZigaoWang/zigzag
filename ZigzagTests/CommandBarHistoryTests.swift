@@ -97,6 +97,22 @@ struct CommandBarHistoryTests {
         #expect(meanwhile.map(\.url) == pages.filter { CommandRanker.matches(["zqab", "0"], $0.title, $0.url.absoluteString) }.map(\.url))
     }
 
+    @Test func aLetterTypedAndDeletedKeepsTheAnswerShowing() async throws {
+        let (store, folder) = try Self.store(count: 20_000)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let lookup = HistoryLookup(store: store)
+        await Self.answer(lookup) { _ = lookup.pages(for: "zqab", limit: 8) }
+        let shown = try #require(lookup.pages(for: "zqab", limit: 8))
+        // A letter, and straight back: the answer for the letter, still coming, never replaces what's showing.
+        _ = lookup.pages(for: "zqab 0", limit: 8)
+        #expect(lookup.pages(for: "zqab", limit: 8)?.map(\.url) == shown.map(\.url))
+        var answers = 0
+        lookup.onPages = { answers += 1 }
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(answers == 0)
+        #expect(lookup.pages(for: "zqab", limit: 8)?.map(\.url) == shown.map(\.url))
+    }
+
     /// Searching history: no "Nothing in your history matches" while History is still being read.
     @Test func searchingHistorySaysNothingMatchesOnlyOnceItKnows() {
         let reading = CommandRanker.results(for: "zqnothing", manager: nil, suggestions: [], history: nil, editingCurrent: false, historyOnly: true)

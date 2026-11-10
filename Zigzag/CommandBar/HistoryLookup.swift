@@ -31,7 +31,8 @@ final class HistoryLookup {
         let words = HistoryStore.words(query)
         guard !words.isEmpty else { return [] }
         let key = "\(limit)|" + words.joined(separator: " ")
-        if let pages, pages.key == key { return pages.entries }
+        // Back to the text already answered (a letter typed, then deleted): an answer still coming for the other is dropped.
+        if let pages, pages.key == key { askedPages = nil; return pages.entries }
         if askedPages != key {
             askedPages = key
             Task { [weak self, store, pagesAsker] in
@@ -48,7 +49,7 @@ final class HistoryLookup {
 
     /// Sites to complete `prefix` to, or nil until they're read.
     func completionSites(for prefix: String) -> [(entry: HistoryEntry, score: Double)]? {
-        if let sites, sites.prefix == prefix { return sites.found }
+        if let sites, sites.prefix == prefix { askedSites = nil; return sites.found }
         if askedSites != prefix {
             askedSites = prefix
             Task { [weak self, store, sitesAsker] in
