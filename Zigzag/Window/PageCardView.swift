@@ -296,7 +296,9 @@ final class PageCardView: NSView {
     func show(_ newWebView: WKWebView?, placeholderImage: NSImage? = nil) {
         guard newWebView !== webView else { return }
         let old = webView
-        if let newWebView {
+        // A page whose video is in full screen stays in WebKit's window, which puts it back here when that ends: taken
+        // out now, the full screen would be left without it.
+        if let newWebView, newWebView.fullscreenState == .notInFullscreen {
             let top = showsHeader ? PaneHeaderView.height : 0
             newWebView.frame = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
             newWebView.autoresizingMask = [.width, .height]
