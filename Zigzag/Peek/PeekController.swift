@@ -216,7 +216,7 @@ final class PeekController {
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 0
         fade.toValue = 1
-        fade.duration = Tokens.Motion.menuIn
+        fade.duration = Tokens.Motion.enter
         fade.timingFunction = Tokens.Motion.easeOut
         layer.add(spring, forKey: "grow")
         layer.add(fade, forKey: "fade")
@@ -249,7 +249,7 @@ final class PeekController {
         fade.toValue = 0
         let both = CAAnimationGroup()
         both.animations = [move, fade]
-        both.duration = Tokens.Motion.menuIn
+        both.duration = Tokens.Motion.enter
         both.timingFunction = Tokens.Motion.easeOut
         both.fillMode = .forwards
         both.isRemovedOnCompletion = false

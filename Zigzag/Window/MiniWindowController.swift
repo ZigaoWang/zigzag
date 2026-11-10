@@ -202,15 +202,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         showWindow(nil)
         window.makeKeyAndOrderFront(nil)
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = Tokens.Motion.menuIn * Tokens.Motion.debugSlowdown
+            context.duration = Tokens.Motion.enter * Tokens.Motion.debugSlowdown
             context.timingFunction = Tokens.Motion.easeOut
             window.animator().alphaValue = 1
         }
         guard !Tokens.Motion.reduceMotion, let layer = root.layer else { return }
         let grow = CABasicAnimation(keyPath: "transform")
-        grow.fromValue = NSValue(caTransform3D: Tokens.Motion.scale(Tokens.Motion.menuFrom, of: layer, around: CGPoint(x: 0.5, y: 0), flipped: false))
+        grow.fromValue = NSValue(caTransform3D: Tokens.Motion.scale(Tokens.Motion.enterScale, of: layer, around: CGPoint(x: 0.5, y: 0), flipped: false))
         grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        grow.duration = Tokens.Motion.menuIn * Tokens.Motion.debugSlowdown
+        grow.duration = Tokens.Motion.enter * Tokens.Motion.debugSlowdown
         grow.timingFunction = Tokens.Motion.easeOut
         layer.add(grow, forKey: "appear")
     }
@@ -223,15 +223,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         if !Tokens.Motion.reduceMotion, let layer = root.layer {
             let shrink = CABasicAnimation(keyPath: "transform")
             shrink.fromValue = NSValue(caTransform3D: layer.presentation()?.transform ?? CATransform3DIdentity)
-            shrink.toValue = NSValue(caTransform3D: Tokens.Motion.scale(Tokens.Motion.menuOutScale, of: layer, flipped: false))
-            shrink.duration = Tokens.Motion.menuOut * Tokens.Motion.debugSlowdown
+            shrink.toValue = NSValue(caTransform3D: Tokens.Motion.scale(Tokens.Motion.exitScale, of: layer, flipped: false))
+            shrink.duration = Tokens.Motion.exit * Tokens.Motion.debugSlowdown
             shrink.timingFunction = Tokens.Motion.easeOut
             shrink.fillMode = .forwards
             shrink.isRemovedOnCompletion = false
             layer.add(shrink, forKey: "leave")
         }
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = Tokens.Motion.menuOut * Tokens.Motion.debugSlowdown
+            context.duration = Tokens.Motion.exit * Tokens.Motion.debugSlowdown
             context.timingFunction = Tokens.Motion.easeOut
             window.animator().alphaValue = 0
         }, completionHandler: done)

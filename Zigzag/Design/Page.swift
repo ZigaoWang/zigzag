@@ -338,7 +338,7 @@ enum PageStyle {
     .menu { position: absolute; right: 0; top: calc(100% + var(--space-1)); z-index: 5; min-width: 200px; padding: var(--space-1); border-radius: var(--radius-float);
             background: var(--panel); box-shadow: 0 0 0 1px var(--panel-edge), 0 var(--panel-drop) var(--panel-blur) var(--panel-shadow); display: none;
             transform-origin: top right; }
-    /* In from 96% in 180ms, out toward 98% in 120ms, as MenuPanel (Motion.menuIn, menuOut). */
+    /* In from 96% in 180ms, out toward 98% in 120ms, as MenuPanel (Motion.enter, exit). */
     .menu.open { display: block; animation: menu-in .18s cubic-bezier(.23, 1, .32, 1); }
     .menu.closing:not(.open) { display: block; pointer-events: none; animation: menu-out .12s cubic-bezier(.23, 1, .32, 1) forwards; }
     @keyframes menu-in { from { opacity: 0; transform: scale(.96); } }

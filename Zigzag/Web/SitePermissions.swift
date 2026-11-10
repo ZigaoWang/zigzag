@@ -487,7 +487,7 @@ final class PermissionPrompt: FloatingPanelView {
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 0
         fade.toValue = 1
-        fade.duration = Tokens.Motion.menuOut
+        fade.duration = Tokens.Motion.exit
         layer.add(drop, forKey: "slideIn")
         layer.add(fade, forKey: "fadeIn")
     }
@@ -507,7 +507,7 @@ final class PermissionPrompt: FloatingPanelView {
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.toValue = 0
         fade.beginTime = CACurrentMediaTime() + 0.08
-        fade.duration = Tokens.Motion.menuOut
+        fade.duration = Tokens.Motion.exit
         fade.fillMode = .forwards
         fade.isRemovedOnCompletion = false
         layer.add(rise, forKey: "slideOut")

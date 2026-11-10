@@ -209,8 +209,8 @@ One look for each state, everywhere:
 Quick, eased, no bounce (`Tokens.Motion`). The bar is the craft at animations.dev: every movement says where
 something came from, answers at once, and can be interrupted.
 
-- Origin: a menu or popover grows out of what opened it, from `menuFrom` (0.96) with a fade, anchored at that
-  control, in `menuIn` (180ms) on the house ease-out (0.23, 1, 0.32, 1). It leaves quicker and subtler: `menuOut`
+- Origin: a menu or popover grows out of what opened it, from `enterScale` (0.96) with a fade, anchored at that
+  control, in `enter` (180ms) on the house ease-out (0.23, 1, 0.32, 1). It leaves quicker and subtler: `exit`
   (120ms) toward 0.98. Exits are always quieter than entrances.
 - The selected tab's card slides: picking another row with the pointer, the card travels there from the row it was
   on (`SelectionCardView`, `Motion.selection`, eased out), and the new row takes it over when it lands. A click

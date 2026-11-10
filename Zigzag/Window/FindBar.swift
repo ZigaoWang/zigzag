@@ -503,7 +503,7 @@ class FloatingPanelView: NSView {
             } ?? false
             if !on && held { continue }
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = on ? Tokens.Motion.menuIn : Tokens.Motion.highlightGlide
+                context.duration = on ? Tokens.Motion.enter : Tokens.Motion.highlightGlide
                 context.timingFunction = Tokens.Motion.easeOut
                 view.animator().alphaValue = on ? Tokens.Opacity.receded : 1
             }
@@ -555,7 +555,7 @@ class FloatingPanelView: NSView {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1
-            fade.duration = Tokens.Motion.menuOut
+            fade.duration = Tokens.Motion.exit
             layer.add(drop, forKey: "present.grow")
             layer.add(fade, forKey: "present")
             return
@@ -571,7 +571,7 @@ class FloatingPanelView: NSView {
             let grow = CABasicAnimation(keyPath: "transform")
             grow.fromValue = NSValue(caTransform3D: scaled(arrival == .burst ? 0.94 : 0.97))
             grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-            grow.duration = Tokens.Motion.menuIn
+            grow.duration = Tokens.Motion.enter
             grow.timingFunction = Tokens.Motion.easeOut
             layer.add(fade, forKey: "present")
             layer.add(grow, forKey: "present.grow")

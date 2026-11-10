@@ -532,12 +532,13 @@ enum Tokens {
         static let pressSettle: TimeInterval = 0.18
         /// A download thrown into its button: a slow, high lob you can follow, the one movement past `large`.
         static let flight: TimeInterval = 1.1
-        /// A menu growing out of the control that opened it: from this scale with a fade, in `menuIn`, eased out;
-        /// leaving is quicker and subtler (`menuOut`, toward `menuOutScale`).
-        static let menuFrom: CGFloat = 0.96
-        static let menuIn: TimeInterval = 0.18
-        static let menuOut: TimeInterval = 0.12
-        static let menuOutScale: CGFloat = 0.98
+        /// Showing up: a menu, popover, panel, bar or sheet arrives in `enter`, eased out, growing from `enterScale` out
+        /// of what opened it (or sliding in from the edge it's attached to) as it fades in. Going is quicker and
+        /// subtler: `exit`, toward `exitScale`.
+        static let enterScale: CGFloat = 0.96
+        static let enter: TimeInterval = 0.18
+        static let exit: TimeInterval = 0.12
+        static let exitScale: CGFloat = 0.98
         /// One shared highlight gliding from row to row in a menu, and a selection gliding between a list's places
         /// or a filter's segments.
         static let highlightGlide: TimeInterval = 0.14

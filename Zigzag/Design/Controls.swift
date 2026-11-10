@@ -1571,21 +1571,21 @@ final class MenuPanel: FloatingPanelView {
         closed?()
     }
 
-    /// Grows out of the control that opened it: from `Motion.menuFrom` with a fade, anchored at that control, eased
+    /// Grows out of the control that opened it: from `Motion.enterScale` with a fade, anchored at that control, eased
     /// out. From the keyboard it's simply there; with Reduce Motion it only fades.
     private func arrive() {
         guard let layer, !Tokens.Motion.isFromKey else { return }
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 0
         fade.toValue = 1
-        fade.duration = Tokens.Motion.menuIn * 0.7
+        fade.duration = Tokens.Motion.enter * 0.7
         fade.timingFunction = Tokens.Motion.easeOut
         layer.add(fade, forKey: "arrive.fade")
         guard !Tokens.Motion.reduceMotion else { return }
         let grow = CABasicAnimation(keyPath: "transform")
-        grow.fromValue = NSValue(caTransform3D: Tokens.Motion.scale(Tokens.Motion.menuFrom, of: layer, around: growsFrom, flipped: layer.isGeometryFlipped || isFlipped))
+        grow.fromValue = NSValue(caTransform3D: Tokens.Motion.scale(Tokens.Motion.enterScale, of: layer, around: growsFrom, flipped: layer.isGeometryFlipped || isFlipped))
         grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        grow.duration = Tokens.Motion.menuIn
+        grow.duration = Tokens.Motion.enter
         grow.timingFunction = Tokens.Motion.easeOut
         layer.add(grow, forKey: "arrive.grow")
     }
@@ -1602,15 +1602,15 @@ final class MenuPanel: FloatingPanelView {
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = shownOpacity
         fade.toValue = 0
-        fade.duration = Tokens.Motion.menuOut
+        fade.duration = Tokens.Motion.exit
         fade.timingFunction = Tokens.Motion.easeOut
         layer.add(fade, forKey: "leave.fade")
         layer.opacity = 0
         if !Tokens.Motion.reduceMotion {
             let shrink = CABasicAnimation(keyPath: "transform")
             shrink.fromValue = NSValue(caTransform3D: shownTransform)
-            shrink.toValue = NSValue(caTransform3D: Tokens.Motion.scale(Tokens.Motion.menuOutScale, of: layer, around: growsFrom, flipped: layer.isGeometryFlipped || isFlipped))
-            shrink.duration = Tokens.Motion.menuOut
+            shrink.toValue = NSValue(caTransform3D: Tokens.Motion.scale(Tokens.Motion.exitScale, of: layer, around: growsFrom, flipped: layer.isGeometryFlipped || isFlipped))
+            shrink.duration = Tokens.Motion.exit
             shrink.timingFunction = Tokens.Motion.easeOut
             shrink.fillMode = .forwards
             shrink.isRemovedOnCompletion = false

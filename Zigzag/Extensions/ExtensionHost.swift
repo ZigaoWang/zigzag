@@ -1367,7 +1367,7 @@ enum AttentionHint {
             // A quick fade between what the panel showed and the hint.
             let fade = CATransition()
             fade.type = .fade
-            fade.duration = Tokens.Motion.menuOut
+            fade.duration = Tokens.Motion.exit
             panel.layer?.add(fade, forKey: "content")
             return
         }
