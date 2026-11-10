@@ -23,12 +23,41 @@ struct WhatsNewTests {
         ### New
         - Old
         """
-        let sections = WhatsNew.parse(log, version: "1.1.0")
-        #expect(sections.map(\.title) == ["New", "Fixed"])
-        #expect(sections.map(\.items) == [["One", "Two"], ["Three"]])
-        #expect(WhatsNew.parse(log, version: "1.0.0").map(\.items) == [["Old"]])
+        let release = WhatsNew.parse(log, version: "1.1.0")
+        #expect(release.sections.map(\.title) == ["New", "Fixed"])
+        #expect(release.sections.map { $0.items.map(\.text) } == [["One", "Two"], ["Three"]])
+        #expect(release.date == ISO8601DateFormatter().date(from: "2026-11-01T00:00:00Z"))
+        #expect(WhatsNew.parse(log, version: "1.0.0").sections.map { $0.items.map(\.text) } == [["Old"]])
         // A version with no notes shows none, rather than another version's.
-        #expect(WhatsNew.parse(log, version: "1.1").isEmpty)
+        #expect(WhatsNew.parse(log, version: "1.1").sections.isEmpty)
+        #expect(WhatsNew.parse(log, version: "2.0.0") == WhatsNew.Release())
+    }
+
+    /// A point that runs on over more lines is one point; one indented under another is nested in it.
+    @Test func continuationAndNestedPoints() {
+        let log = """
+        ## [1.2.0] - 2026-11-02
+
+        ### Fixed
+        - A long point
+          that runs on. ([#4](https://github.com/o/r/issues/4))
+          - A detail under it.
+        * Another point.
+
+        - After a blank line.
+        """
+        let items = WhatsNew.parse(log, version: "1.2.0").sections.first?.items ?? []
+        #expect(items.map(\.text) == ["A long point that runs on.", "A detail under it.", "Another point.", "After a blank line."])
+        #expect(items.map(\.nested) == [false, true, false, false])
+        #expect(items.first?.issues.map(\.number) == [4])
+    }
+
+    /// A beta reads the notes of the version it leads up to.
+    @Test func betaReadsItsPlannedVersion() {
+        #expect(WhatsNew.notesVersion == WhatsNew.version.components(separatedBy: "-").first)
+        let log = "## [0.8.0] - 2026-12-01\n\n### New\n- Planned\n"
+        #expect(WhatsNew.parse(log, version: "0.8.0").sections.first?.items.first?.text == "Planned")
+        #expect(WhatsNew.parse(log, version: "0.8.0-beta.1").sections.isEmpty)
     }
 
     /// Every build carries notes for its own version: a release without them can't go out.
@@ -51,9 +80,66 @@ struct WhatsNewTests {
         #expect(engine == [.google, .kagi])
     }
 
-    @Test func linksReadAsPlainWords() {
-        #expect(WhatsNew.plain("Spaces can have an icon. ([#1](https://x/1), [#7](https://x/7))") == "Spaces can have an icon.")
-        #expect(WhatsNew.plain("See the [release notes](https://x) page.") == "See the release notes page.")
+    /// Issue references at a point's end become its issues; links in its words, credits among them, stay.
+    @Test func issuesAndLinks() {
+        let one = WhatsNew.item("Spaces can have an icon. ([#1](https://x/issues/1), [#7](https://x/pull/7))")
+        #expect(one.text == "Spaces can have an icon.")
+        #expect(one.issues == [WhatsNew.Issue(number: 1, url: URL(string: "https://x/issues/1")!), WhatsNew.Issue(number: 7, url: URL(string: "https://x/pull/7")!)])
+        let credit = WhatsNew.item("Faster. Thanks to [zemu](https://github.com/ze-mu-zhou) for measuring it. ([#29](https://x/29))")
+        #expect(credit.text == "Faster. Thanks to [zemu](https://github.com/ze-mu-zhou) for measuring it.")
+        #expect(credit.issues.map(\.number) == [29])
+        // A link whose address has parentheses, and a reference mid-sentence, are words, not issues.
+        let wiki = WhatsNew.item("See [Foo](https://en.wikipedia.org/wiki/Foo_(bar)) and ([#3](https://x/3)) here.")
+        #expect(wiki.issues.isEmpty && wiki.text.hasSuffix("here."))
+        #expect(WhatsNew.item("No references.").issues.isEmpty)
+    }
+
+    /// The sheet draws the Markdown: links clickable in the words, issues as "#n" links, no stray syntax.
+    @Test func drawsInlineMarkdown() {
+        let item = WhatsNew.item("**Bold** and `code` see [Foo](https://en.wikipedia.org/wiki/Foo_(bar)). Thanks to [zemu](https://github.com/ze-mu-zhou). ([#1](https://x/1), [#2](https://x/2))")
+        let text = WhatsNew.attributed(item, accent: .systemBlue)
+        #expect(text.string == "Bold and code see Foo. Thanks to zemu. #1, #2")
+        var links: [URL] = []
+        text.enumerateAttribute(.link, in: NSRange(location: 0, length: text.length)) { value, _, _ in
+            if let url = value as? URL { links.append(url) }
+        }
+        #expect(links.map(\.absoluteString) == ["https://en.wikipedia.org/wiki/Foo_(bar)", "https://github.com/ze-mu-zhou", "https://x/1", "https://x/2"])
+        let bold = text.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
+        #expect(bold.map { NSFontManager.shared.traits(of: $0).contains(.boldFontMask) } == true)
+        // Only web links are links.
+        let local = WhatsNew.attributed(WhatsNew.item("[x](file:///etc/hosts) [y](javascript:alert(1))"), accent: .systemBlue)
+        #expect(local.attribute(.link, at: 0, effectiveRange: nil) == nil)
+    }
+
+    /// The notes after an update: owed from the first launch of a new version until they've been on screen, and
+    /// never on a fresh install.
+    @Test func offerIsOwedUntilShown() throws {
+        let suite = "zigzag-whatsnew-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        // A fresh install: quiet.
+        WhatsNew.noteLaunch(defaults: defaults, version: "0.7.7")
+        #expect(!WhatsNew.isPending(defaults: defaults, version: "0.7.7"))
+        // Updated from 0.7.6: owed, even after the backup records 0.7.7 as run, as it does at every new build.
+        defaults.set("0.7.6", forKey: "LastRunVersion")
+        WhatsNew.noteLaunch(defaults: defaults, version: "0.7.7")
+        ProfileBackup.backUpIfUpdated(build: "72", version: "0.7.7", defaults: defaults, root: FileManager.default.temporaryDirectory.appendingPathComponent(suite))
+        #expect(defaults.string(forKey: "LastRunVersion") == "0.7.7")
+        #expect(WhatsNew.isPending(defaults: defaults, version: "0.7.7"))
+        // No browser window came up that launch: the next one still owes it.
+        WhatsNew.noteLaunch(defaults: defaults, version: "0.7.7")
+        #expect(WhatsNew.isPending(defaults: defaults, version: "0.7.7"))
+        // Shown once: done, and the launch after stays quiet.
+        WhatsNew.markOffered(defaults: defaults)
+        WhatsNew.noteLaunch(defaults: defaults, version: "0.7.7")
+        #expect(!WhatsNew.isPending(defaults: defaults, version: "0.7.7"))
+        // A Mac that ran Zigzag before the version was remembered.
+        defaults.removeObject(forKey: "LastRunVersion")
+        defaults.set(3, forKey: "LaunchCount")
+        WhatsNew.noteLaunch(defaults: defaults, version: "0.8.0-beta.1")
+        #expect(WhatsNew.isPending(defaults: defaults, version: "0.8.0-beta.1"))
+        // Owed for one version only: the next one owes its own.
+        #expect(!WhatsNew.isPending(defaults: defaults, version: "0.8.0"))
     }
 
     @Test func shippedNotesAreThere() {
