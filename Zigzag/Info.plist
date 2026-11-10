@@ -94,6 +94,8 @@
 	</dict>
 	<key>NSAppleScriptEnabled</key>
 	<true/>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Extensions you use, like Shazam, can hear what a tab plays, only while they listen.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Websites you visit can ask to use your camera.</string>
 	<key>NSContactsUsageDescription</key>
