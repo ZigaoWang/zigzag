@@ -6201,6 +6201,17 @@
         }
       }
     },
+    "Into" : {
+      "comment" : "Label in the Import window, with more than one profile, before the choice of the profile that what's imported goes into.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入到"
+          }
+        }
+      }
+    },
     "It loads a little slower the first time. You stay signed in." : {
       "comment" : "Message of the sheet that asks before clearing one site's cache.",
       "localizations" : {

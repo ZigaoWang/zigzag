@@ -62,9 +62,10 @@ enum ArcImporter {
     /// Trying again reads history only (`Choice.history`), never the sidebar a second time.
     static func historyProblem(_ error: Error) -> ImportProblem { problem(reading: .history, error, retries: 4) }
 
-    /// Spaces, pinned tabs and Favorites.
+    /// Spaces, pinned tabs and Favorites. `into`: the profile the new spaces are put on and the favorites go to. A
+    /// space already here that gains pages stays on its own. Arc's profiles aren't recreated.
     @discardableResult
-    static func importSidebar() -> (result: Result, firstSpace: UUID?) {
+    static func importSidebar(into profile: UUID = Profile.defaultID) -> (result: Result, firstSpace: UUID?) {
         var result = Result()
         let (spaces, favorites): ([SpaceInfo], [Bookmark])
         do {
@@ -74,8 +75,7 @@ enum ArcImporter {
             (spaces, favorites) = ([], [])
         }
         var newSpaces = spaces
-        // Arc's Favorites are global, like ours.
-        let addedFavorites = Library.shared.appendFavorites(favorites, in: Profile.defaultID)
+        let addedFavorites = Library.shared.appendFavorites(favorites, in: profile)
         for favorite in favorites { FaviconStore.shared.prefetch(for: favorite.url) }
         result.spaces = newSpaces.count
         result.bookmarks = newSpaces.map(\.bookmarks.count).reduce(0, +)
@@ -123,6 +123,7 @@ enum ArcImporter {
                 space.bookmarks.isEmpty && WindowManager.shared.controllers.allSatisfy { $0.tabManager.tabs(in: space.id).isEmpty }
             } : []
             Library.shared.appendSpaces(newSpaces)
+            for space in newSpaces { Library.shared.setProfile(profile, forSpace: space.id) }
             for space in pristine where Library.shared.spaces.count > 1 { Library.shared.removeSpace(space.id) }
             for bookmark in newSpaces.flatMap(\.bookmarks) { FaviconStore.shared.prefetch(for: bookmark.url) }
         }

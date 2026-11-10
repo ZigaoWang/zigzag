@@ -285,7 +285,7 @@ nonisolated enum SignInImporter {
         }
     }
 
-    /// Sets the cookies into Zigzag's default store. A cookie Zigzag already has for the same name, domain and
+    /// Sets the cookies into a profile's store. A cookie Zigzag already has for the same name, domain and
     /// path stays as it is: if you've signed in here already, that session wins over an older one coming in.
     /// The same cookie twice (two profiles) comes over once, the first.
     @MainActor
