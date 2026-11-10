@@ -432,6 +432,7 @@ final class ImportView: NSView {
                 switch row.source.kind {
                 case .safari: SafariImporter.bundleID
                 case .firefox(let browser): browser.bundleID
+                case .orion: OrionImporter.bundleID
                 default: "com.apple.Passwords"
                 }
             }()
@@ -727,6 +728,7 @@ private final class SourceRow: InteractiveView, ImportListItem {
             switch source.kind {
             case .safari: title = String(localized: "Open Safari", comment: "Button under a note in the Import window: open Safari to export from it.")
             case .firefox(let browser): title = String(localized: "Open \(browser.name)", comment: "Button under a problem in the Import window: open a browser, like Firefox, to export from it.")
+            case .orion: title = String(localized: "Open \(OrionImporter.name)", comment: "Button under a problem in the Import window: open a browser, like Firefox, to export from it.")
             default: title = String(localized: "Open Passwords", comment: "Button under a note in the Import window: open Apple's Passwords app to export from it.")
             }
         case .primaryPassword: title = String(localized: "Unlock", comment: "Button in the Import window after typing Firefox's primary password.")

@@ -9,6 +9,7 @@ enum ImportCoordinator {
         case chromium(ChromiumImporter.Browser)
         case firefox(FirefoxImporter.Browser)
         case safari
+        case orion(OrionImporter.Browser)
         /// A CSV or Safari export zip the person chose.
         case file(URL)
     }
@@ -38,6 +39,9 @@ enum ImportCoordinator {
             case .firefox: [.passwords, .bookmarks, .history, .signIns]
             // Safari's cookies sit behind Full Disk Access, and a file holds none: nothing to offer.
             case .safari: [.passwords, .bookmarks, .history]
+            // Orion's passwords are in its own Keychain (a note says how to export them); its sign-ins, like
+            // Safari's, aren't in a file Zigzag reads. Its Chrome Web Store extensions come from the same store.
+            case .orion: [.passwords, .bookmarks, .history, .extensions]
             case .file: [.passwords, .bookmarks, .history]
             }
         }
@@ -111,6 +115,18 @@ enum ImportCoordinator {
         for browser in FirefoxImporter.browsers where FirefoxImporter.isInstalled(browser) {
             sources.append(Source(kind: .firefox(browser), name: browser.name, bundleID: browser.bundleID))
         }
+        if OrionImporter.isInstalled() {
+            // Several profiles: each is its own choice ("Orion (Work)"), as Chrome's are.
+            let profiles = plainNames ? [] : OrionImporter.profileNames()
+            if profiles.count > 1 {
+                for (folder, name) in profiles {
+                    sources.append(Source(kind: .orion(OrionImporter.Browser().only(folder, named: name)),
+                                          name: "\(OrionImporter.name) (\(name))", bundleID: OrionImporter.bundleID))
+                }
+            } else {
+                sources.append(Source(kind: .orion(OrionImporter.Browser()), name: OrionImporter.name, bundleID: OrionImporter.bundleID))
+            }
+        }
         return sources
     }
 
@@ -160,6 +176,8 @@ enum ImportCoordinator {
             return FirefoxImporter.profiles(of: browser).compactMap { modified($0.appendingPathComponent("places.sqlite")) }.max()
         case .safari:
             return modified(fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Safari/History.db"))
+        case .orion(let browser):
+            return OrionImporter.profiles(of: browser).compactMap { modified($0.appendingPathComponent("history")) }.max()
         case .file:
             return nil
         }
@@ -234,6 +252,13 @@ enum ImportCoordinator {
                 return SafariImporter.hasAccess
                     ? String(localized: "Bookmarks and history, no passwords", comment: "Under Safari's name in the Import window's list: what can come over from it.")
                     : Self.safariNeedsPermission
+            case .orion(let browser):
+                if OrionImporter.isPrivate(browser) { return Self.needsPermission }
+                let counts = OrionImporter.counts(browser)
+                let newExtensions = installed.map { ChromiumExtensions.toAdd(OrionImporter.extensions(of: browser, source: ""), installed: $0).count } ?? 0
+                let parts = [bookmarks(counts.bookmarks), counts.history > 0 ? history : nil,
+                             newExtensions > 0 ? String(localized: "\(newExtensions) extensions", comment: "Item in a list of what a browser holds or what came over, in the Import window.") : nil].compactMap { $0 }
+                return parts.isEmpty ? String(localized: "Nothing to bring over", comment: "Under a browser's name in the Import window's list.") : Self.sentence(parts)
             case .file(let url):
                 return url.lastPathComponent
             }
@@ -337,6 +362,12 @@ enum ImportCoordinator {
                 ChromiumExtensions.toAdd(ChromiumExtensions.found(in: browser, source: name), installed: installed)
             }.value
         }
+        if choice.contains(.extensions), case .orion(let browser) = source.kind {
+            let installed = Set(ExtensionStore.installedIDs), name = source.name
+            summary.foundExtensions = await Task.detached(priority: .userInitiated) {
+                ChromiumExtensions.toAdd(OrionImporter.extensions(of: browser, source: name), installed: installed)
+            }.value
+        }
 
         let kind = source.kind
         let batch: ImportBatch = await Task.detached(priority: .userInitiated) {
@@ -344,6 +375,7 @@ enum ImportCoordinator {
             case .chromium(let browser): return ChromiumImporter.read(browser, isArc ? arcReading : reading)
             case .firefox(let browser): return FirefoxImporter.read(browser, reading, primaryPassword: primaryPassword)
             case .safari: return SafariImporter.read(reading)
+            case .orion(let browser): return OrionImporter.read(browser, reading)
             case .file(let url):
                 if url.pathExtension.lowercased() == "zip" { return SafariImporter.readExport(url) }
                 switch CSVImporter.read(url) {

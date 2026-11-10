@@ -163,6 +163,7 @@
 		A297D44BA6B37496BC5287EC /* DownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */; };
 		A2ACCFEF365397393F528C75 /* Onboarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31A2391B831DAAD2A652FCA /* Onboarding.swift */; };
 		A49DFBB9C68513D2B9431F6A /* FaviconStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9FAF507728E18C4FC4266C5 /* FaviconStore.swift */; };
+		A4D71BE5761D2F335B0787EA /* OrionImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7520635385AA4E5E5C5AC9FB /* OrionImporter.swift */; };
 		A51ADDC4218AC8285461C618 /* Atmosphere.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1368F679CEF702DA00EC3E6 /* Atmosphere.swift */; };
 		A59C6B456EB71D4263B94AB1 /* IconChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = D33639F712B0A57DBFC66DB5 /* IconChoice.swift */; };
 		A601B78AFE9B349C0C46968E /* PageShots.swift in Sources */ = {isa = PBXBuildFile; fileRef = E97F4271F918C8D77FB14081 /* PageShots.swift */; };
@@ -353,6 +354,7 @@
 		6E9E28B1061F9D52B96C814E /* ZigzagTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZigzagTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7069B71082962459B24D179F /* ChromiumExtensionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromiumExtensionsTests.swift; sourceTree = "<group>"; };
 		71C449E3F3ECA4A28D2BCAA7 /* bridge.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = bridge.js; sourceTree = "<group>"; };
+		7520635385AA4E5E5C5AC9FB /* OrionImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrionImporter.swift; sourceTree = "<group>"; };
 		7620A6879D1A5DEB651B0A66 /* SavePasswordPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavePasswordPrompt.swift; sourceTree = "<group>"; };
 		765C1F36BCEE463F8B5316BE /* Paths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Paths.swift; sourceTree = "<group>"; };
 		76DB536661E9E732536910C2 /* Readability-LICENSE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Readability-LICENSE.md"; sourceTree = "<group>"; };
@@ -754,6 +756,7 @@
 				C0943F5424EE8E9EE3A714D4 /* ImportExtensionViews.swift */,
 				8F50C552DADDAC51AC86787B /* ImportView.swift */,
 				D31A2391B831DAAD2A652FCA /* Onboarding.swift */,
+				7520635385AA4E5E5C5AC9FB /* OrionImporter.swift */,
 				E97F4271F918C8D77FB14081 /* PageShots.swift */,
 				F51CBCCC0F5050F641CEAB31 /* SafariImporter.swift */,
 				146D98C93CFFD5EA35B991D8 /* SignInImporter.swift */,
@@ -1165,6 +1168,7 @@
 				EFB6119FA3897F6A6EFD725D /* NowPlaying.swift in Sources */,
 				529A6EE9C8FC1FAFA5D383A8 /* NumberHints.swift in Sources */,
 				A2ACCFEF365397393F528C75 /* Onboarding.swift in Sources */,
+				A4D71BE5761D2F335B0787EA /* OrionImporter.swift in Sources */,
 				6492B599ABBE44450D161D18 /* PDFViewer.swift in Sources */,
 				6BD966C3F37EC0E45F62CB2A /* Page.swift in Sources */,
 				55E2EE95BF56E2D3A4B618EF /* PageCardView.swift in Sources */,

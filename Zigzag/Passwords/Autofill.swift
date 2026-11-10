@@ -28,6 +28,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         case .chromium(let browser): return browser.name
         case .firefox(let browser): return browser.name
         case .safari: return "Safari"
+        case .orion: return OrionImporter.name
         case .file: return nil
         }
     }

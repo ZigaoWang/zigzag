@@ -8215,6 +8215,28 @@
         }
       }
     },
+    "Orion keeps its passwords in its own Keychain, which only Orion can open. Export them there (File › Export › Passwords), then choose the file here." : {
+      "comment" : "Note in the Import window. File › Export › Passwords is Orion's own menu wording.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orion 将密码保存在它自己的钥匙串中，只有 Orion 能打开。请在 Orion 中导出（文件 › 导出 › 密码），然后在这里选择该文件。"
+          }
+        }
+      }
+    },
+    "Orion’s passwords stay in Orion. Export them there (File › Export › Passwords), then use Import a password file." : {
+      "comment" : "Under Orion in the welcome window. File › Export › Passwords is Orion’s own menu wording; Import a password file is a link here.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orion 的密码保存在 Orion 中。请在那里导出（文件 › 导出 › 密码），然后使用“导入密码文件”。"
+          }
+        }
+      }
+    },
     "Oxblood" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor. A deep red.",
       "localizations" : {
@@ -8977,6 +8999,17 @@
         }
       }
     },
+    "Profile %lld" : {
+      "comment" : "Name of an Orion profile whose name couldn't be found, in the Import window: Orion (Profile 2).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个人资料 %lld"
+          }
+        }
+      }
+    },
     "Proxy scripts (PAC)" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag: proxy auto-config scripts, which choose a proxy for each site.",
       "localizations" : {
@@ -9204,6 +9237,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "阅读器"
+          }
+        }
+      }
+    },
+    "Reading List" : {
+      "comment" : "Folder that pages from another browser's reading list are imported into.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阅读列表"
           }
         }
       }
@@ -14900,6 +14944,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "个空间"
+          }
+        }
+      }
+    },
+    "import.orion-default-profile" : {
+      "comment" : "Name of Orion's default profile, in the Import window: Orion (Default).",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Default"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认"
           }
         }
       }

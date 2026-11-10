@@ -1204,12 +1204,19 @@ private final class BringPicker: StepContent {
                 row.state = .working
                 var wanted = choice.intersection(row.source.offers)
                 let isSafari: Bool = { if case .safari = row.source.kind { true } else { false } }()
-                // Safari's passwords live in the Passwords app, which only it can read; the row says how to bring them.
-                if isSafari { wanted.remove(.passwords) }
+                let isOrion: Bool = { if case .orion = row.source.kind { true } else { false } }()
+                // Safari's passwords live in the Passwords app, Orion's in its own Keychain, which only they can
+                // read; the row says how to bring them.
+                if isSafari || isOrion { wanted.remove(.passwords) }
                 let summary = await ImportCoordinator.run(row.source, wanted)
                 row.state = .done(summary)
                 if isSafari, choice.contains(.passwords), summary.problems.isEmpty {
                     row.note(String(localized: "Safari’s passwords are in the Passwords app. Export them there, then use Import a password file.", comment: "Under Safari in the welcome window. Passwords is Apple’s app; Import a password file is a link here."))
+                    self.fileLink.isHidden = false
+                }
+                if isOrion, choice.contains(.passwords), summary.problems.isEmpty {
+                    row.note(String(localized: "Orion’s passwords stay in Orion. Export them there (File › Export › Passwords), then use Import a password file.",
+                                    comment: "Under Orion in the welcome window. File › Export › Passwords is Orion’s own menu wording; Import a password file is a link here."))
                     self.fileLink.isHidden = false
                 }
                 self.needsLayout = true
@@ -1286,6 +1293,12 @@ private final class BringPicker: StepContent {
                 row.recheckAccess()
                 self.refresh()
             }
+        case .orion:
+            // Its folder has no picker step of its own here: macOS's switch for it is in Files & Folders.
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders")!)
+            row.note(String(localized: "In Files & Folders, find Zigzag and turn on \(OrionImporter.name). Then come back and click Check Again.",
+                             comment: "Under a browser in the welcome window. The placeholder is a browser’s name; Files & Folders is a pane in macOS’s System Settings, Check Again a button here."))
+            row.awaitSettings()
         default:
             break
         }

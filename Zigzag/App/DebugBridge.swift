@@ -554,6 +554,7 @@ enum DebugBridge {
                         case .chromium(let b): return ChromiumImporter.read(b, [.bookmarks, .history])
                         case .firefox(let b): return FirefoxImporter.read(b, [.bookmarks, .history])
                         case .safari: return SafariImporter.read([.bookmarks, .history])
+                        case .orion(let b): return OrionImporter.read(b, [.bookmarks, .history])
                         case .file: return ImportBatch()
                         }
                     }.value
