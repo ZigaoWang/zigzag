@@ -31,7 +31,7 @@ final class ExtensionBridge {
     private var ports: [ObjectIdentifier: (port: WKWebExtension.MessagePort, id: String, events: Set<String>)] = [:]
 
     private init() {
-        let all: [any BridgeNamespace] = [BridgeHistory(), BridgeTopSites(), BridgeBookmarks(), BridgeDownloads(), BridgeNotifications(), BridgeIdle(), BridgeDisplay(), BridgeContexts(), BridgeRuntime(),
+        let all: [any BridgeNamespace] = [BridgeHistory(), BridgeTopSites(), BridgeBookmarks(), BridgeDownloads(), BridgeNotifications(), BridgeIdle(), BridgeDisplay(), BridgeContexts(), BridgeRuntime(), BridgeFavicons(),
                                           BridgeSpeech(), BridgePower(), offscreen, BridgeIdentity(), sidePanel, tabCapture, BridgeUserScripts(), proxy, webRequest]
         namespaces = Dictionary(uniqueKeysWithValues: all.map { (type(of: $0).name, $0) })
     }

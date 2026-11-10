@@ -227,6 +227,37 @@ struct ExtensionScriptTests {
         return context
     }
 
+    @Test func tabsComeWithTheirSiteIcons() {
+        // WebKit's tabs have no favIconUrl; Sound Booster's popup drew an empty square for each (#45).
+        let context = Self.workerWorld(worker: false, setup: """
+        var __asks = [], __callbacks = 0;
+        chrome.tabs = {
+          query: (info, callback) => {
+            if (callback) { __callbacks++; callback(undefined); return; }
+            if (info && info.fail) return Promise.reject(new Error('No tab'));
+            return Promise.resolve([{ id: 1, url: 'https://video.example/watch' }, { id: 2 }, { id: 3, url: 'https://own.example/', favIconUrl: 'https://own.example/i.png' }]);
+          },
+          get: (id) => Promise.resolve({ id, url: 'https://video.example/watch' }),
+        };
+        globalThis.__zigzagFavicons = (urls) => { __asks.push(urls); return Promise.resolve(urls.map((url) => (url === 'https://video.example/watch' ? 'data:image/png;base64,AA' : null))); };
+        """)
+        context.evaluateScript("""
+        chrome.tabs.query({}).then((tabs) => { globalThis.__queried = tabs; });
+        chrome.tabs.get(1, (tab) => { globalThis.__got = tab; });
+        chrome.tabs.query({ fail: true }, (value) => { globalThis.__failed = String(value); });
+        """)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__queried[0].favIconUrl").toString() == "data:image/png;base64,AA")
+        // No address (no permission to read it): nothing asked, nothing added. One the tab has already is kept.
+        #expect(context.evaluateScript("__queried[1].favIconUrl === undefined").toBool())
+        #expect(context.evaluateScript("__queried[2].favIconUrl").toString() == "https://own.example/i.png")
+        #expect(context.evaluateScript("JSON.stringify(__asks[0])").toString() == "[\"https://video.example/watch\"]")
+        #expect(context.evaluateScript("__got.favIconUrl").toString() == "data:image/png;base64,AA")
+        // Refused: asked again as the extension asked, so its callback hears WebKit's own answer and lastError.
+        #expect(context.evaluateScript("__callbacks").toInt32() == 1)
+        #expect(context.evaluateScript("__failed").toString() == "undefined")
+    }
+
     @Test func workerMessagingIsLeftAloneUntilAnExtensionUsesIt() {
         // A page: controller stays WebKit's, and only posts to the extension's own worker take the hidden port.
         let page = Self.workerWorld(worker: false)

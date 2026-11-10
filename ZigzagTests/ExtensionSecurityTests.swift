@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import WebKit
@@ -219,6 +220,26 @@ struct ExtensionSecurityTests {
         #expect(BridgeTabCapture.siteAllows(url, offSites: [], hasAccess: false, allSites: true))
         #expect(BridgeTabCapture.siteAllows(url, offSites: [], hasAccess: true, allSites: false))
         #expect(!BridgeTabCapture.siteAllows(url, offSites: ["music.example"], hasAccess: true, allSites: true))
+    }
+
+    /// Tabs come with their site's icon only while open, not private, and readable by the extension: never one from
+    /// history or the icon cache, which would tell where you've been (#45).
+    @Test func tabIconsOnlyForOpenTabsTheExtensionCanRead() throws {
+        let icon = NSImage(size: NSSize(width: 16, height: 16), flipped: false) { rect in NSColor.red.setFill(); rect.fill(); return true }
+        let open = [
+            BridgeFavicons.OpenTab(url: "https://video.example/watch", icon: icon, isPrivate: false, mayRead: true),
+            BridgeFavicons.OpenTab(url: "https://bank.example/", icon: icon, isPrivate: false, mayRead: false),
+            BridgeFavicons.OpenTab(url: "https://secret.example/", icon: icon, isPrivate: true, mayRead: true),
+            BridgeFavicons.OpenTab(url: "https://blank.example/", icon: nil, isPrivate: false, mayRead: true),
+        ]
+        let found = BridgeFavicons.icons(for: ["https://video.example/watch", "https://bank.example/", "https://secret.example/",
+                                               "https://blank.example/", "https://visited-once.example/", nil], among: open)
+        #expect(found.map { $0 != nil } == [true, false, false, false, false, false])
+        let url = try #require(BridgeFavicons.dataURL(icon, side: BridgeFavicons.side))
+        #expect(url.hasPrefix("data:image/png;base64,"))
+        let data = try #require(Data(base64Encoded: String(url.dropFirst("data:image/png;base64,".count))))
+        let bitmap = try #require(NSBitmapImageRep(data: data))
+        #expect(bitmap.pixelsWide == BridgeFavicons.side && bitmap.pixelsHigh == BridgeFavicons.side)
     }
 
     /// The page sees the tap's message handler only while a capture of it is live; with none, it goes again.

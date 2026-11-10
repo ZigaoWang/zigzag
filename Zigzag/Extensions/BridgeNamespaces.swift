@@ -205,6 +205,74 @@ final class BridgeRuntime: BridgeNamespace {
     }
 }
 
+// MARK: - Tab favicons
+
+/// `favIconUrl` on the tabs `tabs.query` and `tabs.get` answer, which WebKit leaves out: Sound Booster's popup shows
+/// each tab it boosts by its site's icon, and drew an empty square. Chrome gives it with the tab's address, so here
+/// too: only for a tab open now, not private, whose address the extension may read. The icon is the one Zigzag
+/// shows, as a small PNG data: URL, which any extension page can draw without fetching anything.
+@available(macOS 15.4, *)
+@MainActor
+final class BridgeFavicons: BridgeNamespace {
+    static let name = "favicons"
+    static let permission = ""
+    /// The side of the icon handed over, in pixels: Chrome's own are 16 pt, drawn sharp at 2x.
+    static let side = 32
+
+    private var encoded: [ObjectIdentifier: (image: NSImage, url: String)] = [:]
+
+    func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
+        guard fn == "forPages", let asked = args.first as? [Any] else { throw BridgeError.unsupported(Self.name, fn) }
+        guard let context = ExtensionHost.shared.context(for: extensionID) else { return [] }
+        let readsAll = context.hasPermission(.tabs)
+        let open = WindowManager.shared.controllers.filter { !$0.tabManager.isPrivate }.flatMap(\.tabManager.allTabs).compactMap { tab -> OpenTab? in
+            guard let url = tab.webView?.url ?? tab.url else { return nil }
+            return OpenTab(url: url.absoluteString, icon: tab.favicon, isPrivate: tab.isPrivate,
+                           mayRead: readsAll || context.hasAccess(to: url, in: tab))
+        }
+        return Self.icons(for: asked.map { $0 as? String }, among: open).map { $0.flatMap(dataURL) ?? NSNull() } as [Any]
+    }
+
+    struct OpenTab {
+        let url: String
+        let icon: NSImage?
+        let isPrivate: Bool
+        let mayRead: Bool
+    }
+
+    /// The icon for each address asked about: an open tab's, when one shows it and the extension may read it. Never
+    /// one from history or the icon cache, so asking can't tell where you've been.
+    static func icons(for asked: [String?], among open: [OpenTab]) -> [NSImage?] {
+        asked.map { url in
+            guard let url else { return nil }
+            return open.first { $0.url == url && !$0.isPrivate && $0.mayRead && $0.icon != nil }?.icon
+        }
+    }
+
+    /// The icon as a PNG data: URL, kept while the tab's image is the same.
+    private func dataURL(_ image: NSImage) -> String? {
+        let key = ObjectIdentifier(image)
+        if let kept = encoded[key], kept.image === image { return kept.url }
+        guard let url = Self.dataURL(image, side: Self.side) else { return nil }
+        if encoded.count > 200 { encoded.removeAll() }
+        encoded[key] = (image, url)
+        return url
+    }
+
+    static func dataURL(_ image: NSImage, side: Int) -> String? {
+        guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8, samplesPerPixel: 4,
+                                            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        bitmap.size = NSSize(width: side, height: side)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+        NSGraphicsContext.current?.imageInterpolation = .high
+        image.draw(in: NSRect(x: 0, y: 0, width: side, height: side), from: .zero, operation: .copy, fraction: 1)
+        NSGraphicsContext.restoreGraphicsState()
+        guard let png = bitmap.representation(using: .png, properties: [:]) else { return nil }
+        return "data:image/png;base64," + png.base64EncodedString()
+    }
+}
+
 // MARK: - system.display
 
 /// `chrome.system.display`: your screens' sizes and places, as Chrome reports them (from the top left of the main

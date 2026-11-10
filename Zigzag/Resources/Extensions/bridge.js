@@ -65,6 +65,9 @@
       return reply ? reply.value : undefined;
     });
 
+  // The icons of open tabs, by address, for the favIconUrl WebKit's tabs leave out (webkit-differences.js).
+  Object.defineProperty(globalThis, '__zigzagFavicons', { value: (urls) => send('favicons', 'forPages', [urls]), configurable: true });
+
   // A Chrome-style method: a promise, or the trailing callback Chrome extensions often pass instead.
   const method = (ns, fn, { before, after } = {}) => (...args) => {
     const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;

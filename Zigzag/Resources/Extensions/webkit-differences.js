@@ -851,6 +851,33 @@
       });
     }
 
+    // tabs.query, tabs.get, tabs.getCurrent: WebKit's tabs have no favIconUrl, and a popup listing tabs by their
+    // site's icon (Sound Booster's) drew empty squares. As in Chrome, a tab whose address the extension can read comes
+    // with its icon: Zigzag's, as a data: URL (ExtensionBridge's favicons). A slow or missing answer leaves the tabs
+    // as WebKit gave them; a call WebKit refuses is made again as it was, so the callback hears its lastError.
+    const withFavicons = async (value) => {
+      const ask = globalThis.__zigzagFavicons;
+      const tabs = (Array.isArray(value) ? value : [value]).filter((tab) => tab && typeof tab === 'object' && typeof tab.url === 'string' && !tab.favIconUrl);
+      if (!ask || !tabs.length) return value;
+      try {
+        const icons = await Promise.race([ask(tabs.map((tab) => tab.url)), new Promise((done) => setTimeout(() => done(null), 500))]);
+        if (Array.isArray(icons)) tabs.forEach((tab, i) => { if (typeof icons[i] === 'string') tab.favIconUrl = icons[i]; });
+      } catch (e) {}
+      return value;
+    };
+    for (const name of ['query', 'get', 'getCurrent']) {
+      const original = api.tabs && api.tabs[name];
+      if (typeof original !== 'function') continue;
+      const call = original.bind(api.tabs);
+      setMember(['tabs'], name, (...args) => {
+        const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+        const result = Promise.resolve(call(...args)).then(withFavicons);
+        if (!callback) return result;
+        result.then((value) => callback(value), () => call(...args, callback));
+        return undefined;
+      });
+    }
+
     // runtime.requestUpdateCheck: Zigzag updates extensions itself; as in Chrome when none is waiting, "no update".
     if (typeof api.runtime.requestUpdateCheck !== 'function') {
       setMember(['runtime'], 'requestUpdateCheck', (callback) => {
