@@ -5,6 +5,19 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.7.8] - 2026-11-10
+
+### New
+- After an update, Zigzag says so and offers What's New, and the note waits until you've seen it. The notes show their links, credits and issue numbers. ([#33](https://github.com/ZigaoWang/zigzag/issues/33))
+- Panels, menus, toasts, sheets and the find bar (⌘F) come and go with short, quiet motion that shows where they came from. The command bar and switching tabs stay instant, and Reduce Motion turns it all into a simple fade. ([#37](https://github.com/ZigaoWang/zigzag/issues/37))
+
+### Fixed
+- Swiping sideways in web apps like Excel scrolls the sheet instead of going back, even inside embedded frames, and a scroll that starts mid-sheet stays a scroll at the edge, as in Chrome. ([#38](https://github.com/ZigaoWang/zigzag/issues/38))
+- Swiping on a PDF goes back and forward, as on any page. ([#36](https://github.com/ZigaoWang/zigzag/issues/36))
+- Links Zigzag opens itself, like those in About, open in a tab instead of Zigzag Mini, and closing a Zigzag Mini you used alongside your windows keeps you in Zigzag. ([#34](https://github.com/ZigaoWang/zigzag/issues/34))
+- A long site name keeps its start and its ending, in the address and Site Controls. ([#35](https://github.com/ZigaoWang/zigzag/issues/35))
+- A dialog's title lines up with the text under it.
+
 ## [0.7.7] - 2026-11-10
 
 ### New
