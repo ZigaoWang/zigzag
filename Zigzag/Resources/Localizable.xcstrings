@@ -470,23 +470,6 @@
         }
       }
     },
-    "%@, by %@" : {
-      "comment" : "Under an article's title in Reader: the site it's from, then who wrote it.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@, by %2$@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@，作者：%2$@"
-          }
-        }
-      }
-    },
     "%@, current space" : {
       "comment" : "Spoken by VoiceOver as the space switcher's choice moves to the space you're in. The placeholder is its name.",
       "localizations" : {
@@ -5771,7 +5754,7 @@
       }
     },
     "Hide Reader" : {
-      "comment" : "Menu bar item: closes Reader.\nTooltip of the Reader action in the site panel, while Reader is on.\nTooltip of the address bar's Reader button while Reader is on.\nTooltip of the button in Reader's bar that closes Reader.",
+      "comment" : "Menu bar item: closes Reader.\nTooltip of the Reader action in the site panel, while Reader is on.\nTooltip of the address bar's Reader button while Reader is on.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
