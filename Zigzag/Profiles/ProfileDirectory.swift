@@ -52,6 +52,23 @@ nonisolated struct ProfileDirectory: Codable, Equatable {
 
     func profile(_ id: UUID) -> ProfileInfo? { all.first { $0.id == id } }
 
+    /// Why a profile can't be removed now.
+    enum RemovalBlock: Equatable {
+        /// The first profile holds what Zigzag kept before there were profiles: it's never removed.
+        case first
+        /// It's in no list: there's nothing to remove.
+        case unlisted
+        /// Something is still writing into it (an import): removing it now would erase data that's being written.
+        case inUse
+    }
+
+    /// Whether a profile may be removed, and if not, why. `inUse`: the profiles something is writing into.
+    func removalBlock(_ id: UUID, inUse: Set<UUID> = []) -> RemovalBlock? {
+        if id == Profile.defaultID { return .first }
+        guard profile(id) != nil else { return .unlisted }
+        return inUse.contains(id) ? .inUse : nil
+    }
+
     /// The profile a space is on. A space whose profile is gone is on the first.
     func profileID(ofSpace space: UUID) -> UUID {
         guard let id = spaces[space.uuidString], others.contains(where: { $0.id == id }) else { return Profile.defaultID }

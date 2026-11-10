@@ -225,3 +225,20 @@ struct ProfileChoiceTests {
         #expect(PasswordManagers.active(among: ["nngceckbapebfimnlniiiahkandclblb", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"]) == "1Password")
     }
 }
+
+/// Which profiles may be removed.
+@MainActor
+struct ProfileRemovalRuleTests {
+    @Test func theFirstAnUnlistedAndOneInUseAreNotRemoved() {
+        var directory = ProfileDirectory()
+        let work = directory.add(name: "Work", color: nil)
+        #expect(directory.removalBlock(Profile.defaultID) == .first)
+        #expect(directory.removalBlock(UUID()) == .unlisted)
+        #expect(directory.removalBlock(work.id) == nil)
+        // Something is writing into it (an import): not until that's done.
+        #expect(directory.removalBlock(work.id, inUse: [work.id]) == .inUse)
+        #expect(directory.removalBlock(work.id, inUse: [UUID()]) == nil)
+        // The first profile is never removed, in use or not.
+        #expect(directory.removalBlock(Profile.defaultID, inUse: [Profile.defaultID]) == .first)
+    }
+}

@@ -333,6 +333,14 @@ enum ImportCoordinator {
         let choice = choice.intersection(source.offers)
         let profile = target ?? Profiles.shared.default
         var summary = Summary(source: source.name)
+        // The profile is held for as long as this writes into it, so it isn't removed meanwhile. One that's
+        // already gone gets nothing.
+        guard Profiles.shared.hold(profile.id) else {
+            summary.problems.append(ImportProblem(message: String(localized: "The profile this was going into has been deleted. Choose another and import again.", comment: "Problem in the Import window, when the profile chosen under Into was deleted before the import ran."),
+                                                  fix: .none))
+            return summary
+        }
+        defer { Profiles.shared.done(profile.id) }
         let reading = choice.reading
         let isArc: Bool = { if case .chromium(let b) = source.kind { return b.name == "Arc" } else { return false } }()
 
