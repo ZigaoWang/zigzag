@@ -4507,6 +4507,17 @@
         }
       }
     },
+    "Data from a profile that’s no longer listed" : {
+      "comment" : "Title of a row in Settings › Profiles, for data left on this Mac by a profile that's in no list.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自已不在列表中的描述文件的数据"
+          }
+        }
+      }
+    },
     "Data." : {
       "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.",
       "localizations" : {
@@ -4552,7 +4563,7 @@
       }
     },
     "Delete" : {
-      "comment" : "Button on a saved login in the Passwords window.",
+      "comment" : "Button of the sheet that deletes data left by a profile that's no longer listed.\nButton on a saved login in the Passwords window.\nTooltip of the trash button in Settings › Profiles, on data left by a profile that's no longer listed.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4602,6 +4613,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "删除空间…"
+          }
+        }
+      }
+    },
+    "Delete this profile’s data?" : {
+      "comment" : "Title of the sheet that asks before deleting data left by a profile that's no longer listed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要删除这个描述文件的数据吗？"
           }
         }
       }
@@ -5327,6 +5349,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "扩展只能从 Chrome 及基于它的浏览器导入。Firefox 和 Safari 的扩展来自它们各自的商店。"
+          }
+        }
+      }
+    },
+    "Extensions, sign-ins and history kept on this Mac" : {
+      "comment" : "Under the title of a row in Settings › Profiles, for data left by a profile that's in no list.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留在这台 Mac 上的扩展、登录状态和历史记录"
           }
         }
       }
@@ -6307,6 +6340,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它还将能够"
+          }
+        }
+      }
+    },
+    "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins, saved passwords and history. Make sure you have your recovery phrases. This can’t be undone." : {
+      "comment" : "Message of the sheet that asks before deleting data left by a profile that's no longer listed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的扩展及其保存的所有内容（包括钱包）都会被删除，登录状态、已存储的密码和历史记录也会一并删除。请确认你已保存好恢复短语。此操作不可撤销。"
           }
         }
       }
@@ -7751,6 +7795,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暂无"
+          }
+        }
+      }
+    },
+    "Not Listed" : {
+      "comment" : "A heading in Settings › Profiles, over data left on this Mac by profiles that are no longer in the list.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不在列表中"
           }
         }
       }
@@ -10233,6 +10288,17 @@
         }
       }
     },
+    "Restore" : {
+      "comment" : "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复"
+          }
+        }
+      }
+    },
     "Restore and Restart" : {
       "comment" : "Button of the sheet that restores the backup.",
       "localizations" : {
@@ -10262,6 +10328,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要恢复到上次更新之前吗？"
+          }
+        }
+      }
+    },
+    "Restored Profile" : {
+      "comment" : "Name a profile gets when it's made again from data left on this Mac. People can rename it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已恢复的描述文件"
           }
         }
       }

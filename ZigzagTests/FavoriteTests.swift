@@ -27,6 +27,23 @@ struct FavoriteTests {
         #expect(Library.arranging(marks, as: [UUID(), ids[0]]).map(\.id) == [ids[1], ids[2], ids[3], ids[4], ids[0]])
     }
 
+    /// A pair is kept only when both pages are one profile's; the right page then sits just after the left.
+    @Test func aPairAcrossProfilesIsUndoneAndOneWithinIsKeptTogether() {
+        let marks = ids.map { Bookmark(id: $0, url: URL(string: "https://example.com/\($0)")!, title: "") }
+        var directory = ProfileDirectory()
+        let work = directory.add(name: "Work")
+        // 3 and 4 are Work's; 0, 1 and 2 the first profile's.
+        directory.assign(favorite: ids[3], to: work.id)
+        directory.assign(favorite: ids[4], to: work.id)
+        let across = PinnedSplit(left: ids[0], right: ids[3]), within = PinnedSplit(left: ids[4], right: ids[3])
+        let firsts = PinnedSplit(left: ids[2], right: ids[0])
+        let (favorites, splits) = Library.tidied(marks, splits: [across, within, firsts], directory: directory)
+        #expect(splits.map(\.left) == [ids[4], ids[2]])
+        #expect(favorites.map(\.id) == [ids[1], ids[2], ids[0], ids[4], ids[3]])
+        // With one profile every pair is within it.
+        #expect(Library.tidied(marks, splits: [across], directory: ProfileDirectory()).1.count == 1)
+    }
+
     @Test func aSplitCountsAsOneTile() {
         // Tiles: [0], [1|2], [3]. Slot 2 is the tile of 3, after the split's right page.
         let split = PinnedSplit(left: ids[1], right: ids[2])

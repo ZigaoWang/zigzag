@@ -119,6 +119,29 @@ struct ProfileDirectoryTests {
         #expect(directory.orphans(amongStores: [crypto.id, school.id, stray]) == [stray])
     }
 
+    /// Data under an ID that's no profile's can be written down for erasing; a profile's own, the first's above
+    /// all, never can.
+    @Test func onlyWhatIsNoProfilesCanBeMarkedForErasing() {
+        var directory = ProfileDirectory()
+        let crypto = directory.add(name: "Crypto")
+        let stray = UUID()
+        directory.markForErasing(Profile.defaultID)
+        directory.markForErasing(crypto.id)
+        #expect(directory.deleting.isEmpty)
+        directory.markForErasing(stray)
+        directory.markForErasing(stray)
+        #expect(directory.deleting.map(\.id) == [stray])
+        #expect(directory.all.map(\.id) == [Profile.defaultID, crypto.id])
+    }
+
+    @Test func whatIsOnDiskIsListedOnceAndNeverTheFirstProfiles() {
+        var directory = ProfileDirectory()
+        let crypto = directory.add(name: "Crypto")
+        let stray = UUID()
+        // A store and a folder under the same ID are one thing to ask about.
+        #expect(directory.orphans(amongStores: [stray, crypto.id, Profile.defaultID, stray]) == [stray])
+    }
+
     @Test func itSurvivesTheFile() throws {
         var directory = ProfileDirectory()
         let crypto = directory.add(name: "Crypto", color: .mint)

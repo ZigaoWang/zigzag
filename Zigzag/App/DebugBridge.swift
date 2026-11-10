@@ -342,6 +342,22 @@ enum DebugBridge {
                 guard arg != "confirm" || isTestCopy else { debugLog("formsheet confirm refused: not a test copy"); break }
                 sheet.debugAnswer(arg == "confirm")
             }
+        case "orphans", "restoreorphan", "eraseorphan":
+            // orphans <path>: the IDs of data on disk that's no profile's. restoreorphan / eraseorphan <n>: makes the
+            // nth a profile again, or erases it (only in a test copy).
+            Task { @MainActor in
+                let found = await Profiles.shared.orphans()
+                let index = Int(arg) ?? 0
+                let chosen = found.indices.contains(index) ? found[index] : nil
+                switch name {
+                case "orphans": try? JSONSerialization.data(withJSONObject: found.map(\.uuidString)).write(to: URL(fileURLWithPath: arg))
+                case "restoreorphan": if let chosen { Library.shared.restoreProfile(chosen, name: "Restored Profile") }
+                default:
+                    guard isTestCopy, let chosen else { debugLog("eraseorphan refused"); return }
+                    await Profiles.shared.eraseOrphan(chosen)
+                    debugLog("eraseorphan => deleting \(Library.shared.directory.deleting.count)")
+                }
+            }
         case "delprofile":
             // delprofile <name>: removes the profile and its data, without asking. Only in a test copy.
             guard isTestCopy else { debugLog("delprofile refused: not a test copy"); break }
