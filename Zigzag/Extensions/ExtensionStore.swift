@@ -6,40 +6,41 @@ import WebKit
 /// The extensions pinned to the address, left to right. An extension that's off keeps its place and uses no slot.
 struct ExtensionPins: Equatable {
     private(set) var ids: [String]
-    var limit = Tokens.Sidebar.maxPins
 
-    init(ids: [String] = [], limit: Int = Tokens.Sidebar.maxPins) {
+    /// How many extensions can be pinned to the address.
+    static let limit = 3
+
+    init(ids: [String] = []) {
         self.ids = ids
-        self.limit = limit
     }
 
     func contains(_ id: String) -> Bool { ids.contains(id) }
 
     /// A new pin goes on the left, so the ones already there don't move.
     func pinning(_ id: String) -> ExtensionPins {
-        contains(id) ? self : ExtensionPins(ids: [id] + ids, limit: limit)
+        contains(id) ? self : ExtensionPins(ids: [id] + ids)
     }
 
     func unpinning(_ id: String) -> ExtensionPins {
-        ExtensionPins(ids: ids.filter { $0 != id }, limit: limit)
+        ExtensionPins(ids: ids.filter { $0 != id })
     }
 
     func keeping(_ isKept: (String) -> Bool) -> ExtensionPins {
-        ExtensionPins(ids: ids.filter(isKept), limit: limit)
+        ExtensionPins(ids: ids.filter(isKept))
     }
 
     /// Whether there's a free slot, with these extensions loaded.
-    func canPin(loaded: Set<String>) -> Bool { ids.filter(loaded.contains).count < limit }
+    func canPin(loaded: Set<String>) -> Bool { ids.filter(loaded.contains).count < Self.limit }
 
     /// The pins that get a button: those loaded, nearest Site Controls first in line for the limit.
-    func shown(among loaded: Set<String>) -> [String] { Array(ids.filter(loaded.contains).suffix(limit)) }
+    func shown(among loaded: Set<String>) -> [String] { Array(ids.filter(loaded.contains).suffix(Self.limit)) }
 
     /// The showing pins in a new order. They take the places the showing pins held, so a pin that's hidden or off
     /// keeps its own; one that went away meanwhile is left out.
     func reordered(visible: [String]) -> ExtensionPins {
         let present = visible.filter(contains)
         var next = present.makeIterator()
-        return ExtensionPins(ids: ids.map { present.contains($0) ? next.next() ?? $0 : $0 }, limit: limit)
+        return ExtensionPins(ids: ids.map { present.contains($0) ? next.next() ?? $0 : $0 })
     }
 }
 

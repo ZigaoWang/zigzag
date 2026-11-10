@@ -16,6 +16,12 @@ struct AddressTests {
         #expect(CommandRanker.url(from: "youtube.com/@mkbhd")?.absoluteString == "https://youtube.com/@mkbhd")
     }
 
+    @Test func atMostThreeExtensionsArePinned() {
+        #expect(ExtensionPins.limit == 3)
+        #expect(ExtensionPins(ids: ["a", "b"]).canPin(loaded: ["a", "b"]))
+        #expect(!ExtensionPins(ids: ["a", "b", "c"]).canPin(loaded: ["a", "b", "c"]))
+    }
+
     @Test func aNewPinGoesLeftAndPinningTwiceChangesNothing() {
         let pins = ExtensionPins(ids: ["a", "b"]).pinning("c")
         #expect(pins.ids == ["c", "a", "b"])
@@ -24,13 +30,13 @@ struct AddressTests {
     }
 
     @Test func onlyExtensionsThatAreOnUseASlot() {
-        let pins = ExtensionPins(ids: ["a", "b", "c"], limit: 3)
+        let pins = ExtensionPins(ids: ["a", "b", "c"])
         #expect(!pins.canPin(loaded: ["a", "b", "c", "d"]))
         #expect(pins.canPin(loaded: ["a", "b", "d"]))
     }
 
     @Test func theRightmostLoadedPinsShow() {
-        let pins = ExtensionPins(ids: ["a", "b", "c", "d"], limit: 3)
+        let pins = ExtensionPins(ids: ["a", "b", "c", "d"])
         #expect(pins.shown(among: ["a", "b", "c", "d"]) == ["b", "c", "d"])
         #expect(pins.shown(among: ["a", "b", "d"]) == ["a", "b", "d"])
         #expect(pins.shown(among: []).isEmpty)

@@ -223,8 +223,6 @@ enum Tokens {
         static let addressGlyph: CGFloat = glyph
         /// The room the site's name always keeps: pinned extensions give way before it gets narrower.
         static let addressMinText: CGFloat = 72
-        /// How many extensions can be pinned to the address.
-        static let maxPins = 3
         /// The round pin on an extension's tile in Site Controls, and how far past the tile's corner it sits.
         static let hoverPin: CGFloat = 19
         static let hoverPinOverhang: CGFloat = 4
