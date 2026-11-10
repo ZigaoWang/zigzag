@@ -547,11 +547,11 @@ final class PDFViewerView: NSView, PDFViewDelegate {
 final class ZigzagPDFView: PDFView {
     var onSwipe: ((NSEvent, (left: Bool, right: Bool)) -> Bool)?
 
-    override func scrollWheel(with event: NSEvent) {
-        // Every event goes to the swipe, so it sees each gesture begin and end; zoomed in, a sideways swipe pans
-        // until the pages reach their edge, and only then goes back or forward.
-        if onSwipe?(event, sidewaysRoom) == true { return }
-        super.scrollWheel(with: event)
+    /// PDFKit's own scroll view inside takes the trackpad's scrolls, so they never reach this view: the window hands
+    /// each scroll over the pages here first (`BrowserWindow.sendEvent`), so the swipe sees every gesture begin and
+    /// end. Zoomed in, a sideways swipe pans until the pages reach their edge, and only then goes back or forward.
+    func takesSwipe(_ event: NSEvent) -> Bool {
+        onSwipe?(event, sidewaysRoom) == true
     }
 
     /// Whether the pages can scroll further left or right.
