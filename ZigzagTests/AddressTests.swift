@@ -61,6 +61,25 @@ struct AddressTests {
         #expect(AddressView.pinsThatFit(count: 3, otherButtons: others, room: field - 18 - http) == fits)
     }
 
+    /// The prompt on a new tab is about 150pt: in the usual 224pt field there's room for one pin beside it, and the
+    /// rest give way rather than cut it short.
+    @Test(arguments: [(224.0, 150.0, 1), (224.0, 60.0, 3), (224.0, 110.0, 2), (200.0, 150.0, 0), (224.0, 300.0, 0)])
+    func pinsGiveWayBeforeTheNameIsCut(field: Double, text: Double, fits: Int) {
+        #expect(AddressView.pinsThatFit(count: 3, otherButtons: 1, room: field - 18, text: text) == fits)
+    }
+
+    @Test func aPinsCountStaysInsideItsButton() {
+        let address = field()
+        address.setPins([pin("a", badge: "12"), pin("b", badge: "3")], animated: false)
+        for id in ["a", "b"] {
+            guard let button = address.pinButton(for: id), let badge = button.subviews.compactMap({ $0 as? BadgeView }).first else {
+                Issue.record("no badge on \(id)"); continue
+            }
+            badge.layout()
+            #expect(button.bounds.contains(badge.frame))
+        }
+    }
+
     @Test func pinsNeverFitANegativeCountOrMoreThanThereAre() {
         #expect(AddressView.pinsThatFit(count: 3, otherButtons: 5, room: 20) == 0)
         #expect(AddressView.pinsThatFit(count: 1, otherButtons: 1, room: 400) == 1)

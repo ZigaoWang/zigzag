@@ -130,17 +130,25 @@ final class AddressView: InteractiveView {
             badge.update(text: text, attention: pin.needsAttention)
         } else {
             let badge = BadgeView(text: text, attention: pin.needsAttention)
+            badge.isCompact = true
             button.addSubview(badge)
             entry.badge = badge
         }
+        // A count takes the button's bottom-right corner, inside it; the icon moves up and left out of its way.
+        let nudge = text.isEmpty || pin.needsAttention ? 0 : Self.badgeNudge
+        button.imageOffset = CGSize(width: -nudge, height: -nudge)
     }
 
     /// How many of `count` pins can show when `otherButtons` share the end of a field with `room` for text and
     /// buttons: the site's name keeps its minimum, and every button takes its width and a gap.
-    static func pinsThatFit(count: Int, otherButtons: Int, room: CGFloat) -> Int {
-        let spare = room - Tokens.Sidebar.addressMinText - CGFloat(otherButtons) * pinStep
+    /// `text`: the width of the site's name, or the prompt, in full: pins give way before it's cut short.
+    static func pinsThatFit(count: Int, otherButtons: Int, room: CGFloat, text: CGFloat = 0) -> Int {
+        let spare = room - max(Tokens.Sidebar.addressMinText, ceil(text)) - CGFloat(otherButtons) * pinStep
         return max(0, min(count, Int(floor(spare / pinStep))))
     }
+
+    /// How far a pinned icon moves up and left to make room for its count.
+    private static let badgeNudge: CGFloat = 3
 
     /// From one button in the field to the next.
     private static let pinStep = buttonSide + 2
@@ -270,6 +278,17 @@ final class AddressView: InteractiveView {
     }
 
     #if DEBUG
+    /// pindump <path>: every view in the field, one a line, to check that each pin has one button and nothing is left over.
+    func debugDump(to path: String) {
+        let pins = Dictionary(uniqueKeysWithValues: pinEntries.map { (ObjectIdentifier($0.button), $0.pin.id) })
+        var lines = ["visible \(visiblePinIDs.joined(separator: ",")) entries \(pinEntries.count) dragging \(pinDrag != nil)"]
+        for view in subviews {
+            let name = pins[ObjectIdentifier(view)].map { "pin \($0)" } ?? String(describing: type(of: view))
+            lines.append("\(name) frame=\(view.frame) hidden=\(view.isHidden) alpha=\(view.alphaValue) opacity=\(view.layer?.opacity ?? -1) anims=\(view.layer?.animationKeys() ?? [])")
+        }
+        try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
+    }
+
     /// pindrag begin <id> | move <x> [y] (window points, top-left; y defaults to the field's middle) | drop | cancel:
     /// the drag a pointer would make, through the same steps.
     func debugPinDrag(_ arg: String) {
@@ -444,7 +463,8 @@ final class AddressView: InteractiveView {
             if wanted { others.append(button) } else { takeAway(button, animated: animated, removing: false) }
         }
         let room = bounds.width - x - inset - Tokens.Space.x1
-        let fit = Self.pinsThatFit(count: pinEntries.count, otherButtons: others.count + 1, room: room)
+        let text = (label.stringValue as NSString).size(withAttributes: [.font: label.font ?? Tokens.Font.sidebarRow()]).width
+        let fit = Self.pinsThatFit(count: pinEntries.count, otherButtons: others.count + 1, room: room, text: text)
         // The one furthest from Site Controls gives way first.
         let showing = pinEntries.suffix(fit)
         for entry in pinEntries.dropLast(fit) { takeAway(entry.button, animated: animated, removing: false) }
@@ -1924,6 +1944,8 @@ final class BadgeView: NSView {
     private let label: Label
     private var attention: Bool
     var text: String { label.stringValue }
+    /// Smaller, for a button in the address field: it stays inside the button, clear of its neighbors.
+    var isCompact = false { didSet { needsLayout = true } }
 
     init(text: String, attention: Bool) {
         self.attention = attention
@@ -1957,10 +1979,10 @@ final class BadgeView: NSView {
         super.layout()
         guard let superview else { return }
         // A ring in the address field's color keeps the badge apart from the icon under it.
-        let ring: CGFloat = 1.5
-        let height: CGFloat = (attention ? 6 : 10) + ring * 2
+        let ring: CGFloat = isCompact ? 1 : 1.5
+        let height: CGFloat = (attention ? (isCompact ? 5 : 6) : (isCompact ? 8 : 10)) + ring * 2
         let text = (label.stringValue as NSString).size(withAttributes: [.font: label.font ?? NSFont.systemFont(ofSize: Tokens.TypeSize.badge)]).width
-        let width = attention ? height : max(height, ceil(text) + 6 + ring * 2)
+        let width = attention ? height : max(height, ceil(text) + (isCompact ? 4 : 6) + ring * 2)
         // A count sits bottom-right, like Safari's; the attention dot top-right, clear of the icon's artwork.
         let y = attention ? 1 : superview.bounds.height - height
         frame = NSRect(x: superview.bounds.width - width - (attention ? 1 : 0), y: y, width: width, height: height)

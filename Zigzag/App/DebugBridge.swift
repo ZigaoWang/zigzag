@@ -224,6 +224,11 @@ enum DebugBridge {
             return
         }
         guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+        // pindrag and pindump work on the address as it is, without bringing the window forward.
+        if name == "pindrag" { controller.sidebar.address.debugPinDrag(arg); return }
+        if name == "pindump" { controller.sidebar.address.debugDump(to: arg); return }
+        // pintoggle <extension id>: pins or unpins it, as the pin on its tile in Site Controls does.
+        if name == "pintoggle" { ExtensionStore.togglePin(arg); return }
         NSApp.activate()
         controller.window?.makeKeyAndOrderFront(nil)
         switch name {
@@ -367,7 +372,6 @@ enum DebugBridge {
             }
         case "edgedrag": controller.root.debugEdgeDrag(arg)
         case "spacedrag": controller.sidebar.debugSpaceDrag(arg)
-        case "pindrag": controller.sidebar.address.debugPinDrag(arg)
         case "sidebarwidth":
             // sidebarwidth <points>: as a drag of the sidebar's edge would leave it, within its narrowest and widest.
             if let n = Double(arg) {
