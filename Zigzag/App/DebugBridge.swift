@@ -194,12 +194,35 @@ enum DebugBridge {
         }
     }
 
+    /// windowsdump <path>: every window's views, WebKit's own full screen window too, without bringing any forward
+    /// (which would take a page out of its full screen).
+    private static func dumpWindows(to path: String) {
+        var out = ""
+        func walk(_ v: NSView, _ depth: Int) {
+            out += String(repeating: "  ", count: depth) + "\(type(of: v)) \(v.frame) hidden=\(v.isHidden) alpha=\(v.alphaValue)"
+                + " autoresizing=\(v.translatesAutoresizingMaskIntoConstraints) constraints=\(v.constraints.count)\n"
+            if depth < 8 { v.subviews.forEach { walk($0, depth + 1) } }
+        }
+        for window in NSApp.windows {
+            out += "== \(type(of: window)) #\(window.windowNumber) \(window.frame) visible=\(window.isVisible) key=\(window.isKeyWindow) "
+                + "fullScreen=\(window.styleMask.contains(.fullScreen)) level=\(window.level.rawValue) title=\(window.title)\n"
+            if let frameView = window.contentView?.superview { walk(frameView, 1) }
+        }
+        try? out.write(toFile: path, atomically: true, encoding: .utf8)
+    }
+
     static func run(_ command: String) {
         let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
         guard let name = parts.first else { return }
         let arg = parts.count > 1 ? parts[1] : ""
         // Zigzag Mini windows come first: they work with no browser window open, and must not bring one forward.
         if name.hasPrefix("mini") { runMini(name, arg); return }
+        if name == "windowsdump" { dumpWindows(to: arg); return }
+        if name == "relayout" {
+            // relayout: every browser window lays its pages out again, as a resize would, without coming forward.
+            WindowManager.shared.controllers.forEach { $0.root.needsLayout = true; $0.root.card.needsLayout = true; $0.root.secondCard.needsLayout = true }
+            return
+        }
         guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
         NSApp.activate()
         controller.window?.makeKeyAndOrderFront(nil)
