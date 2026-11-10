@@ -9,7 +9,7 @@ System Settings › Privacy & Security › Automation.
 
 ## What a script sees
 
-A `window` is a browser window. Private windows are never listed, so a script can't see or touch them.
+A `window` is a browser window. Private windows and Zigzag Mini are never listed, so a script can't see or touch them.
 
 A window's `tabs` are all of its tabs, in every space, in the sidebar's order: the favorites that are open, then for each
 space its open pinned tabs and its tabs. A window also has a `current tab` (Chrome's `active tab` works too) and the
@@ -68,7 +68,7 @@ end tell
 
 ## Run JavaScript
 
-Running JavaScript from a script is off until you turn on Settings › General › Allow JavaScript from Apple Events.
+Running JavaScript from a script is off until you turn on Settings › General › Automation › Allow JavaScript from Apple Events.
 A script that can run JavaScript can read and change anything on your pages, including sites you're signed in to, so
 only turn it on when you need it. Until then, `do JavaScript` stops with error -1743, which says where the setting is.
 It never runs in private windows, or in Zigzag's own pages such as Settings and History.
