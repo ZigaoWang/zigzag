@@ -476,8 +476,8 @@ final class ExtensionHost: NSObject {
 
     /// The extension's button pressed, from Site Controls or (`fromPin`) its pinned button in the address.
     func performAction(_ item: ActionItem, tab: Tab?, in controller: BrowserWindowController, fromPin: Bool = false) {
-        // Never handed a private tab, nor given its site.
-        guard tab?.isPrivate != true else { return }
+        // Never handed a private tab, nor given its site, nor run from a private window at all.
+        guard tab?.isPrivate != true, !controller.tabManager.isPrivate else { return }
         popupRequest = nil
         // Its own popup always opens; if it still needs a step only you can do (1Password trusting Zigzag), a
         // short note says so, with the way there.
@@ -893,8 +893,9 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             return
         }
         // Asked by the page (1Password's "Unlock" button) rather than a click, it comes from the address bar of the
-        // window you're in.
-        let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first
+        // window you're in; never a private one, where extensions don't run.
+        let controller = ([WindowManager.shared.keyController].compactMap { $0 } + WindowManager.shared.controllers)
+            .first { !$0.tabManager.isPrivate }
         let fromPin = request?.fromPin == true && request?.controller === controller
         guard let place = controller?.popupAnchor(forPin: fromPin ? context.uniqueIdentifier : nil), place.view.window != nil else {
             completionHandler(NSError(domain: "Zigzag", code: 2, userInfo: [NSLocalizedDescriptionKey: "No window to show the popup in"]))
