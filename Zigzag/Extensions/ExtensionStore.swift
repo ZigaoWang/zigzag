@@ -335,6 +335,17 @@ enum ExtensionStore {
         return .success(context?.webExtension.displayName ?? prepared.extensionInfo.displayName ?? id)
     }
 
+    /// Adds an extension Zigzag already has the package of (another profile's) to a profile: on, with what it asks
+    /// for approved afresh and nothing it stored elsewhere.
+    @available(macOS 15.4, *)
+    static func add(_ id: String, to profile: Profile) async {
+        guard packageDirectory(for: id) != nil, !profile.installs.hasRecord(id) else { return }
+        profile.installs.save(ExtensionInstalls.State(), for: id)
+        profile.installs.newlyInstalled.insert(id)
+        await profile.extensions.load(id)
+        ExtensionCenter.changed.send()
+    }
+
     @available(macOS 15.4, *)
     static func discard(_ prepared: PreparedInstall) {
         try? FileManager.default.removeItem(at: prepared.folder)

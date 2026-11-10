@@ -460,7 +460,7 @@ final class SitePanel: FloatingPanelView {
 
     private static func clearNow(_ kind: WebsiteData.Kind, site: String, tab: Tab, controller: BrowserWindowController?) {
         Task { @MainActor [weak controller] in
-            await WebsiteData.clear(kind, site: site)
+            await WebsiteData.clear(kind, site: site, in: tab.privateStore ?? tab.profile.store)
             tab.reload()
             if let controller { Toast.show(kind == .cache ? String(localized: "Cache cleared for \(site)", comment: "Toast after one site's cache is cleared. The site is a domain, like example.com.")
                                                        : String(localized: "Cookies cleared for \(site)", comment: "Toast after one site's cookies are cleared. The site is a domain, like example.com."),

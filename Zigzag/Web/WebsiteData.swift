@@ -19,9 +19,9 @@ enum WebsiteData {
         }
     }
 
-    /// Clears `kind` for a site ("youtube.com", covering its subdomains), or for every site when `site` is nil.
-    static func clear(_ kind: Kind, site: String? = nil) async {
-        let store = WKWebsiteDataStore.default()
+    /// Clears `kind` for a site ("youtube.com", covering its subdomains), or for every site when `site` is nil, in
+    /// one store: a profile's, or a private window's own.
+    static func clear(_ kind: Kind, site: String? = nil, in store: WKWebsiteDataStore) async {
         guard let site else {
             await store.removeData(ofTypes: kind.types, modifiedSince: .distantPast)
             return

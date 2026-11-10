@@ -515,6 +515,23 @@
         }
       }
     },
+    "%@, in %@" : {
+      "comment" : "Under a space's name in Settings › Spaces, with more than one profile: what the space holds, then the profile it's on, like “3 open tabs, in Work”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, in %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，位于“%2$@”"
+          }
+        }
+      }
+    },
     "%@, pinned tabs hidden" : {
       "comment" : "Accessibility label of the space's name above its pinned tabs, while they're folded away.",
       "localizations" : {
@@ -1667,6 +1684,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "广告拦截"
+          }
+        }
+      }
+    },
+    "Add" : {
+      "comment" : "Button on an extension another profile has, in Settings › Extensions: adds it to the profile shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加"
           }
         }
       }
@@ -6058,6 +6086,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在“文件与文件夹”中找到 Zigzag，然后打开“%@”。完成后回到这里，点按“再次检查”。"
+          }
+        }
+      }
+    },
+    "In Other Profiles" : {
+      "comment" : "A heading in Settings › Extensions: extensions your other profiles have and the one shown doesn't.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其他描述文件中的扩展"
           }
         }
       }
@@ -11746,6 +11785,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "开始朗读"
+          }
+        }
+      }
+    },
+    "Starts fresh here: nothing it stored in another profile comes along." : {
+      "comment" : "Under an extension another profile has, in Settings › Extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在这里全新开始：它在其他描述文件中存储的内容不会带过来。"
           }
         }
       }
