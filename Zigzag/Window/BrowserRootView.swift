@@ -525,12 +525,18 @@ final class BrowserRootView: SpaceFrameView {
     static let addressPlaceChanged = Notification.Name("AddressPlaceChanged")
 
     /// The bar above the page: from the sidebar's edge, or the window's with the sidebar hidden, to the window's right.
-    static func topBarFrame(in bounds: NSRect, sidebarVisible: Bool, sidebarWidth: CGFloat) -> NSRect {
+    /// `inset`: framed, the bar starts the frame's inset down, the top of the card it makes with the page, so its
+    /// buttons and address sit in that card's middle.
+    static func topBarFrame(in bounds: NSRect, sidebarVisible: Bool, sidebarWidth: CGFloat, inset: CGFloat = 0) -> NSRect {
         let x = sidebarVisible ? sidebarWidth : 0
-        return NSRect(x: x, y: 0, width: max(0, bounds.width - x), height: min(bounds.height, TopBarView.height))
+        let y = min(bounds.height, inset)
+        return NSRect(x: x, y: y, width: max(0, bounds.width - x), height: min(bounds.height - y, TopBarView.height))
     }
 
-    var topBarFrame: NSRect { Self.topBarFrame(in: bounds, sidebarVisible: sidebarVisible, sidebarWidth: sidebarWidth) }
+    var topBarFrame: NSRect { Self.topBarFrame(in: bounds, sidebarVisible: sidebarVisible, sidebarWidth: sidebarWidth, inset: topBarInset) }
+
+    /// Framed, the bar is the top of the page's card; borderless or edge to edge, it starts at the window's top.
+    private var topBarInset: CGFloat { isEdgeToEdge || Self.isBorderless ? 0 : Tokens.Metric.cardInset }
 
     var cardFrame: NSRect {
         let whole = pageAreaFrame
@@ -552,12 +558,12 @@ final class BrowserRootView: SpaceFrameView {
     /// The page area as a whole, before a side panel takes its share.
     private var pageAreaFrame: NSRect {
         Self.pageArea(in: bounds, sidebarVisible: sidebarVisible, sidebarWidth: sidebarWidth, edgeToEdge: isEdgeToEdge,
-                      borderless: Self.isBorderless, topBar: showsTopBar)
+                      borderless: Self.isBorderless, topBar: showsTopBar, barInset: topBarInset)
     }
 
     /// Where the pages go. With the bar above the page, they start under it: framed, the bar stands in for the gap
     /// above the page; borderless or edge to edge, the page meets it in a straight line, as Zigzag Mini's meets its strip.
-    static func pageArea(in bounds: NSRect, sidebarVisible: Bool, sidebarWidth: CGFloat, edgeToEdge: Bool, borderless: Bool, topBar: Bool) -> NSRect {
+    static func pageArea(in bounds: NSRect, sidebarVisible: Bool, sidebarWidth: CGFloat, edgeToEdge: Bool, borderless: Bool, topBar: Bool, barInset: CGFloat = 0) -> NSRect {
         let inset = Tokens.Metric.cardInset
         var area: NSRect
         if edgeToEdge {
@@ -570,7 +576,7 @@ final class BrowserRootView: SpaceFrameView {
             area = bounds.insetBy(dx: inset, dy: inset)
         }
         guard topBar else { return area }
-        let top = bounds.minY + min(bounds.height, TopBarView.height)
+        let top = bounds.minY + min(bounds.height, barInset + TopBarView.height)
         area.size.height = max(0, area.maxY - top)
         area.origin.y = top
         return area
@@ -608,9 +614,18 @@ final class BrowserRootView: SpaceFrameView {
     /// Under the bar above the page, the top right corner meets the bar and the window's edge in a line, as the
     /// window's own corner would, so it's square too.
     private func windowCorners(of pane: NSRect, attached: Bool) -> (top: Bool, bottom: Bool) {
-        guard attached, pane.maxX >= bounds.maxX - 1 else { return (false, false) }
+        // Under a bar in the page's color, the bar's corners are the card's, so the page's own top corners are square.
+        guard attached, pane.maxX >= bounds.maxX - 1 else { return (underPaintedBar, false) }
         let top = showsTopBar ? topBarFrame.maxY : bounds.minY
-        return (pane.minY <= top + 1, pane.maxY >= bounds.maxY - 1)
+        return (underPaintedBar || pane.minY <= top + 1, pane.maxY >= bounds.maxY - 1)
+    }
+
+    private var underPaintedBar: Bool { showsTopBar && topBar.pageColor != nil }
+
+    /// The bar above the page in the page's color (`TopBarView.pageColor`), nil for none.
+    func paintTopBar(_ color: NSColor?) {
+        topBar.pageColor = color
+        needsLayout = true
     }
 
     private func layoutCards() {
@@ -622,6 +637,8 @@ final class BrowserRootView: SpaceFrameView {
         let attached = sidebarVisible && Self.isBorderless
         card.squaresRightCorners = windowCorners(of: panes.left, attached: attached)
         secondCard.squaresRightCorners = panes.right.map { windowCorners(of: $0, attached: attached) } ?? (false, false)
+        card.squaresLeftCorners = (underPaintedBar, false)
+        secondCard.squaresLeftCorners = (underPaintedBar, false)
         card.isAttached = attached
         secondCard.isAttached = attached
         if let right = panes.right {
@@ -699,6 +716,10 @@ final class BrowserRootView: SpaceFrameView {
         topBar.frame = topBarFrame
         // The address ends where the page does: at the frame's inset, or near the window's edge when it meets it.
         topBar.trailingInset = max(Tokens.Sidebar.edge, bounds.maxX - pageAreaFrame.maxX)
+        // The page's color over the page's width, framed with the card's top corners.
+        let page = pageAreaFrame
+        topBar.pageSpan = NSRect(x: page.minX - topBar.frame.minX, y: 0, width: page.width, height: topBar.frame.height)
+        topBar.pageRadius = topBarInset > 0 ? Tokens.Radius.card : 0
     }
 
     func setSidebarVisible(_ visible: Bool, animated: Bool) {

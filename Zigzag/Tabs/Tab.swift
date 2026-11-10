@@ -685,6 +685,10 @@ final class Tab: NSObject {
                     self.changed.send(.themeColor)
                 }
             },
+            // A page that turns dark after it loads (Gmail): the bar above the page follows its color.
+            webView.observe(\.underPageBackgroundColor, options: [.new]) { [weak self] _, _ in
+                MainActor.assumeIsolated { self?.changed.send(.themeColor) }
+            },
         ]
         if webView.responds(to: NSSelectorFromString("_isPlayingAudio")) {
             webView.addObserver(self, forKeyPath: "_isPlayingAudio", options: [.new], context: nil)
