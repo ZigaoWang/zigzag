@@ -65,15 +65,13 @@ final class Profiles {
 
     /// Every profile, the first one first.
     var all: [Profile] { Library.shared.profiles.map { profile($0.id) } }
-    /// The profiles something has used since Zigzag started: the ones whose stores exist to be tidied. Asking for
-    /// `all` would make a store for each profile, opened or not.
-    var opened: [Profile] { [`default`] + Library.shared.profiles.compactMap { others[$0.id] } }
+    /// The profiles whose store something has used since Zigzag started: the ones there is anything to tidy in.
+    var opened: [Profile] { all.filter { $0.isDefault || $0.storeIfMade != nil } }
 
     /// The profile with this ID. One that's gone, or was never there, is the first profile.
     func profile(_ id: UUID) -> Profile {
         guard id != Profile.defaultID, Library.shared.directory.profile(id) != nil else { return `default` }
         if let known = others[id] { return known }
-        // WebKit keeps a store for each identifier, made the first time it's asked for.
         let made = Profile(id: id)
         others[id] = made
         return made
@@ -87,6 +85,12 @@ final class Profiles {
 
     func profile(ofStore store: WKWebsiteDataStore) -> Profile? { all.first { $0.storeIfMade === store } }
 
+    /// The profile a page is in: its tab's, or for a page that isn't a tab's (a pop-up window), the one it was made
+    /// in; the first for a page that's in none. Where a page's history is looked up.
+    func profile(ofPage webView: WKWebView?) -> Profile {
+        (webView as? BrowserWebView)?.owner?.profile ?? webView.flatMap { profile(of: $0) } ?? `default`
+    }
+
     // MARK: Removing a profile
 
     /// Removes a profile and everything it kept: its extensions and what they stored, its sign-ins and website
@@ -98,12 +102,15 @@ final class Profiles {
     func remove(_ id: UUID) async {
         guard id != Profile.defaultID, Library.shared.directory.profile(id) != nil else { return }
         let profile = profile(id)
+        // Never the first profile, whatever was asked for: its folder is all of Zigzag's data.
+        guard !profile.isDefault else { return }
         let had = profile.installs.installedIDs
-        // From here it's in no list: its spaces are on the first profile, and their pages are rebuilt there.
-        Library.shared.removeProfile(id)
+        // From here it's in no list: its spaces are on the first profile, and their pages are rebuilt there. Nothing
+        // is erased unless that's on disk.
+        guard Library.shared.removeProfile(id) else { return }
         others[id] = nil
         for popup in PopupWindowController.all where popup.webView.configuration.websiteDataStore === profile.storeIfMade { popup.window?.close() }
-        for mini in MiniWindowController.all { mini.tab.settleProfile() }
+        for mini in MiniWindowController.all { mini.settleProfile() }
         if let host = profile.startedExtensions { await host.shutDown() }
         profile.installs.removeAll()
         try? FileManager.default.removeItem(at: profile.folder)
@@ -117,7 +124,8 @@ final class Profiles {
 
     /// At launch, before anything has opened their stores: the profiles whose removal isn't finished.
     static func finishRemovals() {
-        let waiting = Library.shared.directory.deleting.map(\.id)
+        // Never the first profile, and never one that's listed as in use.
+        let waiting = Library.shared.directory.deleting.map(\.id).filter { $0 != Profile.defaultID && Library.shared.directory.profile($0) == nil }
         guard !waiting.isEmpty else { return }
         Task {
             for id in waiting {
@@ -126,12 +134,17 @@ final class Profiles {
                 UserDefaults.standard.removeObject(forKey: "ExtensionsPinned.\(id.uuidString)")
                 await eraseStore(id)
             }
+            // A removal cut short didn't get to the packages only that profile had.
+            for id in ExtensionStore.packageIDs where ExtensionStore.profiles(with: id).isEmpty && !ExtensionStore.isUnpacked(id) {
+                try? FileManager.default.removeItem(at: ExtensionStore.folder(for: id))
+            }
         }
     }
 
     /// Has WebKit remove a profile's store, then removes what WebKit leaves of its extensions' storage. Only then
     /// is the removal done; if WebKit won't yet, it stays written down for the next start.
     private static func eraseStore(_ id: UUID) async {
+        guard id != Profile.defaultID else { return }
         do {
             try await WKWebsiteDataStore.remove(forIdentifier: id)
         } catch {

@@ -419,6 +419,8 @@ final class Library {
 
     /// Fires whenever spaces or bookmarks change.
     let changed = Signal<Void>()
+    /// Whether the library was read from its file, not started afresh (a first run, or a file that couldn't be read).
+    private let wasRead: Bool
 
     private init() {
         directory = FileManager.default.fileExists(atPath: Paths.profiles.path) ? JSONStore.load(ProfileDirectory.self, from: Paths.profiles) ?? ProfileDirectory() : ProfileDirectory()
@@ -429,7 +431,11 @@ final class Library {
             favoriteSplits = stored.favoriteSplits ?? []
             searchEngine = stored.searchEngine
             importedFromArc = stored.importedFromArc ?? false
+            wasRead = true
+            // What an older Zigzag may have left that this one doesn't allow.
+            tidyFavorites()
         } else {
+            wasRead = false
             spaces = [SpaceInfo(name: String(localized: "Personal", comment: "The name of the first space in a new Zigzag. People can rename it."), color: .sky)]
             searchEngine = .google
             importedFromArc = false
@@ -447,10 +453,8 @@ final class Library {
         saveDebouncer.cancel()
         JSONStore.save(Stored(spaces: spaces, favorites: favorites, favoriteSplits: favoriteSplits.isEmpty ? nil : favoriteSplits,
                               searchEngine: searchEngine, importedFromArc: importedFromArc), to: Paths.library)
-        if directory != savedDirectory {
-            JSONStore.save(directory, to: Paths.profiles)
-            savedDirectory = directory
-        }
+        // Only what reached the disk counts as saved: a write that failed is tried again with the next save.
+        if directory != savedDirectory, JSONStore.save(directory, to: Paths.profiles) { savedDirectory = directory }
     }
 
     private func commit() {
@@ -768,7 +772,10 @@ final class Library {
         let ids = Set(favorites.map(\.id))
         var paired: Set<UUID> = []
         favoriteSplits = favoriteSplits.filter { split in
+            // Both of one profile: an older Zigzag, which shows every profile's favorites together, can pair two
+            // that aren't, and half of such a pair would show in neither profile.
             guard split.left != split.right, ids.contains(split.left), ids.contains(split.right),
+                  directory.profileID(ofFavorite: split.left) == directory.profileID(ofFavorite: split.right),
                   !paired.contains(split.left), !paired.contains(split.right) else { return false }
             paired.formUnion([split.left, split.right])
             return true
@@ -1369,14 +1376,24 @@ final class Library {
     /// Takes a profile out of the list, leaving its data to be erased (Profiles). Its spaces move to the first
     /// profile; its favorites go with it. Written at once: from here on, a removal that's interrupted is finished
     /// at the next start.
-    func removeProfile(_ id: UUID) {
-        guard directory.profile(id)?.isDefault == false else { return }
+    ///
+    /// False, with nothing changed, when that couldn't be written (a full disk): erasing its data then would leave
+    /// a profile that comes back at the next start with its passwords and history gone.
+    @discardableResult
+    func removeProfile(_ id: UUID) -> Bool {
+        guard directory.profile(id)?.isDefault == false else { return false }
+        let before = (directory, favorites, favoriteSplits)
         let gone = Set(favorites(in: id).map(\.id))
         favorites.removeAll { gone.contains($0.id) }
         tidyFavorites()
         directory.remove(id)
         saveNow()
+        guard savedDirectory == directory else {
+            (directory, favorites, favoriteSplits) = before
+            return false
+        }
         changed.send()
+        return true
     }
 
     /// A removed profile's data is erased.
@@ -1385,9 +1402,12 @@ final class Library {
         saveNow()
     }
 
-    /// At launch: spaces that are gone are forgotten.
+    /// At launch: spaces and favorites that are gone are forgotten. Not when the library couldn't be read and was
+    /// set aside: put back, its spaces must find their profiles as they left them. A space that's gone but has
+    /// archived tabs is remembered while it has them, so they stay its profile's.
     func pruneProfileAssignments() {
-        directory.prune(keeping: Set(spaces.map(\.id)), favorites: Set(favorites.map(\.id)))
+        guard wasRead else { return }
+        directory.prune(keeping: Set(spaces.map(\.id)).union(TabArchive.shared.entries.map(\.spaceID)), favorites: Set(favorites.map(\.id)))
         save()
     }
 

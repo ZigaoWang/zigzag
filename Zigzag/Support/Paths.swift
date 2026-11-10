@@ -58,14 +58,18 @@ nonisolated enum JSONStore {
         try? FileManager.default.moveItem(at: url, to: aside)
     }
 
-    static func save<T: Encodable>(_ value: T, to url: URL) {
+    /// Whether it was written: for what must be on disk before something that can't be undone goes ahead.
+    @discardableResult
+    static func save<T: Encodable>(_ value: T, to url: URL) -> Bool {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .secondsSince1970
-        guard let data = try? encoder.encode(value) else { return }
+        guard let data = try? encoder.encode(value) else { return false }
         do {
             try data.write(to: url, options: .atomic)
+            return true
         } catch {
             tellOnce(error)
+            return false
         }
     }
 

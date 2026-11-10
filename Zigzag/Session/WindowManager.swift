@@ -345,7 +345,14 @@ final class WindowManager {
             }
             for bookmarkState in windowState.bookmarkTabs {
                 let isFavorite = Library.shared.isFavorite(bookmarkState.bookmarkID)
-                guard let spaceID = Library.shared.spaceID(ofBookmark: bookmarkState.bookmarkID) ?? (isFavorite ? windowState.currentSpaceID : nil) else { continue }
+                // A favorite's page comes back in a space of the favorite's own profile: the one the window was in if
+                // that's on it, else that profile's first.
+                let favoriteSpace: UUID? = isFavorite ? {
+                    let home = Library.shared.profileID(ofFavorite: bookmarkState.bookmarkID)
+                    if Library.shared.profileID(ofSpace: windowState.currentSpaceID) == home { return windowState.currentSpaceID }
+                    return Library.shared.spaces(in: home).first?.id ?? windowState.currentSpaceID
+                }() : nil
+                guard let spaceID = Library.shared.spaceID(ofBookmark: bookmarkState.bookmarkID) ?? favoriteSpace else { continue }
                 let tab = restoreTab(bookmarkState.tab, spaceID: spaceID, history: history[bookmarkState.tab.id])
                 tab.isFavorite = isFavorite
                 manager.adoptBookmarkTab(tab, bookmarkID: bookmarkState.bookmarkID)

@@ -120,6 +120,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         tokens.append(tab.changed.observe { [weak self] change in self?.tabChanged(change) })
         // The space's color or name changed, or the space went: the window follows, as a browser window does.
         tokens.append(Library.shared.changed.observe { [weak self] in
+            self?.settleProfile()
             self?.paint(animated: true)
             self?.refreshStrip()
         })
@@ -191,14 +192,22 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     private func choose(space id: UUID) {
         guard id != tab.spaceID, Library.shared.space(id) != nil else { return }
-        // To a space on another profile, the page is rebuilt there: this window is then that profile's
-        // extensions' to know, not the one it left.
-        let crossing = Library.shared.profileID(ofSpace: id) != tab.profile.id
-        if #available(macOS 15.4, *), crossing { ExtensionCenter.miniClosed(self) }
-        tab.setSpace(id)
-        if #available(macOS 15.4, *), crossing { ExtensionCenter.miniOpened(self) }
+        move(to: Profiles.shared.profile(forSpace: id)) { tab.setSpace(id) }
         paint(animated: true)
         refreshStrip()
+    }
+
+    /// Its space was put on another profile, or its profile was removed: the page is rebuilt where it now belongs,
+    /// as a browser window's tabs are.
+    func settleProfile() { move(to: tab.homeProfile) { tab.settleProfile() } }
+
+    /// Does something that takes the page to `target`'s profile. If that's another profile, this window is then
+    /// that profile's extensions' to know, not the one it left: it closes for one set and opens for the other.
+    private func move(to target: Profile, _ change: () -> Void) {
+        let crossing = target !== tab.profile
+        if #available(macOS 15.4, *), crossing { ExtensionCenter.miniClosed(self) }
+        change()
+        if #available(macOS 15.4, *), crossing { ExtensionCenter.miniOpened(self) }
     }
 
     // MARK: Coming and going

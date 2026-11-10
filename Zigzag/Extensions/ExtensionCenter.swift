@@ -26,8 +26,10 @@ enum ExtensionCenter {
 
     // MARK: Tabs
 
-    /// A tab is told to its profile's extensions once, and its closing to the extensions that were told of it: a
-    /// tab that changes profile closes for one set and opens for the other.
+    /// A tab is told to its profile's extensions once, and its closing to the extensions that know of it: a tab
+    /// that changes profile closes for one set and opens for the other. Extensions also come to know a tab that
+    /// was never announced (a pinned page opened, a tab brought back) by its being shown or listed, so its closing
+    /// is told to its profile's extensions all the same, as long as they're up.
     static func tabOpened(_ tab: Tab) {
         guard let host = tab.extensionHost, tab.toldTo !== host else { return }
         tab.toldTo?.tabClosed(tab)
@@ -36,7 +38,8 @@ enum ExtensionCenter {
     }
 
     static func tabClosed(_ tab: Tab, windowClosing: Bool = false) {
-        tab.toldTo?.tabClosed(tab, windowClosing: windowClosing)
+        let known = tab.toldTo ?? (tab.isPrivate ? nil : tab.profile.startedExtensions)
+        known?.tabClosed(tab, windowClosing: windowClosing)
         tab.toldTo = nil
     }
     static func tabActivated(_ tab: Tab, previous: Tab?) { tab.extensionHost?.tabActivated(tab, previous: previous) }

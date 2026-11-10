@@ -40,7 +40,8 @@ final class Tab: NSObject {
     /// The space it's in. Changed only through `setSpace`, the one place that can see a tab change profile.
     private(set) var spaceID: UUID
     /// Set when this tab is the live page behind a bookmark. Such tabs live in the bookmark row, not the tab list.
-    var bookmarkID: UUID?
+    /// A favorite's page belongs in the favorite's profile, which is known only once this is.
+    var bookmarkID: UUID? { didSet { if bookmarkID != oldValue, isFavorite { settleProfile() } } }
     /// Set when this tab is the live page behind a favorite tile.
     var isFavorite = false { didSet { if isFavorite != oldValue { settleProfile() } } }
 
@@ -92,7 +93,8 @@ final class Tab: NSObject {
     /// Makes sure its page is in its space's profile, rebuilding it there if the space changed profile or the tab
     /// changed space. A private tab's page is in its window's own store, whatever the space.
     func settleProfile() {
-        guard !isPrivate else { return }
+        // A private page stays in its window's store; what it's offered (saved logins) is still its space's profile's.
+        guard !isPrivate else { profile = Profiles.shared.profile(forSpace: spaceID); return }
         let wanted = homeProfile
         if wanted !== profile { rehome(to: wanted) }
     }
@@ -110,7 +112,8 @@ final class Tab: NSObject {
     /// list. What the page held that wasn't saved (a form half filled in) is lost, as on a reload.
     private func rehome(to new: Profile) {
         let wasLive = webView != nil
-        let wasTold = toldTo != nil
+        // The profile it leaves hears it close, whether or not its extensions were ever told it opened: they may
+        // know it from having listed it.
         if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(self) }
         if let webView {
             pendingInteractionState = webView.interactionState as? Data
@@ -120,7 +123,7 @@ final class Tab: NSObject {
         // A configuration WebKit handed over belongs to the profile of the page that asked for it.
         pendingConfiguration = nil
         profile = new
-        if #available(macOS 15.4, *), wasTold {
+        if #available(macOS 15.4, *), !isPrivate {
             ExtensionCenter.tabOpened(self)
             if (host as? BrowserWindowController)?.tabManager.selectedTab === self { ExtensionCenter.tabActivated(self, previous: nil) }
         }
@@ -463,7 +466,7 @@ final class Tab: NSObject {
 
     /// The profile a page is in: its tab's, or for a page that isn't a tab's (a pop-up window), the one it was made in.
     private static func profile(of webView: WKWebView) -> Profile {
-        (webView as? BrowserWebView)?.owner?.profile ?? Profiles.shared.profile(of: webView) ?? Profiles.shared.default
+        Profiles.shared.profile(ofPage: webView)
     }
 
     /// Starts this tab with another tab's back/forward list, then navigates: used for search folding.
