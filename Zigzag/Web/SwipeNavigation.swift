@@ -5,7 +5,8 @@ import WebKit
 /// the page's edge as you swipe, fills once you've gone far enough, and letting go moves at once, with no slow
 /// slide of the whole page. A page that can scroll sideways where you are (a carousel, a map, a wide table) keeps
 /// the swipe for itself, and so does one that handles the scroll itself (Canva, Figma, Google Maps pan with their own
-/// code): as in Safari and Chrome, the page sees the swipe's first steps and answers before anything moves. The
+/// code) or asks for no overscroll (`overscroll-behavior-x`), in whichever frame the swipe lands (Excel's sheet is in
+/// one): as in Safari and Chrome, the page sees the swipe's first steps and answers before anything moves. The
 /// system's "Swipe between pages" setting is respected, and Settings › Tabs can turn swiping off in Zigzag alone.
 @MainActor
 final class SwipeNavigator {
@@ -27,10 +28,17 @@ final class SwipeNavigator {
     private var direction = 0
     /// What the page can scroll sideways under the pointer, once the page has answered.
     private var pageScrolls: (left: Bool, right: Bool)?
+    /// The pointer is over a frame: only the page inside can say whether it keeps the swipe.
+    private var overFrame = false
     /// Whether the page kept this gesture's sideways scrolls for itself (SwipeAnswers), once it has said.
     private var page = SwipeDecision.Page.unknown
     /// When the gesture began, to wait a moment for the page's answer and no longer.
     private var began: TimeInterval = 0
+    /// The same moment as wall-clock milliseconds, the time the page's answers carry: one about an earlier gesture's
+    /// scrolls (its momentum) arriving now isn't about this one.
+    private var beganAt: Double = 0
+    /// Counts gestures, so the probe's answer for one that's over is dropped.
+    private var gesture = 0
     /// Something covering the page has this gesture (a zoomed-in PDF), and says what room it has.
     private var covered = false
     private var armed = false
@@ -82,8 +90,10 @@ final class SwipeNavigator {
             stopWatchingRest()
             guard webView.window != nil else { state = .idle; return false }
             state = .deciding
-            dx = 0; dy = 0; direction = 0; armed = false; pageScrolls = nil; samples = []
+            dx = 0; dy = 0; direction = 0; armed = false; pageScrolls = nil; overFrame = false; samples = []
             began = event.timestamp
+            beganAt = (Date().timeIntervalSince1970 - (ProcessInfo.processInfo.systemUptime - event.timestamp)) * 1000
+            gesture += 1
             // Something covering the page has the scroll, not the page: what it says is its room.
             covered = room != nil
             page = covered ? .left : .unknown
@@ -102,7 +112,7 @@ final class SwipeNavigator {
             case .deciding:
                 switch SwipeDecision.decide(dx: dx, dy: dy, canGoBack: webView.owner?.canGoBackOrReturn ?? webView.canGoBack,
                                             canGoForward: webView.canGoForward, pageScrolls: pageScrolls, page: page,
-                                            waited: event.timestamp - began) {
+                                            waited: event.timestamp - began, overFrame: overFrame) {
                 case .undecided:
                     return false
                 case .ignore:
@@ -142,13 +152,14 @@ final class SwipeNavigator {
         }
     }
 
-    /// The page's answer for this gesture's sideways scrolls: whether it called preventDefault() on them.
-    func pageAnswered(took: Bool) {
+    /// The page's answer for one of this gesture's sideways scrolls, from the frame it landed in: whether it keeps
+    /// them (`kept`). `at` is when that scroll came, in wall-clock milliseconds.
+    func pageAnswered(kept: Bool, at: Double) {
         // Covered by something else (a zoomed-in PDF), the page isn't what's scrolling.
-        guard !covered, state == .deciding || state == .tracking, page != .took else { return }
-        page = took ? .took : .left
+        guard !covered, state == .deciding || state == .tracking else { return }
+        page = SwipeDecision.page(page, answered: kept, at: at, began: beganAt)
         // It took it after all, answering after the swipe had started: the arrow goes and the page has the rest.
-        if took, state == .tracking { cancel(); state = .ignoring }
+        if page == .took, state == .tracking { cancel(); state = .ignoring }
     }
 
     private var progress: CGFloat { max(0, CGFloat(-direction) * dx) / Self.threshold }
@@ -200,29 +211,29 @@ final class SwipeNavigator {
         return direction < 0 ? pageScrolls.left : pageScrolls.right
     }
 
-    /// Asks the page whether anything under the pointer (or the page itself) can scroll sideways, and which way.
+    /// Asks the page, before the gesture's first scroll reaches it, whether anything under the pointer (or the page
+    /// itself) can scroll sideways and which way, whether it asked for no overscroll, and whether the pointer is over
+    /// a frame, which only the frame's own answer can speak for.
     private func probe(at point: NSPoint) {
         guard let webView else { return }
         let zoom = webView.pageZoom
         let x = point.x / zoom, y = (webView.isFlipped ? point.y : webView.bounds.height - point.y) / zoom
         let script = """
         (() => {
-          let left = false, right = false;
-          for (let el = document.elementFromPoint(\(x), \(y)); el; el = el.parentElement) {
-            const style = getComputedStyle(el);
-            const scrolls = /(auto|scroll)/.test(style.overflowX) && el.scrollWidth > el.clientWidth + 24;
-            if (scrolls) { left = left || el.scrollLeft > 0; right = right || el.scrollLeft + el.clientWidth < el.scrollWidth - 1; }
-          }
-          // The page itself only counts when it's really wide: many are a few pixels too wide by accident.
-          const root = document.scrollingElement;
-          if (root && root.scrollWidth > root.clientWidth + 80) { left = left || root.scrollLeft > 0; right = right || root.scrollLeft + root.clientWidth < root.scrollWidth - 1; }
-          return [left, right];
+          const el = document.elementFromPoint(\(x), \(y));
+          const room = (\(SwipeAnswers.sideways))(el, getComputedStyle, document.scrollingElement, [document.documentElement, document.body]);
+          return [room.left, room.right, !!el && /^(IFRAME|FRAME|EMBED|OBJECT)$/.test(el.tagName), room.still];
         })()
         """
+        let gesture = gesture
         webView.evaluateJavaScript(script, in: nil, in: .defaultClient) { [weak self] result in
-            guard case .success(let value) = result, let pair = value as? [Bool], pair.count == 2 else { return }
+            guard let self, self.gesture == gesture, !self.covered,
+                  case .success(let value) = result, let answer = value as? [Bool], answer.count == 4 else { return }
             // Swiping toward "back" moves the view left, so it's the page's room to the left that matters.
-            self?.pageScrolls = (pair[0], pair[1])
+            self.pageScrolls = (answer[0], answer[1])
+            self.overFrame = answer[2]
+            // The page asked for no overscroll: like a page that cancels the scrolls, it keeps the gesture.
+            if answer[3] { self.pageAnswered(kept: true, at: .infinity) }
         }
     }
 
@@ -310,12 +321,27 @@ enum SwipeDecision: Equatable {
     /// How long a swipe waits for the page to answer before going on without it. Pages answer well within this,
     /// so on most a swipe never waits; one too busy to answer can still take it back late.
     static let answerWait: TimeInterval = 0.05
+    /// Over a frame (a web app's sheet or editor) only the frame can answer, and a busy app takes longer: Chrome
+    /// doesn't go back before it has. Also while it's not yet known what's under the pointer.
+    static let frameWait: TimeInterval = 0.12
+
+    /// What the page did with the gesture once a frame answers that it kept (`kept`) or left a scroll that came at
+    /// `at`, for a gesture that began at `began` (both wall-clock milliseconds).
+    static func page(_ page: Page, answered kept: Bool, at: Double, began: Double) -> Page {
+        // About an earlier gesture (its momentum, answered late): not this one's.
+        guard at >= began - 1, page != .took else { return page }
+        // Kept once, it's the page's for the rest of the gesture: a sheet that had room when the gesture started
+        // stays the page's after this same gesture scrolls it to its edge, as in Chrome.
+        return kept ? .took : .left
+    }
 
     /// `pageScrolls` is the room the page (or what covers it) can still scroll sideways under the pointer, once known;
-    /// `waited`, the time since the gesture began.
+    /// `waited`, the time since the gesture began; `overFrame`, that the pointer is over a frame in the page.
     static func decide(dx: CGFloat, dy: CGFloat, canGoBack: Bool, canGoForward: Bool,
-                       pageScrolls: (left: Bool, right: Bool)?, page: Page, waited: TimeInterval) -> SwipeDecision {
-        // A page that pans with its own code (a canvas, a map) has the gesture, as in Safari and Chrome.
+                       pageScrolls: (left: Bool, right: Bool)?, page: Page, waited: TimeInterval,
+                       overFrame: Bool = false) -> SwipeDecision {
+        // A page that pans with its own code (a canvas, a map), scrolls there, or asked for no overscroll has the
+        // gesture, as in Safari and Chrome.
         if page == .took { return .ignore }
         guard abs(dx) > 10 || abs(dy) > 10 else { return .undecided }
         // Mostly sideways is enough: a natural swipe is rarely dead level.
@@ -325,38 +351,85 @@ enum SwipeDecision: Equatable {
         // Swiping toward "back" moves the view left, so it's the page's room to the left that matters.
         let pageTakes = pageScrolls.map { wanted < 0 ? $0.left : $0.right } ?? false
         guard sideways, canGo, !pageTakes else { return .ignore }
-        if page == .unknown, waited < answerWait { return .undecided }
+        if page == .unknown, waited < (overFrame || pageScrolls == nil ? frameWait : answerWait) { return .undecided }
         return .track(wanted)
     }
 }
 
-/// The page's side of a swipe: whether it calls preventDefault() on the wheel events of a sideways scroll, as Canva,
-/// Figma, Google Maps and Sheets do to pan or scroll with their own code. Safari and Chrome only go back when it
-/// doesn't. Zigzag's own script world sees the page's events (and when they're cancelled) while the page can't see
-/// it or speak for it; it says so for sideways scrolls only, at most every 100 ms each way.
+/// The page's side of a swipe, from inside whichever frame it lands in (Excel's sheet is in one, which the page
+/// around it can't see into): whether the page keeps the gesture's sideways scrolls, as Safari and Chrome would let
+/// it. It does when it calls preventDefault() on them, as Canva, Figma, Google Maps and Sheets do to pan or scroll
+/// with their own code, when something under the pointer can still scroll that way, or when it asked for no
+/// overscroll (`overscroll-behavior-x: none` or `contain`). Zigzag's own script world sees the page's events (and
+/// when they're cancelled) while the page can't see it or speak for it; it says so for sideways scrolls only.
 final class SwipeAnswers: NSObject, WKScriptMessageHandler {
     static let shared = SwipeAnswers()
     static let messageName = "zigzagWheelTaken"
 
+    /// A function of the element under the pointer: which way it, the things around it, or the page itself can
+    /// still scroll sideways (`left`, `right`), and whether one asked not to pass its overscroll on (`still`).
+    /// `style` is getComputedStyle; `root`, the page's scrolling element; `ends`, its root and body.
+    static let sideways = """
+    (el, style, root, ends) => {
+      let left = false, right = false, still = false;
+      const room = (box, rtl) => {
+        const max = box.scrollWidth - box.clientWidth, at = rtl ? max + box.scrollLeft : box.scrollLeft;
+        left = left || at > 0.5; right = right || at < max - 1;
+      };
+      for (; el; el = el.parentElement || (el.parentNode && el.parentNode.host) || null) {
+        if (el.nodeType === 3) continue;
+        const s = style(el);
+        const scrollsX = /(auto|scroll|overlay)/.test(s.overflowX) && el.scrollWidth > el.clientWidth;
+        const scrollsY = /(auto|scroll|overlay)/.test(s.overflowY) && el.scrollHeight > el.clientHeight;
+        // A few pixels too wide is usually by accident.
+        if (scrollsX && el.scrollWidth > el.clientWidth + 24) room(el, s.direction === 'rtl');
+        // Something that scrolls and asked to keep its overscroll: the gesture never goes past it.
+        if ((scrollsX || scrollsY) && /(none|contain)/.test(s.overscrollBehaviorX)) still = true;
+      }
+      // The page itself only counts when it's really wide: many are a few pixels too wide by accident.
+      if (root && root.scrollWidth > root.clientWidth + 80) room(root, style(root).direction === 'rtl');
+      // The page's own setting is what turns off going back and forward.
+      for (const end of ends) if (end && /(none|contain)/.test(style(end).overscrollBehaviorX)) still = true;
+      return { left, right, still };
+    }
+    """
+
+    /// Whether the page keeps a sideways scroll of `deltaX` (the page's sign: negative moves toward its left edge),
+    /// given its room and whether it cancelled it.
+    static let keeps = """
+    (room, deltaX, prevented) => prevented || !!room && (room.still || (deltaX < 0 ? room.left : room.right))
+    """
+
     static let script = WKUserScript(source: """
     (() => {
-      let tookAt = -1e9, leftAt = -1e9;
+      const sideways = \(sideways), keeps = \(keeps);
+      let sent = null, sentAt = -1e9, lastAt = -1e9;
       window.addEventListener('wheel', (e) => {
         if (!e.isTrusted || e.ctrlKey || e.deltaX === 0 || Math.abs(e.deltaX) < Math.abs(e.deltaY)) return;
+        const now = performance.now(), fresh = now - lastAt > 80;
+        lastAt = now;
+        // The room there is now, before the page's listeners or the scroll itself have moved anything.
+        let room = null;
+        try { room = sideways(e.composedPath()[0] || e.target, getComputedStyle, document.scrollingElement, [document.documentElement, document.body]); } catch (_) {}
+        // When the scroll came, in wall-clock time: Zigzag drops answers about an earlier gesture.
+        const age = now - e.timeStamp, at = Date.now() - (age >= 0 && age < 2000 ? age : 0);
         // Once the page's own listeners have all had it.
         setTimeout(() => {
-          const took = e.defaultPrevented, now = performance.now();
-          if (now - (took ? tookAt : leftAt) < 100) return;
-          if (took) tookAt = now; else leftAt = now;
-          try { window.webkit.messageHandlers.\(messageName).postMessage(took); } catch (_) {}
+          const kept = keeps(room, e.deltaX, e.defaultPrevented), later = performance.now();
+          // The first of a gesture always; then on a change, or every 40 ms.
+          if (!fresh && kept === sent && later - sentAt < 40) return;
+          sent = kept; sentAt = later;
+          try { window.webkit.messageHandlers.\(messageName).postMessage({ kept, at }); } catch (_) {}
         }, 0);
       }, { capture: true, passive: true });
     })();
     """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .defaultClient)
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.name == Self.messageName, let took = message.body as? Bool, let webView = message.webView as? BrowserWebView else { return }
-        webView.pageAnsweredSwipe(took: took)
+        // From any frame: one in a frame is the page's answer as much as one from the page around it.
+        guard message.name == Self.messageName, let body = message.body as? [String: Any], let kept = body["kept"] as? Bool,
+              let at = body["at"] as? Double, let webView = message.webView as? BrowserWebView else { return }
+        webView.pageAnsweredSwipe(kept: kept, at: at)
     }
 }
 

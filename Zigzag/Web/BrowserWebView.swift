@@ -10,8 +10,8 @@ final class BrowserWebView: WKWebView {
     /// unless it can still scroll that way (`room`).
     func handleSwipe(_ event: NSEvent, room: (left: Bool, right: Bool)) -> Bool { swipe.handle(event, room: room) }
 
-    /// The page kept a sideways scroll for itself (`took`), or left it (SwipeAnswers).
-    func pageAnsweredSwipe(took: Bool) { swipe.pageAnswered(took: took) }
+    /// The page, in some frame, kept a sideways scroll from `at` (wall-clock ms) for itself, or left it (SwipeAnswers).
+    func pageAnsweredSwipe(kept: Bool, at: Double) { swipe.pageAnswered(kept: kept, at: at) }
 
     /// Covered by the PDF viewer or Settings: typing (arrows, space, ⌘F's text) goes to that instead.
     override func becomeFirstResponder() -> Bool {
