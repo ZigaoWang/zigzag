@@ -114,13 +114,17 @@ final class SitePanel: FloatingPanelView {
         let anchorFrame = anchor.convert(anchor.bounds, to: controller.root.overlay)
         // From the address bar in the sidebar: its width and left edge, just below it. With the sidebar slid out or
         // hidden it's the same width (the address keeps its width off screen), so it never grows past the sidebar.
-        panel.width = anchorFrame.width > 0 ? anchorFrame.width : controller.root.sidebarWidth - Tokens.Metric.sidebarPadding * 2
-        if controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible {
+        // From the address above the page, the sidebar's width, under the address's end where its button is.
+        let aboveThePage = anchor.isDescendant(of: controller.root.topBar)
+        let sidebarLane = controller.root.sidebarWidth - Tokens.Metric.sidebarPadding * 2
+        panel.width = anchorFrame.width > 0 && !aboveThePage ? anchorFrame.width : sidebarLane
+        if controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible, !aboveThePage {
             // The same glass panel as Downloads over the sidebar's lane, with the tabs under it faded back.
             panel.recedes = [controller.sidebar.list]
         }
         panel.frame.size = NSSize(width: panel.width, height: panel.layoutContent(dryRun: true))
-        panel.frame.origin = NSPoint(x: max(Tokens.Metric.cardInset, anchorFrame.minX), y: anchorFrame.maxY + 4)
+        let x = aboveThePage ? anchorFrame.maxX - panel.width : anchorFrame.minX
+        panel.frame.origin = NSPoint(x: max(Tokens.Metric.cardInset, x), y: anchorFrame.maxY + 4)
         controller.root.overlay.addSubview(panel)
         panel.needsLayout = true
         // Out of the button that opened it (the site controls, at the address's right end), not a corner.

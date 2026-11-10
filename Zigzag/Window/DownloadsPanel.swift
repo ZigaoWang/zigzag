@@ -294,9 +294,10 @@ final class DownloadsPanelView: FloatingPanelView {
     /// Lined up with the sidebar's rows: the same left and right edges, so it never spills onto the page.
     private var sidebarLane: (x: CGFloat, width: CGFloat)? {
         guard let controller else { return nil }
-        // The address bar's edges, the same as the site panel's.
-        let address = controller.sidebar.address.convert(controller.sidebar.address.bounds, to: controller.root.overlay)
-        return (address.minX, address.width)
+        // The address bar's edges in the sidebar, the same as the site panel's, wherever the address is.
+        let sidebar = controller.sidebar.convert(controller.sidebar.bounds, to: controller.root.overlay)
+        let edge = Tokens.Sidebar.edge
+        return (sidebar.minX + edge, sidebar.width - edge * 2)
     }
 
     init(controller: BrowserWindowController) {
