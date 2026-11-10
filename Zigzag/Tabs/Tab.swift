@@ -67,6 +67,8 @@ final class Tab: NSObject {
     private var pageIsGet = true
     /// Settings, over the page while the tab is at zigzag://settings; nil for any other page.
     private(set) var settingsView: SettingsView?
+    /// The profile Settings was asked to show before this tab had its page: shown once it has.
+    private var settingsProfileAsked: UUID?
     private(set) var isPlayingAudio = false
     private(set) var isMuted = false
     private(set) var hasLoadedOnce = false
@@ -1303,12 +1305,15 @@ extension Tab {
             }
             return
         }
-        let pane = SettingsPage.pane(for: url)
+        // Website Data is part of Privacy until there's a second profile.
+        let pane = SettingsPage.pane(for: url).shown(manyProfiles: Library.shared.hasManyProfiles)
         if let settingsView {
             if settingsView.pane != pane { settingsView.show(pane) }
             return
         }
         let view = SettingsView(pane: pane)
+        if let asked = settingsProfileAsked { view.choose(profile: asked) }
+        settingsProfileAsked = nil
         view.onPaneChange = { [weak self] pane in self?.settingsAddressFollows(pane) }
         settingsView = view
         changed.send(.settings)
@@ -1319,6 +1324,11 @@ extension Tab {
         guard let settingsView else { load(SettingsPage.url(for: pane)); return }
         settingsView.show(pane)
         settingsAddressFollows(pane)
+    }
+
+    /// Shows a profile's things in the Settings this tab shows, now or once its page is there.
+    func showSettings(of profile: UUID) {
+        if let settingsView { settingsView.choose(profile: profile) } else { settingsProfileAsked = profile }
     }
 
     /// The address names the section, without adding a page to Back and Forward, so the tab comes back to it.

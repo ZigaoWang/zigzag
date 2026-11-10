@@ -303,7 +303,9 @@ something came from, answers at once, and can be interrupted.
   list is taller than the window. Press and drag to an item to choose in one movement. With the keyboard, Space,
   Return, Up or Down opens it. VoiceOver: a pop-up button whose value is the choice. `actions` are items after a
   separator that do something and choose nothing ("New Profile…"). A choice of profile is filled by
-  `ProfileChoice`, each profile with its tile, wherever one is asked for.
+  `ProfileChoice`, each profile with its tile, wherever one is asked for. `showsPictureOnly` leaves only the
+  choice's picture where there's no room for its name (Settings' profile menu beside the search on a narrow
+  page); the name is then its tooltip and its VoiceOver value.
 - **Card**: the chosen thing in a list (`applyRowStyle`, `GlassTile` when selected).
 - **Row** (`CardRow`): icon, title, quiet trailing detail; states above.
 - **Tile** (`GlassTile`): soft glass, `Radius.tile`; a fine darker edge (`openEdge`) when its page is open.

@@ -445,7 +445,9 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
 /// its name in the page's address (zigzag://settings/privacy), which a tab keeps with the session: a pane can be
 /// added anywhere in the column, but a name never changes.
 enum SettingsPane: String, CaseIterable {
-    case general, appearance, tabs, spaces, profiles, search, mini, passwords, privacy, translation, extensions, shortcuts
+    case general, appearance, tabs, spaces, profiles, search, mini, passwords, privacy, translation, extensions
+    case websiteData = "website-data"
+    case shortcuts
 
     var title: String {
         switch self {
@@ -460,6 +462,7 @@ enum SettingsPane: String, CaseIterable {
         case .privacy: String(localized: "Privacy", comment: "A section of Settings.")
         case .translation: String(localized: "Translation", comment: "A section of Settings: translating web pages.")
         case .extensions: String(localized: "Extensions", comment: "A section of Settings.")
+        case .websiteData: String(localized: "Website Data", comment: "A section of Settings, there with more than one profile: what websites keep on this Mac in the profile chosen, and clearing it.")
         case .shortcuts: String(localized: "Shortcuts", comment: "A section of Settings: keyboard shortcuts.")
         }
     }
@@ -477,12 +480,31 @@ enum SettingsPane: String, CaseIterable {
         case .privacy: "hand.raised"
         case .translation: "translate"
         case .extensions: "puzzlepiece.extension"
+        case .websiteData: "internaldrive"
         case .shortcuts: "command"
         }
     }
 
     /// Its name in the page's address: zigzag://settings/privacy.
     var path: String { rawValue }
+
+    /// The sections that show one profile's things. With a single profile there's nothing to tell apart: Extensions
+    /// sits among the others and what Website Data holds stays in Privacy, as before there were profiles.
+    static let perProfile: [SettingsPane] = [.extensions, .websiteData]
+
+    /// The column's sections: the ones every profile shares, then, with more than one profile, the ones about
+    /// the profile chosen there.
+    static func column(manyProfiles: Bool) -> (shared: [SettingsPane], profile: [SettingsPane]) {
+        guard manyProfiles else { return (allCases.filter { $0 != .websiteData }, []) }
+        return (allCases.filter { !perProfile.contains($0) }, perProfile)
+    }
+
+    /// The section that's shown when this one is asked for: Website Data is part of Privacy until there's a
+    /// second profile, so an address kept from when there was one still opens.
+    func shown(manyProfiles: Bool) -> SettingsPane { self == .websiteData && !manyProfiles ? .privacy : self }
+
+    /// Where the groups that clear and list what websites keep are.
+    static func websiteData(manyProfiles: Bool) -> SettingsPane { manyProfiles ? .websiteData : .privacy }
 }
 
 /// One section in the column: a list item, as every list of places in Zigzag draws them.
@@ -503,6 +525,10 @@ private final class SectionItem: ListItem {
 /// window or half of a split, and the column folds down to symbols when that gets narrow.
 final class SettingsView: NSView, NSTextFieldDelegate {
     private var items: [SectionItem] = []
+    /// With more than one profile: over the sections that are about one profile, with the menu that chooses it.
+    private let profileHeading = Label.groupHeading(String(localized: "For This Profile", comment: "A heading in the column of Settings, with more than one profile, over the menu that chooses a profile and the sections that show that profile's things."))
+    /// Whether the column was built for more than one profile.
+    private var columnHasProfiles = false
     private let column = FlippedView()
     /// The chosen section's fill, gliding to the one you pick.
     private let sectionSelection = SelectionGlide()
@@ -533,6 +559,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Zigzag Mini's shortcut, as the menu has it now.
     private let miniKeys = KeyCaps()
     private let passwordsGroup = FormGroup()
+    /// With more than one profile, what fills forms and isn't a profile's has a group of its own.
+    private let cardGroup = FormGroup()
     private let passwordsWindowGroup = FormGroup()
     private let privacyGroup = FormGroup()
     private let sitesGroup = FormGroup()
@@ -612,13 +640,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var keyToken: NSObjectProtocol?
 
     init(pane: SettingsPane = .general) {
-        self.pane = pane
+        self.pane = pane.shown(manyProfiles: Library.shared.hasManyProfiles)
         super.init(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
         // Its own layer, so it paints the page's surface rather than showing whatever is under it.
         wantsLayer = true
         build()
         token = Library.shared.changed.observe { [weak self] in
             guard let self, self.window != nil else { return }
+            self.profilesChanged()
             self.reloadSpaces()
             self.reloadProfiles()
             self.reloadExtensions()
@@ -658,13 +687,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // The column of sections, under the page's title.
         column.addSubview(columnTitle)
         column.addSubview(sectionSelection)
-        items = SettingsPane.allCases.map { pane in
-            let item = SectionItem(pane)
-            item.drawsSelection = false
-            item.onClick = { [weak self] _ in self?.pick(pane) }
-            column.addSubview(item)
-            return item
-        }
+        buildColumn()
         // The column of sections takes a light tint of the window's space, so Settings belongs to it.
         column.wantsLayer = true
         addSubview(column)
@@ -776,6 +799,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
         addProfileButton.onClick = { [weak self] _ in if let self { ProfileSheets.new(in: self) } }
         profilePicker.onSelect = { [weak self] index in self?.choseProfile(at: index) }
+        refreshProfilePicker()
 
         // Search
         refreshEngines()
@@ -927,6 +951,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         header.contentFrame = (span.x + Tokens.Page.groupPad, span.x + span.width - Tokens.Page.groupPad)
         // With no column to carry it, the wordmark heads the pane's own title.
         refreshTitle()
+        placeProfilePicker(arrangement)
         settingSearch.tint = Brand.Theme.for(self).accent
         layoutColumn(arrangement)
         // The pane's rows depend only on the width, so a change of height just stretches the page under them,
@@ -952,7 +977,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func layoutColumn(_ arrangement: Arrangement) {
         columnTitle.isHidden = arrangement != .column
         items.forEach { $0.isCompact = arrangement != .column }
-        let count = CGFloat(items.count)
+        // With names beside them, the sections about one profile stand under a heading and the menu that chooses it;
+        // as symbols alone they follow the others, and the menu is beside the search (`placeProfilePicker`).
+        let grouped = arrangement == .column && columnHasProfiles
+        profileHeading.isHidden = !grouped
+        // The heading and the menu take about two sections' room.
+        let count = CGFloat(items.count + (grouped ? 2 : 0))
         // In the row they shrink to fit, rather than run off the page's edge.
         let side = arrangement == .row ? min(Tokens.Space.x10, floor((column.bounds.width - Tokens.Space.x2 * 2) / count)) : Tokens.Space.x10
         // Down the column, a short page (a small window) takes some height off each section, never below a control's,
@@ -969,6 +999,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let rowHeight = height(Tokens.Page.rowHeight)
             var y = top
             for item in items {
+                if grouped, item.pane == SettingsPane.perProfile.first {
+                    y += Tokens.Space.x3
+                    profileHeading.frame = NSRect(x: gutter - Label.inset, y: y, width: column.bounds.width - gutter * 2, height: profileHeading.lineHeight)
+                    y = profileHeading.frame.maxY + Tokens.Space.x2
+                    profilePicker.frame = NSRect(x: gutter - inset, y: y, width: column.bounds.width - (gutter - inset) * 2, height: Tokens.Page.controlHeight)
+                    y = profilePicker.frame.maxY + Tokens.Space.x2
+                }
                 item.frame = NSRect(x: gutter - inset, y: y, width: column.bounds.width - (gutter - inset) * 2, height: rowHeight)
                 y += rowHeight + 2
             }
@@ -998,18 +1035,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
     /// Opens a pane.
     func show(_ pane: SettingsPane) {
-        // A profile chosen in one section isn't carried to the next: each starts on the window's own.
-        if pane != self.pane, scope != nil {
-            scope = nil
-            reloadExtensions()
-            reloadPrivacy()
-        }
+        let pane = pane.shown(manyProfiles: Library.shared.hasManyProfiles)
         self.pane = pane
         settingSearch.stringValue = ""
         items.forEach { $0.isSelected = $0.pane == pane }
         moveSectionSelection(animated: true)
         refreshTitle()
-        if pane == .privacy { reloadPrivacy() }
+        if showsWebsiteData { reloadPrivacy() }
         if pane == .shortcuts { reloadShortcuts() }
         layoutDocument()
         documentView.scroll(.zero)
@@ -1033,12 +1065,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             MainActor.assumeIsolated { self?.refresh() }
         }
         refresh()
+        // A profile made or removed while this tab wasn't showing.
+        followProfiles()
         reloadSpaces()
         reloadProfiles()
         reloadExtensions()
         reloadPasswords()
         reloadTranslation()
-        if pane == .privacy { reloadPrivacy() }
+        if showsWebsiteData { reloadPrivacy() }
         layoutDocument()
     }
 
@@ -1051,32 +1085,103 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         return image
     }
 
-    /// The profile chosen from the menu beside a heading, until you leave the section. Nil: the window's own.
-    private var scope: UUID?
-    /// The profile whose extensions and website data it shows: the one chosen here, else the one of the space the
-    /// window is on.
+    // MARK: The profile shown
+
+    /// The profile chosen in the menu, for as long as Settings stays open. Nil: the one of the space it's used in.
+    private var chosenProfile: UUID?
+    /// The profile whose things the sections about one profile show: the one chosen in the menu, else the one of
+    /// the space the window is on. One that's removed gives way to that space's again.
     private var profile: Profile {
-        if let scope, Library.shared.directory.profile(scope) != nil { return Profiles.shared.profile(scope) }
+        if let chosenProfile, Library.shared.directory.profile(chosenProfile) != nil { return Profiles.shared.profile(chosenProfile) }
         return browser?.tabManager.profile ?? Profiles.shared.default
     }
-    /// Chooses that profile, in the sections that are about one profile. Only there once there's more than one.
+    /// Its name, as headings say it.
+    private var profileName: String { Library.shared.directory.profile(profile.id)?.displayName ?? "" }
+    private var hasManyProfiles: Bool { Library.shared.hasManyProfiles }
+    /// Chooses that profile, once there's more than one: under its heading in the column, or beside the search
+    /// when the column is only symbols.
     private let profilePicker = DropdownButton()
     /// The profiles as its menu lists them.
     private var pickerIDs: [UUID] = []
 
     private func refreshProfilePicker() {
         pickerIDs = ProfileChoice.fill(profilePicker, selected: profile.id)
-        profilePicker.isHidden = pickerIDs.count < 2
         profilePicker.setAccessibilityLabel(ProfileChoice.label)
     }
 
     private func choseProfile(at index: Int) {
         guard pickerIDs.indices.contains(index) else { return }
-        scope = pickerIDs[index]
+        choose(profile: pickerIDs[index])
+    }
+
+    /// Shows a profile's things: chosen in the menu, or the one of the space Settings was asked for in.
+    func choose(profile id: UUID) {
+        guard id != profile.id, Library.shared.directory.profile(id) != nil else { return }
+        chosenProfile = id
+        profileChanged()
+    }
+
+    /// Another profile is the one shown: everything that's about one profile is read again.
+    private func profileChanged() {
+        refreshProfilePicker()
         reloadExtensions()
-        reloadPrivacy()
+        if showsWebsiteData { reloadPrivacy() }
+        reloadPasswords()
         layoutDocument()
     }
+
+    /// The sections, in the column. Built again when a second profile is made or the last other one goes.
+    private func buildColumn() {
+        items.forEach { $0.removeFromSuperview() }
+        let many = hasManyProfiles
+        let sections = SettingsPane.column(manyProfiles: many)
+        columnHasProfiles = many
+        items = (sections.shared + sections.profile).map { pane in
+            let item = SectionItem(pane)
+            item.drawsSelection = false
+            item.isSelected = pane == self.pane
+            item.onClick = { [weak self] _ in self?.pick(pane) }
+            column.addSubview(item)
+            return item
+        }
+        if profileHeading.superview == nil { column.addSubview(profileHeading) }
+    }
+
+    /// Where the menu is: in the column under its heading, beside the search when the column has no room for it,
+    /// nowhere with a single profile.
+    private func placeProfilePicker(_ arrangement: Arrangement) {
+        let inColumn = columnHasProfiles && arrangement == .column
+        let inHeader = columnHasProfiles && !inColumn
+        // Beside the search there's room for the profile's tile, not its name too: the section's title comes first.
+        profilePicker.showsPictureOnly = inHeader
+        if inColumn, profilePicker.superview !== column { header.trailing = [settingSearch]; column.addSubview(profilePicker) }
+        if inHeader, profilePicker.superview !== header { header.trailing = [profilePicker, settingSearch] }
+        if !columnHasProfiles, profilePicker.superview != nil { header.trailing = [settingSearch]; profilePicker.removeFromSuperview() }
+    }
+
+    /// A profile made, renamed or removed while Settings is open.
+    private func profilesChanged() {
+        followProfiles()
+        if showsWebsiteData { reloadPrivacy() }
+        reloadPasswords()
+        layoutDocument()
+    }
+
+    /// The column and the menu as the profiles are now: grouped or not, the profile chosen still there.
+    private func followProfiles() {
+        if chosenProfile.map({ Library.shared.directory.profile($0) == nil }) == true { chosenProfile = nil }
+        if columnHasProfiles != hasManyProfiles {
+            buildColumn()
+            // Website Data went back into Privacy with the last other profile.
+            let shown = pane.shown(manyProfiles: hasManyProfiles)
+            if shown != pane { show(shown); onPaneChange?(shown) }
+            needsLayout = true
+        }
+        refreshProfilePicker()
+    }
+
+    /// Whether the section shown has what websites keep, which is read when it's looked at.
+    private var showsWebsiteData: Bool { pane == .privacy || pane == .websiteData }
 
     /// The browser window it's in, for what it opens there (History, the Chrome Web Store).
     private var browser: BrowserWindowController? {
@@ -1289,6 +1394,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// When a password-manager extension is on, Zigzag's own saving and filling start off, and say why.
     private func reloadPasswords() {
         passwordsGroup.removeAllRows()
+        cardGroup.removeAllRows()
         passwordsWindowGroup.removeAllRows()
         // Saving and filling are chosen for each profile: a password manager is an extension, and those are a profile's.
         let profile = profile
@@ -1312,7 +1418,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                    control: fillToggle))
         cardToggle.isOn = ContactCard.isOn
         cardToggle.onChange = { on in ContactCard.isOn = on }
-        passwordsGroup.add(FormRow(title: String(localized: "Fill forms from My Card", comment: "A setting in Settings › Passwords."),
+        // Not a profile's: with more than one, it stands apart from the two that are.
+        (hasManyProfiles ? cardGroup : passwordsGroup).add(FormRow(title: String(localized: "Fill forms from My Card", comment: "A setting in Settings › Passwords."),
                                    detail: String(localized: "Your name, email, phone and address, from your own card in Contacts.", comment: "Explanation under “Fill forms from My Card” in Settings › Passwords."),
                                    control: cardToggle))
         let open = PillButton(title: String(localized: "Open Passwords", comment: "Button in Settings › Passwords that opens the Passwords window."))
@@ -1426,6 +1533,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         settingSearch.stringValue = text
         searchChanged()
     }
+
+    /// What a scripted check reads: the section and profile shown, the column as it's built, the headings of the
+    /// section's groups, and whether Zigzag saves and fills passwords in that profile.
+    var debugState: [String: Any] {
+        let profile = profile
+        return ["pane": pane.rawValue, "profile": Library.shared.directory.profile(profile.id)?.name ?? "",
+                "column": items.map(\.pane.rawValue), "grouped": columnHasProfiles,
+                "menu": profilePicker.superview === column ? "column" : profilePicker.superview === header ? "header" : "none",
+                "headings": groups(of: pane).map { $0.title ?? "" },
+                "saves": PasswordCapture.offersToSave(in: profile), "fills": Autofill.isOn(in: profile),
+                "manager": PasswordManagers.active(in: profile) ?? ""]
+    }
     #endif
 
     /// ⌘F on Settings finds a setting, rather than text in the empty page under it.
@@ -1439,12 +1558,30 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private static var spacesHeading: String { String(localized: "Your Spaces", comment: "A heading in Settings › Spaces.") }
     private static var profilesHeading: String { String(localized: "Your Profiles", comment: "A heading in Settings › Profiles.") }
     private static var unlistedHeading: String { String(localized: "Not Listed", comment: "A heading in Settings › Profiles, over data left on this Mac by profiles that are no longer in the list.") }
-    private static var browsingDataHeading: String { String(localized: "Clear Browsing Data", comment: "A heading in Settings › Privacy: buttons that clear history, cache and cookies.") }
-    private static var siteDataHeading: String { String(localized: "Stored by Websites", comment: "A heading in Settings › Privacy: what each site keeps on this Mac, with a Remove button each.") }
     private static var sitesHeading: String { String(localized: "Site Permissions", comment: "A heading in Settings › Privacy: camera, location, pop-ups and other choices made for single sites.") }
     private static var alwaysTranslateHeading: String { String(localized: "Always Translate", comment: "A heading in Settings › Translation.") }
     private static var fillingHeading: String { String(localized: "AutoFill", comment: "A heading in Settings › Passwords: when Zigzag offers to save and fill passwords and forms.") }
-    private static var installedHeading: String { String(localized: "Installed", comment: "A heading in Settings › Extensions: the extensions you have.") }
+    // Over what's one profile's, a heading names the profile once there's more than one: it's the one chosen in the
+    // column's menu. A heading that names none is over what every profile shares.
+    private var browsingDataHeading: String {
+        hasManyProfiles ? String(localized: "Clear Browsing Data in \(profileName)", comment: "A heading in Settings › Website Data, with more than one profile: buttons that clear history, cache and cookies. The placeholder is a profile's name.")
+            : String(localized: "Clear Browsing Data", comment: "A heading in Settings › Privacy: buttons that clear history, cache and cookies.")
+    }
+    private var siteDataHeading: String {
+        hasManyProfiles ? String(localized: "Stored by Websites in \(profileName)", comment: "A heading in Settings › Website Data, with more than one profile: what each site keeps on this Mac, with a Remove button each. The placeholder is a profile's name.")
+            : String(localized: "Stored by Websites", comment: "A heading in Settings › Privacy: what each site keeps on this Mac, with a Remove button each.")
+    }
+    private var installedHeading: String {
+        hasManyProfiles ? String(localized: "Installed in \(profileName)", comment: "A heading in Settings › Extensions, with more than one profile: the extensions the profile has. The placeholder is a profile's name.")
+            : String(localized: "Installed", comment: "A heading in Settings › Extensions: the extensions you have.")
+    }
+    private var savingHeading: String {
+        hasManyProfiles ? String(localized: "Saving and Filling in \(profileName)", comment: "A heading in Settings › Passwords, with more than one profile: whether Zigzag offers to save and fill passwords in the profile. The placeholder is a profile's name.")
+            : Self.fillingHeading
+    }
+    /// The groups that clear and list what websites keep: in Privacy, or in a section of their own once there's
+    /// more than one profile (`SettingsPane.websiteData(manyProfiles:)`).
+    private var websiteDataGroups: [(title: String?, group: FormGroup)] { [(browsingDataHeading, privacyGroup), (siteDataHeading, siteDataGroup)] }
     private static var otherProfilesHeading: String { String(localized: "In Other Profiles", comment: "A heading in Settings › Extensions: extensions your other profiles have and the one shown doesn't.") }
     /// What a button says for a moment once it has cleared something.
     private static var cleared: String { String(localized: "Cleared", comment: "Shown on a Clear button in Settings › Privacy for a moment after it clears.") }
@@ -1478,10 +1615,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .mini: [(nil, miniGroup)]
         case .spaces: [(Self.spacesHeading, spacesGroup)]
         case .profiles: [(Self.profilesHeading, profilesGroup), (Self.unlistedHeading, unlistedGroup)]
-        case .passwords: [(nil, passwordsWindowGroup), (Self.fillingHeading, passwordsGroup)]
-        case .privacy: [(nil, blockingGroup), (Self.sitesHeading, sitesGroup), (Self.browsingDataHeading, privacyGroup), (Self.siteDataHeading, siteDataGroup)]
+        case .passwords: [(nil, passwordsWindowGroup), (savingHeading, passwordsGroup)] + (hasManyProfiles ? [(Self.fillingHeading, cardGroup)] : [])
+        case .privacy: [(nil, blockingGroup), (Self.sitesHeading, sitesGroup)] + (SettingsPane.websiteData(manyProfiles: hasManyProfiles) == .privacy ? websiteDataGroups : [])
+        case .websiteData: SettingsPane.websiteData(manyProfiles: hasManyProfiles) == .websiteData ? websiteDataGroups : []
         case .translation: [(nil, translationGroup), (Self.alwaysTranslateHeading, alwaysGroup)]
-        case .extensions: [(Self.installedHeading, extensionsGroup), (Self.otherProfilesHeading, otherProfilesGroup), (nil, developerGroup)]
+        case .extensions: [(installedHeading, extensionsGroup), (Self.otherProfilesHeading, otherProfilesGroup), (nil, developerGroup)]
         case .shortcuts: shortcutGroups.map { ($0.0, $0.1) }
         }
     }
@@ -1574,25 +1712,21 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             documentView.addSubview(hint)
             y = hint.frame.maxY + Tokens.Page.groupGap
             if !unlistedGroup.rows.isEmpty { section(Self.unlistedHeading, unlistedGroup) }
-        case .passwords:
-            section(nil, passwordsWindowGroup)
-            section(Self.fillingHeading, passwordsGroup)
+        case .passwords, .websiteData:
+            for (title, group) in groups(of: pane) { section(title, group) }
         case .privacy:
             section(nil, blockingGroup)
             section(Self.sitesHeading, sitesGroup, accessory: sitesReset)
-            refreshProfilePicker()
-            section(Self.browsingDataHeading, privacyGroup, accessory: profilePicker.isHidden ? nil : profilePicker)
-            section(Self.siteDataHeading, siteDataGroup)
+            for (title, group) in groups(of: pane).dropFirst(2) { section(title, group) }
         case .translation:
             section(nil, translationGroup)
             section(Self.alwaysTranslateHeading, alwaysGroup, accessory: alwaysReset)
         case .extensions:
             // With nothing installed, the empty row already offers Get Extensions; once said is enough.
             getExtensionsButton.isHidden = !hasExtensions
-            refreshProfilePicker()
-            let buttons = NSStackView(views: [profilePicker, loadUnpackedButton, getExtensionsButton])
+            let buttons = NSStackView(views: [loadUnpackedButton, getExtensionsButton])
             buttons.spacing = Tokens.Space.x2
-            section(Self.installedHeading, extensionsGroup, accessory: buttons)
+            section(installedHeading, extensionsGroup, accessory: buttons)
             if !otherProfilesGroup.rows.isEmpty { section(Self.otherProfilesHeading, otherProfilesGroup) }
             section(nil, developerGroup)
         case .shortcuts:

@@ -39,7 +39,30 @@ struct SettingsPageTests {
 
     @Test func theColumnKeepsItsOrder() {
         #expect(SettingsPane.allCases == [.general, .appearance, .tabs, .spaces, .profiles, .search, .mini, .passwords, .privacy,
-                                          .translation, .extensions, .shortcuts])
+                                          .translation, .extensions, .websiteData, .shortcuts])
+    }
+
+    @Test func withOneProfileTheColumnIsAsItWasBeforeProfiles() {
+        let column = SettingsPane.column(manyProfiles: false)
+        #expect(column.shared == [.general, .appearance, .tabs, .spaces, .profiles, .search, .mini, .passwords, .privacy,
+                                  .translation, .extensions, .shortcuts])
+        #expect(column.profile.isEmpty)
+        // What websites keep is in Privacy, and an address that names Website Data opens it there.
+        #expect(SettingsPane.websiteData(manyProfiles: false) == .privacy)
+        #expect(SettingsPane.websiteData.shown(manyProfiles: false) == .privacy)
+        #expect(SettingsPane.privacy.shown(manyProfiles: false) == .privacy)
+    }
+
+    @Test func withMoreProfilesTheSectionsAboutOneStandApart() {
+        let column = SettingsPane.column(manyProfiles: true)
+        #expect(column.profile == [.extensions, .websiteData])
+        #expect(column.shared == [.general, .appearance, .tabs, .spaces, .profiles, .search, .mini, .passwords, .privacy,
+                                  .translation, .shortcuts])
+        // Every section is listed once.
+        #expect(Set(column.shared + column.profile) == Set(SettingsPane.allCases))
+        #expect(SettingsPane.websiteData(manyProfiles: true) == .websiteData)
+        #expect(SettingsPane.websiteData.shown(manyProfiles: true) == .websiteData)
+        #expect(SettingsPage.url(for: .websiteData).absoluteString == "zigzag://settings/website-data")
     }
 
     @Test func onlyItsOwnAddressIsSettings() {

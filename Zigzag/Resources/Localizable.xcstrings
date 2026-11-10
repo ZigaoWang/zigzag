@@ -3380,6 +3380,17 @@
         }
       }
     },
+    "Clear Browsing Data in %@" : {
+      "comment" : "A heading in Settings › Website Data, with more than one profile: buttons that clear history, cache and cookies. The placeholder is a profile's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除“%@”的浏览数据"
+          }
+        }
+      }
+    },
     "Clear Cache" : {
       "comment" : "Button of the sheet that clears the cache.\nButton that clears the cache, in the sheet that asks first.",
       "localizations" : {
@@ -5573,6 +5584,17 @@
         }
       }
     },
+    "For This Profile" : {
+      "comment" : "A heading in the column of Settings, with more than one profile, over the menu that chooses a profile and the sections that show that profile's things.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此描述文件"
+          }
+        }
+      }
+    },
     "For example: lofi music" : {
       "comment" : "Under a hint in the getting-started guide, a card in the window: something to search YouTube for.",
       "localizations" : {
@@ -6230,6 +6252,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已安装"
+          }
+        }
+      }
+    },
+    "Installed in %@" : {
+      "comment" : "A heading in Settings › Extensions, with more than one profile: the extensions the profile has. The placeholder is a profile's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”中已安装"
           }
         }
       }
@@ -10701,6 +10734,17 @@
         }
       }
     },
+    "Saving and Filling in %@" : {
+      "comment" : "A heading in Settings › Passwords, with more than one profile: whether Zigzag offers to save and fill passwords in the profile. The placeholder is a profile's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在“%@”中存储和填充"
+          }
+        }
+      }
+    },
     "Saving pages" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
       "localizations" : {
@@ -12089,6 +12133,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "网站存储的数据"
+          }
+        }
+      }
+    },
+    "Stored by Websites in %@" : {
+      "comment" : "A heading in Settings › Website Data, with more than one profile: what each site keeps on this Mac, with a Remove button each. The placeholder is a profile's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”中网站存储的数据"
           }
         }
       }
@@ -14173,6 +14228,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "网站"
+          }
+        }
+      }
+    },
+    "Website Data" : {
+      "comment" : "A section of Settings, there with more than one profile: what websites keep on this Mac in the profile chosen, and clearing it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站数据"
           }
         }
       }
