@@ -190,6 +190,16 @@ struct AddressTests {
         #expect(clicks == 1)
     }
 
+    @Test func aPopupOpeningClosesTheOtherOneInItsWindowOnly() {
+        let windows = (NSObject(), NSObject())
+        let window = ObjectIdentifier(windows.0), other = ObjectIdentifier(windows.1)
+        let shown: [String: ObjectIdentifier?] = ["a": window, "b": other, "c": window, "new": window, "sheet": nil]
+        #expect(Set(ExtensionPopups.makingWay(for: "new", in: window, among: shown)) == ["a", "c"])
+        #expect(ExtensionPopups.makingWay(for: "new", in: window, among: ["new": window]).isEmpty)
+        #expect(ExtensionPopups.makingWay(for: "x", in: nil, among: shown) == ["sheet"])
+        withExtendedLifetime(windows) {}
+    }
+
     @Test func keepingDropsOnlyWhatIsNoLongerKept() {
         #expect(ExtensionPins(ids: ["a", "b", "c"]).keeping { $0 != "b" }.ids == ["a", "c"])
     }

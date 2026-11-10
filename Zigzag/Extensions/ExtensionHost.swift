@@ -2,6 +2,15 @@ import AppKit
 import WebKit
 import os
 
+/// Extension popups, one to a window.
+enum ExtensionPopups {
+    /// The popups that close as `opening` shows in `window`: every other one showing in that window, whichever
+    /// extension it's from and whether it came from Site Controls, a pin or a shortcut. Other windows keep theirs.
+    static func makingWay<Key: Hashable>(for opening: Key, in window: ObjectIdentifier?, among shown: [Key: ObjectIdentifier?]) -> [Key] {
+        shown.compactMap { key, place in key != opening && place == window ? key : nil }
+    }
+}
+
 /// Runs browser extensions with WebKit's extension engine: Chrome Web Store extensions, and 1Password
 /// set up for you, so they work the way they do in other browsers.
 @available(macOS 15.4, *)
@@ -100,6 +109,12 @@ final class ExtensionHost: NSObject {
 
     private func closePopups(for id: String) {
         close(openPopups.values.filter { $0.extensionID == id })
+    }
+
+    private func closeOtherPopups(than popover: NSPopover, in window: NSWindow?) {
+        let shown = openPopups.filter { $0.value.popover.isShown }.mapValues { $0.window.map(ObjectIdentifier.init) }
+        let away = ExtensionPopups.makingWay(for: ObjectIdentifier(popover), in: window.map(ObjectIdentifier.init), among: shown)
+        close(away.compactMap { openPopups[$0] })
     }
 
     private func close(_ popups: [OpenPopup]) {
@@ -888,6 +903,8 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         // A popup takes the place of an open panel, as a panel takes a popup's.
         controller?.closeFloatingPanels()
         popover.behavior = .semitransient
+        // One popup to a window: another extension's steps aside, however this one was asked for.
+        closeOtherPopups(than: popover, in: place.view.window)
         endCapturesWhenClosed(popover, action: action, extensionID: context.uniqueIdentifier, window: place.view.window, fromPin: fromPin)
         popover.show(relativeTo: place.rect, of: place.view, preferredEdge: .maxY)
         popupsChanged.send()
