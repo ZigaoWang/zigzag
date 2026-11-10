@@ -211,6 +211,37 @@ enum DebugBridge {
         try? out.write(toFile: path, atomically: true, encoding: .utf8)
     }
 
+    /// The mini player, without bringing the window forward: mpstate <path> (JSON), mphover on|off (its controls, as
+    /// the pointer brings them), mppress back|close|play|rewind|forward, mpdrag <dx> <dy> (dragged that far and let
+    /// go), mpselect <index> (as `select`), mpwindow <path> (window number and process), mpeval <index> <path> <script>
+    /// (the script's result in that tab's page, which it may await, written to the file).
+    private static func runMiniPlayer(_ name: String, _ arg: String, in controller: BrowserWindowController) {
+        let player = controller.miniPlayer
+        switch name {
+        case "mpstate":
+            if let data = try? JSONSerialization.data(withJSONObject: player.debugState, options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: arg)) }
+        case "mphover": player.card?.debugHover(arg != "off")
+        case "mppress": player.card?.debugPress(arg)
+        case "mpdrag":
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            if n.count == 2 { player.card?.debugDrag(dx: n[0], dy: n[1]) }
+        case "mpselect": controller.tabManager.select(at: Int(arg) ?? 0)
+        case "mpwindow":
+            if let window = controller.window {
+                try? "\(window.windowNumber) \(ProcessInfo.processInfo.processIdentifier)".write(toFile: arg, atomically: true, encoding: .utf8)
+            }
+        case "mpeval":
+            let f = arg.split(separator: " ", maxSplits: 2).map(String.init)
+            let list = controller.tabManager.navigableTabs
+            guard f.count == 3, let i = Int(f[0]), list.indices.contains(i), let webView = list[i].webView else { break }
+            Task {
+                let result = try? await webView.callAsyncJavaScript(f[2], arguments: [:], in: nil, contentWorld: .page)
+                try? String(describing: result ?? "nil").write(toFile: f[1], atomically: true, encoding: .utf8)
+            }
+        default: break
+        }
+    }
+
     static func run(_ command: String) {
         let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
         guard let name = parts.first else { return }
@@ -230,6 +261,7 @@ enum DebugBridge {
         // pintoggle <extension id>: pins or unpins it, as the pin on its tile in Site Controls does.
         if name == "pintoggle" { ExtensionStore.togglePin(arg); return }
         if name == "pinhover" { SitePanel.shown?.debugHover(arg); return }
+        if name.hasPrefix("mp") { runMiniPlayer(name, arg, in: controller); return }
         NSApp.activate()
         controller.window?.makeKeyAndOrderFront(nil)
         switch name {
