@@ -1545,7 +1545,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
         case .profiles:
             section(Self.profilesHeading, profilesGroup, accessory: addProfileButton)
-            let hint = Label(String(localized: "Each profile has its own extensions, sign-ins and website data. Spaces on the same profile share them.", comment: "Under the list in Settings › Profiles."),
+            let hint = Label(String(localized: "Each profile has its own extensions, sign-ins, passwords, history and favorites. Spaces on the same profile share them.", comment: "Under the list in Settings › Profiles."),
                              font: Tokens.Font.detail(), color: Tokens.Color.textTertiary)
             hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y - Tokens.Page.groupGap + Tokens.Space.x2,
                                 width: contentWidth - Tokens.Page.groupPad, height: hint.lineHeight)

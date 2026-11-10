@@ -111,7 +111,7 @@ enum ProfileSheets {
             .note(String(localized: "Extensions are added fresh. Nothing they’ve stored in another profile comes along.", comment: "Note in the sheet that makes a profile, under the choice of which extensions it starts with.")),
         ]
         return FormSheet.show(in: host, title: String(localized: "New Profile", comment: "Title of the sheet that makes a profile."), symbol: "person",
-                       message: String(localized: "A profile has its own extensions, sign-ins and website data. Spaces on the same profile share them.", comment: "Under the title of the sheet that makes a profile."),
+                       message: String(localized: "A profile has its own extensions, sign-ins, passwords, history and favorites. Spaces on the same profile share them.", comment: "Under the title of the sheet that makes a profile."),
                        rows: rows, confirmTitle: String(localized: "Create", comment: "Button that makes the profile, in the sheet that asks for its name."),
                        canConfirm: { [weak name] in !(name?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) }) { confirmed in
             guard confirmed else { return }
@@ -157,7 +157,7 @@ enum ProfileSheets {
         guard let profile = library.directory.profile(id), !profile.isDefault else { return }
         let name = profile.displayName
         let typed = FilledField(placeholder: name)
-        var message = String(localized: "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins and website data. Make sure you have your recovery phrases. This can’t be undone.",
+        var message = String(localized: "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins, saved passwords, history and favorites. Make sure you have your recovery phrases. This can’t be undone.",
                              comment: "Message of the sheet that deletes a profile.")
         if !library.spaces(in: id).isEmpty {
             let first = library.profiles[0].displayName
