@@ -275,7 +275,7 @@ final class SitePanel: FloatingPanelView {
         addSubview(add)
         extensionTiles.append(add)
         addSubview(extensionsLabel)
-        // Over every tile, so a neighbor is never drawn on top.
+        // Over its tile.
         for entry in hoverPins {
             addSubview(entry.pin)
             wireHoverPin(entry.tile, entry.pin, id: entry.id)
@@ -286,10 +286,10 @@ final class SitePanel: FloatingPanelView {
 
     private func wireHoverPin(_ tile: PanelTile, _ pin: HoverPin, id: String) {
         pin.onClick = { _ in ExtensionStore.togglePin(id) }
-        // The pointer on the tile or on the pin, which reaches past the tile; or the keyboard on the tile.
+        // The pointer on the tile or on the pin; or the keyboard on the tile.
         let update: (Bool) -> Void = { [weak tile, weak pin] _ in
             guard let tile, let pin else { return }
-            pin.setShowing(tile.isHovered || tile.hasKeyboardFocus || (pin.isShowing && pin.isHovered))
+            pin.isWanted = tile.isHovered || tile.hasKeyboardFocus || (pin.isShowing && pin.isHovered)
         }
         tile.hoverChanged = update
         tile.keyboardFocusChanged = update
@@ -298,6 +298,8 @@ final class SitePanel: FloatingPanelView {
 
     /// What each pin says now. Runs on every change, from here or another window, so the limit is always the truth.
     private func refreshHoverPins() {
+        // A count that came or went moves the pin to the other corner.
+        needsLayout = true
         let pins = ExtensionStore.pins
         for entry in hoverPins {
             let pinned = pins.contains(entry.id)
@@ -528,39 +530,45 @@ final class SitePanel: FloatingPanelView {
             y -= Tokens.Space.x5
         }
         if !dryRun {
-            let side = Tokens.Sidebar.hoverPin, overhang = Tokens.Sidebar.hoverPinOverhang
+            let side = Tokens.Sidebar.hoverPin, inset = Tokens.Sidebar.hoverPinInset
             for entry in hoverPins {
-                entry.pin.frame = NSRect(x: entry.tile.frame.maxX - side + overhang, y: entry.tile.frame.minY - overhang, width: side, height: side)
+                // In a top corner, inside the tile: the right one, or the left when a count already sits on the right.
+                let tile = entry.tile.frame
+                let x = entry.tile.badge.isEmpty ? tile.maxX - side - inset : tile.minX + inset
+                entry.pin.frame = NSRect(x: x, y: tile.minY + inset, width: side, height: side)
             }
         }
         return y + pad
     }
 }
 
-/// The round pin on an extension's tile while the pointer or keyboard is on it: one click pins or unpins. The tile
-/// stays one thing to the keyboard and VoiceOver, which reach pinning through the tile's menu and actions.
+/// The pin in a top corner of an extension's tile: a small plain glyph, no fill. Always there, a little darker, on a
+/// pinned extension; on another, only while the pointer or keyboard is on the tile, quiet, and one click pins it.
+/// At the limit it's dimmed and only explains, in its tooltip. The tile stays one thing to the keyboard and VoiceOver,
+/// which reach pinning through the tile's menu and actions.
 final class HoverPin: InteractiveView {
     enum State { case unpinned, pinned, atLimit }
 
     private let icon = NSImageView()
     private(set) var isShowing = false
+    /// The pointer or keyboard is on its tile.
+    var isWanted = false { didSet { if isWanted != oldValue { updateShowing() } } }
     var state = State.unpinned {
         didSet {
             guard state != oldValue else { return }
             toolTipForState()
             // At the limit it only explains, in its tooltip: dimmed, and a click does nothing.
             isEnabled = state != .atLimit
-            stateDidChange(animated: window != nil)
+            stateDidChange(animated: false)
+            updateShowing()
         }
     }
 
     init() {
         let side = Tokens.Sidebar.hoverPin
         super.init(frame: NSRect(x: 0, y: 0, width: side, height: side))
-        pressScales = true
         isHidden = true
-        layer?.cornerRadius = side / 2
-        icon.image = Tokens.Symbol.image("pin.fill", size: Tokens.Symbol.inline)
+        icon.image = Tokens.Symbol.image("pin.fill", size: Tokens.Sidebar.hoverPinGlyph)
         icon.imageScaling = .scaleNone
         icon.frame = bounds
         addSubview(icon)
@@ -577,8 +585,10 @@ final class HoverPin: InteractiveView {
         toolTip = state == .pinned ? SitePanel.unpinTitle : state == .atLimit ? SitePanel.pinLimitTip : SitePanel.pinTitle
     }
 
-    /// Shows up and goes the shared way, out of its own middle; from the keyboard it's simply there.
-    func setShowing(_ showing: Bool) {
+    private func updateShowing() { setShowing(state == .pinned || isWanted) }
+
+    /// Fades in and out where it is; from the keyboard it's simply there.
+    private func setShowing(_ showing: Bool) {
         guard showing != isShowing else { return }
         isShowing = showing
         if showing {
@@ -591,7 +601,7 @@ final class HoverPin: InteractiveView {
             isHidden = !showing
             return
         }
-        Tokens.Motion.present(self, from: .point(CGPoint(x: 0.5, y: 0.5)), entering: showing) { [weak self] in
+        Tokens.Motion.present(self, from: .inPlace, entering: showing) { [weak self] in
             // Shown again while going: it stays.
             guard let self, !self.isShowing else { return }
             self.isHidden = true
@@ -600,19 +610,9 @@ final class HoverPin: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        guard let layer else { return }
-        let theme = Brand.Theme.for(self)
-        let pinned = state == .pinned
-        layer.set(backgroundColor: cgColor(pinned ? theme.accent : Tokens.Color.panelBackground), animated: animated, duration: Tokens.Motion.enter)
-        Tokens.Motion.withoutAnimation {
-            layer.borderWidth = pinned ? 0 : Tokens.Metric.hairline
-            layer.borderColor = cgColor(Tokens.Color.separator)
-            layer.shadowColor = cgColor(Tokens.Color.liftShadow)
-            layer.shadowRadius = Tokens.Shadow.liftRadius
-            layer.shadowOffset = CGSize(width: 0, height: Tokens.Shadow.liftDrop)
-            layer.shadowOpacity = state == .atLimit ? 0 : 1
-        }
-        icon.contentTintColor = pinned ? theme.onAccent : state == .atLimit ? Tokens.Color.textTertiary : isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        // Only the glyph: tertiary on offer, secondary once pinned, the primary text color under the pointer.
+        icon.contentTintColor = state == .pinned || (isHovered && state == .unpinned) ? (isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary)
+            : Tokens.Color.textTertiary
         icon.alphaValue = state == .atLimit ? Tokens.Opacity.disabled : 1
     }
 }
