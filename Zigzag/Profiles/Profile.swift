@@ -65,6 +65,9 @@ final class Profiles {
 
     /// Every profile, the first one first.
     var all: [Profile] { Library.shared.profiles.map { profile($0.id) } }
+    /// The profiles something has used since Zigzag started: the ones whose stores exist to be tidied. Asking for
+    /// `all` would make a store for each profile, opened or not.
+    var opened: [Profile] { [`default`] + Library.shared.profiles.compactMap { others[$0.id] } }
 
     /// The profile with this ID. One that's gone, or was never there, is the first profile.
     func profile(_ id: UUID) -> Profile {

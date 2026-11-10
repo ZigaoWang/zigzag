@@ -875,8 +875,8 @@ enum DebugBridge {
                 debugLog("altsvc after forget => \(await describe())")
             }
         case "cookies":
-            // cookies <path>: the cookies in the default store and in every private window's, by name and domain.
-            // Never their values.
+            // cookies <path>: the cookies in the default store, in each other profile's in use and in every private
+            // window's, by name and domain. Never their values.
             Task { @MainActor in
                 func describe(_ cookies: [HTTPCookie]) -> [[String: Any]] {
                     cookies.map { ["name": $0.name, "domain": $0.domain, "path": $0.path, "secure": $0.isSecure, "httpOnly": $0.isHTTPOnly,
@@ -887,7 +887,12 @@ enum DebugBridge {
                 for store in WindowManager.shared.controllers.compactMap(\.tabManager.privateStore) {
                     privateCookies += describe(await store.httpCookieStore.allCookies())
                 }
-                let json: [String: Any] = ["default": describe(await WKWebsiteDataStore.default().httpCookieStore.allCookies()), "private": privateCookies]
+                var profileCookies: [String: Any] = [:]
+                for profile in Profiles.shared.opened where !profile.isDefault {
+                    profileCookies[profile.id.uuidString] = describe(await profile.store.httpCookieStore.allCookies())
+                }
+                let json: [String: Any] = ["default": describe(await WKWebsiteDataStore.default().httpCookieStore.allCookies()), "private": privateCookies,
+                                           "profiles": profileCookies]
                 if let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
             }
         case "closewindow":
