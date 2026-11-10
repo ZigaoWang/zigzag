@@ -11508,6 +11508,17 @@
         }
       }
     },
+    "Swipe to go back and forward" : {
+      "comment" : "A setting in Settings › Tabs: two fingers sideways on the trackpad go back or forward.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻扫以前进和后退"
+          }
+        }
+      }
+    },
     "Swipe two fingers across the sidebar, or click its dot" : {
       "comment" : "Under a step's title in the getting-started guide, a card in the window.",
       "localizations" : {
@@ -12648,6 +12659,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "双页"
+          }
+        }
+      }
+    },
+    "Two fingers sideways on the trackpad. When off, websites get every swipe." : {
+      "comment" : "Explanation under “Swipe to go back and forward” in Settings › Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在触控板上用两指左右轻扫。关闭后，所有轻扫都交给网页。"
           }
         }
       }

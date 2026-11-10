@@ -561,6 +561,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let favoritesPerRow = DropdownButton()
     private let newTabPlace = DropdownButton()
     private let pinOfferToggle = Toggle()
+    private let swipeToggle = Toggle()
     private let miniToggle = Toggle()
     private let energyToggle = Toggle()
     private let languagePicker = DropdownButton()
@@ -739,6 +740,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         tabsGroup.add(FormRow(title: String(localized: "Keep videos playing when you switch tabs", comment: "A setting in Settings › Tabs."),
                               detail: String(localized: "A playing video floats in its own window until you come back.", comment: "Explanation under “Keep videos playing when you switch tabs” in Settings › Tabs."),
                               control: pipToggle))
+        swipeToggle.onChange = { on in SwipeNavigator.isOn = on }
+        tabsGroup.add(FormRow(title: String(localized: "Swipe to go back and forward", comment: "A setting in Settings › Tabs: two fingers sideways on the trackpad go back or forward."),
+                              detail: String(localized: "Two fingers sideways on the trackpad. When off, websites get every swipe.", comment: "Explanation under “Swipe to go back and forward” in Settings › Tabs."),
+                              control: swipeToggle))
         pinOfferToggle.onChange = { on in BrowserWindowController.offersToPinWanderedPage = on }
         tabsGroup.add(FormRow(title: String(localized: "Offer to pin the page you moved to", comment: "A setting in Settings › Tabs."),
                               detail: String(localized: "After you close a pinned tab that went to another page, like a new chat.", comment: "Explanation under “Offer to pin the page you moved to” in Settings › Tabs."),
@@ -1525,6 +1530,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         scriptJavaScriptToggle.isOn = Scripting.allowsJavaScript
         newTabPlace.selectedIndex = TabManager.NewTabPlace.allCases.firstIndex(of: TabManager.newTabPlace) ?? 0
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
+        swipeToggle.isOn = SwipeNavigator.isOn
         miniToggle.isOn = MiniWindowController.opensExternalLinks
         miniKeys.keys = Shortcuts.allItems.first { $0.action == #selector(AppDelegate.newMiniWindow(_:)) }.map(Shortcuts.caps) ?? []
         energyToggle.isOn = EnergyWatch.sleepsBusyTabs

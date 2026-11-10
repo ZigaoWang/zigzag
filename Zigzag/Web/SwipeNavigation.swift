@@ -6,9 +6,16 @@ import WebKit
 /// slide of the whole page. A page that can scroll sideways where you are (a carousel, a map, a wide table) keeps
 /// the swipe for itself, and so does one that handles the scroll itself (Canva, Figma, Google Maps pan with their own
 /// code): as in Safari and Chrome, the page sees the swipe's first steps and answers before anything moves. The
-/// system's "Swipe between pages" setting is respected.
+/// system's "Swipe between pages" setting is respected, and Settings › Tabs can turn swiping off in Zigzag alone.
 @MainActor
 final class SwipeNavigator {
+    private static let key = "SwipeBetweenPages"
+    /// Two fingers sideways go back and forward. On unless turned off in Settings; then every swipe is the page's.
+    static var isOn: Bool {
+        get { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+
     private weak var webView: BrowserWebView?
     private var arrow: SwipeArrowView?
 
@@ -59,7 +66,7 @@ final class SwipeNavigator {
     /// Returns true when it took the event, so the page doesn't also scroll with it. `room`, from something
     /// covering the page (a zoomed-in PDF), is which way it can still scroll sideways, in place of asking the page.
     func handle(_ event: NSEvent, room: (left: Bool, right: Bool)? = nil) -> Bool {
-        guard let webView, event.hasPreciseScrollingDeltas, NSEvent.isSwipeTrackingFromScrollEventsEnabled else { return false }
+        guard let webView, event.hasPreciseScrollingDeltas, NSEvent.isSwipeTrackingFromScrollEventsEnabled, Self.isOn else { return false }
         // Momentum after a swipe that navigated (or was abandoned) is part of it, not a scroll.
         if !event.momentumPhase.isEmpty {
             if event.momentumPhase == .ended || event.momentumPhase == .cancelled { if state == .finishing { state = .idle } }
