@@ -606,6 +606,16 @@ enum DebugBridge {
                     debugLog("popupjs => \(String(describing: result).prefix(2000)) \(String(describing: error))")
                 }
             } else { debugLog("popupjs: no popup") }
+        case "tabjs":
+            // tabjs <address prefix> <script>: like js, in the first tab of any window (private ones included) whose
+            // page starts with that address, selected or not.
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            guard f.count == 2 else { break }
+            let tab = WindowManager.shared.controllers.lazy.flatMap(\.tabManager.allTabs).first { $0.webView?.url?.absoluteString.hasPrefix(f[0]) == true }
+            guard let webView = tab?.webView else { debugLog("tabjs: no tab at \(f[0])"); break }
+            webView.evaluateJavaScript(f[1]) { result, error in
+                debugLog("tabjs => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
+            }
         case "jsclient":
             // Like js, in Zigzag's own script world rather than the page's.
             controller.selectedWebView?.evaluateJavaScript(arg, in: nil, in: .defaultClient) { result in
