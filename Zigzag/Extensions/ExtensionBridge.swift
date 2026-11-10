@@ -157,7 +157,15 @@ enum ExtensionBridgeScript {
     }()
 
     /// Where WebKit answers differently from Chrome, made to answer as Chrome does (webkit-differences.js).
-    static let differences: String = {
+    static let differences: String = webLocks + "\n" + differencesSource
+
+    /// The stand-in for navigator.locks (web-locks.js); also goes in front of worker scripts that use it.
+    static let webLocks: String = {
+        Bundle.main.url(forResource: "web-locks", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+    }()
+    static let webLocksMark = "zigzag.webLocks"
+
+    private static let differencesSource: String = {
         Bundle.main.url(forResource: "webkit-differences", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
     }()
 

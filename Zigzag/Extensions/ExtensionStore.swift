@@ -1146,16 +1146,25 @@ extension ExtensionStore {
         let fm = FileManager.default
         guard let enumerator = fm.enumerator(at: overlay, includingPropertiesForKeys: nil) else { return }
         for case let file as URL in enumerator where ["js", "mjs"].contains(file.pathExtension) {
-            guard let text = try? String(contentsOf: file, encoding: .utf8),
-                  text.contains("Symbol.dispose") || text.contains("Symbol.asyncDispose"), !text.hasPrefix(languageFill) else { continue }
-            var filled = languageFill + "\n" + text
-            for directive in ["\"use strict\";", "'use strict';"] where text.hasPrefix(directive) {
-                filled = directive + languageFill + String(text.dropFirst(directive.count))
-            }
+            guard let text = try? String(contentsOf: file, encoding: .utf8), let filled = filled(text) else { continue }
             // A new file in place of the link, so the package's own stays exactly as it came.
             try? fm.removeItem(at: file)
             try? filled.write(to: file, atomically: true, encoding: .utf8)
         }
+    }
+
+    /// A script with what it needs in front of it, or nil if it needs nothing. A dedicated worker gets no prelude, and
+    /// a lock request from one kills the extension's process, so a script that names navigator.locks brings the
+    /// stand-in with it; on a page or background that already has it, it does nothing.
+    static func filled(_ text: String) -> String? {
+        var fill = ""
+        if text.contains("Symbol.dispose") || text.contains("Symbol.asyncDispose"), !text.hasPrefix(languageFill) { fill += languageFill }
+        if text.contains("navigator.locks"), !text.contains(ExtensionBridgeScript.webLocksMark) { fill += "\n" + ExtensionBridgeScript.webLocks + "\n" }
+        guard !fill.isEmpty else { return nil }
+        for directive in ["\"use strict\";", "'use strict';"] where text.hasPrefix(directive) {
+            return directive + fill + String(text.dropFirst(directive.count))
+        }
+        return fill + "\n" + text
     }
 
     /// A patched file is a real copy (the package's stays as it was); its link in the overlay is replaced.
