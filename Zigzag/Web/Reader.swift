@@ -656,7 +656,10 @@ final class ReaderControls: NSView {
         setShown(true)
         options.preferences = preferences
         let size = options.panelSize
-        options.frame = NSRect(x: frame.maxX - size.width, y: frame.maxY + 6, width: size.width, height: size.height)
+        // Under the Aa button, its right edge with the button's, but always whole inside the page.
+        let margin = Tokens.Space.x3
+        let x = min(max(margin, frame.maxX - size.width), host.bounds.width - size.width - margin)
+        options.frame = NSRect(x: x, y: frame.maxY + 6, width: size.width, height: size.height)
         options.growsFrom = CGPoint(x: 1, y: 0)
         host.addSubview(options)
         options.present()
@@ -855,7 +858,11 @@ private final class ThemeTile: InteractiveView {
         layer?.borderWidth = Tokens.Metric.hairline
         layer?.borderColor = NSColor.black.withAlphaComponent(0.1).cgColor
         if theme == .auto {
+            // Rounded on its own outer corners, so it keeps the swatch's shape whatever clips it.
             darkHalf.backgroundColor = Tokens.Color.hex(Reader.Palette.dark.paper).cgColor
+            darkHalf.cornerRadius = Tokens.Radius.field + 3
+            darkHalf.cornerCurve = .continuous
+            darkHalf.maskedCorners = [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
             layer?.addSublayer(darkHalf)
         }
         for (text, color) in [(lightInk, ink), (darkInk, Tokens.Color.hex(Reader.Palette.dark.ink))] {
