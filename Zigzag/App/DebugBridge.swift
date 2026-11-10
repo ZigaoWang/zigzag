@@ -291,7 +291,13 @@ enum DebugBridge {
             if let root = controller.tabManager.selectedTab?.settingsView { rows(root).first?.openEditor() }
         case "saveprompt": if arg == "close" { SavePasswordPrompt.debugClose() } else { SavePasswordPrompt.debugPreview(in: controller) }
         case "select": controller.tabManager.select(at: Int(arg) ?? 0)
-        case "suspendtab": controller.tabManager.allTabs.first { $0.url?.absoluteString.hasPrefix(arg) == true }?.suspend()
+        case "suspendtab": controller.tabManager.allTabs.first { $0.url?.absoluteString.hasPrefix(arg) == true }?.suspend(because: "debug")
+        case "killpage":
+            // killpage <url prefix>: ends that tab's page process, as macOS does when it takes memory back.
+            if let webView = controller.tabManager.allTabs.first(where: { $0.url?.absoluteString.hasPrefix(arg) == true })?.webView,
+               let pid = EnergyWatch.processID(of: webView), pid > 0 { kill(pid, SIGKILL) }
+        case "lowmemory": MemoryPressure.shared.warned(critical: arg == "critical")
+        case "sleepidle": controller.tabManager.sleepIdleTabs()
         case "space": controller.tabManager.switchSpace(by: Int(arg) ?? 1)
         case "newspace":
             let space = Library.shared.addSpace(name: arg.isEmpty ? nil : arg)
