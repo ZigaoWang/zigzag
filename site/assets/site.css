@@ -165,6 +165,10 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .rel ul { margin: 0; padding-left: 18px; }
 .rel > * { min-width: 0; }
 .rel li { margin: 0 0 10px; line-height: 1.6; text-wrap: pretty; overflow-wrap: anywhere; }
+.rel li a { color: inherit; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.rel li a:hover { text-decoration-color: currentColor; }
+.rel li a.issue { color: var(--soft); text-decoration: none; font-size: 0.9em; white-space: nowrap; }
+.rel li a.issue:hover { color: inherit; }
 .rel li::marker { color: var(--soft); }
 @media (max-width: 640px) { .log { padding-top: 40px; } .log h1 { font-size: 30px; } .rel { grid-template-columns: 1fr; gap: 16px; } .rel header { position: static; } }
 
