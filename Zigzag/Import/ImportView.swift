@@ -143,6 +143,8 @@ final class ImportView: NSView {
         choiceButtons.first { $0.0 == .tabs }?.1.isHidden = !anyArc
         // Safari's stay behind (they need Full Disk Access), so Sign-ins shows only for a browser that has them.
         let anySignIns = rows.contains { $0.isChosen && $0.source.offers.contains(.signIns) }
+        // A browser whose Keychain item isn't known (Comet) brings no passwords; alone, it offers none.
+        choiceButtons.first { $0.0 == .passwords }?.1.isHidden = rows.contains(where: \.isChosen) && !rows.contains { $0.isChosen && $0.source.offers.contains(.passwords) }
         choiceButtons.first { $0.0 == .signIns }?.1.isHidden = !anySignIns
         // Only in their own window: the welcome has a step of its own for extensions.
         let extensionsPill = choiceButtons.first { $0.0 == .extensions }?.1
@@ -180,7 +182,7 @@ final class ImportView: NSView {
         stage = .importing
         title.stringValue = String(localized: "Bringing it over…", comment: "Title of the Import window while importing.")
         // Only Chrome and its kin keep their passwords and sign-ins behind a Keychain item that macOS asks about.
-        let fromChromium = chosen.contains { if case .chromium = $0.source.kind { true } else { false } }
+        let fromChromium = chosen.contains { if case .chromium(let browser) = $0.source.kind { browser.safeStorage != nil } else { false } }
         let note: String
         switch (data.contains(.passwords), data.contains(.signIns)) {
         case (true, true): note = String(localized: "macOS will ask for your Mac’s password to open your passwords and sign-ins. Type it, then click Always Allow.",

@@ -62,6 +62,12 @@ nonisolated enum BrowserFolders {
         return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
     }
 
+    /// Of the apps that use one browser's folder (Firefox, its Developer Edition and Nightly), the first on this
+    /// Mac, for its icon and to match the default browser; the first listed when none is.
+    static func installedApp(_ bundleIDs: [String]) -> String {
+        bundleIDs.first { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) != nil } ?? bundleIDs[0]
+    }
+
     #if DEBUG
     /// A debug copy checked by script reads made-up profiles from this folder instead (ZIGZAG_FAKE_BROWSERS, a path),
     /// so no run ever opens a real browser's data, its Keychain item, or Safari's.

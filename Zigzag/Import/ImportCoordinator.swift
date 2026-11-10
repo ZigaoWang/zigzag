@@ -31,7 +31,10 @@ enum ImportCoordinator {
         var offers: Choice {
             switch kind {
             // Only Chrome and its kin share a store with Zigzag: Firefox's and Safari's extensions come from their own.
-            case .chromium(let browser): browser.name == "Arc" ? [.passwords, .bookmarks, .history, .tabs, .signIns, .extensions] : [.passwords, .bookmarks, .history, .signIns, .extensions]
+            case .chromium(let browser) where browser.name == "Arc": [.passwords, .bookmarks, .history, .tabs, .signIns, .extensions]
+            // Passwords and most sign-ins need the browser's Keychain item; without one known, they stay behind.
+            case .chromium(let browser) where browser.safeStorage == nil: [.bookmarks, .history, .extensions]
+            case .chromium: [.passwords, .bookmarks, .history, .signIns, .extensions]
             case .firefox: [.passwords, .bookmarks, .history, .signIns]
             // Safari's cookies sit behind Full Disk Access, and a file holds none: nothing to offer.
             case .safari: [.passwords, .bookmarks, .history]
@@ -216,9 +219,10 @@ enum ImportCoordinator {
                 let counts = ChromiumImporter.counts(browser)
                 let newExtensions = installed.map { ChromiumExtensions.toAdd(ChromiumExtensions.found(in: browser, source: ""), installed: $0).count } ?? 0
                 // Short enough for one line in the list: Arc's spaces first, then what's counted.
-                let parts = [browser.name == "Arc" ? spaces : nil, passwords(counts.passwords),
+                let opens = browser.safeStorage != nil
+                let parts = [browser.name == "Arc" ? spaces : nil, opens ? passwords(counts.passwords) : nil,
                              bookmarks(counts.bookmarks), counts.history > 0 ? history : nil,
-                             SignInImporter.hasAny(chromium: profiles) ? signIns : nil,
+                             opens && SignInImporter.hasAny(chromium: profiles) ? signIns : nil,
                              newExtensions > 0 ? String(localized: "\(newExtensions) extensions", comment: "Item in a list of what a browser holds or what came over, in the Import window.") : nil].compactMap { $0 }
                 return parts.isEmpty ? String(localized: "Nothing to bring over", comment: "Under a browser's name in the Import window's list.") : Self.sentence(parts)
             case .firefox(let browser):
@@ -298,6 +302,7 @@ enum ImportCoordinator {
     /// Imports from one source. Reading happens off the main thread; macOS may show its own prompts on the way
     /// (allowing access to a browser's passwords).
     static func run(_ source: Source, _ choice: Choice, primaryPassword: String = "") async -> Summary {
+        let choice = choice.intersection(source.offers)
         var summary = Summary(source: source.name)
         let reading = choice.reading
         let isArc: Bool = { if case .chromium(let b) = source.kind { return b.name == "Arc" } else { return false } }()

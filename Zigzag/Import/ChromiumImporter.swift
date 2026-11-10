@@ -3,23 +3,46 @@ import AppKit
 import CommonCrypto
 import Security
 
-/// Chrome and the browsers built on it: Arc, Edge, Brave, Dia, Vivaldi, Opera. They share one layout:
-/// profiles listed in `Local State`, and in each profile `Login Data` (passwords), `Bookmarks` and `History`.
+/// Chrome and the browsers built on it: Arc, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale,
+/// Chromium, Thorium and Chrome's and Brave's test channels. They share one layout: profiles listed in
+/// `Local State`, and in each profile `Login Data` (passwords), `Bookmarks` and `History`.
 ///
 /// Passwords are encrypted with a key kept in the login keychain as "<Browser> Safe Storage". Reading it shows
 /// macOS's own prompt ("Zigzag wants to use … Chrome Safe Storage"), so the person always decides.
 nonisolated enum ChromiumImporter {
+    /// The Keychain item holding a browser's "Safe Storage" secret.
+    struct SafeStorage: Sendable, Hashable {
+        let service: String
+        let account: String
+    }
+
     struct Browser: Sendable, Hashable {
         let name: String
-        let bundleID: String
+        /// Its app, then any other app using the same folder (ungoogled-chromium uses Chromium's).
+        let bundleIDs: [String]
         /// Under ~/Library/Application Support.
         let root: String
-        let keychainService: String
-        let keychainAccount: String
+        /// Nil when the browser's own code or docs don't say which item it is: its passwords and sign-ins then
+        /// stay behind rather than ask macOS for a guessed one, and bookmarks, history and extensions still come.
+        let safeStorage: SafeStorage?
         /// One profile's folder ("Profile 1"), when importing a single profile; nil means all of them.
         var profile: String? = nil
         /// That profile's name as the browser shows it ("Work").
         var profileName: String? = nil
+
+        init(name: String, bundleIDs: [String], root: String, safeStorage: SafeStorage?) {
+            self.name = name
+            self.bundleIDs = bundleIDs
+            self.root = root
+            self.safeStorage = safeStorage
+        }
+
+        init(name: String, bundleID: String, root: String, keychainService: String, keychainAccount: String) {
+            self.init(name: name, bundleIDs: [bundleID], root: root, safeStorage: SafeStorage(service: keychainService, account: keychainAccount))
+        }
+
+        /// The app on this Mac, for its icon.
+        var bundleID: String { BrowserFolders.installedApp(bundleIDs) }
 
         func only(_ folder: String, named display: String) -> Browser {
             var copy = self
@@ -37,6 +60,22 @@ nonisolated enum ChromiumImporter {
         Browser(name: "Brave", bundleID: "com.brave.Browser", root: "BraveSoftware/Brave-Browser", keychainService: "Brave Safe Storage", keychainAccount: "Brave"),
         Browser(name: "Vivaldi", bundleID: "com.vivaldi.Vivaldi", root: "Vivaldi", keychainService: "Vivaldi Safe Storage", keychainAccount: "Vivaldi"),
         Browser(name: "Opera", bundleID: "com.operasoftware.Opera", root: "com.operasoftware.Opera", keychainService: "Opera Safe Storage", keychainAccount: "Opera"),
+        // Closed source, and Perplexity doesn't document its Keychain item.
+        Browser(name: "Comet", bundleIDs: ["ai.perplexity.comet"], root: "Comet", safeStorage: nil),
+        // Helium names its item differently from every other Chromium browser (helium-macos, change-keychain-name.patch).
+        Browser(name: "Helium", bundleID: "net.imput.helium", root: "net.imput.helium", keychainService: "Helium Storage Key", keychainAccount: "Helium"),
+        Browser(name: "Yandex", bundleID: "ru.yandex.desktop.yandex-browser", root: "Yandex/YandexBrowser", keychainService: "Yandex Safe Storage", keychainAccount: "Yandex"),
+        Browser(name: "Whale", bundleID: "com.naver.Whale", root: "Naver/Whale", keychainService: "Whale Safe Storage", keychainAccount: "Whale"),
+        Browser(name: "Chromium", bundleIDs: ["org.chromium.Chromium", "io.ungoogled-software.ungoogled-chromium"], root: "Chromium",
+                safeStorage: SafeStorage(service: "Chromium Safe Storage", account: "Chromium")),
+        // Its source changes the folder but not, as far as can be told, the Keychain item: left out until it's sure.
+        Browser(name: "Thorium", bundleIDs: ["org.chromium.Thorium"], root: "Thorium", safeStorage: nil),
+        // Chrome's and Brave's test channels: their own app and folder, the same Keychain item as the main one.
+        Browser(name: "Chrome Beta", bundleID: "com.google.Chrome.beta", root: "Google/Chrome Beta", keychainService: "Chrome Safe Storage", keychainAccount: "Chrome"),
+        Browser(name: "Chrome Dev", bundleID: "com.google.Chrome.dev", root: "Google/Chrome Dev", keychainService: "Chrome Safe Storage", keychainAccount: "Chrome"),
+        Browser(name: "Chrome Canary", bundleID: "com.google.Chrome.canary", root: "Google/Chrome Canary", keychainService: "Chrome Safe Storage", keychainAccount: "Chrome"),
+        Browser(name: "Brave Beta", bundleID: "com.brave.Browser.beta", root: "BraveSoftware/Brave-Browser-Beta", keychainService: "Brave Safe Storage", keychainAccount: "Brave"),
+        Browser(name: "Brave Nightly", bundleID: "com.brave.Browser.nightly", root: "BraveSoftware/Brave-Browser-Nightly", keychainService: "Brave Safe Storage", keychainAccount: "Brave"),
     ]
 
     static func rootURL(of browser: Browser) -> URL {
@@ -190,13 +229,14 @@ nonisolated enum ChromiumImporter {
 
     /// The browser's "Safe Storage" secret, turned into its AES key. Asks macOS, which asks the person.
     static func safeStorageKey(_ browser: Browser) -> Result<Data, KeyError> {
-        if let kept = unlocked.withLock({ $0[browser.keychainService] }), Date().timeIntervalSince(kept.at) < 600 { return .success(kept.key) }
-        let result = askForKey(browser)
-        if case .success(let key) = result { unlocked.withLock { $0[browser.keychainService] = (key, Date()) } }
+        guard let item = browser.safeStorage else { return .failure(.missing) }
+        if let kept = unlocked.withLock({ $0[item.service] }), Date().timeIntervalSince(kept.at) < 600 { return .success(kept.key) }
+        let result = askForKey(item)
+        if case .success(let key) = result { unlocked.withLock { $0[item.service] = (key, Date()) } }
         return result
     }
 
-    private static func askForKey(_ browser: Browser) -> Result<Data, KeyError> {
+    private static func askForKey(_ item: SafeStorage) -> Result<Data, KeyError> {
         #if DEBUG
         // Fake profiles never touch the Keychain: their secret comes from ZIGZAG_FAKE_SAFE_STORAGE, "deny" plays the
         // person clicking Deny, and none plays a browser that never saved one.
@@ -210,8 +250,8 @@ nonisolated enum ChromiumImporter {
         #endif
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
-            kSecAttrService: browser.keychainService,
-            kSecAttrAccount: browser.keychainAccount,
+            kSecAttrService: item.service,
+            kSecAttrAccount: item.account,
             kSecReturnData: true,
             kSecMatchLimit: kSecMatchLimitOne,
         ]
