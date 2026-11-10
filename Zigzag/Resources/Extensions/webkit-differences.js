@@ -573,8 +573,18 @@
         return copy;
       };
       const stillMatches = (script) => !script || typeof script !== 'object' || !Array.isArray(script.matches) || script.matches.length > 0;
-      const note = (name) => {
-        try { const sent = api.runtime.sendNativeMessage('zigzag.diagnostics', { where: 'scripting', kind: 'note', text: `${name}: registered without its file: patterns` }); if (sent && sent.catch) sent.catch(() => {}); } catch (e) {}
+      // What the second try left out: scripts that kept other patterns, and ones whose matches were all file:, skipped.
+      const note = (name, scripts) => {
+        const id = (script) => String(script.id);
+        const named = scripts.filter(namesFiles);
+        const trimmed = named.filter((script) => stillMatches(withoutFiles(script))).map(id);
+        const skipped = named.filter((script) => !stillMatches(withoutFiles(script))).map(id);
+        const done = name === 'updateContentScripts' ? 'updated' : 'registered';
+        const text = [
+          trimmed.length ? `${trimmed.join(', ')} ${done} without file: patterns` : '',
+          skipped.length ? `skipped ${skipped.join(', ')}, whose matches were all file:` : '',
+        ].filter(Boolean).join('; ');
+        try { const sent = api.runtime.sendNativeMessage('zigzag.diagnostics', { where: 'scripting', kind: 'note', text: `${name}: ${text}` }); if (sent && sent.catch) sent.catch(() => {}); } catch (e) {}
       };
       // A callback hears a failure through runtime.lastError, as from WebKit, for as long as it runs.
       const callWithError = (callback, error) => {
@@ -597,7 +607,7 @@
           const callback = rest.find((argument) => typeof argument === 'function');
           const answer = new Promise((resolve) => resolve(original(scripts))).catch((error) => {
             if (!kept.length) throw error;
-            return Promise.resolve().then(() => original(kept)).then((result) => { note(name); return result; }, () => { throw error; });
+            return Promise.resolve().then(() => original(kept)).then((result) => { note(name, scripts); return result; }, () => { throw error; });
           });
           if (!callback) return answer;
           answer.then(() => callback(), (error) => callWithError(callback, error));

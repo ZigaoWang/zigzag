@@ -352,7 +352,7 @@ struct ExtensionScriptTests {
         #expect(worker.evaluateScript("__calls[1].length").toInt32() == 1)
         #expect(worker.evaluateScript("__calls[1][0].matches.join()").toString() == "http://*/*,https://*/*")
         #expect(worker.evaluateScript("__calls[1][0].world").toString() == "MAIN")
-        #expect(worker.evaluateScript("__notes.length").toInt32() == 1)
+        #expect(worker.evaluateScript("__notes.join('|')").toString() == "registerContentScripts: p registered without file: patterns; skipped local, whose matches were all file:")
         // A WebKit that takes them keeps them, and any other refusal stays the extension's to hear about.
         worker.evaluateScript("__calls = []; __acceptsFiles = true; chrome.scripting.registerContentScripts([__script('p')])")
         #expect(worker.evaluateScript("__calls.length + ' ' + __calls[0][0].matches[0]").toString() == "1 file://*/*")
@@ -396,6 +396,29 @@ struct ExtensionScriptTests {
         #expect(worker.evaluateScript("__heard.join()").toString() == "Script has an invalid match pattern 'file://*/*'.")
         // The error is there only while the callback runs.
         #expect(worker.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+    }
+
+    @Test func anUpdateSaysWhichScriptsItSkipped() {
+        let worker = Self.workerWorld(worker: true, setup: """
+        var __calls = [], __notes = [];
+        chrome.runtime.sendNativeMessage = (host, message) => { __notes.push(message.text); return Promise.resolve(); };
+        chrome.scripting = {
+          registerContentScripts: () => Promise.resolve(),
+          updateContentScripts: (scripts) => {
+            __calls.push(scripts);
+            const files = scripts.some((s) => (s.matches || []).some((m) => m.startsWith('file:')));
+            return files ? Promise.reject(new Error("Script has an invalid match pattern 'file:///*'.")) : Promise.resolve();
+          },
+        };
+        """)
+        // A script whose matches were all file: is left out of the update, and the log says so.
+        worker.evaluateScript("chrome.scripting.updateContentScripts([{ id: 'local', matches: ['file:///*'] }, { id: 'p', matches: ['https://*/*'] }])")
+        #expect(worker.evaluateScript("__calls.length + ' ' + __calls[1].map((s) => s.id).join()").toString() == "2 p")
+        #expect(worker.evaluateScript("__notes.join('|')").toString() == "updateContentScripts: skipped local, whose matches were all file:")
+        // One that keeps other patterns is updated without its file: ones.
+        worker.evaluateScript("__calls = []; __notes = []; chrome.scripting.updateContentScripts([{ id: 'p', matches: ['file:///*', 'https://*/*'] }])")
+        #expect(worker.evaluateScript("__calls[1][0].matches.join()").toString() == "https://*/*")
+        #expect(worker.evaluateScript("__notes.join('|')").toString() == "updateContentScripts: p updated without file: patterns")
     }
 
     @Test func scriptsNamingLocksBringTheStandIn() throws {
