@@ -209,9 +209,18 @@ One look for each state, everywhere:
 Quick, eased, no bounce (`Tokens.Motion`). The bar is the craft at animations.dev: every movement says where
 something came from, answers at once, and can be interrupted.
 
-- Origin: a menu or popover grows out of what opened it, from `enterScale` (0.96) with a fade, anchored at that
-  control, in `enter` (180ms) on the house ease-out (0.23, 1, 0.32, 1). It leaves quicker and subtler: `exit`
-  (120ms) toward 0.98. Exits are always quieter than entrances.
+- Showing up and going: one vocabulary, `Motion.present(_:from:entering:)`, and `FloatingPanelView.present` and
+  `dismiss` on it. Where a thing lives decides where it comes from (`Motion.Origin`):
+  - `.point`: a menu, popover or panel grows out of the control that opened it (`growsFrom`), from `enterScale`
+    (0.96) with a fade, in `enter` (180ms) on the house ease-out (0.23, 1, 0.32, 1). A sheet grows from a little
+    below its middle (`sheetOrigin`), its scrim fading in `enter` and out in `exit`.
+  - `.edge`: a bar that hangs from an edge slides `edgeOffset` (6pt) in from it: the find bar (⌘F) and a toast
+    from the page's top, the Desk's and a PDF's bars from the bottom.
+  - `.offstage`: a notice from outside (a site's question, Save password?, an offer) comes down from beyond the
+    window's top edge in `noticeIn` (250ms) and goes back up in `noticeOut` (170ms).
+  - `.inPlace`: what stands in for something under it (the address being edited) only fades.
+  Leaving is quicker and subtler, always about two thirds: `exit` (120ms) toward 0.98, or half the edge offset.
+  The fade runs a touch quicker than the movement coming in, so it's solid before it settles.
 - The selected tab's card slides: picking another row with the pointer, the card travels there from the row it was
   on (`SelectionCardView`, `Motion.selection`, eased out), and the new row takes it over when it lands. A click
   mid-slide carries on from where the card is. From the keyboard, with Reduce Motion or while dragging, it lands.
@@ -221,22 +230,27 @@ something came from, answers at once, and can be interrupted.
   each row lighting on its own. A list of places (Settings' sections) and a row of filters (`SegmentedPills`) glide
   their selection the same way (`SelectionGlide`). From the keyboard it simply lands.
 - Interruptible: every animation starts from what's on screen now (`presentation()`), so opening and closing fast,
-  or pressing twice, never queues or jumps.
+  or pressing twice, never queues or jumps. Turned around partway, it takes only the time left
+  (`Motion.remainingDuration`): ⌘F pressed twice fast lifts the bar a little and brings it straight back.
 
 - Curve: `Motion.easeOut` for anything arriving, leaving or settling; `easeInOut` only for something traveling
   across the screen. Never ease-in, never overshoot.
 - Durations: hover and press 0 (instant), a row's hover leaving `hoverFade` 0.15; `quick` 0.1 for small feedback; `selection` 0.15 for the card moving to a
-  new row; `standard` 0.2 for most transitions; panels arrive in 0.18 growing from 97% of their size out of what
-  opened them (`FloatingPanelView.present`); `large` 0.3 is the ceiling.
-- Anything opened or changed from the keyboard is instant (`Motion.isFromKey`, `Motion.animate`); only the window's
-  layout (the sidebar, splits, switching spaces) still moves so you see where things went (`evenFromKeyboard`).
-  Letting go of Control after ⌃Tab closes the switcher at once.
+  new row; `standard` 0.2 for most transitions; `enter` 0.18 and `exit` 0.12 for anything showing up and going;
+  `large` 0.3 is the ceiling.
+- Keys: a panel shows up and goes the same way whether a key or the pointer asked (⌘F, Esc, a menu), because the
+  movement says where it is. What you summon to type in or flick through many times an hour is simply there and
+  simply gone: the command bar (⌘T, ⌘L), the tab and space switchers (⌃Tab), the link under the pointer, and anything
+  shown while ⌘T is handled (`Arrival.instant`, `Motion.isKeyboardDriven`). Typing, moving through a list with the
+  arrows, and switching tabs never animate; the find bar following its tab comes and goes with the page, at once.
+  Changes made with `Motion.animate` (layout, hovers, lists) are still instant from a key, except the window's
+  layout (the sidebar, splits, switching spaces), which moves so you see where things went (`evenFromKeyboard`).
 - Light and dark cross-fade with the space's color when a space changes the window's mode: one fade, no flicker.
 - A closed tab's row folds away: it takes no more clicks, and its height closes as it fades, in step with the rows
   below gliding up.
 - Reduce Motion (the Mac's, or Settings › Appearance › Reduce motion for Zigzag alone): nothing slides, scales or
-  travels; fades and color changes still play (`Motion.animate(moves:)`), and a space switch cross-fades the list in
-  place instead of sliding it.
+  travels; fades and color changes still play (`Motion.animate(moves:)`), anything showing up or going crossfades
+  in place in `crossfade` (120ms), and a space switch cross-fades the list in place instead of sliding it.
 - Arrivals and departures in lists: a new tab's row opens its height from nothing as it fades in; a closed one folds
   away. Favorites keep their tiles by id and glide to new places; a new one fades in, a removed one fades out.
   A favicon that swaps for another cross-fades (`selection`). A split opens at `standard`, a closed pane fades where it
