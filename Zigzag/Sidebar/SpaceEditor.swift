@@ -1681,10 +1681,11 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     // MARK: Profile
 
+    /// The profiles as the menu lists them.
+    private var profileIDs: [UUID] = []
+
     private func refreshProfiles() {
-        let library = Library.shared
-        profileButton.options = library.profiles.map { DropdownButton.Option(title: $0.displayName, image: ProfileSheets.tile(for: $0)) }
-        profileButton.selectedIndex = library.profiles.firstIndex { $0.id == library.profileID(ofSpace: spaceID) } ?? 0
+        profileIDs = ProfileChoice.fill(profileButton, selected: Library.shared.profileID(ofSpace: spaceID))
         needsLayout = true
     }
 
@@ -1693,8 +1694,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     private func chooseProfile(at index: Int) {
         let library = Library.shared
-        guard library.profiles.indices.contains(index), let space = library.space(spaceID) else { return }
-        let profile = library.profiles[index]
+        guard profileIDs.indices.contains(index), let profile = library.directory.profile(profileIDs[index]), let space = library.space(spaceID) else { return }
         guard profile.id != library.profileID(ofSpace: spaceID) else { return }
         // Pages that are loaded are rebuilt in the other profile, which is worth a question; a space with none
         // open just changes.

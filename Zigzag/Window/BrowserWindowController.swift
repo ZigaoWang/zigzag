@@ -616,9 +616,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func confirmClearCache() {
         // The profile you're in when you ask; a private window's own store.
         let store = tabManager.privateStore ?? tabManager.profile.store
-        let only = tabManager.isPrivate ? "" : ProfileSheets.onlyNote(tabManager.profile.id)
+        let only = ProfileSheets.onlyNote(tabManager.isPrivate ? nil : tabManager.profile.id)
         ConfirmSheet.show(in: root.overlay, title: String(localized: "Clear the cache for every site?", comment: "Title of the sheet that asks before clearing every site's cache."),
-                          message: String(localized: "Pages load a little slower the first time you open them again. You stay signed in.", comment: "Message of the sheet that asks before clearing every site's cache.") + only,
+                          message: Words.sentences(String(localized: "Pages load a little slower the first time you open them again. You stay signed in.", comment: "Message of the sheet that asks before clearing every site's cache."), only),
                           confirmTitle: String(localized: "Clear Cache", comment: "Button that clears the cache, in the sheet that asks first."), destructive: false) { [weak self] confirmed in
             guard confirmed else { return }
             Task { @MainActor in
@@ -632,9 +632,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func confirmClearCookies() {
         // The profile you're in when you ask; a private window's own store.
         let store = tabManager.privateStore ?? tabManager.profile.store
-        let only = tabManager.isPrivate ? "" : ProfileSheets.onlyNote(tabManager.profile.id)
+        let only = ProfileSheets.onlyNote(tabManager.isPrivate ? nil : tabManager.profile.id)
         ConfirmSheet.show(in: root.overlay, title: String(localized: "Clear cookies for every site?", comment: "Title of the sheet that asks before clearing every site's cookies."),
-                          message: String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that asks before clearing every site's cookies.") + only,
+                          message: Words.sentences(String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that asks before clearing every site's cookies."), only),
                           confirmTitle: String(localized: "Clear Cookies", comment: "Button that clears cookies, in the sheet that asks first."), destructive: true) { [weak self] confirmed in
             guard confirmed else { return }
             Task { @MainActor in
@@ -710,7 +710,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 if profiles.count > 1 {
                     asked.destination = ExtensionSheet.Destination(
                         label: String(localized: "Add to", comment: "Label in the sheet that asks before adding an extension, before the choice of the profile it's added to."),
-                        options: profiles.map { DropdownButton.Option(title: $0.displayName, image: ProfileSheets.tile(for: $0)) },
+                        options: ProfileChoice.options(profiles),
                         selected: profiles.firstIndex { $0.id == profile.id } ?? 0)
                 }
                 var sheet: ExtensionSheet?
@@ -1804,19 +1804,8 @@ extension BrowserWindowController: SidebarDelegate {
     /// profile's sign-ins and extensions; `move` runs at once when nothing would change profile. Undoing such a
     /// move doesn't ask: it only puts back what was.
     func confirmProfileCrossing(_ tabs: [Tab], to spaceID: UUID, then move: @escaping () -> Void) {
-        let target = Library.shared.profileID(ofSpace: spaceID)
-        let crossing = tabs.filter { !$0.isPrivate && $0.webView != nil && $0.profile.id != target }
-        guard !crossing.isEmpty, let space = Library.shared.space(spaceID), let profile = Library.shared.directory.profile(target) else { move(); return }
-        let one = crossing.count == 1
-        ConfirmSheet.show(in: root.overlay,
-                          title: one ? String(localized: "Move this tab to \(space.name)?", comment: "Title of the sheet that asks before a tab moves to a space on another profile. The placeholder is the space's name.")
-                                     : String(localized: "Move these tabs to \(space.name)?", comment: "Title of the sheet that asks before several tabs move to a space on another profile. The placeholder is the space's name."),
-                          message: one ? String(localized: "\(space.name) is on \(profile.displayName). The page reloads there, with that profile’s sign-ins and extensions, and keeps its back and forward history.", comment: "Message of the sheet that asks before a tab moves to a space on another profile. First the space's name, then the profile's.")
-                                       : String(localized: "\(space.name) is on \(profile.displayName). The pages reload there, with that profile’s sign-ins and extensions, and keep their back and forward history.", comment: "Message of the sheet that asks before several tabs move to a space on another profile. First the space's name, then the profile's."),
-                          confirmTitle: String(localized: "Move and Reload", comment: "Button of the sheet that asks before tabs move to a space on another profile.")) { confirmed in
-            // Not moved after all: a row dragged there goes back to where it was.
-            if confirmed { move() } else { self.sidebar.list.reload(animated: true) }
-        }
+        // Not moved after all: a row dragged there goes back to where it was.
+        ProfileSheets.confirmCrossing(tabs, to: spaceID, in: root.overlay, cancelled: { [weak self] in self?.sidebar.list.reload(animated: true) }, then: move)
     }
 
     /// The same question for a pinned page, whose open page goes where it does.

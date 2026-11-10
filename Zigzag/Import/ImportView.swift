@@ -103,10 +103,7 @@ final class ImportView: NSView {
         rowScroll.contentView.drawsBackground = false
         rowScroll.documentView = rowList
         [title, subtitle, rowScroll, choiceLabel, signInsNote, intoLabel, intoPicker, chooseFile, primary, secondary].forEach { addSubview($0) }
-        let profiles = Library.shared.profiles
-        intoPicker.options = profiles.map { DropdownButton.Option(title: $0.displayName, image: ProfileSheets.tile(for: $0)) }
-        intoPicker.selectedIndex = profiles.firstIndex { $0.id == intoProfile } ?? 0
-        intoIDs = profiles.map(\.id)
+        intoIDs = ProfileChoice.fill(intoPicker, selected: intoProfile)
         intoPicker.setAccessibilityLabel(intoLabel.stringValue)
         intoPicker.onSelect = { [weak self] index in
             guard let self, self.intoIDs.indices.contains(index) else { return }

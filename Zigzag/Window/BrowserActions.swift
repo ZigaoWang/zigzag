@@ -65,7 +65,7 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     /// It's all of it, so it asks first; ⌘Z (or Undo on the toast) brings it back.
     @objc func clearHistory(_ sender: Any?) {
-        ConfirmSheet.show(in: root.overlay, title: HistoryPage.clearTitle, message: HistoryPage.clearMessage + HistoryPage.whoseNote(tabManager.profile.id),
+        ConfirmSheet.show(in: root.overlay, title: HistoryPage.clearTitle, message: Words.sentences(HistoryPage.clearMessage, HistoryPage.whoseNote(tabManager.profile.id)),
                           confirmTitle: String(localized: "Clear History", comment: "Button that clears all history, in the sheet that asks first."), destructive: true) { [weak self] confirmed in
             guard confirmed, let self else { return }
             self.historyChange(String(localized: "Clear History", comment: "Undo action name, shown in the Edit menu as Undo Clear History.")) { [tabManager] in tabManager.profile.history.remove() }

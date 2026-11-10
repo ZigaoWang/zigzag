@@ -113,13 +113,16 @@ final class FormSheet: NSView, NSTextFieldDelegate {
     /// What a key does while a form is up.
     enum KeyAction: Equatable {
         case confirm, cancel
+        /// Tab and Shift-Tab: on to the form's next field or control, or back to the one before.
+        case moveFocus(backward: Bool)
         /// On to whatever has the keyboard: a field being typed in, or a button Tab reached.
         case pass
         /// Nothing: it goes no further.
         case swallow
     }
 
-    /// Escape cancels. Return confirms a form that can be confirmed, never a destructive one. Typing and editing keys
+    /// Escape cancels. Return confirms a form that can be confirmed, never a destructive one. Tab moves within the
+    /// form. Typing and editing keys
     /// (⌘A, ⌘C, ⌘V, ⌘X, ⌘Z) go to the field; any other shortcut stops here, except ⌘Q, which asks about quitting itself.
     static func keyAction(keyCode: UInt16, modifiers: NSEvent.ModifierFlags, characters: String?, destructive: Bool, canConfirm: Bool,
                           composing: Bool) -> KeyAction {
@@ -132,6 +135,8 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         }
         switch keyCode {
         case 53: return .cancel
+        // As in ConfirmSheet: round the form's own stops, never out to the page behind.
+        case 48: return mods.isEmpty ? .moveFocus(backward: modifiers.contains(.shift)) : .swallow
         case 36, 76: return mods.isEmpty && canConfirm && !destructive ? .confirm : .swallow
         default: return .pass
         }
@@ -145,10 +150,27 @@ final class FormSheet: NSView, NSTextFieldDelegate {
                               destructive: isDestructive, canConfirm: canConfirm(), composing: composing) {
         case .confirm: finish(true)
         case .cancel: finish(false)
+        case .moveFocus(let backward): moveFocus(backward: backward, in: window)
         case .pass: return event
         case .swallow: break
         }
         return nil
+    }
+
+    /// Tab goes round the form's fields, then whichever of its controls and buttons take the keyboard (with Full
+    /// Keyboard Access off, only the fields do), and never leaves it.
+    private func moveFocus(backward: Bool, in window: NSWindow) {
+        let stops: [NSView] = rows.compactMap { row -> NSView? in
+            if let filled = row.view as? FilledField { return filled.field }
+            return row.view.canBecomeKeyView ? row.view : nil
+        } + [cancel, confirm].filter(\.canBecomeKeyView)
+        guard !stops.isEmpty else { return }
+        // A field being typed in has the keyboard through its editor.
+        var responder = window.firstResponder as? NSView
+        if let editor = responder as? NSTextView, editor.isFieldEditor { responder = editor.delegate as? NSView }
+        let current = stops.firstIndex { $0 === responder }
+        let next = current.map { ($0 + (backward ? stops.count - 1 : 1)) % stops.count } ?? (backward ? stops.count - 1 : 0)
+        window.makeFirstResponder(stops[next])
     }
 
     #if DEBUG

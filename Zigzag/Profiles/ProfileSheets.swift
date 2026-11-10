@@ -18,50 +18,24 @@ extension Library {
 
 /// The curated colors as a row of dots, one chosen: a profile's color in its form.
 final class ColorDots: NSView {
-    private final class Dot: InteractiveView {
-        let color: SpaceColor
-
-        init(_ color: SpaceColor) {
-            self.color = color
-            super.init(frame: .zero)
-            setAccessibilityRole(.radioButton)
-            setAccessibilityLabel(color.name)
-            toolTip = color.name
-        }
-
-        required init?(coder: NSCoder) { fatalError() }
-
-        override func stateDidChange(animated: Bool) {
-            layer?.cornerRadius = bounds.height / 2
-            layer?.backgroundColor = cgColor(color.swatch)
-            // The chosen one wears the accent as a ring around it; the others a hairline, so a pale one still shows.
-            layer?.borderWidth = isSelected ? Tokens.Metric.focusRing : Tokens.Metric.hairline
-            layer?.borderColor = cgColor(isSelected ? Brand.Theme.for(self).accent : Tokens.Color.controlEdge)
-            setAccessibilityValue(isSelected)
-        }
-
-        override func layout() {
-            super.layout()
-            stateDidChange(animated: false)
-        }
-    }
-
     static let colors = SpaceColor.allCases.filter { !$0.isNeutral }
-    static let side: CGFloat = Tokens.Metric.favicon + Tokens.Space.x1
-    private let dots: [Dot]
+    /// As big as the space editor's swatches, which these are.
+    static let side: CGFloat = 24
+    private let dots: [LookSwatch]
     var selected: SpaceColor { didSet { refresh() } }
     var onChange: ((SpaceColor) -> Void)?
 
     init(selected: SpaceColor) {
         self.selected = selected
-        dots = Self.colors.map(Dot.init)
+        // The space editor's own swatch, so a color chosen looks chosen the same way everywhere.
+        dots = Self.colors.map { LookSwatch(look: .curated($0)) }
         super.init(frame: .zero)
         for dot in dots {
             addSubview(dot)
             dot.onClick = { [weak self, weak dot] _ in
-                guard let self, let dot else { return }
-                self.selected = dot.color
-                self.onChange?(dot.color)
+                guard let self, let dot, let index = self.dots.firstIndex(where: { $0 === dot }) else { return }
+                self.selected = Self.colors[index]
+                self.onChange?(self.selected)
             }
         }
         refresh()
@@ -71,7 +45,7 @@ final class ColorDots: NSView {
     override var isFlipped: Bool { true }
 
     private func refresh() {
-        for dot in dots { dot.isSelected = dot.color == selected }
+        for (dot, color) in zip(dots, Self.colors) { dot.isSelected = color == selected }
     }
 
     override func layout() {
@@ -85,6 +59,28 @@ final class ColorDots: NSView {
     }
 }
 
+/// The profiles as a dropdown's choices, wherever one is chosen: Settings, a space's editor, the Passwords window,
+/// Import, adding an extension.
+enum ProfileChoice {
+    /// Fills a dropdown with the profiles, each with its tile, and selects one. Returns their IDs in the order
+    /// shown: the choice is read back from these, not from the list as it is later, which may have changed while
+    /// the menu was open.
+    @discardableResult
+    static func fill(_ button: DropdownButton, selected: UUID) -> [UUID] {
+        let profiles = Library.shared.profiles
+        button.options = options(profiles)
+        button.selectedIndex = profiles.firstIndex { $0.id == selected } ?? 0
+        return profiles.map(\.id)
+    }
+
+    static func options(_ profiles: [ProfileInfo] = Library.shared.profiles) -> [DropdownButton.Option] {
+        profiles.map { DropdownButton.Option(title: $0.displayName, image: ProfileSheets.tile(for: $0)) }
+    }
+
+    /// What a profile's dropdown is called, for VoiceOver, where no label stands beside it.
+    static var label: String { String(localized: "Profile", comment: "What VoiceOver calls a menu that chooses a profile, and the label before that choice in a space's editor.") }
+}
+
 /// The sheets that make, change and remove a profile, wherever they're asked for: Settings, or a space's editor.
 enum ProfileSheets {
     /// The profile's color with its first letter, the size of the picture on a row.
@@ -94,9 +90,26 @@ enum ProfileSheets {
 
     /// With more than one profile, added to what a sheet says before clearing one profile's cache or cookies: whose
     /// they are.
-    static func onlyNote(_ profile: UUID) -> String {
-        guard Library.shared.hasManyProfiles, let info = Library.shared.directory.profile(profile) else { return "" }
-        return " " + String(localized: "Only in \(info.displayName); other profiles aren’t changed.", comment: "Added to the message of a sheet that asks before clearing the cache or cookies, when there's more than one profile. The placeholder is the profile's name.")
+    static func onlyNote(_ profile: UUID?) -> String? {
+        guard let profile, Library.shared.hasManyProfiles, let info = Library.shared.directory.profile(profile) else { return nil }
+        return String(localized: "Only in \(info.displayName); other profiles aren’t changed.", comment: "Added to the message of a sheet that asks before clearing the cache or cookies, when there's more than one profile. The placeholder is the profile's name.")
+    }
+
+    /// Asks, over `host`, before pages that are loaded move to a space on another profile, where they're rebuilt
+    /// with that profile's sign-ins and extensions. `move` runs at once when none of them would change profile.
+    static func confirmCrossing(_ tabs: [Tab], to spaceID: UUID, in host: NSView, cancelled: @escaping () -> Void = {}, then move: @escaping () -> Void) {
+        let target = Library.shared.profileID(ofSpace: spaceID)
+        let crossing = tabs.filter { !$0.isPrivate && $0.webView != nil && $0.profile.id != target }
+        guard !crossing.isEmpty, let space = Library.shared.space(spaceID), let profile = Library.shared.directory.profile(target) else { move(); return }
+        let one = crossing.count == 1
+        ConfirmSheet.show(in: host,
+                          title: one ? String(localized: "Move this tab to \(space.name)?", comment: "Title of the sheet that asks before a tab moves to a space on another profile. The placeholder is the space's name.")
+                                     : String(localized: "Move these tabs to \(space.name)?", comment: "Title of the sheet that asks before several tabs move to a space on another profile. The placeholder is the space's name."),
+                          message: one ? String(localized: "\(space.name) is on \(profile.displayName). The page reloads there, with that profile’s sign-ins and extensions, and keeps its back and forward history.", comment: "Message of the sheet that asks before a tab moves to a space on another profile. First the space's name, then the profile's.")
+                                       : String(localized: "\(space.name) is on \(profile.displayName). The pages reload there, with that profile’s sign-ins and extensions, and keep their back and forward history.", comment: "Message of the sheet that asks before several tabs move to a space on another profile. First the space's name, then the profile's."),
+                          confirmTitle: String(localized: "Move and Reload", comment: "Button of the sheet that asks before tabs move to a space on another profile.")) { confirmed in
+            if confirmed { move() } else { cancelled() }
+        }
     }
 
     /// Asks for a new profile's name and color, and what extensions it starts with. `done` hears the profile made.
@@ -104,8 +117,7 @@ enum ProfileSheets {
     static func new(in host: NSView, done: ((ProfileInfo) -> Void)? = nil) -> FormSheet {
         let library = Library.shared
         let name = FilledField(placeholder: String(localized: "Name this profile", comment: "Placeholder of the name field in the sheet that makes or edits a profile."))
-        let used = Set(library.profiles.map { library.color(of: $0) })
-        let dots = ColorDots(selected: ColorDots.colors.first { !used.contains($0) } ?? ColorDots.colors[library.profiles.count % ColorDots.colors.count])
+        let dots = ColorDots(selected: SpaceColor.next(unused: library.profiles.map { library.color(of: $0) }, fallback: ColorDots.colors))
         let seeds = library.profiles
         let start = DropdownButton()
         start.options = [DropdownButton.Option(title: String(localized: "Start Empty", comment: "Choice in the sheet that makes a profile: it starts with no extensions."), image: nil)]
@@ -168,7 +180,7 @@ enum ProfileSheets {
                              comment: "Message of the sheet that deletes a profile.")
         if !library.spaces(in: id).isEmpty {
             let first = library.profiles[0].displayName
-            message += " " + String(localized: "Its spaces move to \(first).", comment: "Added to the message of the sheet that deletes a profile, when the profile has spaces. The placeholder is the first profile's name.")
+            message = Words.sentences(message, String(localized: "Its spaces move to \(first).", comment: "Added to the message of the sheet that deletes a profile, when the profile has spaces. The placeholder is the first profile's name."))
         }
         let rows = [
             FormSheet.Row.note(String(localized: "Type \(name) to confirm", comment: "Over the field in the sheet that deletes a profile. The placeholder is the profile's name.")),

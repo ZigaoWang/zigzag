@@ -191,10 +191,14 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func choose(space id: UUID) {
-        guard id != tab.spaceID, Library.shared.space(id) != nil else { return }
-        move(to: Profiles.shared.profile(forSpace: id)) { tab.setSpace(id) }
-        paint(animated: true)
-        refreshStrip()
+        guard id != tab.spaceID, Library.shared.space(id) != nil, let host = window?.contentView else { return }
+        // To a space on another profile the page reloads there: asked first, as in a browser window.
+        ProfileSheets.confirmCrossing([tab], to: id, in: host) { [weak self] in
+            guard let self else { return }
+            self.move(to: Profiles.shared.profile(forSpace: id)) { self.tab.setSpace(id) }
+            self.paint(animated: true)
+            self.refreshStrip()
+        }
     }
 
     /// Its space was put on another profile, or its profile was removed: the page is rebuilt where it now belongs,

@@ -585,6 +585,39 @@ struct UpdateBackupTests {
         #expect(read(history(made, in: before)) == "new")
     }
 
+    /// A removed profile is taken out of each backup's own lists too, with its favorites: a restore can't bring
+    /// back what the removal said was gone.
+    @Test func aRemovedProfileGoesFromABackupsLists() throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var directory = ProfileDirectory()
+        let gone = directory.add(name: "Gone"), kept = directory.add(name: "Kept")
+        let space = UUID(), keptSpace = UUID(), favorite = UUID(), keptFavorite = UUID(), firstFavorite = UUID()
+        directory.assign(space: space, to: gone.id)
+        directory.assign(space: keptSpace, to: kept.id)
+        directory.assign(favorite: favorite, to: gone.id)
+        directory.assign(favorite: keptFavorite, to: kept.id)
+        try JSONEncoder().encode(directory).write(to: root.appendingPathComponent("Profiles.json"))
+        let library: [String: Any] = ["spaces": [], "searchEngine": "google",
+                                      "favorites": [favorite, keptFavorite, firstFavorite].map { ["id": $0.uuidString, "url": "https://example.com/", "title": ""] },
+                                      "favoriteSplits": [["left": favorite.uuidString, "right": firstFavorite.uuidString]]]
+        try JSONSerialization.data(withJSONObject: library).write(to: root.appendingPathComponent("Library.json"))
+        let backup = try #require(UpdateBackup.make(from: "0.9.0", in: root))
+
+        UpdateBackup.forget(profile: gone.id, in: root)
+
+        let read = try JSONDecoder().decode(ProfileDirectory.self, from: Data(contentsOf: backup.appendingPathComponent("Profiles.json")))
+        #expect(read.all.map(\.id) == [Profile.defaultID, kept.id])
+        #expect(read.profileID(ofSpace: space) == Profile.defaultID && read.profileID(ofSpace: keptSpace) == kept.id)
+        #expect(read.assignments.favorites == [keptFavorite.uuidString: kept.id])
+        let after = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: backup.appendingPathComponent("Library.json"))) as? [String: Any])
+        #expect((after["favorites"] as? [[String: Any]])?.compactMap { $0["id"] as? String } == [keptFavorite.uuidString, firstFavorite.uuidString])
+        #expect((after["favoriteSplits"] as? [[String: Any]])?.isEmpty == true)
+        // What's in use now is untouched.
+        let live = try JSONDecoder().decode(ProfileDirectory.self, from: Data(contentsOf: root.appendingPathComponent("Profiles.json")))
+        #expect(live == directory)
+    }
+
     /// A backup from before profiles says nothing of the other profiles' histories: they stay.
     @Test func restoreLeavesOtherProfilesHistoriesWhenTheBackupHasNoProfiles() throws {
         let root = try makeRoot()

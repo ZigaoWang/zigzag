@@ -30,7 +30,10 @@ struct FormSheetTests {
     @Test func typingAndEditingReachTheField() {
         #expect(action(0, [], "a") == .pass)
         #expect(action(51) == .pass)
-        #expect(action(48) == .pass)
+        // Tab stays in the form, as in a confirmation: on to its next stop, or with Shift back to the one before.
+        #expect(action(48) == .moveFocus(backward: false))
+        #expect(action(48, .shift) == .moveFocus(backward: true))
+        #expect(action(48, .command) == .swallow)
         for key in ["a", "c", "v", "x", "z"] { #expect(action(0, .command, key) == .pass) }
     }
 

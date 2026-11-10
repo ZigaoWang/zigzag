@@ -81,10 +81,35 @@ nonisolated enum UpdateBackup {
         return ids.filter { UUID(uuidString: $0) != nil }.sorted().flatMap { id in historyFiles.map { "Profiles/\(id)/\($0)" } }
     }
 
-    /// A removed profile's history goes from every backup too.
+    /// A removed profile goes from every backup too: its history, and its name in the backup's own lists, with
+    /// the favorites that were its. Putting a backup back then never brings back an emptied profile, or what the
+    /// removal said was gone for good; the spaces it had come back on the first profile, as they are now.
     static func forget(profile: UUID, in root: URL = Paths.support) {
+        let id = profile.uuidString
+        func edit(_ file: URL, _ change: (inout [String: Any]) -> Void) {
+            guard let data = try? Data(contentsOf: file), var json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return }
+            change(&json)
+            if let data = try? JSONSerialization.data(withJSONObject: json) { try? data.write(to: file, options: .atomic) }
+        }
         for backup in all(in: root) {
-            try? FileManager.default.removeItem(at: backup.appendingPathComponent("Profiles/\(profile.uuidString)", isDirectory: true))
+            try? FileManager.default.removeItem(at: backup.appendingPathComponent("Profiles/\(id)", isDirectory: true))
+            var favorites: Set<String> = []
+            edit(backup.appendingPathComponent("Profiles.json")) { json in
+                let owned = (json["favorites"] as? [String: String]) ?? [:]
+                favorites = Set(owned.filter { $0.value == id }.keys)
+                if json["favorites"] != nil { json["favorites"] = owned.filter { $0.value != id } }
+                if let spaces = json["spaces"] as? [String: String] { json["spaces"] = spaces.filter { $0.value != id } }
+                for list in ["others", "deleting"] {
+                    if let profiles = json[list] as? [[String: Any]] { json[list] = profiles.filter { $0["id"] as? String != id } }
+                }
+            }
+            guard !favorites.isEmpty else { continue }
+            edit(backup.appendingPathComponent("Library.json")) { json in
+                if let kept = json["favorites"] as? [[String: Any]] { json["favorites"] = kept.filter { !favorites.contains($0["id"] as? String ?? "") } }
+                if let splits = json["favoriteSplits"] as? [[String: Any]] {
+                    json["favoriteSplits"] = splits.filter { !favorites.contains($0["left"] as? String ?? "") && !favorites.contains($0["right"] as? String ?? "") }
+                }
+            }
         }
     }
     private static let restoreMarker = "Restore"

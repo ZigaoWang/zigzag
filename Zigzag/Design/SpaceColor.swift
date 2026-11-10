@@ -5,6 +5,13 @@ import AppKit
 enum SpaceColor: String, Codable, CaseIterable {
     case snow, graphite, ink, sky, sage, sand, rose, lavender, mint, peach
 
+    /// The color a new space or profile gets: the first with a hue that none has yet, else, once all are taken,
+    /// the next of `fallback` in turn.
+    static func next(unused used: [SpaceColor], fallback: [SpaceColor] = allCases) -> SpaceColor {
+        let taken = Set(used)
+        return allCases.first { !$0.isNeutral && !taken.contains($0) } ?? fallback[used.count % fallback.count]
+    }
+
     /// Without a hue: pure white, gray and black. A gradient or a hue doesn't apply to them.
     var isNeutral: Bool { self == .snow || self == .graphite || self == .ink }
 

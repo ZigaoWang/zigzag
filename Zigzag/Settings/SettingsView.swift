@@ -1079,19 +1079,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
     /// Chooses that profile, in the sections that are about one profile. Only there once there's more than one.
     private let profilePicker = DropdownButton()
+    /// The profiles as its menu lists them.
+    private var pickerIDs: [UUID] = []
 
     private func refreshProfilePicker() {
-        let profiles = Library.shared.profiles
-        profilePicker.options = profiles.map { DropdownButton.Option(title: $0.displayName, image: ProfileSheets.tile(for: $0)) }
-        profilePicker.selectedIndex = profiles.firstIndex { $0.id == profile.id } ?? 0
-        profilePicker.isHidden = profiles.count < 2
-        profilePicker.setAccessibilityLabel(String(localized: "Profile", comment: "Label in a space's editor, before the choice of the profile the space is on."))
+        pickerIDs = ProfileChoice.fill(profilePicker, selected: profile.id)
+        profilePicker.isHidden = pickerIDs.count < 2
+        profilePicker.setAccessibilityLabel(ProfileChoice.label)
     }
 
     private func choseProfile(at index: Int) {
-        let profiles = Library.shared.profiles
-        guard profiles.indices.contains(index) else { return }
-        scope = profiles[index].id
+        guard pickerIDs.indices.contains(index) else { return }
+        scope = pickerIDs[index]
         reloadExtensions()
         reloadPrivacy()
         layoutDocument()
@@ -1786,7 +1785,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let history = PillButton(title: String(localized: "Clear History…", comment: "Button in Settings › Privacy."))
         history.onClick = { [weak self, weak history] _ in
             guard let profile = self?.profile else { return }
-            self?.confirm(title: HistoryPage.clearTitle, message: HistoryPage.clearMessage + HistoryPage.whoseNote(profile.id),
+            self?.confirm(title: HistoryPage.clearTitle, message: Words.sentences(HistoryPage.clearMessage, HistoryPage.whoseNote(profile.id)),
                           action: String(localized: "Clear History", comment: "Button of the sheet that clears history.")) {
                 BrowserWindowController.historyChange(String(localized: "Clear History", comment: "What Edit › Undo undoes after history is cleared.")) {
                     profile.history.remove()
@@ -1811,7 +1810,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let cache = PillButton(title: String(localized: "Clear Cache…", comment: "Button in Settings › Privacy."))
         cache.onClick = { [weak self, weak cache] _ in
             self?.confirm(title: String(localized: "Clear the cache for every site?", comment: "Title of the sheet that clears the cache."),
-                          message: String(localized: "Pages load a little slower the first time you open them again. You stay signed in.", comment: "Message of the sheet that clears the cache.") + only,
+                          message: Words.sentences(String(localized: "Pages load a little slower the first time you open them again. You stay signed in.", comment: "Message of the sheet that clears the cache."), only),
                           action: String(localized: "Clear Cache", comment: "Button of the sheet that clears the cache."), destructive: false) {
                 Task { @MainActor in
                     await WebsiteData.clear(.cache, in: store)
@@ -1823,7 +1822,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let cookies = PillButton(title: String(localized: "Clear Cookies…", comment: "Button in Settings › Privacy."))
         cookies.onClick = { [weak self, weak cookies] _ in
             self?.confirm(title: String(localized: "Clear cookies for every site?", comment: "Title of the sheet that clears cookies."),
-                          message: String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that clears cookies.") + only,
+                          message: Words.sentences(String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that clears cookies."), only),
                           action: String(localized: "Clear Cookies", comment: "Button of the sheet that clears cookies.")) {
                 Task { @MainActor in
                     await WebsiteData.clear(.cookies, in: store)
