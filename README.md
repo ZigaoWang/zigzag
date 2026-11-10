@@ -63,7 +63,7 @@ Zigzag connects to on its own.
 | **Passwords** | In your Mac's Keychain, synced by iCloud Keychain. Touch ID, a generator, and a check for weak and reused ones. Passkeys work. |
 | **Ad blocking** | Built in and on: about 130,000 EasyList, EasyPrivacy and EasyList China rules, compiled into WebKit content rule lists. |
 | **Extensions** | From the Chrome Web Store, with an Add to Zigzag button on each listing. 1Password, Bitwarden, Dark Reader, Tampermonkey and most popular ones work; see below for what doesn't. |
-| **Import** | Bookmarks, history, passwords, sign-ins and extensions from Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Firefox and Zen. |
+| **Import** | Bookmarks, history, passwords, sign-ins and extensions from Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox and Zen. |
 | **Automation** | AppleScript, Shortcuts and `osascript` can list and open tabs and read pages, written the way Safari and Chrome take them. See [docs/automation.md](docs/automation.md). |
 | **Languages** | English and Simplified Chinese. |
 | **And** | Reader, PDF viewer, full-page screenshots (⇧⌘2), on-device translation, Picture in Picture, private windows, Web Inspector. |

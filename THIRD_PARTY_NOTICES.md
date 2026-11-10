@@ -227,7 +227,7 @@ documented formats, with one made-up login. It contains no third-party code or r
 
 ## Names and marks
 
-Zigzag mentions other browsers (Arc, Chrome, Safari, Firefox, Zen, Edge, Brave, Dia, Vivaldi, Opera) to import
+Zigzag mentions other browsers (Arc, Chrome, Safari, Firefox, Zen, Edge, Brave, Dia, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium) to import
 from them, and popular websites in onboarding and site search. The bundled `Zigzag/Resources/Onboarding/avoidxray.png`
 is the logo of AvoidXray, which is also made by Zigao Wang; it's used to show that site in onboarding. Some site
 icons are loaded from their owners' servers when shown. These names, logos and icons belong to their owners; their use here doesn't mean an
