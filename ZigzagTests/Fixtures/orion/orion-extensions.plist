@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Made up for Zigzag's tests, shaped like Orion's Defaults/Extensions/extensions.plist. The ids are made up too. -->
+<plist version="1.0">
+<dict>
+	<key>extensions</key>
+	<dict>
+		<key>aaaabbbbccccddddeeeeffffgggghhhh</key>
+		<dict>
+			<key>active</key><true/>
+			<key>store_type</key><string>chrome</string>
+			<key>store_id</key><string>aaaabbbbccccddddeeeeffffgggghhhh</string>
+			<key>installTimeStamp</key><real>1700000000</real>
+			<key>permissions</key><array><string>storage</string></array>
+		</dict>
+		<key>bbbbccccddddeeeeffffgggghhhhiiii</key>
+		<dict>
+			<key>active</key><false/>
+			<key>store_type</key><string>chrome</string>
+			<key>store_id</key><string>bbbbccccddddeeeeffffgggghhhhiiii</string>
+		</dict>
+		<key>{11111111-2222-3333-4444-555555555555}</key>
+		<dict>
+			<key>active</key><true/>
+			<key>store_type</key><string>firefox</string>
+			<key>store_id</key><string>some-firefox-addon</string>
+		</dict>
+		<key>ccccddddeeeeffffgggghhhhiiiijjjj</key>
+		<dict>
+			<key>active</key><true/>
+			<key>store_type</key><string>chrome</string>
+			<key>store_id</key><string>ccccddddeeeeffffgggghhhhiiiijjjj</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

@@ -1,0 +1,35 @@
+-- Made up for Zigzag's tests: Orion's Defaults/history schema (WebKit-style), with a few pages.
+CREATE TABLE history_items (
+ID INTEGER PRIMARY KEY AUTOINCREMENT,
+URL TEXT,
+TITLE TEXT,
+HOST TEXT,
+LAST_VISIT_TIME TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+VISIT_COUNT INTEGER,
+TYPED_COUNT INTEGER
+);
+CREATE TABLE visits (
+ID INTEGER PRIMARY KEY AUTOINCREMENT,
+HISTORY_ITEM_ID INTEGER,
+VISIT_TIME TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+REFERRING_VISIT_ID INTEGER,
+TRANSITION_TYPE TEXT
+);
+CREATE UNIQUE INDEX history_items_index ON history_items (URL);
+CREATE UNIQUE INDEX visits_index ON visits (HISTORY_ITEM_ID,VISIT_TIME);
+CREATE TABLE history_suggestion_items (
+QUERY TEXT PRIMARY KEY,
+HISTORY_ITEM_ID INTEGER
+);
+CREATE TABLE top_hits_ranking (
+	HOST TEXT PRIMARY KEY,
+	RANK INTEGER DEFAULT 1
+);
+INSERT INTO history_items (URL, TITLE, HOST, LAST_VISIT_TIME, VISIT_COUNT, TYPED_COUNT) VALUES
+  ('https://news.test/', 'News', 'news.test', '2024-03-01 12:00:00', 5, 2),
+  ('https://old.test/page', 'Old page', 'old.test', '2023-01-15 08:30:00', 1, 0),
+  ('https://untitled.test/', NULL, 'untitled.test', '2024-02-01 00:00:00', 0, 0),
+  ('about:blank', '', '', '2024-03-02 00:00:00', 1, 0);
+INSERT INTO visits (HISTORY_ITEM_ID, VISIT_TIME, REFERRING_VISIT_ID, TRANSITION_TYPE) VALUES
+  (1, '2024-03-01 12:00:00', NULL, 'typed'),
+  (2, '2023-01-15 08:30:00', NULL, 'link');

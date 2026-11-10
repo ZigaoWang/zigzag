@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Made up for Zigzag's tests, shaped like Orion's Defaults/favourites.plist: every item by its id. -->
+<plist version="1.0">
+<dict>
+	<key>0</key>
+	<dict>
+		<key>id</key><string>0</string>
+		<key>title</key><string></string>
+		<key>type</key><string>folder</string>
+		<key>index</key><integer>0</integer>
+		<key>unmodifiable</key><string>managed</string>
+		<key>dateAdded</key><real>1700000000000</real>
+	</dict>
+	<key>1</key>
+	<dict>
+		<key>id</key><string>1</string>
+		<key>parentId</key><string>0</string>
+		<key>title</key><string>Bookmarks Bar</string>
+		<key>type</key><string>folder</string>
+		<key>index</key><integer>1</integer>
+		<key>unmodifiable</key><string>managed</string>
+		<key>dateAdded</key><real>1700000000000</real>
+	</dict>
+	<key>2</key>
+	<dict>
+		<key>id</key><string>2</string>
+		<key>parentId</key><string>0</string>
+		<key>title</key><string>Bookmarks</string>
+		<key>type</key><string>folder</string>
+		<key>index</key><integer>2</integer>
+		<key>unmodifiable</key><string>managed</string>
+		<key>dateAdded</key><real>1700000000000</real>
+	</dict>
+	<key>3</key>
+	<dict>
+		<key>id</key><string>3</string>
+		<key>parentId</key><string>0</string>
+		<key>title</key><string>Favorites</string>
+		<key>type</key><string>folder</string>
+		<key>index</key><integer>0</integer>
+		<key>unmodifiable</key><string>managed</string>
+		<key>dateAdded</key><real>1700000000000</real>
+	</dict>
+	<key>A1</key>
+	<dict>
+		<key>id</key><string>A1</string>
+		<key>parentId</key><string>3</string>
+		<key>title</key><string>Top</string>
+		<key>type</key><string>bookmark</string>
+		<key>url</key><string>https://top.test/</string>
+		<key>index</key><integer>0</integer>
+		<key>dateAdded</key><real>1700000000000</real>
+	</dict>
+	<key>F1</key>
+	<dict>
+		<key>id</key><string>F1</string>
+		<key>parentId</key><string>1</string>
+		<key>title</key><string>Work</string>
+		<key>type</key><string>folder</string>
+		<key>index</key><integer>0</integer>
+		<key>dateAdded</key><real>1700000000000</real>
+	</dict>
+	<key>F2</key>
+	<dict>
+		<key>id</key><string>F2</string>
+		<key>parentId</key><string>F1</string>
+		<key>title</key><string>Docs</string>
+		<key>type</key><string>folder</string>
+		<key>index</key><integer>2</integer>
+		<key>dateAdded</key><real>1700000000000</real>
+	</dict>
+	<key>B2</key>
+	<dict>
+		<key>id</key><string>B2</string>
+		<key>parentId</key><string>F1</string>
+		<key>title</key><string>Second in Work</string>
+		<key>type</key><string>bookmark</string>
+		<key>url</key><string>https://work.test/second</string>
+		<key>index</key><integer>1</integer>
+		<key>dateAdded</key><real>1700000000000</real>
+	</dict>
+	<key>B1</key>
+	<dict>
+		<key>id</key><string>B1</string>
+		<key>parentId</key><string>F1</string>
+		<key>title</key><string>First in Work</string>
+		<key>type</key><string>bookmark</string>
+		<key>url</key><string>https://work.test/first</string>
+		<key>index</key><integer>0</integer>
+		<key>dateAdded</key><real>1700000000000</real>
+	</dict>
+	<key>B3</key>
+	<dict>
+		<key>id</key><string>B3</string>
+		<key>parentId</key><string>F2</string>
+		<key>title</key><string>In Docs</string>
+		<key>type</key><string>bookmark</string>
+		<key>url</key><string>https://docs.test/</string>
+		<key>index</key><integer>0</integer>
+		<key>keyword</key><string>docs</string>
+		<key>dateAdded</key><real>1700000000000</real>
+	</dict>
+	<key>B4</key>
+	<dict>
+		<key>id</key><string>B4</string>
+		<key>parentId</key><string>2</string>
+		<key>title</key><string>A bookmarklet</string>
+		<key>type</key><string>bookmark</string>
+		<key>url</key><string>javascript:void(0)</string>
+		<key>index</key><integer>0</integer>
+		<key>dateAdded</key><real>1700000000000</real>
+	</dict>
+	<key>B5</key>
+	<dict>
+		<key>id</key><string>B5</string>
+		<key>parentId</key><string>2</string>
+		<key>title</key><string></string>
+		<key>type</key><string>bookmark</string>
+		<key>url</key><string>https://untitled.test/page</string>
+		<key>index</key><integer>1</integer>
+		<key>dateAdded</key><real>1700000000000</real>
+	</dict>
+	<key>B6</key>
+	<dict>
+		<key>id</key><string>B6</string>
+		<key>parentId</key><string>gone</string>
+		<key>title</key><string>Its folder is gone</string>
+		<key>type</key><string>bookmark</string>
+		<key>url</key><string>https://orphan.test/</string>
+		<key>index</key><integer>0</integer>
+		<key>dateAdded</key><real>1700000000000</real>
+	</dict>
+</dict>
+</plist>
