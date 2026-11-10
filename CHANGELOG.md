@@ -5,6 +5,19 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.7.7] - 2026-11-10
+
+### New
+- Settings › Tabs › Swipe to go back and forward: turn it off and websites get every two-finger swipe. ([#30](https://github.com/ZigaoWang/zigzag/issues/30))
+
+### Fixed
+- Tabs you leave in the background stay as they were. They sleep after an hour out of sight instead of 15 minutes (after 15 minutes once more than 20 are awake, and after 5 only while your Mac is low on memory), and never while they have something you typed in them. ([#32](https://github.com/ZigaoWang/zigzag/issues/32))
+- A tab that loads again comes back where you were, with the text you'd typed, but never passwords or card details. ([#32](https://github.com/ZigaoWang/zigzag/issues/32))
+- When a page reloads because it used too much memory, or your Mac ran low, Zigzag says so. ([#32](https://github.com/ZigaoWang/zigzag/issues/32))
+- A busy background tab gets three minutes, not one, before it's put to sleep for using a lot of energy. ([#32](https://github.com/ZigaoWang/zigzag/issues/32))
+- A full-screen video keeps the whole screen, with no frozen strips, and going back to its tab doesn't take it out of full screen. Swiping over it no longer goes back a page. ([#31](https://github.com/ZigaoWang/zigzag/issues/31))
+- Typing in the command bar never waits on your history, however big it is. History results and address completion join the list as they arrive. Thanks to [zemu](https://github.com/ze-mu-zhou) for measuring it. ([#29](https://github.com/ZigaoWang/zigzag/issues/29))
+
 ## [0.7.6] - 2026-11-10
 
 ### New
