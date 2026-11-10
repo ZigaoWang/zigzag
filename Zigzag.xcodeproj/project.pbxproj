@@ -201,6 +201,7 @@
 		CF63705B985B423D3B9EC482 /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77478845778FB285ADD29C14 /* Library.swift */; };
 		CFF40171919A4F0A934D4576 /* FaviconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192303361A76A758A8F9346F /* FaviconView.swift */; };
 		D14729ACC5D7A52A9E69E2A9 /* ChromiumImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59824EC63CB9D39A3EFC97CC /* ChromiumImporter.swift */; };
+		D230403602A78BE3B228B74C /* ErrorPageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09641835EC802C4387DBF55 /* ErrorPageTests.swift */; };
 		D2985616CED5916351C99C8F /* PublicSuffix.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0872FF032E0FE3CBD091DB5 /* PublicSuffix.swift */; };
 		D2C57092BCC2EE225A2762E1 /* SidebarRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32D47467F8351F9270BAE20A /* SidebarRows.swift */; };
 		D35C9F0D071FD702CE802ECF /* SpaceColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AC14679F1BBD42EB63BB056 /* SpaceColor.swift */; };
@@ -410,6 +411,7 @@
 		BD2664CEA2397AB72FA6371E /* ExternalLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalLinks.swift; sourceTree = "<group>"; };
 		BF2F4BA4D4D31C1518CC7B9E /* CapitalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapitalizationTests.swift; sourceTree = "<group>"; };
 		C0943F5424EE8E9EE3A714D4 /* ImportExtensionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportExtensionViews.swift; sourceTree = "<group>"; };
+		C09641835EC802C4387DBF55 /* ErrorPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorPageTests.swift; sourceTree = "<group>"; };
 		C21F72054D6913E7D8AD017F /* WebNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebNotifications.swift; sourceTree = "<group>"; };
 		C31DB0355627F311823B01A6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C472C971546CFF3A725753ED /* MoveToApplications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveToApplications.swift; sourceTree = "<group>"; };
@@ -835,6 +837,7 @@
 				3014AEB17D7BEE4384710CD9 /* DeveloperToolsTests.swift */,
 				14B44E3C60BDACED82D8B858 /* DiagnosticsTests.swift */,
 				53584D3A138EABED88285971 /* DialogPasswordFixesTests.swift */,
+				C09641835EC802C4387DBF55 /* ErrorPageTests.swift */,
 				840842D8431CA3F0AD989350 /* ExtensionBridgeTests.swift */,
 				F75F27BD154DC2EB7A42D2DE /* ExtensionImportTests.swift */,
 				36C7F87F644076D0EBA10F87 /* ExtensionScriptTests.swift */,
@@ -1238,6 +1241,7 @@
 				B5E6F1A8F313A228FEF5DE37 /* DeveloperToolsTests.swift in Sources */,
 				4E5CF0E3E770AEFADC046339 /* DiagnosticsTests.swift in Sources */,
 				CE5616DC4C93BC6AEDB917D3 /* DialogPasswordFixesTests.swift in Sources */,
+				D230403602A78BE3B228B74C /* ErrorPageTests.swift in Sources */,
 				0CC1228D26EEC04E26173909 /* ExtensionBridgeTests.swift in Sources */,
 				B04713924CD34C38A4EC8FF5 /* ExtensionImportTests.swift in Sources */,
 				D8AACEBA75F8D120D6AFE1D1 /* ExtensionScriptTests.swift in Sources */,
