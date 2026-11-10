@@ -73,3 +73,60 @@ struct SettingsPageTests {
         #expect(HistoryPage.isInternal(URL(string: "zigzag://settings")))
     }
 }
+
+/// A group whose rows are read a moment after they're asked for is filled again only when what it lists changes.
+struct GroupListingTests {
+    @Test func theSameRowsAreNeverReadTwice() {
+        var listing = GroupListing<[String]>()
+        let answer1 = listing.needs(["a", "b"])
+        #expect(answer1)
+        // Asked again while they're being read: nothing more to do.
+        let answer2 = listing.needs(["a", "b"])
+        #expect(!answer2)
+        let answer3 = listing.arrived(["a", "b"])
+        #expect(answer3)
+        #expect(listing.shown == ["a", "b"])
+        // Asked again once they show: they stay as they are.
+        let answer4 = listing.needs(["a", "b"])
+        #expect(!answer4)
+        // Something else: read.
+        let answer5 = listing.needs(["a"])
+        #expect(answer5)
+    }
+
+    @Test func rowsReadForSomethingNoLongerWantedAreDropped() {
+        var listing = GroupListing<[String]>()
+        let answer6 = listing.needs(["a"])
+        #expect(answer6)
+        let answer7 = listing.needs(["b"])
+        #expect(answer7)
+        // The first answer comes in after the second was asked for.
+        let answer8 = listing.arrived(["a"])
+        #expect(!answer8)
+        #expect(listing.shown == nil)
+        let answer9 = listing.arrived(["b"])
+        #expect(answer9)
+        #expect(listing.shown == ["b"])
+    }
+
+    @Test func aGroupShownAtOnceOrEmptiedStartsOver() {
+        var listing = GroupListing<[String]>()
+        let answer10 = listing.needs(["a"])
+        #expect(answer10)
+        // Nothing to list after all: shown empty at once, and the answer still coming is dropped.
+        listing.show([])
+        let answer11 = listing.arrived(["a"])
+        #expect(!answer11)
+        #expect(listing.shown == [])
+        let answer12 = listing.needs([])
+        #expect(!answer12)
+        // Its rows taken out (another profile is shown): the same list has to be read again.
+        let answer13 = listing.needs(["a"])
+        #expect(answer13)
+        let answer14 = listing.arrived(["a"])
+        #expect(answer14)
+        listing.forget()
+        let answer15 = listing.needs(["a"])
+        #expect(answer15)
+    }
+}

@@ -82,6 +82,43 @@ final class FormGroup: NSView {
     }
 }
 
+/// What a group lists when its rows are read a moment after they're asked for (from disk, from WebKit). The group is
+/// read and filled again only when what it lists changes: asked again for the same, its rows stay as they are, so
+/// they never go and come back while you look at them.
+nonisolated struct GroupListing<Key: Equatable> {
+    /// What the group's rows are of.
+    private(set) var shown: Key?
+    /// What's being read for it, to take its rows' place once it's in.
+    private(set) var reading: Key?
+
+    /// Whether rows for `key` have to be read: not while they're showing, or already being read.
+    mutating func needs(_ key: Key) -> Bool {
+        guard key != shown, key != reading else { return false }
+        reading = key
+        return true
+    }
+
+    /// The rows read for `key` are in. False when something else has been asked for since: they're dropped.
+    mutating func arrived(_ key: Key) -> Bool {
+        guard reading == key else { return false }
+        shown = key
+        reading = nil
+        return true
+    }
+
+    /// The group shows `key` now, with nothing to wait for. What was being read is no longer wanted.
+    mutating func show(_ key: Key) {
+        shown = key
+        reading = nil
+    }
+
+    /// The group's rows were taken out: whatever is asked for next has to be read.
+    mutating func forget() {
+        shown = nil
+        reading = nil
+    }
+}
+
 /// A row "Find a setting" can find, by the words it shows.
 protocol SettingsSearchable { var searchText: String { get } }
 
@@ -583,6 +620,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// What's on disk from a profile that's in no list, to bring back or delete. Only there when there's any.
     private let unlistedGroup = FormGroup()
     private var otherProfilesTask: Task<Void, Never>?
+    /// Which profile's missing extensions "In Other Profiles" lists, and which they are.
+    private struct OtherProfilesKey: Equatable { let profile: UUID; let ids: [String] }
+    private var otherProfilesListing = GroupListing<OtherProfilesKey>()
+    /// The IDs "Not Listed" shows data for.
+    private var unlistedListing = GroupListing<[UUID]>()
+    /// Reloads that are being gathered into one layout (`layingOutOnce`), and whether any of them asked for it.
+    private var heldLayouts = 0
+    private var layoutIsWanted = false
     private var shortcutGroups: [(String, FormGroup)] = []
 
     private let engine = DropdownButton()
@@ -650,10 +695,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         build()
         token = Library.shared.changed.observe { [weak self] in
             guard let self, self.window != nil else { return }
-            self.profilesChanged()
-            self.reloadSpaces()
-            self.reloadProfiles()
-            self.reloadExtensions()
+            self.layingOutOnce {
+                self.profilesChanged()
+                self.reloadSpaces()
+                self.reloadProfiles()
+                self.reloadExtensions()
+            }
         }
         // An extension's engine chosen from its toast, or gone with it, while Settings is open.
         engineToken = ExtensionSearchProvider.changed.observe { [weak self] in
@@ -1086,16 +1133,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         keyToken = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }
-        refresh()
-        // A profile made or removed while this tab wasn't showing.
-        followProfiles()
-        reloadSpaces()
-        reloadProfiles()
-        reloadExtensions()
-        reloadPasswords()
-        reloadTranslation()
-        if showsWebsiteData { reloadPrivacy() }
-        layoutDocument()
+        layingOutOnce {
+            refresh()
+            // A profile made or removed while this tab wasn't showing.
+            followProfiles()
+            reloadSpaces()
+            reloadProfiles()
+            reloadExtensions()
+            reloadPasswords()
+            reloadTranslation()
+            if showsWebsiteData { reloadPrivacy() }
+            layoutDocument()
+        }
     }
 
     /// Its picture, for the tab's preview and switcher.
@@ -1145,11 +1194,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// Another profile is the one shown: everything that's about one profile is read again.
     private func profileChanged() {
-        refreshProfilePicker()
-        reloadExtensions()
-        if showsWebsiteData { reloadPrivacy() }
-        reloadPasswords()
-        layoutDocument()
+        layingOutOnce {
+            refreshProfilePicker()
+            reloadExtensions()
+            if showsWebsiteData { reloadPrivacy() }
+            reloadPasswords()
+            layoutDocument()
+        }
     }
 
     /// The sections, in the column. Built again when a second profile is made or the last other one goes.
@@ -1183,10 +1234,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// A profile made, renamed or removed while Settings is open.
     private func profilesChanged() {
-        followProfiles()
-        if showsWebsiteData { reloadPrivacy() }
-        reloadPasswords()
-        layoutDocument()
+        layingOutOnce {
+            followProfiles()
+            if showsWebsiteData { reloadPrivacy() }
+            reloadPasswords()
+            layoutDocument()
+        }
     }
 
     /// The column and the menu as the profiles are now: grouped or not, the profile chosen still there.
@@ -1231,23 +1284,37 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         for (id, ext) in installed { extensionsGroup.add(extensionRow(id: id, ext: ext)) }
         // What your other profiles have that this one doesn't, to add without another trip to the store. Read from
         // each package, not from the other profile's running extensions: looking here starts none of them.
-        otherProfilesGroup.removeAllRows()
         let here = profile, has = Set(here.installs.installedIDs)
         let offered = Array(Set(Profiles.shared.all.filter { $0 !== here }.flatMap { $0.installs.installedIDs }).subtracting(has)).sorted()
-        otherProfilesTask?.cancel()
-        otherProfilesTask = offered.isEmpty ? nil : Task { @MainActor [weak self] in
-            var rows: [FormRow] = []
-            for id in offered {
-                guard let folder = ExtensionStore.packageDirectory(for: id), let ext = try? await WKWebExtension(resourceBaseURL: folder) else { continue }
-                let add = PillButton(title: String(localized: "Add", comment: "Button on an extension another profile has, in Settings › Extensions: adds it to the profile shown."))
-                add.onClick = { [weak self] _ in Task { await ExtensionStore.add(id, to: here); self?.reloadExtensions() } }
-                rows.append(FormRow(title: ext.displayName ?? id,
-                                    detail: String(localized: "Starts fresh here: nothing it stored in another profile comes along.", comment: "Under an extension another profile has, in Settings › Extensions."),
-                                    icon: ext.icon(for: NSSize(width: 24, height: 24)), control: add))
+        let listed = OtherProfilesKey(profile: here.id, ids: offered)
+        // Another profile's rows never stand under this one's name while its own are read.
+        if otherProfilesListing.shown?.profile != here.id {
+            otherProfilesGroup.removeAllRows()
+            otherProfilesListing.forget()
+        }
+        if offered.isEmpty {
+            otherProfilesTask?.cancel()
+            otherProfilesGroup.removeAllRows()
+            otherProfilesListing.show(listed)
+        } else if otherProfilesListing.needs(listed) {
+            // Each package is read for its name and icon, which takes a moment. The rows showing stay until the new
+            // ones are in, and the same extensions asked for again (any extension's change brings us here) read nothing.
+            otherProfilesTask?.cancel()
+            otherProfilesTask = Task { @MainActor [weak self] in
+                var rows: [FormRow] = []
+                for id in offered {
+                    guard let folder = ExtensionStore.packageDirectory(for: id), let ext = try? await WKWebExtension(resourceBaseURL: folder) else { continue }
+                    let add = PillButton(title: String(localized: "Add", comment: "Button on an extension another profile has, in Settings › Extensions: adds it to the profile shown."))
+                    add.onClick = { [weak self] _ in Task { await ExtensionStore.add(id, to: here); self?.reloadExtensions() } }
+                    rows.append(FormRow(title: ext.displayName ?? id,
+                                        detail: String(localized: "Starts fresh here: nothing it stored in another profile comes along.", comment: "Under an extension another profile has, in Settings › Extensions."),
+                                        icon: ext.icon(for: NSSize(width: 24, height: 24)), control: add))
+                }
+                guard let self, !Task.isCancelled, self.otherProfilesListing.arrived(listed) else { return }
+                self.otherProfilesGroup.removeAllRows()
+                rows.forEach(self.otherProfilesGroup.add)
+                if self.pane == .extensions || self.isSearching { self.layoutDocument() }
             }
-            guard let self, !Task.isCancelled else { return }
-            rows.forEach(self.otherProfilesGroup.add)
-            if self.pane == .extensions || self.isSearching { self.layoutDocument() }
         }
         let developer = Toggle(isOn: ExtensionStore.developerMode)
         developer.onChange = { [weak self] on in
@@ -1366,7 +1433,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func reloadUnlisted() {
         Task { @MainActor [weak self] in
             let found = await Profiles.shared.orphans()
-            guard let self else { return }
+            // The same data as is listed: its rows stay as they are.
+            guard let self, self.unlistedListing.shown != found else { return }
+            self.unlistedListing.show(found)
             self.unlistedGroup.removeAllRows()
             for id in found {
                 let restore = PillButton(title: String(localized: "Restore", comment: "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again."))
@@ -1558,9 +1627,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// What a scripted check reads: the section and profile shown, the column as it's built, the headings of the
     /// section's groups, and whether Zigzag saves and fills passwords in that profile.
+    /// How many times the page has been laid out, for a check that it isn't laid out more than it needs.
+    private(set) var debugLayouts = 0
+
     var debugState: [String: Any] {
         let profile = profile
-        return ["pane": pane.rawValue, "profile": Library.shared.directory.profile(profile.id)?.name ?? "",
+        return ["layouts": debugLayouts, "inOtherProfiles": otherProfilesGroup.rows.count,
+                "pane": pane.rawValue, "profile": Library.shared.directory.profile(profile.id)?.name ?? "",
                 "column": items.map(\.pane.rawValue), "grouped": columnHasProfiles,
                 "menu": profilePicker.superview === column ? "column" : profilePicker.superview === header ? "header" : "none",
                 "headings": groups(of: pane).map { $0.title ?? "" },
@@ -1648,7 +1721,22 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     // MARK: Layout
 
+    /// Several things read again, the page laid out once: what `reloads` reads may each ask for a layout, and one
+    /// is done at the end if any did. Without it, choosing another profile laid the page out three times over.
+    private func layingOutOnce(_ reloads: () -> Void) {
+        heldLayouts += 1
+        reloads()
+        heldLayouts -= 1
+        guard heldLayouts == 0, layoutIsWanted else { return }
+        layoutIsWanted = false
+        layoutDocument()
+    }
+
     private func layoutDocument() {
+        guard heldLayouts == 0 else { layoutIsWanted = true; return }
+        #if DEBUG
+        debugLayouts += 1
+        #endif
         documentView.subviews.forEach { $0.removeFromSuperview() }
         let width = scroll.contentSize.width
         laidOutWidth = scroll.frame.width
@@ -2118,7 +2206,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             sitesGroup.add(FormRow(title: String(localized: "\(more) more sites", comment: "Under the first 30 sites in Settings › Privacy, beside Show All."), control: all))
         }
-        reloadSiteData()
+        // What websites keep is read where it's listed: with more than one profile that's Website Data, and
+        // Privacy has no use for it.
+        if !(pane == .privacy && hasManyProfiles) { reloadSiteData() }
     }
 
     /// What each site keeps on this Mac, read from WebKit (it takes a moment, so the list fills in when it's ready),
