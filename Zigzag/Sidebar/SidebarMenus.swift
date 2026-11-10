@@ -404,7 +404,7 @@ final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
         // Where the command bar opens, the other place you type a name.
         panel.frame.origin = NSPoint(x: round(card.midX - width / 2), y: card.minY + max(Tokens.Space.x12, floor(card.height * 0.18)))
         controller.root.overlay.addSubview(panel)
-        panel.present(arrival: .fade)
+        panel.present()
         controller.window?.makeFirstResponder(panel.field.field)
         panel.field.field.currentEditor()?.selectAll(nil)
         panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown]) { [weak panel] event in

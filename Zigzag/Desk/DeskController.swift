@@ -303,6 +303,8 @@ final class DeskController {
         }
         // A floating capsule at the bottom, its pills inset evenly so their ends run with its own.
         actionBar.radius = Self.actionBarHeight / 2
+        // It rises those few points from the bottom it sits on as you pick a card, and sinks back when you've none.
+        actionBar.attachedEdge = .maxY
         actionBar.addSubview(closeButton)
         actionBar.addSubview(doneButton)
         closeButton.onClick = { [weak self] _ in self?.closeSelected() }

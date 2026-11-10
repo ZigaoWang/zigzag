@@ -102,8 +102,9 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         addSubview(sidebar)
         addSubview(sidebarEdge)
 
-        // A capsule, as the Reader's bar is.
+        // A capsule, as the Reader's bar is, rising those few points from the page's bottom as the PDF opens.
         bar.radius = Self.barHeight / 2
+        bar.attachedEdge = .maxY
         [sidebarButton, pageButton, zoomOutButton, zoomInButton, twoPagesButton, darkButton, saveButton].forEach { bar.addSubview($0) }
         bar.isHidden = true
         addSubview(bar)

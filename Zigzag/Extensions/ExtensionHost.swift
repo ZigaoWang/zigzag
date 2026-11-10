@@ -1374,7 +1374,9 @@ enum AttentionHint {
         let anchorFrame = anchor.convert(anchor.bounds, to: overlay)
         panel.frame = NSRect(x: max(Tokens.Metric.cardInset, anchorFrame.maxX - width), y: anchorFrame.maxY + Tokens.Space.x2, width: width, height: y)
         overlay.addSubview(panel)
-        panel.present(arrival: .fade)
+        // Out of the button it hangs under.
+        panel.growsFrom = CGPoint(x: min(max((anchorFrame.midX - panel.frame.minX) / width, 0), 1), y: 0)
+        panel.present()
         current = panel
         var monitor: Any?
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .keyDown]) { [weak panel] event in
