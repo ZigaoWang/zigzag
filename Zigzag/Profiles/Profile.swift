@@ -10,8 +10,19 @@ final class Profile {
     let id: UUID
     var isDefault: Bool { id == Self.defaultID }
     /// Cookies and everything else websites keep. One object for as long as Zigzag runs: certificate exceptions,
-    /// sign-in prompts and downloads tell stores apart by which object they are.
-    let store: WKWebsiteDataStore
+    /// sign-in prompts and downloads tell stores apart by which object they are. Made the first time something in
+    /// the profile needs it: WebKit creates a store on disk when it's asked for, and won't remove one this run has
+    /// opened, so a profile that's only listed (in Settings, in a menu) doesn't get one.
+    var store: WKWebsiteDataStore {
+        if let madeStore { return madeStore }
+        let store: WKWebsiteDataStore = isDefault ? .default() : WKWebsiteDataStore(forIdentifier: id)
+        WebKitSetup.allowCrossSiteCookies(in: store)
+        madeStore = store
+        return store
+    }
+    /// Its store if anything has used it since Zigzag started, without making it.
+    var storeIfMade: WKWebsiteDataStore? { madeStore }
+    private var madeStore: WKWebsiteDataStore?
     /// Where its own files are kept. The first profile's are where Zigzag's have always been.
     var folder: URL {
         isDefault ? Paths.support : Paths.directory("Profiles").appendingPathComponent(id.uuidString, isDirectory: true)
@@ -31,10 +42,8 @@ final class Profile {
     /// Its extensions if they've been brought up, without bringing them up.
     var startedExtensions: ExtensionHost? { host }
 
-    init(id: UUID, store: WKWebsiteDataStore) {
+    init(id: UUID) {
         self.id = id
-        self.store = store
-        WebKitSetup.allowCrossSiteCookies(in: store)
     }
 }
 
@@ -44,7 +53,7 @@ final class Profiles {
     static let shared = Profiles()
 
     /// The first profile, which holds what Zigzag kept before there were profiles.
-    let `default` = Profile(id: Profile.defaultID, store: .default())
+    let `default` = Profile(id: Profile.defaultID)
     private var others: [UUID: Profile] = [:]
 
     /// Every profile, the first one first.
@@ -55,7 +64,7 @@ final class Profiles {
         guard id != Profile.defaultID, Library.shared.directory.profile(id) != nil else { return `default` }
         if let known = others[id] { return known }
         // WebKit keeps a store for each identifier, made the first time it's asked for.
-        let made = Profile(id: id, store: WKWebsiteDataStore(forIdentifier: id))
+        let made = Profile(id: id)
         others[id] = made
         return made
     }
@@ -66,7 +75,7 @@ final class Profiles {
     /// The profile a page was made in. None for a private page, whose store is its window's own.
     func profile(of webView: WKWebView) -> Profile? { profile(ofStore: webView.configuration.websiteDataStore) }
 
-    func profile(ofStore store: WKWebsiteDataStore) -> Profile? { all.first { $0.store === store } }
+    func profile(ofStore store: WKWebsiteDataStore) -> Profile? { all.first { $0.storeIfMade === store } }
 
     // MARK: Removing a profile
 
@@ -83,7 +92,7 @@ final class Profiles {
         // From here it's in no list: its spaces are on the first profile, and their pages are rebuilt there.
         Library.shared.removeProfile(id)
         others[id] = nil
-        for popup in PopupWindowController.all where popup.webView.configuration.websiteDataStore === profile.store { popup.window?.close() }
+        for popup in PopupWindowController.all where popup.webView.configuration.websiteDataStore === profile.storeIfMade { popup.window?.close() }
         for mini in MiniWindowController.all { mini.tab.settleProfile() }
         if let host = profile.startedExtensions { await host.shutDown() }
         profile.installs.removeAll()
