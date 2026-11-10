@@ -248,15 +248,28 @@ final class Tab: NSObject {
     /// `because`: why, for Help › Report a Problem.
     func suspend(because reason: String? = nil) {
         guard let webView, !isPlayingAudio else { return }
-        readPageState { [weak self] state in
-            guard let self, self.webView === webView, state?.hasTypedText != true else { return }
-            self.captureSnapshot { [weak self] in
-                guard let self, self.webView === webView else { return }
-                self.pendingInteractionState = webView.interactionState as? Data
-                self.tearDown(webView)
-                self.changed.send(.webView)
-                if let reason { Diagnostics.note("Tab put to sleep", site: self.url?.host(), reason, isPrivate: self.isPrivate) }
-            }
+        sleepTicket += 1
+        let ticket = sleepTicket
+        readPageState { [weak self] state in self?.sleep(webView, ticket: ticket, state: state, because: reason) }
+        // A page stuck in a loop (what EnergyWatch sleeps) never answers: what was read as you left it decides.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            MainActor.assumeIsolated { self?.sleep(webView, ticket: ticket, state: self?.pageState, because: reason) }
+        }
+    }
+
+    /// The asking for `suspend` still waiting, so whichever of the page's answer and the wait for it comes first decides.
+    private var sleepTicket = 0
+
+    private func sleep(_ webView: BrowserWebView, ticket: Int, state: PageState?, because reason: String?) {
+        guard sleepTicket == ticket, self.webView === webView else { return }
+        sleepTicket += 1
+        guard state?.hasTypedText != true else { return }
+        captureSnapshot { [weak self] in
+            guard let self, self.webView === webView else { return }
+            self.pendingInteractionState = webView.interactionState as? Data
+            self.tearDown(webView)
+            self.changed.send(.webView)
+            if let reason { Diagnostics.note("Tab put to sleep", site: self.url?.host(), reason, isPrivate: self.isPrivate) }
         }
     }
 
