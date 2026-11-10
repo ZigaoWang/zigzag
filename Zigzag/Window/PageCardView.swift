@@ -240,7 +240,9 @@ final class PageCardView: NSView {
             // The clip isn't flipped: the header sits at its top edge, the page fills the rest below.
             header.frame = NSRect(x: 0, y: clip.bounds.height - PaneHeaderView.height, width: clip.bounds.width, height: PaneHeaderView.height)
             let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
-            webView?.frame = content
+            // A page in full screen (a video's) is in WebKit's own window, which sizes it: sized to the card from here, it
+            // would no longer fill the screen.
+            if let webView, webView.superview === clip { webView.frame = content }
             document?.frame = content
             placeholder.frame = content
             overlay?.frame = content

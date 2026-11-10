@@ -1,4 +1,5 @@
 import Foundation
+import WebKit
 import Testing
 @testable import Zigzag
 
@@ -37,6 +38,23 @@ struct ShipFixesTests {
         let json = Data(#"["sky", "ultraviolet", "mint"]"#.utf8)
         let colours = try JSONDecoder().decode([SpaceColor].self, from: json)
         #expect(colours == [.sky, .graphite, .mint])
+    }
+
+    @Test func aPageInFullScreenKeepsTheSizeWebKitGaveIt() {
+        let card = PageCardView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        let webView = WKWebView(frame: .zero)
+        card.show(webView)
+        card.layoutSubtreeIfNeeded()
+        #expect(webView.frame.size == NSSize(width: 800, height: 600))
+        // A video goes full screen: WebKit takes the page into a window of its own, the size of the screen.
+        let screen = NSView(frame: NSRect(x: 0, y: 0, width: 1512, height: 949))
+        screen.addSubview(webView)
+        webView.frame = screen.bounds
+        // The card lays itself out meanwhile (the page shown changes, the window resizes): the page isn’t its to size.
+        card.showsHeader = false
+        card.setFrameSize(NSSize(width: 700, height: 500))
+        card.layoutSubtreeIfNeeded()
+        #expect(webView.frame == screen.bounds)
     }
 }
 
