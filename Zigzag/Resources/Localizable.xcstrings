@@ -1,6 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "#%lld on GitHub" : {
+      "comment" : "Tooltip of an issue number at the end of a point in What’s New, like “#32 on GitHub”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 上的 #%lld"
+          }
+        }
+      }
+    },
     "%@ %@" : {
       "comment" : "Joins two sentences, one after the other. Leave out the space if your language doesn't put one between sentences.",
       "localizations" : {
@@ -13318,6 +13329,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "版本 %@ 已准备就绪。在你允许之前，当前版本会继续运行。"
+          }
+        }
+      }
+    },
+    "Version %@, %@" : {
+      "comment" : "Under the title of the What’s New sheet: the version number, then the day it was released, like “Version 0.7.7, November 10, 2026”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Version %1$@, %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本 %1$@，%2$@"
           }
         }
       }
