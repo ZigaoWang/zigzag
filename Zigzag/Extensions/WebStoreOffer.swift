@@ -45,6 +45,10 @@ final class WebStoreOffer: FloatingPanelView {
         icon.contentTintColor = Tokens.Color.textSecondary
         icon.imageScaling = .scaleProportionallyUpOrDown
         refreshName()
+        // With more than one profile, the button says which it's added to: the one of the space you're in.
+        if Library.shared.hasManyProfiles, let profile = Library.shared.directory.profile(controller.tabManager.profile.id) {
+            add.title = String(localized: "Add to \(profile.displayName)", comment: "Button on the bar over a Chrome Web Store page, with more than one profile: installs the extension in the profile named.")
+        }
         name.lineBreakMode = .byTruncatingTail
         done.contentTintColor = Tokens.Color.success
         done.isHidden = true
