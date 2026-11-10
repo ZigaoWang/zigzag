@@ -571,6 +571,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let pipToggle = Toggle()
     private let suggestionsToggle = Toggle()
     private let borderlessToggle = Toggle()
+    private let addressAboveToggle = Toggle()
     private let largeNamesToggle = Toggle()
     private let quitToggle = Toggle()
     private let scriptJavaScriptToggle = Toggle()
@@ -698,6 +699,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         appearanceGroup.add(FormRow(title: String(localized: "Borderless page", comment: "A setting in Settings › Appearance."),
                                     detail: String(localized: "The page meets the window’s edges instead of floating inside it. Hold ⌥⌘ and drag anywhere on the page to move the window.", comment: "Explanation under “Borderless page” in Settings › Appearance. ⌥⌘ are the Option and Command keys."),
                                     control: borderlessToggle))
+        addressAboveToggle.onChange = { on in BrowserRootView.addressAbovePage = on }
+        appearanceGroup.add(FormRow(title: String(localized: "Address bar above the page", comment: "A setting in Settings › Appearance."),
+                                    detail: String(localized: "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden.", comment: "Explanation under “Address bar above the page” in Settings › Appearance."),
+                                    control: addressAboveToggle))
         largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
         appearanceGroup.add(FormRow(title: String(localized: "Large space names", comment: "A setting in Settings › Appearance."),
                                     detail: String(localized: "Shows the space’s name large and light above its tabs. When off, it’s a plain heading.", comment: "Explanation under “Large space names” in Settings › Appearance."),
@@ -1525,6 +1530,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         pipToggle.isOn = PictureInPicture.followsTabs
         suggestionsToggle.isOn = SuggestionFetcher.isOn
         borderlessToggle.isOn = BrowserRootView.isBorderless
+        addressAboveToggle.isOn = BrowserRootView.addressAbovePage
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
         scriptJavaScriptToggle.isOn = Scripting.allowsJavaScript
