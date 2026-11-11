@@ -229,6 +229,10 @@ final class Tab: NSObject {
     private var extensionToken: SignalToken?
 
     var isSuspended: Bool { webView == nil }
+    /// Put to sleep this run (not merely not loaded yet after a relaunch), and whether it was for using a lot of energy:
+    /// the sidebar marks it, so a tab never seems to have lost its page for no reason.
+    private(set) var isAsleep = false
+    private(set) var sleptForEnergy = false
     /// A name you gave the tab (double-click to rename); it stays whatever the page calls itself.
     /// While a pinned page is first loading, where it ends up on its own (a site that redirects, like
     /// calendar.google.com) counts as the pinned page, so it's never "moved on" before you've done anything.
@@ -256,6 +260,8 @@ final class Tab: NSObject {
     @discardableResult
     func ensureWebView() -> BrowserWebView {
         if let webView { return webView }
+        isAsleep = false
+        sleptForEnergy = false
         let fromWebKit = pendingConfiguration != nil
         let extensionConfiguration = fromWebKit ? nil : Self.extensionConfiguration(for: url, in: profile)
         let configuration = pendingConfiguration ?? extensionConfiguration ?? WebKitSetup.makeConfiguration(for: profile)
@@ -343,6 +349,8 @@ final class Tab: NSObject {
             guard let self, self.webView === webView else { return }
             self.pendingInteractionState = webView.interactionState as? Data
             self.tearDown(webView)
+            self.isAsleep = true
+            self.sleptForEnergy = reason == EnergyWatch.sleepReason
             self.changed.send(.webView)
             if let reason { Diagnostics.note("Tab put to sleep", site: self.url?.host(), reason, isPrivate: self.isPrivate) }
         }

@@ -1689,6 +1689,23 @@
         }
       }
     },
+    "A tab on %@ is using a lot of energy. It’ll sleep in %lld minutes." : {
+      "comment" : "Toast when a background tab keeps the Mac busy. The site is a domain, like example.com; the number is how many minutes until the tab sleeps. A sleeping tab wakes where it was when you open it.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "A tab on %1$@ is using a lot of energy. It’ll sleep in %2$lld minutes."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 上的一个标签页耗电较多，%2$lld 分钟后会休眠。"
+          }
+        }
+      }
+    },
     "A tab on %@ was using a lot of energy, so it’s asleep now" : {
       "comment" : "Toast after Zigzag put a background tab to sleep because it used a lot of energy. The site is a domain, like example.com. The tab wakes when you open it.",
       "localizations" : {
@@ -2461,6 +2478,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "退出前询问"
+          }
+        }
+      }
+    },
+    "Asleep to save energy. Opens where you left off." : {
+      "comment" : "Tooltip of a sidebar tab that Zigzag put to sleep because it used a lot of energy in the background.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为省电已休眠，打开后回到你离开的位置。"
+          }
+        }
+      }
+    },
+    "Asleep to save memory. Opens where you left off." : {
+      "comment" : "Tooltip of a sidebar tab that Zigzag put to sleep because it wasn't used for a while or the Mac was low on memory.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为省内存已休眠，打开后回到你离开的位置。"
           }
         }
       }
@@ -6725,6 +6764,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "只需输入这个词"
+          }
+        }
+      }
+    },
+    "Keep Awake" : {
+      "comment" : "Button in the toast saying a busy tab will sleep soon: keeps it awake.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保持唤醒"
           }
         }
       }
