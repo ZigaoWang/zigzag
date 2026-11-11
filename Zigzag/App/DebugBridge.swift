@@ -41,6 +41,41 @@ enum DebugBridge {
     /// minieval <path> <script>, miniswipe <dx> [slow] [noend] (as `swipe page`, over the mini page),
     /// miniborderless on|off (Settings › Appearance › Borderless page). With no Zigzag Mini open, miniask and minianswer
     /// use the front browser window.
+    /// pageprobe <path> [mark]: every tab of every window, whether its page is alive, its web view and process, and
+    /// what its page says of itself (when it was loaded, how, its scroll, a marker left by `mark`) (JSON). `mark`
+    /// first leaves the marker in each live page, so a later probe shows which pages loaded again since.
+    private static func pageProbe(_ arg: String) {
+        let f = arg.split(separator: " ").map(String.init)
+        guard let path = f.first else { return }
+        let mark = f.dropFirst().first == "mark"
+        let script = (mark ? "window.__zzMark = window.__zzMark || Date.now();" : "") + """
+        JSON.stringify({ mark: window.__zzMark || null, origin: performance.timeOrigin,
+          nav: (performance.getEntriesByType('navigation')[0] || {}).type || null, y: scrollY,
+          visibility: document.visibilityState, href: location.href })
+        """
+        var rows: [[String: Any]] = []
+        let group = DispatchGroup()
+        for controller in WindowManager.shared.controllers {
+            for tab in controller.tabManager.allTabs {
+                var row: [String: Any] = ["title": tab.displayTitle, "favorite": tab.isFavorite, "selected": tab === controller.tabManager.selectedTab,
+                                          "space": Library.shared.space(tab.spaceID)?.name ?? "", "alive": tab.webView != nil]
+                guard let webView = tab.webView else { rows.append(row); continue }
+                row["webView"] = "\(ObjectIdentifier(webView).hashValue)"
+                row["pid"] = EnergyWatch.processID(of: webView) ?? -1
+                row["inWindow"] = webView.window != nil
+                group.enter()
+                webView.evaluateJavaScript(script) { result, _ in
+                    row["page"] = result as? String ?? "no answer"
+                    rows.append(row)
+                    group.leave()
+                }
+            }
+        }
+        group.notify(queue: .main) {
+            if let data = try? JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: path)) }
+        }
+    }
+
     private static func runMini(_ name: String, _ arg: String) {
         let mini = MiniWindowController.all.last
         switch name {
@@ -281,6 +316,7 @@ enum DebugBridge {
         if name == "pintoggle" { controller.tabManager.profile.installs.togglePin(arg); return }
         if name == "pinhover" { SitePanel.shown?.debugHover(arg); return }
         if name.hasPrefix("mp") { runMiniPlayer(name, arg, in: controller); return }
+        if name == "pageprobe" { pageProbe(arg); return }
         NSApp.activate()
         controller.window?.makeKeyAndOrderFront(nil)
         switch name {
@@ -528,6 +564,12 @@ enum DebugBridge {
             if n.count == 2, controller.tabManager.currentTabs.indices.contains(Int(n[0])) {
                 controller.tabManager.currentTabs[Int(n[0])].lastActivated = Date().addingTimeInterval(-n[1] * 3600)
                 controller.sidebar.list.refreshRows()
+            }
+        case "agefav":
+            // agefav <minutes>: pretend every favorite but the one shown was last looked at that long ago.
+            let minutes = Double(arg) ?? 30
+            for tab in controller.tabManager.allTabs where tab.isFavorite && tab !== controller.tabManager.selectedTab {
+                tab.lastActivated = Date().addingTimeInterval(-minutes * 60)
             }
         case "edgedrag": controller.root.debugEdgeDrag(arg)
         case "spacedrag": controller.sidebar.debugSpaceDrag(arg)
