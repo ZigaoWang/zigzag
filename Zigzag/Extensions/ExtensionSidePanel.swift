@@ -13,6 +13,8 @@ final class ExtensionSidePanelView: NSView {
     private(set) var webView: WKWebView?
     /// The extension the panel belongs to.
     private(set) var extensionID: String?
+    /// The tab (the extension's id for it) the panel was opened for, with options for that tab; nil for every tab.
+    private(set) var tabID: Int?
     var onClose: (() -> Void)?
 
     override init(frame: NSRect) {
@@ -39,10 +41,11 @@ final class ExtensionSidePanelView: NSView {
     override var isFlipped: Bool { true }
 
     /// Shows an extension's page in the panel, replacing whatever was there.
-    func show(_ webView: WKWebView, extensionID: String, name: String, image: NSImage?) {
+    func show(_ webView: WKWebView, extensionID: String, name: String, image: NSImage?, tabID: Int? = nil) {
         self.webView?.removeFromSuperview()
         self.webView = webView
         self.extensionID = extensionID
+        self.tabID = tabID
         title.stringValue = name
         icon.image = image ?? Tokens.Symbol.image("puzzlepiece.extension", size: 14)
         setAccessibilityLabel(String(localized: "\(name) side panel", comment: "What VoiceOver calls an extension's side panel. The placeholder is the extension's name."))
@@ -67,6 +70,7 @@ final class ExtensionSidePanelView: NSView {
         webView?.removeFromSuperview()
         webView = nil
         extensionID = nil
+        tabID = nil
     }
 
     override func layout() {

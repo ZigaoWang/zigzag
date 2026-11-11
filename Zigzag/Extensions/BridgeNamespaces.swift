@@ -177,26 +177,43 @@ final class BridgeContexts: BridgeNamespace {
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         guard fn == "getContexts" else { throw BridgeError.unsupported(Self.name, fn) }
         guard let context = host.context(for: extensionID) else { return [Any]() }
+        var pages: [Page] = []
+        let background = (context.webExtension.manifest["background"] as? [String: Any])?["service_worker"] as? String
+        pages.append(Page(type: "BACKGROUND", url: background.flatMap { URL(string: $0, relativeTo: context.baseURL)?.absoluteURL }))
+        if let url = host.bridge.offscreen.pageURL(for: extensionID) { pages.append(Page(type: "OFFSCREEN_DOCUMENT", url: url)) }
+        if let page = host.shownPopupPage(for: extensionID) { pages.append(Page(type: "POPUP", url: URL(string: page, relativeTo: context.baseURL)?.absoluteURL)) }
+        for controller in WindowManager.shared.controllers where controller.root.showsSidePanel && host.showsSidePanel(of: extensionID, in: controller) {
+            let panel = controller.root.sidePanel
+            pages.append(Page(type: "SIDE_PANEL", url: panel.webView?.url, tabID: panel.tabID))
+        }
+        return Self.contexts(pages, extensionID: extensionID, filter: args.object(0))
+    }
+
+    /// One of the extension's pages that's open.
+    nonisolated struct Page {
+        var type: String
+        var url: URL?
+        /// The tab a side panel was opened for, when the extension gave its options for one tab.
+        var tabID: Int?
+    }
+
+    /// Chrome's answer for these pages: a side panel opened for one tab names it (Claude's panel checks that it's
+    /// its tab's), any other page -1. Each field of the filter given narrows the answer; addresses are compared
+    /// whole, query included, as Chrome does.
+    nonisolated static func contexts(_ pages: [Page], extensionID: String, filter: [String: Any]) -> [[String: Any]] {
         var found: [[String: Any]] = []
-        let add = { (type: String, url: URL?) in
-            let address = url?.absoluteString ?? ""
-            let origin = url.flatMap { url in url.scheme.map { "\($0)://\(url.host() ?? "")" } } ?? ""
-            found.append(["contextType": type, "contextId": "\(type.lowercased())-\(found.count)", "tabId": -1, "windowId": -1,
+        for page in pages {
+            let address = page.url?.absoluteString ?? ""
+            let origin = page.url.flatMap { url in url.scheme.map { "\($0)://\(url.host() ?? "")" } } ?? ""
+            let type = page.type
+            found.append(["contextType": type, "contextId": "\(type.lowercased())-\(found.count)", "tabId": page.tabID ?? -1, "windowId": -1,
                           "documentId": "\(type.lowercased())-\(extensionID)", "frameId": type == "BACKGROUND" ? -1 : 0,
                           "documentUrl": address, "documentOrigin": origin, "incognito": false])
         }
-        let background = (context.webExtension.manifest["background"] as? [String: Any])?["service_worker"] as? String
-        add("BACKGROUND", background.flatMap { URL(string: $0, relativeTo: context.baseURL)?.absoluteURL })
-        if let url = host.bridge.offscreen.pageURL(for: extensionID) { add("OFFSCREEN_DOCUMENT", url) }
-        if let page = host.shownPopupPage(for: extensionID) { add("POPUP", URL(string: page, relativeTo: context.baseURL)?.absoluteURL) }
-        for controller in WindowManager.shared.controllers where controller.root.showsSidePanel && host.showsSidePanel(of: extensionID, in: controller) {
-            add("SIDE_PANEL", controller.root.sidePanel.webView?.url)
-        }
-        // Chrome's filter: each field given narrows the answer.
-        let filter = args.object(0)
         if let types = filter["contextTypes"] as? [String] { found = found.filter { types.contains($0["contextType"] as? String ?? "") } }
         if let urls = filter["documentUrls"] as? [String] { found = found.filter { urls.contains($0["documentUrl"] as? String ?? "") } }
         if let origins = filter["documentOrigins"] as? [String] { found = found.filter { origins.contains($0["documentOrigin"] as? String ?? "") } }
+        if let tabs = filter["tabIds"] as? [Int] { found = found.filter { tabs.contains($0["tabId"] as? Int ?? -1) } }
         if filter["incognito"] as? Bool == true { found = [] }
         return found
     }
@@ -1155,8 +1172,9 @@ final class BridgeIdentity: NSObject, BridgeNamespace, WKNavigationDelegate, NSW
 // MARK: - sidePanel
 
 /// `chrome.sidePanel`: the extension's page docked on the window's right (ExtensionSidePanelView), opened by its
-/// toolbar button when it asks for that, or by `open()` after a click. Options apply to every tab; Zigzag doesn't keep
-/// a panel per tab.
+/// toolbar button when it asks for that, or by `open()` after a click. Options may be for one tab (`tabId`): `open`
+/// for that tab shows that tab's page (Claude's, `sidepanel.html?tabId=…`), and the panel is reported as that tab's.
+/// Zigzag keeps one panel per window, which stays as you move between tabs.
 @available(macOS 15.4, *)
 @MainActor
 final class BridgeSidePanel: BridgeNamespace {
@@ -1166,6 +1184,8 @@ final class BridgeSidePanel: BridgeNamespace {
     unowned let host: ExtensionHost
     init(host: ExtensionHost) { self.host = host }
     private var paths: [String: String] = [:]
+    /// Pages set for one tab, by the extension's id for the tab.
+    private var tabPaths: [String: [Int: String]] = [:]
     private var disabled: Set<String> = []
     private var opensOnClick: Set<String> = []
 
@@ -1173,14 +1193,26 @@ final class BridgeSidePanel: BridgeNamespace {
         switch fn {
         case "setOptions":
             let options = args.object(0)
+            if let tab = options["tabId"] as? Int {
+                if let path = options.string("path") { tabPaths[extensionID, default: [:]][tab] = path }
+                // Off for that tab: its page goes, and its panel with it.
+                if options["enabled"] as? Bool == false {
+                    tabPaths[extensionID]?[tab] = nil
+                    for controller in WindowManager.shared.controllers
+                    where host.showsSidePanel(of: extensionID, in: controller) && controller.root.sidePanel.tabID == tab { hide(in: controller) }
+                }
+                return nil
+            }
             if let path = options.string("path") { paths[extensionID] = path }
             if let enabled = options["enabled"] as? Bool {
                 if enabled { disabled.remove(extensionID) } else { disabled.insert(extensionID); close(extensionID) }
             }
             return nil
         case "getOptions":
+            let tab = args.object(0)["tabId"] as? Int
             var options: [String: Any] = ["enabled": !disabled.contains(extensionID)]
-            if let path = path(for: extensionID) { options["path"] = path }
+            if let path = path(for: extensionID, tab: tab) { options["path"] = path }
+            if let tab { options["tabId"] = tab }
             return options
         case "setPanelBehavior":
             if let click = args.object(0)["openPanelOnActionClick"] as? Bool {
@@ -1194,7 +1226,8 @@ final class BridgeSidePanel: BridgeNamespace {
             guard Date().timeIntervalSince(UndoClock.lastPageInput) < 5 || Date().timeIntervalSince(lastClick) < 5 else {
                 throw BridgeError("`sidePanel.open()` may only be called in response to a user gesture.")
             }
-            guard open(extensionID, in: WindowManager.shared.keyController) else { throw BridgeError("No active side panel for the extension") }
+            let tab = args.object(0)["tabId"] as? Int
+            guard open(extensionID, in: WindowManager.shared.keyController, tab: tab) else { throw BridgeError("No active side panel for the extension") }
             return nil
         case "close":
             close(extensionID)
@@ -1206,8 +1239,9 @@ final class BridgeSidePanel: BridgeNamespace {
 
     private var lastClick = Date.distantPast
 
-    /// The page to show: what the extension set, else its manifest's.
-    private func path(for extensionID: String) -> String? {
+    /// The page to show: what the extension set for the tab, else for every tab, else its manifest's.
+    private func path(for extensionID: String, tab: Int? = nil) -> String? {
+        if let tab, let set = tabPaths[extensionID]?[tab] { return set }
         if let set = paths[extensionID] { return set }
         return (ExtensionStore.manifest(for: extensionID)?["side_panel"] as? [String: Any])?["default_path"] as? String
     }
@@ -1227,17 +1261,21 @@ final class BridgeSidePanel: BridgeNamespace {
     }
 
     @discardableResult
-    func open(_ extensionID: String, in controller: BrowserWindowController?) -> Bool {
-        guard let controller, !disabled.contains(extensionID), let path = path(for: extensionID),
+    func open(_ extensionID: String, in controller: BrowserWindowController?, tab: Int? = nil) -> Bool {
+        guard let controller, !disabled.contains(extensionID), let path = path(for: extensionID, tab: tab),
               let context = host.context(for: extensionID), let configuration = context.webViewConfiguration,
               let url = URL(string: path, relativeTo: context.baseURL)?.absoluteURL, url.host() == context.baseURL.host() else { return false }
         let root = controller.root
-        if root.showsSidePanel, host.showsSidePanel(of: extensionID, in: controller), root.sidePanel.webView?.url?.path == url.path { return true }
+        // A tab's own page is reported as that tab's; the page for every tab, as no tab's.
+        let panelTab = tab.flatMap { tabPaths[extensionID]?[$0] } != nil ? tab : nil
+        // Already showing that very page (its query too: Claude's names its tab), for the same tab.
+        if root.showsSidePanel, host.showsSidePanel(of: extensionID, in: controller), root.sidePanel.webView?.url == url,
+           root.sidePanel.tabID == panelTab { return true }
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.load(URLRequest(url: url))
         let image = context.webExtension.icon(for: NSSize(width: 32, height: 32))
         root.sidePanel.show(webView, extensionID: extensionID, name: context.webExtension.displayName
-                                ?? String(localized: "Extension", comment: "Name on an extension's side panel when the extension has none."), image: image)
+                                ?? String(localized: "Extension", comment: "Name on an extension's side panel when the extension has none."), image: image, tabID: panelTab)
         root.sidePanel.onClose = { [weak self, weak controller] in if let controller { self?.hide(in: controller) } }
         Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, moves: true) {
             root.showsSidePanel = true
@@ -1258,6 +1296,7 @@ final class BridgeSidePanel: BridgeNamespace {
     func release(_ extensionID: String) {
         close(extensionID)
         paths[extensionID] = nil
+        tabPaths[extensionID] = nil
         opensOnClick.remove(extensionID)
         disabled.remove(extensionID)
     }

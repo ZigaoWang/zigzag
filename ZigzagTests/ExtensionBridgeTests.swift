@@ -535,6 +535,53 @@ extension ExtensionBridgeTests {
     }
 }
 
+/// `runtime.getContexts`, as Chrome answers it: Claude's side panel opens only when it finds itself there as its
+/// tab's side panel, by its whole address (#112).
+struct ExtensionContextsTests {
+    private let id = "fcoeoabgfenejglbffodgkkbkcdhcgfn"
+    private let base = "webkit-extension://fcoeoabgfenejglbffodgkkbkcdhcgfn/"
+
+    @available(macOS 15.4, *)
+    private var pages: [BridgeContexts.Page] {
+        [BridgeContexts.Page(type: "BACKGROUND", url: URL(string: base + "zigzag-entry.js")),
+         BridgeContexts.Page(type: "OFFSCREEN_DOCUMENT", url: URL(string: base + "offscreen.html")),
+         BridgeContexts.Page(type: "SIDE_PANEL", url: URL(string: base + "sidepanel.html?tabId=770"), tabID: 770)]
+    }
+
+    @Test func aSidePanelForOneTabNamesItsTab() {
+        guard #available(macOS 15.4, *) else { return }
+        let found = BridgeContexts.contexts(pages, extensionID: id, filter: ["documentUrls": [base + "sidepanel.html?tabId=770"]])
+        #expect(found.count == 1)
+        #expect(found.first?["contextType"] as? String == "SIDE_PANEL")
+        #expect(found.first?["tabId"] as? Int == 770)
+        #expect(found.first?["documentUrl"] as? String == base + "sidepanel.html?tabId=770")
+        #expect(found.first?["documentOrigin"] as? String == "webkit-extension://fcoeoabgfenejglbffodgkkbkcdhcgfn")
+        // Every other page is no tab's.
+        let all = BridgeContexts.contexts(pages, extensionID: id, filter: [:])
+        #expect(all.map { $0["tabId"] as? Int } == [-1, -1, 770])
+    }
+
+    @Test func addressesMatchWholeQueryIncluded() {
+        guard #available(macOS 15.4, *) else { return }
+        #expect(BridgeContexts.contexts(pages, extensionID: id, filter: ["documentUrls": [base + "sidepanel.html"]]).isEmpty)
+        #expect(BridgeContexts.contexts(pages, extensionID: id, filter: ["documentUrls": [base + "sidepanel.html?tabId=771"]]).isEmpty)
+    }
+
+    @Test func aPanelForEveryTabIsNoTabs() {
+        guard #available(macOS 15.4, *) else { return }
+        let panel = [BridgeContexts.Page(type: "SIDE_PANEL", url: URL(string: base + "sidepanel.html"))]
+        #expect(BridgeContexts.contexts(panel, extensionID: id, filter: [:]).first?["tabId"] as? Int == -1)
+    }
+
+    @Test func filtersNarrowTheAnswer() {
+        guard #available(macOS 15.4, *) else { return }
+        #expect(BridgeContexts.contexts(pages, extensionID: id, filter: ["contextTypes": ["SIDE_PANEL"]]).count == 1)
+        #expect(BridgeContexts.contexts(pages, extensionID: id, filter: ["tabIds": [770]]).count == 1)
+        #expect(BridgeContexts.contexts(pages, extensionID: id, filter: ["documentOrigins": ["webkit-extension://fcoeoabgfenejglbffodgkkbkcdhcgfn"]]).count == 3)
+        #expect(BridgeContexts.contexts(pages, extensionID: id, filter: ["incognito": true]).isEmpty)
+    }
+}
+
 /// An extension's notification is named so a click on it finds the extension again, in its own profile.
 struct ExtensionNotificationKeyTests {
     private let rabby = "acmacodkjbdgmoleebolmdjonilkdbch"
