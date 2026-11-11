@@ -682,6 +682,11 @@ final class ExtensionFetchRequests {
     private var writes: [RequestKey: Task<ExtensionWriteResponse, any Error>] = [:]
     // A cancel can arrive before its fetch message has started. Keep that decision briefly, with a fixed bound.
     private var cancelled: [RequestKey: Date] = [:]
+    // Each read opens a page of its own; an extension firing many at once waits its turn rather than open dozens.
+    nonisolated static let pageLimit = 6
+    private var openPages = 0
+    private var queued: [(key: RequestKey, go: CheckedContinuation<Void, Never>)] = []
+    private var waiting: Set<RequestKey> = []
 
     func response(_ options: [String: Any], url: URL, extensionID: String, store: WKWebsiteDataStore,
                   requestID id: UUID = UUID(), authorize: @escaping @MainActor @Sendable () -> Bool = { true }) async throws -> Any? {
@@ -710,6 +715,18 @@ final class ExtensionFetchRequests {
             defer { writes[key] = nil }
             return try await task.value.value
         }
+        if openPages < Self.pageLimit {
+            openPages += 1
+        } else {
+            waiting.insert(key)
+            await withCheckedContinuation { queued.append((key, $0)) }
+            waiting.remove(key)
+        }
+        defer {
+            if queued.isEmpty { openPages -= 1 } else { queued.removeFirst().go.resume() }
+        }
+        // Cancelled, or its extension unloaded, while it waited.
+        if cancelled.removeValue(forKey: key) != nil { throw BridgeError("Extension request cancelled.") }
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = store
         configuration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
@@ -821,7 +838,11 @@ final class ExtensionFetchRequests {
     func release(_ extensionID: String) {
         for key in Array(pages.keys) + Array(writes.keys) where key.extensionID == extensionID { cancel(key.id, extensionID: extensionID) }
         cancelled = cancelled.filter { $0.key.extensionID != extensionID }
+        for key in waiting where key.extensionID == extensionID { cancelled[key] = Date() }
     }
+
+    /// Reads with a page open now, and reads waiting for one.
+    var pageCounts: (open: Int, waiting: Int) { (openPages, waiting.count) }
 }
 
 /// A write's network part, away from the main thread: a short-lived session whose jar starts with the target's

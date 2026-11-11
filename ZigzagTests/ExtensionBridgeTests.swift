@@ -356,6 +356,27 @@ extension ExtensionBridgeTests {
         #expect(ExtensionWrite.mayBeSet("X-HTTP-Method-Override", "DELETE"))
     }
 
+    /// Many reads at once open a few pages and queue the rest; cancelling or unloading reaches queued ones too.
+    @Test func manyReadsShareAFewPages() async throws {
+        let server = try SessionTestServer()
+        let url = try await server.start().appendingPathComponent("pending")
+        defer { server.listener.cancel() }
+        let requests = ExtensionFetchRequests(), store = WKWebsiteDataStore.nonPersistent()
+        let count = ExtensionFetchRequests.pageLimit + 2
+        let ids = (0..<count).map { _ in UUID() }
+        let reads = ids.map { id in
+            Task { _ = try await requests.response([:], url: url, extensionID: "test", store: store, requestID: id) }
+        }
+        for _ in 0..<300 where server.requests.withLock({ $0 }) < ExtensionFetchRequests.pageLimit { try await Task.sleep(for: .milliseconds(10)) }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(server.requests.withLock { $0 } == ExtensionFetchRequests.pageLimit)
+        #expect(requests.pageCounts == (ExtensionFetchRequests.pageLimit, 2))
+        requests.release("test")
+        for read in reads { await #expect(throws: (any Error).self) { try await read.value } }
+        #expect(server.requests.withLock { $0 } == ExtensionFetchRequests.pageLimit)
+        #expect(requests.pageCounts == (0, 0))
+    }
+
     /// Nothing bigger than the bridge carries is held in memory: reads go to WebKit's streaming fetch, writes fail.
     @Test func bigResponsesAreNeverBuffered() async throws {
         let server = try SessionTestServer()
