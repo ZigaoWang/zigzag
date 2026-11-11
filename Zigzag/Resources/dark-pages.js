@@ -1,55 +1,85 @@
 // Dark pages (Settings › Appearance): a light page is drawn dark, one that's already dark is left alone.
-// Runs in Zigzag's own script world, in the main frame, from the start of the document. DarkPages.swift puts the
+// Runs in Zigzag's own script world, in every frame, from the start of the document. DarkPages.swift puts the
 // choices in __CONFIG__: { on: default for sites without a choice, sitesOn, sitesOff, native: sites last seen
-// already dark }.
+// already dark, black: Pure black backgrounds, strength: how far white is turned over, root, canvas, media: the
+// style's parts, marks: the attributes it looks for }.
 //
 // How: the whole page goes through one filter on the root (inverted, then its hues turned back), and pictures,
 // video and the like are turned back again, so they look as they are. A filter on the root keeps fixed headers in
 // place (it isn't a containing block there) and WebKit draws it on the GPU, so scrolling isn't touched. Whether a
 // page is already dark is read from what it draws: the background under the page's middle, its body, and the
 // color-scheme it declares.
+//
+// Frames: a frame's page says hello to the page around it, which turns that frame back and tells it whether dark
+// pages are wanted (the top page's choice), so the frame darkens itself only if it's light: a light widget comes out
+// dark and a dark video player as it is. A frame that never says hello (no script can run there) stays darkened with
+// the page around it, as before. Shadow roots get the pictures' rules of their own, since the page's style doesn't
+// reach inside them. Pictures that arrive later are looked at when the page is idle, never on every change.
 (() => {
   if (window.__zigzagDark) return;
   const config = __CONFIG__;
+  const marks = config.marks;
+  const isTop = window === window.top;
   const type = document.contentType || '';
   // A page left alone still says so: what Zigzag heard about the page before this one doesn't hold here.
   const leftAlone = () => {
+    if (!isTop) return;
     try { window.webkit.messageHandlers.zigzagDark.postMessage({ darkened: false, native: false, site: '' }); } catch (e) {}
   };
   // A picture, video or PDF opened on its own has nothing to darken.
   if (!/html|xml|text\/plain/.test(type)) { leftAlone(); return; }
-  // Web pages, files and Zigzag's own pages; an extension's own page is its own business.
-  if (!/^(https?|file|about|zigzag):$/.test(location.protocol)) { leftAlone(); return; }
+  // Web pages, files and Zigzag's own pages; an extension's own page is its own business. A frame with no address of
+  // its own (about:blank, srcdoc) is part of the page around it, and darkened with it.
+  if (!(isTop ? /^(https?|file|about|zigzag):$/ : /^(https?|file):$/).test(location.protocol)) { leftAlone(); return; }
 
   const siteOf = (host) => host.toLowerCase().replace(/^www\./, '');
   const matches = (site, list) => list.some((s) => site === s || site.endsWith('.' + s));
   const site = siteOf(location.hostname || '');
-  const choice = () => (matches(site, config.sitesOn) ? true : matches(site, config.sitesOff) ? false : config.on);
+  // A frame follows the top page's choice, which the page around it passes on; nothing until then.
+  let told = isTop ? null : false;
+  // Whether this page knows its choice: the top page always, a frame once told.
+  let heard = isTop;
+  const choice = () => (!isTop ? told === true
+    : matches(site, config.sitesOn) ? true : matches(site, config.sitesOff) ? false : config.on);
   let wanted = choice();
   // null until the page has been looked at.
-  let native = matches(site, config.native) ? true : null;
+  let native = isTop && matches(site, config.native) ? true : null;
   let darkened = false;
   let lastSent = '';
 
-  const imageMark = 'data-zigzag-dark-image';
-  // Pictures and video, turned back. An SVG picture is usually a logo or icon drawn in the text's ink: it's left
-  // darkened with the page, so a black logo doesn't vanish into the dark.
-  const media = [
-    'img:not([src$=".svg"]):not([src*=".svg?"])', 'video', 'canvas', 'embed', 'object', 'svg image',
-    '[' + imageMark + ']', '[style*="background-image"][style*="url("]', '[style*="background:"][style*="url("]',
-    // Video players and maps from elsewhere, framed in the page.
-    'iframe[src*="youtube.com/embed"]', 'iframe[src*="youtube-nocookie.com"]', 'iframe[src*="player.vimeo.com"]',
-    'iframe[src*="google.com/maps"]', 'iframe[src*="player.bilibili.com"]', 'iframe[src*="player.twitch.tv"]',
-  ];
-  const all = media.join(',');
-  const css = `
-    html { filter: invert(0.92) hue-rotate(180deg) !important; color-scheme: light !important; }
-    :where(html) { background-color: #fff; }
-    :is(${all}) { filter: invert(1) hue-rotate(180deg) !important; }
-    :is(${all}) :is(${all}) { filter: none !important; }
-  `;
+  const css = () => config.root + (isTop ? config.canvas : '') + config.media;
   const style = document.createElement('style');
   style.setAttribute('data-zigzag-dark', '');
+
+  // MARK: Shadow roots
+
+  // One sheet shared by every open shadow root: the pictures' rules alone, empty while the page isn't darkened.
+  const shadowRoots = new Set();
+  let shadowSheet = null;
+  try { shadowSheet = new CSSStyleSheet(); } catch (e) {}
+  const shadowStyles = [];
+  const shadowCSS = () => (darkened ? config.media : '');
+  const restyleShadows = () => {
+    const text = shadowCSS();
+    if (shadowSheet) { try { shadowSheet.replaceSync(text); } catch (e) {} }
+    for (const s of shadowStyles) s.textContent = text;
+  };
+  const adopt = (root) => {
+    if (shadowRoots.has(root)) return;
+    shadowRoots.add(root);
+    let adopted = false;
+    if (shadowSheet) {
+      try { root.adoptedStyleSheets = [...root.adoptedStyleSheets, shadowSheet]; adopted = true; } catch (e) {}
+    }
+    if (!adopted) {
+      const s = document.createElement('style');
+      s.textContent = shadowCSS();
+      shadowStyles.push(s);
+      root.appendChild(s);
+    }
+    added.observe(root, { childList: true, subtree: true });
+    scanSoon(root);
+  };
 
   const put = () => {
     const root = document.documentElement;
@@ -58,7 +88,8 @@
   const apply = (on) => {
     if (on === darkened) { if (on) put(); return; }
     darkened = on;
-    if (on) { style.textContent = css; put(); scanSoon(document.documentElement); } else { style.textContent = ''; style.remove(); }
+    if (on) { style.textContent = css(); put(); scanSoon(document.documentElement); } else { style.textContent = ''; style.remove(); }
+    restyleShadows();
     send();
   };
 
@@ -129,39 +160,141 @@
     send();
   };
 
-  // MARK: Background pictures
+  // MARK: Pictures the selectors can't see
 
-  // An element showing a photo as its background (a hero, a card) turns back like a picture. Small ones are
-  // icons, drawn in the text's ink, and stay darkened; so do the page's own body and anything holding a lot.
-  let scanTimer = 0;
-  const queue = new Set();
+  // An element showing a photo as its background (a hero, a card, a ::before), and open shadow roots, found when
+  // the page is idle: each element once, a slice at a time, so a long page never holds up scrolling or typing.
+  // Icon-sized ones and SVG drawings are drawn in the text's ink and stay darkened; so does a repeating texture
+  // behind a lot of the page.
+  const idle = window.requestIdleCallback
+    ? (f) => requestIdleCallback(f, { timeout: 1000 })
+    : (f) => setTimeout(() => { const end = performance.now() + 12; f({ timeRemaining: () => end - performance.now() }); }, 120);
+  const seen = new WeakSet();
+  const roots = [];
+  let list = [], at = 0;
+  let scanning = false;
   const scanSoon = (root) => {
     if (!root || !darkened) return;
-    queue.add(root);
-    if (!scanTimer) scanTimer = setTimeout(scan, 120);
+    roots.push(root);
+    if (!scanning) { scanning = true; idle(scan); }
   };
-  const scan = () => {
-    scanTimer = 0;
-    const roots = [...queue];
-    queue.clear();
-    if (!darkened) return;
-    const started = performance.now();
-    for (const root of roots) {
-      if (!root.isConnected) continue;
-      const list = root.nodeType === 1 ? [root, ...root.getElementsByTagName('*')] : [];
-      for (const el of list) {
-        if (el === document.documentElement || el === document.body || el.hasAttribute(imageMark)) continue;
-        const image = getComputedStyle(el).backgroundImage;
-        if (!image || image === 'none' || !image.includes('url(')) continue;
+  const isIcon = (w, h) => w > 0 && h > 0 && w <= 24 && h <= 24;
+  const drawingsOnly = (image) => {
+    const urls = image.match(/url\([^)]*\)/g) || [];
+    return urls.length > 0 && urls.every((u) => /svg/i.test(u));
+  };
+  const showsPicture = (s) => {
+    const image = s.backgroundImage;
+    return !!image && image !== 'none' && image.includes('url(') && !drawingsOnly(image);
+  };
+  const isTexture = (s) => !/no-repeat/.test(s.backgroundRepeat) && !/cover|contain/.test(s.backgroundSize);
+  const look = (el) => {
+    if (el.shadowRoot) adopt(el.shadowRoot);
+    if (el === document.documentElement || el === document.body || el === style) return;
+    if (!el.hasAttribute(marks.image)) {
+      const s = getComputedStyle(el);
+      if (showsPicture(s)) {
         const box = el.getBoundingClientRect();
-        if (Math.min(box.width, box.height) < 40) continue;
-        if (el.getElementsByTagName('*').length > 60) continue;
-        el.setAttribute(imageMark, '');
+        const big = isTexture(s) && el.getElementsByTagName('*').length > 60;
+        if (!isIcon(box.width, box.height) && !big) el.setAttribute(marks.image, '');
       }
-      // A huge page is looked at once, not again on every change.
-      if (performance.now() - started > 60) break;
+    }
+    for (const [pseudo, mark] of [['::before', marks.before], ['::after', marks.after]]) {
+      if (el.hasAttribute(mark)) continue;
+      const s = getComputedStyle(el, pseudo);
+      const content = s.content;
+      if (!content || content === 'none' || content === 'normal') continue;
+      const picture = (content.includes('url(') && !drawingsOnly(content))
+        || (showsPicture(s) && !isIcon(parseFloat(s.width) || 0, parseFloat(s.height) || 0));
+      if (picture) el.setAttribute(mark, '');
     }
   };
+  const scan = (deadline) => {
+    if (!darkened) { roots.length = 0; list = []; at = 0; scanning = false; return; }
+    let n = 0;
+    while (true) {
+      if (at >= list.length) {
+        if (!roots.length) break;
+        const root = roots.shift();
+        if (!root.isConnected) continue;
+        const all = root.querySelectorAll ? root.querySelectorAll('*') : [];
+        list = root.nodeType === 1 ? [root, ...all] : [...all];
+        at = 0;
+      }
+      const el = list[at++];
+      if (seen.has(el)) continue;
+      seen.add(el);
+      if (el.isConnected) look(el);
+      if (++n % 32 === 0 && deadline.timeRemaining() < 2) break;
+    }
+    if (at < list.length || roots.length) idle(scan); else { list = []; at = 0; scanning = false; }
+  };
+  // Shadow roots made after their element was looked at (a custom element defined late), once more as the page
+  // finishes loading: their element is found again by its name, not by looking at every element.
+  const waiting = new Set();
+  const lateHosts = (root) => {
+    if (!window.customElements || !customElements.whenDefined) return;
+    for (const el of root.querySelectorAll(':not(:defined)')) {
+      const name = el.localName;
+      if (waiting.has(name) || !name.includes('-')) continue;
+      waiting.add(name);
+      customElements.whenDefined(name).then(() => {
+        for (const scope of [document, ...shadowRoots]) {
+          for (const host of scope.querySelectorAll(name)) if (host.shadowRoot) adopt(host.shadowRoot);
+        }
+      }).catch(() => {});
+    }
+  };
+
+  // MARK: Frames
+
+  const message = (data) => (data && typeof data === 'object' ? data.zigzagDark : undefined);
+  // What a frame inside is told: whether it's wanted, and the style for it, never the lists of sites.
+  const forFrames = () => ({ wanted, black: config.black, strength: config.strength, root: config.root, media: config.media });
+  const frames = new Set();
+  const asked = [];
+  const tell = (win) => { try { win.postMessage({ zigzagDark: forFrames() }, '*'); } catch (e) {} };
+  const frameOf = (source) => {
+    for (const scope of [document, ...shadowRoots]) {
+      for (const frame of scope.querySelectorAll('iframe')) if (frame.contentWindow === source) return frame;
+    }
+    return null;
+  };
+  const tellFrames = () => {
+    for (const frame of frames) {
+      if (!frame.isConnected) { frames.delete(frame); continue; }
+      if (frame.contentWindow) tell(frame.contentWindow);
+    }
+  };
+  addEventListener('message', (e) => {
+    const source = e.source;
+    if (!source || source === window) return;
+    // From the page around this frame: Zigzag's choice for the top page.
+    if (!isTop && source === window.parent) {
+      const said = message(e.data);
+      if (!said || typeof said !== 'object') return;
+      told = said.wanted === true;
+      heard = true;
+      Object.assign(config, { black: said.black, strength: said.strength, root: said.root, media: said.media });
+      if (darkened) style.textContent = css();
+      restyleShadows();
+      check();
+      tellFrames();
+      asked.splice(0).forEach(tell);
+      return;
+    }
+    // A frame inside this page saying hello: it's turned back from now on and darkens itself.
+    let parent = null;
+    try { parent = source.parent; } catch (e2) { return; }
+    if (parent !== window || message(e.data) !== 'hello') return;
+    const frame = frameOf(source);
+    if (!frame) return;
+    if (!frame.hasAttribute(marks.frame)) frame.setAttribute(marks.frame, '');
+    frames.add(frame);
+    // A frame not yet told answers its own once it is.
+    if (heard) tell(source); else asked.push(source);
+  });
+  if (!isTop) { try { window.parent.postMessage({ zigzagDark: 'hello' }, '*'); } catch (e) {} }
 
   // MARK: Telling Zigzag
 
@@ -170,7 +303,7 @@
     const c = document.body ? backgroundOf(document.body) : canvas();
     let [r, g, b] = c;
     if (darkened) {
-      const k = 0.92;
+      const k = config.strength;
       [r, g, b] = [r, g, b].map((v) => k * (255 - v) + (1 - k) * v);
       // hue-rotate(180deg) leaves gray alone and turns a color to its opposite; the page's background is nearly
       // always a gray, and anything else is close enough for the bar's tint.
@@ -179,7 +312,9 @@
     }
     return '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
   };
+  // Only the top page tells Zigzag; a frame's look is the page's business.
   const send = () => {
+    if (!isTop) return;
     const message = { darkened, native: native === true, color: colorOf(), site };
     const key = JSON.stringify(message);
     if (key === lastSent) return;
@@ -200,8 +335,8 @@
   const themes = new MutationObserver(() => checkSoon(150));
   const watchThemes = (el) => themes.observe(el, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-color-mode', 'data-mode'] });
   let watchedBody = null;
-  // The root can be put back by a page that writes itself over (document.write), taking the style with it.
-  new MutationObserver((records) => {
+  // New elements, in the page and in its shadow roots: only noted here, looked at when idle.
+  const added = new MutationObserver((records) => {
     if (darkened && style.parentNode !== document.documentElement) put();
     if (document.body && document.body !== watchedBody) { watchedBody = document.body; watchThemes(watchedBody); checkSoon(60); }
     if (!darkened) return;
@@ -212,17 +347,30 @@
         else scanSoon(node);
       }
     }
-  }).observe(document, { childList: true, subtree: true });
+  });
+  // The root can be put back by a page that writes itself over (document.write), taking the style with it.
+  added.observe(document, { childList: true, subtree: true });
   if (document.documentElement) watchThemes(document.documentElement);
   document.addEventListener('DOMContentLoaded', () => check());
-  addEventListener('load', () => { check(); setTimeout(check, 600); setTimeout(check, 2000); });
+  addEventListener('load', () => {
+    check();
+    setTimeout(check, 600);
+    setTimeout(check, 2000);
+    if (darkened) idle(() => { try { lateHosts(document); } catch (e) {} });
+  });
   addEventListener('pageshow', (e) => { if (e.persisted) check(); });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => checkSoon(100));
 
   window.__zigzagDark = {
     // Zigzag's choice changed (a setting, the site's own row, the Mac's appearance).
-    set(config2) { Object.assign(config, config2); check(); },
+    set(config2) {
+      Object.assign(config, config2);
+      if (darkened) style.textContent = css();
+      restyleShadows();
+      check();
+      tellFrames();
+    },
     check,
-    state: () => ({ wanted, darkened, native, color: colorOf() }),
+    state: () => ({ wanted, darkened, native, color: colorOf(), frames: frames.size, shadowRoots: shadowRoots.size }),
   };
 })();

@@ -8,7 +8,9 @@ import WebKit
 /// appearance is dark, so `prefers-color-scheme: dark` matches and a site with its own dark theme uses it). Only a
 /// page that still draws itself light is darkened, by dark-pages.js: one filter on the page's root, with pictures
 /// and video turned back. That's drawn by WebKit on the GPU, with no script per element, so pages stay as fast as
-/// they were. Reader has its own themes and its own web view, and isn't touched.
+/// they were. Every frame gets the script: a frame from elsewhere (a player, a map, a widget) is turned back by the
+/// page around it and darkens itself, or not, as a page would. Pure black backgrounds draws white as black instead of
+/// a dark gray. Reader has its own themes and its own web view, and isn't touched.
 enum DarkPages {
     enum Mode: String, CaseIterable {
         case off, system, always
@@ -25,10 +27,17 @@ enum DarkPages {
     private static let modeKey = "DarkPages"
     private static let onKey = "DarkPagesOnSites"
     private static let offKey = "DarkPagesOffSites"
+    private static let blackKey = "DarkPagesPureBlack"
 
     static var mode: Mode {
         get { defaults.string(forKey: modeKey).flatMap(Mode.init(rawValue:)) ?? .off }
         set { defaults.set(newValue.rawValue, forKey: modeKey); refreshAll() }
+    }
+
+    /// Settings › Appearance › Pure black backgrounds: a darkened page's white becomes black instead of a dark gray.
+    static var pureBlack: Bool {
+        get { defaults.bool(forKey: blackKey) }
+        set { defaults.set(newValue, forKey: blackKey); refreshAll() }
     }
 
     /// Sites (hosts without "www.") turned on, or off, in the site panel. A site covers its subdomains.
@@ -114,8 +123,69 @@ enum DarkPages {
 
     static let world = WKContentWorld.world(name: "zigzag-dark")
     static let messageName = "zigzagDark"
+    /// How far a darkened page's colors are turned over: white becomes `1 - strength` gray, black for Pure black.
+    static func strength(black: Bool) -> Double { black ? 1 : 0.92 }
+
     /// Behind a darkened page while it loads and where it ends: the darkened white.
-    static let underPageColor = NSColor(srgbRed: 0.08, green: 0.08, blue: 0.08, alpha: 1)
+    static func underPageColor(black: Bool) -> NSColor {
+        let gray = 1 - strength(black: black)
+        return NSColor(srgbRed: gray, green: gray, blue: gray, alpha: 1)
+    }
+
+    static var underPageColor: NSColor { underPageColor(black: pureBlack) }
+
+    // MARK: The style
+
+    /// On a picture's own element (a background photo), and on one whose ::before or ::after shows a picture.
+    static let imageMark = "data-zigzag-dark-image"
+    static let beforeMark = "data-zigzag-dark-before"
+    static let afterMark = "data-zigzag-dark-after"
+    /// On a frame whose page has Zigzag's script: it's turned back and looks after its own darkening.
+    static let frameMark = "data-zigzag-dark-frame"
+
+    /// What's turned back to how it looks: pictures, video, drawing, plugins, and frames that darken themselves.
+    /// An SVG drawing (an img of an .svg, or inline svg) is usually a logo or icon drawn in the text's ink: it's left
+    /// darkened with the page, so a black logo doesn't vanish into the dark; a photo inside one is turned back.
+    static let replaced: [String] = [
+        #"img:not([src$=".svg"]):not([src*=".svg?"])"#, "picture", "video", "canvas", "embed", "object", "svg image",
+        "input[type=image]", "[\(imageMark)]", #"[style*="background-image"][style*="url("]"#, #"[style*="background:"][style*="url("]"#,
+        "iframe[\(frameMark)]",
+        // Video players and maps from elsewhere, framed in the page, for when their own frame can't run the script.
+        #"iframe[src*="youtube.com/embed"]"#, #"iframe[src*="youtube-nocookie.com"]"#, #"iframe[src*="player.vimeo.com"]"#,
+        #"iframe[src*="google.com/maps"]"#, #"iframe[src*="player.bilibili.com"]"#, #"iframe[src*="player.twitch.tv"]"#,
+    ]
+
+    /// The filter that undoes the page's: inverting by `strength` maps v to s + v(1 - 2s), so after inverting fully,
+    /// contrast of 1 / (2s - 1) puts every tone back where it was (the darkest and lightest few clip, as the page's do).
+    static func restoreFilter(black: Bool) -> String {
+        let contrast = 1 / (2 * strength(black: black) - 1)
+        let tail = abs(contrast - 1) < 0.0001 ? "" : " contrast(\(String(format: "%.4f", contrast)))"
+        return "invert(1) hue-rotate(180deg)" + tail
+    }
+
+    /// The rule on a darkened page's root, and on a darkened frame's.
+    static func rootCSS(black: Bool) -> String {
+        "html { filter: invert(\(strength(black: black))) hue-rotate(180deg) !important; color-scheme: light !important; }\n"
+    }
+
+    /// A page painting no background of its own shows white, then darkened. Not in a frame: one painting nothing
+    /// shows the page around it.
+    static let canvasCSS = ":where(html) { background-color: #fff; }\n"
+
+    /// Pictures and the rest turned back, once: not again inside something turned back already. Shadow roots get
+    /// this alone, since the document's style doesn't reach inside them.
+    static func mediaCSS(black: Bool) -> String {
+        let all = replaced.joined(separator: ", ")
+        let restore = restoreFilter(black: black)
+        let before = "[\(beforeMark)]::before", after = "[\(afterMark)]::after"
+        return """
+        :is(\(all)) { filter: \(restore) !important; }
+        :is(\(all)) :is(\(all)) { filter: none !important; }
+        \(before), \(after) { filter: \(restore) !important; }
+        :is(\(all)) \(before), :is(\(all)) \(after), :is(\(all))\(before), :is(\(all))\(after) { filter: none !important; }
+
+        """
+    }
 
     /// Sites seen already dark, this session only (never written down: it would be a list of where you've been),
     /// so their pages aren't darkened first and then let go. Kept for each profile: a page can see whether it was
@@ -141,8 +211,11 @@ enum DarkPages {
 
     /// The choices as the page script reads them, for pages in this store.
     static func config(for store: WKWebsiteDataStore?) -> [String: Any] {
-        ["on": wants(mode: mode, systemIsDark: systemIsDark, site: nil), "sitesOn": sitesOn.sorted(), "sitesOff": sitesOff.sorted(),
-         "native": nativeSites(in: nativeScope(of: store)).sorted()]
+        let black = pureBlack
+        return ["on": wants(mode: mode, systemIsDark: systemIsDark, site: nil), "sitesOn": sitesOn.sorted(), "sitesOff": sitesOff.sorted(),
+                "native": nativeSites(in: nativeScope(of: store)).sorted(), "black": black, "strength": strength(black: black),
+                "root": rootCSS(black: black), "canvas": canvasCSS, "media": mediaCSS(black: black),
+                "marks": ["image": imageMark, "before": beforeMark, "after": afterMark, "frame": frameMark]]
     }
 
     private static func configJSON(for store: WKWebsiteDataStore?) -> String {
@@ -154,7 +227,7 @@ enum DarkPages {
 
     static func script(for store: WKWebsiteDataStore?) -> WKUserScript {
         WKUserScript(source: scriptMark + source.replacingOccurrences(of: "__CONFIG__", with: configJSON(for: store)),
-                     injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world)
+                     injectionTime: .atDocumentStart, forMainFrameOnly: false, in: world)
     }
 
     /// By its first line only. A web view's scripts come to hundreds of kilobytes (autofill, Reader, an extension's
