@@ -189,14 +189,14 @@ final class Autofill: NSObject, WKScriptMessageHandler {
 
     /// Where the menu floats over a page: its browser window's overlay, or Zigzag Mini's.
     private static func overlay(for webView: WKWebView) -> NSView? {
-        if let controller = WindowManager.shared.controllers.first(where: { $0.window === webView.window }) { return controller.root.overlay }
+        if let controller = WindowManager.shared.controller(for: webView.window) { return controller.root.overlay }
         return MiniWindowController.all.first { $0.tab.webView === webView }?.overlay
     }
 
     /// The page is the one on screen in its window: the selected tab's, the page peeked at over it (a sign-in a
     /// site opens in a window of its own comes up there), or Zigzag Mini's only page.
     static func isInFront(_ webView: WKWebView) -> Bool {
-        if let controller = WindowManager.shared.controllers.first(where: { $0.window === webView.window }) {
+        if let controller = WindowManager.shared.controller(for: webView.window) {
             if controller.peek.isVisible { return controller.peek.tab?.webView === webView }
             return controller.selectedWebView === webView
         }
@@ -312,7 +312,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
 
     /// A short word in the page's window about a fill that didn't happen, so a pick never just does nothing.
     private static func tell(_ text: String, about webView: WKWebView) {
-        if let controller = WindowManager.shared.controllers.first(where: { $0.window === webView.window }) {
+        if let controller = WindowManager.shared.controller(for: webView.window) {
             Toast.show(text, symbol: "exclamationmark.triangle", duration: 4, in: controller)
         } else {
             NSSound.beep()
@@ -342,7 +342,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             // Checked again right before filling: the page may have moved on while the menu was open.
             guard Origin(webView.url) == origin, Self.isInFront(webView) else { Self.tell(Self.pageMovedOn, about: webView); return }
             let result = try? await webView.callAsyncJavaScript(Self.generatedFiller, arguments: arguments, in: target.frame, contentWorld: .defaultClient) as? [String: Any]
-            let controller = WindowManager.shared.controllers.first { $0.window === webView.window }
+            let controller = WindowManager.shared.controller(for: webView.window)
             guard let index = result?["index"] as? Int, candidates.indices.contains(index) else {
                 if result?["noField"] as? Bool == true {
                     Self.tell(Self.noPasswordField, about: webView)
@@ -378,7 +378,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         guard stillThere() else { return }
         Task {
             guard let values = await ContactCard.values() else {
-                if let controller = WindowManager.shared.controllers.first(where: { $0.window === target.webView.window }) {
+                if let controller = WindowManager.shared.controller(for: target.webView.window) {
                     Toast.show(String(localized: "Zigzag can’t read your card. Allow it in System Settings › Privacy › Contacts, and set My Card in Contacts.", comment: "Toast when filling a form from Contacts isn't allowed. System Settings › Privacy › Contacts and My Card are names macOS uses; match them."),
                                symbol: "person.crop.circle.badge.exclamationmark", duration: 5, in: controller)
                 }
@@ -399,7 +399,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
               Self.isInFront(target.webView) else { Self.tell(Self.pageMovedOn, about: target.webView); return }
         Task {
             guard let password = try? await PasswordStore.shared.password(for: login.id) else {
-                if let controller = WindowManager.shared.controllers.first(where: { $0.window === target.webView.window }) {
+                if let controller = WindowManager.shared.controller(for: target.webView.window) {
                     Toast.show(String(localized: "Couldn’t open that password. Try again from the Passwords window.", comment: "Toast when a saved password couldn't be read to fill a form."), symbol: "exclamationmark.triangle", duration: 3, in: controller)
                 }
                 return

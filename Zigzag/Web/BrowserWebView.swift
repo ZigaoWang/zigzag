@@ -173,7 +173,7 @@ final class BrowserWebView: WKWebView {
         evaluateJavaScript("window.getSelection().toString()") { [weak self] result, _ in
             MainActor.assumeIsolated {
                 guard let self, let text = (result as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty,
-                      let controller = WindowManager.shared.controllers.first(where: { $0.window === self.window }) else { return }
+                      let controller = WindowManager.shared.controller(for: self.window) else { return }
                 controller.open(Library.shared.searchEngine.searchURL(text), disposition: .foregroundTab, opener: self.owner, allowSwitch: false)
             }
         }

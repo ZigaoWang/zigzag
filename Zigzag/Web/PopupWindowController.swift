@@ -48,7 +48,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         let controller = PopupWindowController(configuration: configuration, pageSize: size, origin: origin, parent: parent)
         Self.open.insert(controller)
         // Sign-ins and payments run through these: which site opened one is often the clue.
-        let opener = WindowManager.shared.controllers.first { $0.window === parent }?.tabManager.selectedTab?.url?.host()
+        let opener = WindowManager.shared.controller(for: parent)?.tabManager.selectedTab?.url?.host()
         Diagnostics.note("Pop-up opened", site: opener, isPrivate: controller.isPrivate)
         controller.showWindow(nil)
         if #available(macOS 15.4, *), !controller.isPrivate { ExtensionCenter.popupOpened(controller) }
@@ -219,7 +219,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         // A plain link (a help page, the terms) opens as a tab in the browser window, brought forward, as a
         // browser would; only another sized window.open() is a popup of its own.
         let sized = windowFeatures.width != nil || windowFeatures.height != nil || windowFeatures.toolbarsVisibility?.boolValue == false
-        if !sized, let controller = WindowManager.shared.controllers.first(where: { $0.window === parentWindow }) {
+        if !sized, let controller = WindowManager.shared.controller(for: parentWindow) {
             let tab = controller.tabManager.newTab(url: nil, configuration: configuration)
             controller.window?.makeKeyAndOrderFront(nil)
             return tab.ensureWebView()

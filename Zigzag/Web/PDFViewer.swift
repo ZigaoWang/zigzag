@@ -428,7 +428,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     func save() {
         guard let data, let window else { return }
         let name = url.lastPathComponent.lowercased().hasSuffix(".pdf") ? url.lastPathComponent : "Document.pdf"
-        let controller = WindowManager.shared.controllers.first { $0.window === window }
+        let controller = WindowManager.shared.controller(for: window)
         if url.isFileURL {
             let panel = NSSavePanel()
             panel.allowedContentTypes = [.pdf]

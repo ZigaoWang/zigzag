@@ -181,7 +181,7 @@ enum Brand {
         @MainActor static func `for`(_ view: NSView?) -> Theme {
             guard let window = view?.window else { return brand }
             if let owner = window.windowController as? SpaceTinted { return of(owner.tintSpace) }
-            guard let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return brand }
+            guard let controller = WindowManager.shared.controller(for: window) else { return brand }
             return of(controller.tabManager.currentSpace)
         }
 

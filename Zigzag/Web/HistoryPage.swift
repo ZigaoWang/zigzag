@@ -286,7 +286,7 @@ enum HistoryPage {
 
     /// The space this page is in, for its accent and the wordmark's color.
     private static func theme(for webView: WKWebView) -> Brand.Theme {
-        let controller = WindowManager.shared.controllers.first { $0.window === webView.window } ?? WindowManager.shared.keyController
+        let controller = WindowManager.shared.controller(for: webView.window) ?? WindowManager.shared.keyController
         return controller.map { Brand.Theme.of($0.tabManager.currentSpace) } ?? .brand
     }
 

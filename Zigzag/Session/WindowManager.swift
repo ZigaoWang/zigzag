@@ -58,6 +58,11 @@ final class WindowManager {
     private let saveDebouncer = Debouncer(delay: 1.5, maxWait: 10)
     private var isTerminating = false
 
+    /// The browser window's controller, for a window that's one.
+    func controller(for window: NSWindow?) -> BrowserWindowController? {
+        controllers.first { $0.window === window }
+    }
+
     var keyController: BrowserWindowController? {
         if let controller = NSApp.keyWindow?.windowController as? BrowserWindowController { return controller }
         if let controller = NSApp.mainWindow?.windowController as? BrowserWindowController { return controller }

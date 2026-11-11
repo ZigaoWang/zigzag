@@ -37,7 +37,7 @@ extension WindowManager {
     /// The window a page in `window` asks its questions in: a browser window, or Zigzag Mini.
     func promptHost(for window: NSWindow?) -> PromptHost? {
         guard let window else { return nil }
-        if let controller = controllers.first(where: { $0.window === window }) { return controller }
+        if let controller = controller(for: window) { return controller }
         return MiniWindowController.all.first { $0.window === window }
     }
 

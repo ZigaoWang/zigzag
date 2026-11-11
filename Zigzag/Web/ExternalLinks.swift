@@ -32,9 +32,9 @@ enum ExternalLinks {
         // A background tab has no window, and a popup's isn't a browser window: ask in the tab's own window, or the
         // front one, so the link never just does nothing.
         let popup = PopupWindowController.all.first { $0.webView === webView }
-        let controller = WindowManager.shared.controllers.first { $0.window === webView.window }
+        let controller = WindowManager.shared.controller(for: webView.window)
             ?? ((webView as? BrowserWebView)?.owner?.host as? BrowserWindowController)
-            ?? popup.flatMap { p in WindowManager.shared.controllers.first { $0.window === p.parentWindow } }
+            ?? popup.flatMap { p in WindowManager.shared.controller(for: p.parentWindow) }
             ?? WindowManager.shared.keyController
         guard let app = NSWorkspace.shared.urlForApplication(toOpen: url) else {
             Diagnostics.note("No app for a link", site: webView.url?.host(), "\(scheme):", isPrivate: !webView.configuration.websiteDataStore.isPersistent)
