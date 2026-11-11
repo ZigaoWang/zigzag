@@ -33,9 +33,13 @@ protocol SidebarListDelegate: AnyObject {
     func listDragEnded()
     /// The drop has been handled, whatever it did.
     func listDropFinished()
-    func listMove(_ tab: Tab, to index: Int, in spaceID: UUID)
+    /// Within its space, the tabs nested under it come along; `nesting` says which tab it goes under.
+    func listMove(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting)
     func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID)
-    func listUnbookmark(_ bookmarkID: UUID, to index: Int)
+    /// `parent`: the tab it goes under, dropped among nested tabs.
+    func listUnbookmark(_ bookmarkID: UUID, to index: Int, under parent: UUID?)
+    /// Folds away, or shows again, the tabs nested under a tab.
+    func listSetNestedTabsCollapsed(_ tab: Tab, _ collapsed: Bool)
     /// While dragging, hovering a space's dot opens that space so the tab can be dropped into place.
     func listSwitchSpaceDuringDrag(_ spaceID: UUID)
     /// Tabs dropped outside the window: into another window, or a new one, in order. Returns true if handled.
@@ -65,6 +69,11 @@ protocol SidebarListDelegate: AnyObject {
     func listDragOverPage(at windowPoint: NSPoint?, item: SidebarItem)
     /// Dropped on the page: open it in split view beside the current page. Returns true if it did.
     func listDropOnPage(_ item: SidebarItem) -> Bool
+}
+
+extension SidebarListDelegate {
+    func listMove(_ tab: Tab, to index: Int, in spaceID: UUID) { listMove(tab, to: index, in: spaceID, nesting: .fit) }
+    func listUnbookmark(_ bookmarkID: UUID, to index: Int) { listUnbookmark(bookmarkID, to: index, under: nil) }
 }
 
 enum SidebarItem: Hashable {
@@ -191,6 +200,8 @@ final class SidebarListView: NSView {
         let originSpace: UUID
         /// Where the pointer is across the list: set in past a folder's last page, a drop stays in the folder.
         var pointX: CGFloat = 0
+        /// The tab the carried tab was under: dropped where it was but at another level, it's a move all the same.
+        var originParent: UUID?
     }
 
     /// Something carried in from elsewhere (another window's tab, a favorite): where the line shows it would land.
@@ -272,9 +283,29 @@ final class SidebarListView: NSView {
         // The right half of a split rides in its left half's row, when that row is here to carry it.
         let rowIDs = Set(tabs.map(\.id))
         let rightHalves = Set(manager.splits.filter { rowIDs.contains($0.left) }.map(\.right))
-        result += tabs.filter { !rightHalves.contains($0.id) }.map { .tab($0.id) }
+        // Nested tabs are set in under the tab they're under, up to two levels. A folded tab hides the tabs under it but
+        // the one you're on, as a shut folder does.
+        let levels = TabTree.levels(manager.treeNodes(in: spaceID))
+        tabLevels = levels
+        let byID = Dictionary(tabs.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let selected = manager.selectedTab(in: spaceID)
+        for tab in tabs where !rightHalves.contains(tab.id) {
+            var hidden = false
+            var parent = tab.parentID.flatMap { byID[$0] }
+            var seen: Set<UUID> = []
+            while let up = parent, seen.insert(up.id).inserted {
+                if up.isCollapsed { hidden = true; break }
+                parent = up.parentID.flatMap { byID[$0] }
+            }
+            if hidden, tab !== selected, manager.partner(of: tab).map({ $0 !== selected }) ?? true { continue }
+            result.append(.tab(tab.id))
+            if let level = levels[tab.id], level > 0 { rowDepth[.tab(tab.id)] = TabTree.shownLevel(level) }
+        }
         return result
     }
+
+    /// How deep each tab of the space on show is nested, as the list was last built.
+    private var tabLevels: [UUID: Int] = [:]
 
     /// The pinned page whose row shows this one: itself, or for the right half of a pinned split, its left half.
     static func rowID(_ bookmarkID: UUID) -> UUID {
@@ -798,6 +829,10 @@ final class SidebarListView: NSView {
                 if let partner = row?.partner { self?.delegate?.listClose([tab, partner]) } else { self?.delegate?.listClose(tab) }
             }
             row.onMiddleClick = row.onClose
+            row.onToggleNested = { [weak self, weak row] in
+                guard let tab = row?.tab else { return }
+                self?.delegate?.listSetNestedTabsCollapsed(tab, !tab.isCollapsed)
+            }
             row.onRightClick = { [weak self] _ in self?.menu(for: item) }
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
@@ -885,10 +920,14 @@ final class SidebarListView: NSView {
             row.focusedHalf = partner != nil && partner === selected ? 1 : 0
             row.freshness = SiteTint.freshness(lastActivated: tab.lastActivated)
             row.isMarked = marked.contains(item)
+            // A tab with tabs nested under it carries the folder's chevron, to fold them away.
+            row.nestedTabs = manager.hasNestedTabs(tab) ? (tab.isCollapsed ? .collapsed : .expanded) : nil
+            row.setAccessibilityDisclosureLevel(tabLevels[id] ?? 0)
         case .folder(let id):
             guard let row = view as? FolderRowView, let folder = Library.shared.folder(id) else { return }
             let count = folderPageCounts[id] ?? Library.shared.allBookmarkIDs(inFolder: id).count
             row.configure(name: folder.name, open: folder.isOpen, count: count, icon: folder.icon)
+            row.setAccessibilityDisclosureLevel(rowDepth[item] ?? 0)
         case .bookmark(let id):
             guard let row = view as? TabRowView, let bookmark = Library.shared.bookmark(id) else { return }
             let tab = manager.bookmarkTab(for: id)
@@ -912,6 +951,7 @@ final class SidebarListView: NSView {
             }
             row.configure(partner: partner)
             row.isUnloaded = tab == nil && partner == nil
+            row.setAccessibilityDisclosureLevel(rowDepth[item] ?? 0)
             // Beside a tab, it's on screen while that tab is: the tab's row carries the pair, and this one stays lit.
             let beside = tab.flatMap(manager.partner(of:))
             row.isSelected = (tab != nil && tab === selected) || (partner != nil && partner === selected) || (beside != nil && beside === selected)
@@ -1390,6 +1430,25 @@ final class SidebarListView: NSView {
         return Self.listIndex(forRow: row, rows: rows, in: list)
     }
 
+    /// The tab a drop at the gap among the tab rows (`row` rows above it, the carried ones left out) goes under: right
+    /// under a tab whose nested tabs show, or between two tabs of one group, into that group; after a group's last
+    /// row, set in as far as its rows to stay in it, as with a folder's pages. Nil: the top level.
+    private func tabGapParent(row: Int, pointX: CGFloat, carried: Set<SidebarItem>) -> UUID? {
+        guard let manager else { return nil }
+        let shown: [UUID] = items.compactMap { item in
+            guard !carried.contains(item), case .tab(let id) = item else { return nil }
+            return id
+        }
+        let leaving = Set(carried.compactMap { item -> UUID? in if case .tab(let id) = item { id } else { nil } })
+        var nodes = manager.treeNodes(in: shownSpaceID ?? manager.currentSpaceID)
+        for id in leaving { nodes = TabTree.removing(id, from: nodes) }
+        let before = row > 0 && row - 1 < shown.count ? shown[row - 1] : nil
+        let after = row >= 0 && row < shown.count ? shown[row] : nil
+        return TabTree.dropParent(before: before, after: after, in: nodes) { level in
+            pointX > Self.indent(depth: level) + Tokens.Space.x2
+        }
+    }
+
     /// The sidebar list under a screen point, in whichever window is in front there.
     static func list(at screenPoint: NSPoint) -> (BrowserWindowController, SidebarListView)? {
         for window in NSApp.orderedWindows where window.isVisible && window.frame.contains(screenPoint) {
@@ -1437,10 +1496,16 @@ final class SidebarListView: NSView {
         guard let window, let manager, item.isDraggable else { return false }
         delegate?.listHover(nil, row: nil, bookmark: nil)
         // Dragging one of several picked rows carries them all, landing together in list order.
-        let together = marked.count > 1 && marked.contains(item) ? marked : [item]
-        if together.count == 1 { clearMarks() }
-        // A folder's pages go with it.
+        let picked = marked.count > 1 && marked.contains(item) ? marked : [item]
+        if picked.count == 1 { clearMarks() }
+        // A folder's pages go with it, and a tab's nested tabs with it.
         var carried: Set<SidebarItem> = [item]
+        var together = picked
+        if case .tab(let id) = item, let tab = manager.tab(with: id) {
+            let nested = manager.nestedTabs(under: tab).map { SidebarItem.tab($0.id) }
+            carried.formUnion(nested.filter(items.contains))
+            together.removeAll { nested.contains($0) }
+        }
         if case .folder(let id) = item {
             // Its pages and its folders, at any depth.
             carried.formUnion(Library.shared.allBookmarkIDs(inFolder: id).map { .bookmark(Self.rowID($0)) })
@@ -1454,6 +1519,7 @@ final class SidebarListView: NSView {
                                ground: Tokens.Color.panelBackground, radius: Tokens.Sidebar.rowRadius)
         drag = DragState(item: item, view: view, copy: copy, together: together, carried: carried, faint: faint,
                          targetSection: nil, targetIndex: 0, originSpace: shownSpaceID ?? manager.currentSpaceID)
+        if case .tab(let id) = item { drag?.originParent = manager.tab(with: id)?.parentID }
         if let start = drag.map({ reorderTarget(pointerY: convert(event.locationInWindow, from: nil).y, dragging: $0) }) {
             drag?.targetSection = start.0
             drag?.targetIndex = start.1
@@ -1508,7 +1574,7 @@ final class SidebarListView: NSView {
     /// The row whose middle the pointer is on: most of a row's height, so it's easy to hit and holds still. Its
     /// top and bottom edges are for reordering.
     private func splitTarget(pointer: NSPoint, dragging item: SidebarItem) -> SplitDrop? {
-        for (candidate, view) in rows where view !== drag?.view {
+        for (candidate, view) in rows where view !== drag?.view && drag?.carried.contains(candidate) != true {
             guard view is TabRowView else { continue }
             let band = view.frame.insetBy(dx: 0, dy: view.frame.height * 0.22)
             guard band.contains(pointer), canSplit(item, onto: candidate) else { continue }
@@ -1535,6 +1601,7 @@ final class SidebarListView: NSView {
         let section: Section?, index: Int, pointX: CGFloat
         if let drag {
             let home = carriedRowShown && drag.targetSection == drag.originSection && drag.targetIndex == drag.originIndex
+                && (drag.targetSection != .tabs || tabGapParent(row: drag.targetIndex, pointX: drag.pointX, carried: drag.carried) == drag.originParent)
             section = home || drag.folderTarget != nil || splitCandidate != nil || drag.splitTarget != nil ? nil : drag.targetSection
             index = drag.targetIndex
             pointX = drag.pointX
@@ -1561,8 +1628,15 @@ final class SidebarListView: NSView {
             return
         }
         y = round(y)
-        // Set in as far as the folder it would land in holds its pages.
-        let x = folderForGap(in: placed, pointX: pointX).map { Self.indent(depth: Library.shared.depth(ofFolder: $0) + 1) } ?? 0
+        // Set in as far as the folder it would land in holds its pages, or as far as the tabs under the tab it would go
+        // under.
+        let x: CGFloat
+        if section == .tabs {
+            x = tabGapParent(row: index, pointX: pointX, carried: carried)
+                .map { Self.indent(depth: TabTree.shownLevel((tabLevels[$0] ?? 0) + 1)) } ?? 0
+        } else {
+            x = folderForGap(in: placed, pointX: pointX).map { Self.indent(depth: Library.shared.depth(ofFolder: $0) + 1) } ?? 0
+        }
         if insertionLine.superview !== self { addSubview(insertionLine) }
         Tokens.Motion.withoutAnimation {
             insertionLine.frame = NSRect(x: x, y: y - 3, width: bounds.width - x, height: 6)
@@ -1885,9 +1959,11 @@ final class SidebarListView: NSView {
         var landing: NSView?
         // Among the tabs, the gap's row count as a position in the tab list (the dragged tab taken out first).
         let listIndex = tabListIndex(forRow: drag.targetIndex, carried: drag.carried, moving: tab.map { [$0.id] } ?? [])
+        // And the tab it goes under, among nested tabs.
+        let gapParent = section == .tabs ? tabGapParent(row: drag.targetIndex, pointX: drag.pointX, carried: drag.carried) : nil
         switch (drag.item, section) {
         case (.tab, .tabs):
-            if let tab { delegate?.listMove(tab, to: listIndex, in: space) }
+            if let tab { delegate?.listMove(tab, to: listIndex, in: space, nesting: .under(gapParent)) }
         case (.tab, .bookmarks):
             if let tab {
                 let index = drag.targetIndex
@@ -1907,7 +1983,7 @@ final class SidebarListView: NSView {
             delegate?.listMoveFolder(id, to: drag.targetIndex, in: space, parent: gapFolder)
             landing = rows[.folder(id)]
         case (.bookmark(let id), .tabs):
-            delegate?.listUnbookmark(id, to: listIndex)
+            delegate?.listUnbookmark(id, to: listIndex, under: gapParent)
             let tabs = manager.tabs(in: space)
             landing = tabs.indices.contains(listIndex) ? row(for: tabs[listIndex]) : nil
         default:
@@ -1982,8 +2058,11 @@ final class SidebarListView: NSView {
                     case .tab(let id):
                         guard let tab = manager.tab(with: id) else { continue }
                         let rest = tabs.filter { $0 !== tab }
-                        let at = neighbor.flatMap { n in rest.firstIndex { $0 === n } }.map { after ? $0 + 1 : $0 } ?? rest.count
-                        delegate?.listMove(tab, to: at, in: space)
+                        // Beside the dragged one, after the tabs nested under it, and at its level.
+                        let nodes = manager.treeNodes(in: space).filter { $0.id != tab.id }
+                        let at = neighbor.flatMap { n in rest.firstIndex { $0 === n } }
+                            .map { after ? TabTree.subtreeEnd(at: $0, in: nodes) : $0 } ?? rest.count
+                        delegate?.listMove(tab, to: at, in: space, nesting: .under(neighbor?.parentID))
                         neighbor = tab
                     case .bookmark(let id):
                         let at = neighbor.flatMap { n in tabs.firstIndex { $0 === n } }.map { after ? $0 + 1 : $0 } ?? tabs.count

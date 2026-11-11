@@ -170,6 +170,39 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         return button
     }
     var onClose: (() -> Void)?
+
+    /// Whether tabs are nested under this one, and shown or folded away; nil when none are.
+    enum NestedTabs { case expanded, collapsed }
+    var nestedTabs: NestedTabs? {
+        didSet {
+            guard oldValue != nestedTabs else { return }
+            if let nestedTabs {
+                let open = nestedTabs == .expanded
+                // The folder's chevron: down while they show, right while they're folded, turning between the two.
+                nestedButton.symbol = open ? "chevron.down" : "chevron.right"
+                if oldValue != nil { FolderRowView.turn(nestedButton.layer, opening: open, size: nestedButton.bounds.size) }
+                nestedButton.toolTip = open ? String(localized: "Hide Nested Tabs", comment: "Tooltip of the chevron on a tab's row in the sidebar that has tabs nested under it: folds them away.")
+                    : String(localized: "Show Nested Tabs", comment: "Tooltip of the chevron on a tab's row in the sidebar whose nested tabs are folded away: shows them.")
+                nestedButton.setAccessibilityValue(open ? 1 : 0)
+            }
+            setAccessibilityDisclosed(nestedTabs == .expanded)
+            refreshAccessories()
+        }
+    }
+    var onToggleNested: (() -> Void)?
+    /// The chevron of a tab with tabs nested under it, in the column a folder's sits in.
+    private lazy var nestedButton: IconButton = {
+        let button = TabRowView.rowButton("chevron.down", toolTip: "")
+        button.tint = Tokens.Color.textTertiary
+        button.wantsLayer = true
+        button.setAccessibilityRole(.disclosureTriangle)
+        button.onClick = { [weak self] _ in self?.onToggleNested?() }
+        button.isHidden = true
+        addSubview(button)
+        return button
+    }()
+    private var showsNested: Bool { nestedTabs != nil && renameField == nil }
+
     /// Bookmarks keep their own title; only the icon and state follow the page.
     var fixedTitle: String? { didSet { if fixedTitle != oldValue { refresh() } } }
     var isBookmark = false
@@ -404,9 +437,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     override var trailingAccessoryWidth: CGFloat {
         let close = endSlot
+        let nested = showsNested ? Tokens.Sidebar.rowButton + (close > 0 ? Self.buttonGap : 0) : 0
         // In a split each half's speaker sits at that half's end (laid out with the halves).
-        let audio = isSplit ? 0 : showsAudio ? audioButton.frame.width + (close > 0 ? Self.buttonGap : 0) : 0
-        return close + audio
+        let audio = isSplit ? 0 : showsAudio ? audioButton.frame.width + (close + nested > 0 ? Self.buttonGap : 0) : 0
+        return close + nested + audio
     }
 
     func refresh() {
@@ -442,6 +476,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             : isBookmark ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.") : String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         audioButton.isHidden = !showsAudio || renameField != nil
         partnerAudioButton.isHidden = !isSplit || !partnerShowsAudio || renameField != nil
+        if nestedTabs != nil || renameField != nil { nestedButton.isHidden = !showsNested }
+        // Quiet at rest as a folder's is, clear under the pointer or while the tabs are folded away.
+        if nestedTabs != nil { nestedButton.alphaValue = isHovered || nestedTabs == .collapsed ? 1 : 0.6 }
         needsLayout = true
     }
 
@@ -506,7 +543,11 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             let height = NumberHintView.height
             hint.frame = NSRect(x: bounds.width - edge - hint.width, y: (bounds.height - height) / 2, width: hint.width, height: height)
         }
-        let end = endSlot > 0 ? bounds.width - edge - endSlot - Self.buttonGap : bounds.width - edge
+        var end = endSlot > 0 ? bounds.width - edge - endSlot - Self.buttonGap : bounds.width - edge
+        if showsNested {
+            nestedButton.frame = NSRect(x: end - size.width, y: y, width: size.width, height: size.height)
+            end = nestedButton.frame.minX - Self.buttonGap
+        }
         layoutDropHalf()
 
         guard isSplit else {
@@ -617,11 +658,16 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
     /// or shut with a click, it turns there from where it pointed.
     private func showChevron(turning: Bool) {
         chevron.image = Tokens.Symbol.image(isOpen ? "chevron.down" : "chevron.right", size: Tokens.Symbol.inline)
-        guard turning, window != nil, !Tokens.Motion.reduceMotion, let layer = chevron.layer else { return }
-        // A quarter turn back to where the other one pointed, about its middle, and on to rest.
-        let size = chevron.bounds.size
+        guard turning, window != nil else { return }
+        Self.turn(chevron.layer, opening: isOpen, size: chevron.bounds.size)
+    }
+
+    /// A chevron just redrawn pointing its new way turns there from where it pointed: a quarter turn back, about its
+    /// middle, and on to rest. A folder's, and a tab's with tabs nested under it.
+    static func turn(_ layer: CALayer?, opening: Bool, size: NSSize) {
+        guard let layer, !Tokens.Motion.reduceMotion else { return }
         let from = CATransform3DConcat(CATransform3DConcat(CATransform3DMakeTranslation(-size.width / 2, -size.height / 2, 0),
-                                                           CATransform3DMakeRotation(isOpen ? -.pi / 2 : .pi / 2, 0, 0, 1)),
+                                                           CATransform3DMakeRotation(opening ? -.pi / 2 : .pi / 2, 0, 0, 1)),
                                        CATransform3DMakeTranslation(size.width / 2, size.height / 2, 0))
         let turn = Tokens.Motion.easeAnimation(keyPath: "transform")
         turn.fromValue = from

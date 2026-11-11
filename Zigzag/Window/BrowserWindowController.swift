@@ -1736,12 +1736,12 @@ extension BrowserWindowController: SidebarDelegate {
         sidebarUndo.setActionName(String(localized: "Close Tab", comment: "Undo action name, shown in the Edit menu as Undo Close Tab."))
     }
 
-    /// Moves a tab within or between spaces, undoably.
-    func moveWithUndo(_ tab: Tab, to index: Int, in spaceID: UUID) {
+    /// Moves a tab within or between spaces, undoably. Within its space, the tabs nested under it come along.
+    func moveWithUndo(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting = .fit) {
         pageChange(spaceID == tab.spaceID ? String(localized: "Move Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Tab.") : String(localized: "Move to Space", comment: "Undo action name, shown in the Edit menu as Undo Move to Space.")) { [weak self] in
             guard let self else { return }
             let oldSpace = tab.spaceID
-            if spaceID == oldSpace { tabManager.move(tab, to: index) } else { tabManager.moveTabToSpace(tab, spaceID: spaceID, at: index) }
+            if spaceID == oldSpace { tabManager.move(tab, to: index, nesting: nesting) } else { tabManager.moveTabToSpace(tab, spaceID: spaceID, at: index) }
             // Dropped into the space a drag opened, with the old page still showing: you're there now, so it's this tab.
             if spaceID != oldSpace, spaceID == tabManager.currentSpaceID, shownTab !== tabManager.selectedTab { tabManager.select(tab) }
         }
@@ -1878,20 +1878,21 @@ extension BrowserWindowController: SidebarDelegate {
         sidebar.list.reload(animated: true)
         DispatchQueue.main.async { [weak self] in self?.sidebar.list.renameFolder(id) }
     }
-    func listMove(_ tab: Tab, to index: Int, in spaceID: UUID) { moveWithUndo(tab, to: index, in: spaceID) }
+    func listMove(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting) { moveWithUndo(tab, to: index, in: spaceID, nesting: nesting) }
+    func listSetNestedTabsCollapsed(_ tab: Tab, _ collapsed: Bool) { tabManager.setNestedTabsCollapsed(tab, collapsed) }
     func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) {
         // Pins are shared by every window: a private one's tabs stay out of them.
         guard !tabManager.isPrivate else { return }
         bookmarkWithUndo(tab, at: index, in: spaceID)
     }
-    func listUnbookmark(_ bookmarkID: UUID, to index: Int) {
+    func listUnbookmark(_ bookmarkID: UUID, to index: Int, under parent: UUID?) {
         // Pins are shared by every window: a private one doesn't take them away.
         guard !tabManager.isPrivate else { return }
         let space = tabManager.currentSpaceID
         pageChange(String(localized: "Unpin Tab", comment: "Undo action name, shown in the Edit menu as Undo Unpin Tab.")) { [tabManager] in
             // Carried here from another space: into this one first, so it comes down among the tabs you're looking at.
             if Library.shared.spaceID(ofBookmark: bookmarkID) != space { Library.shared.moveBookmark(bookmarkID, to: Int.max, in: space) }
-            tabManager.unbookmark(bookmarkID, toIndex: index)
+            tabManager.unbookmark(bookmarkID, toIndex: index, under: parent)
         }
     }
     /// A tab in a window of its own, a little down and to the right of this one, so both stay in view.
