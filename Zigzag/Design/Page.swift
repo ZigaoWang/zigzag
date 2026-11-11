@@ -113,11 +113,7 @@ final class PageHeader: NSView {
 extension Label {
     /// A group's heading on a page ("Tabs", "Browsing data"): quiet gray, the same as a section's label in the
     /// sidebar or a panel, over the group with room above it in place of a line.
-    static func groupHeading(_ text: String) -> Label {
-        let label = Label(text, font: Tokens.Font.label(), color: Tokens.Color.textTertiary)
-        label.setAccessibilityRole(.staticText)
-        return label
-    }
+    static func groupHeading(_ text: String) -> Label { section(text) }
 }
 
 /// A row in a list of places (Settings' sections): a symbol and a name, a soft fill of the accent when chosen, the
