@@ -83,3 +83,79 @@ import Testing
         token.cancel()
     }
 }
+
+/// What extensions' files say is read once and kept until Zigzag changes them (#89): every web view made and every
+/// sign-in field focused asked again, a dozen file reads each.
+@MainActor struct ExtensionReadCacheTests {
+    private let packageKeys = ["version", "pendingVersion", "unpackedPath"]
+    private let stateKeys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "siteAccess", "accessSites"]
+
+    private func file() throws -> URL {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-cache-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder.appendingPathComponent("state.json")
+    }
+
+    @Test func askingAgainReadsNothing() throws {
+        let file = try file()
+        ExtensionStore.write(ExtensionInstalls.State(enabled: true), keys: stateKeys, to: file)
+        let before = ExtensionStore.reads
+        for _ in 0..<100 { #expect(ExtensionStore.read(ExtensionInstalls.State.self, from: file)?.enabled == true) }
+        #expect(ExtensionStore.reads == before + 1)
+    }
+
+    @Test func aMissingFileIsRememberedAsMissing() throws {
+        let file = try file()
+        let before = ExtensionStore.reads
+        for _ in 0..<10 { #expect(ExtensionStore.read(ExtensionStore.Package.self, from: file) == nil) }
+        #expect(ExtensionStore.reads == before + 1)
+    }
+
+    @Test func eachKindOfRecordInOneFileIsItsOwn() throws {
+        let file = try file()
+        ExtensionStore.write(ExtensionStore.Package(version: "1.0"), keys: packageKeys, to: file)
+        ExtensionStore.write(ExtensionInstalls.State(enabled: false), keys: stateKeys, to: file)
+        #expect(ExtensionStore.read(ExtensionStore.Package.self, from: file)?.version == "1.0")
+        #expect(ExtensionStore.read(ExtensionInstalls.State.self, from: file)?.enabled == false)
+    }
+
+    @Test func aWriteIsSeenAtOnce() throws {
+        let file = try file()
+        ExtensionStore.write(ExtensionInstalls.State(enabled: true), keys: stateKeys, to: file)
+        #expect(ExtensionStore.read(ExtensionInstalls.State.self, from: file)?.enabled == true)
+        ExtensionStore.write(ExtensionInstalls.State(enabled: false), keys: stateKeys, to: file)
+        #expect(ExtensionStore.read(ExtensionInstalls.State.self, from: file)?.enabled == false)
+    }
+
+    @Test func removingIsSeenAtOnce() throws {
+        let file = try file()
+        ExtensionStore.write(ExtensionStore.Package(version: "1.0"), keys: packageKeys, to: file)
+        ExtensionStore.write(ExtensionInstalls.State(), keys: stateKeys, to: file)
+        #expect(ExtensionStore.read(ExtensionInstalls.State.self, from: file) != nil)
+        ExtensionStore.remove(keys: stateKeys, from: file)
+        #expect(ExtensionStore.read(ExtensionInstalls.State.self, from: file) == nil)
+        #expect(ExtensionStore.read(ExtensionStore.Package.self, from: file)?.version == "1.0")
+    }
+
+    @Test func aChangeMadeElsewhereIsReadOnceForgotten() throws {
+        let file = try file()
+        ExtensionStore.write(ExtensionStore.Package(version: "1.0"), keys: packageKeys, to: file)
+        #expect(ExtensionStore.read(ExtensionStore.Package.self, from: file)?.version == "1.0")
+        try Data(#"{"version":"2.0"}"#.utf8).write(to: file)
+        // Coming to the front, or Zigzag removing a folder, forgets what was read.
+        ExtensionStore.forgetWhatWasRead()
+        #expect(ExtensionStore.read(ExtensionStore.Package.self, from: file)?.version == "2.0")
+    }
+
+    @Test func anAnswerWorkedOutIsKeptUntilTheFilesChange() throws {
+        var remembered = Remembered<Int>()
+        var made = 0
+        let generation = ExtensionStore.generation
+        for _ in 0..<5 { _ = remembered.value(at: generation) { made += 1; return made } }
+        #expect(made == 1)
+        let file = try file()
+        ExtensionStore.write(ExtensionInstalls.State(), keys: stateKeys, to: file)
+        #expect(ExtensionStore.generation != generation)
+        #expect(remembered.value(at: ExtensionStore.generation) { made += 1; return made } == 2)
+    }
+}

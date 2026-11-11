@@ -154,6 +154,7 @@ final class Profiles {
         for id in had where ExtensionStore.profiles(with: id).isEmpty && !ExtensionStore.isUnpacked(id) {
             try? FileManager.default.removeItem(at: ExtensionStore.folder(for: id))
         }
+        ExtensionStore.forgetWhatWasRead()
         await Self.eraseStore(id)
         return true
     }
@@ -165,10 +166,12 @@ final class Profiles {
         guard !waiting.isEmpty else { return }
         Task {
             for id in waiting { await erase(id) }
+            ExtensionStore.forgetWhatWasRead()
             // A removal cut short didn't get to the packages only that profile had.
             for id in ExtensionStore.packageIDs where ExtensionStore.profiles(with: id).isEmpty && !ExtensionStore.isUnpacked(id) {
                 try? FileManager.default.removeItem(at: ExtensionStore.folder(for: id))
             }
+            ExtensionStore.forgetWhatWasRead()
         }
     }
 

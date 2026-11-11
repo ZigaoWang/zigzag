@@ -74,6 +74,7 @@ final class ExtensionInstalls {
             for name in ["loaded", "proxy.json", "UserScripts.json"] { try? FileManager.default.removeItem(at: folder(for: id).appendingPathComponent(name)) }
         } else {
             try? FileManager.default.removeItem(at: folder(for: id))
+            ExtensionStore.forgetWhatWasRead()
         }
     }
 
@@ -84,7 +85,12 @@ final class ExtensionInstalls {
     }
 
     /// The extensions this profile has, on or off, whose package can be read.
-    var installedIDs: [String] { ExtensionStore.packageIDs.filter { state($0) != nil } }
+    var installedIDs: [String] { installedRead.value(at: ExtensionStore.generation) { ExtensionStore.packageIDs.filter { state($0) != nil } } }
+
+    // Worked out once from what was read, until extension files change (ExtensionStore.forgetWhatWasRead).
+    private var installedRead = Remembered<[String]>()
+    private var declaresRead = Remembered<[String: Bool]>()
+    private var connectableRead = Remembered<[String: [String]]>()
 
     func isInstalled(_ id: String) -> Bool { state(id) != nil && ExtensionStore.packageDirectory(for: id) != nil }
     /// Whether the profile still has this extension, even if its package can't be read right now (an unpacked folder
@@ -158,15 +164,24 @@ final class ExtensionInstalls {
 
     /// Whether an extension that's on here asked for a permission, required or optional.
     func someEnabledExtensionDeclares(_ permission: String) -> Bool {
-        installedIDs.contains { id in
+        var known = declaresRead.value(at: ExtensionStore.generation) { [:] }
+        if let answer = known[permission] { return answer }
+        let answer = installedIDs.contains { id in
             guard isEnabled(id) else { return false }
             let declared = ExtensionStore.declaredPermissions(id)
             return declared.required.contains(permission) || declared.optional.contains(permission)
         }
+        known[permission] = answer
+        declaresRead.set(known, at: ExtensionStore.generation)
+        return answer
     }
 
     /// The sites each extension that's on here lets message it (`externally_connectable.matches`), never every site.
     func externallyConnectablePatterns() -> [String: [String]] {
+        connectableRead.value(at: ExtensionStore.generation) { readExternallyConnectablePatterns() }
+    }
+
+    private func readExternallyConnectablePatterns() -> [String: [String]] {
         var byExtension: [String: [String]] = [:]
         for id in installedIDs where isEnabled(id) {
             let matches = ((ExtensionStore.manifest(for: id)?["externally_connectable"] as? [String: Any])?["matches"] as? [String]) ?? []
@@ -174,5 +189,23 @@ final class ExtensionInstalls {
             if !narrow.isEmpty { byExtension[id] = narrow.sorted() }
         }
         return byExtension
+    }
+}
+
+/// An answer worked out from files, kept while they're unchanged: until the generation it was worked out at moves on.
+struct Remembered<Value> {
+    private var value: Value?
+    private var generation: Int?
+
+    mutating func value(at generation: Int, _ make: () -> Value) -> Value {
+        if let value, self.generation == generation { return value }
+        let made = make()
+        set(made, at: generation)
+        return made
+    }
+
+    mutating func set(_ value: Value, at generation: Int) {
+        self.value = value
+        self.generation = generation
     }
 }

@@ -1522,9 +1522,9 @@ enum ExtensionLog {
 }
 
 /// Debug builds write a plain log next to the app's data; release builds stay silent.
-func debugLog(_ message: String) {
+func debugLog(_ message: @autoclosure () -> String) {
     #if DEBUG
-    let line = "\(Date()) \(message)\n"
+    let line = "\(Date()) \(message())\n"
     let url = Paths.support.appendingPathComponent("debug.log")
     if let handle = try? FileHandle(forWritingTo: url) {
         _ = try? handle.seekToEnd()

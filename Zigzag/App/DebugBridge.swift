@@ -1018,10 +1018,12 @@ enum DebugBridge {
                     let records = await store.dataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes().union([NetworkChanges.alternativeServices]))
                     return records.filter { sites.contains($0.displayName) }.map { "\($0.displayName) \($0.dataTypes.sorted())" }.sorted().joined(separator: " | ")
                 }
-                debugLog("altsvc => \(await describe())")
+                let before = await describe()
+                debugLog("altsvc => \(before)")
                 guard arg == "forget" else { return }
                 await NetworkChanges.forget()
-                debugLog("altsvc after forget => \(await describe())")
+                let after = await describe()
+                debugLog("altsvc after forget => \(after)")
             }
         case "cookies":
             // cookies <path>: the cookies in the default store, in each other profile's in use and in every private

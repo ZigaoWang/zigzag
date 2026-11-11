@@ -92,6 +92,7 @@ enum ExtensionStore {
 
     /// Takes a record's keys out of the file, leaving its others.
     static func remove(keys: [String], from file: URL) {
+        defer { forgetWhatWasRead() }
         guard var all = (try? Data(contentsOf: file)).flatMap({ try? JSONSerialization.jsonObject(with: $0) }) as? [String: Any] else { return }
         for key in keys { all[key] = nil }
         guard let out = try? JSONSerialization.data(withJSONObject: all, options: [.sortedKeys]) else { return }
@@ -99,13 +100,19 @@ enum ExtensionStore {
     }
 
     static func read<Record: Decodable>(_ type: Record.Type, from file: URL) -> Record? {
-        guard let data = try? Data(contentsOf: file) else { return nil }
-        return try? JSONDecoder().decode(type, from: data)
+        let key = ReadKey(path: file.path, type: ObjectIdentifier(Record.self))
+        if let cached = records[key] { return cached as? Record }
+        reads += 1
+        watchActivation()
+        let record = (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode(type, from: $0) }
+        records[key] = .some(record.map { $0 as Any })
+        return record
     }
 
     /// Writes a record's own keys and leaves the file's others as they are: the package's record and the first
     /// profile's answers share one file, and neither writer knows the other's keys.
     static func write<Record: Encodable>(_ record: Record, keys: [String], to file: URL) {
+        defer { forgetWhatWasRead() }
         guard let data = try? JSONEncoder().encode(record),
               let fields = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
         var all = ((try? Data(contentsOf: file)).flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
@@ -114,8 +121,55 @@ enum ExtensionStore {
         try? out.write(to: file, options: .atomic)
     }
 
+    // MARK: What was read
+
+    /// What the extension files said when last read. Pages ask on every web view made and every sign-in field
+    /// focused (which extensions are on, what they declare), and each answer was a dozen file reads: the answers are
+    /// kept until Zigzag writes or removes any of these files (`forgetWhatWasRead`), and read again each time Zigzag
+    /// comes to the front, for an unpacked extension's folder changed meanwhile.
+    private struct ReadKey: Hashable {
+        let path: String
+        let type: ObjectIdentifier
+    }
+    /// A decoded record, or nil (stored as such) for a file that isn't there or doesn't read.
+    private static var records: [ReadKey: Any?] = [:]
+    private static var packageDirectories: [String: URL?] = [:]
+    private static var packageIDsRead: [String]?
+    private static var manifests: [String: [String: Any]?] = [:]
+    /// Moves on each time what was read is forgotten, for answers worked out from it elsewhere (ExtensionInstalls).
+    private(set) static var generation = 0
+    /// How many times a record or manifest was read from disk, for tests.
+    private(set) static var reads = 0
+    private static var activationToken: NSObjectProtocol?
+
+    /// What was read is forgotten each time Zigzag comes to the front: a developer may have changed an unpacked
+    /// extension's folder, or unplugged the drive it's on, while Zigzag was behind.
+    static func watchActivation() {
+        guard activationToken == nil else { return }
+        activationToken = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { forgetWhatWasRead() }
+        }
+    }
+
+    /// Zigzag changed extension files, or something else may have: everything is read afresh.
+    static func forgetWhatWasRead() {
+        records.removeAll()
+        packageDirectories.removeAll()
+        packageIDsRead = nil
+        manifests.removeAll()
+        generation &+= 1
+    }
+
     /// The untouched package for a version (the current one unless named).
     static func packageDirectory(for id: String, version: String? = nil) -> URL? {
+        let key = version.map { "\(id)/\($0)" } ?? id
+        if let cached = packageDirectories[key] { return cached }
+        let found = findPackageDirectory(for: id, version: version)
+        packageDirectories[key] = found
+        return found
+    }
+
+    private static func findPackageDirectory(for id: String, version: String?) -> URL? {
         guard let package = package(id) else { return nil }
         if let path = package.unpackedPath {
             let dir = URL(fileURLWithPath: path, isDirectory: true)
@@ -127,8 +181,11 @@ enum ExtensionStore {
 
     /// Every extension whose package can be read, whichever profiles have it.
     static var packageIDs: [String] {
+        if let packageIDsRead { return packageIDsRead }
         let items = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
-        return items.filter { packageDirectory(for: $0) != nil }.sorted()
+        let found = items.filter { packageDirectory(for: $0) != nil }.sorted()
+        packageIDsRead = found
+        return found
     }
 
     static func isUnpacked(_ id: String) -> Bool { package(id)?.unpackedPath != nil }
@@ -385,6 +442,8 @@ enum ExtensionStore {
     /// Re-reads an unpacked extension's files, in every profile running it.
     static func reloadUnpacked(_ id: String) async {
         guard #available(macOS 15.4, *), isUnpacked(id) else { return }
+        // Its folder is the developer's: whatever they changed in it is read again.
+        forgetWhatWasRead()
         for profile in profiles(with: id) where profile.installs.isEnabled(id) {
             profile.extensions.unload(id)
             await profile.extensions.load(id)
@@ -469,6 +528,7 @@ enum ExtensionStore {
     /// Moves a downloaded package into its version folder.
     private static func store(_ package: (folder: URL, version: String), for id: String) -> Bool {
         let target = versionsFolder(for: id).appendingPathComponent(package.version, isDirectory: true)
+        defer { forgetWhatWasRead() }
         do {
             try FileManager.default.createDirectory(at: versionsFolder(for: id), withIntermediateDirectories: true)
             if FileManager.default.fileExists(atPath: target.path) {
@@ -484,7 +544,13 @@ enum ExtensionStore {
     }
 
     /// The current version's manifest.
-    static func manifest(for id: String) -> [String: Any]? { packageDirectory(for: id).flatMap(manifest(in:)) }
+    static func manifest(for id: String) -> [String: Any]? {
+        if let cached = manifests[id] { return cached }
+        let read = packageDirectory(for: id).flatMap(manifest(in:))
+        reads += 1
+        manifests[id] = .some(read)
+        return read
+    }
 
     /// What the extension asked for in its own manifest (the package's, not the loaded copy's, which adds native
     /// messaging for Zigzag's bridge). Read once per version.
@@ -511,6 +577,7 @@ enum ExtensionStore {
 
     private static func removeVersions(of id: String, keeping keep: [String]) {
         let folder = versionsFolder(for: id)
+        defer { forgetWhatWasRead() }
         for name in (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [] where !keep.contains(name) {
             try? FileManager.default.removeItem(at: folder.appendingPathComponent(name))
         }
@@ -631,6 +698,7 @@ enum ExtensionStore {
             // An unpacked extension's own folder belongs to its developer; only our record of it goes.
             try? FileManager.default.removeItem(at: folder(for: id))
             if !unpacked { removedIDs.insert(id) }
+            forgetWhatWasRead()
         }
         profile.extensions.forget(id)
         // Only now is it gone from disk: removing a password manager brings back the passkey fallback.
@@ -665,6 +733,7 @@ enum ExtensionStore {
         }
         UserDefaults.standard.removeObject(forKey: "DisabledExtensions")
         UserDefaults.standard.removeObject(forKey: "OnePasswordExtensionUpdated")
+        forgetWhatWasRead()
     }
 
     private static func undoLegacyPatch(in folder: URL) {
@@ -676,6 +745,7 @@ enum ExtensionStore {
         manifest["background"] = background
         if let out = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted]) { try? out.write(to: manifestURL) }
         for name in ["zigzag-background.js", "zigzag-shim.js"] { try? FileManager.default.removeItem(at: folder.appendingPathComponent(name)) }
+        forgetWhatWasRead()
     }
 }
 

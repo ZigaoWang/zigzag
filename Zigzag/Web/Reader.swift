@@ -20,8 +20,9 @@ enum Reader {
         return ExternalLinks.isExternal(url) ? .externalApp : .ignore
     }
 
-    /// Readability itself plus a small helper that says whether a page looks like an article.
-    static var scripts: [WKUserScript] {
+    /// Readability itself plus a small helper that says whether a page looks like an article. Read from the app once,
+    /// not for every page made.
+    static let scripts: [WKUserScript] = {
         guard let readability = resource("Readability"), let readerable = resource("Readability-readerable") else { return [] }
         let check = """
         window.__zigzagReader = {
@@ -100,7 +101,7 @@ enum Reader {
         };
         """
         return [WKUserScript(source: readability + "\n" + readerable + "\n" + check, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: .defaultClient)]
-    }
+    }()
 
     private static func resource(_ name: String) -> String? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "js") else { return nil }
