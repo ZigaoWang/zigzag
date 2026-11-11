@@ -172,26 +172,48 @@ enum DarkPages {
             controller.removeAllUserScripts()
             others.forEach(controller.addUserScript)
         }
-        controller.addUserScript(script(for: webView.configuration.websiteDataStore))
-        installed[ObjectIdentifier(controller)] = generation
+        let store = webView.configuration.websiteDataStore
+        controller.addUserScript(script(for: store))
+        installed[ObjectIdentifier(controller)] = Installed(generation: generation, native: nativeSites(in: nativeScope(of: store)))
     }
 
-    /// Counts up each time what a page script is given changes without anyone asking (a site learned dark): a web
-    /// view whose script is older gets the new one as it next goes to a page, not all of them at once.
+    /// Counts up each time the choices change (the setting, a site's own, the Mac's appearance): a web view whose
+    /// script is older gets the new one as it next goes to a page, if `refreshAll` hasn't reached it yet.
     private static var generation = 0
-    /// Which generation each web view's scripts (by their set, shared by a page and the pop-ups it opened) have.
-    private static var installed: [ObjectIdentifier: Int] = [:]
+    /// What each web view's script (by their set, shared by a page and the pop-ups it opened) was given.
+    private struct Installed {
+        var generation: Int
+        /// The profile's sites seen dark, then.
+        var native: Set<String>
+    }
+    private static var installed: [ObjectIdentifier: Installed] = [:]
+
+    /// Whether a page going to `site` needs the script put in again for what was learned since: only when that site
+    /// joined or left the list it was given. Any page teaching it a site moved every tab to new scripts, a few hundred
+    /// kilobytes each, as each next changed its address (#89); the list is only read for the page's own site.
+    static func siteChanged(_ site: String?, given: Set<String>, now: Set<String>) -> Bool {
+        guard let site else { return false }
+        return given.contains(site) != now.contains(site)
+    }
 
     private static func installIfStale(in webView: WKWebView) {
         let key = ObjectIdentifier(webView.configuration.userContentController)
-        if installed[key] != generation { install(in: webView) }
+        guard let given = installed[key], given.generation == generation else { install(in: webView); return }
+        let now = nativeSites(in: nativeScope(of: webView.configuration.websiteDataStore))
+        if siteChanged(site(of: webView.url), given: given.native, now: now) { install(in: webView) }
     }
 
     private final class Entry {
         weak var webView: WKWebView?
         var observation: NSKeyValueObservation?
+        /// The look again a moment after the address last changed: a single-page app changing its address as you
+        /// scroll is looked at once it settles, not for every change.
+        var recheck: DispatchWorkItem?
         init(_ webView: WKWebView) { self.webView = webView }
     }
+
+    /// Open pages hearing of a change a few at a time, the ones on screen first (`refreshAll`).
+    private static let refreshes = StagedQueue<ObjectIdentifier>(perStep: 4, interval: 0.05)
 
     private static var entries: [ObjectIdentifier: Entry] = [:]
     private static var appearanceObservation: NSKeyValueObservation?
@@ -204,15 +226,18 @@ enum DarkPages {
         controller.add(Messages.shared, contentWorld: world, name: messageName)
         let entry = Entry(webView)
         // Going to another site, its own choice applies before its page starts.
-        entry.observation = webView.observe(\.url, options: [.new]) { webView, _ in
+        entry.observation = webView.observe(\.url, options: [.new]) { [weak entry] webView, _ in
             MainActor.assumeIsolated {
                 // Sites learned since its script was put in: the page it's going to starts with them.
                 installIfStale(in: webView)
                 applyLook(to: webView)
                 // A single-page app's new view, which loads nothing: looked at again once it's drawn.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak webView] in
+                entry?.recheck?.cancel()
+                let work = DispatchWorkItem { [weak webView] in
                     MainActor.assumeIsolated { if let webView { recheck(webView) } }
                 }
+                entry?.recheck = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
             }
         }
         entries = entries.filter { $0.value.webView != nil }
@@ -245,15 +270,21 @@ enum DarkPages {
     /// reloading, and pages loaded later start the right way.
     static func refreshAll() {
         entries = entries.filter { $0.value.webView != nil }
-        var controllers = Set<ObjectIdentifier>()
-        for entry in entries.values {
-            guard let webView = entry.webView else { continue }
-            let controller = webView.configuration.userContentController
-            if controllers.insert(ObjectIdentifier(controller)).inserted { install(in: webView) }
+        // Every script put in before now is out of date, so a page that goes somewhere before its turn below gets the
+        // new one all the same.
+        generation += 1
+        // The look at once; the new script and the page's own change a few at a time, on screen first: all of them in
+        // one go held Zigzag up with many tabs open.
+        let webViews = entries.values.compactMap(\.webView).sorted { ($0.window != nil ? 0 : 1) < ($1.window != nil ? 0 : 1) }
+        for webView in webViews {
             applyLook(to: webView)
-            webView.callAsyncJavaScript("if (window.__zigzagDark) window.__zigzagDark.set(config);",
-                                        arguments: ["config": config(for: webView.configuration.websiteDataStore)],
-                                        in: nil, in: world) { _ in }
+            refreshes.add(ObjectIdentifier(webView)) { [weak webView] in
+                guard let webView else { return }
+                installIfStale(in: webView)
+                webView.callAsyncJavaScript("if (window.__zigzagDark) window.__zigzagDark.set(config);",
+                                            arguments: ["config": config(for: webView.configuration.websiteDataStore)],
+                                            in: nil, in: world) { _ in }
+            }
         }
         changed.send()
     }

@@ -271,3 +271,18 @@ struct SessionSaveTests {
         #expect(JSONStore.load(SessionState.self, from: file)?.windows.first?.spaces.first?.tabs.first?.url?.absoluteString == "https://example.com/19")
     }
 }
+
+/// A site learned dark puts new scripts only into the pages going to that site (#89).
+struct DarkPagesReinstallTests {
+    @Test func onlyThePageGoingToASiteThatChangedGetsANewScript() {
+        let given: Set<String> = ["dark.test"]
+        // Some other site was learned: nothing the page going to example.com reads has changed.
+        #expect(!DarkPages.siteChanged("example.com", given: given, now: ["dark.test", "other.test"]))
+        // Its own site joined, or left, the list.
+        #expect(DarkPages.siteChanged("other.test", given: given, now: ["dark.test", "other.test"]))
+        #expect(DarkPages.siteChanged("dark.test", given: given, now: []))
+        #expect(!DarkPages.siteChanged("dark.test", given: given, now: given))
+        // A page with no site (a blank page) reads none of it.
+        #expect(!DarkPages.siteChanged(nil, given: given, now: []))
+    }
+}
