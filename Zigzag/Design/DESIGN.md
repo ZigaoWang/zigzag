@@ -318,10 +318,14 @@ something came from, answers at once, and can be interrupted.
   each, a live preview on hover), the wheel and Shade for a color of your own, and Effects folded under a disclosure
   (`DisclosureRow`): a second color and its direction, See-through, Grain. Effects opens by itself when the space
   uses any of them. Then Profile: a dropdown of the profiles, with New Profile… at its end.
-- **Menu** (`MenuPanel`): Zigzag draws its own; only right-click menus are the system's. The floating panel's
+- **Menu** (`MenuPanel`): Zigzag draws its own; only right-click menus are the system's, except the sidebar's empty
+  space, whose menu is the +'s. The floating panel's
   surface and its one shadow, `Radius.panel`, a hairline `panelEdge`. `body` items
   `Metric.controlHeight` tall with `Radius.row`, inset 4pt; every item has its picture slot, a neutral globe where a
-  site's icon is missing; the chosen item has a check at its trailing end in the window's accent. Keys: Up and Down,
+  site's icon is missing; the chosen item has a check at its trailing end in the window's accent. An item's shortcut,
+  as the menu bar has it now, sits at the trailing end in `textTertiary`, as the Mac's menus set it. The sidebar's +
+  opens its menu (New Tab, New Folder, New Space…) 4pt above it, the trailing edges lined up; a right-click on the
+  sidebar's empty space opens the same items, with Edit Space…, under the pointer. Keys: Up and Down,
   Home and End, Return or Space to choose, Esc or Tab to close, typing to jump to a name. VoiceOver reads it as a menu
   of menu items and speaks the item the keys reach. A click outside closes it and goes no further. Panels under it
   leave Esc and that click to it (`MenuPanel.current`). The HTML pages' `.menu` matches it.
@@ -336,6 +340,8 @@ something came from, answers at once, and can be interrupted.
   page); the name is then its tooltip and its VoiceOver value.
 - **Card**: the chosen thing in a list (`applyRowStyle`, `GlassTile` when selected).
 - **Row** (`CardRow`): icon, title, quiet trailing detail; states above.
+- **A row's delete** (`RowDelete`): the compact trash, 8pt before the row's last control, shown while the row is
+  pointed at or has keyboard focus, and always with VoiceOver on. Hidden, it keeps its room, so nothing moves.
 - **Tile** (`GlassTile`): soft glass, `Radius.tile`; a fine darker edge (`openEdge`) when its page is open.
 - **Pill button** (`PillButton`): capsule, `.plain` on `fieldFill`, `.quiet` fill on hover only, `.prominent` in
   the accent, one per surface; `isDestructive` for what can't be undone. `PrimaryButton` and `TextButton` remain
