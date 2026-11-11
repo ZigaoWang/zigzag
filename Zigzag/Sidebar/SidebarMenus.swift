@@ -170,6 +170,8 @@ enum SidebarMenus {
         let pinned = Library.shared.pinnedSplit(containing: bookmark.id)
         // A pinned split's row is named after both its pages, so renaming one of them from it would be a puzzle.
         if pinned == nil { menu.addItem(Item(String(localized: "Rename", comment: "Item in a pinned tab's context menu in the sidebar.")) { BookmarkEditor.edit(bookmark.id, in: controller) }) }
+        // Copy Link right after Rename, as in a tab's and a favorite's menus.
+        menu.addItem(Item(String(localized: "Copy Link", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.copyLink(bookmark.url) })
         if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(bookmark.url) {
             menu.addItem(Item(String(localized: "Back to Pinned Page", comment: "Item in a pinned tab's context menu in the sidebar. Goes back to the page the tab was pinned with.")) { manager.resetBookmarkTab(bookmark.id) })
             menu.addItem(Item(String(localized: "Separate from Pinned Tab", comment: "Item in a pinned tab's context menu in the sidebar. The page wandered off; this opens it as a tab of its own.")) { manager.separateBookmarkTab(bookmark.id) })
@@ -180,7 +182,6 @@ enum SidebarMenus {
                 })
             }
         }
-        menu.addItem(Item(String(localized: "Copy Link", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.copyLink(bookmark.url) })
         menu.addItem(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar.")) {
             controller.libraryChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.makeFavorite(bookmark.id, in: manager.profile.id) }
             live?.isFavorite = true
