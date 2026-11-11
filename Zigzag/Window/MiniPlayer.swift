@@ -483,6 +483,13 @@ final class MiniPlayer {
          "anchor": Self.place?.stored ?? "", "area": NSStringFromRect(movableArea), "playing": video?.isPlaying ?? false, "time": video?.time ?? 0,
          "selected": controller?.tabManager.selectedTab?.displayTitle ?? "", "space": controller?.tabManager.currentSpaceID.uuidString ?? "",
          "follows": controller?.tabManager.allTabs.filter(follows).map(\.displayTitle) ?? [],
+         // Each tab's videos as its page last told them, and whether its page is on its way out.
+         "videos": controller?.tabManager.allTabs.map { tab -> [String: Any] in
+             let videos = tab.webView.map { PageVideos.shared.frames(in: $0).flatMap(\.videos) } ?? []
+             return ["tab": tab.displayTitle, "leaving": tab.isLeavingPage, "videos": videos.map { String(describing: $0) },
+                     "inWindow": tab.webView?.window != nil, "inCard": Self.isInPageCard(tab.pageHolder),
+                     "presenting": tab.webView.map { PageVideos.shared.isPresentingItself($0) } ?? false]
+         } ?? [],
          "reporting": controller?.tabManager.allTabs.filter { $0.webView.map { !PageVideos.shared.frames(in: $0).isEmpty } ?? false }.map(\.displayTitle) ?? [],
          "hovered": card?.showsControls ?? false, "webViewInCard": webView.map { $0.isDescendant(of: card ?? NSView()) } ?? false,
          "parked": parked.compactMap { $0.tab?.displayTitle }, "parkedInWindow": parked.compactMap { $0.holder.map { $0.superview === parking && $0.window != nil } }]
