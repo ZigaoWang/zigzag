@@ -1173,7 +1173,7 @@ final class DropdownButton: InteractiveView {
 /// row under the pointer or the arrow keys, a check at the trailing end of the chosen one. It arrives in a quick fade
 /// from a touch smaller and leaves the same way; opened or closed from the keyboard it's simply there.
 /// Keys: Up and Down move, Return or Space chooses, Esc closes, and typing a name jumps to it. Right-click menus stay
-/// the system's.
+/// the system's, except the sidebar's own, which match its +.
 final class MenuPanel: FloatingPanelView {
     override var replacesExtensionPopup: Bool { true }
     enum Entry {
@@ -1190,18 +1190,22 @@ final class MenuPanel: FloatingPanelView {
         var isChecked = false
         var isDestructive = false
         var isEnabled = true
+        /// Its keyboard shortcut as the menu bar has it now ("⌘T"), quiet at the trailing end; empty for none.
+        var shortcut: String
         var action: () -> Void
 
         init(title: String, image: NSImage? = nil, symbol: String? = nil, isChecked: Bool = false, isDestructive: Bool = false,
-             isEnabled: Bool = true, action: @escaping () -> Void) {
+             isEnabled: Bool = true, shortcut: String = "", action: @escaping () -> Void) {
             self.title = title; self.image = image; self.symbol = symbol; self.isChecked = isChecked
-            self.isDestructive = isDestructive; self.isEnabled = isEnabled; self.action = action
+            self.isDestructive = isDestructive; self.isEnabled = isEnabled; self.shortcut = shortcut; self.action = action
         }
     }
 
     /// Where it opens: with item `index` right over the control, its text `textInset` from the control's edge, as a
-    /// pop-up button's menu does (below it when there's no room); or under the control, as a button's menu does.
-    enum Placement { case over(Int, textInset: CGFloat), below }
+    /// pop-up button's menu does (below it when there's no room); under the control, as a button's menu does; above
+    /// it with their trailing edges lined up, for a button at the bottom of the window (the sidebar's +); or with its
+    /// top left corner at a point in the window, as a right-click's menu opens under the pointer.
+    enum Placement { case over(Int, textInset: CGFloat), below, aboveTrailing, at(NSPoint) }
 
     /// The menu that's open, if any. Panels that close on Esc or a click elsewhere leave those to it while it's open.
     static weak var current: MenuPanel?
@@ -1313,7 +1317,9 @@ final class MenuPanel: FloatingPanelView {
         let font = Tokens.Font.body()
         let widest = rows.map { ceil(($0.item.title as NSString).size(withAttributes: [.font: font]).width) }.max() ?? 0
         let icon: CGFloat = rows.first?.reservesIcon == true ? DropdownButton.iconSide + Tokens.Space.x2 : 0
-        return Self.pad * 2 + Self.rowInset + icon + widest + Tokens.Space.x6 + Row.checkSide + Self.rowInset
+        // The shortcuts share one column at the trailing end, where a check would be.
+        let keys = rows.map { $0.item.shortcut.isEmpty ? 0 : ceil(($0.item.shortcut as NSString).size(withAttributes: [.font: font]).width) }.max() ?? 0
+        return Self.pad * 2 + Self.rowInset + icon + widest + Tokens.Space.x6 + max(Row.checkSide, keys) + Self.rowInset
     }
 
     // MARK: Showing
@@ -1366,11 +1372,28 @@ final class MenuPanel: FloatingPanelView {
             } else {
                 maxY = area.maxY
             }
+        case .aboveTrailing:
+            x = a.maxX - width
+            if fits(a.maxY + Tokens.Space.x1 + height) {
+                maxY = a.maxY + Tokens.Space.x1 + height
+                growsY = 1
+            } else if fits(a.minY - Tokens.Space.x1) {
+                maxY = a.minY - Tokens.Space.x1
+            } else {
+                maxY = area.maxY
+            }
+        case .at(let point):
+            // Under the pointer, as a right-click's menu opens; above it where there's no room below.
+            x = point.x
+            maxY = fits(point.y) ? point.y : fits(point.y + height) ? point.y + height : area.maxY
+            growsY = maxY == point.y ? 0 : 1
         }
         x = min(max(x, area.minX), max(area.minX, area.maxX - width))
         let rect = NSRect(x: x, y: maxY - height, width: width, height: height)
         menu.frame = host.convert(rect, from: nil)
-        menu.growsFrom = CGPoint(x: min(max((a.midX - x) / width, 0), 1), y: growsY)
+        let from: CGFloat
+        if case .at(let point) = placement { from = point.x } else { from = a.midX }
+        menu.growsFrom = CGPoint(x: min(max((from - x) / width, 0), 1), y: growsY)
         host.addSubview(menu)
         menu.layoutSubtreeIfNeeded()
         menu.scroll.contentView.scroll(to: NSPoint(x: 0, y: scrollTo))
@@ -1517,8 +1540,13 @@ final class MenuPanel: FloatingPanelView {
         }
     }
 
+    /// The item the pointer or the keys are on.
+    var highlightedIndex: Int? { highlighted }
+    /// Its items' titles, in order.
+    var itemTitles: [String] { rows.map(\.item.title) }
+
     /// True when the key was the menu's.
-    private func handleKey(_ event: NSEvent) -> Bool {
+    func handleKey(_ event: NSEvent) -> Bool {
         let mods = event.modifierFlags.intersection([.command, .control, .option])
         if !mods.isEmpty {
             // A shortcut: the menu steps aside and lets it through.
@@ -1581,6 +1609,7 @@ final class MenuPanel: FloatingPanelView {
         private let icon = NSImageView()
         private let label: Label
         private let check = NSImageView()
+        private let keys: Label
         static let checkSide: CGFloat = 12
         var isHighlighted = false { didSet { if oldValue != isHighlighted { stateDidChange(animated: false) } } }
 
@@ -1588,6 +1617,10 @@ final class MenuPanel: FloatingPanelView {
             self.item = item
             self.reservesIcon = reservesIcon
             label = Label(item.title, font: Tokens.Font.body(), color: item.isDestructive ? Tokens.Color.destructive : Tokens.Color.textPrimary)
+            // The shortcut in quiet type at the trailing end, as the Mac's menus set it.
+            keys = Label(item.shortcut, font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
+            keys.alignment = .right
+            keys.isHidden = item.shortcut.isEmpty
             super.init(frame: .zero)
             layer?.cornerRadius = Tokens.Radius.row
             layer?.cornerCurve = .continuous
@@ -1607,10 +1640,11 @@ final class MenuPanel: FloatingPanelView {
             check.image = Tokens.Symbol.image("checkmark", size: Tokens.Symbol.inline)
             check.imageScaling = .scaleNone
             check.isHidden = !item.isChecked
-            [icon, label, check].forEach { addSubview($0) }
+            [icon, label, keys, check].forEach { addSubview($0) }
             isEnabled = item.isEnabled
             setAccessibilityRole(.menuItem)
             setAccessibilityLabel(item.title)
+            if !item.shortcut.isEmpty { setAccessibilityHelp(item.shortcut) }
             setAccessibilityValue(item.isChecked ? String(localized: "selected", comment: "What VoiceOver says after a checked item in one of Zigzag's menus.") : nil)
             stateDidChange(animated: false)
         }
@@ -1627,8 +1661,15 @@ final class MenuPanel: FloatingPanelView {
             }
             let side = Self.checkSide + 4
             check.frame = NSRect(x: bounds.width - MenuPanel.rowInset - side, y: (bounds.height - side) / 2, width: side, height: side)
+            var end = check.frame.minX
+            if !keys.isHidden {
+                let width = keys.inkWidth + 2
+                keys.frame = NSRect(x: bounds.width - MenuPanel.rowInset - width - Label.inset, y: (bounds.height - keys.lineHeight) / 2,
+                                    width: width + Label.inset * 2, height: keys.lineHeight)
+                end = min(end, keys.frame.minX + Label.inset)
+            }
             label.frame = NSRect(x: x - Label.inset, y: (bounds.height - label.lineHeight) / 2,
-                                 width: max(0, check.frame.minX - Tokens.Space.x2 - x + Label.inset * 2), height: label.lineHeight)
+                                 width: max(0, end - Tokens.Space.x2 - x + Label.inset * 2), height: label.lineHeight)
         }
 
         override func stateDidChange(animated: Bool) {
