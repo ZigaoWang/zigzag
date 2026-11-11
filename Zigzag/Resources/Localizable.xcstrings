@@ -1601,13 +1601,13 @@
         }
       }
     },
-    "A link you open in a new tab sits under the page it came from, so tabs from one page stay together. Drag a tab out to make it a tab of its own." : {
+    "A link you open in a new tab sits under the page it came from. Drag a tab out to make it a tab of its own." : {
       "comment" : "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在新标签页中打开的链接会放在它来自的页面下面，同一页面打开的标签页就待在一起。把标签页拖出来，它就成为独立的标签页。"
+            "value" : "在新标签页中打开的链接会放在它来自的页面下面。把标签页拖出来，它就成为独立的标签页。"
           }
         }
       }
@@ -5069,7 +5069,7 @@
       }
     },
     "Edit" : {
-      "comment" : "A menu in the menu bar.\nButton on a profile's row in Settings › Profiles.\nButton on a saved login in the Passwords window.\nButton on a space's row in Settings › Spaces.",
+      "comment" : "A menu in the menu bar.\nButton on a saved login in the Passwords window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5119,6 +5119,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "编辑此页面的地址"
+          }
+        }
+      }
+    },
+    "Edit “%@”" : {
+      "comment" : "VoiceOver label of the Edit button on a profile's row in Settings › Profiles; the profile's name.\nVoiceOver label of the Edit button on a space's row in Settings › Spaces; the space's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑“%@”"
+          }
+        }
+      }
+    },
+    "Edit…" : {
+      "comment" : "Button on a profile's row in Settings › Profiles: opens the sheet that renames it and changes its color.\nButton on a space's row in Settings › Spaces: opens its editor.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑…"
           }
         }
       }
@@ -7635,7 +7657,7 @@
       }
     },
     "New Profile" : {
-      "comment" : "Button beside Your Profiles in Settings › Profiles.\nTitle of the sheet that makes a profile.",
+      "comment" : "Title of the sheet that makes a profile.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7646,7 +7668,7 @@
       }
     },
     "New Profile…" : {
-      "comment" : "Item at the end of the Profile menu in a space's editor: makes a profile and puts the space on it.",
+      "comment" : "Button beside Your Profiles in Settings › Profiles: opens the sheet that makes a profile.\nItem at the end of the Profile menu in a space's editor: makes a profile and puts the space on it.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12429,7 +12451,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "轻扫以前进和后退"
+            "value" : "轻扫以后退和前进"
           }
         }
       }
@@ -16121,6 +16143,17 @@
         }
       }
     },
+    "mini player picture in picture pip floating" : {
+      "comment" : "Words that find the Keep videos playing setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小播放器 画中画 悬浮 视频 mini player picture in picture pip floating"
+          }
+        }
+      }
+    },
     "muted" : {
       "comment" : "Spoken by VoiceOver after a tab row's name: the tab is muted.",
       "localizations" : {
@@ -16128,6 +16161,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已静音"
+          }
+        }
+      }
+    },
+    "nested tree child command click" : {
+      "comment" : "Words that find the Open ⌘-clicked links under their tab setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "嵌套 子标签页 树状 层级 nested tree child command click"
           }
         }
       }
@@ -16318,6 +16362,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "空间"
+          }
+        }
+      }
+    },
+    "toolbar top bar url location" : {
+      "comment" : "Words that find the Address bar above the page setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工具栏 顶栏 网址 地址 toolbar top bar url location"
           }
         }
       }
