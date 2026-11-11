@@ -224,6 +224,7 @@ final class TabManager {
         let place = newTabPlacement(in: space, opener: opener, select: select)
         tab.parentID = place.parent
         tabsBySpace[space, default: []].insert(tab, at: place.index)
+        unfold(place.parent)
         if opener == nil, !select, Self.newTabPlace == .next, space == currentSpaceID { placedBeside = PlacedBeside(anchor: selectedTab, last: tab) } else { placedBeside = nil }
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
         // Opened in front from a page in split view: it takes that page's pane, so the split stays on screen and
@@ -1066,6 +1067,7 @@ final class TabManager {
             case .under(let id): id
             }
             applyTree(TabTree.moving(tab.id, to: at, parent: parent, in: nodes), in: target)
+            if case .under = nesting { unfold(tab.parentID) }
         }
         // No other space keeps it selected, whichever one is showing.
         for (space, id) in selectedBySpace where id == tab.id && space != target { selectedBySpace[space] = nil }
@@ -1383,6 +1385,12 @@ final class TabManager {
     private func liftToTopLevel(_ tab: Tab) {
         guard tab.bookmarkID == nil else { tab.parentID = nil; return }
         applyTree(TabTree.liftingToTopLevel(tab.id, in: treeNodes(in: tab.spaceID)), in: tab.spaceID)
+    }
+
+    /// A tab put under a folded one shows: unfolded, so a link opened under it doesn't vanish into the fold.
+    private func unfold(_ parent: UUID?) {
+        guard let parent, let tab = tab(with: parent), tab.isCollapsed else { return }
+        tab.isCollapsed = false
     }
 
     func hasNestedTabs(_ tab: Tab) -> Bool { tab.bookmarkID == nil && tabs(in: tab.spaceID).contains { $0.parentID == tab.id } }
