@@ -298,7 +298,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     init(space: SpaceInfo) {
         spaceID = space.id
         name = Label(space.name, font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
-        super.init(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Page.groupRowHeight))
+        super.init(frame: NSRect(x: 0, y: 0, width: 400, height: Self.height))
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
         tile.image = Self.tile(for: space)
@@ -321,6 +321,15 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Between the name and the line under it, as in every other row.
+    private static let lineGap: CGFloat = 2
+    /// As tall as any other row with a line under its name (a profile's), so the two lists read alike.
+    private static var height: CGFloat {
+        let name = Label("", font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
+        let detail = Label("", font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
+        return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + name.lineHeight + lineGap + detail.lineHeight)
+    }
+
     override func layout() {
         super.layout()
         let pad = Tokens.Page.groupPad
@@ -334,9 +343,9 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         // The name has the room up to Edit while Delete isn't showing: a narrow page cuts it short only on hover.
         let end = deleteButton.alphaValue > 0 ? deleteButton.frame.minX : editButton.frame.minX
         let width = max(0, end - x - Tokens.Space.x2)
-        let top = round((bounds.height - name.lineHeight - 2 - detail.lineHeight) / 2)
+        let top = round((bounds.height - name.lineHeight - Self.lineGap - detail.lineHeight) / 2)
         name.frame = NSRect(x: x, y: top, width: width, height: name.lineHeight)
-        detail.frame = NSRect(x: x, y: name.frame.maxY + 2, width: width, height: detail.lineHeight)
+        detail.frame = NSRect(x: x, y: name.frame.maxY + Self.lineGap, width: width, height: detail.lineHeight)
         // The lifted row's shadow has a set shape: without one, it's worked out from the row's contents on every frame
         // of a drag, which is what made reordering stutter.
         let radius = layer?.cornerRadius ?? 0
