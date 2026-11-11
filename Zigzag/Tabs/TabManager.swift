@@ -87,6 +87,8 @@ final class TabManager {
         let requested = spaceID.flatMap { Library.shared.space($0)?.id }
         currentSpaceID = requested ?? Library.shared.spaces[0].id
         libraryToken = Library.shared.changed.observe { [weak self] in
+            // Favorites and pinned pages count among the navigable tabs.
+            self?.extensionPlaces.removeAll()
             self?.libraryDidChange()
             Brand.themeChanged.send(())
         }
@@ -394,6 +396,32 @@ final class TabManager {
         let favoriteLive = Library.shared.favorites(in: profile.id).compactMap { bookmarkTabs[$0.id] }
         let bookmarkLive = Library.shared.bookmarks(in: currentSpaceID).compactMap { bookmarkTabs[$0.id] }
         return favoriteLive + bookmarkLive + currentTabs
+    }
+
+    /// Each tab's place among the navigable tabs one set of extensions sees, for `indexInWindow`: WebKit asks it of
+    /// every tab each time an extension lists tabs, and each answer went through the whole list again (#89). Worked
+    /// out once for the burst: kept until the turn of the run loop ends or anything here changes.
+    private var extensionPlaces: [ObjectIdentifier: [ObjectIdentifier: Int]] = [:]
+    private var placesToken: SignalToken?
+
+    func extensionPlace(of tab: Tab, seenBy key: ObjectIdentifier, isSeen: (Tab) -> Bool) -> Int? {
+        if extensionPlaces.isEmpty {
+            placesToken = placesToken ?? changed.observe { [weak self] _ in self?.extensionPlaces.removeAll() }
+            DispatchQueue.main.async { [weak self] in
+                MainActor.assumeIsolated { self?.extensionPlaces.removeAll() }
+            }
+        }
+        if let places = extensionPlaces[key] { return places[ObjectIdentifier(tab)] }
+        let places = Self.places(navigableTabs.filter(isSeen))
+        extensionPlaces[key] = places
+        return places[ObjectIdentifier(tab)]
+    }
+
+    /// Where each item is in the list: its first place, as `firstIndex` would say.
+    static func places<Item: AnyObject>(_ list: [Item]) -> [ObjectIdentifier: Int] {
+        var places: [ObjectIdentifier: Int] = [:]
+        for (index, item) in list.enumerated() where places[ObjectIdentifier(item)] == nil { places[ObjectIdentifier(item)] = index }
+        return places
     }
 
     /// Turns a tab into a favorite at a tile's place. Its page stays open behind the tile.

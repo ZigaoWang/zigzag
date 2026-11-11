@@ -359,3 +359,23 @@ struct DarkPagesReinstallTests {
         #expect(await store.search("example", limit: 20, asker: 1) { $0.count } == 10)
     }
 }
+
+/// An extension listing tabs asks each one's place: worked out once for all of them (#89).
+@MainActor struct ExtensionTabPlaceTests {
+    @Test func eachPlaceIsWhereFirstIndexFindsIt() {
+        let a = NSObject(), b = NSObject(), c = NSObject()
+        let list = [a, b, a, c]
+        let places = TabManager.places(list)
+        for item in [a, b, c] { #expect(places[ObjectIdentifier(item)] == list.firstIndex { $0 === item }) }
+        #expect(places[ObjectIdentifier(NSObject())] == nil)
+    }
+
+    @Test func aLongListIsGoneThroughOnce() {
+        let list = (0..<5000).map { _ in NSObject() }
+        let started = Date()
+        let places = TabManager.places(list)
+        #expect(places.count == 5000)
+        #expect(places[ObjectIdentifier(list[4999])] == 4999)
+        #expect(Date().timeIntervalSince(started) < 0.5)
+    }
+}

@@ -694,11 +694,41 @@ final class ExtensionHost: NSObject {
     func tabChanged(_ tab: Tab, _ change: Tab.Change) {
         guard !tab.isPrivate else { return }
         switch change {
-        case .url: controller.didChangeTabProperties([.URL], for: tab)
-        case .title: controller.didChangeTabProperties([.title], for: tab)
-        case .loading: controller.didChangeTabProperties([.loading], for: tab)
-        case .audio: controller.didChangeTabProperties([.playingAudio, .muted], for: tab)
+        // An address or sound is told at once, after what was waiting for that tab, so the order is as it happened.
+        case .url: tellChanges(of: tab, adding: [.URL])
+        case .audio: tellChanges(of: tab, adding: [.playingAudio, .muted])
+        // A page that ticks its title (a timer, an unread count) told every extension every second: a title is told a
+        // quarter of a second later, with whatever else changed meanwhile, and loading at the next turn.
+        case .title: holdChange([.title], of: tab, for: 0.25)
+        case .loading: holdChange([.loading], of: tab, for: 0)
         default: break
+        }
+    }
+
+    private struct HeldChanges {
+        weak var tab: Tab?
+        var properties: WKWebExtension.TabChangedProperties
+    }
+    private var heldChanges: [ObjectIdentifier: HeldChanges] = [:]
+    private let heldChangesTold = Coalescer()
+
+    private func holdChange(_ properties: WKWebExtension.TabChangedProperties, of tab: Tab, for delay: TimeInterval) {
+        heldChanges[ObjectIdentifier(tab), default: HeldChanges(tab: tab, properties: [])].properties.formUnion(properties)
+        heldChangesTold.schedule(after: delay) { [weak self] in self?.tellHeldChanges() }
+    }
+
+    private func tellChanges(of tab: Tab, adding properties: WKWebExtension.TabChangedProperties) {
+        let held = heldChanges.removeValue(forKey: ObjectIdentifier(tab))?.properties ?? []
+        controller.didChangeTabProperties(held.union(properties), for: tab)
+    }
+
+    private func tellHeldChanges() {
+        let held = heldChanges
+        heldChanges.removeAll()
+        for change in held.values {
+            // A tab that closed or went to another profile meanwhile: nothing more about it here.
+            guard let tab = change.tab, !tab.isClosed, tab.extensionHost === self else { continue }
+            controller.didChangeTabProperties(change.properties, for: tab)
         }
     }
     // Private windows are never told to extensions: not opened, focused or closed, and never listed.
@@ -1121,7 +1151,9 @@ extension Tab: WKWebExtensionTab {
 
     func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { miniWindow ?? windowController }
     func indexInWindow(for context: WKWebExtensionContext) -> Int {
-        windowController?.tabManager.navigableTabs.filter { $0.isSeen(by: context) }.firstIndex { $0 === self } ?? 0
+        // Which tabs a context sees depends only on whose extensions it runs with.
+        let key = context.webExtensionController.map(ObjectIdentifier.init) ?? ObjectIdentifier(context)
+        return windowController?.tabManager.extensionPlace(of: self, seenBy: key) { $0.isSeen(by: context) } ?? 0
     }
     // A private tab that reaches an extension anyway (none should) tells it nothing: no page, title or address.
     // Nor does a tab on another profile: its page isn't one this context's extensions may reach.
