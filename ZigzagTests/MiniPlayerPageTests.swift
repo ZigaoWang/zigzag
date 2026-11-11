@@ -73,6 +73,39 @@ struct MiniPlayerPageTests {
         #expect(try await script("return window.__zigzagVideos.unisolate()", in: webView) as? Bool == false)
     }
 
+    /// A homepage's video card plays its preview inside the link to the video's page; a video the page plays by
+    /// itself, with no press or key from you, isn't one you started (#156).
+    @Test func aLinksPreviewAndAVideoNoOneStartedAreToldApart() async throws {
+        let html = """
+        <html><body><a href="/video/1"><video id="preview" muted style="width:290px;height:163px"></video></a>
+        <video id="main" style="width:640px;height:360px"></video></body></html>
+        """
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController.addUserScript(PageVideos.script)
+        configuration.userContentController.add(PageVideos.shared, contentWorld: .defaultClient, name: PageVideos.messageName)
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 700), configuration: configuration)
+        let loading = Loading()
+        webView.navigationDelegate = loading
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString(html, baseURL: URL(string: "https://videos.test/"))
+        }
+        // The page plays and turns up its own videos: no one pressed anything.
+        try await webView.callAsyncJavaScript("document.querySelectorAll('video').forEach((v) => { v.volume = 0.5; v.dispatchEvent(new Event('play')); }); return true",
+                                              arguments: [:], in: nil, contentWorld: .page)
+        try await script("return window.__zigzagVideos.report()", in: webView)
+        var videos: [PageVideo] = []
+        for _ in 0..<40 where videos.count < 2 {
+            try await Task.sleep(for: .milliseconds(50))
+            videos = PageVideos.shared.frames(in: webView).first(where: \.isMain)?.videos ?? []
+        }
+        #expect(videos.count == 2)
+        #expect(videos.first?.isInLink == true)
+        #expect(videos.last?.isInLink == false)
+        #expect(videos.allSatisfy { !$0.isStartedByUser })
+        configuration.userContentController.removeScriptMessageHandler(forName: PageVideos.messageName, contentWorld: .defaultClient)
+    }
+
     @Test func aVideoThePageMovesIsShownAloneWhereItWent() async throws {
         let webView = await load(Self.page)
         try await script("window.__zigzagVideos.report(); return window.__zigzagVideos.isolate(0)", in: webView)
