@@ -37,7 +37,7 @@ enum Passkeys {
             if wanted {
                 install(in: controller)
             } else {
-                let others = controller.userScripts.filter { !$0.source.hasPrefix(marker) }
+                let others = controller.userScripts.filter { !isOurs($0) }
                 controller.removeAllUserScripts()
                 others.forEach(controller.addUserScript)
             }
@@ -49,8 +49,11 @@ enum Passkeys {
     private static func passwordManagerOn(in profile: Profile) -> Bool { PasswordManagers.active(in: profile) != nil }
 
     private static func has(_ controller: WKUserContentController) -> Bool {
-        controller.userScripts.contains { $0.source.hasPrefix(marker) }
+        controller.userScripts.contains(where: isOurs)
     }
+
+    /// By its first line, compared as Foundation does: a page's scripts come to hundreds of kilobytes (#89).
+    static func isOurs(_ script: WKUserScript) -> Bool { (script.source as NSString).hasPrefix(marker) }
 
     private static func install(in controller: WKUserContentController) {
         guard !has(controller) else { return }

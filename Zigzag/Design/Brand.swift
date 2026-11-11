@@ -195,6 +195,12 @@ enum Brand {
     /// Sent when the space in front changes, or its color does.
     @MainActor static let themeChanged = Signal<Void>()
 
+    /// A change to the library (a space's color among them) says `themeChanged` once, however many windows heard of
+    /// it: each window said it again, and every view following the theme drew again for each (#89). Said at the next
+    /// turn of the run loop, once every window has caught up with the change.
+    @MainActor static func libraryChanged() { libraryChanges.schedule { themeChanged.send(()) } }
+    @MainActor private static let libraryChanges = Coalescer()
+
     // MARK: Type
 
     /// Display type for brand moments: the app's voice (light and tight).

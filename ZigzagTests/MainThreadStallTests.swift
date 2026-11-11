@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import SQLite3
 import Testing
+import WebKit
 @testable import Zigzag
 
 /// Lets the main queue run what was put on it for `seconds`.
@@ -477,5 +478,26 @@ struct FaviconDecodeTests {
 
     @Test func whatIsntAPictureIsNoIcon() {
         #expect(FaviconStore.decode(Data("<html>not found</html>".utf8), side: 16) == nil)
+    }
+}
+
+/// The smaller things (#89).
+@MainActor struct SmallStallTests {
+    @Test func aLibraryChangeHeardByManyWindowsRedrawsTheThemeOnce() async {
+        var heard = 0
+        let token = Brand.themeChanged.observe { heard += 1 }
+        // Five windows, each hearing of one change.
+        for _ in 0..<5 { Brand.libraryChanged() }
+        #expect(heard == 0)
+        await settle()
+        #expect(heard == 1)
+        token.cancel()
+    }
+
+    @Test func thePasskeyScriptIsKnownByItsFirstLineOnly() {
+        let big = WKUserScript(source: "/* other */" + String(repeating: "// zigzag passkeys\n", count: 50_000),
+                               injectionTime: .atDocumentStart, forMainFrameOnly: false)
+        #expect(!Passkeys.isOurs(big))
+        #expect(Passkeys.isOurs(WKUserScript(source: "/* zigzag passkeys */\n1", injectionTime: .atDocumentStart, forMainFrameOnly: false)))
     }
 }

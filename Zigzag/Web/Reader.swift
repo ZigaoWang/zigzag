@@ -549,12 +549,15 @@ final class ReaderView: NSView {
     /// A reading page kept loaded in the background in the store Reader will next use, so its web process is
     /// already up when Reader opens, most of a second sooner. Not for a private window: it would keep the window's
     /// store, and what's in it, after the window closes.
-    private static var warm: WKWebView?
+    /// One for each of the last few stores, so articles in two profiles one after the other don't make a new web
+    /// view each time (#89).
+    private static var warm: [WKWebView] = []
     static func prewarm(for store: WKWebsiteDataStore) {
-        guard store.isPersistent, warm?.configuration.websiteDataStore !== store else { return }
+        guard store.isPersistent, !warm.contains(where: { $0.configuration.websiteDataStore === store }) else { return }
         let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 10, height: 10), configuration: configuration(store: store))
         view.loadHTMLString("<!doctype html><title></title>", baseURL: nil)
-        warm = view
+        warm.append(view)
+        if warm.count > 3 { warm.removeFirst() }
     }
 
     override func layout() {

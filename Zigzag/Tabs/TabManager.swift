@@ -90,7 +90,7 @@ final class TabManager {
             // Favorites and pinned pages count among the navigable tabs.
             self?.extensionPlaces.removeAll()
             self?.libraryDidChange()
-            Brand.themeChanged.send(())
+            Brand.libraryChanged()
         }
         suspendTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.sleepIdleTabs() }
