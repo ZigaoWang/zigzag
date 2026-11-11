@@ -242,12 +242,12 @@ final class FaviconStore {
     /// own turns up further down the list. The home-screen icons in `touch` are tried only when the site has none
     /// of its own at all: a small icon of its own still wins over a home-screen tile.
     private func fetchFirst(_ candidates: [URL], touch: [URL] = [], key: String, save: Bool = true, small: NSImage? = nil, completion: @escaping (NSImage?) -> Void) {
-        func finish(_ image: NSImage) {
-            if save { store(image, key: key); completion(memory[key]) } else { completion(Self.normalize(image)) }
+        func finish(_ image: NSImage, normalized: NSImage? = nil) {
+            if save { store(image, key: key, normalized: normalized); completion(memory[key]) } else { completion(normalized ?? Self.normalize(image)) }
         }
-        func found(_ image: NSImage, rest: [URL]) {
+        func found(_ image: NSImage, rest: [URL], read: Decoded? = nil) {
             // An icon that draws nothing (an SVG styled by the page, which AppKit can't follow) is passed over.
-            if Self.isBlank(image) {
+            if read?.blank ?? Self.isBlank(image) {
                 fetchFirst(rest, touch: touch, key: key, save: save, small: small, completion: completion)
                 return
             }
@@ -257,7 +257,7 @@ final class FaviconStore {
             } else if pixels > 0, pixels < 32, let small, (small.representations.map(\.pixelsWide).max() ?? 0) >= pixels {
                 finish(small)
             } else {
-                finish(image)
+                finish(image, normalized: read?.normalized)
             }
         }
         guard let next = candidates.first else {
@@ -275,16 +275,34 @@ final class FaviconStore {
             found(image, rest: rest)
             return
         }
+        let side = Tokens.Metric.favicon
         Task {
             let result = try? await session.data(from: next)
             let ok = ((result?.1 as? HTTPURLResponse)?.statusCode ?? 200) < 400
-            if ok, let data = result?.0, let image = NSImage(data: data), image.isValid, image.size.width > 0 {
-                found(image, rest: rest)
+            // Decoded, drawn to its square and looked at off the main thread: many tabs loading at once each fetch one.
+            let data = ok ? result?.0 : nil
+            let read = await Task.detached(priority: .utility) { data.flatMap { Self.decode($0, side: side) } }.value
+            if let read {
+                found(read.image, rest: rest, read: read)
             } else {
                 fetchFirst(rest, touch: touch, key: key, save: save, small: small, completion: completion)
             }
         }
     }
+
+    /// An icon as read from what a site sent, with its square and whether that draws anything.
+    nonisolated struct Decoded: @unchecked Sendable {
+        let image: NSImage
+        let normalized: NSImage
+        let blank: Bool
+    }
+
+    nonisolated static func decode(_ data: Data, side: CGFloat) -> Decoded? {
+        guard let image = NSImage(data: data), image.isValid, image.size.width > 0 else { return nil }
+        let normalized = normalize(image, side: side)
+        return Decoded(image: image, normalized: normalized, blank: isBlankSquare(normalized))
+    }
+
 
     /// Keeps an icon we already have (onboarding's site logos), so the sidebar never starts with a globe.
     /// Clearing history: the icons saved for sites you visited go too (all of them, or those saved since `date`), so
@@ -292,6 +310,8 @@ final class FaviconStore {
     /// They're set aside rather than deleted, so ⌘Z can put them back, and are gone for good the next time Zigzag
     /// starts (`Paths.setAsideIcons`).
     func setAsideVisited(since date: Date? = nil) -> URL? {
+        // An icon still on its way to disk is set aside with the rest, not written after.
+        Self.finishWriting()
         let kept = Set((Library.shared.favorites + Library.shared.allBookmarks.map(\.0)).compactMap { key(for: $0.url) }.map { file(for: $0).lastPathComponent })
         let files = (try? FileManager.default.contentsOfDirectory(at: Paths.favicons, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
         let aside = Paths.setAsideIcons.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -321,21 +341,34 @@ final class FaviconStore {
         store(image, key: key)
     }
 
-    private func store(_ image: NSImage, key: String) {
-        let normalized = Self.normalize(image)
+    private func store(_ image: NSImage, key: String, normalized: NSImage? = nil) {
+        let normalized = normalized ?? Self.normalize(image)
         keep(normalized, for: key)
         missing.remove(key)
         failures[key] = nil
-        if let tiff = normalized.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
-           let png = rep.representation(using: .png, properties: [:]) {
-            try? png.write(to: file(for: key), options: .atomic)
+        // Encoded and written off the main thread, in order; clearing history waits for what's still being written.
+        nonisolated(unsafe) let written = normalized
+        let url = file(for: key)
+        Self.writer.async {
+            if let tiff = written.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+               let png = rep.representation(using: .png, properties: [:]) {
+                try? png.write(to: url, options: .atomic)
+            }
         }
         updated.send(key)
     }
 
+    private static let writer = DispatchQueue(label: "app.zigzag.favicons", qos: .utility)
+
+    /// Waits for the icons still being written.
+    static func finishWriting() { writer.sync {} }
+
     /// Renders to a square bitmap so every icon draws the same, whatever the source format. It keeps the source's
     /// own pixels, up to 128: a small icon is never stretched here, so a view can tell how large it stays sharp.
-    private static func normalize(_ image: NSImage) -> NSImage {
+    private static func normalize(_ image: NSImage) -> NSImage { normalize(image, side: Tokens.Metric.favicon) }
+
+    /// `side`: the points the icon is drawn at. Draws into its own bitmap, so it's safe off the main thread.
+    nonisolated private static func normalize(_ image: NSImage, side points: CGFloat) -> NSImage {
         let native = image.representations.map(\.pixelsWide).max() ?? 0
         // Drawings (SVG, PDF) have no pixels of their own and render sharp at any size.
         let side = native <= 0 ? 128 : min(max(native, 16), 128)
@@ -348,18 +381,22 @@ final class FaviconStore {
         NSGraphicsContext.current?.imageInterpolation = .high
         image.draw(in: NSRect(x: 0, y: 0, width: side, height: side), from: .zero, operation: .copy, fraction: 1)
         NSGraphicsContext.restoreGraphicsState()
-        let out = NSImage(size: NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon))
+        let out = NSImage(size: NSSize(width: points, height: points))
         out.addRepresentation(rep)
         return out
     }
 
-    private static func isBlank(_ image: NSImage) -> Bool {
-        guard let rep = normalize(image).representations.first as? NSBitmapImageRep, let data = rep.bitmapData else { return false }
+    private static func isBlank(_ image: NSImage) -> Bool { isBlankSquare(normalize(image)) }
+
+    /// Whether a normalized icon draws nothing at all.
+    nonisolated private static func isBlankSquare(_ normalized: NSImage) -> Bool {
+        guard let rep = normalized.representations.first as? NSBitmapImageRep, let data = rep.bitmapData else { return false }
         for y in 0..<rep.pixelsHigh {
             for x in 0..<rep.pixelsWide where data[y * rep.bytesPerRow + x * 4 + 3] > 8 { return false }
         }
         return true
     }
+
 
     /// The size, in points, an icon fills pixel for pixel on a Retina display; drawn any larger, it's scaled up.
     static func sharpSide(of image: NSImage) -> CGFloat {

@@ -451,3 +451,31 @@ struct DarkPagesReinstallTests {
         #expect(ExtensionStore.filled("const a = 1;", with: fills) == nil)
     }
 }
+
+/// A site's icon is decoded, drawn to its square and looked at off the main thread (#89).
+struct FaviconDecodeTests {
+    private func png(width: Int, _ color: CGColor?) -> Data {
+        let context = CGContext(data: nil, width: width, height: width, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        if let color { context.setFillColor(color); context.fill(CGRect(x: 0, y: 0, width: width, height: width)) }
+        let rep = NSBitmapImageRep(cgImage: context.makeImage()!)
+        return rep.representation(using: .png, properties: [:])!
+    }
+
+    @Test func anIconIsReadOffTheMainThread() async {
+        let data = png(width: 64, CGColor(red: 1, green: 0, blue: 0, alpha: 1))
+        let read = await Task.detached { FaviconStore.decode(data, side: 16) }.value
+        #expect(read?.blank == false)
+        #expect(read?.normalized.size == NSSize(width: 16, height: 16))
+        #expect(read?.normalized.representations.first?.pixelsWide == 64)
+    }
+
+    @Test func anIconThatDrawsNothingIsBlank() async {
+        let data = png(width: 32, nil)
+        #expect(await Task.detached { FaviconStore.decode(data, side: 16)?.blank }.value == true)
+    }
+
+    @Test func whatIsntAPictureIsNoIcon() {
+        #expect(FaviconStore.decode(Data("<html>not found</html>".utf8), side: 16) == nil)
+    }
+}

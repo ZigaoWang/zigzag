@@ -203,6 +203,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // What's still being written goes to disk before Zigzag ends.
         TabArchive.flush()
         HistoryStore.finishWriting()
+        FaviconStore.finishWriting()
         // Undo ends with Zigzag, and the icons clearing history set aside for it go now (or at the next start).
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
         // Password managers' helpers end with Zigzag, so none are left running.
