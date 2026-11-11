@@ -39,6 +39,8 @@ final class SitePanel: FloatingPanelView {
     /// Whose extensions these are, at the label's end, once there's more than one profile.
     private let extensionsProfileLabel = Label("", font: Tokens.Font.label(), color: Tokens.Color.textTertiary)
     private var extensionTiles: [PanelTile] = []
+    /// No extensions: the + is alone, with its name under it.
+    private var addsAlone = false
     /// The pin button on each extension's tile: the panel's child over the tile, a control of its own.
     private var hoverPins: [(id: String, label: String, value: String?, tile: PanelTile, pin: HoverPin)] = []
     private var extensionsToken: SignalToken?
@@ -267,9 +269,12 @@ final class SitePanel: FloatingPanelView {
             hoverPins.append((item.id, item.label, value, tile, HoverPin()))
             return tile
         }
-        let add = PanelTile(symbol: "plus", caption: nil)
-        add.toolTip = String(localized: "Get Extensions", comment: "Tooltip and VoiceOver name of the + button after the extensions in the site panel: opens the Chrome Web Store.")
-        add.setAccessibilityLabel(add.toolTip)
+        // With none yet, the + says what it does under it, as the actions above do; after the extensions, it's one of them.
+        let getTitle = String(localized: "Get Extensions", comment: "Tooltip and VoiceOver name of the + button after the extensions in the site panel: opens the Chrome Web Store.")
+        let add = PanelTile(symbol: "plus", caption: items.isEmpty ? getTitle : nil)
+        add.toolTip = getTitle
+        add.setAccessibilityLabel(getTitle)
+        addsAlone = items.isEmpty
         add.onClick = { [weak self] _ in
             self?.controller?.tabManager.newTab(url: ExtensionStore.webStoreURL)
             self?.close()
@@ -568,7 +573,14 @@ final class SitePanel: FloatingPanelView {
                 place(extensionsProfileLabel, NSRect(x: pad + inner + Label.inset - profileWidth, y: y, width: profileWidth, height: extensionsLabel.lineHeight))
             }
             y += extensionsLabel.lineHeight + Tokens.Space.x2
-            grid(extensionTiles, columns: columns)
+            if addsAlone, let add = extensionTiles.first {
+                // Named, as the actions are: its icon over its name, as wide as the name shows whole.
+                let w = max(add.captionWidth, PanelTile.captionedHeight)
+                place(add, NSRect(x: pad, y: y, width: w, height: PanelTile.captionedHeight))
+                y += PanelTile.captionedHeight
+            } else {
+                grid(extensionTiles, columns: columns)
+            }
             y += Tokens.Space.x5
         }
 
