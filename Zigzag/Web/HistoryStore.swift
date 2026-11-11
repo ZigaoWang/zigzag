@@ -139,6 +139,8 @@ final class HistoryStore {
         // What went wrong lately names its sites too. That, where you were in PDFs and the sites' icons aren't
         // kept by profile, so with several profiles they go for all: cleared never leaves a trace behind.
         Diagnostics.forget(since: date)
+        // Dark pages' palettes are a list of sites visited in the profile, so they go too.
+        DarkPalettes.forget(scope: DarkPalettes.scope(ofProfile: profile), since: date)
         onRemove?(date == nil ? nil : visits.map(\.url))
         return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(since: date, where: isOurs),
                               pdfPlaces: PDFViewerView.takePlaces(since: date), icons: FaviconStore.shared.setAsideVisited(since: date), profile: profile)
