@@ -162,6 +162,51 @@ struct NestedTabsTests {
         #expect(nodes == [node(newA), node(newB, newA), node(newC, newB), node(e)])
     }
 
+    @Test func closingAFoldedTabClosesWhatIsUnderIt() {
+        // Folded (#155): a and everything under it, in list order. Unfolded: a alone, the rest move up a level.
+        #expect(TabTree.closing(a, folded: true, in: tree) == [a, b, c, d])
+        #expect(TabTree.closing(a, folded: false, in: tree) == [a])
+        #expect(TabTree.closing(b, folded: true, in: tree) == [b, c])
+        // Folded with nothing under it, or gone: as ever.
+        #expect(TabTree.closing(e, folded: true, in: tree) == [e])
+        #expect(TabTree.closing(f, folded: true, in: tree).isEmpty)
+    }
+
+    /// Closes these one by one as TabManager.close does (the tab you're on last), then puts them back in reverse as
+    /// ⌘Z does, each as a new tab: the list it ends with, in the old ids.
+    private func closeAndPutBack(_ ids: [UUID], selected: UUID?, in start: [TabTree.Node]) -> (closed: [TabTree.Node], back: [TabTree.Node]) {
+        let order = ids.filter { $0 != selected } + ids.filter { $0 == selected }
+        var nodes = start
+        var records: [(id: UUID, index: Int, parent: UUID?, children: [UUID])] = []
+        for id in order {
+            let i = nodes.firstIndex { $0.id == id }!
+            records.append((id, i, nodes[i].parent, nodes.filter { $0.parent == id }.map(\.id)))
+            nodes = TabTree.removing(id, from: nodes)
+        }
+        let closed = nodes
+        var now: [UUID: UUID] = [:]
+        for record in records.reversed() {
+            let id = UUID()
+            nodes = TabTree.reinserting(id, at: record.index, parent: record.parent.map { now[$0] ?? $0 },
+                                        children: Set(record.children.map { now[$0] ?? $0 }), in: nodes)
+            now[record.id] = id
+        }
+        let old = Dictionary(uniqueKeysWithValues: now.map { ($1, $0) })
+        return (closed, nodes.map { node(old[$0.id] ?? $0.id, $0.parent.map { old[$0] ?? $0 }) })
+    }
+
+    @Test func undoBringsAFoldedTabBackWithEverythingUnderIt() {
+        let start = tree + [node(f, e)]
+        let closing = TabTree.closing(a, folded: true, in: start)
+        // On a, the folded tab: it closes last.
+        let onIt = closeAndPutBack(closing, selected: a, in: start)
+        #expect(onIt.closed == [node(e), node(f, e)])
+        #expect(onIt.back == start)
+        // On another tab, and on a tab inside the fold (it shows while you're on it).
+        #expect(closeAndPutBack(closing, selected: e, in: start).back == start)
+        #expect(closeAndPutBack(closing, selected: c, in: start).back == start)
+    }
+
     @Test func aTabPutBackUnderAParentThatIsBackFirst() {
         // c closed, then b; ⇧⌘T brings b back first, then c, which goes under b again.
         var nodes = TabTree.removing(c, from: tree)
