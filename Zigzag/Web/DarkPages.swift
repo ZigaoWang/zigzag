@@ -118,26 +118,39 @@ enum DarkPages {
     static let underPageColor = NSColor(srgbRed: 0.08, green: 0.08, blue: 0.08, alpha: 1)
 
     /// Sites seen already dark, this session only (never written down: it would be a list of where you've been),
-    /// so their pages aren't darkened first and then let go.
-    private static var nativeSites: Set<String> = []
+    /// so their pages aren't darkened first and then let go. Kept for each profile: a page can see whether it was
+    /// darkened from its first moment, so one profile's list would tell a site it had been visited in another.
+    /// A private window learns nothing and is given nothing.
+    private static var nativeSites: [String: Set<String>] = [:]
+
+    /// Whose list of sites seen dark a page's store reads and adds to: its profile's; nil for a private one.
+    static func nativeScope(of store: WKWebsiteDataStore?) -> String? {
+        guard let store, store.isPersistent else { return nil }
+        return store.identifier?.uuidString ?? "default"
+    }
+
+    /// Sites seen dark in a profile (`nativeScope`), as given to its pages.
+    static func nativeSites(in scope: String?) -> Set<String> {
+        scope.flatMap { nativeSites[$0] } ?? []
+    }
 
     private static let source: String = {
         guard let url = Bundle.main.url(forResource: "dark-pages", withExtension: "js") else { return "" }
         return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
     }()
 
-    /// The choices as the page script reads them.
-    static func config() -> [String: Any] {
+    /// The choices as the page script reads them, for pages in this store.
+    static func config(for store: WKWebsiteDataStore?) -> [String: Any] {
         ["on": wants(mode: mode, systemIsDark: systemIsDark, site: nil), "sitesOn": sitesOn.sorted(), "sitesOff": sitesOff.sorted(),
-         "native": nativeSites.sorted()]
+         "native": nativeSites(in: nativeScope(of: store)).sorted()]
     }
 
-    private static func configJSON() -> String {
-        (try? JSONSerialization.data(withJSONObject: config(), options: [.sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    private static func configJSON(for store: WKWebsiteDataStore?) -> String {
+        (try? JSONSerialization.data(withJSONObject: config(for: store), options: [.sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     }
 
-    static func script() -> WKUserScript {
-        WKUserScript(source: source.replacingOccurrences(of: "__CONFIG__", with: configJSON()),
+    static func script(for store: WKWebsiteDataStore?) -> WKUserScript {
+        WKUserScript(source: source.replacingOccurrences(of: "__CONFIG__", with: configJSON(for: store)),
                      injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world)
     }
 
@@ -145,13 +158,14 @@ enum DarkPages {
 
     /// Puts the page script, with the choices as they are now, into a web view's set of scripts, in place of the
     /// one it had. Pages already open hear of a change from `refresh`; this is for the pages loaded after it.
-    private static func install(in controller: WKUserContentController) {
+    private static func install(in webView: WKWebView) {
+        let controller = webView.configuration.userContentController
         let others = controller.userScripts.filter { !isOurs($0) }
         if others.count != controller.userScripts.count {
             controller.removeAllUserScripts()
             others.forEach(controller.addUserScript)
         }
-        controller.addUserScript(script())
+        controller.addUserScript(script(for: webView.configuration.websiteDataStore))
     }
 
     private final class Entry {
@@ -166,7 +180,7 @@ enum DarkPages {
     /// A tab's new web view: it gets the page script and follows the choices from here on.
     static func attach(to webView: WKWebView) {
         let controller = webView.configuration.userContentController
-        install(in: controller)
+        install(in: webView)
         controller.removeScriptMessageHandler(forName: messageName, contentWorld: world)
         controller.add(Messages.shared, contentWorld: world, name: messageName)
         let entry = Entry(webView)
@@ -209,13 +223,13 @@ enum DarkPages {
     static func refreshAll() {
         entries = entries.filter { $0.value.webView != nil }
         var controllers = Set<ObjectIdentifier>()
-        let config = config()
         for entry in entries.values {
             guard let webView = entry.webView else { continue }
             let controller = webView.configuration.userContentController
-            if controllers.insert(ObjectIdentifier(controller)).inserted { install(in: controller) }
+            if controllers.insert(ObjectIdentifier(controller)).inserted { install(in: webView) }
             applyLook(to: webView)
-            webView.callAsyncJavaScript("if (window.__zigzagDark) window.__zigzagDark.set(config);", arguments: ["config": config],
+            webView.callAsyncJavaScript("if (window.__zigzagDark) window.__zigzagDark.set(config);",
+                                        arguments: ["config": config(for: webView.configuration.websiteDataStore)],
                                         in: nil, in: world) { _ in }
         }
         changed.send()
@@ -239,26 +253,34 @@ enum DarkPages {
 
     private static var pendingInstall: DispatchWorkItem?
 
-    fileprivate static func received(_ state: State, from webView: WKWebView, isPrivate: Bool) {
-        // Learned sites go into the scripts of pages loaded later; not from a private window.
-        if !isPrivate, !state.site.isEmpty {
-            let before = nativeSites
-            if state.native { nativeSites.insert(state.site) } else if state.darkened { nativeSites.remove(state.site) }
-            if nativeSites != before {
-                pendingInstall?.cancel()
-                let work = DispatchWorkItem {
-                    MainActor.assumeIsolated {
-                        var done = Set<ObjectIdentifier>()
-                        for entry in entries.values {
-                            guard let controller = entry.webView?.configuration.userContentController,
-                                  done.insert(ObjectIdentifier(controller)).inserted else { continue }
-                            install(in: controller)
-                        }
+    /// What a page in this store found: a site it saw dark, or saw light, joins or leaves its profile's list.
+    /// True when the list changed.
+    @discardableResult
+    static func learn(_ state: State, in scope: String?) -> Bool {
+        guard let scope, !state.site.isEmpty else { return false }
+        let before = nativeSites[scope] ?? []
+        var after = before
+        if state.native { after.insert(state.site) } else if state.darkened { after.remove(state.site) }
+        nativeSites[scope] = after
+        return after != before
+    }
+
+    fileprivate static func received(_ state: State, from webView: WKWebView) {
+        // Learned sites go into the scripts of pages loaded later in the same profile; not from a private window.
+        if learn(state, in: nativeScope(of: webView.configuration.websiteDataStore)) {
+            pendingInstall?.cancel()
+            let work = DispatchWorkItem {
+                MainActor.assumeIsolated {
+                    var done = Set<ObjectIdentifier>()
+                    for entry in entries.values {
+                        guard let webView = entry.webView,
+                              done.insert(ObjectIdentifier(webView.configuration.userContentController)).inserted else { continue }
+                        install(in: webView)
                     }
                 }
-                pendingInstall = work
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
             }
+            pendingInstall = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
         }
         if let tab = (webView as? BrowserWebView)?.owner { tab.darkPageChanged(state) }
         applyLook(to: webView)
@@ -272,7 +294,7 @@ enum DarkPages {
             guard message.frameInfo.isMainFrame, let body = message.body as? [String: Any], let webView = message.webView else { return }
             let state = State(darkened: body["darkened"] as? Bool ?? false, native: body["native"] as? Bool ?? false,
                               color: (body["color"] as? String).flatMap(DarkPages.color(hex:)), site: body["site"] as? String ?? "")
-            DarkPages.received(state, from: webView, isPrivate: !webView.configuration.websiteDataStore.isPersistent)
+            DarkPages.received(state, from: webView)
         }
     }
 

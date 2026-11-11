@@ -158,4 +158,25 @@ struct DarkPagesTests {
         #expect(state["darkened"] as? Bool == false)
         #expect(state["native"] as? Bool == true)
     }
+
+    // MARK: Sites seen dark
+
+    /// Whether a page was darkened from its first moment is something the page can see, so the sites seen dark in
+    /// one profile are never given to another's pages, or to a private window's.
+    @Test func sitesSeenDarkAreKeptForEachProfile() {
+        let one = UUID().uuidString, other = UUID().uuidString
+        #expect(DarkPages.nativeScope(of: .nonPersistent()) == nil)
+        #expect(DarkPages.nativeScope(of: .default()) == "default")
+        let dark = DarkPages.State(darkened: false, native: true, color: nil, site: "seen-dark-\(UUID().uuidString).test")
+        #expect(DarkPages.learn(dark, in: one))
+        #expect(DarkPages.nativeSites(in: one).contains(dark.site))
+        #expect(!DarkPages.nativeSites(in: other).contains(dark.site))
+        // A private window learns nothing and is given nothing.
+        #expect(!DarkPages.learn(dark, in: nil))
+        #expect(DarkPages.nativeSites(in: nil).isEmpty)
+        #expect((DarkPages.config(for: .nonPersistent())["native"] as? [String])?.isEmpty == true)
+        // Seen light again, it leaves that profile's list.
+        #expect(DarkPages.learn(DarkPages.State(darkened: true, native: false, color: nil, site: dark.site), in: one))
+        #expect(!DarkPages.nativeSites(in: one).contains(dark.site))
+    }
 }
