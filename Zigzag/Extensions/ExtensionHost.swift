@@ -134,6 +134,10 @@ final class ExtensionHost: NSObject {
         openPopups.values.contains { $0.extensionID == id && $0.popover.isShown }
     }
 
+    #if DEBUG
+    var debugShownPopovers: [NSPopover] { openPopups.values.map(\.popover).filter(\.isShown) }
+    #endif
+
     /// The page of the popup an extension is showing, if it is.
     func shownPopupPage(for id: String) -> String? {
         openPopups.values.first { $0.extensionID == id && $0.popover.isShown }?.page

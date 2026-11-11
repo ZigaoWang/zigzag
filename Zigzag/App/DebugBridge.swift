@@ -232,6 +232,62 @@ enum DebugBridge {
 
     /// windowsdump <path>: every window's views, WebKit's own full screen window too, without bringing any forward
     /// (which would take a page out of its full screen).
+    /// The extension popup showing, without bringing the browser window forward (that would close it):
+    /// popupwinstate <path> (its window: key, first responder; JSON), popupwinclick <x> <y> (a click there, in the
+    /// popup's points from its top left), popupwintype <text> (keys pressed one by one, to whichever window is key,
+    /// as typing goes), popupwinjs <path> <script> (the script's result in the popup page).
+    private static func popupWindow(_ name: String, _ arg: String) {
+        guard #available(macOS 15.4, *) else { return }
+        let popovers = Profiles.shared.all.compactMap { $0.isDefault ? $0.extensions : $0.startedExtensions }.flatMap(\.debugShownPopovers)
+        let popover = popovers.last
+        let window = popover?.contentViewController?.view.window
+        func findWeb(_ v: NSView?) -> WKWebView? { (v as? WKWebView) ?? v?.subviews.lazy.compactMap(findWeb).first }
+        let popupPage = findWeb(popover?.contentViewController?.view)
+        switch name {
+        case "popupwinstate":
+            var webView: NSView? = window?.firstResponder as? NSView
+            while let v = webView, !(v is WKWebView) { webView = v.superview }
+            let state: [String: Any] = ["popovers": popovers.count, "window": window.map { "\(type(of: $0))" } ?? "none",
+                                        "key": window?.isKeyWindow ?? false, "canBecomeKey": window?.canBecomeKey ?? false,
+                                        "appKey": NSApp.keyWindow.map { "\(type(of: $0))" } ?? "none",
+                                        "firstResponder": window?.firstResponder.map { "\(type(of: $0))" } ?? "none",
+                                        "responderInWebView": webView != nil,
+                                        "page": popupPage?.url?.absoluteString ?? "-"]
+            if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
+        case "popupwinclick":
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            guard n.count == 2, let window, let content = window.contentView else { break }
+            let point = NSPoint(x: n[0], y: content.frame.height - n[1])
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                  windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) {
+                    NSApp.postEvent(event, atStart: false)
+                }
+            }
+        case "popupwintype":
+            let codes: [Character: UInt16] = ["0": 29, "1": 18, "2": 19, "3": 20, "4": 21, "5": 23, "6": 22, "7": 26, "8": 28, "9": 25, "a": 0, "b": 11, "c": 8]
+            let target = NSApp.keyWindow ?? window
+            for ch in arg {
+                for type in [NSEvent.EventType.keyDown, .keyUp] {
+                    if let target, let event = NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                                windowNumber: target.windowNumber, context: nil, characters: String(ch), charactersIgnoringModifiers: String(ch),
+                                                                isARepeat: false, keyCode: codes[ch] ?? 0) {
+                        NSApp.postEvent(event, atStart: false)
+                    }
+                }
+            }
+        case "popupwinjs":
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            guard f.count == 2, let webView = popupPage else {
+                debugLog("popupwinjs: no popup"); break
+            }
+            webView.evaluateJavaScript(f[1]) { result, error in
+                try? "\(result.map { "\($0)" } ?? "nil") \(error.map { "\($0)" } ?? "")".write(toFile: f[0], atomically: true, encoding: .utf8)
+            }
+        default: break
+        }
+    }
+
     private static func dumpWindows(to path: String) {
         var out = ""
         func walk(_ v: NSView, _ depth: Int) {
@@ -333,6 +389,7 @@ enum DebugBridge {
         if name == "pinhover" { SitePanel.shown?.debugHover(arg); return }
         if name.hasPrefix("mp") { runMiniPlayer(name, arg, in: controller); return }
         if name == "pageprobe" { pageProbe(arg); return }
+        if name.hasPrefix("popupwin") { popupWindow(name, arg); return }
         NSApp.activate()
         controller.window?.makeKeyAndOrderFront(nil)
         switch name {
