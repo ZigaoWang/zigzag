@@ -24,7 +24,7 @@ enum OpenDisposition {
     case privateWindow
 }
 
-/// One page in the browser. The tab owns its web view; views only borrow it to display.
+/// One page in the browser. The tab owns its web view and the holder it sits in; views only borrow the holder to display.
 /// A tab can be suspended (web view released, state kept) and restored without the user noticing.
 final class Tab: NSObject {
     enum Change {
@@ -195,6 +195,9 @@ final class Tab: NSObject {
     let changed = Signal<Change>()
 
     private(set) var webView: BrowserWebView?
+    /// Where the web view sits, with the Web Inspector when it's docked (`PageHolder`): what shows the tab borrows this,
+    /// never the web view alone. Made with the first web view and kept, so the next one appears in its place.
+    private(set) var pageHolder: PageHolder?
     /// Back/forward history and scroll position kept while suspended or across launches.
     private var pendingInteractionState: Data?
     private var pendingConfiguration: WKWebViewConfiguration?
@@ -300,6 +303,7 @@ final class Tab: NSObject {
         }
         #endif
         self.webView = webView
+        if let pageHolder { pageHolder.hold(webView) } else { pageHolder = PageHolder(holding: webView) }
         observe(webView)
         DarkPages.attach(to: webView)
 
@@ -399,6 +403,9 @@ final class Tab: NSObject {
         // Sound stops the moment it closes, whatever may still hold the page for a moment.
         webView?.pauseAllMediaPlayback(completionHandler: nil)
         if let webView { tearDown(webView) }
+        // Its holder leaves whatever was showing it (the page card, Peek, a card it stayed in during a video's full
+        // screen), as its page does.
+        pageHolder?.removeFromSuperview()
         if !keepingSnapshot {
             SnapshotStore.remove(id)
             // Undo steps can hold a closed tab for a while; its picture (megabytes, on a Retina screen) needn't.
@@ -718,21 +725,22 @@ final class Tab: NSObject {
     }
 
     /// A page that has only ever loaded out of sight (opened in the background) has no picture: WebKit draws it
-    /// only in a window. It's put in `host` for a moment, at `size`, under everything else, to be drawn and pictured,
-    /// then let go, unless something else took it meanwhile (you went to its tab).
+    /// only in a window. Its holder is put in `host` for a moment, at `size`, under everything else, to be drawn and
+    /// pictured, then let go, unless something else took it meanwhile (you went to its tab).
     func captureSnapshotOutOfSight(in host: NSView, size: NSSize, _ completion: @escaping () -> Void) {
-        guard let webView, webView.superview == nil, hasLoadedOnce, host.window != nil, size.width > 0, size.height > 0 else {
+        guard let webView, let holder = pageHolder, webView.superview === holder, webView.window == nil, hasLoadedOnce,
+              host.window != nil, size.width > 0, size.height > 0 else {
             completion()
             return
         }
-        let resizing = webView.autoresizingMask
-        webView.autoresizingMask = []
-        webView.frame = NSRect(origin: .zero, size: size)
-        host.addSubview(webView)
-        let letGo = { [weak webView, weak host] in
-            guard let webView, let host, webView.superview === host else { return }
-            webView.removeFromSuperview()
-            webView.autoresizingMask = resizing
+        let resizing = holder.autoresizingMask
+        holder.autoresizingMask = []
+        holder.frame = NSRect(origin: .zero, size: size)
+        host.addSubview(holder)
+        let letGo = { [weak holder, weak host] in
+            guard let holder, let host, holder.superview === host else { return }
+            holder.removeFromSuperview()
+            holder.autoresizingMask = resizing
         }
         let config = WKSnapshotConfiguration()
         config.afterScreenUpdates = true

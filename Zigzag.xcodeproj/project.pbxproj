@@ -142,6 +142,7 @@
 		6E7C92A60154EF30AE8E1983 /* SitePermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */; };
 		6F00D32C32387168F17DADDA /* Passkeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BA1C91E3BBFB79F23D274B4 /* Passkeys.swift */; };
 		70473A9BA477CEFAB852CC91 /* TabArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17AF38DFC935177F4D6F19F5 /* TabArchive.swift */; };
+		71B932DF6F32CC896DE84AB4 /* PageHolder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FC330CEE0425B72CE83C21D /* PageHolder.swift */; };
 		72796F999AA54249F5465613 /* TabStateCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D86346DE78193D507DCECC /* TabStateCacheTests.swift */; };
 		72E2F6BF3464C210D83D8ADB /* ExtensionReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30417C99681AAC2507555F94 /* ExtensionReport.swift */; };
 		73BEB8BF61DB6AA3E32A3ACB /* PasswordMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9EC4A25A23CB02B95200F47 /* PasswordMenuTests.swift */; };
@@ -371,6 +372,7 @@
 		2C1EF45053176602E3D8A4C1 /* UserScriptsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserScriptsTests.swift; sourceTree = "<group>"; };
 		2D8E0E7DB1C952078DABEE2B /* MiniLinkWake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniLinkWake.swift; sourceTree = "<group>"; };
 		2E2214E6363E199754548C38 /* PageState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageState.swift; sourceTree = "<group>"; };
+		2FC330CEE0425B72CE83C21D /* PageHolder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageHolder.swift; sourceTree = "<group>"; };
 		3014AEB17D7BEE4384710CD9 /* DeveloperToolsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperToolsTests.swift; sourceTree = "<group>"; };
 		30417C99681AAC2507555F94 /* ExtensionReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionReport.swift; sourceTree = "<group>"; };
 		316205FDAE606ECFE3682BA1 /* NumberHints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumberHints.swift; sourceTree = "<group>"; };
@@ -882,6 +884,7 @@
 				0124D0F7C86C266C5E8A6AC7 /* NetworkChanges.swift */,
 				CD0CD79C0A1D2CDBE8C34B91 /* PageDialogs.swift */,
 				88B983CBE21557E05E6C3E28 /* PageDialogSheet.swift */,
+				2FC330CEE0425B72CE83C21D /* PageHolder.swift */,
 				0C625E33D1E438FE873F8B42 /* PageScreenshot.swift */,
 				8F7FCA5586EF97D50AF36363 /* PageTranslator.swift */,
 				E6B84DBDA9267299D5DB571D /* PageVideos.swift */,
@@ -1390,6 +1393,7 @@
 				55E2EE95BF56E2D3A4B618EF /* PageCardView.swift in Sources */,
 				C97B9B37DFA7FAA30CFCA860 /* PageDialogSheet.swift in Sources */,
 				696A9156848EC86706D34804 /* PageDialogs.swift in Sources */,
+				71B932DF6F32CC896DE84AB4 /* PageHolder.swift in Sources */,
 				D4E392F2E4665F1392953B9D /* PageScreenshot.swift in Sources */,
 				A601B78AFE9B349C0C46968E /* PageShots.swift in Sources */,
 				33E706A12F4E2336AF5BA09E /* PageState.swift in Sources */,

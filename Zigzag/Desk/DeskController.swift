@@ -435,7 +435,7 @@ final class DeskController {
         let root = controller.root
         let size = root.cardFrame.size
         let pages = Library.shared.spaces.flatMap { manager.tabs(in: $0.id) }.filter {
-            Tab.needsPictureOutOfSight(hasWebView: $0.webView != nil, onScreen: $0.webView?.superview != nil, loaded: $0.hasLoadedOnce,
+            Tab.needsPictureOutOfSight(hasWebView: $0.webView != nil, onScreen: $0.webView?.window != nil, loaded: $0.hasLoadedOnce,
                                        hasPicture: !TabThumbnailView.isBlank($0.snapshot))
         }
         guard !pages.isEmpty, size.width > 0 else { return }

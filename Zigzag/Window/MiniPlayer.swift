@@ -29,10 +29,12 @@ final class MiniPlayer {
     private struct Parked {
         weak var tab: Tab?
         weak var webView: BrowserWebView?
+        /// What waits in the window: the page in its holder.
+        weak var holder: PageHolder?
         /// The card fading out with the page still in it, until it hands the page over.
         weak var card: MiniPlayerView?
         var frame: PageVideos.Frame?
-        var token: SignalToken?
+        var tokens: [SignalToken] = []
         /// The video stopped: the page is let go of after a moment, unless it plays again.
         var stopped: DispatchWorkItem?
     }
@@ -85,7 +87,7 @@ final class MiniPlayer {
     /// Whether this tab's video would follow you out of it: its page is on screen and plays a video, and isn't
     /// floating or filling the screen with it itself.
     private func follows(_ tab: Tab) -> Bool {
-        guard !tab.isPeek, !tab.isClosed, let webView = tab.webView, webView.window != nil, webView.superview?.superview is PageCardView,
+        guard !tab.isPeek, !tab.isClosed, let webView = tab.webView, webView.window != nil, tab.pageHolder?.superview?.superview is PageCardView,
               !PageVideos.shared.isPresentingItself(webView) else { return false }
         return PageVideos.shared.playing(in: webView) != nil
     }
@@ -138,7 +140,7 @@ final class MiniPlayer {
     // MARK: Showing and going
 
     private func start(_ tab: Tab) {
-        guard let controller, let webView = tab.webView, let (frame, video) = PageVideos.shared.playing(in: webView) else {
+        guard let controller, let webView = tab.webView, let holder = tab.pageHolder, let (frame, video) = PageVideos.shared.playing(in: webView) else {
             _ = model.lost(tab.id)
             return
         }
@@ -165,7 +167,7 @@ final class MiniPlayer {
         card.onPointer = { [weak self] in self?.controller?.previews.hide() }
         self.card = card
         root.showMiniPlayer(card)
-        card.adopt(webView)
+        card.adopt(holder)
         tab.isInMiniPlayer = true
         place()
         card.update(video)
@@ -220,9 +222,9 @@ final class MiniPlayer {
         }
         if let card {
             if closing {
-                card.disappear(handOff: parking ? { [weak self] page in
-                    guard let self, self.parked.contains(where: { $0.webView === page }) else { return }
-                    self.parking.park(page)
+                card.disappear(handOff: parking ? { [weak self] holder in
+                    guard let self, self.parked.contains(where: { $0.holder === holder }) else { return }
+                    self.parking.park(holder)
                 } : nil)
             } else { card.release(); card.removeFromSuperview() }
         }
@@ -236,16 +238,23 @@ final class MiniPlayer {
 
     // MARK: Minimized
 
-    /// Keeps a minimized video's page in the window, out of sight, until you go to its tab, it closes, or its video
-    /// stops. WebKit pauses a muted or silent video in a page that isn't in a window (only sound plays on there); in
-    /// the window, however small and hidden, its page counts as on screen and plays on. The tab stays awake meanwhile.
+    /// Keeps a minimized video's page in the window, out of sight, until you go to its tab, it closes, its tab gets a
+    /// new page, or its video stops. WebKit pauses a muted or silent video in a page that isn't in a window (only
+    /// sound plays on there); in the window, however small and hidden, its page counts as on screen and plays on.
+    /// The tab stays awake meanwhile.
     private func park(_ webView: BrowserWebView, of tab: Tab, frame: PageVideos.Frame?) {
         unpark { $0.webView === webView }
-        let token = PageVideos.shared.reported.observe { [weak self, weak webView] page in
-            guard let self, let webView, page === webView else { return }
-            self.parkedPageReported(webView)
-        }
-        parked.append(Parked(tab: tab, webView: webView, frame: frame, token: token))
+        let tokens = [
+            PageVideos.shared.reported.observe { [weak self, weak webView] page in
+                guard let self, let webView, page === webView else { return }
+                self.parkedPageReported(webView)
+            },
+            tab.changed.observe { [weak self, weak tab, weak webView] change in
+                guard let self, let tab, change == .webView, tab.webView !== webView else { return }
+                self.unpark { $0.tab === tab }
+            },
+        ]
+        parked.append(Parked(tab: tab, webView: webView, holder: tab.pageHolder, frame: frame, tokens: tokens))
         tab.isInMiniPlayer = true
     }
 
@@ -276,8 +285,8 @@ final class MiniPlayer {
         for entry in going {
             entry.stopped?.cancel()
             entry.card?.release()
+            if let holder = entry.holder { parking.release(holder) }
             guard let webView = entry.webView else { continue }
-            parking.release(webView)
             if entry.tab?.id != model.tab { entry.tab?.isInMiniPlayer = false }
             if let frame = entry.frame { Task { _ = await PageVideos.shared.run("restore", in: frame, of: webView) } }
         }
@@ -402,7 +411,7 @@ final class MiniPlayer {
             ?? MiniPlayerLayout.clamp(MiniPlayerLayout.frame(at: .bottomRight, size: size, in: controller.root.cardFrame), in: area)
         card.dragArea = area
         if !card.isDragging, card.frame != target { card.frame = target }
-        card.show(MiniPlayerLayout.placement(showing: picture, in: target.size))
+        card.show(MiniPlayerLayout.placement(showing: card.shown(picture, of: webView), in: target.size))
     }
 
     /// Let go after a drag: it stays where it was let go, settling on the edge when it's let go near one. Its place is
@@ -430,7 +439,7 @@ final class MiniPlayer {
          "follows": controller?.tabManager.allTabs.filter(follows).map(\.displayTitle) ?? [],
          "reporting": controller?.tabManager.allTabs.filter { $0.webView.map { !PageVideos.shared.frames(in: $0).isEmpty } ?? false }.map(\.displayTitle) ?? [],
          "hovered": card?.showsControls ?? false, "webViewInCard": webView.map { $0.isDescendant(of: card ?? NSView()) } ?? false,
-         "parked": parked.compactMap { $0.tab?.displayTitle }, "parkedInWindow": parked.compactMap { $0.webView.map { $0.superview === parking && $0.window != nil } }]
+         "parked": parked.compactMap { $0.tab?.displayTitle }, "parkedInWindow": parked.compactMap { $0.holder.map { $0.superview === parking && $0.window != nil } }]
     }
     #endif
 }
@@ -456,18 +465,18 @@ final class MiniPlayerParking: NSView {
     override func isAccessibilityElement() -> Bool { false }
     override func accessibilityChildren() -> [Any]? { [] }
 
-    func park(_ webView: WKWebView) {
-        let size = webView.frame.size
-        webView.autoresizingMask = []
-        addSubview(webView)
-        webView.frame = NSRect(origin: .zero, size: size)
+    func park(_ holder: PageHolder) {
+        let size = holder.frame.size
+        holder.autoresizingMask = []
+        addSubview(holder)
+        holder.frame = NSRect(origin: .zero, size: size)
     }
 
     /// Out of the window, unless something else has already taken it (its tab's page card).
-    func release(_ webView: WKWebView) {
-        guard webView.superview === self else { return }
-        webView.removeFromSuperview()
-        webView.autoresizingMask = [.width, .height]
+    func release(_ holder: PageHolder) {
+        guard holder.superview === self else { return }
+        holder.removeFromSuperview()
+        holder.autoresizingMask = [.width, .height]
     }
 }
 
@@ -499,7 +508,7 @@ final class MiniPlayerView: NSView {
     private let forwardButton = MiniPlayerView.overlayButton("goforward.15", side: MiniPlayerView.centerSide, glyph: 20,
         tip: String(localized: "Forward 15 Seconds", comment: "Tooltip of the mini player's button that skips the video ahead 15 seconds."))
     private let progress = MiniPlayerProgress()
-    private weak var webView: WKWebView?
+    private weak var holder: PageHolder?
 
     var onBack: (() -> Void)?
     var onClose: (() -> Void)?
@@ -595,21 +604,28 @@ final class MiniPlayerView: NSView {
 
     // MARK: The page inside
 
-    /// Takes the page in, at the size it had in the page card.
-    func adopt(_ webView: WKWebView) {
-        self.webView = webView
-        let size = webView.frame.size
-        webView.autoresizingMask = []
-        host.addSubview(webView)
-        webView.frame = NSRect(origin: .zero, size: size)
+    /// Takes the page in, in its holder, at the size it had in the page card.
+    func adopt(_ holder: PageHolder) {
+        self.holder = holder
+        let size = holder.frame.size
+        holder.autoresizingMask = []
+        host.addSubview(holder)
+        holder.frame = NSRect(origin: .zero, size: size)
+    }
+
+    /// A part of the page, in the web view's own points, as it lies in what the card shows: the same, unless the Web
+    /// Inspector is docked to the page's left. When the page isn't in the card (WebKit has it in full screen for a
+    /// moment while the window resizes), as given.
+    func shown(_ rect: NSRect, of webView: WKWebView) -> NSRect {
+        webView.isDescendant(of: host) ? host.convert(rect, from: webView) : rect
     }
 
     /// Lets the page go, unless something else has already taken it (its tab shown in another window).
     func release() {
-        guard let webView, webView.superview === host else { return }
-        webView.removeFromSuperview()
-        webView.autoresizingMask = [.width, .height]
-        self.webView = nil
+        guard let holder, holder.superview === host else { return }
+        holder.removeFromSuperview()
+        holder.autoresizingMask = [.width, .height]
+        self.holder = nil
     }
 
     private var placement = MiniPlayerLayout.Placement(scale: 1, origin: .zero)
@@ -717,14 +733,14 @@ final class MiniPlayerView: NSView {
 
     /// Fades as it goes, then lets the page go: to `handOff` when given (a minimized video's page, to be kept in the
     /// window), unless something else took it meanwhile.
-    func disappear(handOff: ((WKWebView) -> Void)? = nil) {
+    func disappear(handOff: ((PageHolder) -> Void)? = nil) {
         isGoing = true
         setControls(false, animated: false)
         Tokens.Motion.present(self, from: .point(CGPoint(x: 0.5, y: 0.5)), entering: false) { [weak self] in
             guard let self else { return }
-            if let handOff, let webView, webView.superview === host {
-                self.webView = nil
-                handOff(webView)
+            if let handOff, let holder, holder.superview === host {
+                self.holder = nil
+                handOff(holder)
             } else {
                 release()
             }

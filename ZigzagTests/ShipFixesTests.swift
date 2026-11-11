@@ -43,7 +43,9 @@ struct ShipFixesTests {
 
     @Test func aPageInFullScreenKeepsTheSizeWebKitGaveIt() {
         let card = PageCardView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
-        let webView = WKWebView(frame: .zero)
+        // The tab is kept for the whole test: the card shows a page in its tab's holder, and finds none without the tab.
+        let tab = Tab(url: nil, spaceID: UUID(), configuration: WKWebViewConfiguration())
+        let webView = tab.ensureWebView()
         card.show(webView)
         card.layoutSubtreeIfNeeded()
         #expect(webView.frame.size == NSSize(width: 800, height: 600))
@@ -60,20 +62,27 @@ struct ShipFixesTests {
 
     @Test func aPageBackFromFullScreenBehindAnotherLeavesTheCard() throws {
         let card = PageCardView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
-        let video = WKWebView(frame: .zero), other = WKWebView(frame: .zero)
+        let videoTab = Tab(url: nil, spaceID: UUID(), configuration: WKWebViewConfiguration())
+        let otherTab = Tab(url: nil, spaceID: UUID(), configuration: WKWebViewConfiguration())
+        let video = videoTab.ensureWebView(), other = otherTab.ensureWebView()
         card.show(video)
-        let clip = try #require(video.superview)
-        // In full screen, in WebKit's window, while you switch to another tab in the browser window.
-        NSView().addSubview(video)
+        let holder = try #require(videoTab.pageHolder), clip = try #require(holder.superview)
+        // In full screen, in WebKit's window, while you switch to another tab in the browser window: its holder stays
+        // in the card, under the page now shown, for WebKit to put it back in.
+        let fullScreen = NSView()
+        fullScreen.addSubview(video)
         card.show(other)
-        // Its full screen ends: WebKit puts it back where it was, under the page now shown.
-        clip.addSubview(video, positioned: .below, relativeTo: other)
+        clip.addSubview(holder, positioned: .below, relativeTo: otherTab.pageHolder)
+        // Its full screen ends: WebKit puts it back where it was.
+        holder.addSubview(video)
+        #expect(video.isDescendant(of: card))
         card.pageLeftFullScreen(video)
-        #expect(video.superview == nil)
-        #expect(other.superview === clip)
+        #expect(!video.isDescendant(of: card))
+        #expect(holder.superview == nil)
+        #expect(other.isDescendant(of: card))
         // The page shown is never taken out.
         card.pageLeftFullScreen(other)
-        #expect(other.superview === clip)
+        #expect(other.isDescendant(of: card))
     }
 }
 
