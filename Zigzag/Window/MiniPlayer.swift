@@ -48,10 +48,10 @@ final class MiniPlayer {
         self.controller = controller
     }
 
-    /// Where the card sits, where you last let it go: from the window's nearest corner. None until it's first moved:
-    /// it starts at the bottom right of the page.
-    static var anchor: MiniPlayerLayout.Anchor? {
-        get { UserDefaults.standard.string(forKey: "MiniPlayerPlace").flatMap(MiniPlayerLayout.Anchor.init(stored:)) }
+    /// Where the card rests, as you last let it go: a corner of the page area, or a place of its own. None until
+    /// it's first moved: it starts at the bottom right of the page.
+    static var place: MiniPlayerLayout.Place? {
+        get { UserDefaults.standard.string(forKey: "MiniPlayerPlace").flatMap(MiniPlayerLayout.Place.init(stored:)) }
         set { UserDefaults.standard.set(newValue?.stored, forKey: "MiniPlayerPlace") }
     }
 
@@ -162,7 +162,7 @@ final class MiniPlayer {
         card.onToggle = { [weak self] in self?.command("toggle") }
         card.onSeek = { [weak self] by in self?.command("seek", [("by", by)]) }
         card.onSeekTo = { [weak self] fraction in self?.command("seekTo", [("f", fraction)]) }
-        card.onMoved = { [weak self] in self?.dropped() }
+        card.onMoved = { [weak self] free in self?.dropped(free: free) }
         // A tab's hover preview never stays over the card you're on.
         card.onPointer = { [weak self] in self?.controller?.previews.hide() }
         self.card = card
@@ -399,6 +399,13 @@ final class MiniPlayer {
         return MiniPlayerLayout.movableArea(in: root.bounds, below: root.showsTopBar ? root.topBarFrame.maxY : nil)
     }
 
+    /// The page area, whose corners the card rests in.
+    private var pageArea: NSRect {
+        guard let root = controller?.root else { return .zero }
+        let page = root.cardFrame.intersection(movableArea)
+        return page.isNull ? movableArea : page
+    }
+
     /// Sizes the card for the video and the window, where you left it (or where it's being dragged).
     func place() {
         guard let controller, let card, let webView else { return }
@@ -407,22 +414,21 @@ final class MiniPlayer {
         let aspect = picture.height > 0 ? picture.width / picture.height : 16 / 9
         let size = MiniPlayerLayout.cardSize(aspect: aspect, in: controller.root.cardFrame.size)
         // Until it's first moved, at the bottom right of the page.
-        let target = Self.anchor.map { MiniPlayerLayout.frame(for: $0, size: size, in: area) }
-            ?? MiniPlayerLayout.clamp(MiniPlayerLayout.frame(at: .bottomRight, size: size, in: controller.root.cardFrame), in: area)
+        let target = MiniPlayerLayout.frame(for: Self.place ?? .corner(.bottomRight), size: size, page: pageArea, in: area)
         card.dragArea = area
-        if !card.isDragging, card.frame != target { card.frame = target }
-        card.show(MiniPlayerLayout.placement(showing: card.shown(picture, of: webView), in: target.size))
+        if !card.isDragging, !card.isSettling, card.frame != target { card.frame = target }
+        let shown = card.isDragging || card.isSettling ? card.frame.size : target.size
+        card.show(MiniPlayerLayout.placement(showing: card.shown(picture, of: webView), in: shown))
     }
 
-    /// Let go after a drag: it stays where it was let go, settling on the edge when it's let go near one. Its place is
-    /// kept from the window's nearest corner, for the next video too.
-    private func dropped() {
+    /// Let go after a drag: it glides into the page area's nearest corner, as the Mac's Picture in Picture does; let
+    /// go with ⌘ held (`free`), it stays where it was let go, settling on an edge only near one. Its place is kept
+    /// for the next video too.
+    private func dropped(free: Bool) {
         guard let card else { return }
-        let area = movableArea
-        let target = MiniPlayerLayout.dropped(card.frame, in: area)
-        Self.anchor = MiniPlayerLayout.anchor(of: target, in: area)
-        guard target != card.frame else { return }
-        Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) { card.animator().frame = target }
+        let (target, place) = MiniPlayerLayout.rest(card.frame, free: free, page: pageArea, in: movableArea)
+        Self.place = place
+        card.settle(at: target)
     }
 
     static func siteName(_ url: URL?) -> String {
@@ -434,7 +440,7 @@ final class MiniPlayer {
     /// The card's state for scripted checks.
     var debugState: [String: Any] {
         ["showing": isShowing, "tab": tab?.displayTitle ?? "", "frame": card.map { NSStringFromRect($0.frame) } ?? "",
-         "anchor": Self.anchor?.stored ?? "", "area": NSStringFromRect(movableArea), "playing": video?.isPlaying ?? false, "time": video?.time ?? 0,
+         "anchor": Self.place?.stored ?? "", "area": NSStringFromRect(movableArea), "playing": video?.isPlaying ?? false, "time": video?.time ?? 0,
          "selected": controller?.tabManager.selectedTab?.displayTitle ?? "", "space": controller?.tabManager.currentSpaceID.uuidString ?? "",
          "follows": controller?.tabManager.allTabs.filter(follows).map(\.displayTitle) ?? [],
          "reporting": controller?.tabManager.allTabs.filter { $0.webView.map { !PageVideos.shared.frames(in: $0).isEmpty } ?? false }.map(\.displayTitle) ?? [],
@@ -516,7 +522,8 @@ final class MiniPlayerView: NSView {
     var onToggle: (() -> Void)?
     var onSeek: ((Double) -> Void)?
     var onSeekTo: ((Double) -> Void)?
-    var onMoved: (() -> Void)?
+    /// Let go after a drag; true with ⌘ held, to stay where it was let go.
+    var onMoved: ((Bool) -> Void)?
     /// The pointer came onto the card, or pressed on it.
     var onPointer: (() -> Void)?
     /// Where it may be dragged, in its superview.
@@ -837,6 +844,19 @@ final class MiniPlayerView: NSView {
         moveTo(NSPoint(x: pressOrigin.x + dx, y: pressOrigin.y + dy))
     }
 
+    /// Glides to where it comes to rest after a drag, briefly, as a window snaps; at once with Reduce Motion.
+    /// Meanwhile the page inside keeps the card's size, so nothing jumps.
+    func settle(at target: NSRect) {
+        guard target != frame else { return }
+        isSettling = true
+        Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) {
+            self.animator().frame = target
+        } completion: { [weak self] in
+            self?.isSettling = false
+        }
+    }
+    private(set) var isSettling = false
+
     /// Follows the pointer, never out of the window.
     private func moveTo(_ origin: NSPoint) {
         let moved = MiniPlayerLayout.clamp(NSRect(origin: origin, size: frame.size), in: dragArea)
@@ -848,7 +868,7 @@ final class MiniPlayerView: NSView {
         pressPoint = nil
         if isDragging {
             isDragging = false
-            onMoved?()
+            onMoved?(event.modifierFlags.contains(.command))
         } else {
             keepControls()
         }
@@ -871,12 +891,12 @@ final class MiniPlayerView: NSView {
         default: break
         }
     }
-    /// A drag of the card by this much, let go where it ends.
-    func debugDrag(dx: CGFloat, dy: CGFloat) {
+    /// A drag of the card by this much, let go where it ends (with ⌘ held: `free`).
+    func debugDrag(dx: CGFloat, dy: CGFloat, free: Bool = false) {
         isDragging = true
         moveTo(NSPoint(x: frame.minX + dx, y: frame.minY + dy))
         isDragging = false
-        onMoved?()
+        onMoved?(free)
     }
     #endif
 }

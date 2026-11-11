@@ -304,8 +304,8 @@ enum DebugBridge {
     }
 
     /// The mini player, without bringing the window forward: mpstate <path> (JSON), mphover on|off (its controls, as
-    /// the pointer brings them), mppress back|site|double|minimize|close|play|rewind|forward, mpdrag <dx> <dy> (dragged that far and let
-    /// go), mpselect <index> (as `select`), mpwindow <path> (window number and process), mpeval <index> <path> <script>
+    /// the pointer brings them), mppress back|site|double|minimize|close|play|rewind|forward, mpdrag <dx> <dy> [free] (dragged that far and
+    /// let go, with ⌘ held for free), mpselect <index> (as `select`), mpwindow <path> (window number and process), mpeval <index> <path> <script>
     /// (the script's result in that tab's page, which it may await, written to the file).
     private static func runMiniPlayer(_ name: String, _ arg: String, in controller: BrowserWindowController) {
         let player = controller.miniPlayer
@@ -318,7 +318,7 @@ enum DebugBridge {
         case "mppress": player.card?.debugPress(arg)
         case "mpdrag":
             let n = arg.split(separator: " ").compactMap { Double($0) }
-            if n.count == 2 { player.card?.debugDrag(dx: n[0], dy: n[1]) }
+            if n.count >= 2 { player.card?.debugDrag(dx: n[0], dy: n[1], free: arg.hasSuffix(" free")) }
         case "mpselect": controller.tabManager.select(at: Int(arg) ?? 0)
         case "mpwindow":
             if let window = controller.window {

@@ -261,6 +261,49 @@ nonisolated enum MiniPlayerLayout {
         return area
     }
 
+    // MARK: Snapping to a corner
+
+    /// Where the card rests: in a corner of the page area, a margin in, as the Mac's own Picture in Picture does; or,
+    /// let go with ⌘ held, wherever it was let go (`Anchor`, from the window's nearest corner).
+    enum Place: Equatable, Sendable {
+        case corner(Corner)
+        case free(Anchor)
+
+        /// As saved: "bottomRight" for a corner, "bottomRight 8 8" for a free place (as every place was saved before
+        /// the card snapped, so those keep where they were).
+        var stored: String {
+            switch self {
+            case .corner(let corner): corner.rawValue
+            case .free(let anchor): anchor.stored
+            }
+        }
+        init?(stored: String) {
+            if let corner = Corner(rawValue: stored) { self = .corner(corner) }
+            else if let anchor = Anchor(stored: stored) { self = .free(anchor) }
+            else { return nil }
+        }
+    }
+
+    /// The card of this size at its place: in its corner of `page` (the page area), or at its anchor in `area` (where
+    /// it may go at all), and wholly inside `area` either way.
+    static func frame(for place: Place, size: CGSize, page: CGRect, in area: CGRect) -> CGRect {
+        switch place {
+        case .corner(let corner): clamp(frame(at: corner, size: size, in: page), in: area)
+        case .free(let anchor): frame(for: anchor, size: size, in: area)
+        }
+    }
+
+    /// Where a card let go at `frame` comes to rest, and its place from then on: in the page area's corner nearest its
+    /// middle; with `free` (⌘ held), where it was let go, settling on an edge only near one (`dropped`).
+    static func rest(_ frame: CGRect, free: Bool, page: CGRect, in area: CGRect) -> (frame: CGRect, place: Place) {
+        if free {
+            let target = dropped(frame, in: area)
+            return (target, .free(anchor(of: target, in: area)))
+        }
+        let corner = nearestCorner(to: CGPoint(x: frame.midX, y: frame.midY), in: page)
+        return (self.frame(for: .corner(corner), size: frame.size, page: page, in: area), .corner(corner))
+    }
+
     /// The corner nearest a point.
     static func nearestCorner(to point: CGPoint, in area: CGRect) -> Corner {
         let left = point.x < area.midX, top = point.y < area.midY
