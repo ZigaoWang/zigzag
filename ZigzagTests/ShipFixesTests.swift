@@ -186,7 +186,8 @@ struct BookmarkFolderTests {
     }
 
     @Test func swipeGoesBackOnAPlainPage() {
-        // Fingers to the right go back, once they've gone far enough to tell.
+        // A scroll toward the left edge goes back (fingers to the right, with natural scrolling), once it has gone
+        // far enough to tell.
         #expect(decide(dx: 4) == .undecided)
         #expect(decide(dx: 14) == .track(-1))
         #expect(decide(dx: -14, forward: true) == .track(1))
@@ -196,11 +197,18 @@ struct BookmarkFolderTests {
         // A page that scrolls sideways that way keeps it.
         #expect(decide(dx: 14, scrolls: (true, false)) == .ignore)
         #expect(decide(dx: 14, scrolls: (false, true)) == .track(-1))
-        // Without natural scrolling, fingers to the right scroll toward the page's right edge instead.
-        #expect(SwipeDecision.decide(dx: 14, dy: 0, canGoBack: true, canGoForward: false, pageScrolls: (false, true),
-                                     page: .left, waited: 0.02, natural: false) == .ignore)
-        #expect(SwipeDecision.decide(dx: 14, dy: 0, canGoBack: true, canGoForward: false, pageScrolls: (true, false),
-                                     page: .left, waited: 0.02, natural: false) == .track(-1))
+    }
+
+    @Test func swipeFollowsTheMacsScrollingDirection() {
+        // dx is the scroll, as macOS reports it after its scrolling direction setting: back is a scroll toward the
+        // page's left edge, as in Safari. With natural scrolling that's fingers to the right; without it, fingers to
+        // the left. Either way, a page with room on its left keeps a back swipe, and room on its right a forward one.
+        #expect(decide(dx: 14, back: true, forward: true) == .track(-1))
+        #expect(decide(dx: -14, back: true, forward: true) == .track(1))
+        #expect(decide(dx: 14, back: true, forward: true, scrolls: (true, false)) == .ignore)
+        #expect(decide(dx: 14, back: true, forward: true, scrolls: (false, true)) == .track(-1))
+        #expect(decide(dx: -14, back: true, forward: true, scrolls: (false, true)) == .ignore)
+        #expect(decide(dx: -14, back: true, forward: true, scrolls: (true, false)) == .track(1))
     }
 
     @Test func swipeLeavesPagesThatPanThemselves() {
