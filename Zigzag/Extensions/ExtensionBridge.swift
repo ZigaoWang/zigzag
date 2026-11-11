@@ -155,7 +155,7 @@ final class ExtensionBridge {
 }
 
 /// A failure to say to the extension, in words.
-struct BridgeError: Error {
+nonisolated struct BridgeError: Error {
     let message: String
     init(_ message: String) { self.message = message }
     static func unsupported(_ ns: String, _ fn: String) -> BridgeError { BridgeError("\(ns).\(fn) isn't available in Zigzag") }

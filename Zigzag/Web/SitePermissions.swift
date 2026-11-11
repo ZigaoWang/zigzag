@@ -7,7 +7,7 @@ import WebKit
 /// the port left out only when it's the scheme's own (443 for https, 80 for http). Pages without a host (file:,
 /// data:, about:) have no origin to keep an answer under: they're asked every time.
 enum SiteOrigin {
-    static func make(scheme: String, host: String, port: Int?) -> String? {
+    nonisolated static func make(scheme: String, host: String, port: Int?) -> String? {
         let scheme = scheme.lowercased()
         var host = host.lowercased()
         if host.hasPrefix("["), host.hasSuffix("]") { host = String(host.dropFirst().dropLast()) }
@@ -19,7 +19,7 @@ enum SiteOrigin {
     }
 
     /// The origin of a page's address. A blob: address belongs to the page that made it.
-    static func of(_ url: URL?) -> String? {
+    nonisolated static func of(_ url: URL?) -> String? {
         guard let url, let scheme = url.scheme?.lowercased() else { return nil }
         if scheme == "blob" {
             return URL(string: String(url.absoluteString.dropFirst("blob:".count))).flatMap { $0.scheme?.lowercased() == "blob" ? nil : of($0) }

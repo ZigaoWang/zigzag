@@ -683,7 +683,7 @@ final class ExtensionFetchRequests {
     private var cancelled: [RequestKey: Date] = [:]
 
     func response(_ options: [String: Any], url: URL, extensionID: String, store: WKWebsiteDataStore,
-                  requestID id: UUID = UUID(), authorize: @escaping () -> Bool = { true }) async throws -> Any? {
+                  requestID id: UUID = UUID(), authorize: @escaping @MainActor @Sendable () -> Bool = { true }) async throws -> Any? {
         let key = RequestKey(extensionID: extensionID, id: id)
         if let when = cancelled.removeValue(forKey: key), when.timeIntervalSinceNow > -40 { throw BridgeError("Extension request cancelled.") }
         guard pages[key] == nil, writes[key] == nil else { throw BridgeError("Extension request is already running.") }
@@ -691,7 +691,14 @@ final class ExtensionFetchRequests {
         if !["GET", "HEAD"].contains(method) {
             // A website-origin helper gives POST the wrong Origin. A short-lived native session preserves the
             // Chrome extension origin and uses only this profile's cookies, including server-side deletions.
-            let task = Task { try await Self.write(options, url: url, extensionID: extensionID, store: store, authorize: authorize) }
+            let request = try Self.writeRequest(options, url: url, extensionID: extensionID)
+            // Only WebKit's cookie store stays on the main thread; the jar, the request and its body leave it.
+            let task = Task {
+                try await ExtensionWrite.send(request, cookies: await store.httpCookieStore.allCookies(), authorize: authorize) { set, deleted in
+                    for cookie in deleted { await store.httpCookieStore.deleteCookie(cookie) }
+                    for cookie in set { await store.httpCookieStore.setCookie(cookie) }
+                }
+            }
             writes[key] = task
             defer { writes[key] = nil }
             return try await task.value.value
@@ -714,87 +721,18 @@ final class ExtensionFetchRequests {
         return try await page.callAsyncJavaScript(Self.requestScript, arguments: ["options": options, "target": url.absoluteString], in: nil, contentWorld: .page)
     }
 
-    private static func write(_ options: [String: Any], url: URL, extensionID: String, store: WKWebsiteDataStore,
-                              authorize: () -> Bool) async throws -> ExtensionWriteResponse {
+    /// What a write sends, read from the extension's message here so the rest can leave the main thread.
+    private static func writeRequest(_ options: [String: Any], url: URL, extensionID: String) throws -> ExtensionWrite.Request {
         let method = (options["method"] as? String ?? "POST").uppercased()
         guard ["POST", "PUT", "PATCH", "DELETE", "OPTIONS"].contains(method),
               options["body"] == nil || options["body"] is NSNull || options["body"] is String else {
             throw BridgeError("Unsupported extension request.")
         }
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.urlCache = nil
-        configuration.timeoutIntervalForResource = 30
-        let jar = configuration.httpCookieStorage!
-        jar.cookieAcceptPolicy = .onlyFromMainDocumentDomain
-        // Never use HTTPCookieStorage.shared. The temporary jar starts with cookies for this target only.
-        let cookies = await store.httpCookieStore.allCookies()
-        let host = url.host()?.lowercased() ?? ""
-        let scoped = cookies.filter { cookie in
-            let domain = cookie.domain.lowercased()
-            return domain == host || (domain.hasPrefix(".") && (host == String(domain.dropFirst()) || host.hasSuffix(domain)))
-        }
-        jar.setCookies(scoped, for: url, mainDocumentURL: url)
-        try Task.checkCancellation()
-        guard authorize() else { throw BridgeError("The extension can no longer access this URL.") }
-        let session = URLSession(configuration: configuration, delegate: ExtensionWriteRedirects(), delegateQueue: nil)
-        defer { session.invalidateAndCancel() }
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.httpBody = (options["body"] as? String).map { Data($0.utf8) }
-        switch options["cache"] as? String {
-        case "no-store", "reload": request.cachePolicy = .reloadIgnoringLocalCacheData
-        case "no-cache": request.cachePolicy = .reloadRevalidatingCacheData
-        case "force-cache": request.cachePolicy = .returnCacheDataElseLoad
-        default: break
-        }
-        for header in options["headers"] as? [[String]] ?? [] where header.count == 2 {
-            let name = header[0].lowercased()
-            if ["cookie", "cookie2", "origin", "referer", "host", "content-length", "connection", "transfer-encoding"].contains(name)
-                || name.hasPrefix("sec-") || name.hasPrefix("proxy-") { continue }
-            request.setValue(header[1], forHTTPHeaderField: header[0])
-        }
         // Derived from the native-message sender, never a payload-supplied Origin or a website's origin.
-        request.setValue("chrome-extension://\(extensionID)", forHTTPHeaderField: "Origin")
-        var redirected = false
-        for _ in 0..<20 {
-            try Task.checkCancellation()
-            guard authorize() else { throw BridgeError("The extension can no longer access this URL.") }
-            let before = jar.cookies ?? []
-            let (data, raw) = try await session.data(for: request)
-            try Task.checkCancellation()
-            guard let response = raw as? HTTPURLResponse else { throw BridgeError("Invalid extension response.") }
-            // CFNetwork applies all Set-Cookie fields (including Max-Age=0) to the isolated jar. Apply only its
-            // delta back to WebKit, rather than replacing the profile's whole jar or restoring stale cookies.
-            let after = jar.cookies ?? []
-            func matches(_ a: HTTPCookie, _ b: HTTPCookie) -> Bool { a.name == b.name && a.domain == b.domain && a.path == b.path }
-            for old in before where !after.contains(where: { matches(old, $0) }) { await store.httpCookieStore.deleteCookie(old) }
-            for cookie in after {
-                let old = before.first { matches(cookie, $0) }
-                if old == nil || NSDictionary(dictionary: old!.properties ?? [:]) != NSDictionary(dictionary: cookie.properties ?? [:]) {
-                    await store.httpCookieStore.setCookie(cookie)
-                }
-            }
-            let status = response.statusCode
-            if [301, 302, 303, 307, 308].contains(status), let location = response.value(forHTTPHeaderField: "Location"),
-               let next = URL(string: location, relativeTo: request.url)?.absoluteURL {
-                guard options["redirect"] as? String != "error", SiteOrigin.of(next) == SiteOrigin.of(url),
-                      next.user == nil, next.password == nil else { throw BridgeError("Extension request redirect is not allowed.") }
-                if status == 303 || ([301, 302].contains(status) && request.httpMethod == "POST") {
-                    request.httpMethod = "GET"
-                    request.httpBody = nil
-                    for name in ["Content-Type", "Content-Encoding", "Content-Language", "Content-Location"] { request.setValue(nil, forHTTPHeaderField: name) }
-                }
-                request.url = next
-                redirected = true
-                continue
-            }
-            let headers = response.allHeaderFields.compactMap { key, value -> [String]? in
-                let name = String(describing: key).lowercased()
-                return ["set-cookie", "set-cookie2"].contains(name) ? nil : [name, String(describing: value)]
-            }
-            return ExtensionWriteResponse(status: status, headers: headers, body: data, url: response.url?.absoluteString ?? url.absoluteString, redirected: redirected)
-        }
-        throw BridgeError("Too many extension request redirects.")
+        return ExtensionWrite.Request(url: url, method: method, body: (options["body"] as? String).map { Data($0.utf8) },
+                                      headers: (options["headers"] as? [[String]] ?? []).filter { $0.count == 2 },
+                                      cache: options["cache"] as? String, redirect: options["redirect"] as? String,
+                                      origin: "chrome-extension://\(extensionID)")
     }
 
     static let requestScript = """
@@ -842,22 +780,159 @@ final class ExtensionFetchRequests {
     }
 }
 
-nonisolated private struct ExtensionWriteResponse: Sendable {
+/// A write's network part, away from the main thread: a short-lived session whose jar starts with the target's
+/// cookies from the profile, and whose cookie changes go back to the profile's store, which is the main thread's.
+nonisolated enum ExtensionWrite {
+    struct Request: Sendable {
+        let url: URL
+        let method: String
+        let body: Data?
+        let headers: [[String]]
+        let cache: String?
+        let redirect: String?
+        let origin: String
+    }
+
+    /// Cookies that go back to the profile: those the server set or changed, and those it deleted.
+    typealias Apply = @MainActor @Sendable (_ set: [HTTPCookie], _ deleted: [HTTPCookie]) async -> Void
+
+    @concurrent static func send(_ input: Request, cookies: [HTTPCookie], authorize: @escaping @MainActor @Sendable () -> Bool,
+                                 apply: @escaping Apply) async throws -> ExtensionWriteResponse {
+        let url = input.url
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.timeoutIntervalForResource = 30
+        let jar = configuration.httpCookieStorage!
+        jar.cookieAcceptPolicy = .onlyFromMainDocumentDomain
+        // Never use HTTPCookieStorage.shared. The temporary jar starts with cookies for this target only.
+        let host = url.host()?.lowercased() ?? ""
+        let scoped = cookies.filter { cookie in
+            let domain = cookie.domain.lowercased()
+            return domain == host || (domain.hasPrefix(".") && (host == String(domain.dropFirst()) || host.hasSuffix(domain)))
+        }
+        jar.setCookies(scoped, for: url, mainDocumentURL: url)
+        try Task.checkCancellation()
+        guard await authorize() else { throw BridgeError("The extension can no longer access this URL.") }
+        let transfer = ExtensionWriteTransfer()
+        let session = URLSession(configuration: configuration, delegate: transfer, delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        var request = URLRequest(url: url)
+        request.httpMethod = input.method
+        request.httpBody = input.body
+        switch input.cache {
+        case "no-store", "reload": request.cachePolicy = .reloadIgnoringLocalCacheData
+        case "no-cache": request.cachePolicy = .reloadRevalidatingCacheData
+        case "force-cache": request.cachePolicy = .returnCacheDataElseLoad
+        default: break
+        }
+        for header in input.headers {
+            let name = header[0].lowercased()
+            if ["cookie", "cookie2", "origin", "referer", "host", "content-length", "connection", "transfer-encoding"].contains(name)
+                || name.hasPrefix("sec-") || name.hasPrefix("proxy-") { continue }
+            request.setValue(header[1], forHTTPHeaderField: header[0])
+        }
+        request.setValue(input.origin, forHTTPHeaderField: "Origin")
+        var redirected = false
+        for _ in 0..<20 {
+            try Task.checkCancellation()
+            guard await authorize() else { throw BridgeError("The extension can no longer access this URL.") }
+            let before = jar.cookies ?? []
+            let (data, raw) = try await transfer.run(request, in: session)
+            try Task.checkCancellation()
+            guard let response = raw as? HTTPURLResponse else { throw BridgeError("Invalid extension response.") }
+            // CFNetwork applies all Set-Cookie fields (including Max-Age=0) to the isolated jar. Apply only its
+            // delta back to WebKit, rather than replacing the profile's whole jar or restoring stale cookies.
+            let after = jar.cookies ?? []
+            func matches(_ a: HTTPCookie, _ b: HTTPCookie) -> Bool { a.name == b.name && a.domain == b.domain && a.path == b.path }
+            let deleted = before.filter { old in !after.contains { matches(old, $0) } }
+            let set = after.filter { cookie in
+                guard let old = before.first(where: { matches(cookie, $0) }) else { return true }
+                return NSDictionary(dictionary: old.properties ?? [:]) != NSDictionary(dictionary: cookie.properties ?? [:])
+            }
+            if !set.isEmpty || !deleted.isEmpty { await apply(set, deleted) }
+            let status = response.statusCode
+            if [301, 302, 303, 307, 308].contains(status), let location = response.value(forHTTPHeaderField: "Location"),
+               let next = URL(string: location, relativeTo: request.url)?.absoluteURL {
+                guard input.redirect != "error", SiteOrigin.of(next) == SiteOrigin.of(url),
+                      next.user == nil, next.password == nil else { throw BridgeError("Extension request redirect is not allowed.") }
+                if status == 303 || ([301, 302].contains(status) && request.httpMethod == "POST") {
+                    request.httpMethod = "GET"
+                    request.httpBody = nil
+                    for name in ["Content-Type", "Content-Encoding", "Content-Language", "Content-Location"] { request.setValue(nil, forHTTPHeaderField: name) }
+                }
+                request.url = next
+                redirected = true
+                continue
+            }
+            let headers = response.allHeaderFields.compactMap { key, value -> [String]? in
+                let name = String(describing: key).lowercased()
+                return ["set-cookie", "set-cookie2"].contains(name) ? nil : [name, String(describing: value)]
+            }
+            return ExtensionWriteResponse(status: status, headers: headers, body: data.base64EncodedString(),
+                                          url: response.url?.absoluteString ?? url.absoluteString, redirected: redirected)
+        }
+        throw BridgeError("Too many extension request redirects.")
+    }
+}
+
+nonisolated struct ExtensionWriteResponse: Sendable {
     let status: Int
     let headers: [[String]]
-    let body: Data
+    /// Base64, made off the main thread.
+    let body: String
     let url: String
     let redirected: Bool
 
     var value: [String: Any] {
-        ["status": status, "statusText": "", "headers": headers, "body": body.base64EncodedString(), "url": url, "redirected": redirected]
+        ["status": status, "statusText": "", "headers": headers, "body": body, "url": url, "redirected": redirected]
     }
 }
 
-/// Redirects are handled explicitly above, after checking the destination and applying response cookies.
-nonisolated private final class ExtensionWriteRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+/// One write's response at a time. Redirects come back unfollowed, to be checked above after their cookies.
+nonisolated private final class ExtensionWriteTransfer: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    private let lock = NSLock()
+    private var data = Data()
+    private var response: URLResponse?
+    private var done: CheckedContinuation<(Data, URLResponse), any Error>?
+
+    func run(_ request: URLRequest, in session: URLSession) async throws -> (Data, URLResponse) {
+        let task = session.dataTask(with: request)
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                lock.withLock {
+                    data = Data()
+                    response = nil
+                    done = continuation
+                }
+                task.resume()
+            }
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
-                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
+                    newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) { completionHandler(nil) }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                    completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void) {
+        lock.withLock { self.response = response }
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        lock.withLock { self.data.append(data) }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
+        let (continuation, data, response) = lock.withLock {
+            defer { done = nil }
+            return (done, self.data, self.response)
+        }
+        if let error { continuation?.resume(throwing: error) }
+        else if let response { continuation?.resume(returning: (data, response)) }
+        else { continuation?.resume(throwing: BridgeError("Invalid extension response.")) }
+    }
 }
 
 // MARK: - identity
