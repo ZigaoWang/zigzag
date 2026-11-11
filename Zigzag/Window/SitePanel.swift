@@ -349,7 +349,9 @@ final class SitePanel: FloatingPanelView {
 
     private func buildRows() {
         rows = []
-        if ContentBlocker.isEnabled {
+        // The choices kept for a site (ad blocking, dark pages, keeping tabs awake) aren't offered in a private
+        // window: its site would be kept in Settings › Privacy › Sites. Its tabs still follow the ones made elsewhere.
+        if ContentBlocker.isEnabled, !isPrivate {
             let blocked = !ContentBlocker.isAllowed(on: url)
             rows.append(.toggle(String(localized: "Ad blocking", comment: "Row in the site panel's This Site group."), on: blocked, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                 guard let self else { return }
@@ -369,8 +371,8 @@ final class SitePanel: FloatingPanelView {
             })
         }
         // Dark pages, for this site alone: on here though off everywhere else, or the other way round. A site that's
-        // dark on its own says so: there's nothing for Zigzag to darken.
-        if url.scheme == "http" || url.scheme == "https" {
+        // dark on its own says so: there's nothing for Zigzag to darken. Offered where keeping tabs awake is.
+        if KeepAwake.isOffered(for: url, isPrivate: isPrivate) {
             let native = String(localized: "This site is dark already", comment: "Under Dark page in the site panel's This Site group: dark pages are on, and the site has a dark look of its own, so it's left as it is.")
             let tab = tab
             rows.append(.toggle(String(localized: "Dark page", comment: "Row in the site panel's This Site group: draws this site's pages dark."), on: DarkPages.wants(url),
