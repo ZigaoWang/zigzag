@@ -493,18 +493,25 @@ final class FavoriteTile: InteractiveView {
         icon.isAsleep = tab?.isAsleep == true
         let name = Words.list([bookmark?.title, partner?.title].compactMap { $0 })
         toolTip = tab.flatMap(TabRowView.asleepToolTip).map { name.isEmpty ? $0 : "\(name)\n\($0)" } ?? name
-        if let favicon = tab?.favicon, !(tab?.isLoading ?? false) { icon.image = favicon; needsLayout = true }
+        if let image = tab?.displayIcon, !(tab?.isLoading ?? false) { icon.image = image; needsLayout = true }
     }
 
     func refreshIcon() {
         guard let bookmark else { return }
         if let partner {
-            if let image = FaviconStore.shared.cachedIcon(for: partner.url) { partnerIcon.image = image } else { FaviconStore.shared.prefetch(for: partner.url) }
+            if let image = partner.displayIcon {
+                partnerIcon.image = image
+            } else {
+                // Back to its site's icon, not fetched yet: the one you chose doesn't stay meanwhile.
+                if partnerIcon.image.map(IconChoice.isPageIcon) == true { partnerIcon.image = nil }
+                FaviconStore.shared.prefetch(for: partner.url)
+            }
         }
-        if let image = FaviconStore.shared.cachedIcon(for: bookmark.url) {
+        if let image = bookmark.displayIcon {
             icon.image = image
             needsLayout = true
         } else {
+            if icon.image.map(IconChoice.isPageIcon) == true { icon.image = nil; needsLayout = true }
             FaviconStore.shared.prefetch(for: bookmark.url)
         }
     }
@@ -530,7 +537,8 @@ final class FavoriteTile: InteractiveView {
         } else {
             // Every favorite at one size: a site's own 32px icon is drawn up to it with the best filtering, only a
             // 16px one stays at a tab's size rather than blur.
-            let size = icon.image.map { FaviconStore.sharpSide(of: $0) >= Self.iconSide } == true ? Self.iconSide : Tokens.Sidebar.favicon
+            // An icon you chose is drawn, never blurred: always the larger size.
+            let size = icon.image.map { IconChoice.isPageIcon($0) || FaviconStore.sharpSide(of: $0) >= Self.iconSide } == true ? Self.iconSide : Tokens.Sidebar.favicon
             icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size).integral
         }
         let side = Self.closeSide, edge = Self.closeInset

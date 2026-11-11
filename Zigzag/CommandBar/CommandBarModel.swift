@@ -347,7 +347,7 @@ enum CommandRanker {
                                        failed: \.showsErrorPage, leavingOutFailed: leavingOutFailed)
             for tab in recent {
                 guard let url = tab.url else { continue }
-                add(CommandResult(kind: .switchTo(tab.id), title: tab.displayTitle, detail: detail(displayURL(url), under: tab.displayTitle), icon: tab.favicon),
+                add(CommandResult(kind: .switchTo(tab.id), title: tab.displayTitle, detail: detail(displayURL(url), under: tab.displayTitle), icon: tab.displayIcon),
                     key: TabManager.normalize(url))
             }
             return results
@@ -389,7 +389,7 @@ enum CommandRanker {
                       !repeatsCommand(url, offered: offered) else { continue }
                 let key = TabManager.normalize(url)
                 guard !seen.contains(key) else { continue }
-                add(CommandResult(kind: .switchTo(tab.id), title: tab.displayTitle, detail: detail(displayURL(url), under: tab.displayTitle), icon: tab.favicon), key: key)
+                add(CommandResult(kind: .switchTo(tab.id), title: tab.displayTitle, detail: detail(displayURL(url), under: tab.displayTitle), icon: tab.displayIcon), key: key)
                 tabCount += 1
             }
             var bookmarkCount = 0
@@ -402,7 +402,7 @@ enum CommandRanker {
                 let key = TabManager.normalize(bookmark.url)
                 guard !seen.contains(key) else { continue }
                 add(CommandResult(kind: .bookmark(bookmark.id), title: bookmark.title, detail: detail(displayURL(bookmark.url), under: bookmark.title),
-                                  icon: FaviconStore.shared.cachedIcon(for: bookmark.url), isFavorite: favorites.contains(bookmark.id)), key: key)
+                                  icon: bookmark.displayIcon, isFavorite: favorites.contains(bookmark.id)), key: key)
                 bookmarkCount += 1
             }
         }

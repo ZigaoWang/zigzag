@@ -557,7 +557,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             // one ↓ away, so neither ever happens by surprise.
             if let manager = host.commandBarTabs, let existing = manager.existingTab(for: completionURL), existing !== manager.selectedTab {
                 let other = CommandResult(kind: .switchTo(existing.id), title: existing.displayTitle,
-                                          detail: CommandRanker.displayURL(completionURL), icon: existing.favicon)
+                                          detail: CommandRanker.displayURL(completionURL), icon: existing.displayIcon)
                 results.removeAll { $0.kind == other.kind }
                 results.insert(other, at: 1)
             }

@@ -353,7 +353,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     private func refreshPartner() {
         partnerTitle.stringValue = pinnedPartner?.title ?? partner?.displayTitle ?? ""
-        partnerIcon.image = partner?.favicon ?? pinnedPartner?.icon
+        partnerIcon.image = partner?.displayIcon ?? pinnedPartner?.icon
         partnerIcon.isLoading = (partner?.isLoading ?? false) && !(partner?.isSuspended ?? true)
         partnerIcon.isAsleep = partner?.isAsleep == true
         // A symbol set again is drawn again: only when it changes.
@@ -446,7 +446,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     func refresh() {
         title.stringValue = fixedTitle ?? tab?.displayTitle ?? ""
-        icon.image = tab?.favicon ?? (fixedTitle != nil ? bookmarkIcon : nil)
+        icon.image = tab?.displayIcon ?? (fixedTitle != nil ? bookmarkIcon : nil)
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
         icon.isAsleep = tab?.isAsleep == true
         toolTip = tab.flatMap(Self.asleepToolTip)

@@ -971,7 +971,7 @@ final class SidebarListView: NSView {
         case .bookmark(let id):
             guard let row = view as? TabRowView, let bookmark = Library.shared.bookmark(id) else { return }
             let tab = manager.bookmarkTab(for: id)
-            row.bookmarkIcon = FaviconStore.shared.cachedIcon(for: bookmark.url)
+            row.bookmarkIcon = bookmark.displayIcon
             if row.bookmarkIcon == nil { FaviconStore.shared.prefetch(for: bookmark.url) }
             // Moved on from its pinned page: the row shows where it is now, and its button goes back.
             let away = manager.isAway(id)
@@ -983,7 +983,7 @@ final class SidebarListView: NSView {
             let pinned = Library.shared.pinnedSplit(containing: id).flatMap { $0.left == id ? Library.shared.bookmark($0.right) : nil }
             let partner = pinned.flatMap { manager.bookmarkTab(for: $0.id) }
             if let pinned {
-                let icon = FaviconStore.shared.cachedIcon(for: pinned.url)
+                let icon = pinned.displayIcon
                 if icon == nil { FaviconStore.shared.prefetch(for: pinned.url) }
                 row.configure(pinnedPartner: pinned.title, icon: icon, unloaded: partner == nil)
             } else {
@@ -1288,6 +1288,9 @@ final class SidebarListView: NSView {
     }
     #endif
     func folderRow(_ id: UUID) -> NSView? { madeRow(.folder(id)) }
+    /// A tab's or pinned page's row, scrolled into sight, for something to open beside it.
+    func tabRow(_ id: UUID) -> NSView? { shownRow(.tab(id)) }
+    func bookmarkRow(_ id: UUID) -> NSView? { shownRow(.bookmark(id)) }
 
     /// A row scrolled into sight, to type in.
     private func shownRow(_ item: SidebarItem) -> NSView? {

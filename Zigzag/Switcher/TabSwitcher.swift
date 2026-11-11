@@ -140,16 +140,16 @@ final class TabThumbnailView: InteractiveView {
         self.tab = tab
         self.partner = partner
         self.split = partner == nil ? nil : split ?? (0.5, false)
-        placeholder.image = tab.favicon
+        placeholder.image = tab.displayIcon
         // A web page by its site; Zigzag's own pages (History) and files by their title, never a bare "history".
         if let url = tab.url, ["http", "https"].contains(url.scheme), let host = url.host() {
             siteName.stringValue = host.withoutWWW
         } else {
             siteName.stringValue = tab.displayTitle
         }
-        icon.image = tab.favicon
+        icon.image = tab.displayIcon
         title.stringValue = tab.displayTitle
-        icon2.image = partner?.favicon
+        icon2.image = partner?.displayIcon
         title2.stringValue = partner?.displayTitle ?? ""
         setAccessibilityLabel(partner.map { Words.list([tab.displayTitle, $0.displayTitle]) } ?? tab.displayTitle)
         refreshImage()

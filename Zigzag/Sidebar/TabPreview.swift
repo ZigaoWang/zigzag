@@ -43,7 +43,7 @@ final class TabPreviewView: FloatingPanelView {
         detail2.stringValue = partner?.url.map(CommandRanker.displayURL) ?? ""
         title2.isHidden = partner == nil
         detail2.isHidden = partner == nil
-        placeholder.image = tab?.favicon ?? bookmark.flatMap { FaviconStore.shared.cachedIcon(for: $0.url) }
+        placeholder.image = tab?.displayIcon ?? bookmark?.displayIcon
         setImages(tab?.snapshot, partner?.snapshot)
         needsLayout = true
     }

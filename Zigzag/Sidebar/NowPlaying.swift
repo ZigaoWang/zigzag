@@ -32,7 +32,7 @@ final class NowPlayingView: InteractiveView {
 
     func refresh() {
         guard let tab else { return }
-        icon.image = tab.favicon
+        icon.image = tab.displayIcon
         title.stringValue = tab.displayTitle
         setAccessibilityLabel(String(localized: "Now playing: \(tab.displayTitle)", comment: "Accessibility label of the sidebar's Now Playing control. The placeholder is the playing tab's title."))
         playButton.symbol = isPaused ? "play" : "pause"
