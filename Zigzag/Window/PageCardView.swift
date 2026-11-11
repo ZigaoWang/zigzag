@@ -4,6 +4,13 @@ import WebKit
 /// The web page as a card: rounded, lifted by a hairline and a whisper of shadow, inset from the window or, borderless,
 /// meeting its edges.
 final class PageCardView: NSView {
+    /// The card's face: its rounded shape, its edge and its ground, the page's own color (`ground`). It follows
+    /// the card's frame, gliding with it when that's animated (the sidebar coming or going), while the page on it
+    /// takes its new size at once, as a website should be laid out only once. So the card narrows and widens in one
+    /// piece: the room the page has yet to reach, or has just given up, is the card's own ground, never a hole onto
+    /// the window's frame.
+    private let surface = FlippedView()
+    /// The page's place on the surface: at its final size from the moment the card starts to move.
     private let clip = NSView()
     private let edge = CALayer()
     private(set) weak var webView: WKWebView?
@@ -36,11 +43,13 @@ final class PageCardView: NSView {
     var headerAlpha: CGFloat { isUnfocusedPane ? Tokens.Color.unfocusedPaneAlpha : 1 }
     /// Whether the header takes the top of the card.
     private var headerOnCard: Bool { showsHeader && !liftsHeader }
-    /// Under the bar above the page, the card's top this tall is the bar's, in the page's own color (`bandColor`), so
-    /// the bar and the page read as one card: its corners, edge and shadow are the card's, and it moves with it.
+    /// Under the bar above the page, the card's top this tall is the bar's: the page starts under it, and the card's
+    /// ground shows there in the page's own color (`ground`), so the bar and the page read as one card: its
+    /// corners, edge and shadow are the card's, and it moves with it.
     var band: CGFloat = 0 { didSet { if band != oldValue { needsLayout = true } } }
-    var bandColor: NSColor? { didSet { if bandColor != oldValue { refreshColors() } } }
-    private let bandLayer = CALayer()
+    /// The card's color wherever the page isn't: the page's own (`Tab.pageColor`), so a split's two cards each have
+    /// theirs; the plain card's with no page, or under what covers it.
+    private var ground: NSColor { (webView as? BrowserWebView)?.owner?.pageColor ?? Tokens.Color.cardBackground }
     /// The page's part of the card, in the superview's terms: under the band.
     var pageFrame: NSRect { NSRect(x: frame.minX, y: frame.minY + band, width: frame.width, height: max(0, frame.height - band)) }
     /// How far down the card the page starts: under the bar's band and a split pane's header.
@@ -89,7 +98,7 @@ final class PageCardView: NSView {
         CATransaction.setDisableActions(duration == 0)
         CATransaction.setAnimationDuration(duration)
         CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
-        clip.layer?.cornerRadius = radius
+        surface.layer?.cornerRadius = radius
         edge.cornerRadius = radius
         edge.opacity = on ? 0 : 1
         layer?.shadowOpacity = castsShadow ? 1 : 0
@@ -142,7 +151,7 @@ final class PageCardView: NSView {
             progressLine.anchorPoint = CGPoint(x: 0, y: 1)
             // Above the page's own layer.
             progressLine.zPosition = 100
-            clip.layer?.addSublayer(progressLine)
+            surface.layer?.addSublayer(progressLine)
         }
         paintProgress()
         let target = loading ? max(0.08, CGFloat(value)) : 1
@@ -173,8 +182,9 @@ final class PageCardView: NSView {
 
     private func layoutProgress() {
         let top = contentTop
-        progressLine.bounds = CGRect(x: 0, y: 0, width: clip.bounds.width * progress, height: 2)
-        progressLine.position = CGPoint(x: 0, y: clip.bounds.height - top)
+        // On the surface, over the card's edge, in the page's place on it: a layer's y counts from the bottom.
+        progressLine.bounds = CGRect(x: 0, y: 0, width: clip.frame.width * progress, height: 2)
+        progressLine.position = CGPoint(x: 0, y: clip.frame.height - top)
     }
 
     private func paintProgress() {
@@ -221,7 +231,7 @@ final class PageCardView: NSView {
 
     /// Out of sight under something opaque (the tab overview): the page is hidden, not just see-through, so WebKit
     /// knows it isn't shown and throttles it.
-    var isCoveredOver = false { didSet { clip.isHidden = isCoveredOver } }
+    var isCoveredOver = false { didSet { surface.isHidden = isCoveredOver } }
 
     /// Shown while a suspended tab wakes up so the card never flashes blank.
     private let placeholder = NSImageView()
@@ -240,23 +250,28 @@ final class PageCardView: NSView {
         layer?.shadowRadius = Tokens.Shadow.cardRadius
         layer?.shadowOffset = Tokens.Shadow.cardOffset
 
+        surface.wantsLayer = true
+        surface.layer?.cornerRadius = Tokens.Radius.card
+        surface.layer?.cornerCurve = .continuous
+        surface.layer?.masksToBounds = true
+        // Resized with the card as its frame is set, inside the animation when there is one, so it glides too.
+        surface.autoresizingMask = [.width, .height]
+        addSubview(surface)
         clip.wantsLayer = true
-        clip.layer?.cornerRadius = Tokens.Radius.card
-        clip.layer?.cornerCurve = .continuous
         clip.layer?.masksToBounds = true
-        addSubview(clip)
+        surface.addSubview(clip)
 
         placeholder.imageScaling = .scaleProportionallyUpOrDown
         placeholder.imageAlignment = .alignTop
         placeholder.isHidden = true
         clip.addSubview(placeholder)
-        clip.layer?.addSublayer(bandLayer)
 
         edge.cornerRadius = Tokens.Radius.card
         edge.cornerCurve = .continuous
         edge.borderWidth = Tokens.Metric.hairline
         edge.zPosition = 10
-        clip.layer?.addSublayer(edge)
+        edge.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+        surface.layer?.addSublayer(edge)
         header.isHidden = true
         clip.addSubview(header)
         refreshColors()
@@ -269,11 +284,10 @@ final class PageCardView: NSView {
     override func layout() {
         super.layout()
         Tokens.Motion.withoutAnimation {
+            surface.frame = bounds
             clip.frame = bounds
             let top = contentTop
-            // The clip isn't flipped: the band and then the header sit at its top edge, the page fills the rest below.
-            bandLayer.frame = CGRect(x: 0, y: clip.bounds.height - band, width: clip.bounds.width, height: band)
-            bandLayer.isHidden = band == 0
+            // The clip isn't flipped: the band and then the header are at its top edge, the page fills the rest below.
             if !liftsHeader {
                 header.frame = NSRect(x: 0, y: clip.bounds.height - band - PaneHeaderView.height, width: clip.bounds.width, height: PaneHeaderView.height)
             }
@@ -284,18 +298,18 @@ final class PageCardView: NSView {
             document?.frame = content
             placeholder.frame = content
             overlay?.frame = content
-            edge.frame = clip.bounds
+            edge.frame = surface.bounds
             if progressLine.superlayer != nil { layoutProgress() }
             let radius = cornerRadius
-            clip.layer?.cornerRadius = radius
+            surface.layer?.cornerRadius = radius
             edge.cornerRadius = radius
-            // The clip isn't flipped: its top corners are at max Y.
+            // A layer's own corners count from the bottom, whichever way up its view is: the top ones are at max Y.
             var corners: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
             if squaresRightCorners.top { corners.remove(.layerMaxXMaxYCorner) }
             if squaresRightCorners.bottom { corners.remove(.layerMaxXMinYCorner) }
             if squaresLeftCorners.top { corners.remove(.layerMinXMaxYCorner) }
             if squaresLeftCorners.bottom { corners.remove(.layerMinXMinYCorner) }
-            clip.layer?.maskedCorners = corners
+            surface.layer?.maskedCorners = corners
             edge.maskedCorners = corners
             layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
             Tokens.Motion.withoutAnimation {
@@ -313,8 +327,7 @@ final class PageCardView: NSView {
     private func refreshColors() {
         paintProgress()
         Tokens.Motion.withoutAnimation {
-            clip.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
-            bandLayer.backgroundColor = bandColor.map { cgColor($0) }
+            surface.layer?.backgroundColor = cgColor(ground)
             edge.borderColor = cgColor(Tokens.Color.cardEdge)
             // Meeting the window's edges, the page's own edge is its outline: a drawn one runs along the window's edge
             // and round the corners as an extra line.
@@ -329,6 +342,24 @@ final class PageCardView: NSView {
             ambient.shadowOffset = .zero
             ambient.shadowOpacity = castsShadow && isAttached ? 1 : 0
         }
+    }
+
+    /// The page's color changed, or the page did: the card's ground follows, and so does the web view's own.
+    private func refreshGround() {
+        Tokens.Motion.withoutAnimation { surface.layer?.backgroundColor = cgColor(ground) }
+        Self.paintGround(of: webView, (webView as? BrowserWebView)?.owner?.pageColor)
+    }
+
+    private static let setGround = NSSelectorFromString("_setBackgroundColor:")
+
+    /// What WebKit shows where a page hasn't drawn yet is a plain ground of its own, light or dark with the window:
+    /// a white strip down a dark site (or a dark one down a light site) for the few frames after the page is given
+    /// more room, as when the sidebar goes. In the page's own color it reads as more of the page; nil gives the web
+    /// view its own back, as it leaves the card. Not public API, so only where WebKit has it; without it, that
+    /// strip is as it was.
+    private static func paintGround(of webView: WKWebView?, _ color: NSColor?) {
+        guard let webView, webView.responds(to: setGround) else { return }
+        webView.perform(setGround, with: color)
     }
 
     /// Puts a web view in the card, in its holder. The new one goes in before the old one leaves, so nothing flickers.
@@ -359,12 +390,21 @@ final class PageCardView: NSView {
                 oldHolder.removeFromSuperview()
             }
         }
-        documentToken = owner?.changed.observe { [weak self] change in if change == .pdf || change == .settings { self?.refreshDocument() } }
+        documentToken = owner?.changed.observe { [weak self] change in
+            switch change {
+            case .pdf, .settings:
+                self?.refreshDocument()
+                self?.refreshGround()
+            case .themeColor, .darkPage: self?.refreshGround()
+            default: break
+            }
+        }
         refreshDocument()
         placeholder.image = placeholderImage
         placeholder.isHidden = placeholderImage == nil
-        edge.removeFromSuperlayer()
-        clip.layer?.addSublayer(edge)
+        // The page that left has its own ground back, whoever shows it next; the one that came has this card's.
+        Self.paintGround(of: old, nil)
+        refreshGround()
     }
 
     /// A page's full screen ended: WebKit put it back in its holder. Left here behind the page now shown, that holder

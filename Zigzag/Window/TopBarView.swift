@@ -15,19 +15,20 @@ final class TopBarView: NSView {
     /// From the bar's leading edge to its first button while the traffic lights aren't there: the page's left edge,
     /// plus the inset the address keeps from the page's right edge, so both ends match.
     var leadingInset: CGFloat = Tokens.Sidebar.edge { didSet { if leadingInset != oldValue { needsLayout = true } } }
-    /// From the bar's trailing edge to the address's end, so the address ends where the page does.
+    /// From the bar's trailing edge to the address's end: where the page ends, or `Sidebar.edge` before it while the
+    /// bar is the top of the page's card (`insets`).
     var trailingInset: CGFloat = Tokens.Sidebar.edge { didSet { if trailingInset != oldValue { needsLayout = true } } }
 
     /// The sidebar's toggle, first after the traffic lights while the sidebar is hidden: the sidebar's own is out of
     /// sight with it then. Shown, the sidebar keeps it in its own top row.
     let sidebarButton = SidebarView.chromeButton("sidebar.left", toolTip: String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."))
     var showsSidebarButton = false { didSet { if showsSidebarButton != oldValue { refreshSidebarButton() } } }
-    /// While the sidebar slides back in, its toggle stays here where the sidebar's own will land (this far from the
-    /// window's left edge), still as the traffic lights, until the sidebar arrives with its own. Takes no room.
-    var heldSidebarButtonX: CGFloat? { didSet { if heldSidebarButtonX != oldValue { refreshSidebarButton() } } }
+    /// While the sidebar slides back in, its toggle stays here where the sidebar's own will land (this place in the
+    /// window), still as the traffic lights, until the sidebar arrives with its own. Takes no room.
+    var heldSidebarButtonOrigin: NSPoint? { didSet { if heldSidebarButtonOrigin != oldValue { refreshSidebarButton() } } }
 
     private func refreshSidebarButton() {
-        sidebarButton.isHidden = !showsSidebarButton && heldSidebarButtonX == nil
+        sidebarButton.isHidden = !showsSidebarButton && heldSidebarButtonOrigin == nil
         needsLayout = true
     }
 
@@ -115,9 +116,13 @@ final class TopBarView: NSView {
     /// Where the bar's controls start and end, from its own edges: the page's edges, pulled in by one inset on both
     /// ends, enough that the address never comes closer than `Sidebar.edge` to the window's edge. Framed, that's the
     /// page's edges themselves; borderless, the page meets the window, so they sit `Sidebar.edge` inside it.
-    static func insets(bar: NSRect, page: NSRect, window: NSRect) -> (leading: CGFloat, trailing: CGFloat) {
+    /// `onCard`: the bar is the top of the page's card, in the page's color. The card's right edge is then an edge
+    /// the address has to keep clear of too, framed as well: it ends `Sidebar.edge` before it. (The first button
+    /// needs nothing more: its glyph sits that far inside its target.) On the plain bar, over Settings or a PDF,
+    /// there's no such edge beside the address, and the frame's own inset is all the room it needs.
+    static func insets(bar: NSRect, page: NSRect, window: NSRect, onCard: Bool = false) -> (leading: CGFloat, trailing: CGFloat) {
         let inset = edgeInset(page: page, window: window)
-        return (page.minX - bar.minX + inset, bar.maxX - page.maxX + inset)
+        return (page.minX - bar.minX + inset, bar.maxX - page.maxX + (onCard ? Tokens.Sidebar.edge : inset))
     }
 
     // MARK: Split view
@@ -166,20 +171,26 @@ final class TopBarView: NSView {
         }
     }
 
+    /// How far below the bar's own top its row sits. While the sidebar slides, the bar is held over both where it was
+    /// and where it's going; when those differ in height (the frame comes back with the sidebar in full screen), the
+    /// row is where the bar will be, so the controls glide down or up with the page and nothing drops at the end.
+    var rowTop: CGFloat = 0 { didSet { if rowTop != oldValue { needsLayout = true } } }
+
     /// Each control showing here and where it goes.
     private var places: [(view: NSView, frame: NSRect)] {
         let frames = Self.frames(width: bounds.width, buttons: buttons.count, sidebarButton: showsSidebarButton,
                                  trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset, trailingInset: trailingInset)
         var places: [(view: NSView, frame: NSRect)] = []
-        if let toggle = frames.sidebarButton {
-            places.append((sidebarButton, toggle))
-        } else if let x = heldSidebarButtonX {
-            let b = Tokens.Sidebar.button
-            places.append((sidebarButton, NSRect(x: x - frame.minX, y: Self.height / 2 - b / 2, width: b, height: b)))
-        }
+        if let toggle = frames.sidebarButton { places.append((sidebarButton, toggle)) }
         for (button, rect) in zip(buttons, frames.buttons) where button.superview === self { places.append((button, rect)) }
         if let address, address.superview === self { places.append((address, frames.address)) }
         for (strip, place) in zip(strips, stripPlaces) where strip.superview === self { places.append((strip, place.frame)) }
+        places = places.map { ($0.view, $0.frame.offsetBy(dx: 0, dy: rowTop)) }
+        // Held for the sidebar's own: where that one lands in the window, whatever the bar's row is doing.
+        if frames.sidebarButton == nil, let origin = heldSidebarButtonOrigin {
+            let b = Tokens.Sidebar.button
+            places.append((sidebarButton, NSRect(x: origin.x - frame.minX, y: origin.y - frame.minY, width: b, height: b)))
+        }
         return places
     }
 
@@ -194,13 +205,9 @@ final class TopBarView: NSView {
 
     override func layout() {
         super.layout()
-        guard !isSliding else { return }
         for place in places { place.view.frame = place.frame }
         centerStripAddresses()
     }
-
-    /// While the controls glide (`slideControls`), layout leaves them to it.
-    private var isSliding = false
 
     /// Where each control showing is now, in the superview's terms: taken before the sidebar comes or goes.
     var controlPositions: [ObjectIdentifier: NSRect] {
@@ -209,28 +216,18 @@ final class TopBarView: NSView {
             .map { (ObjectIdentifier($0), $0.frame.offsetBy(dx: frame.minX, dy: frame.minY)) })
     }
 
-    /// In an animation, with the bar where it stays for it: each control glides from where it was (`old`, from
+    /// With the bar where it stays for the slide: each control glides from where it was (`old`, from
     /// `controlPositions`) to its new place, so none jumps as the sidebar comes or goes. One that wasn't showing
     /// (the sidebar's toggle) appears where it goes, and stays put there as the traffic lights do.
+    /// Each is in its new place at once and shown traveling there (`Motion.glide`), which says where it starts
+    /// rather than leaving that to where it was last drawn: the bar has just moved under them, so that would be
+    /// the wrong place, a sidebar's width off.
     func slideControls(from old: [ObjectIdentifier: NSRect], curve: Tokens.Motion.Curve) {
-        isSliding = true
-        let places = places
         centerStripAddresses()
         for place in places {
             let start = old[ObjectIdentifier(place.view)]?.offsetBy(dx: -frame.minX, dy: -frame.minY) ?? place.frame
             Tokens.Motion.withoutAnimation { place.view.frame = start }
+            Tokens.Motion.glide(place.view, to: place.frame, duration: curve.duration, timing: curve.timing, resizes: true)
         }
-        // From the next turn of the run loop, once they're drawn where they start: an animation begun in the same one
-        // starts from where they were last drawn instead, in the bar's old place.
-        DispatchQueue.main.async {
-            Tokens.Motion.animate(curve, evenFromKeyboard: true, moves: true) {
-                for place in places { place.view.animator().frame = place.frame }
-            }
-        }
-    }
-
-    func endSlide() {
-        isSliding = false
-        needsLayout = true
     }
 }

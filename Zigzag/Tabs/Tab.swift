@@ -61,6 +61,15 @@ final class Tab: NSObject {
     /// and its color as drawn. Nil until a page has been looked at; a page left alone (dark pages off there, a picture
     /// opened on its own) says it isn't darkened.
     private(set) var darkPage: DarkPages.State?
+    /// The page's own color, for what's drawn in it around the page: its card's ground and the bar above it. Its
+    /// background (a site's theme color can be its header's, and stay light on a page that turned dark), else its
+    /// theme color. None with no page, or under what covers it with a color of its own (a PDF, Settings).
+    var pageColor: NSColor? {
+        guard let webView, pdfViewer == nil, settingsView == nil else { return nil }
+        // Drawn dark by Zigzag: the page's own colors are still light underneath, so it's the color as drawn.
+        if let darkPage, darkPage.darkened, let color = darkPage.color { return color }
+        return webView.underPageBackgroundColor ?? themeColor
+    }
     private(set) var isLoading = false
     private(set) var progress: Double = 0
     private(set) var canGoBack = false

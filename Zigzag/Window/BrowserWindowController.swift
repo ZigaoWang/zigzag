@@ -891,19 +891,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         floatingDownloads.dismiss()
     }
 
-    /// The bar above the page in the shown page's color: its background (a site's theme color can be its header's,
-    /// and stay light on a page that turned dark), else its theme color. None over what covers the page (a PDF,
+    /// The bar above the page in the shown page's color (`Tab.pageColor`). None over what covers the page (a PDF,
     /// Settings, Reader), which has a color of its own: the bar is the plain one then.
     private func paintTopBar() {
         let covered = reader != nil && readerCard === root.card
-        root.paintTopBar(covered ? nil : Self.pageColor(of: shownTab))
-    }
-
-    static func pageColor(of tab: Tab?) -> NSColor? {
-        guard let tab, let webView = tab.webView, tab.pdfViewer == nil, tab.settingsView == nil else { return nil }
-        // Drawn dark by Zigzag: the page's own colors are still light underneath, so the bar takes the color as drawn.
-        if let dark = tab.darkPage, dark.darkened, let color = dark.color { return color }
-        return webView.underPageBackgroundColor ?? tab.themeColor
+        root.paintTopBar(covered ? nil : shownTab?.pageColor)
     }
 
     /// Where popovers that belong to the address bar (extension popups) open from: the address bar while the sidebar
@@ -1523,7 +1515,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // sidebar slides back in, the bar's stays where the sidebar's lands, and the sidebar's shows once it's there.
         let held = root.showsTopBar && holdsToggle
         root.topBar.showsSidebarButton = root.showsTopBar && !docked
-        root.topBar.heldSidebarButtonX = held && docked ? sidebar.sidebarButton.frame.minX : nil
+        root.topBar.heldSidebarButtonOrigin = held && docked
+            ? NSPoint(x: sidebar.sidebarButton.frame.minX, y: Tokens.Sidebar.lightsCenter + root.sidebarTopRowDrop - SidebarView.toolbarButton / 2) : nil
         sidebar.sidebarButton.alphaValue = held ? 0 : 1
         sidebar.sidebarButton.toolTip = Shortcuts.tooltip(docked ? String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows.")
                                                                   : String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."),
