@@ -54,6 +54,9 @@ final class PaneHeaderView: NSView {
         swap.symbol = vertical ? "arrow.up.arrow.down" : "arrow.left.arrow.right"
         swap.toolTip = vertical ? String(localized: "Swap Top and Bottom", comment: "Tooltip of a button in the strip on top of each page of a split view: swaps the two stacked pages.")
                               : String(localized: "Swap Sides", comment: "Tooltip of a button in the strip on top of each page of a split view: swaps the two pages.")
+        // The whole split's, not this page's: with its shortcut, as the window's own buttons say theirs.
+        close.toolTip = Shortcuts.tooltip(String(localized: "Separate Tabs", comment: "Tooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs."),
+                                          for: #selector(BrowserWindowController.closeSplitView(_:)))
     }
 
     func show(_ tab: Tab?) {
