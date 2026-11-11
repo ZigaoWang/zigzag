@@ -6,6 +6,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- Split view with the address bar above the page has one set of controls: each page's own bar moves into the top row, instead of repeating back, reload and the address. ([#97](https://github.com/ZigaoWang/zigzag/issues/97))
+- iCloud Passwords and other extensions that talk to an app on your Mac stay connected in every profile, instead of asking for a new code after a couple of minutes. ([#98](https://github.com/ZigaoWang/zigzag/issues/98))
 - Passwords… stays open until you pick a login or move on, instead of closing straight away. ([#96](https://github.com/ZigaoWang/zigzag/issues/96))
 - A pinned page you've opened shows under its folder even when the folder is shut, as in Arc. ([#94](https://github.com/ZigaoWang/zigzag/issues/94))
 - Holding ⌥⌘ and dragging moves the window from anywhere in it, Settings and an empty window included. ([#95](https://github.com/ZigaoWang/zigzag/issues/95))
