@@ -48,6 +48,39 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
       document.addEventListener('webkitfullscreenchange', soon);
       addEventListener('pagehide', () => { last = '[]'; post({ id, main, vw: innerWidth, vh: innerHeight, videos: [], gone: true }); });
       const finite = (v) => v && isFinite(v.duration);
+      const mark = 'data-zigzag-mini';
+      const css = `:not([${mark}]) { visibility: hidden !important; }
+        [${mark}]::before, [${mark}]::after { visibility: hidden !important; }
+        [${mark}="path"] { background: #000 !important; color: transparent !important; border-color: transparent !important;
+          box-shadow: none !important; outline: none !important; text-shadow: none !important; scrollbar-width: none !important; }
+        [${mark}="video"]::-webkit-media-controls { display: none !important; }`;
+      let isolated = null;
+      const unisolate = () => {
+        if (!isolated) return false;
+        for (const [e, before] of isolated.marked) { if (before === null) e.removeAttribute(mark); else e.setAttribute(mark, before); }
+        isolated.styles.forEach((s) => s.remove());
+        isolated = null;
+        return true;
+      };
+      const alone = (target) => {
+        if (!target) return false;
+        // Still alone where it was: nothing to do. Moved (a player laid out again elsewhere), it's done afresh.
+        let whole = isolated && isolated.target === target && target.getAttribute(mark) === 'video';
+        for (let e = target.parentElement; whole && e; e = e.parentElement) whole = e.getAttribute(mark) === 'path';
+        if (whole && target.isConnected) return true;
+        unisolate();
+        const marked = [], styles = [];
+        const put = (e, value) => { marked.push([e, e.getAttribute(mark)]); e.setAttribute(mark, value); };
+        const style = document.createElement('style');
+        style.setAttribute(mark, 'style');
+        style.textContent = css;
+        document.documentElement.appendChild(style);
+        styles.push(style);
+        put(target, 'video');
+        for (let e = target.parentElement; e; e = e.parentElement) put(e, 'path');
+        isolated = { target, marked, styles };
+        return true;
+      };
       window.__zigzagVideos = {
         report: () => { report(true); return true; },
         watch: (on) => { clearInterval(ticking); ticking = on ? setInterval(() => report(true), 250) : 0; if (on) report(true); return true; },
@@ -82,6 +115,20 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
           saved = null;
           return true;
         },
+        // Only the video shows while it's in the mini player: everything else on the page (the site's own player
+        // controls, its title and end cards, the article around it) is made invisible, without moving or resizing
+        // anything, so the page never reflows. The video and the elements it sits in stay, the latter on black.
+        // Called as often as the page reports; the same video again changes nothing.
+        isolate: (i) => alone(list[i]),
+        // A frame's video: the frame itself is what stays, found by where its content starts. A video's own controls
+        // (its controls attribute) are hidden by the style too: the card has its own.
+        isolateFrame: (x, y) => alone(Array.from(document.querySelectorAll('iframe')).find((f) => {
+          const r = f.getBoundingClientRect();
+          return Math.abs(r.left + f.clientLeft - x) <= 2 && Math.abs(r.top + f.clientTop - y) <= 2;
+        })),
+        // Everything exactly as it was: no marks, no style.
+        unisolate: () => unisolate(),
+        isolated: () => !!isolated,
         // The page's frames as it lays them out, so a frame's videos can be placed in it.
         frames: () => Array.from(document.querySelectorAll('iframe')).map((f) => {
           const r = f.getBoundingClientRect();
@@ -157,13 +204,14 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
 
     // MARK: Commands
 
-    /// Runs one of the script's commands in the frame, with its arguments in order.
+    /// Runs one of the script's commands in the frame (nil: the page itself, whether or not it has said anything),
+    /// with its arguments in order.
     @discardableResult
-    func run(_ command: String, _ arguments: [(String, Any)] = [], in frame: Frame, of webView: WKWebView) async -> Any? {
+    func run(_ command: String, _ arguments: [(String, Any)] = [], in frame: Frame?, of webView: WKWebView) async -> Any? {
         let names = arguments.map(\.0).joined(separator: ", ")
         let source = "return window.__zigzagVideos ? window.__zigzagVideos.\(command)(\(names)) : null;"
         let values = Dictionary(arguments, uniquingKeysWith: { a, _ in a })
-        return try? await webView.callAsyncJavaScript(source, arguments: values, in: frame.info, contentWorld: .defaultClient)
+        return try? await webView.callAsyncJavaScript(source, arguments: values, in: frame?.info, contentWorld: .defaultClient)
     }
 
     /// Where a frame's viewport starts in the page, in CSS pixels: none for the page itself.

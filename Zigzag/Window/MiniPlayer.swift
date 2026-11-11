@@ -22,6 +22,8 @@ final class MiniPlayer {
     private var tokens: [SignalToken] = []
     /// The video went missing: the player waits a moment for it (a page moving on to the next video), then goes.
     private var lostWait: DispatchWorkItem?
+    /// The frame whose video is shown alone (`isolate`), to give back as it was.
+    private var isolatedFrame: PageVideos.Frame?
 
     init(controller: BrowserWindowController) {
         self.controller = controller
@@ -147,6 +149,7 @@ final class MiniPlayer {
             if !frame.isMain, let origin = await PageVideos.shared.origin(of: frame, in: webView) { self.frameOrigin = origin; self.place() }
             _ = await PageVideos.shared.run("reveal", [("i", video.index)], in: frame, of: webView)
             _ = await PageVideos.shared.run("watch", [("on", true)], in: frame, of: webView)
+            self.isolate()
         }
     }
 
@@ -156,9 +159,13 @@ final class MiniPlayer {
         lostWait?.cancel()
         lostWait = nil
         tokens = []
-        let webView = webView, frame = currentFrame
-        if let webView, let frame {
+        let webView = webView, frame = currentFrame, isolated = isolatedFrame
+        isolatedFrame = nil
+        if let webView {
             Task {
+                // The page whole again first: it's going back on screen.
+                if let isolated { await Self.unisolate(isolated, in: webView) }
+                guard let frame else { return }
                 _ = await PageVideos.shared.run("watch", [("on", false)], in: frame, of: webView)
                 _ = await PageVideos.shared.run("restore", in: frame, of: webView)
             }
@@ -182,6 +189,28 @@ final class MiniPlayer {
         } else {
             webView.pauseAllMediaPlayback(completionHandler: nil)
         }
+    }
+
+    /// Shows only the video in its page (the site's own controls and overlays, and the page around it, made
+    /// invisible), and with a frame's video, only that frame in the page. Called as the page reports; the same video
+    /// again changes nothing, and a new one (the page replaced it, an ad ended) is shown alone in its place.
+    private func isolate() {
+        guard let webView, let frame = currentFrame else { return }
+        let index = videoIndex, origin = frameOrigin, previous = isolatedFrame
+        isolatedFrame = frame
+        Task { [weak self] in
+            if let previous, previous.id != frame.id { await Self.unisolate(previous, in: webView) }
+            guard self?.webView === webView else { return }
+            _ = await PageVideos.shared.run("isolate", [("i", index)], in: frame, of: webView)
+            guard !frame.isMain, self?.webView === webView else { return }
+            _ = await PageVideos.shared.run("isolateFrame", [("x", origin.x), ("y", origin.y)], in: nil, of: webView)
+        }
+    }
+
+    /// The page exactly as it was: the frame's video, and the page around a frame.
+    private static func unisolate(_ frame: PageVideos.Frame, in webView: WKWebView) async {
+        _ = await PageVideos.shared.run("unisolate", in: frame, of: webView)
+        if !frame.isMain { _ = await PageVideos.shared.run("unisolate", in: nil, of: webView) }
     }
 
     private func command(_ name: String, _ arguments: [(String, Any)] = []) {
@@ -231,6 +260,7 @@ final class MiniPlayer {
         video = found
         card?.update(found)
         place()
+        isolate()
         // A frame moves with its page: its place is asked again as it reports.
         if let frame = currentFrame, !frame.isMain {
             Task { [weak self] in
