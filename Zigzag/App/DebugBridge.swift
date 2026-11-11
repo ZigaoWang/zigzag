@@ -392,6 +392,24 @@ enum DebugBridge {
         if name == "pinhover" { SitePanel.shown?.debugHover(arg); return }
         if name.hasPrefix("mp") { runMiniPlayer(name, arg, in: controller); return }
         if name == "pageprobe" { pageProbe(arg); return }
+        if name == "speval" {
+            // speval <path> <script>: the script's result in the side panel's page, which it may await, written to
+            // the file with the panel's address; without bringing the window forward.
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            guard f.count == 2, let webView = controller.root.sidePanel.webView else {
+                if let path = f.first { try? "no side panel".write(toFile: path, atomically: true, encoding: .utf8) }
+                return
+            }
+            Task {
+                let text: String
+                do {
+                    let result = try await webView.callAsyncJavaScript(f[1], arguments: [:], in: nil, contentWorld: .page)
+                    text = String(describing: result ?? "nil")
+                } catch { text = "error: \(error)" }
+                try? "\(webView.url?.absoluteString ?? "-")\n\(text)".write(toFile: f[0], atomically: true, encoding: .utf8)
+            }
+            return
+        }
         if name.hasPrefix("popupwin") { popupWindow(name, arg); return }
         NSApp.activate()
         controller.window?.makeKeyAndOrderFront(nil)
