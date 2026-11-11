@@ -799,46 +799,27 @@ final class PanelTile: GlassTile {
     }
 }
 
-/// "This site"'s settings as one card, the way Settings groups its rows: a quiet fill, hairlines between that start
-/// where the text does.
+/// "This site"'s settings: plain rows on the panel itself, separated by space alone, no card and no lines.
 final class PanelGroup: NSView {
     var rows: [PanelRow] = [] {
         didSet {
             oldValue.forEach { $0.removeFromSuperview() }
-            lines.forEach { $0.removeFromSuperview() }
-            lines = rows.dropFirst().map { _ in ColorView(color: Tokens.Color.separator) }
-            (rows + lines).forEach { addSubview($0) }
+            rows.forEach { addSubview($0) }
             needsLayout = true
         }
     }
-    private var lines: [ColorView] = []
-    private let fill = ColorView(color: Tokens.Color.fieldFill)
 
     var height: CGFloat { CGFloat(rows.count) * PanelRow.height }
     /// The room left under the last row's words inside its row: the panel's bottom margin counts from the words,
     /// as its top does, so this much less is added there.
     var bottomSlack: CGFloat { rows.last.map { (PanelRow.height - $0.contentHeight) / 2 } ?? 0 }
 
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        // Plain rows on the panel itself, no card behind them: space and a hairline between them are enough.
-        fill.isHidden = true
-        addSubview(fill)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
     override func layout() {
         super.layout()
-        fill.frame = bounds
-        let inset: CGFloat = 0
         for (i, row) in rows.enumerated() {
-            row.frame = NSRect(x: inset, y: CGFloat(i) * PanelRow.height, width: bounds.width - inset * 2, height: PanelRow.height)
-        }
-        for (i, line) in lines.enumerated() {
-            let x = inset
-            line.frame = NSRect(x: x, y: CGFloat(i + 1) * PanelRow.height, width: bounds.width - x, height: Tokens.Metric.hairline)
+            row.frame = NSRect(x: 0, y: CGFloat(i) * PanelRow.height, width: bounds.width, height: PanelRow.height)
         }
     }
 }
