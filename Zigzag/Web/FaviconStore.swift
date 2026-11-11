@@ -410,16 +410,26 @@ enum SnapshotStore {
 
     static func load(_ id: UUID) -> NSImage? {
         if let image = memory[id] { return image }
-        guard let image = NSImage(contentsOf: file(id)) else { return nil }
+        let url = file(id)
+        guard let image = NSImage(contentsOf: url) else { return nil }
         // Whether it's blank, from the file's small thumbnail: the picture itself stays undecoded until it's shown.
-        if let source = CGImageSourceCreateWithURL(file(id) as CFURL, nil),
-           let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true,
-                                                                            kCGImageSourceThumbnailMaxPixelSize: 128] as CFDictionary) {
-            TabThumbnailView.remember(image, blank: TabThumbnailView.isBlank(thumbnail))
+        // Worked out off the main thread: every restored tab reads its picture as Zigzag opens (#89).
+        nonisolated(unsafe) let shown = image
+        DispatchQueue.global(qos: .utility).async {
+            guard let blank = blankness(ofFile: url) else { return }
+            DispatchQueue.main.async { MainActor.assumeIsolated { TabThumbnailView.remember(shown, blank: blank) } }
         }
         // Read back from disk, it counts toward the limit like a fresh one, so the cache never grows without end.
         remember(image, for: id)
         return image
+    }
+
+    /// Whether the picture in a file is blank, from a small thumbnail of it.
+    nonisolated static func blankness(ofFile url: URL) -> Bool? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                                                               kCGImageSourceThumbnailMaxPixelSize: 128] as CFDictionary) else { return nil }
+        return TabThumbnailView.isBlank(thumbnail)
     }
 
     private static func remember(_ image: NSImage, for id: UUID) {

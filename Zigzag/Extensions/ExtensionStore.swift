@@ -244,6 +244,25 @@ enum ExtensionStore {
     /// registration files directly, before anything starts WebKit: only rows whose script is an extension's, so
     /// sites keep their workers and extensions keep what they stored. A layout WebKit has changed is left alone, and
     /// the extensions log says so, since backgrounds may then stop starting again.
+    ///
+    /// Every profile's store holds a folder for each site, often thousands, so at launch it's done off the main thread
+    /// (`forgetServiceWorkerRegistrationsInBackground`), and a store being made waits for it.
+    nonisolated static func forgetServiceWorkerRegistrationsInBackground(in stores: [URL]) {
+        forgetting.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            for store in stores { forgetServiceWorkerRegistrations(in: store) }
+            forgetting.leave()
+        }
+    }
+
+    nonisolated private static let forgetting = DispatchGroup()
+
+    /// Before WebKit opens a store: waits for the registrations to be forgotten, a few seconds at most, as it did
+    /// before on the main thread at launch. Nothing to wait for once they are.
+    nonisolated static func waitForServiceWorkersForgotten() {
+        _ = forgetting.wait(timeout: .now() + 3)
+    }
+
     nonisolated static func forgetServiceWorkerRegistrations(in websiteData: URL = defaultWebsiteData) {
         let files = FileManager.default
         for partition in (try? files.contentsOfDirectory(at: websiteData, includingPropertiesForKeys: nil)) ?? [] {
@@ -1214,15 +1233,53 @@ extension ExtensionStore {
     /// the prelude first. The package keeps its exact bytes either way.
     /// `folder`: where the profile loading it keeps this extension's own files. Each profile has its loaded copy
     /// there, since Zigzag writes into it (user scripts' code) for that profile alone.
-    static func loadDirectory(for id: String, copyIn folder: URL) -> URL? {
+    ///
+    /// Making that folder (the first launch after an update, in each profile) links every file of the package and
+    /// reads and rewrites its scripts: done off the main thread, which it held up for seconds (#89).
+    static func loadDirectory(for id: String, copyIn folder: URL) async -> URL? {
         guard let package = packageDirectory(for: id), let state = self.package(id) else { return nil }
         let shim = ExtensionShims.shim(for: id)
         let prelude = shim?.backgroundPrelude
-        let patches = shim?.patches ?? []
+        let patches = (shim?.patches ?? []).map { OverlayPatch(file: $0.file, find: $0.find, replace: $0.replace) }
         guard prelude != nil || !patches.isEmpty else { return package }
         let overlay = overlayFolder(in: folder, version: state.version)
         // What this overlay was made from: rebuilt whenever the prelude, a patch or the language fill changes.
         let signature = (prelude ?? "") + patches.map { $0.file + $0.find + $0.replace }.joined() + languageFill
+        // Asked for twice at once (a profile's extensions starting as one is added): made once.
+        if let making = overlaysMaking[overlay.path] { return await making.value }
+        let fill = fills
+        let making = Task.detached(priority: .userInitiated) {
+            makeOverlay(overlay, from: package, prelude: prelude, patches: patches, signature: signature, fill: fill, id: id)
+        }
+        overlaysMaking[overlay.path] = making
+        let made = await making.value
+        overlaysMaking[overlay.path] = nil
+        return made
+    }
+
+    private static var overlaysMaking: [String: Task<URL?, Never>] = [:]
+
+    /// One of a shim's patches, as plain text for making an overlay off the main thread.
+    nonisolated struct OverlayPatch: Sendable {
+        let file: String
+        let find: String
+        let replace: String
+    }
+
+    /// What scripts are given at their top (`filled`), for use off the main thread.
+    nonisolated struct Fills: Sendable {
+        let language: String
+        let webLocks: String
+        let webLocksMark: String
+    }
+
+    private static var fills: Fills {
+        Fills(language: languageFill, webLocks: ExtensionBridgeScript.webLocks, webLocksMark: ExtensionBridgeScript.webLocksMark)
+    }
+
+    /// The overlay, made afresh unless it's already the one `signature` describes; the package itself if it can't be.
+    nonisolated private static func makeOverlay(_ overlay: URL, from package: URL, prelude: String?, patches: [OverlayPatch],
+                                                signature: String, fill: Fills, id: String) -> URL? {
         let marker = overlay.appendingPathComponent("zigzag-profile.txt")
         if (try? String(contentsOf: marker, encoding: .utf8)) == signature { return overlay }
         try? FileManager.default.removeItem(at: overlay.deletingLastPathComponent())
@@ -1236,7 +1293,7 @@ extension ExtensionStore {
         for file in Array(NSOrderedSet(array: patches.map(\.file))) as? [String] ?? [] {
             apply(patches.filter { $0.file == file }, to: file, in: overlay, from: package, id: id)
         }
-        fillLanguage(in: overlay)
+        fillLanguage(in: overlay, fill: fill)
         try? signature.write(to: marker, atomically: true, encoding: .utf8)
         return overlay
     }
@@ -1262,11 +1319,11 @@ extension ExtensionStore {
 
     /// Puts `languageFill` at the top of the overlay's scripts that need it, after a "use strict" that opens the file
     /// (it must stay first to count). A script already patched is a copy; the rest become copies here.
-    private static func fillLanguage(in overlay: URL) {
+    nonisolated private static func fillLanguage(in overlay: URL, fill: Fills) {
         let fm = FileManager.default
         guard let enumerator = fm.enumerator(at: overlay, includingPropertiesForKeys: nil) else { return }
         for case let file as URL in enumerator where ["js", "mjs"].contains(file.pathExtension) {
-            guard let text = try? String(contentsOf: file, encoding: .utf8), let filled = filled(text) else { continue }
+            guard let text = try? String(contentsOf: file, encoding: .utf8), let filled = filled(text, with: fill) else { continue }
             // A new file in place of the link, so the package's own stays exactly as it came.
             try? fm.removeItem(at: file)
             try? filled.write(to: file, atomically: true, encoding: .utf8)
@@ -1276,13 +1333,15 @@ extension ExtensionStore {
     /// A script with what it needs in front of it, or nil if it needs nothing. A dedicated worker gets no prelude, and
     /// a lock request from one kills the extension's process, so a script that names navigator.locks brings the
     /// stand-in with it; on a page or background that already has it, it does nothing.
-    static func filled(_ text: String) -> String? {
+    static func filled(_ text: String) -> String? { filled(text, with: fills) }
+
+    nonisolated static func filled(_ text: String, with fills: Fills) -> String? {
         // Foundation's search: the standard library's `contains` walks a megabyte of script a character at a time,
         // which held Zigzag up for most of a second as an extension was set up (#89).
         func has(_ word: String) -> Bool { text.range(of: word, options: .literal) != nil }
         var fill = ""
-        if has("Symbol.dispose") || has("Symbol.asyncDispose"), !text.hasPrefix(languageFill) { fill += languageFill }
-        if has("navigator.locks"), !has(ExtensionBridgeScript.webLocksMark) { fill += "\n" + ExtensionBridgeScript.webLocks + "\n" }
+        if has("Symbol.dispose") || has("Symbol.asyncDispose"), !text.hasPrefix(fills.language) { fill += fills.language }
+        if has("navigator.locks"), !has(fills.webLocksMark) { fill += "\n" + fills.webLocks + "\n" }
         guard !fill.isEmpty else { return nil }
         for directive in ["\"use strict\";", "'use strict';"] where text.hasPrefix(directive) {
             return directive + fill + String(text.dropFirst(directive.count))
@@ -1290,8 +1349,9 @@ extension ExtensionStore {
         return fill + "\n" + text
     }
 
+
     /// A patched file is a real copy (the package's stays as it was); its link in the overlay is replaced.
-    private static func apply(_ patches: [ExtensionShims.Patch], to file: String, in overlay: URL, from package: URL, id: String) {
+    nonisolated private static func apply(_ patches: [OverlayPatch], to file: String, in overlay: URL, from package: URL, id: String) {
         let source = package.appendingPathComponent(file), target = overlay.appendingPathComponent(file)
         guard var text = try? String(contentsOf: source, encoding: .utf8) else { return }
         for patch in patches {
@@ -1305,7 +1365,7 @@ extension ExtensionStore {
         try? text.write(to: target, atomically: true, encoding: .utf8)
     }
 
-    private static func linkTree(from source: URL, to target: URL) -> Bool {
+    nonisolated private static func linkTree(from source: URL, to target: URL) -> Bool {
         let fm = FileManager.default
         // The enumerator answers with links resolved (/tmp is /private/tmp): so must the root, for paths to line up.
         let source = source.resolvingSymlinksInPath()
@@ -1326,7 +1386,7 @@ extension ExtensionStore {
         return true
     }
 
-    private static func writeOverlayManifest(in overlay: URL, from package: URL, prelude: String) -> Bool {
+    nonisolated private static func writeOverlayManifest(in overlay: URL, from package: URL, prelude: String) -> Bool {
         guard let data = try? Data(contentsOf: package.appendingPathComponent("manifest.json")),
               var manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               var background = manifest["background"] as? [String: Any],

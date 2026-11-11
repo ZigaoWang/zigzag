@@ -15,6 +15,8 @@ final class Profile {
     /// opened, so a profile that's only listed (in Settings, in a menu) doesn't get one.
     var store: WKWebsiteDataStore {
         if let madeStore { return madeStore }
+        // Its extensions' service workers are forgotten before WebKit reads them (started at launch, off the main thread).
+        ExtensionStore.waitForServiceWorkersForgotten()
         let store: WKWebsiteDataStore = isDefault ? .default() : WKWebsiteDataStore(forIdentifier: id)
         WebKitSetup.allowCrossSiteCookies(in: store)
         madeStore = store

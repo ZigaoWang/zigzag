@@ -379,3 +379,75 @@ struct DarkPagesReinstallTests {
         #expect(Date().timeIntervalSince(started) < 0.5)
     }
 }
+
+/// What Zigzag did on the main thread as it opened, done off it (#89).
+@MainActor struct LaunchWorkTests {
+    private func folder() throws -> URL {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-launch-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
+    @Test func serviceWorkersAreForgottenOffTheMainThreadBeforeAStoreIsMade() throws {
+        let root = try folder()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let workers = root.appendingPathComponent("partition/origin/ServiceWorkers", isDirectory: true)
+        try FileManager.default.createDirectory(at: workers, withIntermediateDirectories: true)
+        let file = workers.appendingPathComponent("ServiceWorkerRegistrations-8.sqlite3")
+        var db: OpaquePointer?
+        sqlite3_open(file.path, &db)
+        sqlite3_exec(db, "CREATE TABLE Records(key TEXT, scriptURL TEXT)", nil, nil, nil)
+        sqlite3_exec(db, "INSERT INTO Records VALUES('0', 'webkit-extension://abc/zigzag-entry.js'), ('1', 'https://example.com/sw.js')", nil, nil, nil)
+        sqlite3_close(db)
+
+        ExtensionStore.forgetServiceWorkerRegistrationsInBackground(in: [root])
+        // What a store being made waits for.
+        ExtensionStore.waitForServiceWorkersForgotten()
+
+        sqlite3_open(file.path, &db)
+        var statement: OpaquePointer?
+        sqlite3_prepare_v2(db, "SELECT scriptURL FROM Records", -1, &statement, nil)
+        var left: [String] = []
+        while sqlite3_step(statement) == SQLITE_ROW { left.append(String(cString: sqlite3_column_text(statement, 0))) }
+        sqlite3_finalize(statement)
+        sqlite3_close(db)
+        #expect(left == ["https://example.com/sw.js"])
+    }
+
+    @Test func nothingToWaitForOnceDone() {
+        let started = Date()
+        ExtensionStore.waitForServiceWorkersForgotten()
+        #expect(Date().timeIntervalSince(started) < 0.5)
+    }
+
+    private func jpeg(_ draw: (CGContext) -> Void, to url: URL) {
+        let context = CGContext(data: nil, width: 200, height: 120, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        draw(context)
+        let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.jpeg" as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, context.makeImage()!, nil)
+        CGImageDestinationFinalize(destination)
+    }
+
+    @Test func aPictureOnDiskIsToldBlankOrNotWithoutTheMainThread() throws {
+        let root = try folder()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let blank = root.appendingPathComponent("blank.jpg"), page = root.appendingPathComponent("page.jpg")
+        jpeg({ $0.setFillColor(gray: 1, alpha: 1); $0.fill(CGRect(x: 0, y: 0, width: 200, height: 120)) }, to: blank)
+        jpeg({ context in
+            context.setFillColor(gray: 1, alpha: 1); context.fill(CGRect(x: 0, y: 0, width: 200, height: 120))
+            context.setFillColor(red: 0.1, green: 0.2, blue: 0.8, alpha: 1)
+            for i in 0..<10 { context.fill(CGRect(x: i * 20, y: 0, width: 10, height: 120)) }
+        }, to: page)
+        #expect(SnapshotStore.blankness(ofFile: blank) == true)
+        #expect(SnapshotStore.blankness(ofFile: page) == false)
+        #expect(SnapshotStore.blankness(ofFile: root.appendingPathComponent("none.jpg")) == nil)
+    }
+
+    @Test func scriptsAreFilledTheSameOffTheMainThread() {
+        let fills = ExtensionStore.Fills(language: "/*fill*/", webLocks: "/*locks*/", webLocksMark: "zigzag.webLocks")
+        #expect(ExtensionStore.filled("'use strict';Symbol.dispose", with: fills) == "'use strict';/*fill*/Symbol.dispose")
+        #expect(ExtensionStore.filled("navigator.locks.query()", with: fills) == "\n/*locks*/\n\nnavigator.locks.query()")
+        #expect(ExtensionStore.filled("const a = 1;", with: fills) == nil)
+    }
+}

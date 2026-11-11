@@ -35,12 +35,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UpdateBackup.restoreIfAsked()
             // Site permissions kept by host alone become per origin before any page can ask.
             SitePermissions.migrateHostOnlyAnswers()
-            // Extensions' service worker backgrounds start afresh, as in Chrome, before WebKit reads their registrations.
-            ExtensionStore.forgetServiceWorkerRegistrations()
-            // In every profile's store, each before WebKit has opened it.
-            for profile in Library.shared.profiles where !profile.isDefault {
-                ExtensionStore.forgetServiceWorkerRegistrations(in: ExtensionStore.websiteData(ofStore: profile.id))
-            }
+            // Extensions' service worker backgrounds start afresh, as in Chrome, before WebKit reads their registrations:
+            // in every profile's store, each before WebKit has opened it. Off the main thread, while launch goes on; a
+            // store waits for it as it's first made (Profile.store).
+            let stores = [ExtensionStore.defaultWebsiteData]
+                + Library.shared.profiles.filter { !$0.isDefault }.map { ExtensionStore.websiteData(ofStore: $0.id) }
+            ExtensionStore.forgetServiceWorkerRegistrationsInBackground(in: stores)
             Library.shared.pruneProfileAssignments()
             Profiles.finishRemovals()
         }

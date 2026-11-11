@@ -303,7 +303,7 @@ final class ExtensionHost: NSObject {
     @discardableResult
     func load(_ id: String) async -> WKWebExtensionContext? {
         if let existing = context(for: id) { return existing }
-        guard let directory = profile.installs.loadDirectory(for: id) else { return nil }
+        guard let directory = await profile.installs.loadDirectory(for: id) else { return nil }
         do {
             let ext = try await WKWebExtension(resourceBaseURL: directory)
             // Asked for twice at once (the profile's extensions starting as one is added): the first to finish stands.

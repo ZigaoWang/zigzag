@@ -54,7 +54,7 @@ final class ExtensionInstalls {
     private func stateFile(for id: String) -> URL { folder(for: id).appendingPathComponent("state.json") }
 
     /// The folder WebKit loads this extension from, in this profile.
-    func loadDirectory(for id: String) -> URL? { ExtensionStore.loadDirectory(for: id, copyIn: folder(for: id)) }
+    func loadDirectory(for id: String) async -> URL? { await ExtensionStore.loadDirectory(for: id, copyIn: folder(for: id)) }
 
     /// This profile's loaded copy, where Zigzag may add files of its own; nil when WebKit loads the package itself.
     func overlayDirectory(for id: String) -> URL? { ExtensionStore.overlayDirectory(for: id, copyIn: folder(for: id)) }
