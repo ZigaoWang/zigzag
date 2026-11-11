@@ -226,11 +226,14 @@ final class SidebarListView: NSView {
         // The right page of a pinned split rides in its left page's row, as a split among tabs does.
         let riders = Set(Library.shared.pinnedSplits(in: spaceID).map(\.right))
         let current = manager.selectedTab?.bookmarkID.map(Self.rowID)
+        // A pinned page that's open shows even inside a shut folder or a collapsed section, as in Arc: you see what's
+        // open without opening every folder on the way to it. The page you're on is always open.
+        let shown: (UUID) -> Bool = { id in id == current || manager.bookmarkTab(for: id) != nil }
         if collapsed {
-            result += bookmarks.filter { $0.id == current }.map { .bookmark($0.id) }
+            result += bookmarks.filter { shown($0.id) }.map { .bookmark($0.id) }
         } else {
             // A folder sits where its first page is, its pages and subfolders after it, each level set in one step. A shut
-            // folder hides all that's inside it but the page you're on. An empty folder sits at the top of where it is,
+            // folder hides all that's inside it but its pages that are open. An empty folder sits at the top of where it is,
             // where you'll see it and can drop pages in.
             var folderOf: [UUID: UUID] = [:]
             for folder in folders { for id in folder.bookmarkIDs { folderOf[id] = folder.id } }
@@ -266,7 +269,7 @@ final class SidebarListView: NSView {
                 while !stack.isEmpty, stack.count > chain.count || Array(chain.prefix(stack.count)) != stack { stack.removeLast() }
                 for id in chain.dropFirst(stack.count) { enter(id) }
                 if let shut = firstShut {
-                    guard bookmark.id == current else { continue }
+                    guard shown(bookmark.id) else { continue }
                     result.append(.bookmark(bookmark.id)); rowDepth[.bookmark(bookmark.id)] = shut + 1
                 } else {
                     result.append(.bookmark(bookmark.id)); rowDepth[.bookmark(bookmark.id)] = stack.count
