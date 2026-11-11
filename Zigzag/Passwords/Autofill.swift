@@ -423,6 +423,19 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         let request = target
         let rect = overlay.convert(target.webView.convert(field, to: nil), from: nil)
         hide()
+        // The Mac's AutoFill panel on the page's own field, with this site's logins first. Without it, the list
+        // opened on native fields laid over the page.
+        guard SystemAutoFillPanel.isAvailable else { openSystemList(over: rect, in: overlay, for: request); return }
+        Task {
+            if await SystemAutoFillPanel.open(in: request.webView, frame: request.frame, origin: request.origin, inFront: Self.isInFront) { return }
+            // It couldn't be asked for, and it's still the page in front, on its site: the list over the field, as before.
+            guard Origin(request.webView.url) == request.origin, Self.isInFront(request.webView) else { return }
+            self.openSystemList(over: rect, in: overlay, for: request)
+        }
+    }
+
+    /// Passwords… without the Mac's AutoFill panel: its list of passwords, opened on native fields over the page's.
+    private func openSystemList(over rect: NSRect, in overlay: NSView, for request: (webView: BrowserWebView, frame: WKFrameInfo, origin: Origin)) {
         systemRequest = request
         SystemPasswordPicker.shared.present(over: rect, in: overlay, restoringFocusTo: request.webView) { [weak self] outcome in
             guard let self else { return }
@@ -531,6 +544,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         return /first.?name|last.?name|full.?name|your.?name|^name$|e-?mail|phone|mobile|address|street|city|zip|postal|postcode|company|organi[sz]ation/i.test(hint.trim());
       };
       const report = (el) => {
+        // The field the menu is for, should Passwords… open the Mac's panel on it (SystemAutoFillPanel).
+        window.__zigzagField = new WeakRef(el);
         const r = el.getBoundingClientRect();
         post({ kind: 'focus', isForm: formField(el), isNew: isNew(el) && !el.value, rules: el.getAttribute('passwordrules') || '',
                minLength: el.minLength, maxLength: el.maxLength, rect: { x: r.left, y: r.top, w: r.width, h: r.height } });

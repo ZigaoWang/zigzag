@@ -4,7 +4,9 @@ import WebKit
 /// "Passwords…" in the password menu: the Mac's own list of passwords, from the Passwords app and the password
 /// manager apps that fill across the Mac (1Password, Dashlane, Bitwarden and the like), as Orion offers it.
 ///
-/// macOS has no way for a browser to ask it for a website's password, so this goes the one way there is: a pair of
+/// On macOS 27 Passwords… opens the Mac's AutoFill panel on the page's field itself (`SystemAutoFillPanel`); this is
+/// what's left before that, or when the panel can't be asked for. Here macOS has no way for a browser to ask it for a
+/// website's password, so this goes the one way there is: a pair of
 /// native fields marked username and password, laid over the page's field all but transparent, is focused and asked
 /// for passwords, as Edit › AutoFill › Passwords… does in any app. You pick a login in the system's list (it asks
 /// for Touch ID), macOS fills the two fields, and they're read, emptied and taken away at once. The login goes into
@@ -227,6 +229,54 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
             return fields.contains { $0 === delegate }
         }
         return false
+    }
+}
+
+/// macOS 27 and later: the Mac's own AutoFill panel, opened on the page's field itself, as the page's right-click
+/// AutoFill › Passwords… does. Pointed at the web field, macOS knows the page's site, so the panel puts that site's
+/// logins first ("Suggested") and fills the one you pick straight into the field.
+///
+/// The menu item sends `_handleInsertFromPasswordsCommand:` up the responder chain; WKWebView doesn't answer it, so
+/// NSApplication does, presenting the panel for the text input in focus (AppKit's NSAutoFillHeuristicController).
+/// Zigzag sends the same command, to NSApplication, with the page's field focused.
+@MainActor
+enum SystemAutoFillPanel {
+    static var command: Selector { SystemPasswordPicker.passwordsCommand }
+
+    /// The panel can be asked for here. Off before macOS 27, where only the fields laid over the page work.
+    static var isAvailable: Bool {
+        guard #available(macOS 27, *) else { return false }
+        return NSApp.responds(to: command)
+    }
+
+    /// Puts the cursor back in the field the menu was for, without bringing Zigzag's menu up again.
+    static let focuser = """
+    if (location.origin !== expectedOrigin) return false;
+    const el = window.__zigzagField && window.__zigzagField.deref();
+    if (!el || !el.isConnected || el.disabled || el.readOnly) return false;
+    window.__zigzagFilling = true;
+    try { if (document.activeElement !== el) el.focus({ preventScroll: true }); }
+    finally { setTimeout(() => { window.__zigzagFilling = false; }, 0); }
+    return document.activeElement === el;
+    """
+
+    /// Opens the panel at the field in `frame` of `webView`, if it's still `origin`'s page, in the tab in front, with
+    /// its window key. False when it couldn't be asked for (nothing was shown).
+    static func open(in webView: WKWebView, frame: WKFrameInfo?, origin: Origin, inFront: @MainActor (WKWebView) -> Bool) async -> Bool {
+        guard isAvailable, NSApp.isActive, let window = webView.window, window.isKeyWindow,
+              Origin(webView.url) == origin, inFront(webView) else {
+            debugLog("sysautofill not asked active=\(NSApp.isActive) key=\(webView.window?.isKeyWindow ?? false) front=\(inFront(webView))")
+            return false
+        }
+        if window.firstResponder !== webView, !window.makeFirstResponder(webView) { return false }
+        let focused = try? await webView.callAsyncJavaScript(focuser, arguments: ["expectedOrigin": origin.description], in: frame, contentWorld: .defaultClient) as? Bool
+        guard focused == true else { debugLog("sysautofill no field"); return false }
+        // WebKit tells AppKit about the focused field a moment after the page has it.
+        try? await Task.sleep(for: .milliseconds(120))
+        guard NSApp.isActive, window.isKeyWindow, window.firstResponder === webView, Origin(webView.url) == origin, inFront(webView) else { return false }
+        let sent = NSApp.sendAction(command, to: NSApp, from: nil)
+        debugLog("sysautofill sent=\(sent)")
+        return sent
     }
 }
 

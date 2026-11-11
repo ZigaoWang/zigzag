@@ -365,4 +365,23 @@ struct SystemPasswordsTests {
         _ = try await webView.callAsyncJavaScript("return 1", arguments: [:], in: nil, contentWorld: .defaultClient)
         #expect(heard.kinds.contains("focus"))
     }
+
+    // MARK: macOS 27: the Mac's AutoFill panel on the page's field
+
+    @Test func thePanelIsAskedForOnTheFieldTheMenuWasFor() async throws {
+        let (webView, _, _) = await page(form) { configuration in
+            configuration.userContentController.addUserScript(Autofill.script)
+        }
+        // The watcher keeps the field it reported; the cursor has gone elsewhere since.
+        _ = try await webView.callAsyncJavaScript("window.__zigzagField = new WeakRef(document.getElementById('p')); document.getElementById('u').focus()",
+                                                  arguments: [:], in: nil, contentWorld: .defaultClient)
+        let elsewhere = try await webView.callAsyncJavaScript(SystemAutoFillPanel.focuser, arguments: ["expectedOrigin": "https://other.example"], in: nil, contentWorld: .defaultClient) as? Bool
+        #expect(elsewhere == false)
+        let focused = try await webView.callAsyncJavaScript(SystemAutoFillPanel.focuser, arguments: ["expectedOrigin": "https://example.com"], in: nil, contentWorld: .defaultClient) as? Bool
+        #expect(focused == true)
+        #expect(try await webView.evaluateJavaScript("document.activeElement.id") as? String == "p")
+        // The page can't see or set the field it's kept by.
+        #expect(try await webView.evaluateJavaScript("typeof window.__zigzagField") as? String == "undefined")
+    }
+
 }
