@@ -85,6 +85,12 @@ enum CommandRanker {
         return words.allSatisfy { joined.contains($0) }
     }
 
+    /// A row for an open tab on one of Zigzag's own pages that a command listed with it already opens (Settings):
+    /// the command goes there too, so the row would only say the same thing twice.
+    static func repeatsCommand(_ url: URL?, offered actionIDs: Set<String>) -> Bool {
+        (SettingsPage.isSettings(url) && actionIDs.contains("settings")) || (HistoryPage.isHistory(url) && actionIDs.contains("history"))
+    }
+
     static func displayURL(_ url: URL) -> String {
         var text = url.absoluteString
         for prefix in ["https://", "http://"] where text.hasPrefix(prefix) { text.removeFirst(prefix.count) }
@@ -362,9 +368,11 @@ enum CommandRanker {
 
         if !historyOnly {
             var tabCount = 0
+            let offered = Set(matched.map(\.id))
             // Open pages of this profile: one typed for here never lands you in another profile's.
             for tab in (manager?.recentTabs ?? []) + (manager?.allTabs ?? []) where tabCount < 3 && tab.homeProfile === profile {
-                guard let url = tab.url, matches(words, tab.displayTitle, url.absoluteString) else { continue }
+                guard let url = tab.url, matches(words, tab.displayTitle, url.absoluteString),
+                      !repeatsCommand(url, offered: offered) else { continue }
                 let key = TabManager.normalize(url)
                 guard !seen.contains(key) else { continue }
                 add(CommandResult(kind: .switchTo(tab.id), title: tab.displayTitle, detail: displayURL(url), icon: tab.favicon), key: key)
