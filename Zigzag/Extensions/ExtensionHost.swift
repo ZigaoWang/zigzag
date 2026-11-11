@@ -1350,6 +1350,17 @@ final class NativeMessagingHost {
 
     static func manifest(named name: String) -> [String: Any]? {
         guard isValidName(name) else { return nil }
+        #if DEBUG
+        // A test copy (ZIGZAG_DATA_DIR) never reaches the helpers of the apps on this Mac (1Password, Apple's
+        // Passwords): only hosts in its own data folder, and none at all with ZIGZAG_BLOCK_NATIVE_MESSAGING=1.
+        let env = ProcessInfo.processInfo.environment
+        if env["ZIGZAG_BLOCK_NATIVE_MESSAGING"] == "1" { return nil }
+        if let data = env["ZIGZAG_DATA_DIR"], !data.isEmpty {
+            let file = URL(fileURLWithPath: data, isDirectory: true).appendingPathComponent("NativeMessagingHosts/\(name).json")
+            guard let bytes = try? Data(contentsOf: file) else { return nil }
+            return try? JSONSerialization.jsonObject(with: bytes) as? [String: Any]
+        }
+        #endif
         let home = FileManager.default.homeDirectoryForCurrentUser
         let dirs = [
             "Library/Application Support/Google/Chrome/NativeMessagingHosts",
