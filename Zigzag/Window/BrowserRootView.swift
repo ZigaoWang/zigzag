@@ -614,7 +614,6 @@ final class BrowserRootView: SpaceFrameView {
     /// Under the bar above the page, the top right corner meets the bar and the window's edge in a line, as the
     /// window's own corner would, so it's square too.
     private func windowCorners(of pane: NSRect, attached: Bool) -> (top: Bool, bottom: Bool) {
-        // Under a bar in the page's color, the bar's corners are the card's, so the page's own top corners are square.
         guard attached, pane.maxX >= bounds.maxX - 1 else { return (false, false) }
         let top = showsTopBar ? topBarFrame.maxY : bounds.minY
         return (pane.minY <= top + 1, pane.maxY >= bounds.maxY - 1)
