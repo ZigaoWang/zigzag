@@ -54,11 +54,27 @@ final class TabPreviewView: FloatingPanelView {
         picture.show(first, second, split: split)
         let empty = first == nil && second == nil
         placeholder.isHidden = !empty
+        Tokens.Motion.withoutAnimation { picture.layer.isHidden = empty }
+        refreshColors()
+    }
+
+    /// With no picture yet, a soft wash of the space under the site's icon instead of a blank white page, as the tab
+    /// switcher's cards have.
+    private func refreshColors() {
         Tokens.Motion.withoutAnimation {
-            picture.layer.isHidden = empty
             picture.divider.backgroundColor = cgColor(Tokens.Color.cardEdge)
-            imageClip.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
+            imageClip.layer?.backgroundColor = cgColor(placeholder.isHidden ? Tokens.Color.cardBackground : Brand.Theme.for(self).wash)
         }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        refreshColors()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshColors()
     }
 
     private func layoutContent() {
