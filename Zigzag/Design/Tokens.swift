@@ -832,19 +832,46 @@ enum Tokens {
         /// traveling there from wherever it's drawn right now. Smooth however busy the app is, and a move that
         /// changes course mid-way carries on from where it is on screen, never jumping back. For rows and tiles
         /// that make room for something being dragged.
+        /// `resizes`: a view that changes size on the way (the address, as the bar above the page gets wider or
+        /// narrower) is shown growing or shrinking to it too, rather than at its new size from the start. What's in
+        /// it goes with it: it's laid out for its new size at once, and the subviews that moves glide to their new
+        /// places as well, so one that keeps to its far edge (a button at the address's end) stays on that edge
+        /// all the way.
         static func glide(_ view: NSView, to frame: NSRect, duration: TimeInterval = standard,
-                          timing: CAMediaTimingFunction = easeInOut) {
+                          timing: CAMediaTimingFunction = easeInOut, resizes: Bool = false) {
             guard let layer = view.layer else { view.frame = frame; return }
+            let size = view.frame.size
             var shown = view.frame.origin
             if layer.animation(forKey: "glide") != nil, let drawn = layer.presentation()?.transform {
                 shown.x += drawn.m41
                 shown.y += drawn.m42
             }
-            withoutAnimation { view.frame = frame }
+            let resized = resizes && (abs(size.width - frame.width) > 0.5 || abs(size.height - frame.height) > 0.5)
+            let inside = resized ? view.subviews.filter { !$0.isHidden }.map { ($0, $0.frame) } : []
+            withoutAnimation {
+                view.frame = frame
+                if resized { view.layoutSubtreeIfNeeded() }
+            }
             layer.removeAnimation(forKey: "glide")
+            layer.removeAnimation(forKey: "glideSize")
+            guard !reduceMotion else { return }
+            for (subview, was) in inside where !subview.isHidden && subview.frame.origin != was.origin {
+                let place = subview.frame
+                withoutAnimation { subview.frame.origin = was.origin }
+                glide(subview, to: place, duration: duration, timing: timing)
+            }
+            if resized {
+                let grow = CABasicAnimation(keyPath: "bounds.size")
+                grow.fromValue = NSValue(size: size)
+                grow.toValue = NSValue(size: frame.size)
+                grow.duration = duration * debugSlowdown
+                grow.timingFunction = timing
+                grow.fillMode = .backwards
+                layer.add(grow, forKey: "glideSize")
+            }
             // A layer's y runs the way its view's superview does, so the offset carries over as it is.
             let dx = shown.x - frame.minX, dy = shown.y - frame.minY
-            guard !reduceMotion, abs(dx) > 0.5 || abs(dy) > 0.5 else { return }
+            guard abs(dx) > 0.5 || abs(dy) > 0.5 else { return }
             let animation = CABasicAnimation(keyPath: "transform")
             animation.fromValue = CATransform3DMakeTranslation(dx, dy, 0)
             animation.toValue = CATransform3DIdentity

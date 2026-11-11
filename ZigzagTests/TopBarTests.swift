@@ -90,12 +90,57 @@ struct TopBarTests {
         #expect(TopBarView.insets(bar: shown, page: borderless, window: window, onCard: true).trailing == Tokens.Sidebar.edge)
     }
 
+    /// Where a control gliding to its place (`Motion.glide`) is shown starting from, in its superview's terms; its
+    /// own frame when it isn't gliding.
+    private func glideStart(_ view: NSView) -> NSRect {
+        var start = view.frame
+        if let move = view.layer?.animation(forKey: "glide") as? CABasicAnimation, let from = (move.fromValue as? NSValue)?.caTransform3DValue {
+            start.origin.x += from.m41
+            start.origin.y += from.m42
+        }
+        if let grow = view.layer?.animation(forKey: "glideSize") as? CABasicAnimation, let from = grow.fromValue as? NSValue {
+            start.size = from.sizeValue
+        }
+        return start
+    }
+
+    @Test func heldOverBothPlacesTheRowIsWhereTheBarWillBe() {
+        // Full screen, framed: the sidebar comes back and the frame with it, so the bar moves the inset down. While
+        // it's held over both places its row is already at the lower one: the controls glide down with the page,
+        // and nothing drops when the bar takes its own frame at the end.
+        let parent = NSView(frame: window)
+        parent.wantsLayer = true
+        let topBar = TopBarView(frame: NSRect(x: 0, y: 0, width: 1280, height: bar))
+        parent.addSubview(topBar)
+        let buttons = (0..<3).map { _ in NSView() }, address = NSView()
+        (buttons + [address]).forEach { $0.wantsLayer = true }
+        topBar.hold(buttons: buttons, address: address)
+        topBar.layoutSubtreeIfNeeded()
+        let before = topBar.controlPositions
+        topBar.frame = NSRect(x: 0, y: 0, width: 1280, height: bar + inset)
+        topBar.rowTop = inset
+        topBar.slideControls(from: before, curve: Tokens.Motion.slide)
+        // In their new places at once, the inset lower, and shown starting from where they were.
+        let held = buttons[0].frame.minY
+        #expect(held == before[ObjectIdentifier(buttons[0])]!.minY + inset)
+        if !Tokens.Motion.reduceMotion {
+            for view in buttons + [address] { #expect(glideStart(view) == before[ObjectIdentifier(view)]) }
+        }
+        // The bar in its own frame, the inset down: the same place in the window.
+        topBar.frame = NSRect(x: 0, y: inset, width: 1280, height: bar)
+        topBar.rowTop = 0
+        topBar.layoutSubtreeIfNeeded()
+        #expect(topBar.frame.minY + buttons[0].frame.minY == held)
+    }
+
     @Test func asTheSidebarGoesTheControlsStartWhereTheyWere() {
         // The sidebar hides: the bar holds still over the whole width, and its controls start from where they were.
         let parent = NSView(frame: window)
+        parent.wantsLayer = true
         let topBar = TopBarView(frame: NSRect(x: 240, y: 0, width: 1040, height: bar))
         parent.addSubview(topBar)
         let buttons = (0..<3).map { _ in NSView() }, address = NSView()
+        (buttons + [address]).forEach { $0.wantsLayer = true }
         topBar.hold(buttons: buttons, address: address)
         topBar.layoutSubtreeIfNeeded()
         let before = topBar.controlPositions
@@ -104,15 +149,21 @@ struct TopBarTests {
         topBar.trafficLightsWidth = 52
         topBar.showsSidebarButton = true
         topBar.slideControls(from: before, curve: Tokens.Motion.slide)
-        for view in buttons + [address] {
-            #expect(view.frame.offsetBy(dx: topBar.frame.minX, dy: 0) == before[ObjectIdentifier(view)])
+        // Each is in its new place at once, so layout and clicks see the truth, and is shown gliding there from
+        // where it was: the address from its old width too.
+        let frames = TopBarView.frames(width: 1280, buttons: 3, sidebarButton: true, trafficLightsWidth: 52, trailingInset: Tokens.Sidebar.edge)
+        #expect(buttons.map(\.frame) == frames.buttons && address.frame == frames.address)
+        if !Tokens.Motion.reduceMotion {
+            for view in buttons + [address] {
+                #expect(glideStart(view).offsetBy(dx: topBar.frame.minX, dy: 0) == before[ObjectIdentifier(view)])
+            }
         }
         // The toggle, new, appears where it goes and stays there: by the lights, as in the sidebar.
-        let frames = TopBarView.frames(width: 1280, buttons: 3, sidebarButton: true, trafficLightsWidth: 52, trailingInset: Tokens.Sidebar.edge)
         #expect(!topBar.sidebarButton.isHidden && topBar.sidebarButton.frame == frames.sidebarButton)
-        // Layout leaves them to the slide until it ends.
+        #expect(topBar.sidebarButton.layer?.animation(forKey: "glide") == nil)
+        // Layout in the middle of it changes nothing.
         topBar.layoutSubtreeIfNeeded()
-        #expect(buttons[0].frame.minX == 240 + Tokens.Sidebar.edge)
+        #expect(buttons.map(\.frame) == frames.buttons)
     }
 
     @Test func narrowBarNeverGivesTheAddressANegativeWidth() {

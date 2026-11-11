@@ -171,6 +171,11 @@ final class TopBarView: NSView {
         }
     }
 
+    /// How far below the bar's own top its row sits. While the sidebar slides, the bar is held over both where it was
+    /// and where it's going; when those differ in height (the frame comes back with the sidebar in full screen), the
+    /// row is where the bar will be, so the controls glide down or up with the page and nothing drops at the end.
+    var rowTop: CGFloat = 0 { didSet { if rowTop != oldValue { needsLayout = true } } }
+
     /// Each control showing here and where it goes.
     private var places: [(view: NSView, frame: NSRect)] {
         let frames = Self.frames(width: bounds.width, buttons: buttons.count, sidebarButton: showsSidebarButton,
@@ -185,7 +190,7 @@ final class TopBarView: NSView {
         for (button, rect) in zip(buttons, frames.buttons) where button.superview === self { places.append((button, rect)) }
         if let address, address.superview === self { places.append((address, frames.address)) }
         for (strip, place) in zip(strips, stripPlaces) where strip.superview === self { places.append((strip, place.frame)) }
-        return places
+        return places.map { ($0.view, $0.frame.offsetBy(dx: 0, dy: rowTop)) }
     }
 
     private var stripPlaces: [Strip] {
@@ -199,13 +204,9 @@ final class TopBarView: NSView {
 
     override func layout() {
         super.layout()
-        guard !isSliding else { return }
         for place in places { place.view.frame = place.frame }
         centerStripAddresses()
     }
-
-    /// While the controls glide (`slideControls`), layout leaves them to it.
-    private var isSliding = false
 
     /// Where each control showing is now, in the superview's terms: taken before the sidebar comes or goes.
     var controlPositions: [ObjectIdentifier: NSRect] {
@@ -214,28 +215,18 @@ final class TopBarView: NSView {
             .map { (ObjectIdentifier($0), $0.frame.offsetBy(dx: frame.minX, dy: frame.minY)) })
     }
 
-    /// In an animation, with the bar where it stays for it: each control glides from where it was (`old`, from
+    /// With the bar where it stays for the slide: each control glides from where it was (`old`, from
     /// `controlPositions`) to its new place, so none jumps as the sidebar comes or goes. One that wasn't showing
     /// (the sidebar's toggle) appears where it goes, and stays put there as the traffic lights do.
+    /// Each is in its new place at once and shown traveling there (`Motion.glide`), which says where it starts
+    /// rather than leaving that to where it was last drawn: the bar has just moved under them, so that would be
+    /// the wrong place, a sidebar's width off.
     func slideControls(from old: [ObjectIdentifier: NSRect], curve: Tokens.Motion.Curve) {
-        isSliding = true
-        let places = places
         centerStripAddresses()
         for place in places {
             let start = old[ObjectIdentifier(place.view)]?.offsetBy(dx: -frame.minX, dy: -frame.minY) ?? place.frame
             Tokens.Motion.withoutAnimation { place.view.frame = start }
+            Tokens.Motion.glide(place.view, to: place.frame, duration: curve.duration, timing: curve.timing, resizes: true)
         }
-        // From the next turn of the run loop, once they're drawn where they start: an animation begun in the same one
-        // starts from where they were last drawn instead, in the bar's old place.
-        DispatchQueue.main.async {
-            Tokens.Motion.animate(curve, evenFromKeyboard: true, moves: true) {
-                for place in places { place.view.animator().frame = place.frame }
-            }
-        }
-    }
-
-    func endSlide() {
-        isSliding = false
-        needsLayout = true
     }
 }

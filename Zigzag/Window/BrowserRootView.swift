@@ -754,6 +754,7 @@ final class BrowserRootView: SpaceFrameView {
     private func placeTopBar() {
         let bar = topBarSlideFrame ?? topBarFrame
         topBar.frame = bar
+        topBar.rowTop = topBarFrame.minY - bar.minY
         (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: pageAreaFrame, window: bounds, onCard: addressEndsOnCard)
         let panes = paneFrames
         let over = liftedCards.map { $0 === card ? panes.left : panes.right ?? panes.left }
@@ -882,10 +883,7 @@ final class BrowserRootView: SpaceFrameView {
         }, completion: {
             self.leavesDocked = false
             // Not if another slide took over meanwhile: that one ends it.
-            if self.topBarSlideFrame != nil, self.topBarSlides == slide {
-                self.topBarSlideFrame = nil
-                self.topBar.endSlide()
-            }
+            if self.topBarSlideFrame != nil, self.topBarSlides == slide { self.topBarSlideFrame = nil }
             self.needsLayout = true
         })
     }
