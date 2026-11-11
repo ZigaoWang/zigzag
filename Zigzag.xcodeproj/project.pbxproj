@@ -155,6 +155,7 @@
 		83383198F272FD26FC479A1F /* PageVideos.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6B84DBDA9267299D5DB571D /* PageVideos.swift */; };
 		83A451FE075DF252B6AA5FD3 /* audio-routes.js in Resources */ = {isa = PBXBuildFile; fileRef = CD2C91E2BA65EF3F426B22F9 /* audio-routes.js */; };
 		84475A03BF280A73B4048B32 /* MiniPlayerPageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165A889A6DCFB9D1F338BC7C /* MiniPlayerPageTests.swift */; };
+		87F8E37BD3315332966A7421 /* ContrastTokensTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D3D982B142CB7CC9AA89B6A /* ContrastTokensTests.swift */; };
 		888C0839A35AB223C7909641 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7CEDF75CC1B9CA997C2CF1C /* Haptics.swift */; };
 		89FB4A3F9B9443972556E7D3 /* YouTubeAds.js in Resources */ = {isa = PBXBuildFile; fileRef = 3548E3EB3B0F9F4F4EBEDBA6 /* YouTubeAds.js */; };
 		8B3741625A4E5D67BD974F41 /* WebNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = C21F72054D6913E7D8AD017F /* WebNotifications.swift */; };
@@ -395,6 +396,7 @@
 		5B92A13A0C322891D0B40426 /* SwipeNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeNavigation.swift; sourceTree = "<group>"; };
 		5BD11485F83B11770DF38CE2 /* TabStateCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabStateCache.swift; sourceTree = "<group>"; };
 		5CBAF8A95BA2B524BCF4458E /* orion-history.sql */ = {isa = PBXFileReference; path = "orion-history.sql"; sourceTree = "<group>"; };
+		5D3D982B142CB7CC9AA89B6A /* ContrastTokensTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContrastTokensTests.swift; sourceTree = "<group>"; };
 		5E3E2C413D61E7DBFC4242F2 /* BridgeUserScripts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeUserScripts.swift; sourceTree = "<group>"; };
 		5F25B6A15B8EF24B0520F26F /* ExtensionSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionSearchTests.swift; sourceTree = "<group>"; };
 		5F60DCC2C5651A80DAADE8E8 /* Readability-readerable.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "Readability-readerable.js"; sourceTree = "<group>"; };
@@ -970,6 +972,7 @@
 				7069B71082962459B24D179F /* ChromiumExtensionsTests.swift */,
 				F18C84CC63265389A43E642F /* CommandActionTests.swift */,
 				CE6475CD75E987F5A8B0D182 /* CommandBarHistoryTests.swift */,
+				5D3D982B142CB7CC9AA89B6A /* ContrastTokensTests.swift */,
 				8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */,
 				4295D4E75FDD1157FE955EBF /* DarkPagesTests.swift */,
 				3014AEB17D7BEE4384710CD9 /* DeveloperToolsTests.swift */,
@@ -1428,6 +1431,7 @@
 				95116D4DAA8CC50801C588B5 /* ChromiumExtensionsTests.swift in Sources */,
 				54665D76641D0469C5A31D12 /* CommandActionTests.swift in Sources */,
 				23B86800C5070366304E8423 /* CommandBarHistoryTests.swift in Sources */,
+				87F8E37BD3315332966A7421 /* ContrastTokensTests.swift in Sources */,
 				37417FBDF6F6A5A1633769C5 /* DarkPagesTests.swift in Sources */,
 				B5E6F1A8F313A228FEF5DE37 /* DeveloperToolsTests.swift in Sources */,
 				4E5CF0E3E770AEFADC046339 /* DiagnosticsTests.swift in Sources */,
