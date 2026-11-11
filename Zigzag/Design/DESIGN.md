@@ -225,8 +225,8 @@ something came from, answers at once, and can be interrupted.
 - Space color: switching spaces cross-fades the frame; pointing at a preset in the space editor tries it on the
   window at once, and moving off puts back what you have.
 - One highlight that moves: in a menu, the soft gray pill glides from row to row (`highlightGlide`, 140ms) instead of
-  each row lighting on its own. A list of places (Settings' sections) and a row of filters (`SegmentedPills`) glide
-  their selection the same way (`SelectionGlide`). From the keyboard it simply lands.
+  each row lighting on its own. A list of places (Settings' sections) glides its selection the same way
+  (`SelectionGlide`). From the keyboard it simply lands.
 - Interruptible: every animation starts from what's on screen now (`presentation()`), so opening and closing fast,
   or pressing twice, never queues or jumps. Turned around partway, it takes only the time left
   (`Motion.remainingDuration`): ⌘F pressed twice fast lifts the bar a little and brings it straight back.
