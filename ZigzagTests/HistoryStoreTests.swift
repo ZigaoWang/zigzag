@@ -5,6 +5,14 @@ import Testing
 /// History's own file: a damaged one is set aside and history goes on, rather than quietly stopping for good.
 @MainActor
 struct HistoryStoreTests {
+    @Test func aSiteIsNamedWithoutItsWWW() {
+        #expect("www.example.com".withoutWWW == "example.com")
+        #expect("example.com".withoutWWW == "example.com")
+        #expect("www2.example.com".withoutWWW == "www2.example.com")
+        #expect("wwwexample.com".withoutWWW == "wwwexample.com")
+        #expect(HistoryStore.normalizedHost(URL(string: "https://WWW.Example.com/a")!) == "example.com")
+    }
+
     @Test func startsAfreshFromADamagedFile() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-history-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

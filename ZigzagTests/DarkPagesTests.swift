@@ -93,6 +93,25 @@ struct DarkPagesTests {
         }
     }
 
+    @Test func aSubdomainsChoiceTakesThePlaceOfItsSites() {
+        withDefaults {
+            DarkPages.mode = .system
+            DarkPages.setChoice(true, for: URL(string: "https://example.com/"))
+            DarkPages.setChoice(false, for: URL(string: "https://docs.example.com/"))
+            #expect(DarkPages.sitesOn.isEmpty)
+            #expect(DarkPages.sitesOff == ["docs.example.com"])
+            #expect(DarkPages.choice(for: URL(string: "https://example.com/")) == nil)
+        }
+    }
+
+    @Test func readsThePageScriptsColors() {
+        let color = DarkPages.color(hex: "#1e1e1e")?.usingColorSpace(.sRGB)
+        #expect(color.map { abs($0.redComponent - 30.0 / 255) < 0.001 && abs($0.blueComponent - 30.0 / 255) < 0.001 } == true)
+        #expect(DarkPages.color(hex: "ffffff") != nil)
+        #expect(DarkPages.color(hex: "#fff") == nil)
+        #expect(DarkPages.color(hex: "rgb(0, 0, 0)") == nil)
+    }
+
     // MARK: Pages
 
     private final class Loading: NSObject, WKNavigationDelegate {
