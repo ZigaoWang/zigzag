@@ -24,6 +24,23 @@ final class MiniPlayer {
     private var lostWait: DispatchWorkItem?
     /// The frame whose video is shown alone (`isolate`), to give back as it was.
     private var isolatedFrame: PageVideos.Frame?
+    /// Minimized videos' pages, playing on out of sight (MiniPlayerParking).
+    private var parked: [Parked] = []
+    private struct Parked {
+        weak var tab: Tab?
+        weak var webView: BrowserWebView?
+        /// The card fading out with the page still in it, until it hands the page over.
+        weak var card: MiniPlayerView?
+        var frame: PageVideos.Frame?
+        var token: SignalToken?
+        /// The video stopped: the page is let go of after a moment, unless it plays again.
+        var stopped: DispatchWorkItem?
+    }
+    private lazy var parking: MiniPlayerParking = {
+        let view = MiniPlayerParking()
+        controller?.root.addSubview(view, positioned: .below, relativeTo: nil)
+        return view
+    }()
 
     init(controller: BrowserWindowController) {
         self.controller = controller
@@ -59,6 +76,8 @@ final class MiniPlayer {
     /// before the cards change, while a tab you're leaving is still in its card.
     func switched(from before: [Tab], to after: [Tab]) {
         let shown = Set(after.map(\.id))
+        // A minimized video's tab coming back: its page goes into the page card, as from the card.
+        unpark { $0.tab.map { shown.contains($0.id) } ?? true }
         let playing = PictureInPicture.followsTabs ? before.first { !shown.contains($0.id) && $0.id != model.tab && follows($0) } : nil
         apply(model.switched(shown: shown, playing: playing?.id))
     }
@@ -73,6 +92,10 @@ final class MiniPlayer {
 
     /// Tabs came or went: one closed, or moved to another window, takes the player with it.
     func tabsChanged() {
+        unpark { entry in
+            guard let tab = entry.tab, let webView = entry.webView else { return true }
+            return tab.isClosed || controller?.tabManager.tab(with: tab.id) !== tab || tab.webView !== webView
+        }
         guard let id = model.tab else { return }
         if let tab, !tab.isClosed, controller?.tabManager.tab(with: id) === tab, let webView, tab.webView === webView,
            let card, webView.isDescendant(of: card) { return }
@@ -107,7 +130,7 @@ final class MiniPlayer {
             case .end:
                 finish(closing: steps.contains { if case .pause = $0 { true } else { false } })
             case .hide:
-                finish(closing: true)
+                finish(closing: true, parking: true)
             }
         }
     }
@@ -171,8 +194,9 @@ final class MiniPlayer {
     }
 
     /// Lets the page go. Coming back to its tab, it's put back in the page card next, and scrolled back to where you
-    /// left it; closed, the card fades as it goes.
-    private func finish(closing: Bool) {
+    /// left it; closed, the card fades as it goes. `parking`: minimized, the page stays in the window, out of sight,
+    /// so its video plays on even with no sound (`park`).
+    private func finish(closing: Bool, parking: Bool = false) {
         lostWait?.cancel()
         lostWait = nil
         tokens = []
@@ -184,18 +208,79 @@ final class MiniPlayer {
                 if let isolated { await Self.unisolate(isolated, in: webView) }
                 guard let frame else { return }
                 _ = await PageVideos.shared.run("watch", [("on", false)], in: frame, of: webView)
-                _ = await PageVideos.shared.run("restore", in: frame, of: webView)
+                // Parked, the video stays in view in its page (one scrolled out of it may be paused): the page is
+                // scrolled back as it's let go of.
+                if !parking { _ = await PageVideos.shared.run("restore", in: frame, of: webView) }
             }
         }
-        tab?.isInMiniPlayer = false
-        if let card {
-            if closing { card.disappear() } else { card.release(); card.removeFromSuperview() }
+        if parking, let tab, let webView {
+            park(webView, of: tab, frame: currentFrame)
+        } else {
+            tab?.isInMiniPlayer = false
         }
+        if let card {
+            if closing {
+                card.disappear(handOff: parking ? { [weak self] page in
+                    guard let self, self.parked.contains(where: { $0.webView === page }) else { return }
+                    self.parking.park(page)
+                } : nil)
+            } else { card.release(); card.removeFromSuperview() }
+        }
+        if parking, let index = parked.indices.last { parked[index].card = card }
         card = nil
         tab = nil
         self.webView = nil
         frameID = nil
         video = nil
+    }
+
+    // MARK: Minimized
+
+    /// Keeps a minimized video's page in the window, out of sight, until you go to its tab, it closes, or its video
+    /// stops. WebKit pauses a muted or silent video in a page that isn't in a window (only sound plays on there); in
+    /// the window, however small and hidden, its page counts as on screen and plays on. The tab stays awake meanwhile.
+    private func park(_ webView: BrowserWebView, of tab: Tab, frame: PageVideos.Frame?) {
+        unpark { $0.webView === webView }
+        let token = PageVideos.shared.reported.observe { [weak self, weak webView] page in
+            guard let self, let webView, page === webView else { return }
+            self.parkedPageReported(webView)
+        }
+        parked.append(Parked(tab: tab, webView: webView, frame: frame, token: token))
+        tab.isInMiniPlayer = true
+    }
+
+    /// A parked page's video stopped (paused from Now Playing, ended): a couple of seconds on, with nothing playing
+    /// again, the page is let go of, as it would be with no mini player.
+    private func parkedPageReported(_ webView: BrowserWebView) {
+        guard let index = parked.firstIndex(where: { $0.webView === webView }) else { return }
+        if PageVideos.shared.playing(in: webView) != nil {
+            parked[index].stopped?.cancel()
+            parked[index].stopped = nil
+            return
+        }
+        guard parked[index].stopped == nil else { return }
+        let wait = DispatchWorkItem { [weak self, weak webView] in
+            guard let self, let webView, PageVideos.shared.playing(in: webView) == nil else { return }
+            self.unpark { $0.webView === webView }
+        }
+        parked[index].stopped = wait
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: wait)
+    }
+
+    /// Lets go of the parked pages that `which` picks: out of the window (or into the page card that's about to take
+    /// them), scrolled back to where you left them.
+    private func unpark(_ which: (Parked) -> Bool) {
+        let going = parked.filter(which)
+        guard !going.isEmpty else { return }
+        parked.removeAll(where: which)
+        for entry in going {
+            entry.stopped?.cancel()
+            entry.card?.release()
+            guard let webView = entry.webView else { continue }
+            parking.release(webView)
+            if entry.tab?.id != model.tab { entry.tab?.isInMiniPlayer = false }
+            if let frame = entry.frame { Task { _ = await PageVideos.shared.run("restore", in: frame, of: webView) } }
+        }
     }
 
     private func pause() {
@@ -344,9 +429,46 @@ final class MiniPlayer {
          "selected": controller?.tabManager.selectedTab?.displayTitle ?? "", "space": controller?.tabManager.currentSpaceID.uuidString ?? "",
          "follows": controller?.tabManager.allTabs.filter(follows).map(\.displayTitle) ?? [],
          "reporting": controller?.tabManager.allTabs.filter { $0.webView.map { !PageVideos.shared.frames(in: $0).isEmpty } ?? false }.map(\.displayTitle) ?? [],
-         "hovered": card?.showsControls ?? false, "webViewInCard": webView.map { $0.isDescendant(of: card ?? NSView()) } ?? false]
+         "hovered": card?.showsControls ?? false, "webViewInCard": webView.map { $0.isDescendant(of: card ?? NSView()) } ?? false,
+         "parked": parked.compactMap { $0.tab?.displayTitle }, "parkedInWindow": parked.compactMap { $0.webView.map { $0.superview === parking && $0.window != nil } }]
     }
     #endif
+}
+
+// MARK: - Minimized
+
+/// Where a minimized video's page waits while its video plays on (MiniPlayer's `park`): in the window, so WebKit
+/// counts the page as on screen, but a single point at the back of it, clipped and transparent, so nothing of it
+/// shows; it never takes the pointer, and VoiceOver passes over it. The page keeps its size, so it never reflows.
+final class MiniPlayerParking: NSView {
+    override init(frame: NSRect) {
+        super.init(frame: NSRect(x: 0, y: 0, width: 1, height: 1))
+        wantsLayer = true
+        clipsToBounds = true
+        layer?.masksToBounds = true
+        alphaValue = 0
+        autoresizingMask = []
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func isAccessibilityElement() -> Bool { false }
+    override func accessibilityChildren() -> [Any]? { [] }
+
+    func park(_ webView: WKWebView) {
+        let size = webView.frame.size
+        webView.autoresizingMask = []
+        addSubview(webView)
+        webView.frame = NSRect(origin: .zero, size: size)
+    }
+
+    /// Out of the window, unless something else has already taken it (its tab's page card).
+    func release(_ webView: WKWebView) {
+        guard webView.superview === self else { return }
+        webView.removeFromSuperview()
+        webView.autoresizingMask = [.width, .height]
+    }
 }
 
 // MARK: - The card
@@ -593,13 +715,20 @@ final class MiniPlayerView: NSView {
         layer.add(grow, forKey: "grow")
     }
 
-    /// Fades as it goes, then lets the page go.
-    func disappear() {
+    /// Fades as it goes, then lets the page go: to `handOff` when given (a minimized video's page, to be kept in the
+    /// window), unless something else took it meanwhile.
+    func disappear(handOff: ((WKWebView) -> Void)? = nil) {
         isGoing = true
         setControls(false, animated: false)
         Tokens.Motion.present(self, from: .point(CGPoint(x: 0.5, y: 0.5)), entering: false) { [weak self] in
-            self?.release()
-            self?.removeFromSuperview()
+            guard let self else { return }
+            if let handOff, let webView, webView.superview === host {
+                self.webView = nil
+                handOff(webView)
+            } else {
+                release()
+            }
+            removeFromSuperview()
         }
     }
     private var isGoing = false
