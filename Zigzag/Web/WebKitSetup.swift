@@ -107,6 +107,15 @@ enum WebKitSetup {
             typealias SetMode = @convention(c) (AnyObject, Selector, Bool, Bool, @escaping @convention(block) () -> Void) -> Void
             unsafeBitCast(store.method(for: blocking), to: SetMode.self)(store, blocking, false, false) {}
         }
+        // With the two above alone, a site you've never opened on its own still gets no cookies when embedded:
+        // the store only takes cookies from sites it already has some for. Claude loads an artifact in a frame on
+        // such a site, which then says "This browser isn't supported". Every site's cookies are taken now.
+        let accept = NSSelectorFromString("_setCookieAcceptPolicy:completionHandler:")
+        let cookies = store.httpCookieStore
+        if cookies.responds(to: accept) {
+            typealias SetPolicy = @convention(c) (AnyObject, Selector, UInt, @escaping @convention(block) () -> Void) -> Void
+            unsafeBitCast(cookies.method(for: accept), to: SetPolicy.self)(cookies, accept, HTTPCookie.AcceptPolicy.always.rawValue) {}
+        }
     }
 }
 
