@@ -1522,7 +1522,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let saveNote = manager != nil && !saves ? managerNote!
             : String(localized: "After you sign in. Kept in your Keychain, synced with iCloud.", comment: "Explanation under “Offer to save passwords” in Settings › Passwords.")
         let fillNote = manager != nil && !fills ? managerNote!
-            : String(localized: "Under sign-in fields, only on the site each was saved for.", comment: "Explanation under “Fill saved passwords” in Settings › Passwords.")
+            : String(localized: "Under sign-in fields, only on the site each was saved for. Passwords… there opens the Passwords app and password manager apps.", comment: "Explanation under “Fill saved passwords” in Settings › Passwords. Passwords… is the row in the fill-password menu; the Passwords app is Apple’s, password manager apps are ones like 1Password.")
         passwordsGroup.add(FormRow(title: String(localized: "Offer to save passwords", comment: "A setting in Settings › Passwords."),
                                    detail: saveNote,
                                    control: saveToggle))

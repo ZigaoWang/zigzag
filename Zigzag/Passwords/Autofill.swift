@@ -109,14 +109,15 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                     self.show(Self.menuItems(logins, on: origin, newPassword: true, isPrivate: isPrivate), under: field, in: webView, frame: frame, origin: origin)
                     return
                 }
+                // Nothing saved here: Passwords… is what's left, with a word on why above it when there's one.
                 if logins.isEmpty {
+                    var hint: [AutofillMenu.Item] = []
                     if !all.isEmpty, self.shouldSayMissing(on: origin) {
-                        self.show([.missing], under: field, in: webView, frame: frame, origin: origin)
+                        hint = [.missing]
                     } else if readable, all.isEmpty, let browser = self.browserToImport() {
-                        self.show([.importFrom(browser)], under: field, in: webView, frame: frame, origin: origin)
-                    } else {
-                        self.hide()
+                        hint = [.importFrom(browser)]
                     }
+                    self.show(hint + Self.menuItems([], on: origin), under: field, in: webView, frame: frame, origin: origin)
                     return
                 }
                 self.show(Self.menuItems(logins, on: origin), under: field, in: webView, frame: frame, origin: origin)
@@ -149,17 +150,22 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     ///
     /// On a field for a new password, "Use Strong Password" comes first and the logins follow, as in Safari; in a
     /// private window, which keeps no new password, a row says so in its place.
-    static func menuItems(_ logins: [Credential], on origin: Origin, newPassword: Bool = false, isPrivate: Bool = false) -> [AutofillMenu.Item] {
+    ///
+    /// Passwords… (the Mac's own list: the Passwords app and password manager apps) is always last, in private
+    /// windows too: what it fills is never saved anywhere.
+    static func menuItems(_ logins: [Credential], on origin: Origin, newPassword: Bool = false, isPrivate: Bool = false,
+                          systemPasswords: Bool = true) -> [AutofillMenu.Item] {
         let lead: [AutofillMenu.Item] = newPassword ? [isPrivate ? .note(.privateWindow) : .generate] : []
+        let tail: [AutofillMenu.Item] = systemPasswords ? [.systemPasswords] : []
         let newest: (Credential, Credential) -> Bool = { a, b in
             if a.origin.isExact(for: origin) != b.origin.isExact(for: origin) { return a.origin.isExact(for: origin) }
             return (a.lastUsed ?? a.modified) > (b.lastUsed ?? b.modified)
         }
         let here = logins.filter { $0.origin.host == origin.host }.sorted(by: newest)
         let elsewhere = logins.filter { $0.origin.host != origin.host }.sorted(by: newest)
-        let room = AutofillMenu.maxRows - lead.count
-        guard !elsewhere.isEmpty else { return lead + here.prefix(room).map { .login($0) } }
-        return lead + here.prefix(room - 1).map { .login($0) } + [.elsewhere(elsewhere)]
+        let room = AutofillMenu.maxRows - lead.count - tail.count
+        guard !elsewhere.isEmpty else { return lead + here.prefix(room).map { .login($0) } + tail }
+        return lead + here.prefix(room - 1).map { .login($0) } + [.elsewhere(elsewhere)] + tail
     }
 
     /// Where the menu showing was put: picking "other parts of the site" lists them in the same place.
@@ -250,6 +256,17 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         }
     }
 
+    /// For the debug bridge: a click on a row of the menu showing, once Zigzag is the app in front (the Mac's list
+    /// of passwords opens only for that), waiting up to five seconds for it.
+    func debugPickWhenActive(_ row: Int, tries: Int = 0) {
+        guard NSApp.isActive, NSApp.keyWindow != nil else {
+            guard tries < 50 else { debugLog("autofillpickactive: never in front"); return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.debugPickWhenActive(row, tries: tries + 1) }
+            return
+        }
+        debugPick(row)
+    }
+
     /// For the debug bridge: a click on a row of the menu showing.
     func debugPick(_ row: Int) {
         guard let menu, let frame = menu.debugRowFrame(row) else { debugLog("autofillpick: no row \(row)"); return }
@@ -269,11 +286,13 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     /// keeps the page alive (and playing) after it's gone.
     func forget(_ webView: WKWebView) {
         if target?.webView === webView { hide() }
+        if systemRequest?.webView === webView { SystemPasswordPicker.shared.cancel() }
     }
 
     /// The same for every page in a window that's closing.
     func forget(windowOf window: NSWindow?) {
         if let window, target?.webView.window === window { hide() }
+        if let window, systemRequest?.webView.window === window { SystemPasswordPicker.shared.cancel() }
     }
 
     /// While the menu is up, the page script hands arrow keys and Escape to it; Return only once a login in it is
@@ -297,6 +316,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             show(logins.map { .login($0) }, under: field, in: target.webView, frame: target.frame, origin: target.origin)
         case .generate: fillGenerated()
         case .contact: fillContact()
+        case .systemPasswords: openSystemPasswords()
         // Says why something isn't offered; nothing to do.
         case .note: break
         case .importFrom:
@@ -390,6 +410,58 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         }
     }
 
+    /// The page Passwords… was chosen on, while the Mac's list is open.
+    private(set) var systemRequest: (webView: BrowserWebView, frame: WKFrameInfo, origin: Origin)?
+
+    /// Passwords…: the Mac's own list, opened at the field. What you pick in it goes into the page only if it's still
+    /// the site it was asked for, in the tab you're looking at; it's never saved, in Zigzag or anywhere.
+    private func openSystemPasswords() {
+        guard let target else { hide(); return }
+        guard Origin(target.webView.url) == target.origin, Self.isInFront(target.webView), let overlay = Self.overlay(for: target.webView) else {
+            hide(); Self.tell(Self.pageMovedOn, about: target.webView); return
+        }
+        let request = target
+        let rect = overlay.convert(target.webView.convert(field, to: nil), from: nil)
+        hide()
+        systemRequest = request
+        SystemPasswordPicker.shared.present(over: rect, in: overlay, restoringFocusTo: request.webView) { [weak self] outcome in
+            guard let self else { return }
+            if self.systemRequest?.webView === request.webView { self.systemRequest = nil }
+            switch outcome {
+            case .filled(let username, let password):
+                self.fillFromSystem(username: username, password: password, into: request)
+            case .cancelled(.unavailable):
+                Self.tell(String(localized: "Passwords didn’t open. Click the field and try again.", comment: "Toast when Passwords… was chosen in the fill-password menu but the Mac's list of passwords couldn't be shown."), about: request.webView)
+            case .cancelled: break
+            }
+        }
+    }
+
+    /// Fills what the Mac's list gave into the page Passwords… was chosen on, then lets go of it.
+    func fillFromSystem(username: SecretString, password: SecretString, into request: (webView: BrowserWebView, frame: WKFrameInfo, origin: Origin)) {
+        let webView = request.webView
+        guard Self.systemFillAllowed(asked: request.origin, now: webView.url, inFront: Self.isInFront(webView)) else { Self.tell(Self.pageMovedOn, about: webView); return }
+        Task {
+            // Passed as arguments, never pasted into the script's source, held only for the call, and not marked as
+            // Zigzag's own fill: signing in with it never offers to save it.
+            let arguments: [String: Any] = ["username": username.withUnsafeString { String($0) }, "password": password.withUnsafeString { String($0) },
+                                            "expectedOrigin": request.origin.description, "mark": false]
+            let filled = try? await webView.callAsyncJavaScript(Self.filler, arguments: arguments, in: request.frame, contentWorld: .defaultClient) as? [String: Any]
+            guard let filled, filled["moved"] as? Bool != true else { Self.tell(Self.pageMovedOn, about: webView); return }
+            guard filled["password"] as? Bool == true || filled["username"] as? Bool == true else { Self.tell(Self.noPasswordField, about: webView); return }
+            // Only a password came back, and the username field is still empty: say so, or it looks like a slip.
+            if username.isEmpty, filled["usernameEmpty"] as? Bool == true, let controller = WindowManager.shared.controller(for: webView.window) {
+                Toast.show(String(localized: "Only the password was filled. Type your username.", comment: "Toast after a login picked from the Mac's list of passwords came back without a username."),
+                           symbol: "key", duration: 3, in: controller)
+            }
+        }
+    }
+
+    /// A login from the Mac's list goes only to the exact site it was asked for, in the tab you're looking at.
+    static func systemFillAllowed(asked: Origin, now: URL?, inFront: Bool) -> Bool {
+        Origin(now) == asked && inFront
+    }
+
     private func fill(_ login: Credential) {
         guard let target else { return }
         hide()
@@ -417,13 +489,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         }
     }
 
-    /// Reports focus on sign-in fields (with the field's place on screen), blur, and the keys the menu takes.
-    private static let watcher = """
-    (() => {
-      if (window.__zigzagAutofillWatcher) return;
-      window.__zigzagAutofillWatcher = true;
-      const post = (m) => { try { window.webkit.messageHandlers.zigzagAutofill.postMessage(m); } catch (e) {} };
-      const signIn = (el) => {
+    /// Whether a field is one you sign in with: a password (not a new one), or the username beside one.
+    static let signInCheck = """
+    const signIn = (el) => {
         if (!el || el.tagName !== 'INPUT' || el.disabled || el.readOnly) return false;
         if (el.type === 'password') return !/new-password/.test(el.autocomplete || '');
         if (!['text', 'email', 'tel', ''].includes(el.type)) return false;
@@ -431,6 +499,15 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         const scope = el.form || document;
         return !!scope.querySelector('input[type=password]') && /user|login|email|account|id|name/i.test((el.name || '') + (el.id || '') + (el.placeholder || '') + (el.getAttribute('aria-label') || ''));
       };
+    """
+
+    /// Reports focus on sign-in fields (with the field's place on screen), blur, and the keys the menu takes.
+    private static let watcher = """
+    (() => {
+      if (window.__zigzagAutofillWatcher) return;
+      window.__zigzagAutofillWatcher = true;
+      const post = (m) => { try { window.webkit.messageHandlers.zigzagAutofill.postMessage(m); } catch (e) {} };
+      \(signInCheck)
       // A field for a new password: marked new-password, or on a form with several password fields (sign-up and
       // confirm, or current, new and confirm) where it isn't the current one.
       const isNew = (el) => {
@@ -680,6 +757,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     """
 
     /// Fills the focused form: the username field (if there is one) and the password field, the way typing would.
+    /// An empty username or password leaves its field as it is. `mark` (true unless given) marks the fields as filled
+    /// by Zigzag, so signing in with them counts as your login.
     static let filler = placeholderCheck + """
     // Checked here, at the moment of filling: only the exact site the login belongs to gets it.
     if (location.origin !== expectedOrigin) return { moved: true };
@@ -724,10 +803,11 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     const userField = userFields.find((el) => /username|email/.test(el.autocomplete || ''))
       || (passwordField ? userFields.filter((el) => inputs.indexOf(el) < inputs.indexOf(passwordField)).pop() : null)
       || (active && userFields.includes(active) ? active : null);
+    const remember = typeof mark === 'undefined' || mark === true;
     const set = (el, value) => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
       // Filled by Zigzag, as you asked: signing in with it counts as your login.
-      (window.__zigzagFilled = window.__zigzagFilled || new WeakSet()).add(el);
+      if (remember) (window.__zigzagFilled = window.__zigzagFilled || new WeakSet()).add(el);
       el.focus();
       setter.call(el, value);
       el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText' }));
@@ -737,11 +817,11 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     window.__zigzagFilling = true;
     try {
       if (userField && username) set(userField, username);
-      if (passwordField) set(passwordField, password);
+      if (passwordField && password) set(passwordField, password);
     } finally {
       setTimeout(() => { window.__zigzagFilling = false; }, 0);
     }
-    return { password: !!passwordField, username: !!(userField && username) };
+    return { password: !!(passwordField && password), username: !!(userField && username), usernameEmpty: !!(userField && !userField.value) };
     """
 }
 
@@ -761,6 +841,8 @@ final class AutofillMenu: FloatingPanelView {
         /// Something this field can't have, and why: a dimmed row that does nothing, rather than a menu that's
         /// quietly missing a row.
         case note(Note)
+        /// The Mac's own list of passwords: the Passwords app and password manager apps.
+        case systemPasswords
     }
 
     enum Note {
@@ -892,6 +974,11 @@ private final class AutofillRow: InteractiveView {
             name = Label(String(localized: "Use Strong Password", comment: "A row in the fill-password menu on a sign-up form: fill in a password Zigzag makes."), font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
             detail = Label(String(localized: "Saved to your Keychain for \(origin.displayName)", comment: "Under Use Strong Password in the fill-password menu. The placeholder is a site, like github.com."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
             icon.image = Tokens.Symbol.image("key.viewfinder")
+            icon.contentTintColor = Tokens.Color.accent
+        case .systemPasswords:
+            name = Label(String(localized: "Passwords…", comment: "A row at the bottom of the fill-password menu: opens the Mac’s own list of passwords to pick one from, as Edit › AutoFill › Passwords… does in other apps."), font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+            detail = Label(String(localized: "From your password apps", comment: "Under Passwords… in the fill-password menu: Apple’s Passwords app, and password manager apps like 1Password or Dashlane."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            icon.image = Tokens.Symbol.image("key")
             icon.contentTintColor = Tokens.Color.accent
         case .note(.privateWindow):
             name = Label(String(localized: "No strong password in a private window", comment: "A dimmed row in the fill-password menu on a sign-up form in a private window, in place of Use Strong Password."), font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)

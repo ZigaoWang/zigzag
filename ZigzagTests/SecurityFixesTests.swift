@@ -582,9 +582,9 @@ struct PasswordSafetyTests {
         let here = try #require(Origin(URL(string: "https://www.example.com")))
         let mine = login("https://www.example.com", "sam"), old = login("http://www.example.com", "old")
         let mail = login("https://mail.example.com", "mail")
-        #expect(logins(Autofill.menuItems([mail, mine, old], on: here)) == ["sam", "old", "elsewhere: mail"])
-        #expect(logins(Autofill.menuItems([mail], on: here)) == ["elsewhere: mail"])
-        #expect(logins(Autofill.menuItems([mine], on: here)) == ["sam"])
+        #expect(logins(Autofill.menuItems([mail, mine, old], on: here, systemPasswords: false)) == ["sam", "old", "elsewhere: mail"])
+        #expect(logins(Autofill.menuItems([mail], on: here, systemPasswords: false)) == ["elsewhere: mail"])
+        #expect(logins(Autofill.menuItems([mine], on: here, systemPasswords: false)) == ["sam"])
     }
 
     @Test func theMenuTakesNoClickForHalfASecond() async throws {

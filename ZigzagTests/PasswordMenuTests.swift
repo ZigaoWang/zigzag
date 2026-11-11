@@ -229,15 +229,15 @@ struct PasswordMenuTests {
     @Test func aNewPasswordFieldOffersAStrongOneAndYourLogins() throws {
         let here = try #require(Origin(URL(string: "https://www.example.com")))
         let mine = login("https://www.example.com", "sam"), mail = login("https://mail.example.com", "mail")
-        #expect(names(Autofill.menuItems([mine, mail], on: here, newPassword: true)) == ["strong", "sam", "elsewhere: mail"])
-        #expect(names(Autofill.menuItems([], on: here, newPassword: true)) == ["strong"])
+        #expect(names(Autofill.menuItems([mine, mail], on: here, newPassword: true, systemPasswords: false)) == ["strong", "sam", "elsewhere: mail"])
+        #expect(names(Autofill.menuItems([], on: here, newPassword: true, systemPasswords: false)) == ["strong"])
         // A private window keeps no new password: a row says so, and the logins are still there.
-        #expect(names(Autofill.menuItems([mine], on: here, newPassword: true, isPrivate: true)) == ["note", "sam"])
+        #expect(names(Autofill.menuItems([mine], on: here, newPassword: true, isPrivate: true, systemPasswords: false)) == ["note", "sam"])
         // A sign-in field: logins only.
-        #expect(names(Autofill.menuItems([mine], on: here)) == ["sam"])
+        #expect(names(Autofill.menuItems([mine], on: here, systemPasswords: false)) == ["sam"])
         // Never more rows than the menu lists, the strong password and the other parts of the site kept.
         let many = (0..<12).map { login("https://www.example.com", "user\($0)") }
-        let items = names(Autofill.menuItems(many + [mail], on: here, newPassword: true))
+        let items = names(Autofill.menuItems(many + [mail], on: here, newPassword: true, systemPasswords: false))
         #expect(items.count == AutofillMenu.maxRows)
         #expect(items.first == "strong")
         #expect(items.last == "elsewhere: mail")

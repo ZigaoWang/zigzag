@@ -811,6 +811,9 @@ enum DebugBridge {
         case "autofillpick":
             // autofillpick <row>: a click on that row of the password menu, sent to the window in-process.
             Autofill.shared.debugPick(Int(arg) ?? 0)
+        case "autofillpickactive":
+            // autofillpickactive <row>: the same, once this copy is the app in front (for Passwords…).
+            Autofill.shared.debugPickWhenActive(Int(arg) ?? 0)
         case "importprobe":
             // Lists the browsers found and how many bookmarks and history pages each has; imports nothing.
             Task {

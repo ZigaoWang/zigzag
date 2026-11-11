@@ -5771,6 +5771,17 @@
         }
       }
     },
+    "From your password apps" : {
+      "comment" : "Under Passwords… in the fill-password menu: Apple’s Passwords app, and password manager apps like 1Password or Dashlane.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自你的密码 App"
+          }
+        }
+      }
+    },
     "Frost" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor. A pale, see-through icy blue.",
       "localizations" : {
@@ -8393,6 +8404,17 @@
         }
       }
     },
+    "Only the password was filled. Type your username." : {
+      "comment" : "Toast after a login picked from the Mac's list of passwords came back without a username.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只填好了密码，请输入用户名。"
+          }
+        }
+      }
+    },
     "Open" : {
       "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the page.\nButton on a page's question to open an app.",
       "localizations" : {
@@ -9037,6 +9059,17 @@
         }
       }
     },
+    "Passwords didn’t open. Click the field and try again." : {
+      "comment" : "Toast when Passwords… was chosen in the fill-password menu but the Mac's list of passwords couldn't be shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“密码”没能打开。请点按输入框再试一次。"
+          }
+        }
+      }
+    },
     "Passwords you save while signing in, or bring over from another browser, show up here." : {
       "comment" : "Shown in the Passwords window with no passwords saved yet.",
       "localizations" : {
@@ -9077,6 +9110,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "来自这台 Mac 上任何浏览器的密码、书签、历史记录和扩展。"
+          }
+        }
+      }
+    },
+    "Passwords…" : {
+      "comment" : "A row at the bottom of the fill-password menu: opens the Mac’s own list of passwords to pick one from, as Edit › AutoFill › Passwords… does in other apps.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码…"
           }
         }
       }
@@ -13721,13 +13765,13 @@
         }
       }
     },
-    "Under sign-in fields, only on the site each was saved for." : {
-      "comment" : "Explanation under “Fill saved passwords” in Settings › Passwords.",
+    "Under sign-in fields, only on the site each was saved for. Passwords… there opens the Passwords app and password manager apps." : {
+      "comment" : "Explanation under “Fill saved passwords” in Settings › Passwords. Passwords… is the row in the fill-password menu; the Passwords app is Apple’s, password manager apps are ones like 1Password.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在登录栏下方，只在每个密码所属的网站上。"
+            "value" : "在登录栏下方，只在每个密码所属的网站上。其中的“密码…”会打开“密码”App 和密码管理器 App。"
           }
         }
       }
