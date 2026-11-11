@@ -150,6 +150,9 @@ final class FormRow: NSView, SettingsSearchable {
     var searchText: String { [title.stringValue, detail.stringValue, keywords].joined(separator: " ") }
     /// More words "Find a setting" knows the row by, like its button's.
     var keywords = ""
+    #if DEBUG
+    var debugTitle: String { title.stringValue }
+    #endif
     private let title = Label("", font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
     private let detail = NSTextField(wrappingLabelWithString: "")
     private let icon = NSImageView()
@@ -827,9 +830,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         versionGroup.add(SettingsVersionRow.make())
         versionGroup.add(SettingsVersionRow.betas())
         if let restore = SettingsVersionRow.restore() { versionGroup.add(restore) }
-        generalGroup.add(FormRow(title: String(localized: "Default browser", comment: "A setting in Settings › General."),
+        let defaultRow = FormRow(title: String(localized: "Default browser", comment: "A setting in Settings › General."),
                                  detail: String(localized: "Links from other apps open here.", comment: "Explanation under “Default browser” in Settings › General."),
-                                 control: defaultControl))
+                                 control: defaultControl)
+        defaultRow.keywords = String(localized: "default app links open launch", comment: "Words that find the Default browser setting with Find a setting in Settings. Not shown.")
+        generalGroup.add(defaultRow)
         // Only once Zigzag speaks more than one language: macOS lists an app under Language & Region only then.
         if Self.hasLanguages {
             // Each language named in itself, so anyone finds theirs whatever Zigzag is in now.
@@ -852,9 +857,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                  detail: String(localized: "Passwords, bookmarks and history. The other browser isn’t changed.", comment: "Explanation under “Import from another browser” in Settings › General."),
                                  control: importButton))
         quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
-        generalGroup.add(FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
-                                 detail: String(localized: "So ⌘Q never closes everything by accident.", comment: "Explanation under “Ask before quitting” in Settings › General."),
-                                 control: quitToggle))
+        let quitRow = FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
+                              detail: String(localized: "So ⌘Q never closes everything by accident.", comment: "Explanation under “Ask before quitting” in Settings › General."),
+                              control: quitToggle)
+        // There's no startup setting: your tabs always come back. Quitting is the nearest, and where people look.
+        quitRow.keywords = String(localized: "startup launch on start restore reopen session close quit", comment: "Words that find the Ask before quitting setting with Find a setting in Settings. Zigzag has no startup setting (tabs always come back), so words about starting up find this row. Not shown.")
+        generalGroup.add(quitRow)
         scriptJavaScriptToggle.onChange = { on in Scripting.allowsJavaScript = on }
         automationGroup.add(FormRow(title: String(localized: "Allow JavaScript from Apple Events", comment: "A setting in Settings › General, under Automation, as Safari names it."),
                                     detail: String(localized: "Scripts and apps you allow in Privacy & Security › Automation can then read and change any page you have open, signed in or not. Never in private windows.",
@@ -896,7 +904,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                               detail: String(localized: "Websites without a dark look of their own are drawn dark. Pictures and video stay as they are.",
                                              comment: "Explanation under “Dark pages” in Settings › Appearance."),
                               control: darkPages)
-        darkRow.keywords = String(localized: "dark mode night theme black invert", comment: "Words that find the Dark pages setting with Find a setting in Settings. Not shown.")
+        darkRow.keywords = String(localized: "dark mode light appearance night theme black invert", comment: "Words that find the Dark pages setting with Find a setting in Settings. Not shown.")
         appearanceGroup.add(darkRow)
         motionToggle.onChange = { on in Tokens.Motion.reducesMotionHere = on }
         appearanceGroup.add(FormRow(title: String(localized: "Reduce motion", comment: "A setting in Settings › Appearance."),
@@ -913,9 +921,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             return DropdownButton.Option(title: title)
         }
         newTabPlace.onSelect = { index in TabManager.newTabPlace = TabManager.NewTabPlace.allCases[index] }
-        tabsGroup.add(FormRow(title: String(localized: "New tabs open", comment: "A setting in Settings › Tabs: where a new tab goes in the sidebar's list."),
-                              detail: String(localized: "Where ⌘T and links put a new tab in the sidebar.", comment: "Explanation under “New tabs open” in Settings › Tabs."),
-                              control: newTabPlace))
+        let newTabRow = FormRow(title: String(localized: "New tabs open", comment: "A setting in Settings › Tabs: where a new tab goes in the sidebar's list."),
+                                detail: String(localized: "Where ⌘T and links put a new tab in the sidebar.", comment: "Explanation under “New tabs open” in Settings › Tabs."),
+                                control: newTabPlace)
+        // There's no homepage: a new tab opens the address bar. This is the setting nearest to one.
+        newTabRow.keywords = String(localized: "new tab homepage home page start page position order", comment: "Words that find the New tabs open setting with Find a setting in Settings. Zigzag has no homepage, so words about one find this row. Not shown.")
+        tabsGroup.add(newTabRow)
         nestToggle.onChange = { on in TabManager.nestsOpenedLinks = on }
         let nestRow = FormRow(title: String(localized: "Open ⌘-clicked links under their tab", comment: "A setting in Settings › Tabs: a link opened in a new tab goes in the sidebar nested under the tab it came from. ⌘ is the Command key."),
                               detail: String(localized: "A link you open in a new tab sits under the page it came from. Drag a tab out to make it a tab of its own.", comment: "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs."),
@@ -1714,6 +1725,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     #if DEBUG
+    /// The titles of the rows a search shows, from every section.
+    var debugFound: [String] {
+        SettingsPane.allCases.flatMap { groups(of: $0) }.flatMap { $0.group.rows }
+            .compactMap { $0.isHidden ? nil : ($0 as? FormRow)?.debugTitle }
+    }
+
     func debugFind(_ text: String) {
         settingSearch.stringValue = text
         searchChanged()
@@ -1731,7 +1748,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 "column": items.map(\.pane.rawValue), "grouped": columnHasProfiles,
                 "menu": profilePicker.superview === column ? "column" : profilePicker.superview === header ? "header" : "none",
                 "headings": groups(of: pane).map { $0.title ?? "" },
-                "saves": PasswordCapture.offersToSave(in: profile), "fills": Autofill.isOn(in: profile),
+                "saves": PasswordCapture.offersToSave(in: profile), "fills": Autofill.isOn(in: profile), "found": debugFound,
                 "manager": PasswordManagers.active(in: profile) ?? ""]
     }
     #endif

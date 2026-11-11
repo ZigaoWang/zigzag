@@ -15556,13 +15556,13 @@
         }
       }
     },
-    "dark mode night theme black invert" : {
+    "dark mode light appearance night theme black invert" : {
       "comment" : "Words that find the Dark pages setting with Find a setting in Settings. Not shown.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "深色模式 夜间 暗色 主题 黑色 反色"
+            "value" : "深色模式 浅色 外观 夜间 暗色 主题 黑色 反色 dark mode appearance"
           }
         }
       }
@@ -15585,6 +15585,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开深色网页"
+          }
+        }
+      }
+    },
+    "default app links open launch" : {
+      "comment" : "Words that find the Default browser setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认 应用 链接 打开 启动 default"
           }
         }
       }
@@ -16121,6 +16132,17 @@
         }
       }
     },
+    "new tab homepage home page start page position order" : {
+      "comment" : "Words that find the New tabs open setting with Find a setting in Settings. Zigzag has no homepage, so words about one find this row. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新标签页 主页 首页 起始页 位置 顺序 homepage new tab"
+          }
+        }
+      }
+    },
     "notifications allowed" : {
       "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
       "localizations" : {
@@ -16318,6 +16340,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "空间"
+          }
+        }
+      }
+    },
+    "startup launch on start restore reopen session close quit" : {
+      "comment" : "Words that find the Ask before quitting setting with Find a setting in Settings. Zigzag has no startup setting (tabs always come back), so words about starting up find this row. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启动 开机 打开时 恢复 重新打开 会话 关闭 退出 startup launch"
           }
         }
       }

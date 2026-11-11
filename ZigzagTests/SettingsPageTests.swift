@@ -129,4 +129,21 @@ struct GroupListingTests {
         let answer15 = listing.needs(["a"])
         #expect(answer15)
     }
+
+}
+
+/// Find a setting, in Settings' header.
+@MainActor
+struct SettingsSearchTests {
+    /// Find a setting knows the words people look for, and leads to the nearest row where there's no such setting.
+    @Test func findsCommonWords() {
+        let settings = SettingsView(pane: .general)
+        let expected = ["startup": "Ask before quitting", "launch": "Ask before quitting", "homepage": "New tabs open",
+                        "home page": "New tabs open", "new tab": "New tabs open", "dark mode": "Dark pages",
+                        "appearance": "Dark pages", "default app": "Default browser"]
+        for (words, row) in expected {
+            settings.debugFind(words)
+            #expect(settings.debugFound.contains(row), "“\(words)” should find \(row)")
+        }
+    }
 }
