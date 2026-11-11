@@ -48,6 +48,9 @@ settings:
       CODE_SIGN_IDENTITY: "Apple Development"
       CODE_SIGN_STYLE: Automatic
       SPARKLE_PUBLIC_KEY: fcLCAtuyhCGTC62F2cDfj/vAMXgFvrpQSyF3540+hq0=
+      # Keep Zigzag's own function names in the shipped app (only local symbols are stripped), so a freeze note in
+      # Help › Report a Problem says what was running instead of "Zigzag+0x…" (#89). Costs a little size, no speed.
+      STRIP_STYLE: non-global
       CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
       OTHER_CODE_SIGN_FLAGS: "--timestamp"
 targets:
