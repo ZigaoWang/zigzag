@@ -5,6 +5,12 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- Passwords… stays open until you pick a login or move on, instead of closing straight away. ([#96](https://github.com/ZigaoWang/zigzag/issues/96))
+- A pinned page you've opened shows under its folder even when the folder is shut, as in Arc. ([#94](https://github.com/ZigaoWang/zigzag/issues/94))
+- Holding ⌥⌘ and dragging moves the window from anywhere in it, Settings and an empty window included. ([#95](https://github.com/ZigaoWang/zigzag/issues/95))
+- Zigzag starts a little faster, and a freeze note from Help › Report a Problem says what was running. ([#89](https://github.com/ZigaoWang/zigzag/issues/89))
+
 ## [0.8.1] - 2026-11-11
 
 ### New
