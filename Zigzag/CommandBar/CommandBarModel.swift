@@ -91,6 +91,12 @@ enum CommandRanker {
         (SettingsPage.isSettings(url) && actionIDs.contains("settings")) || (HistoryPage.isHistory(url) && actionIDs.contains("history"))
     }
 
+    /// The open tabs offered before anything is typed: the latest six but the one you're on, and, with
+    /// `leavingOutFailed` (Zigzag Mini, on its own), none that are only showing an error page, as there's nothing there to go back to.
+    static func recentChoices<T: AnyObject>(_ tabs: [T], selected: T?, failed: (T) -> Bool, leavingOutFailed: Bool) -> [T] {
+        tabs.filter { !(leavingOutFailed && failed($0)) }.prefix(6).filter { $0 !== selected }
+    }
+
     static func displayURL(_ url: URL) -> String {
         var text = url.absoluteString
         for prefix in ["https://", "http://"] where text.hasPrefix(prefix) { text.removeFirst(prefix.count) }
@@ -305,7 +311,7 @@ enum CommandRanker {
     /// pages to open and searches. `history`: the pages History has for the text, read off the main thread
     /// (`HistoryLookup`, asked for `historyLimit` of them; nil while it still is), so these results never wait on History.
     static func results(for text: String, manager: TabManager?, profile: Profile, suggestions: [String], history: [HistoryEntry]?,
-                        editingCurrent: Bool, historyOnly: Bool) -> [CommandResult] {
+                        editingCurrent: Bool, historyOnly: Bool, leavingOutFailed: Bool = false) -> [CommandResult] {
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
         var results: [CommandResult] = []
         var seen = Set<String>()
@@ -331,7 +337,9 @@ enum CommandRanker {
                 return results
             }
             // Nothing typed yet: recent tabs, so switching is one keystroke away.
-            for tab in (manager?.recentTabs ?? []).filter({ $0.homeProfile === profile }).prefix(6) where tab !== manager?.selectedTab {
+            let recent = recentChoices((manager?.recentTabs ?? []).filter { $0.homeProfile === profile }, selected: manager?.selectedTab,
+                                       failed: \.showsErrorPage, leavingOutFailed: leavingOutFailed)
+            for tab in recent {
                 guard let url = tab.url else { continue }
                 add(CommandResult(kind: .switchTo(tab.id), title: tab.displayTitle, detail: displayURL(url), icon: tab.favicon),
                     key: TabManager.normalize(url))

@@ -519,7 +519,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let query = editing || scope != nil ? "" : typed
         let pages = query.isEmpty ? [] : history.pages(for: query, limit: CommandRanker.historyLimit(historyOnly: mode == .history))
         var results = CommandRanker.results(for: query, manager: host.commandBarTabs, profile: host.commandBarProfile, suggestions: suggestions, history: pages,
-                                            editingCurrent: mode == .editCurrent, historyOnly: mode == .history)
+                                            editingCurrent: mode == .editCurrent, historyOnly: mode == .history,
+                                            leavingOutFailed: controller == nil)
         if editing { results = [] }
         // Zigzag's commands act on a browser window's tabs: outside one there's nothing for them to act on.
         if controller == nil { results.removeAll { if case .action = $0.kind { true } else { false } } }

@@ -759,6 +759,8 @@ final class Tab: NSObject {
     private var lastRecorded: URL?
     /// The address an error page is showing for ("Can't find…"): not a visit, so not history or a suggestion.
     private var errorShownFor: URL?
+    /// Only showing an error page ("Can't find…") for where it tried to go: there's no page to go back to.
+    var showsErrorPage: Bool { url != nil && url == errorShownFor }
 
     private func recordHistory(_ url: URL, title: String?) {
         // Zigzag's own pages (History, Settings) aren't visits, and neither is a page that failed to load.
