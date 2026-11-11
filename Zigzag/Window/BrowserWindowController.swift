@@ -1438,8 +1438,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let container = root.sidebarContainer.frame
         let lightHeight = window.trafficLightHeight
         let x = (docked || inBar ? 0 : container.minX) + SidebarView.trafficLightsX
-        // In the bar, on its middle line, wherever the bar starts.
-        let y = (docked ? 0 : inBar ? root.topBarFrame.minY : container.minY) + sidebar.trafficLightCenterY - lightHeight / 2
+        // In the bar, on its middle line, wherever the bar starts: not the sidebar's line, which is still the docked
+        // one while it slides away.
+        let center = inBar ? root.topBarFrame.minY + Tokens.Sidebar.lightsCenter : (docked ? 0 : container.minY) + sidebar.trafficLightCenterY
+        let y = center - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating || inBar, let image = window.trafficLightsImage() { trafficLightsPicture = image }
         sidebar.trafficLightsWidth = fullScreen ? 0 : window.trafficLightsWidth
