@@ -602,10 +602,12 @@ final class ExtensionHost: NSObject {
             // Its side panel opening (Claude's, from its own click handler) is it doing something.
             if WindowManager.shared.controllers.contains(where: { $0.root.showsSidePanel && $0.root.sidePanel.extensionID == item.id }) { return }
             let tabsNow = WindowManager.shared.controllers.map(\.tabManager.allTabs.count).reduce(0, +)
-            guard tabsNow == tabsBefore, let options = context.optionsPageURL,
-                  let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+            // This profile's copy of its options, in a space on this profile, never in a private window.
+            let key = WindowManager.shared.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
+            guard tabsNow == tabsBefore, let options = context.optionsPageURL, let controller = key ?? self.openWindows.first,
+                  let space = controller.tabManager.space(for: self.profile) else { return }
             ExtensionLog.write("click did nothing; opening its options")
-            controller.tabManager.newTab(url: options)
+            controller.tabManager.newTab(url: options, spaceID: space)
         }
     }
 
@@ -873,7 +875,9 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
 
     func webExtensionController(_ controller: WKWebExtensionController, openOptionsPageFor extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping ((any Error)?) -> Void) {
-        guard let url = extensionContext.optionsPageURL, let window = WindowManager.shared.keyController else { completionHandler(nil); return }
+        // Never in a private window, where extensions don't run: their options page would be a blank one there.
+        let key = WindowManager.shared.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
+        guard let url = extensionContext.optionsPageURL, let window = key ?? openWindows.first else { completionHandler(nil); return }
         guard let space = window.tabManager.space(for: profile) else { completionHandler(Self.noSpace); return }
         window.tabManager.newTab(url: url, spaceID: space, title: extensionContext.webExtension.displayName)
         completionHandler(nil)
