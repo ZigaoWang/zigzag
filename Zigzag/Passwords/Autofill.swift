@@ -222,7 +222,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     var debugRows: [String] { menu?.debugRows ?? [] }
 
     /// A mouse down and up on the middle of `view`'s `rect`, sent to its window as a click would arrive.
-    private static func debugSendClick(at rect: NSRect, in view: NSView) {
+    private static func debugSendClick(at rect: NSRect, in view: NSView, right: Bool = false) {
         guard let window = view.window, let content = window.contentView?.superview else { return }
         let point = view.convert(NSPoint(x: rect.midX, y: rect.midY), to: nil)
         // Straight to the view under the point, as the window passes a click on: a test copy in the background
@@ -230,6 +230,12 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         guard let target = content.hitTest(content.convert(point, from: nil)) else { return }
         debugLog("autofill debug click on \(type(of: target))")
         if window.firstResponder !== target, target.acceptsFirstResponder { window.makeFirstResponder(target) }
+        if right {
+            // A right-click: the page's own context menu, as WebKit builds it.
+            if let event = NSEvent.mouseEvent(with: .rightMouseDown, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                              windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) { target.rightMouseDown(with: event) }
+            return
+        }
         for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
             guard let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                                                  windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0) else { continue }
@@ -239,7 +245,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
 
     /// For the debug bridge: a click on the page element `selector` matches, as a person's click reaches the page.
     /// `selector@x,y` clicks that far from the element's top left corner instead of its middle.
-    static func debugClick(_ spec: String, in webView: WKWebView) {
+    static func debugClick(_ spec: String, in webView: WKWebView, right: Bool = false) {
         let parts = spec.split(separator: "@", maxSplits: 1).map(String.init)
         let selector = parts[0]
         let offset = parts.count > 1 ? parts[1].split(separator: ",").compactMap { Double($0) } : []
@@ -252,7 +258,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             var local = offset.count == 2 ? NSRect(x: (rect[0] + offset[0]) * zoom - 1, y: (rect[1] + offset[1]) * zoom - 1, width: 2, height: 2)
                 : NSRect(x: rect[0] * zoom, y: rect[1] * zoom, width: rect[2] * zoom, height: rect[3] * zoom)
             if !webView.isFlipped { local.origin.y = webView.bounds.height - local.maxY }
-            debugSendClick(at: local, in: webView)
+            debugSendClick(at: local, in: webView, right: right)
         }
     }
 

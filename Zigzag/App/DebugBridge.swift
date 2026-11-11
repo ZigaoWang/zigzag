@@ -899,7 +899,9 @@ enum DebugBridge {
         case "autofillclick":
             // autofillclick <css selector>: a click on that element of the page, sent to the window in-process.
             // autofillclick peek <css selector>: the same, in the page peeked at.
+            // autofillclick right <css selector>: a right-click there, opening the page's context menu (closed after 3 s).
             if arg.hasPrefix("peek "), let webView = controller.peek.tab?.webView { Autofill.debugClick(String(arg.dropFirst(5)), in: webView) }
+            else if arg.hasPrefix("right "), let webView = controller.selectedWebView { closeNextMenu(after: 3); Autofill.debugClick(String(arg.dropFirst(6)), in: webView, right: true) }
             else if let webView = controller.selectedWebView { Autofill.debugClick(arg, in: webView) }
         case "autofillpick":
             // autofillpick <row>: a click on that row of the password menu, sent to the window in-process.
@@ -907,6 +909,30 @@ enum DebugBridge {
         case "autofillpickactive":
             // autofillpickactive <row>: the same, once this copy is the app in front (for Passwords…).
             Autofill.shared.debugPickWhenActive(Int(arg) ?? 0)
+        case "activate":
+            // activate: this copy in front, its window key (nothing else happens).
+            NSApp.activate(ignoringOtherApps: true)
+            controller.window?.makeKeyAndOrderFront(nil)
+        case "menudump":
+            // menudump <title>: that menu of the menu bar, with its submenus and their actions (Edit › AutoFill).
+            if let menu = NSApp.mainMenu?.items.first(where: { $0.title == arg })?.submenu {
+                menu.update()
+                debugLog("menudump \(arg): " + BrowserWebView.debugDescribe(menu))
+            }
+        case "sysautofill":
+            // sysautofill <css selector>: once this copy is in front, that field of the page focused and the Mac's
+            // AutoFill panel asked for on it, as Passwords… does. Logs whether it was sent; never reads the panel.
+            guard let webView = controller.selectedWebView, let origin = Origin(webView.url) else { break }
+            let selector = arg
+            Task {
+                NSApp.activate(ignoringOtherApps: true)
+                controller.window?.makeKeyAndOrderFront(nil)
+                for _ in 0..<50 where !NSApp.isActive { try? await Task.sleep(for: .milliseconds(100)) }
+                _ = try? await webView.callAsyncJavaScript("const el = document.querySelector(sel); window.__zigzagField = el ? new WeakRef(el) : null; return !!el",
+                                                           arguments: ["sel": selector], in: nil, contentWorld: .defaultClient)
+                let opened = await SystemAutoFillPanel.open(in: webView, frame: nil, origin: origin, inFront: Autofill.isInFront)
+                debugLog("sysautofill => available=\(SystemAutoFillPanel.isAvailable) active=\(NSApp.isActive) opened=\(opened)")
+            }
         case "importprobe":
             // Lists the browsers found and how many bookmarks and history pages each has; imports nothing.
             Task {
