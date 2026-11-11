@@ -83,6 +83,35 @@ extension ExtensionBridgeTests {
         }
         first.setPermissionStatus(.deniedExplicitly, for: api)
         #expect(!BridgeExtensionFetch.allows(URL(string: "https://api.example/session")!, context: first))
+        // A site granted by site access that the manifest never asked for (Zigzag's "When you click it").
+        let clicked = try WKWebExtension.MatchPattern(string: "*://clicked.example/*")
+        second.setPermissionStatus(.grantedExplicitly, for: clicked)
+        #expect(second.hasAccess(to: URL(string: "https://clicked.example/me")!))
+        #expect(!BridgeExtensionFetch.allows(URL(string: "https://clicked.example/me")!, context: second))
+    }
+
+    /// Optional host permissions count once granted at runtime, and "<all_urls>" reaches every site, as in Chrome.
+    @Test func credentialedFetchFollowsOptionalAndAllSitesGrants() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Synthetic","version":"1.0","optional_host_permissions":["https://later.example/*"]}"#.utf8)
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        let context = WKWebExtensionContext(for: try await WKWebExtension(resourceBaseURL: folder))
+        let url = URL(string: "https://later.example/me")!
+        #expect(!BridgeExtensionFetch.allows(url, context: context))
+        context.setPermissionStatus(.grantedExplicitly, for: try WKWebExtension.MatchPattern(string: "https://later.example/*"))
+        #expect(BridgeExtensionFetch.allows(url, context: context))
+
+        let everywhere = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: everywhere, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: everywhere) }
+        try Data(#"{"manifest_version":3,"name":"Synthetic","version":"1.0","host_permissions":["<all_urls>"]}"#.utf8)
+            .write(to: everywhere.appendingPathComponent("manifest.json"))
+        let all = WKWebExtensionContext(for: try await WKWebExtension(resourceBaseURL: everywhere))
+        #expect(!BridgeExtensionFetch.allows(url, context: all))
+        all.setPermissionStatus(.grantedExplicitly, for: .allURLs())
+        #expect(BridgeExtensionFetch.allows(url, context: all))
     }
 
     @Test(arguments: ["Lax", "Strict"])

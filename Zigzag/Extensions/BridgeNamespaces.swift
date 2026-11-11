@@ -639,8 +639,12 @@ final class BridgeExtensionFetch: BridgeNamespace {
     static let permission = ""
     private let requests = ExtensionFetchRequests()
 
+    /// As in Chrome: a site the extension asked for in its manifest (host permissions, optional ones, or its content
+    /// scripts' matches) that it may reach now. Site access can grant a site it never asked for (a click on an
+    /// extension set to "When you click it"), and that alone never brings the site's cookies.
     static func allows(_ url: URL, context: WKWebExtensionContext) -> Bool {
         ["http", "https"].contains(url.scheme ?? "") && url.host() != nil && url.user == nil && url.password == nil
+            && context.webExtension.allRequestedMatchPatterns.union(context.webExtension.optionalPermissionMatchPatterns).contains { $0.matches(url) }
             && context.hasAccess(to: url)
     }
 
