@@ -5634,7 +5634,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此描述文件"
+            "value" : "当前描述文件"
           }
         }
       }
@@ -10916,7 +10916,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在“%@”中存储和填充"
+            "value" : "在“%@”中存储和填写"
           }
         }
       }
