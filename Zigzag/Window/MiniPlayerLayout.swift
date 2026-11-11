@@ -242,29 +242,6 @@ nonisolated enum MiniPlayerLayout {
         case (false, false): return .bottomRight
         }
     }
-
-    // MARK: Tucked away
-
-    /// Minimized, it's a small pill: the video live in a thumbnail at its start, then the site and two buttons.
-    static let pillSize = CGSize(width: 260, height: 44)
-    static let pillThumbnail = CGSize(width: 54, height: 32)
-
-    /// The pill in the card's place, held to the card's nearest corner: it stays where the card was, and the card
-    /// comes back there.
-    static func pillFrame(for card: CGRect, in area: CGRect) -> CGRect {
-        let corner = nearestCorner(to: CGPoint(x: card.midX, y: card.midY), in: area)
-        let x = corner.isLeft ? card.minX : card.maxX - pillSize.width
-        let y = corner.isTop ? card.minY : card.maxY - pillSize.height
-        return clamp(CGRect(origin: CGPoint(x: x, y: y), size: pillSize), in: area)
-    }
-
-    /// The card back from a pill at `pill`: grown out of the pill's corner, kept inside the area.
-    static func cardFrame(from pill: CGRect, size: CGSize, in area: CGRect) -> CGRect {
-        let corner = nearestCorner(to: CGPoint(x: pill.midX, y: pill.midY), in: area)
-        let x = corner.isLeft ? pill.minX : pill.maxX - size.width
-        let y = corner.isTop ? pill.minY : pill.maxY - size.height
-        return clamp(CGRect(origin: CGPoint(x: x, y: y), size: size), in: area)
-    }
 }
 
 /// Which tab is in the mini player, and what happens to it as you move between tabs. One per window: steps come out
@@ -277,11 +254,11 @@ nonisolated struct MiniPlayerModel: Equatable {
         case pause(UUID)
         /// The mini player lets it go: back into its page, or simply away.
         case end(UUID)
+        /// The card goes and the video plays on, out of sight, until you go to its tab.
+        case hide(UUID)
     }
 
-    private(set) var tab: UUID? { didSet { if tab != oldValue { isMinimized = false } } }
-    /// Tucked away in its pill: the video plays on, out of the way.
-    private(set) var isMinimized = false
+    private(set) var tab: UUID?
 
     /// Tabs changed on screen. `shown`: the tabs on screen now (two in a split). `playing`: a tab that was on screen,
     /// isn't now, and is playing a video that would follow you. Coming back to the mini player's tab puts its video
@@ -301,18 +278,13 @@ nonisolated struct MiniPlayerModel: Equatable {
         return steps
     }
 
-    /// Its minimize button: the card becomes a pill and the video plays on.
-    mutating func minimize() -> Bool {
-        guard tab != nil, !isMinimized else { return false }
-        isMinimized = true
-        return true
-    }
-
-    /// The pill's expand button, or a click on it: the card again.
-    mutating func expand() -> Bool {
-        guard tab != nil, isMinimized else { return false }
-        isMinimized = false
-        return true
+    /// Its minimize button: the card goes and the video plays on in its tab, out of sight. It comes back only the
+    /// next time you leave that tab while it plays: never by itself while you're on other tabs, which would undo
+    /// the minimize. The sidebar's now-playing row is the way back to it.
+    mutating func minimize() -> [Step] {
+        guard let tab else { return [] }
+        self.tab = nil
+        return [.hide(tab)]
     }
 
     /// Its close button: the video stops and the player goes.

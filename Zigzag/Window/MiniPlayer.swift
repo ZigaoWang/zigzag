@@ -4,8 +4,8 @@ import WebKit
 /// Arc's mini player: leave a tab while its video plays and the video keeps playing in a small card over the window,
 /// until you come back to the tab or close the card. It is the tab's own live page, moved into the card and scaled so
 /// only its video shows: nothing is copied or reloaded, the page keeps its layout (its size never changes, so it never
-/// reflows), and sound simply carries on. It drags anywhere in the window, over the sidebar too, and minimizes to a
-/// pill that keeps playing. One per window, in private windows too, kept across spaces.
+/// reflows), and sound simply carries on. It drags anywhere in the window, over the sidebar too; minimized, it goes
+/// and the video plays on in its tab, out of sight. One per window, in private windows too, kept across spaces.
 /// Settings › Tabs › Keep videos playing when you switch tabs turns it off.
 final class MiniPlayer {
     private weak var controller: BrowserWindowController?
@@ -22,10 +22,6 @@ final class MiniPlayer {
     private var tokens: [SignalToken] = []
     /// The video went missing: the player waits a moment for it (a page moving on to the next video), then goes.
     private var lostWait: DispatchWorkItem?
-    /// The card's size for this video and window, kept while it's a pill so it comes back the same.
-    private var cardSize: CGSize = .zero
-    /// Where the pill sits while minimized: where the card was, or where you dragged the pill.
-    private var pillAnchor: MiniPlayerLayout.Anchor?
 
     init(controller: BrowserWindowController) {
         self.controller = controller
@@ -39,7 +35,6 @@ final class MiniPlayer {
     }
 
     var isShowing: Bool { model.tab != nil }
-    var isMinimized: Bool { model.isMinimized }
 
     // MARK: Moving between tabs
 
@@ -79,36 +74,10 @@ final class MiniPlayer {
         controller.tabManager.select(tab)
     }
 
-    /// Its minimize button: the card becomes a pill where it was, and the video plays on.
+    /// Its minimize button: the card goes and the video plays on in its tab, out of sight; the sidebar's now-playing
+    /// row goes back to it.
     func minimize() {
-        guard let card, model.minimize() else { return }
-        pillAnchor = nil
-        morph(card)
-    }
-
-    /// The pill clicked, or its expand button: the card again, grown out of the pill's corner.
-    func expand() {
-        guard let card, model.expand() else { return }
-        let area = movableArea
-        if let pillAnchor {
-            let pill = MiniPlayerLayout.frame(for: pillAnchor, size: MiniPlayerLayout.pillSize, in: area)
-            Self.anchor = MiniPlayerLayout.anchor(of: MiniPlayerLayout.cardFrame(from: pill, size: cardSize, in: area), in: area)
-        }
-        pillAnchor = nil
-        morph(card)
-    }
-
-    /// Card to pill and back in a quick cross-fade: the page inside is placed afresh for its new size, which a resize
-    /// on the render server couldn't follow.
-    private func morph(_ card: MiniPlayerView) {
-        let minimized = model.isMinimized
-        Tokens.Motion.animate(Tokens.Motion.feedback, { card.animator().alphaValue = 0 }, completion: { [weak self, weak card] in
-            guard let self, let card, self.card === card else { return }
-            card.setMinimized(minimized)
-            self.place()
-            card.layoutSubtreeIfNeeded()
-            Tokens.Motion.animate(Tokens.Motion.snappy, { card.animator().alphaValue = 1 })
-        })
+        apply(model.minimize())
     }
 
     private func apply(_ steps: [MiniPlayerModel.Step]) {
@@ -120,6 +89,8 @@ final class MiniPlayer {
                 pause()
             case .end:
                 finish(closing: steps.contains { if case .pause = $0 { true } else { false } })
+            case .hide:
+                finish(closing: true)
             }
         }
     }
@@ -138,17 +109,14 @@ final class MiniPlayer {
         videoIndex = video.index
         self.video = video
         frameOrigin = .zero
-        pillAnchor = nil
         // Where the video was on screen, to grow the card out of; a frame's place in its page isn't known yet.
         let source: NSRect? = frame.isMain ? webView.convert(pictureRect(in: webView), to: root) : nil
 
         let card = MiniPlayerView()
         card.siteName = Self.siteName(tab.url)
-        card.title = tab.displayTitle
         card.onBack = { [weak self] in self?.returnToTab() }
         card.onClose = { [weak self] in self?.close() }
         card.onMinimize = { [weak self] in self?.minimize() }
-        card.onExpand = { [weak self] in self?.expand() }
         card.onToggle = { [weak self] in self?.command("toggle") }
         card.onSeek = { [weak self] by in self?.command("seek", [("by", by)]) }
         card.onSeekTo = { [weak self] fraction in self?.command("seekTo", [("f", fraction)]) }
@@ -168,10 +136,7 @@ final class MiniPlayer {
             },
             tab.changed.observe { [weak self, weak tab] change in
                 guard let self, let tab else { return }
-                if change == .title || change == .url {
-                    self.card?.title = tab.displayTitle
-                    self.card?.siteName = Self.siteName(tab.url)
-                }
+                if change == .url { self.card?.siteName = Self.siteName(tab.url) }
                 guard change == .webView || change == .url else { return }
                 if tab.webView !== self.webView { self.apply(self.model.lost(tab.id)) }
             },
@@ -207,7 +172,6 @@ final class MiniPlayer {
         self.webView = nil
         frameID = nil
         video = nil
-        pillAnchor = nil
     }
 
     private func pause() {
@@ -294,29 +258,19 @@ final class MiniPlayer {
         return MiniPlayerLayout.movableArea(in: root.bounds, below: root.showsTopBar ? root.topBarFrame.maxY : nil)
     }
 
-    /// Sizes the card for the video and the window, where you left it (or where it's being dragged); minimized, the
-    /// pill where it sits.
+    /// Sizes the card for the video and the window, where you left it (or where it's being dragged).
     func place() {
         guard let controller, let card, let webView else { return }
         let area = movableArea
         let picture = pictureRect(in: webView)
         let aspect = picture.height > 0 ? picture.width / picture.height : 16 / 9
         let size = MiniPlayerLayout.cardSize(aspect: aspect, in: controller.root.cardFrame.size)
-        cardSize = size
         // Until it's first moved, at the bottom right of the page.
-        let cardFrame = Self.anchor.map { MiniPlayerLayout.frame(for: $0, size: size, in: area) }
+        let target = Self.anchor.map { MiniPlayerLayout.frame(for: $0, size: size, in: area) }
             ?? MiniPlayerLayout.clamp(MiniPlayerLayout.frame(at: .bottomRight, size: size, in: controller.root.cardFrame), in: area)
-        let target: NSRect
-        if model.isMinimized {
-            let anchor = pillAnchor ?? MiniPlayerLayout.anchor(of: MiniPlayerLayout.pillFrame(for: cardFrame, in: area), in: area)
-            pillAnchor = anchor
-            target = MiniPlayerLayout.frame(for: anchor, size: MiniPlayerLayout.pillSize, in: area)
-        } else {
-            target = cardFrame
-        }
         card.dragArea = area
         if !card.isDragging, card.frame != target { card.frame = target }
-        card.show(MiniPlayerLayout.placement(showing: picture, in: card.videoSize(for: target.size)))
+        card.show(MiniPlayerLayout.placement(showing: picture, in: target.size))
     }
 
     /// Let go after a drag: it stays where it was let go, settling on the edge when it's let go near one. Its place is
@@ -325,11 +279,7 @@ final class MiniPlayer {
         guard let card else { return }
         let area = movableArea
         let target = MiniPlayerLayout.dropped(card.frame, in: area)
-        if model.isMinimized {
-            pillAnchor = MiniPlayerLayout.anchor(of: target, in: area)
-        } else {
-            Self.anchor = MiniPlayerLayout.anchor(of: target, in: area)
-        }
+        Self.anchor = MiniPlayerLayout.anchor(of: target, in: area)
         guard target != card.frame else { return }
         Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) { card.animator().frame = target }
     }
@@ -342,7 +292,7 @@ final class MiniPlayer {
     #if DEBUG
     /// The card's state for scripted checks.
     var debugState: [String: Any] {
-        ["showing": isShowing, "minimized": isMinimized, "tab": tab?.displayTitle ?? "", "frame": card.map { NSStringFromRect($0.frame) } ?? "",
+        ["showing": isShowing, "tab": tab?.displayTitle ?? "", "frame": card.map { NSStringFromRect($0.frame) } ?? "",
          "anchor": Self.anchor?.stored ?? "", "area": NSStringFromRect(movableArea), "playing": video?.isPlaying ?? false, "time": video?.time ?? 0,
          "selected": controller?.tabManager.selectedTab?.displayTitle ?? "", "space": controller?.tabManager.currentSpaceID.uuidString ?? "",
          "follows": controller?.tabManager.allTabs.filter(follows).map(\.displayTitle) ?? [],
@@ -355,11 +305,8 @@ final class MiniPlayer {
 // MARK: - The card
 
 /// The card the video plays in: rounded, on the floating layer's one shadow, the page inside scaled so its video
-/// fills it. Pointing at it dims the picture and brings its controls; it drags anywhere in the window. Minimized, it's
-/// a pill: the video live in a thumbnail, its title, play and expand.
+/// fills it. Pointing at it dims the picture and brings its controls; it drags anywhere in the window.
 final class MiniPlayerView: NSView {
-    /// The pill's own surface, under its thumbnail.
-    private let surface = MiniPlayerShape()
     /// Rounds the page inside: an AppKit view only clips what's in it (the page's layers included) with
     /// `clipsToBounds` on, whatever its layer says.
     private let clip = NSView()
@@ -373,7 +320,7 @@ final class MiniPlayerView: NSView {
     private let scrim = MiniPlayerScrim()
     private let backButton = MiniPlayerSiteButton()
     private let minimizeButton = MiniPlayerView.overlayButton("minus", side: MiniPlayerView.topSide, glyph: 13,
-        tip: String(localized: "Minimize", comment: "Tooltip of the mini player's button that shrinks it to a small pill; the video keeps playing."))
+        tip: String(localized: "Minimize", comment: "Tooltip of the mini player's button that hides it; the video keeps playing in its tab."))
     private let closeButton = MiniPlayerView.overlayButton("xmark", side: MiniPlayerView.topSide, glyph: 13,
         tip: String(localized: "Close", comment: "Tooltip of the mini player's close button: stops the video and closes the player."))
     private let rewindButton = MiniPlayerView.overlayButton("gobackward.15", side: MiniPlayerView.centerSide, glyph: 20,
@@ -383,18 +330,11 @@ final class MiniPlayerView: NSView {
     private let forwardButton = MiniPlayerView.overlayButton("goforward.15", side: MiniPlayerView.centerSide, glyph: 20,
         tip: String(localized: "Forward 15 Seconds", comment: "Tooltip of the mini player's button that skips the video ahead 15 seconds."))
     private let progress = MiniPlayerProgress()
-    private let pill = MiniPlayerControls()
-    private let pillTitle = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textPrimary)
-    private let pillPlay = IconButton(symbol: "pause.fill", size: .compact,
-        toolTip: String(localized: "Pause", comment: "Tooltip of the mini player's play button while the video plays."))
-    private let pillExpand = IconButton(symbol: "arrow.up.left.and.arrow.down.right", size: .compact,
-        toolTip: String(localized: "Expand", comment: "Tooltip of the minimized mini player's button that makes it a full card again."))
     private weak var webView: WKWebView?
 
     var onBack: (() -> Void)?
     var onClose: (() -> Void)?
     var onMinimize: (() -> Void)?
-    var onExpand: (() -> Void)?
     var onToggle: (() -> Void)?
     var onSeek: ((Double) -> Void)?
     var onSeekTo: ((Double) -> Void)?
@@ -409,15 +349,10 @@ final class MiniPlayerView: NSView {
             needsLayout = true
         }
     }
-    /// The tab's title, on the pill.
-    var title = "" { didSet { if title != oldValue { pillTitle.stringValue = title.isEmpty ? siteName : title } } }
-    private(set) var isMinimized = false
 
     /// The buttons along the top, and the three in the middle.
     private static let topSide: CGFloat = 28
     private static let centerSide: CGFloat = 36
-    private static let pillRadius: CGFloat = Tokens.Radius.tile
-    private static let pillInset: CGFloat = 6
     /// The controls go this long after the pointer stops moving over the video.
     private static let idleHide: TimeInterval = 2.5
 
@@ -445,8 +380,6 @@ final class MiniPlayerView: NSView {
         layer?.masksToBounds = false
         layer?.shadowOpacity = 1
         layer?.shadowRadius = Tokens.Shadow.panelRadius
-        surface.isHidden = true
-        addSubview(surface)
         clip.wantsLayer = true
         clip.clipsToBounds = true
         clip.layer?.masksToBounds = true
@@ -467,10 +400,6 @@ final class MiniPlayerView: NSView {
         for view in [backButton, minimizeButton, closeButton, rewindButton, playButton, forwardButton, progress] as [NSView] { controls.addSubview(view) }
         addSubview(controls)
 
-        pill.isHidden = true
-        pillTitle.lineBreakMode = .byTruncatingTail
-        for view in [pillTitle, pillPlay, pillExpand] as [NSView] { pill.addSubview(view) }
-        addSubview(pill)
         edge.layer?.borderWidth = Tokens.Metric.hairline
         addSubview(edge)
 
@@ -480,8 +409,6 @@ final class MiniPlayerView: NSView {
         rewindButton.onClick = { [weak self] _ in self?.onSeek?(-15) }
         forwardButton.onClick = { [weak self] _ in self?.onSeek?(15) }
         playButton.onClick = { [weak self] _ in self?.onToggle?() }
-        pillPlay.onClick = { [weak self] _ in self?.onToggle?() }
-        pillExpand.onClick = { [weak self] _ in self?.onExpand?() }
         progress.onSeek = { [weak self] fraction in self?.onSeekTo?(fraction) }
         // Holding the bar keeps the controls up.
         progress.onScrub = { [weak self] _ in self?.keepControls() }
@@ -523,44 +450,20 @@ final class MiniPlayerView: NSView {
         needsLayout = true
     }
 
-    /// How big the video shows in a card or pill this big.
-    func videoSize(for size: CGSize) -> CGSize { isMinimized ? MiniPlayerLayout.pillThumbnail : size }
-
-    private var videoFrame: NSRect {
-        guard isMinimized else { return bounds }
-        let thumb = MiniPlayerLayout.pillThumbnail
-        return NSRect(x: Self.pillInset, y: (bounds.height - thumb.height) / 2, width: thumb.width, height: thumb.height)
-    }
-
-    /// Card or pill.
-    func setMinimized(_ on: Bool) {
-        guard on != isMinimized else { return }
-        isMinimized = on
-        setControls(false, animated: false)
-        hideTimer?.invalidate()
-        needsLayout = true
-    }
-
     override func layout() {
         super.layout()
         Tokens.Motion.withoutAnimation {
-            let radius = isMinimized ? Self.pillRadius : Tokens.Radius.panel
-            let video = videoFrame
-            clip.frame = video
-            clip.layer?.cornerRadius = isMinimized ? Self.pillRadius - Self.pillInset : radius
+            let radius = Tokens.Radius.panel
+            clip.frame = bounds
+            clip.layer?.cornerRadius = radius
             host.frame = clip.bounds
-            host.bounds = placement.visible(in: video.size)
-            surface.isHidden = !isMinimized
-            surface.frame = bounds
-            surface.radius = radius
+            host.bounds = placement.visible(in: bounds.size)
             edge.frame = bounds
             edge.radius = radius
             layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
             layer?.shadowOffset = Tokens.Shadow.panelOffset(flipped: isFlipped)
-            controls.isHidden = isMinimized
             controls.layer?.cornerRadius = radius
-            pill.isHidden = !isMinimized
-            if isMinimized { layoutPill() } else { layoutControls() }
+            layoutControls()
         }
     }
 
@@ -583,16 +486,6 @@ final class MiniPlayerView: NSView {
                                 width: max(0, bounds.width - Tokens.Space.x3 * 2), height: MiniPlayerProgress.height)
     }
 
-    private func layoutPill() {
-        pill.frame = bounds
-        let side = Tokens.Metric.compactIconButton, edge = (bounds.height - side) / 2
-        pillExpand.frame = NSRect(x: bounds.width - edge - side, y: edge, width: side, height: side)
-        pillPlay.frame = NSRect(x: pillExpand.frame.minX - 2 - side, y: edge, width: side, height: side)
-        let x = videoFrame.maxX + Tokens.Space.x2
-        let h = pillTitle.lineHeight
-        pillTitle.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: max(0, pillPlay.frame.minX - Tokens.Space.x1 - x), height: h)
-    }
-
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         refreshColors()
@@ -602,7 +495,6 @@ final class MiniPlayerView: NSView {
         Tokens.Motion.withoutAnimation {
             layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
             edge.layer?.borderColor = cgColor(Tokens.Color.panelEdge)
-            surface.layer?.backgroundColor = cgColor(Tokens.Color.panelBackground)
         }
     }
 
@@ -618,8 +510,6 @@ final class MiniPlayerView: NSView {
             playButton.symbol = symbol
             playButton.glyph = Self.overlayGlyph(symbol, size: 24)
             playButton.toolTip = tip
-            pillPlay.symbol = symbol
-            pillPlay.toolTip = tip
         }
         let seekable = video.duration != nil
         rewindButton.isHidden = !seekable
@@ -672,10 +562,6 @@ final class MiniPlayerView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard !isGoing, !isHidden, frame.contains(point) else { return nil }
         let local = convert(point, from: superview)
-        if isMinimized {
-            if let hit = pill.hitTest(local), hit is InteractiveView, !hit.isHidden { return hit }
-            return self
-        }
         if showsControls, let hit = controls.hitTest(local), hit is InteractiveView || hit is MiniPlayerProgress, !hit.isHidden {
             return hit
         }
@@ -691,8 +577,8 @@ final class MiniPlayerView: NSView {
         tracking = area
     }
 
-    override func mouseEntered(with event: NSEvent) { if !isMinimized { keepControls() } }
-    override func mouseMoved(with event: NSEvent) { if !isMinimized { keepControls() } }
+    override func mouseEntered(with event: NSEvent) { keepControls() }
+    override func mouseMoved(with event: NSEvent) { keepControls() }
     override func mouseExited(with event: NSEvent) {
         guard !isDragging, !progress.isScrubbing else { return }
         hideTimer?.invalidate()
@@ -706,7 +592,6 @@ final class MiniPlayerView: NSView {
 
     /// Up, and up for a while longer: the pointer is on the card.
     private func keepControls() {
-        guard !isMinimized else { return }
         setControls(true, animated: true)
         hideTimer?.invalidate()
         hideTimer = Timer.scheduledTimer(withTimeInterval: Self.idleHide, repeats: false) { [weak self] _ in
@@ -740,7 +625,7 @@ final class MiniPlayerView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         // Twice on the card: back to its tab, as Arc's does.
-        if event.clickCount == 2, !isMinimized { pressPoint = nil; onBack?(); return }
+        if event.clickCount == 2 { pressPoint = nil; onBack?(); return }
         pressPoint = superview?.convert(event.locationInWindow, from: nil)
         pressOrigin = frame.origin
     }
@@ -769,9 +654,6 @@ final class MiniPlayerView: NSView {
         if isDragging {
             isDragging = false
             onMoved?()
-        } else if isMinimized {
-            // A click on the pill: the card again.
-            onExpand?()
         } else {
             keepControls()
         }
@@ -787,7 +669,6 @@ final class MiniPlayerView: NSView {
         case "back", "site": onBack?()
         case "close": onClose?()
         case "minimize": onMinimize?()
-        case "expand": onExpand?()
         case "play": onToggle?()
         case "rewind": onSeek?(-15)
         case "forward": onSeek?(15)
@@ -901,12 +782,12 @@ private final class MiniPlayerScrim: NSView {
     }
 }
 
-/// A holder whose y runs down, for the card's and the pill's controls.
+/// A holder whose y runs down, for the card's controls.
 private final class MiniPlayerControls: NSView {
     override var isFlipped: Bool { true }
 }
 
-/// The card's rounded outline or the pill's surface: drawn, never clicked.
+/// The card's rounded outline: drawn, never clicked.
 private final class MiniPlayerShape: NSView {
     var radius: CGFloat = 0 { didSet { layer?.cornerRadius = radius } }
 

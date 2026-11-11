@@ -206,53 +206,35 @@ struct MiniPlayerTests {
 
     // MARK: Minimized
 
-    @Test func thePillTakesTheCardsCorner() {
-        let bottomRight = CGRect(x: 935, y: 606, width: 333, height: 187)
-        let pill = MiniPlayerLayout.pillFrame(for: bottomRight, in: window)
-        #expect(pill.maxX == bottomRight.maxX)
-        #expect(pill.maxY == bottomRight.maxY)
-        #expect(pill.size == MiniPlayerLayout.pillSize)
-        let topLeft = CGRect(x: 12, y: 60, width: 333, height: 187)
-        #expect(MiniPlayerLayout.pillFrame(for: topLeft, in: window).origin == topLeft.origin)
-        // Expanded, the card grows back out of the pill's corner.
-        #expect(MiniPlayerLayout.cardFrame(from: pill, size: bottomRight.size, in: window) == bottomRight)
-    }
-
-    @Test func minimizingKeepsItPlayingAndExpandingBringsItBack() {
+    @Test func minimizingHidesItAndTheVideoPlaysOn() {
         var model = MiniPlayerModel()
         // Nothing showing: nothing to minimize.
-        let nothing = model.minimize()
-        #expect(!nothing)
+        #expect(model.minimize() == [])
         _ = model.switched(shown: [b], playing: a)
-        let minimized = model.minimize()
-        #expect(minimized)
-        #expect(model.isMinimized)
-        // Nothing stops: still its tab's.
-        #expect(model.tab == a)
-        let again = model.minimize()
-        #expect(!again)
-        let expanded = model.expand()
-        #expect(expanded)
-        #expect(!model.isMinimized)
-        let expandedAgain = model.expand()
-        #expect(!expandedAgain)
+        // The card goes; nothing is paused.
+        #expect(model.minimize() == [.hide(a)])
+        #expect(model.tab == nil)
+        #expect(model.minimize() == [])
     }
 
-    @Test func minimizedItEndsLikeTheCard() {
+    @Test func aMinimizedVideoComesBackOnlyWhenYouLeaveItsTabAgain() {
         var model = MiniPlayerModel()
         _ = model.switched(shown: [b], playing: a)
         _ = model.minimize()
-        // Back to its tab from the pill: the video goes back in its page.
-        #expect(model.switched(shown: [a], playing: nil) == [.end(a)])
-        #expect(!model.isMinimized)
-        // The next video comes as a card.
+        // Moving among other tabs while it plays on out of sight never brings the card back.
+        #expect(model.switched(shown: [c], playing: nil) == [])
+        #expect(model.switched(shown: [b], playing: nil) == [])
+        // Back on its tab, the page simply shows; leaving it again while it plays brings the card.
+        #expect(model.switched(shown: [a], playing: nil) == [])
+        #expect(model.switched(shown: [b], playing: a) == [.show(a)])
+    }
+
+    @Test func anotherVideoAfterAMinimizeTakesTheCardWithoutStoppingIt() {
+        var model = MiniPlayerModel()
         _ = model.switched(shown: [b], playing: a)
         _ = model.minimize()
-        #expect(model.switched(shown: [c], playing: b) == [.pause(a), .end(a), .show(b)])
-        #expect(!model.isMinimized)
-        _ = model.minimize()
-        #expect(model.close() == [.pause(b), .end(b)])
-        #expect(!model.isMinimized)
+        // a is no longer the player's: leaving b playing shows b, and a, hidden, isn't paused by it.
+        #expect(model.switched(shown: [c], playing: b) == [.show(b)])
     }
 
     @Test func backToTheTabInAnotherSpaceEndsIt() {
