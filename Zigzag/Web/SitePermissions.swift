@@ -374,7 +374,7 @@ final class PermissionPrompt: FloatingPanelView {
         return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(frame: .zero)
             prompt.request.stringValue = String(localized: "\(request)?", comment: "A site's permission question: the request, then a question mark, like “Use your camera?”.")
-            prompt.asker.stringValue = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+            prompt.asker.stringValue = host.withoutWWW
             prompt.askingHost = host
             prompt.askingOrigin = origin
             if let icon {

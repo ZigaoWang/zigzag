@@ -62,7 +62,7 @@ final class LinkStatusController {
         guard let scheme = url.scheme, ["http", "https"].contains(scheme.lowercased()) else { return url.absoluteString }
         var text = url.absoluteString
         if let range = text.range(of: "\(scheme)://") { text.removeSubrange(range) }
-        if text.hasPrefix("www.") { text.removeFirst(4) }
+        text = text.withoutWWW
         if text.hasSuffix("/") { text.removeLast() }
         return text.removingPercentEncoding ?? text
     }

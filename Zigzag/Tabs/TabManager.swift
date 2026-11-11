@@ -1089,7 +1089,7 @@ final class TabManager {
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url.absoluteString }
         components.fragment = nil
         components.scheme = components.scheme?.lowercased() == "http" ? "https" : components.scheme?.lowercased()
-        if let host = components.host?.lowercased() { components.host = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host }
+        if let host = components.host?.lowercased() { components.host = host.withoutWWW }
         var path = components.path
         while path.hasSuffix("/") { path.removeLast() }
         components.path = path

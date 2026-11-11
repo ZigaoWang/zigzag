@@ -143,7 +143,7 @@ final class TabThumbnailView: InteractiveView {
         placeholder.image = tab.favicon
         // A web page by its site; Zigzag's own pages (History) and files by their title, never a bare "history".
         if let url = tab.url, ["http", "https"].contains(url.scheme), let host = url.host() {
-            siteName.stringValue = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+            siteName.stringValue = host.withoutWWW
         } else {
             siteName.stringValue = tab.displayTitle
         }

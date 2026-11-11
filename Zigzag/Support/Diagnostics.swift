@@ -33,7 +33,7 @@ nonisolated enum Diagnostics {
     /// Notes something that went wrong (or a step in a flow that tends to: a pop-up, a sign-in). `site` is a host;
     /// pass `isPrivate` from a private window and the site is left out. Repeats in a row are counted, not added.
     static func note(_ kind: String, site: String? = nil, _ detail: String? = nil, isPrivate: Bool = false) {
-        let site = isPrivate ? nil : site.map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 }.flatMap { $0.isEmpty ? nil : $0 }
+        let site = isPrivate ? nil : site.map { $0.withoutWWW }.flatMap { $0.isEmpty ? nil : $0 }
         // A private window's own words (an error quoting a host, a certificate naming its site) never land here:
         // only an error's code, which names nothing.
         let detail = isPrivate ? detail.flatMap(errorCode) : detail.map(clean)

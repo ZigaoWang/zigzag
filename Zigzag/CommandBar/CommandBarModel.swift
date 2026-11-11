@@ -88,7 +88,7 @@ enum CommandRanker {
     static func displayURL(_ url: URL) -> String {
         var text = url.absoluteString
         for prefix in ["https://", "http://"] where text.hasPrefix(prefix) { text.removeFirst(prefix.count) }
-        if text.hasPrefix("www.") { text.removeFirst(4) }
+        text = text.withoutWWW
         if text.hasSuffix("/") { text.removeLast() }
         return text
     }
@@ -116,7 +116,7 @@ enum CommandRanker {
     /// What History is asked for to complete the text: it lowercased and without "www.", or nil when it can't complete.
     static func completionPrefix(for text: String) -> String? {
         let lower = text.lowercased()
-        let bare = lower.hasPrefix("www.") ? String(lower.dropFirst(4)) : lower
+        let bare = lower.withoutWWW
         return !bare.isEmpty && InlineCompletion.looksLikeHost(lower) ? bare : nil
     }
 

@@ -51,7 +51,7 @@ struct SiteSearch: Equatable {
     static func match(_ typed: String) -> SiteSearch? {
         let text = typed.trimmingCharacters(in: .whitespaces).lowercased()
         guard text.count >= 2 else { return nil }
-        let bare = text.hasPrefix("www.") ? String(text.dropFirst(4)) : text
+        let bare = text.withoutWWW
         // Exact short forms first ("gh", "yt"), then the start of a name.
         if let exact = all.first(where: { $0.keys.contains(bare) }) { return exact }
         guard bare.count >= 3, !bare.contains(" ") || all.contains(where: { $0.keys.contains { $0.hasPrefix(bare) && $0.contains(" ") } }) else { return nil }

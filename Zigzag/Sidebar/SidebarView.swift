@@ -376,7 +376,7 @@ final class AddressView: InteractiveView {
     /// The site's name as the address shows it: without "www.", with a port that isn't the usual one, so
     /// "accounts.google.com:81" never reads as Google's own.
     private static func site(_ host: String, port: Int?, scheme: String?) -> String {
-        let name = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        let name = host.withoutWWW
         let usual = scheme == "https" ? 443 : scheme == "http" ? 80 : nil
         guard let port, port != usual else { return name }
         return "\(name):\(port)"

@@ -245,7 +245,7 @@ final class HistoryStore {
 
     nonisolated static func normalizedHost(_ url: URL) -> String {
         let host = url.host()?.lowercased() ?? ""
-        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        return host.withoutWWW
     }
 
     nonisolated static func words(_ query: String) -> [String] {
@@ -466,4 +466,9 @@ nonisolated final class HistoryReader: @unchecked Sendable {
     }
 
     private func isNewest(_ asker: Int, _ ticket: Int) -> Bool { lock.withLock { newest[asker] == ticket } }
+}
+
+extension String {
+    /// A host without its leading "www.", as Zigzag shows and compares sites.
+    nonisolated var withoutWWW: String { hasPrefix("www.") ? String(dropFirst(4)) : self }
 }

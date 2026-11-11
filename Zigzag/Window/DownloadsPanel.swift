@@ -147,7 +147,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         case .finished:
             let size = formatter.string(fromByteCount: max(item.totalBytes, item.completedBytes))
             let site = item.sourceURL.flatMap { ["http", "https"].contains($0.scheme ?? "") ? $0.host() : nil }
-                .map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 }
+                .map { $0.withoutWWW }
             status.stringValue = isFresh ? String(localized: "Just downloaded", comment: "Under a download's name in the downloads panel: the file has just finished downloading.")
                 : site.map { String(localized: "\(size) from \($0)", comment: "Under a download's name in the downloads panel: the file's size and the site it came from, like 9 MB from example.com.") } ?? size
             actionButton.symbol = "magnifyingglass"

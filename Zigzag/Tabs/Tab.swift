@@ -829,7 +829,7 @@ final class Tab: NSObject {
         guard let previous else { return true }
         func site(_ url: URL) -> String {
             let host = url.host()?.lowercased() ?? url.scheme ?? ""
-            return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+            return host.withoutWWW
         }
         return site(previous) == site(committed)
     }
