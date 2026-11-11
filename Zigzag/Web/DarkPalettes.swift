@@ -46,6 +46,8 @@ enum DarkPalettes {
         var prints = (old?.fingerprints ?? []).filter { $0 != fingerprint } + [fingerprint]
         if prints.count > maxFingerprints { prints.removeFirst(prints.count - maxFingerprints) }
         let fresh = Array(rules.prefix(maxRules))
+        // Too big to put in every page of the site as it starts: the filter instead.
+        let invert = invert || fresh.reduce(0, { $0 + $1.utf8.count + 1 }) > maxBytes
         var kept = fresh
         if let old, !old.invert, !invert {
             let new = Set(fresh)

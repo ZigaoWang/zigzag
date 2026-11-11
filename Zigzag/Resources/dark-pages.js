@@ -189,9 +189,15 @@
   // the page is idle: each element once, a slice at a time, so a long page never holds up scrolling or typing.
   // Icon-sized ones and SVG drawings are drawn in the text's ink and stay darkened; so does a repeating texture
   // behind a lot of the page.
-  const idle = window.requestIdleCallback
-    ? (f) => requestIdleCallback(f, { timeout: 1000 })
-    : (f) => setTimeout(() => { const end = performance.now() + 12; f({ timeRemaining: () => end - performance.now() }); }, 120);
+  // A page WebKit isn't drawing (a tab in the background) may not get its idle callbacks at all, timeout or not: a
+  // timer stands in once it's clearly late.
+  const idle = (f) => {
+    let ran = false;
+    const run = (deadline) => { if (!ran) { ran = true; f(deadline); } };
+    if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 1000 });
+    setTimeout(() => { const end = performance.now() + 12; run({ timeRemaining: () => end - performance.now() }); },
+      window.requestIdleCallback ? 1500 : 120);
+  };
   const seen = new WeakSet();
   const roots = [];
   let list = [], at = 0;
@@ -408,6 +414,7 @@
   let analysis = null;
   // Reading the sheets takes no more than this much of the page's idle time, all told.
   const budget = 400;
+  const maxColors = 20000;
   const analyse = async (fp) => {
     const began = performance.now();
     let busy = 0;
@@ -430,7 +437,9 @@
       const step = (deadline) => {
         if (!darkened) { done(false); return; }
         const t0 = performance.now();
-        const over = palette.collect(state, () => deadline.timeRemaining() > 1 && performance.now() - t0 < 10);
+        // A few milliseconds each time even when the page says it has less to spare (it often does), and up
+        // to a frame's worth when it has more.
+        const over = palette.collect(state, () => { const t = performance.now() - t0; return t < 4 || (t < 16 && deadline.timeRemaining() > 1); });
         busy += performance.now() - t0;
         if (over) done(true); else if (busy > budget) done(false); else idle(step);
       };
@@ -438,10 +447,14 @@
     });
     if (!darkened) return;
     const t1 = performance.now();
-    const made = finished ? palette.generate(state, config.black) : null;
-    busy += performance.now() - t1;
-    analysis = { ms: Math.round(busy * 10) / 10, wall: Math.round(performance.now() - began), rules: state.rules,
-      colors: made ? made.colors : 0, sheets: lists.length, fetched, unread, finished };
+    // Writing the sheet is done in one go: past this many colors it would hold the page up, and the sheet would be
+    // too big to start every page with anyway.
+    const decls = state.entries.reduce((n, e) => n + e.decls.length, 0);
+    const made = finished && decls <= maxColors ? palette.generate(state, config.black) : null;
+    const writing = performance.now() - t1;
+    busy += writing;
+    analysis = { ms: Math.round(busy * 10) / 10, writing: Math.round(writing * 10) / 10, wall: Math.round(performance.now() - began),
+      rules: state.rules, colors: made ? made.colors : 0, declarations: decls, sheets: lists.length, fetched, unread, finished };
     // Nothing to go on (too much to read, or no colors of its own): the filter, until the site's style changes.
     const useless = !made || made.colors === 0 || made.capped;
     tellPalette({ fingerprint: fp, rules: useless ? [] : made.rules, invert: useless, stats: analysis });
@@ -461,7 +474,7 @@
         if (!ok) { refused = true; apply(true); }
         if (seen) { tellPalette({ fingerprint: fp, verified: ok }); return; }
       }
-      if (!seen) analyse(fp).catch(() => {});
+      if (!seen) analyse(fp).catch((e) => { analysis = { error: String(e) }; });
     }), config.paletteDelay || 1200);
   };
 

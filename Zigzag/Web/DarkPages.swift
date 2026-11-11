@@ -490,7 +490,7 @@ enum DarkPages {
             let rules = (body["rules"] as? [Any] ?? []).compactMap { $0 as? String }
             entry = DarkPalettes.merged(old, origin: origin, black: black, fingerprint: fingerprint, rules: rules,
                                         invert: body["invert"] as? Bool ?? rules.isEmpty)
-            lastAnalysis = (body["stats"] as? [String: Any] ?? [:]).merging(["origin": origin, "rules": entry.rules.count, "bytes": entry.css.utf8.count]) { $1 }
+            lastAnalysis = (body["stats"] as? [String: Any] ?? [:]).merging(["origin": origin, "kept": entry.rules.count, "bytes": entry.css.utf8.count]) { $1 }
         }
         guard entry != old else { return }
         DarkPalettes.store(entry, scope: scope)
