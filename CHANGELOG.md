@@ -5,6 +5,22 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-11-11
+
+### New
+- The sidebar's + button and a right-click on empty sidebar space open Zigzag's own menu: New Tab, New Folder and New Space…, with their shortcuts. ([#100](https://github.com/ZigaoWang/zigzag/issues/100))
+- Zigzag follows Increase Contrast and Reduce Transparency: lines, edges and quiet text get stronger, and panels go solid. ([#105](https://github.com/ZigaoWang/zigzag/issues/105))
+- Claude's side panel opens in Zigzag, so you can sign in and chat with it. ([#112](https://github.com/ZigaoWang/zigzag/issues/112))
+
+### Fixed
+- YouTube scrolls again after its ad blocker warning is hidden. ([#113](https://github.com/ZigaoWang/zigzag/issues/113))
+- A minimized mini player keeps playing a muted or silent video. ([#111](https://github.com/ZigaoWang/zigzag/issues/111))
+- The ⌃Tab switcher stays on the page beside the sidebar, with many tabs in rows. ([#110](https://github.com/ZigaoWang/zigzag/issues/110))
+- Site Controls never leaves an action alone on a row, and its site switches are spaced like the rest of Zigzag. ([#104](https://github.com/ZigaoWang/zigzag/issues/104))
+- Delete buttons in Settings show when you point at a row, the same everywhere. ([#101](https://github.com/ZigaoWang/zigzag/issues/101))
+- Settings › Passwords reads more clearly with more than one profile, the Shortcuts hint wraps in a narrow window, and Chinese uses one word for filling. ([#106](https://github.com/ZigaoWang/zigzag/issues/106), [#107](https://github.com/ZigaoWang/zigzag/issues/107), [#108](https://github.com/ZigaoWang/zigzag/issues/108))
+- Saving your session skips writes that would change nothing. ([#89](https://github.com/ZigaoWang/zigzag/issues/89))
+
 ## [0.8.2] - 2026-11-11
 
 ### Fixed
