@@ -287,7 +287,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     private let tile = NSImageView()
     private let name: Label
     private let detail = Label("", font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
-    private let editButton = PillButton(title: String(localized: "Edit", comment: "Button on a space's row in Settings › Spaces."))
+    private let editButton = PillButton(title: String(localized: "Edit…", comment: "Button on a space's row in Settings › Spaces: opens its editor."))
     private let deleteButton = IconButton(symbol: "trash", size: .compact,
                                           toolTip: String(localized: "Delete Space", comment: "Tooltip of the trash button on a space's row in Settings › Spaces."))
     /// True while the row is being dragged; it draws as lifted.
@@ -686,7 +686,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let translateInto = DropdownButton()
     private var languages: [(id: String, name: String)] = []
     private let addSpaceButton = PillButton(title: String(localized: "New Space", comment: "Button beside Your Spaces in Settings › Spaces."))
-    private let addProfileButton = PillButton(title: String(localized: "New Profile", comment: "Button beside Your Profiles in Settings › Profiles."))
+    private let addProfileButton = PillButton(title: String(localized: "New Profile…", comment: "Button beside Your Profiles in Settings › Profiles: opens the sheet that makes a profile."))
     private let getExtensionsButton = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens the Chrome Web Store."))
     private let loadUnpackedButton = PillButton(title: String(localized: "Load Unpacked…", comment: "Button in Settings › Extensions, in developer mode: loads an extension from a folder."))
     private var spaceRows: [SpaceSettingsRow] = []
@@ -1421,7 +1421,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 delete.onClick = { [weak self] _ in if let self { ProfileSheets.confirmDelete(profile.id, in: self) } }
                 controls.append(delete)
             }
-            let edit = PillButton(title: String(localized: "Edit", comment: "Button on a profile's row in Settings › Profiles."))
+            let edit = PillButton(title: String(localized: "Edit…", comment: "Button on a profile's row in Settings › Profiles: opens the sheet that renames it and changes its color."))
             edit.onClick = { [weak self] _ in if let self { ProfileSheets.edit(profile.id, in: self) } }
             controls.append(edit)
             let stack = NSStackView(views: controls)
