@@ -6,8 +6,22 @@ import WebKit
 /// extensions are then shown only their own tabs in it.
 @available(macOS 15.4, *)
 enum ExtensionCenter {
-    /// Some profile's extensions loaded or changed their buttons: for views that only need to draw again.
+    /// Some profile's extensions loaded, went, were turned on or off or pinned: for views that only need to draw
+    /// again. Sent once a turn of the run loop however many changes came in it (`noteChanged`).
     static let changed = Signal<Void>()
+    /// An extension's button changed its icon, title or badge: for the tab given, or every tab for none. A busy ad
+    /// blocker counts every request it blocks, in every tab, so this comes often; only buttons look at it.
+    static let actionUpdated = Signal<Tab?>()
+    private static let changes = Coalescer()
+
+    /// Says `changed` once, at the next turn of the run loop.
+    static func noteChanged() { changes.schedule { changed.send() } }
+
+    /// Whether an update to a button for `updated` (every tab for nil) can change what a window showing `selected`
+    /// draws.
+    static func update(for updated: AnyObject?, concerns selected: AnyObject?) -> Bool {
+        updated == nil || updated === selected
+    }
     /// Some profile's extension popup opened or closed.
     static let popupsChanged = Signal<Void>()
 

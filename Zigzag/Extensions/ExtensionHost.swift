@@ -70,7 +70,7 @@ final class ExtensionHost: NSObject {
         controller = WKWebExtensionController(configuration: configuration)
         super.init()
         controller.delegate = self
-        forwarding = [changed.observe { ExtensionCenter.changed.send() }, popupsChanged.observe { ExtensionCenter.popupsChanged.send() }]
+        forwarding = [changed.observe { ExtensionCenter.noteChanged() }, popupsChanged.observe { ExtensionCenter.popupsChanged.send() }]
         watchGestures()
         watchPopupVisibility()
     }
@@ -448,9 +448,26 @@ final class ExtensionHost: NSObject {
         return contexts.contains { attention[$0.uniqueIdentifier] != nil && $0.action(for: tab) != nil }
     }
 
+    /// Each button's icon as last drawn, until WebKit says that button changed: drawing one renders it.
+    /// In the appearance it was drawn for, since an extension may give dark mode its own icon.
+    private let actionIcons = NSMapTable<WKWebExtension.Action, DrawnIcon>.weakToStrongObjects()
+    private final class DrawnIcon {
+        let image: NSImage?
+        let appearance: NSAppearance.Name
+        init(image: NSImage?, appearance: NSAppearance.Name) { self.image = image; self.appearance = appearance }
+    }
+
     private func actionItem(_ context: WKWebExtensionContext, for tab: Tab?) -> ActionItem? {
         guard let action = context.action(for: tab) else { return nil }
-        return ActionItem(context: context, icon: action.icon(for: NSSize(width: 32, height: 32)), label: action.label,
+        let appearance = NSApp.effectiveAppearance.name
+        let icon: NSImage?
+        if let drawn = actionIcons.object(forKey: action), drawn.appearance == appearance {
+            icon = drawn.image
+        } else {
+            icon = action.icon(for: NSSize(width: 32, height: 32))
+            actionIcons.setObject(DrawnIcon(image: icon, appearance: appearance), forKey: action)
+        }
+        return ActionItem(context: context, icon: icon, label: action.label,
                           badge: action.badgeText, attention: attention[context.uniqueIdentifier])
     }
 
@@ -949,7 +966,9 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, didUpdate action: WKWebExtension.Action, forExtensionContext context: WKWebExtensionContext) {
-        changed.send()
+        // Only buttons draw an action: the list of extensions (Settings) is the same as it was.
+        actionIcons.removeObject(forKey: action)
+        ExtensionCenter.actionUpdated.send(action.associatedTab as? Tab)
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, presentActionPopup action: WKWebExtension.Action,

@@ -341,7 +341,7 @@ enum ExtensionStore {
         profile.installs.save(source.carried(enabled: true), for: id)
         profile.installs.newlyInstalled.insert(id)
         await profile.extensions.load(id)
-        ExtensionCenter.changed.send()
+        ExtensionCenter.noteChanged()
     }
 
     @available(macOS 15.4, *)
@@ -535,7 +535,7 @@ enum ExtensionStore {
               let old = packageDirectory(for: id), let new = packageDirectory(for: id, version: package.version) else { return }
         if asksForMore(new, than: old) {
             update(id) { $0.pendingVersion = package.version }
-            ExtensionCenter.changed.send()
+            ExtensionCenter.noteChanged()
             return
         }
         await switchVersion(of: id, to: package.version)

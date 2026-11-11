@@ -64,3 +64,31 @@ final class Debouncer {
 
     func cancel() { work?.cancel(); work = nil; firstCall = nil }
 }
+
+/// Runs an action once for a burst of requests. The first request sets it for `delay` later (the next turn of the
+/// run loop for none); the requests that come before it runs join it, and one asking for sooner brings it forward.
+/// Unlike `Debouncer`, a burst that never pauses still runs it every `delay`, never later.
+final class Coalescer {
+    private var work: DispatchWorkItem?
+    private var deadline: DispatchTime?
+
+    var isPending: Bool { work != nil }
+
+    func schedule(after delay: TimeInterval = 0, _ action: @escaping () -> Void) {
+        let wanted = DispatchTime.now() + delay
+        if let deadline, deadline <= wanted { return }
+        work?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                self?.work = nil
+                self?.deadline = nil
+                action()
+            }
+        }
+        work = item
+        deadline = wanted
+        if delay <= 0 { DispatchQueue.main.async(execute: item) } else { DispatchQueue.main.asyncAfter(deadline: wanted, execute: item) }
+    }
+
+    func cancel() { work?.cancel(); work = nil; deadline = nil }
+}

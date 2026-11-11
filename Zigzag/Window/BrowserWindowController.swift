@@ -166,8 +166,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.flyDownload(item)
         })
         if #available(macOS 15.4, *) {
-            tokens.append(ExtensionCenter.changed.observe { [weak self] in self?.refreshExtensionActions() })
-            tokens.append(ExtensionCenter.popupsChanged.observe { [weak self] in self?.refreshExtensionActions() })
+            tokens.append(ExtensionCenter.changed.observe { [weak self] in self?.scheduleExtensionActions() })
+            tokens.append(ExtensionCenter.popupsChanged.observe { [weak self] in self?.scheduleExtensionActions() })
+            // Badges tick for every request an ad blocker stops, in every tab: only the tab shown here is drawn
+            // again, and no more than ten times a second.
+            tokens.append(ExtensionCenter.actionUpdated.observe { [weak self] tab in
+                guard let self, ExtensionCenter.update(for: tab, concerns: self.tabManager.selectedTab) else { return }
+                self.scheduleExtensionActions(after: 0.1)
+            })
         }
 
         // Fading is slow; checking once a minute is plenty.
@@ -941,7 +947,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// One button by the address, for everything about this page: quick actions, extensions, the site's own
     /// settings, and clearing its data. It shows a dot when an extension needs attention.
+    private let extensionActionRefresh = Coalescer()
+
+    /// Draws the buttons again once for a burst of changes.
+    private func scheduleExtensionActions(after delay: TimeInterval = 0) {
+        extensionActionRefresh.schedule(after: delay) { [weak self] in self?.refreshExtensionActions() }
+    }
+
     func refreshExtensionActions() {
+        extensionActionRefresh.cancel()
         let tab = tabManager.selectedTab
         // Always there, even on a new tab: it's also where your extensions live.
         _ = tab?.url
