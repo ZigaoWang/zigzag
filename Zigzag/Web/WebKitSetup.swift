@@ -66,6 +66,7 @@ enum WebKitSetup {
             configuration.userContentController.add(SwipeAnswers.shared, contentWorld: .defaultClient, name: SwipeAnswers.messageName)
             ContentBlocker.attach(to: configuration)
             ContentBlocker.attachYouTube(to: configuration)
+            WebStoreButton.attach(to: configuration)
             // Extension pages only: their uncaught errors go to the extensions log, so a page that stalls says why.
             configuration.userContentController.addUserScript(PageErrors.script)
             configuration.userContentController.add(PageErrors.shared, contentWorld: .page, name: PageErrors.messageName)

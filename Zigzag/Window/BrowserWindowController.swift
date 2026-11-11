@@ -645,10 +645,32 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if offeredExtensionID != nil { WebStoreOffer.hide() }
         offeredExtensionID = id
         guard let id, !installs.isInstalled(id) else { return }
-        // Shown once the page has its title, so the bar can name the extension.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-            guard let self, self.offeredExtensionID == id else { return }
+        // Shown once the page has its title, so the bar can name the extension, and only where the store's own
+        // button hasn't taken over (WebStoreButton): the bar stays for a store page that no longer asks it.
+        DispatchQueue.main.asyncAfter(deadline: .now() + WebStoreButton.grace) { [weak self] in
+            guard let self, self.offeredExtensionID == id, !WebStoreButton.isEngaged(self.selectedWebView, for: id) else { return }
             WebStoreOffer.show(id, in: self)
+        }
+    }
+
+    /// The store's own button asked about the listing on screen: the bar over it steps aside.
+    func webStoreButtonTookOver(_ id: String) {
+        guard offeredExtensionID == id else { return }
+        WebStoreOffer.hide()
+    }
+
+    /// The store's own button: Zigzag's usual download, review sheet and toasts, then whether it went in.
+    func installExtensionFromStore(_ id: String) async -> Bool {
+        await withCheckedContinuation { done in
+            var finished = false
+            installExtension(id, also: { stage in
+                guard !finished else { return }
+                switch stage {
+                case .added: finished = true; done.resume(returning: true)
+                case .failed, .cancelled: finished = true; done.resume(returning: false)
+                case .downloading, .reviewing, .adding: break
+                }
+            })
         }
     }
 
@@ -660,11 +682,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Adding from the store: verify the package, show what it can do, install only once confirmed. `progress`
     /// hears each stage (the store bar shows them); without it, toasts do.
-    func installExtension(_ id: String, progress: ((InstallStage) -> Void)? = nil) {
-        guard #available(macOS 15.4, *) else { return }
+    /// `also` hears each stage beside the toasts (the store's own button waits on it).
+    func installExtension(_ id: String, progress: ((InstallStage) -> Void)? = nil, also: ((InstallStage) -> Void)? = nil) {
+        guard #available(macOS 15.4, *) else { also?(.failed("")); return }
         // The profile you were in when you asked: it's added there, wherever you are by the time it's ready.
         let profile = tabManager.profile
         let report: (InstallStage) -> Void = { [weak self] stage in
+            also?(stage)
             if let progress { progress(stage); return }
             guard let self else { return }
             switch stage {
