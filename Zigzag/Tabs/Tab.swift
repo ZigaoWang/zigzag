@@ -46,6 +46,11 @@ final class Tab: NSObject {
     var bookmarkID: UUID?
     /// Set when this tab is the live page behind a favorite tile.
     var isFavorite = false
+    /// The tab this one sits under in the list (nested tabs); nil at the top level. Pinned pages and favorites never
+    /// have one. TabManager keeps it right (see TabTree).
+    var parentID: UUID?
+    /// The tabs under this one are folded away in the sidebar.
+    var isCollapsed = false
 
     private(set) var url: URL?
     private(set) var title: String

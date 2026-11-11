@@ -373,12 +373,14 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func moveTabDown(_ sender: Any?) { if let target = tabMoveTarget(by: 1), let tab = selectedTab { moveWithUndo(tab, to: target, in: tab.spaceID) } }
 
     /// Where the tab you're on goes one row up or down, or nil at the end of the list, on a pinned page, or beside a split.
+    /// A nested tab moves past the tab beside it at its own level, each with the tabs under it, and stays in its group.
     func tabMoveTarget(by offset: Int) -> Int? {
         guard let tab = selectedTab, tab.bookmarkID == nil, tabManager.split(for: tab) == nil else { return nil }
         let tabs = tabManager.currentTabs
         guard let index = tabs.firstIndex(where: { $0 === tab }), tabs.indices.contains(index + offset),
               tabManager.split(for: tabs[index + offset]) == nil else { return nil }
-        return index + offset
+        guard tabs.contains(where: { $0.parentID != nil }) else { return index + offset }
+        return tabManager.siblingMoveTarget(tab, by: offset)
     }
 
     @objc func selectNextTab(_ sender: Any?) { tabManager.selectNext(offset: 1) }
