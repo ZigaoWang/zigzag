@@ -11,7 +11,7 @@ nonisolated enum TabTree {
     }
 
     /// How many levels in the sidebar sets rows: deeper ones still nest, drawn as far in as this.
-    static let shownLevels = 2
+    private static let shownLevels = 2
 
     static func shownLevel(_ level: Int) -> Int { min(max(level, 0), shownLevels) }
 

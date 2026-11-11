@@ -151,7 +151,7 @@ enum ProfileSheets {
 
     /// A new profile gets the extensions another has: on or off as there, allowed what they are there and on the same
     /// sites, with nothing they stored.
-    static func copyExtensions(from source: UUID, to target: UUID) {
+    private static func copyExtensions(from source: UUID, to target: UUID) {
         let from = Profiles.shared.profile(source).installs, to = Profiles.shared.profile(target).installs
         for id in from.installedIDs {
             guard let state = from.state(id) else { continue }
