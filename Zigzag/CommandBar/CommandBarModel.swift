@@ -85,6 +85,11 @@ enum CommandRanker {
         return words.allSatisfy { joined.contains($0) }
     }
 
+    /// The grey line under a result, left out when it only says the title again (a page with no title goes by its host).
+    static func detail(_ detail: String, under title: String) -> String {
+        detail.withoutWWW.caseInsensitiveCompare(title.withoutWWW) == .orderedSame ? "" : detail
+    }
+
     /// A row for an open tab on one of Zigzag's own pages that a command listed with it already opens (Settings):
     /// the command goes there too, so the row would only say the same thing twice.
     static func repeatsCommand(_ url: URL?, offered actionIDs: Set<String>) -> Bool {
@@ -324,8 +329,9 @@ enum CommandRanker {
         if query.isEmpty {
             if historyOnly {
                 for entry in profile.history.recent(limit: 8) {
-                    add(CommandResult(kind: .history(entry.url), title: entry.title.isEmpty ? displayURL(entry.url) : entry.title,
-                                      detail: displayURL(entry.url), icon: FaviconStore.shared.cachedIcon(for: entry.url)),
+                    let title = entry.title.isEmpty ? displayURL(entry.url) : entry.title
+                    add(CommandResult(kind: .history(entry.url), title: title,
+                                      detail: detail(displayURL(entry.url), under: title), icon: FaviconStore.shared.cachedIcon(for: entry.url)),
                         key: TabManager.normalize(entry.url))
                 }
                 // No history yet: say what this is for rather than showing nothing.
@@ -341,7 +347,7 @@ enum CommandRanker {
                                        failed: \.showsErrorPage, leavingOutFailed: leavingOutFailed)
             for tab in recent {
                 guard let url = tab.url else { continue }
-                add(CommandResult(kind: .switchTo(tab.id), title: tab.displayTitle, detail: displayURL(url), icon: tab.favicon),
+                add(CommandResult(kind: .switchTo(tab.id), title: tab.displayTitle, detail: detail(displayURL(url), under: tab.displayTitle), icon: tab.favicon),
                     key: TabManager.normalize(url))
             }
             return results
@@ -383,7 +389,7 @@ enum CommandRanker {
                       !repeatsCommand(url, offered: offered) else { continue }
                 let key = TabManager.normalize(url)
                 guard !seen.contains(key) else { continue }
-                add(CommandResult(kind: .switchTo(tab.id), title: tab.displayTitle, detail: displayURL(url), icon: tab.favicon), key: key)
+                add(CommandResult(kind: .switchTo(tab.id), title: tab.displayTitle, detail: detail(displayURL(url), under: tab.displayTitle), icon: tab.favicon), key: key)
                 tabCount += 1
             }
             var bookmarkCount = 0
@@ -395,7 +401,7 @@ enum CommandRanker {
                 guard matches(words, bookmark.title, bookmark.url.absoluteString) else { continue }
                 let key = TabManager.normalize(bookmark.url)
                 guard !seen.contains(key) else { continue }
-                add(CommandResult(kind: .bookmark(bookmark.id), title: bookmark.title, detail: displayURL(bookmark.url),
+                add(CommandResult(kind: .bookmark(bookmark.id), title: bookmark.title, detail: detail(displayURL(bookmark.url), under: bookmark.title),
                                   icon: FaviconStore.shared.cachedIcon(for: bookmark.url), isFavorite: favorites.contains(bookmark.id)), key: key)
                 bookmarkCount += 1
             }
@@ -419,8 +425,9 @@ enum CommandRanker {
         for entry in history ?? [] where historyCount < shown {
             let key = TabManager.normalize(entry.url)
             guard !seen.contains(key), !SearchFolding.isSearchResultsPage(entry.url) else { continue }
-            add(CommandResult(kind: .history(entry.url), title: entry.title.isEmpty ? displayURL(entry.url) : entry.title,
-                              detail: displayURL(entry.url), icon: FaviconStore.shared.cachedIcon(for: entry.url)), key: key)
+            let title = entry.title.isEmpty ? displayURL(entry.url) : entry.title
+            add(CommandResult(kind: .history(entry.url), title: title,
+                              detail: detail(displayURL(entry.url), under: title), icon: FaviconStore.shared.cachedIcon(for: entry.url)), key: key)
             historyCount += 1
         }
 
