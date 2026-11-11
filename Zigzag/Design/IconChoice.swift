@@ -20,6 +20,38 @@ enum IconChoice {
         return emoji(icon, size: size)
     }
 
+    /// The icons made for pages so far, by icon: each one made once and kept, so a row set again with the same icon
+    /// gets the same image and draws nothing new.
+    private static var pageIcons: [String: NSImage] = [:]
+    private static var pageIconIDs: Set<ObjectIdentifier> = []
+
+    /// An icon you gave a tab, a pinned page or a favorite, in a favicon's square: a symbol as a template, so whatever
+    /// draws it gives it the ink around it; an emoji in its own colors.
+    static func pageIcon(_ icon: String) -> NSImage {
+        if let made = pageIcons[icon] { return made }
+        let side = Tokens.Sidebar.favicon
+        let image: NSImage
+        if isSymbol(icon) {
+            let symbol = Tokens.Symbol.image(icon, size: Tokens.Symbol.row)
+            // A wide symbol shrinks to fit the square rather than spilling out of it.
+            image = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+                let size = symbol.size, scale = min(1, rect.width / max(size.width, 1), rect.height / max(size.height, 1))
+                let w = size.width * scale, h = size.height * scale
+                symbol.draw(in: NSRect(x: rect.midX - w / 2, y: rect.midY - h / 2, width: w, height: h))
+                return true
+            }
+            image.isTemplate = true
+        } else {
+            image = emoji(icon, size: side)
+        }
+        pageIcons[icon] = image
+        pageIconIDs.insert(ObjectIdentifier(image))
+        return image
+    }
+
+    /// Whether an image is one of `pageIcon`'s: drawn as chosen, never taken for a site's icon.
+    static func isPageIcon(_ image: NSImage) -> Bool { pageIconIDs.contains(ObjectIdentifier(image)) }
+
     /// Exactly `size` square, like a symbol of that size, so it lines up wherever a symbol would. An emoji's glyph
     /// runs wider than its font size, so it's set a little smaller and centered on its own ink.
     private static func emoji(_ text: String, size: CGFloat) -> NSImage {

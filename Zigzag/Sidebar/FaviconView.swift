@@ -8,6 +8,10 @@ final class FaviconView: NSView {
     /// One-color icons (GitHub, X, Vercel) come in black or white, often whichever the page was in, so either can
     /// vanish against the sidebar. They take the sidebar's own ink instead, readable in light and dark.
     private var isInk = false
+    /// An icon you chose rather than the site's (`IconChoice.pageIcon`): a symbol takes the row's ink, as a folder's
+    /// does; an emoji keeps its colors. Neither is rounded off like a site's square icon.
+    private var isChosen = false
+    private var isSymbol = false
     private struct RenderKey: Equatable {
         let base: ObjectIdentifier?
         let side: CGFloat, scale: CGFloat
@@ -87,7 +91,7 @@ final class FaviconView: NSView {
             effectiveAppearance.performAsCurrentDrawingAppearance { ink = Tokens.Color.textSecondary.cgColor }
             asleepRing.strokeColor = ink
             asleepRing.contentsScale = window?.backingScaleFactor ?? 2
-            imageLayer.cornerRadius = isInk ? 0 : Tokens.Radius.small - 1
+            imageLayer.cornerRadius = isInk || isChosen ? 0 : Tokens.Radius.small - 1
             let scale = window?.backingScaleFactor ?? 2
             // Drawn once at exactly the pixels it fills, with the best filtering, rather than scaled on the fly; again
             // only when the icon, its size or its ink changes.
@@ -99,7 +103,8 @@ final class FaviconView: NSView {
                 let swaps = renderedImage != nil && image != nil && renderedImage !== image && imageLayer.contents != nil && window != nil
                 lastRender = key
                 renderedImage = image
-                let shown = isInk ? image.map { Self.inked($0, Tokens.Color.textPrimary, appearance: effectiveAppearance) } : image
+                let shown = isSymbol ? image.map { Self.tinted($0, Tokens.Color.textSecondary, appearance: effectiveAppearance) }
+                    : isInk ? image.map { Self.inked($0, Tokens.Color.textPrimary, appearance: effectiveAppearance) } : image
                 imageLayer.contents = shown.flatMap { Self.render($0, side: bounds.width, scale: scale) }
                 if swaps {
                     let fade = CATransition()
@@ -114,7 +119,9 @@ final class FaviconView: NSView {
     }
 
     private func refreshImage() {
-        isInk = image.map(FaviconView.isMonochrome) ?? false
+        isChosen = image.map(IconChoice.isPageIcon) ?? false
+        isSymbol = isChosen && image?.isTemplate == true
+        isInk = !isChosen && (image.map(FaviconView.isMonochrome) ?? false)
         refreshColors()
         fallback.isHidden = image != nil || isLoading
     }
@@ -149,6 +156,21 @@ final class FaviconView: NSView {
         context.fill(rect)
         guard let result = context.makeImage() else { return image }
         return NSImage(cgImage: result, size: image.size)
+    }
+
+    /// A template (a chosen symbol) in one color, resolved for the view's light or dark look. Still drawn, not a
+    /// bitmap, so it's as sharp at a favorite's size as at a row's.
+    private static func tinted(_ image: NSImage, _ color: NSColor, appearance: NSAppearance) -> NSImage {
+        var ink = color.cgColor
+        appearance.performAsCurrentDrawingAppearance { ink = color.cgColor }
+        return NSImage(size: image.size, flipped: false) { rect in
+            image.draw(in: rect)
+            guard let context = NSGraphicsContext.current?.cgContext else { return true }
+            context.setBlendMode(.sourceIn)
+            context.setFillColor(ink)
+            context.fill(rect)
+            return true
+        }
     }
 
     /// When loading began, so a page that's done almost at once doesn't flash the loader.
