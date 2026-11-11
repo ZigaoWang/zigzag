@@ -4,6 +4,11 @@ struct Bookmark: Codable, Identifiable, Equatable {
     var id = UUID()
     var url: URL
     var title: String
+    /// Drawn instead of its site's icon: an SF Symbol's name, or an emoji. Nil: its site's (and older libraries).
+    var icon: String? = nil
+
+    /// What stands for it wherever it's drawn: the icon you chose, else its site's, once that's been fetched.
+    var displayIcon: NSImage? { icon.map(IconChoice.pageIcon) ?? FaviconStore.shared.cachedIcon(for: url) }
 }
 
 /// A named group of a space's pinned pages, folded open or shut in the sidebar. Its pages stay in the space's own list
@@ -891,6 +896,28 @@ final class Library {
             }
         }
         commit()
+    }
+
+    /// A pinned page's or favorite's own icon (an SF Symbol's name, or an emoji); nil: its site's again.
+    func setIcon(_ icon: String?, forBookmark id: UUID) {
+        if Self.setting(icon, forBookmark: id, favorites: &favorites, spaces: &spaces) { commit() }
+    }
+
+    /// Gives the page with this id the icon wherever it's kept, a favorite or a space's pinned page. False when
+    /// nothing changed: it's not there, or already has that icon.
+    nonisolated static func setting(_ icon: String?, forBookmark id: UUID, favorites: inout [Bookmark], spaces: inout [SpaceInfo]) -> Bool {
+        var changed = false
+        for f in favorites.indices where favorites[f].id == id && favorites[f].icon != icon {
+            favorites[f].icon = icon
+            changed = true
+        }
+        for s in spaces.indices {
+            for b in spaces[s].bookmarks.indices where spaces[s].bookmarks[b].id == id && spaces[s].bookmarks[b].icon != icon {
+                spaces[s].bookmarks[b].icon = icon
+                changed = true
+            }
+        }
+        return changed
     }
 
     /// Moves a pinned page to a place in a space's list. `folder`: the folder it lands in (nil: none); when left
