@@ -121,6 +121,33 @@
     }
   };
 
+  // A dialog hidden above (the blocker warning, or a note left out) keeps the dimmed backdrop YouTube opened for it,
+  // and that backdrop takes every click: the page looks gray and nothing but the keyboard works. While no dialog
+  // shows, the backdrop is let go and the page scrolls again; a dialog YouTube shows later brings it back.
+  const shown = (element) => {
+    if (!element.isConnected || element.dataset.zigzagQuiet) return false;
+    if (element.querySelector('ytd-enforcement-message-view-model')) return false;
+    const box = element.getBoundingClientRect();
+    const look = getComputedStyle(element);
+    return box.width > 0 && box.height > 0 && look.display !== 'none' && look.visibility !== 'hidden';
+  };
+  const freePage = () => {
+    const backdrops = document.querySelectorAll('tp-yt-iron-overlay-backdrop');
+    if (!backdrops.length) return;
+    const dialogOpen = [...document.querySelectorAll('tp-yt-paper-dialog, ytd-popup-container > *')].some(shown);
+    for (const backdrop of backdrops) {
+      if (dialogOpen) {
+        if (backdrop.dataset.zigzagFreed) { delete backdrop.dataset.zigzagFreed; backdrop.style.removeProperty('display'); }
+      } else if (!backdrop.dataset.zigzagFreed && getComputedStyle(backdrop).display !== 'none') {
+        backdrop.dataset.zigzagFreed = '1';
+        backdrop.style.setProperty('display', 'none', 'important');
+        for (const element of [document.documentElement, document.body]) {
+          if (element && element.style.overflow === 'hidden') element.style.removeProperty('overflow');
+        }
+      }
+    }
+  };
+
   // MARK: If one plays anyway
 
   let before = null;
@@ -128,6 +155,7 @@
     queued = false;
     if (!blocking) return;
     quietNotes();
+    freePage();
     const player = document.querySelector('.html5-video-player');
     const video = player && player.querySelector('video');
     if (!player || !video) return;
