@@ -1497,6 +1497,8 @@ final class NativeMessagingHost {
 
     func connect(_ port: WKWebExtension.MessagePort, onClose: @escaping () -> Void) {
         let id = extensionID
+        // Which profile's copy, for telling two copies' helpers apart in the log.
+        let place = owner.map { "\(id) in profile \($0.profile.id.uuidString.prefix(4))" } ?? id
         var received = 0
         var sent = 0
         // What the extension says before the helper is up waits for it.
@@ -1508,7 +1510,7 @@ final class NativeMessagingHost {
             port.sendMessage(message, completionHandler: nil)
         }
         onExit = {
-            ExtensionLog.write("native host for \(id) ended after \(sent) sent, \(received) received")
+            ExtensionLog.write("native host for \(place) ended after \(sent) sent, \(received) received")
             port.disconnect()
             onClose()
         }
@@ -1524,7 +1526,7 @@ final class NativeMessagingHost {
             guard let self, !self.finished else { return }
             let started = self.start()
             if started { self.owner?.helperStarts[id, default: []].append(Date()) }
-            ExtensionLog.write("native host for \(id) started=\(started)")
+            ExtensionLog.write("native host for \(place) started=\(started) pid=\(self.process?.processIdentifier ?? 0)")
             guard started else { self.finish(); return }
             waiting.forEach { self.write($0) }
             waiting = []
