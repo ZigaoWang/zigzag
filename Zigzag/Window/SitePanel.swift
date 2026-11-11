@@ -548,13 +548,13 @@ final class SitePanel: FloatingPanelView {
         let columns = inner >= 260 ? 6 : inner >= 200 ? 5 : 4
         if !actionTiles.isEmpty {
             // One row, like the markings along a device's edge: every action side by side. In a narrow panel,
-            // where a name wouldn't show whole, they share two even rows instead.
+            // where a name wouldn't show whole, they share even rows instead, never one left alone under the rest.
             let spacing = gap
             gap = 0
-            let widest = actionTiles.map(\.captionWidth).max() ?? 0
-            let fit = max(1, Int(inner / max(widest, 1)))
-            let rows = fit >= actionTiles.count ? 1 : (actionTiles.count + fit - 1) / fit
-            grid(actionTiles, columns: (actionTiles.count + rows - 1) / rows, centered: true) { _ in PanelTile.captionedHeight }
+            let rows = Self.actionRows(count: actionTiles.count, width: inner,
+                                       comfortable: actionTiles.map(\.captionWidth).max() ?? 0,
+                                       tightest: actionTiles.map(\.captionTightWidth).max() ?? 0)
+            grid(actionTiles, columns: rows.first ?? 1, centered: true) { _ in PanelTile.captionedHeight }
             gap = spacing
             y += Tokens.Space.x5
         }
@@ -586,6 +586,26 @@ final class SitePanel: FloatingPanelView {
             for entry in hoverPins { entry.pin.frame = Self.pinFrame(on: entry.tile.frame, left: !entry.tile.badge.isEmpty) }
         }
         return y + pad
+    }
+
+    /// How many actions go on each row, top to bottom: all on one when every name shows whole with room around it,
+    /// otherwise the fewest even rows that keep that room. A layout that would leave one action alone under the others
+    /// (two, two, one) takes a row more snugly instead (three over two), its names as close as they show whole.
+    static func actionRows(count: Int, width: CGFloat, comfortable: CGFloat, tightest: CGFloat) -> [Int] {
+        guard count > 0 else { return [] }
+        func rows(_ wanted: Int) -> [Int] {
+            // As even as the count allows: the same number of rows, the fewest to a row that fill them.
+            let rowCount = (count + wanted - 1) / wanted
+            let columns = (count + rowCount - 1) / rowCount
+            return stride(from: 0, to: count, by: columns).map { min(columns, count - $0) }
+        }
+        // Never one left under the rest, nor a single file of them down the panel.
+        let even = (1...count).reversed().map(rows).filter { $0.count == 1 || $0.last! > 1 }
+        for need in [comfortable, tightest] {
+            if let fits = even.first(where: { width / CGFloat($0[0]) >= need }) { return fits }
+        }
+        // Too narrow for any name whole: the widest even tiles, names cut short; the tooltip has the full name.
+        return even.last ?? [count]
     }
 
     /// Where a tile's pin button goes, in the panel's terms: its chip inside the tile's top-right corner, or the
@@ -718,6 +738,8 @@ final class PanelTile: GlassTile {
 
     /// How wide the tile must be for its name to show whole.
     var captionWidth: CGFloat { caption.map { ceil($0.textWidth) + Tokens.Space.x2 } ?? 0 }
+    /// The narrowest the tile can be with its name still whole, without the room around it.
+    var captionTightWidth: CGFloat { caption.map { ceil($0.textWidth) } ?? 0 }
 
     /// A tile with a caption: the icon over its name.
     static let captionedHeight = Tokens.Space.x12 + Tokens.Space.x2

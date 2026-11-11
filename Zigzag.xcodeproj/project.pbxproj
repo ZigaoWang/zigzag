@@ -168,6 +168,7 @@
 		93F7D9887CC5E8E2800B8E67 /* orion-extensions.plist in Resources */ = {isa = PBXBuildFile; fileRef = 9B8A46E0AC7442B76186A940 /* orion-extensions.plist */; };
 		94ADB66CC737D1DA231E3D74 /* ads.html in Resources */ = {isa = PBXBuildFile; fileRef = 016FF1BFB8B47B23AE450117 /* ads.html */; };
 		95116D4DAA8CC50801C588B5 /* ChromiumExtensionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7069B71082962459B24D179F /* ChromiumExtensionsTests.swift */; };
+		956552C8E76005BC1AA5A4AA /* SitePanelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77968851D276EBBC819F52B /* SitePanelTests.swift */; };
 		95A0A278C6E484155212F812 /* FaviconRankTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888D287756137DE5F88678F5 /* FaviconRankTests.swift */; };
 		95C8F38A5DC38E15187B8AC4 /* ImportExtensionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0943F5424EE8E9EE3A714D4 /* ImportExtensionViews.swift */; };
 		95DDD4B1B3AB548044721FF0 /* ExtensionInstallsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75AEFFC9B5B716F7E433F914 /* ExtensionInstallsTests.swift */; };
@@ -523,6 +524,7 @@
 		D3EF002AF6A129FB4291D7A1 /* Zigzag.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Zigzag.entitlements; sourceTree = "<group>"; };
 		D578A99D755C2A3834B9E52A /* AcknowledgementsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcknowledgementsWindow.swift; sourceTree = "<group>"; };
 		D5AB7730FF54C85E4477E76E /* TourDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TourDemo.swift; sourceTree = "<group>"; };
+		D77968851D276EBBC819F52B /* SitePanelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePanelTests.swift; sourceTree = "<group>"; };
 		D77B2EE3B0C5A70C2E6A8A77 /* ProfileSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSheets.swift; sourceTree = "<group>"; };
 		D9EC4A25A23CB02B95200F47 /* PasswordMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordMenuTests.swift; sourceTree = "<group>"; };
 		D9FAF507728E18C4FC4266C5 /* FaviconStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaviconStore.swift; sourceTree = "<group>"; };
@@ -1020,6 +1022,7 @@
 				014C509EA75D15344BB68028 /* ShipFixesTests.swift */,
 				6567506B7F99FD1755289D6C /* SidebarMenuTests.swift */,
 				DD95FCA35585195612C38204 /* SignInImportTests.swift */,
+				D77968851D276EBBC819F52B /* SitePanelTests.swift */,
 				3D7D2BAAFBF678F6CF7BC040 /* SiteSignInTests.swift */,
 				87D85B5B031BEAE510CBFC57 /* SpaceSwitcherTests.swift */,
 				B13E82E7DA1A290559EC8C20 /* SplitDropTests.swift */,
@@ -1476,6 +1479,7 @@
 				80ADEAD45C5C339358B88DFB /* ShipFixesTests.swift in Sources */,
 				4026E10B64D404C941974769 /* SidebarMenuTests.swift in Sources */,
 				FA190095693F186FC9FC635C /* SignInImportTests.swift in Sources */,
+				956552C8E76005BC1AA5A4AA /* SitePanelTests.swift in Sources */,
 				A93EFB5F858A1B33E7E03B79 /* SiteSignInTests.swift in Sources */,
 				1AB813A270FF9CA633D5E2F7 /* SpaceSwitcherTests.swift in Sources */,
 				40D4C0EB780B16A242E6E1E6 /* SplitDropTests.swift in Sources */,
