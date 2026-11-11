@@ -340,6 +340,9 @@ enum DebugBridge {
     /// windowmenu [mini|popup] (Zigzag and that window in front, the Window menu shown over it for four seconds).
     /// The next menu to open closes by itself after these seconds, so a script can capture it and go on.
     private static func closeNextMenu(after seconds: Double) {
+        // Zigzag's own drawn menus (the sidebar's + and its empty space) aren't tracked by AppKit: close what's open then.
+        let drawn = Timer(timeInterval: seconds, repeats: false) { _ in MainActor.assumeIsolated { MenuPanel.current?.close(animated: false) } }
+        RunLoop.main.add(drawn, forMode: .common)
         menuToClose = NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { note in
             nonisolated(unsafe) let menu = note.object as? NSMenu
             MainActor.assumeIsolated {
@@ -479,6 +482,12 @@ enum DebugBridge {
             var answered = "", items: [String] = []
             while let v = view {
                 if let menu = v.menu(for: event) { answered = "\(type(of: v))"; items = menu.items.map { $0.isSeparatorItem ? "-" : $0.title }; break }
+                // The sidebar draws its own menu for its empty space (`showBlankMenu`).
+                if v === controller.sidebar {
+                    answered = "SidebarView"
+                    items = SidebarMenus.blankPanel(controller: controller).map { if case .item(let item) = $0 { item.title } else { "-" } }
+                    break
+                }
                 view = v.superview
             }
             let json: [String: Any] = ["hit": hit, "answered": answered, "items": items]
@@ -499,13 +508,11 @@ enum DebugBridge {
         case "plus":
             // plus [seconds]: a click on the + at the bottom of the sidebar; its menu closes by itself after the seconds (3).
             closeNextMenu(after: Double(arg) ?? 3)
-            let button = controller.sidebar.newSpaceButton
-            DispatchQueue.main.async { button.onClick?(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)!) }
+            DispatchQueue.main.async { controller.sidebar.showAddMenu() }
         case "addmenu", "blankmenu":
             // addmenu <title>, blankmenu <title>: runs that item of the + menu or the sidebar's empty-space menu, as choosing it would.
-            let menu = name == "addmenu" ? SidebarMenus.addMenu(controller: controller) : SidebarMenus.blankMenu(controller: controller)
-            let index = menu.indexOfItem(withTitle: arg)
-            if index >= 0 { menu.performActionForItem(at: index) }
+            let entries = name == "addmenu" ? SidebarMenus.addPanel(controller: controller) : SidebarMenus.blankPanel(controller: controller)
+            for case .item(let item) in entries where item.title == arg { item.action() }
         case "markedfolder":controller.newFolder(with: controller.pinnedIDs(for: controller.sidebar.list.marked)); controller.sidebar.list.clearMarks()
         case "newspaceui": controller.newSpace(nil)
         case "editspace": SpaceEditorPanel.toggle(spaceID: controller.tabManager.currentSpaceID, in: controller)
