@@ -282,6 +282,22 @@ enum DebugBridge {
 
     /// keepontop [mini|popup] (Window › Keep on Top for the newest Zigzag Mini or pop-up, else the front window),
     /// windowmenu [mini|popup] (Zigzag and that window in front, the Window menu shown over it for four seconds).
+    /// The next menu to open closes by itself after these seconds, so a script can capture it and go on.
+    private static func closeNextMenu(after seconds: Double) {
+        menuToClose = NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { note in
+            nonisolated(unsafe) let menu = note.object as? NSMenu
+            MainActor.assumeIsolated {
+                trackedMenu = menu
+                if let token = menuToClose { NotificationCenter.default.removeObserver(token) }
+                menuToClose = nil
+            }
+            let close = Timer(timeInterval: seconds, repeats: false) { _ in MainActor.assumeIsolated { trackedMenu?.cancelTracking(); trackedMenu = nil } }
+            RunLoop.main.add(close, forMode: .common)
+        }
+    }
+    private static var menuToClose: NSObjectProtocol?
+    private static var trackedMenu: NSMenu?
+
     private static func runKeepOnTop(_ name: String, _ arg: String) {
         let window = arg == "mini" ? MiniWindowController.all.last?.window
             : arg == "popup" ? PopupWindowController.all.last?.window : KeepOnTop.frontWindow
@@ -393,7 +409,47 @@ enum DebugBridge {
             var menu: NSMenu? = SidebarMenus.markedMenu(for: list.marked, controller: controller)
             for name in path.dropLast() { menu = menu?.items.first { $0.title == name }?.submenu }
             if let menu, let last = path.last, case let index = menu.indexOfItem(withTitle: last), index >= 0 { menu.performActionForItem(at: index) }
-        case "markedfolder": controller.newFolder(with: controller.pinnedIDs(for: controller.sidebar.list.marked)); controller.sidebar.list.clearMarks()
+        case "menuat":
+            // menuat <x> <y> <path>: the menu a right-click there would open (window points, top left), as AppKit finds
+            // it, from the view under the point up through the views holding it: who answered and its items (JSON).
+            let f = arg.split(separator: " ", maxSplits: 2).map(String.init)
+            guard f.count == 3, let x = Double(f[0]), let y = Double(f[1]), let window = controller.window, let content = window.contentView else { break }
+            let point = NSPoint(x: x, y: window.frame.height - y)
+            guard let event = NSEvent.mouseEvent(with: .rightMouseDown, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                 windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) else { break }
+            var view = content.superview?.hitTest(point) ?? content.hitTest(point)
+            let hit = view.map { "\(type(of: $0))" } ?? ""
+            var answered = "", items: [String] = []
+            while let v = view {
+                if let menu = v.menu(for: event) { answered = "\(type(of: v))"; items = menu.items.map { $0.isSeparatorItem ? "-" : $0.title }; break }
+                view = v.superview
+            }
+            let json: [String: Any] = ["hit": hit, "answered": answered, "items": items]
+            if let data = try? JSONSerialization.data(withJSONObject: json) { try? data.write(to: URL(fileURLWithPath: f[2])) }
+        case "rclick":
+            // rclick <x> <y> [seconds]: a right-click inside Zigzag at that window point (top left), as `mouse rclick`;
+            // the menu it opens closes by itself after the seconds (3), so a script can capture it and go on.
+            let f = arg.split(separator: " ").map(String.init)
+            guard f.count >= 2, let x = Double(f[0]), let y = Double(f[1]), let window = controller.window else { break }
+            closeNextMenu(after: f.count > 2 ? Double(f[2]) ?? 3 : 3)
+            let point = NSPoint(x: x, y: window.frame.height - y)
+            for type in [NSEvent.EventType.rightMouseDown, .rightMouseUp] {
+                if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                  windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) {
+                    NSApp.postEvent(event, atStart: false)
+                }
+            }
+        case "plus":
+            // plus [seconds]: a click on the + at the bottom of the sidebar; its menu closes by itself after the seconds (3).
+            closeNextMenu(after: Double(arg) ?? 3)
+            let button = controller.sidebar.newSpaceButton
+            DispatchQueue.main.async { button.onClick?(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)!) }
+        case "addmenu", "blankmenu":
+            // addmenu <title>, blankmenu <title>: runs that item of the + menu or the sidebar's empty-space menu, as choosing it would.
+            let menu = name == "addmenu" ? SidebarMenus.addMenu(controller: controller) : SidebarMenus.blankMenu(controller: controller)
+            let index = menu.indexOfItem(withTitle: arg)
+            if index >= 0 { menu.performActionForItem(at: index) }
+        case "markedfolder":controller.newFolder(with: controller.pinnedIDs(for: controller.sidebar.list.marked)); controller.sidebar.list.clearMarks()
         case "newspaceui": controller.newSpace(nil)
         case "editspace": SpaceEditorPanel.toggle(spaceID: controller.tabManager.currentSpaceID, in: controller)
         case "closeeditor": SpaceEditorPanel.current?.close()
