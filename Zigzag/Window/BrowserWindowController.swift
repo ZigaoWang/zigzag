@@ -67,6 +67,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.miniPlayer.place()
             PermissionPrompt.reposition(in: self)
             Toast.reposition(in: self)
+            AgentControl.shared.reposition(in: self)
             if self.floatingDownloads.superview != nil {
                 if self.root.sidebarVisible { self.hideFloatingDownloads() } else { self.showFloatingDownloads() }
             }
@@ -77,6 +78,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.sidebarSliding(duration)
             PermissionPrompt.reposition(in: self, slide: duration)
             Toast.reposition(in: self, slide: duration)
+            AgentControl.shared.reposition(in: self)
         }
         // A panel opened from the slid-out sidebar keeps it out until the panel closes, so it's never left floating alone.
         // So does the guide while it points at something in it.
@@ -294,6 +296,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             miniPlayer.tabsChanged()
         case .selection:
             showSelectedTab()
+            // An AI app's bar goes with the tab it's using.
+            AgentControl.shared.refresh(self)
             // "Translating…" belongs to its tab; the translation goes on there, quietly.
             if let translating = translatingTab, translating !== tabManager.selectedTab { translatingTab = nil; Toast.hide(in: self) }
         case .space:

@@ -721,7 +721,13 @@ enum Toast {
 
     /// Over the page, or with the desk open, over the desk, clear of its search field.
     private static func area(in controller: BrowserWindowController) -> NSRect {
-        controller.desk.toastArea ?? controller.root.cardFrame
+        if let desk = controller.desk.toastArea { return desk }
+        // Under the bar of an AI app using the page, if there is one.
+        var page = controller.root.cardFrame
+        let reserved = AgentControl.shared.reservedHeight(in: controller)
+        page.origin.y += reserved
+        page.size.height -= reserved
+        return page
     }
 
     /// Something that takes a moment: the spinner and what's happening, up until the next toast or `hide` replaces it.
