@@ -18,6 +18,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Keep on Top: pin a pop-up or Zigzag Mini, or choose Window › Keep on Top, and it stays above your other apps. ([#72](https://github.com/ZigaoWang/zigzag/issues/72))
 
 ### Fixed
+- YouTube no longer turns gray and stops taking clicks after its ad blocker warning is hidden. ([#86](https://github.com/ZigaoWang/zigzag/issues/86))
 - Sound Booster, Shazam and other extensions hear streamed tabs like YouTube, and an extension asking for a tab another one is already listening to says which one has it. ([#45](https://github.com/ZigaoWang/zigzag/issues/45))
 - The password menu opens when you click a field, even where the site lays its hint over the field, picking a login fills it, and sign-up fields list your saved logins under Use Strong Password. ([#68](https://github.com/ZigaoWang/zigzag/issues/68))
 - Muting a tab leaves a call's camera and microphone as they were, the speaker shows the page's real state, and a favorite playing sound can be muted from its tile. ([#66](https://github.com/ZigaoWang/zigzag/issues/66))
@@ -27,7 +28,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - VoiceOver and the keyboard can open a space's menu in Settings again. Thanks to [vandenbulckjean](https://github.com/vandenbulckjean) for the fix. ([#54](https://github.com/ZigaoWang/zigzag/issues/54))
 - Text typed into pages keeps its dashes and quotes, and your own text replacements work again. ([#49](https://github.com/ZigaoWang/zigzag/issues/49), [#52](https://github.com/ZigaoWang/zigzag/issues/52))
 - Extensions that look for Chrome's named tab and window constants, like Coupert, work. ([#63](https://github.com/ZigaoWang/zigzag/issues/63))
-- A tab that goes from one site to another drops the last site's icon.
+- A tab that goes from one site to another drops the last site's icon. ([#69](https://github.com/ZigaoWang/zigzag/issues/69))
 - Profiles and private windows keep to themselves: Reader, site icons, search suggestions, dark pages, Download Again and extension options no longer carry anything across. ([#76](https://github.com/ZigaoWang/zigzag/issues/76), [#81](https://github.com/ZigaoWang/zigzag/issues/81), [#82](https://github.com/ZigaoWang/zigzag/issues/82), [#83](https://github.com/ZigaoWang/zigzag/issues/83), [#84](https://github.com/ZigaoWang/zigzag/issues/84), [#85](https://github.com/ZigaoWang/zigzag/issues/85))
 - Nested tabs keep their place when you reopen closed tabs or split one, and a link opened under a folded tab unfolds it. ([#77](https://github.com/ZigaoWang/zigzag/issues/77), [#78](https://github.com/ZigaoWang/zigzag/issues/78), [#79](https://github.com/ZigaoWang/zigzag/issues/79))
 - The bar above the page takes the right color after leaving a page drawn dark. ([#75](https://github.com/ZigaoWang/zigzag/issues/75))
