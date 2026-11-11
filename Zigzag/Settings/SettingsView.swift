@@ -1459,7 +1459,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             controls.append(reload)
         }
         let remove = IconButton(symbol: "trash", size: .compact,
-                                toolTip: String(localized: "Remove from Zigzag", comment: "Tooltip of the trash button on an extension's row in Settings › Extensions."))
+                                toolTip: String(localized: "Remove from Zigzag", comment: "The Chrome Web Store's own button once an extension is in, and the tooltip of the trash button on an extension's row in Settings › Extensions."))
         remove.onClick = { [weak self] _ in if let self { ConfirmSheet.removeExtension(id: id, name: ext.displayName, from: self.profile, in: self) } }
         controls.append(remove)
         let installs = profile.installs

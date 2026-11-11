@@ -1960,7 +1960,7 @@
       }
     },
     "Add to Zigzag" : {
-      "comment" : "Button on the bar over a Chrome Web Store page: installs the extension.",
+      "comment" : "The Chrome Web Store's own button, and the bar over its page: installs the extension.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10427,7 +10427,7 @@
       }
     },
     "Remove from Zigzag" : {
-      "comment" : "Tooltip of the trash button on an extension's row in Settings › Extensions.",
+      "comment" : "The Chrome Web Store's own button once an extension is in, and the tooltip of the trash button on an extension's row in Settings › Extensions.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
