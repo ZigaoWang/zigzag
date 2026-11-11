@@ -132,6 +132,8 @@ struct DarkPaletteScriptTests {
         #expect(run(c, "done").toBool())
         let out = run(c, "made.rules").toArray() as? [String] ?? []
         #expect(out.first?.hasPrefix(":where(html)") == true)
+        // SVG pictures (logos, icons in the page's ink) are turned over; nothing else drawn is.
+        #expect(out.contains { $0.hasPrefix("img:is([src$=\".svg\"]") && $0.contains("invert(0.9)") })
         let root = out.first { $0.hasPrefix(":root") } ?? ""
         #expect(root.contains("--bg: #121212 !important"))
         #expect(root.contains("--rgb-bg: 18 18 18 !important"))

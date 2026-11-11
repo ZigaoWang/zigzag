@@ -433,7 +433,10 @@
     const r = ramp(black);
     // The page itself: dark under everything, light ink where the page names none, and its own controls dark.
     const base = `:where(html) { background-color: ${format([...r.low, 1])}; color: ${format(map([0, 0, 0, 1], 'text', black))}; color-scheme: dark !important; }`;
-    return { rules: [base, ...vars, ...rest], colors, rules_read: state.rules, capped: state.capped };
+    // An SVG shown as a picture is nearly always a logo or icon drawn in the page's ink, which a palette can't reach:
+    // turned over as the filter would (hues kept), so a black wordmark doesn't vanish into the dark. Photos are untouched.
+    const ink = `img:is([src$=".svg"], [src*=".svg?"]) { filter: invert(${black ? 1 : 0.9}) hue-rotate(180deg); }`;
+    return { rules: [base, ink, ...vars, ...rest], colors, rules_read: state.rules, capped: state.capped };
   };
 
   // MARK: Fingerprint
