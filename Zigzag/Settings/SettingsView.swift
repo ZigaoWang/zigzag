@@ -560,6 +560,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                                control: customSearch)
     private let archiveAfter = DropdownButton()
     private let favoritesPerRow = DropdownButton()
+    private let darkPages = DropdownButton()
     private let newTabPlace = DropdownButton()
     private let pinOfferToggle = Toggle()
     private let swipeToggle = Toggle()
@@ -715,6 +716,21 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         appearanceGroup.add(FormRow(title: String(localized: "Favorites per row", comment: "A setting in Settings › Appearance: how many favorites' tiles sit side by side in the sidebar."),
                                     detail: String(localized: "Automatic fits fewer, larger ones in a narrow sidebar.", comment: "Explanation under “Favorites per row” in Settings › Appearance."),
                                     control: favoritesPerRow))
+        darkPages.options = DarkPages.Mode.allCases.map { mode in
+            let title = switch mode {
+            case .off: String(localized: "Off", comment: "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.")
+            case .system: String(localized: "When the Mac Is Dark", comment: "A choice for “Dark pages” in Settings › Appearance: websites are drawn dark while macOS is in Dark Mode.")
+            case .always: String(localized: "Always", comment: "A choice for “Dark pages” in Settings › Appearance: websites are always drawn dark.")
+            }
+            return DropdownButton.Option(title: title)
+        }
+        darkPages.onSelect = { index in DarkPages.mode = DarkPages.Mode.allCases[index] }
+        let darkRow = FormRow(title: String(localized: "Dark pages", comment: "A setting in Settings › Appearance: websites without a dark look of their own are drawn dark."),
+                              detail: String(localized: "Websites without a dark look of their own are drawn dark. Pictures and video stay as they are.",
+                                             comment: "Explanation under “Dark pages” in Settings › Appearance."),
+                              control: darkPages)
+        darkRow.keywords = String(localized: "dark mode night theme black invert", comment: "Words that find the Dark pages setting with Find a setting in Settings. Not shown.")
+        appearanceGroup.add(darkRow)
         motionToggle.onChange = { on in Tokens.Motion.reducesMotionHere = on }
         appearanceGroup.add(FormRow(title: String(localized: "Reduce motion", comment: "A setting in Settings › Appearance."),
                                     detail: String(localized: "Things appear in place instead of sliding or growing. Fades stay.", comment: "Explanation under “Reduce motion” in Settings › Appearance."),
@@ -1545,6 +1561,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshDownloadPlace()
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         favoritesPerRow.selectedIndex = FavoritesView.perRowChoices.firstIndex(of: FavoritesView.perRow) ?? 0
+        darkPages.selectedIndex = DarkPages.Mode.allCases.firstIndex(of: DarkPages.mode) ?? 0
         saveToggle.isOn = PasswordCapture.offersToSave
         fillToggle.isOn = Autofill.isOn
         translateOffer.isOn = PageTranslator.offers
@@ -1696,19 +1713,21 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // The choices made one site at a time, which otherwise have nowhere to be seen.
         let ads = ContentBlocker.allowedSites.count, extensions = ExtensionStore.extensionsOffSites.count
         let media = SitePermissions.sites.count, zoom = ZoomLevels.count
+        let dark = DarkPages.sitesOn.count + DarkPages.sitesOff.count
         func phrase(_ n: Int, _ text: String) -> String? { n > 0 ? "\(text) on \(n) \(n == 1 ? "site" : "sites")" : nil }
-        let parts = [phrase(ads, "Ads allowed"), phrase(extensions, "extensions off"), phrase(media, "permissions set"), phrase(zoom, "zoom set")].compactMap { $0 }
+        let parts = [phrase(ads, "Ads allowed"), phrase(extensions, "extensions off"), phrase(media, "permissions set"), phrase(zoom, "zoom set"), phrase(dark, "dark page set")].compactMap { $0 }
         let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
         sitesReset = parts.isEmpty ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: String(localized: "Reset choices made for single sites?", comment: "Title of the sheet that forgets the choices made for single sites."),
-                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, and zoom goes back to 100%.",
+                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, and dark pages follow your setting again.",
                                           comment: "Message of the sheet that forgets the choices made for single sites."),
                           action: String(localized: "Reset All", comment: "Button of the sheet that forgets the choices made for single sites.")) {
                 ContentBlocker.allowedSites = []
                 ExtensionStore.extensionsOffSites = []
                 SitePermissions.forgetAll()
                 ZoomLevels.resetAll()
+                DarkPages.forgetAll()
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
@@ -1724,6 +1743,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // shares a row with the host's other choices, and anything else in full (http://localhost:3000).
         let origins = Dictionary(SitePermissions.sites.map { (SiteOrigin.label($0), $0) }, uniquingKeysWith: { a, _ in a })
         let sites = Set(origins.keys).union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites).union(ZoomLevels.all.keys)
+            .union(DarkPages.sitesOn).union(DarkPages.sitesOff)
         var listed = 0, more = 0
         for site in sites.sorted() {
             var said: [String] = []
@@ -1748,6 +1768,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 let percent = Int((zoom * 100).rounded())
                 said.append(String(localized: "zoom \(percent)%", comment: "A choice made for a site in Settings › Privacy, in a list of them: its zoom, like “zoom 125%”."))
             }
+            if DarkPages.sitesOn.contains(site) {
+                said.append(String(localized: "dark page on", comment: "A choice made for a site in Settings › Privacy, in a list of them: its pages are drawn dark."))
+            } else if DarkPages.sitesOff.contains(site) {
+                said.append(String(localized: "dark page off", comment: "A choice made for a site in Settings › Privacy, in a list of them: its pages are never drawn dark."))
+            }
             guard !said.isEmpty else { continue }
             // The first 30 by name, as with site data, then the rest on request.
             guard sitesShowAll || listed < 30 else { more += 1; continue }
@@ -1763,6 +1788,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 off.remove(site)
                 ExtensionStore.extensionsOffSites = off
                 ZoomLevels.forget(host: site)
+                DarkPages.setChoice(nil, for: URL(string: "https://\(site)"))
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }

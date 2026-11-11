@@ -361,6 +361,17 @@ final class SitePanel: FloatingPanelView {
                 self.tab.reload()
             })
         }
+        // Dark pages, for this site alone: on here though off everywhere else, or the other way round. A site that's
+        // dark on its own says so: there's nothing for Zigzag to darken.
+        if url.scheme == "http" || url.scheme == "https" {
+            let native = String(localized: "This site is dark already", comment: "Under Dark page in the site panel's This Site group: dark pages are on, and the site has a dark look of its own, so it's left as it is.")
+            let tab = tab
+            rows.append(.toggle(String(localized: "Dark page", comment: "Row in the site panel's This Site group: draws this site's pages dark."), on: DarkPages.wants(url),
+                                status: { on in on && tab.darkPage?.native == true ? native : on ? Self.onHere : Self.offHere }) { [weak self] on in
+                guard let self else { return }
+                DarkPages.setChoice(on, for: self.url)
+            })
+        }
         if let language = tab.foreignLanguage {
             let name = PageTranslator.name(of: language)
             let always = String(localized: "Always translated", comment: "Under a language's name in the site panel's This Site group: pages in it are always translated.")

@@ -1996,13 +1996,13 @@
         }
       }
     },
-    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, and zoom goes back to 100%." : {
+    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, and dark pages follow your setting again." : {
       "comment" : "Message of the sheet that forgets the choices made for single sites.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放也会恢复为 100%。"
+            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放会恢复为 100%，深色网页也会重新跟随你的设置。"
           }
         }
       }
@@ -2190,6 +2190,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已允许"
+          }
+        }
+      }
+    },
+    "Always" : {
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are always drawn dark.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终"
           }
         }
       }
@@ -4430,6 +4441,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "为每个网站开启深色模式"
+          }
+        }
+      }
+    },
+    "Dark page" : {
+      "comment" : "Row in the site panel's This Site group: draws this site's pages dark.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深色网页"
+          }
+        }
+      }
+    },
+    "Dark pages" : {
+      "comment" : "A setting in Settings › Appearance: websites without a dark look of their own are drawn dark.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深色网页"
           }
         }
       }
@@ -7804,6 +7837,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "燕麦"
+          }
+        }
+      }
+    },
+    "Off" : {
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
           }
         }
       }
@@ -12674,6 +12718,17 @@
         }
       }
     },
+    "This site is dark already" : {
+      "comment" : "Under Dark page in the site panel's This Site group: dark pages are on, and the site has a dark look of its own, so it's left as it is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此网站本身就是深色"
+          }
+        }
+      }
+    },
     "This site needs a name and password." : {
       "comment" : "Message in the sheet a site's HTTP sign-in asks with.",
       "localizations" : {
@@ -13790,6 +13845,17 @@
         }
       }
     },
+    "Websites without a dark look of their own are drawn dark. Pictures and video stay as they are." : {
+      "comment" : "Explanation under “Dark pages” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有自带深色外观的网站会以深色显示。图片和视频保持原样。"
+          }
+        }
+      }
+    },
     "Welcome to" : {
       "comment" : "First words of the welcome window, above the drawn ZIGZAG wordmark.",
       "localizations" : {
@@ -13907,6 +13973,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "当页面是其他语言时，Zigzag 会在每个网站上询问一次。"
+          }
+        }
+      }
+    },
+    "When the Mac Is Dark" : {
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are drawn dark while macOS is in Dark Mode.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac 为深色时"
           }
         }
       }
@@ -14791,6 +14868,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "当前标签页"
+          }
+        }
+      }
+    },
+    "dark mode night theme black invert" : {
+      "comment" : "Words that find the Dark pages setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深色模式 夜间 暗色 主题 黑色 反色"
+          }
+        }
+      }
+    },
+    "dark page off" : {
+      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its pages are never drawn dark.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭深色网页"
+          }
+        }
+      }
+    },
+    "dark page on" : {
+      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its pages are drawn dark.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开深色网页"
           }
         }
       }
