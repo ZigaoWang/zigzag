@@ -3,7 +3,10 @@ import AppKit
 protocol SidebarDelegate: SidebarListDelegate {
     func sidebarOpenCommandBar()
     func sidebarSwitchSpace(_ id: UUID)
-    func sidebarNewSpace()
+    /// The + at the bottom: what it can add.
+    func sidebarAddMenu() -> NSMenu?
+    /// Right-click on the sidebar where there's no row or button of its own.
+    func sidebarBlankMenu() -> NSMenu?
     func sidebarShowDownloads(from view: NSView)
     func sidebarSpaceMenu(for id: UUID) -> NSMenu?
 }
@@ -725,7 +728,7 @@ final class SidebarView: NSView {
         return button
     }()
     let newSpaceButton: IconButton = {
-        let button = SidebarView.chromeButton("plus", toolTip: String(localized: "New Space", comment: "Tooltip of the button that adds a space, at the bottom of the sidebar."))
+        let button = SidebarView.chromeButton("plus", toolTip: String(localized: "New Space or Folder", comment: "Tooltip of the + button at the bottom of the sidebar: opens a menu to add a space or a folder."))
         button.glyph = LineGlyph.plus
         return button
     }()
@@ -832,7 +835,9 @@ final class SidebarView: NSView {
             guard let self else { return }
             self.delegate?.sidebarShowDownloads(from: self.downloadsButton)
         }
-        newSpaceButton.onClick = { [weak self] _ in self?.delegate?.sidebarNewSpace() }
+        // A menu, as Arc's + is: a space or a folder, which a single space has no other button for.
+        newSpaceButton.onClick = { [weak self] _ in self?.showAddMenu() }
+        newSpaceButton.onRightClick = { [weak self] _ in self?.delegate?.sidebarAddMenu() }
         address.onClick = { [weak self] _ in self?.delegate?.sidebarOpenCommandBar() }
         themeToken = Brand.themeChanged.observe { [weak self] in self?.tintDownloadsRing() }
     }
@@ -841,6 +846,22 @@ final class SidebarView: NSView {
 
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { true }
+
+    /// Opens just above the +, its left edge on the button's, so it covers neither the button nor the spaces.
+    private func showAddMenu() {
+        guard let menu = delegate?.sidebarAddMenu() else { return }
+        let button = newSpaceButton
+        let gap = Tokens.Space.x1
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.isFlipped ? -gap - menu.size.height : button.bounds.maxY + gap + menu.size.height), in: button)
+    }
+
+    /// Right-click where no row or button has a menu of its own (below the tabs, between the favorites, the bar at
+    /// the bottom): what you'd make here. Not on the address or the buttons above it, which belong to the page.
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let point = convert(event.locationInWindow, from: nil)
+        guard point.y >= (holdsAddress ? address.frame.maxY : contentTop) else { return nil }
+        return delegate?.sidebarBlankMenu()
+    }
 
     /// The sidebar is the window's title bar: drag it to move the window, and double-click it to zoom (or
     /// whatever the Mac's title bar double-click is set to do).

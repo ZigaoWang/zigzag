@@ -2194,7 +2194,11 @@ extension BrowserWindowController: SidebarDelegate {
 
     func sidebarOpenCommandBar() { commandBar.show(mode: .editCurrent) }
     func sidebarSwitchSpace(_ id: UUID) { tabManager.switchToSpace(id) }
-    func sidebarNewSpace() { newSpace(nil) }
+    func sidebarAddMenu() -> NSMenu? {
+        let menu = SidebarMenus.addMenu(controller: self)
+        return menu.items.isEmpty ? nil : menu
+    }
+    func sidebarBlankMenu() -> NSMenu? { SidebarMenus.blankMenu(controller: self) }
     func sidebarShowDownloads(from view: NSView) { DownloadsPanel.show(from: view, in: self) }
     func sidebarSpaceMenu(for id: UUID) -> NSMenu? {
         let menu = SidebarMenus.spaceMenu(for: id, controller: self)

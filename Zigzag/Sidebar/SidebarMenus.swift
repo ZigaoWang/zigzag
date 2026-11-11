@@ -355,6 +355,53 @@ enum SidebarMenus {
         return menu
     }
 
+    /// What the sidebar's own menus hold, in order, before they're made into items: the right-click on its empty
+    /// space and the + at its bottom.
+    enum Entry: Equatable { case newTab, newFolder, editSpace, newSpace, separator }
+
+    /// Right-click on the sidebar where there's no row or button: what you'd make here, then the space itself. A
+    /// private window keeps no pinned tabs or spaces, so only a tab.
+    static func blankEntries(isPrivate: Bool) -> [Entry] {
+        isPrivate ? [.newTab] : [.newTab, .newFolder, .separator, .editSpace, .newSpace]
+    }
+
+    /// The + at the bottom of the sidebar: the bigger things to add, the space first, as the button stands among
+    /// the spaces.
+    static func addEntries(isPrivate: Bool) -> [Entry] {
+        isPrivate ? [] : [.newSpace, .newFolder]
+    }
+
+    static func blankMenu(controller: BrowserWindowController) -> NSMenu {
+        menu(blankEntries(isPrivate: controller.tabManager.isPrivate), controller: controller)
+    }
+
+    static func addMenu(controller: BrowserWindowController) -> NSMenu {
+        menu(addEntries(isPrivate: controller.tabManager.isPrivate), controller: controller)
+    }
+
+    private static func menu(_ entries: [Entry], controller: BrowserWindowController) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for entry in entries {
+            switch entry {
+            case .separator: menu.addItem(.separator())
+            case .newTab:
+                menu.addItem(Item(String(localized: "New Tab", comment: "Item in the menu of the sidebar's empty space.")) { [weak controller] in controller?.listNewTab() })
+            case .newFolder:
+                menu.addItem(Item(String(localized: "New Folder", comment: "Item in a space's context menu.")) { [weak controller] in controller?.newFolder() })
+            case .editSpace:
+                // Beside the space's name, as the View menu's Edit Space… opens it.
+                menu.addItem(Item(String(localized: "Edit Space…", comment: "Item in a space's context menu.")) { [weak controller] in
+                    guard let controller else { return }
+                    controller.openSpaceEditor(controller.tabManager.currentSpaceID, anchor: controller.sidebar.list.headerView)
+                })
+            case .newSpace:
+                menu.addItem(Item(String(localized: "New Space", comment: "Item in a space's context menu.")) { [weak controller] in controller?.newSpace(nil) })
+            }
+        }
+        return menu
+    }
+
     private static func swatch(_ color: NSColor) -> NSImage {
         let size = NSSize(width: Tokens.Space.x3, height: Tokens.Space.x3)
         return NSImage(size: size, flipped: false) { rect in
