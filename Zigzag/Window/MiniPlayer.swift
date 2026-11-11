@@ -94,8 +94,20 @@ final class MiniPlayer {
     /// Whether this tab's video would follow you out of it: its page is on screen, and plays a video you were
     /// watching (`MiniPlayerLayout.followed`), not one it's leaving behind for a page on its way in.
     private func follows(_ tab: Tab) -> Bool {
-        guard !tab.isPeek, !tab.isClosed, let webView = tab.webView, webView.window != nil, tab.pageHolder?.superview?.superview is PageCardView else { return false }
+        guard !tab.isPeek, !tab.isClosed, let webView = tab.webView, webView.window != nil, Self.isInPageCard(tab.pageHolder) else { return false }
         return PageVideos.shared.followed(in: webView, leavingPage: tab.isLeavingPage) != nil
+    }
+
+    /// Whether the page is shown in one of the window's page cards (not the mini player's, nor a peek's), however
+    /// deep in it its holder sits.
+    private static func isInPageCard(_ holder: PageHolder?) -> Bool {
+        var view = holder?.superview
+        while let current = view {
+            if current is PageCardView { return true }
+            if current is MiniPlayerView { return false }
+            view = current.superview
+        }
+        return false
     }
 
     /// Tabs came or went: one closed, or moved to another window, takes the player with it.
