@@ -1778,6 +1778,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             y = group.frame.maxY + Tokens.Page.groupGap
         }
 
+        // A line said once under a group, in the rows' own explanation style, wrapping on a narrow page.
+        func note(_ text: String) {
+            let label = NSTextField(wrappingLabelWithString: text)
+            label.font = Tokens.Font.detail()
+            label.textColor = Tokens.Color.textSecondary
+            label.isSelectable = false
+            let textWidth = max(0, contentWidth - Tokens.Page.groupPad * 2) + Label.inset * 2
+            let height = ceil(label.sizeThatFits(NSSize(width: textWidth, height: 400)).height)
+            label.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y - Tokens.Page.groupGap + Tokens.Space.x2, width: textWidth, height: height)
+            documentView.addSubview(label)
+            y = label.frame.maxY + Tokens.Page.groupGap
+        }
+
         // A search: what matches, from every section, under the section's name.
         let words = searchWords
         for pane in SettingsPane.allCases {
@@ -1815,21 +1828,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             section(Self.spacesHeading, spacesGroup, accessory: addSpaceButton)
             // Said once, under the list, and only when there's an order to change.
             if spaceRows.count > 1 {
-                let hint = Label(String(localized: "Drag a space to change its order.", comment: "Hint under Your Spaces in Settings › Spaces."),
-                                 font: Tokens.Font.detail(), color: Tokens.Color.textTertiary)
-                hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y - Tokens.Page.groupGap + Tokens.Space.x2,
-                                    width: contentWidth - Tokens.Page.groupPad, height: hint.lineHeight)
-                documentView.addSubview(hint)
-                y = hint.frame.maxY + Tokens.Page.groupGap
+                note(String(localized: "Drag a space to change its order.", comment: "Hint under Your Spaces in Settings › Spaces."))
             }
         case .profiles:
             section(Self.profilesHeading, profilesGroup, accessory: addProfileButton)
-            let hint = Label(String(localized: "Each profile has its own extensions, sign-ins, history and favorites. Spaces on the same profile share them.", comment: "Under the list in Settings › Profiles."),
-                             font: Tokens.Font.detail(), color: Tokens.Color.textTertiary)
-            hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y - Tokens.Page.groupGap + Tokens.Space.x2,
-                                width: contentWidth - Tokens.Page.groupPad, height: hint.lineHeight)
-            documentView.addSubview(hint)
-            y = hint.frame.maxY + Tokens.Page.groupGap
+            note(String(localized: "Each profile has its own extensions, sign-ins, history and favorites. Spaces on the same profile share them.", comment: "Under the list in Settings › Profiles."))
             if !unlistedGroup.rows.isEmpty { section(Self.unlistedHeading, unlistedGroup) }
         case .passwords, .websiteData:
             for (title, group) in groups(of: pane) { section(title, group) }
