@@ -117,6 +117,7 @@
 		5F21C65FD6DBBC3F333DFD27 /* ScriptingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 633F57F860ED6EC0B7E99FC3 /* ScriptingTests.swift */; };
 		5F8FD5529E5D633E06EE0A83 /* SharedSoundGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 104B0C82EED3690FF32A2B00 /* SharedSoundGateTests.swift */; };
 		5FDB01E014959F64469D16F6 /* MiniPlayerLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B83A1FED706DC751940773 /* MiniPlayerLayout.swift */; };
+		605786340091141429E15759 /* DarkPagesFallbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B788AB64DB761375F0FEFA16 /* DarkPagesFallbackTests.swift */; };
 		60C9CEF1FC960DAA8A7ED766 /* web-locks.js in Resources */ = {isa = PBXBuildFile; fileRef = DFEB02EB619B5441AC6DED95 /* web-locks.js */; };
 		63392082D00360175C202F9A /* HistoryLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A7E9A550FE7FAD6F8CA7697 /* HistoryLookup.swift */; };
 		6358AB53F0B1E9EAD7CB79AD /* Signal.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0657DD4DA14F56BD051BC34 /* Signal.swift */; };
@@ -502,6 +503,7 @@
 		B13E82E7DA1A290559EC8C20 /* SplitDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDropTests.swift; sourceTree = "<group>"; };
 		B1C94BBE34DB020CBB3EA2A2 /* ProxyRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyRulesTests.swift; sourceTree = "<group>"; };
 		B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptHost.swift; sourceTree = "<group>"; };
+		B788AB64DB761375F0FEFA16 /* DarkPagesFallbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPagesFallbackTests.swift; sourceTree = "<group>"; };
 		BAD3351437EE20BC819F95CD /* ConfirmSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmSheet.swift; sourceTree = "<group>"; };
 		BC7CC06A0253CAF1E0CAEA2F /* Profile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Profile.swift; sourceTree = "<group>"; };
 		BCA8F1625F7717F1444D8B29 /* Words.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Words.swift; sourceTree = "<group>"; };
@@ -1000,6 +1002,7 @@
 				97B89F5BC1A42191D2C02C66 /* CommandBarRankingTests.swift */,
 				5D3D982B142CB7CC9AA89B6A /* ContrastTokensTests.swift */,
 				8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */,
+				B788AB64DB761375F0FEFA16 /* DarkPagesFallbackTests.swift */,
 				4295D4E75FDD1157FE955EBF /* DarkPagesTests.swift */,
 				3014AEB17D7BEE4384710CD9 /* DeveloperToolsTests.swift */,
 				14B44E3C60BDACED82D8B858 /* DiagnosticsTests.swift */,
@@ -1468,6 +1471,7 @@
 				23B86800C5070366304E8423 /* CommandBarHistoryTests.swift in Sources */,
 				AD66AB1C32F3990847A89971 /* CommandBarRankingTests.swift in Sources */,
 				87F8E37BD3315332966A7421 /* ContrastTokensTests.swift in Sources */,
+				605786340091141429E15759 /* DarkPagesFallbackTests.swift in Sources */,
 				37417FBDF6F6A5A1633769C5 /* DarkPagesTests.swift in Sources */,
 				B5E6F1A8F313A228FEF5DE37 /* DeveloperToolsTests.swift in Sources */,
 				4E5CF0E3E770AEFADC046339 /* DiagnosticsTests.swift in Sources */,
