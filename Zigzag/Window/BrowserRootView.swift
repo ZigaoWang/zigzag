@@ -615,17 +615,30 @@ final class BrowserRootView: SpaceFrameView {
     /// window's own corner would, so it's square too.
     private func windowCorners(of pane: NSRect, attached: Bool) -> (top: Bool, bottom: Bool) {
         // Under a bar in the page's color, the bar's corners are the card's, so the page's own top corners are square.
-        guard attached, pane.maxX >= bounds.maxX - 1 else { return (underPaintedBar, false) }
+        guard attached, pane.maxX >= bounds.maxX - 1 else { return (false, false) }
         let top = showsTopBar ? topBarFrame.maxY : bounds.minY
-        return (underPaintedBar || pane.minY <= top + 1, pane.maxY >= bounds.maxY - 1)
+        return (pane.minY <= top + 1, pane.maxY >= bounds.maxY - 1)
     }
 
-    private var underPaintedBar: Bool { showsTopBar && topBar.pageColor != nil }
+    /// The shown page's own color, for the bar above it (`paintTopBar`).
+    private var pageColor: NSColor?
 
-    /// The bar above the page in the page's color (`TopBarView.pageColor`), nil for none.
+    /// The bar above the page in the page's color, nil for none: the page's card grows up under the bar, its top in
+    /// that color, so the two read as one card and move as one. Not in split view, where two pages have two colors.
     func paintTopBar(_ color: NSColor?) {
-        topBar.pageColor = color
+        pageColor = color
+        topBar.pageColor = paintsTopBar ? color : nil
         needsLayout = true
+        refreshGlassOcclusion()
+    }
+
+    private var paintsTopBar: Bool { showsTopBar && pageColor != nil && splitRatio == nil && !isEmpty }
+
+    /// The page card's own frame for `pane`: under a bar in the page's color, it reaches up to the bar's top.
+    private func cardViewFrame(_ pane: NSRect) -> NSRect {
+        guard paintsTopBar else { return pane }
+        let top = min(pane.minY, topBarFrame.minY)
+        return NSRect(x: pane.minX, y: top, width: pane.width, height: pane.maxY - top)
     }
 
     private func layoutCards() {
@@ -633,12 +646,14 @@ final class BrowserRootView: SpaceFrameView {
         emptyHint.frame = Self.markFrame(in: panes.left)
         card.isEdgeToEdge = isEdgeToEdge
         secondCard.isEdgeToEdge = isEdgeToEdge
-        card.frame = panes.left
+        let left = cardViewFrame(panes.left)
+        card.frame = left
+        card.band = left.height - panes.left.height
+        card.bandColor = paintsTopBar ? pageColor : nil
+        topBar.pageColor = paintsTopBar ? pageColor : nil
         let attached = sidebarVisible && Self.isBorderless
-        card.squaresRightCorners = windowCorners(of: panes.left, attached: attached)
+        card.squaresRightCorners = windowCorners(of: left, attached: attached)
         secondCard.squaresRightCorners = panes.right.map { windowCorners(of: $0, attached: attached) } ?? (false, false)
-        card.squaresLeftCorners = (underPaintedBar, false)
-        secondCard.squaresLeftCorners = (underPaintedBar, false)
         card.isAttached = attached
         secondCard.isAttached = attached
         if let right = panes.right {
@@ -702,7 +717,7 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     /// Nothing to see through: the page runs edge to edge, or the tab overview covers the window with its own glass.
-    override var glassIsCovered: Bool { (isEdgeToEdge && !showsTopBar && !card.isHidden && !isEmpty) || glassCovered }
+    override var glassIsCovered: Bool { (isEdgeToEdge && (!showsTopBar || paintsTopBar) && !card.isHidden && !isEmpty) || glassCovered }
 
     override func layout() {
         super.layout()
@@ -730,11 +745,7 @@ final class BrowserRootView: SpaceFrameView {
     private func placeTopBar() {
         let bar = topBarSlideFrame ?? topBarFrame
         topBar.frame = bar
-        let page = pageAreaFrame
-        (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: page, window: bounds)
-        // The page's color over the page's width, framed with the card's top corners.
-        topBar.pageSpan = NSRect(x: page.minX - bar.minX, y: topBarFrame.minY - bar.minY, width: page.width, height: topBarFrame.height)
-        topBar.pageRadius = topBarInset > 0 ? Tokens.Radius.card : 0
+        (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: pageAreaFrame, window: bounds)
     }
 
     /// While the sidebar slides, the bar holds still over both where it was and where it's going, and only its
@@ -775,7 +786,7 @@ final class BrowserRootView: SpaceFrameView {
         // Borderless: the corners square off as the page grows to the window's edges, and round again as it shrinks.
         // Beside the sidebar, borderless, the page rounds like the window's corner; floating, like a card.
         let panes = paneFrames
-        card.squaresRightCorners = windowCorners(of: panes.left, attached: visible && Self.isBorderless)
+        card.squaresRightCorners = windowCorners(of: cardViewFrame(panes.left), attached: visible && Self.isBorderless)
         secondCard.squaresRightCorners = panes.right.map { windowCorners(of: $0, attached: visible && Self.isBorderless) } ?? (false, false)
         card.isAttached = visible && Self.isBorderless
         secondCard.isAttached = visible && Self.isBorderless
@@ -786,7 +797,7 @@ final class BrowserRootView: SpaceFrameView {
         if topBarSlideFrame != nil { topBar.slideControls(from: oldControls, curve: Tokens.Motion.slide) }
         Tokens.Motion.animate(Tokens.Motion.slide, evenFromKeyboard: true, moves: true, {
             if self.topBarSlideFrame == nil, self.showsTopBar { self.topBar.animator().frame = self.topBarFrame }
-            self.card.animator().frame = self.paneFrames.left
+            self.card.animator().frame = self.cardViewFrame(self.paneFrames.left)
             self.emptyHint.animator().frame = Self.markFrame(in: self.paneFrames.left)
             if let right = self.paneFrames.right { self.secondCard.animator().frame = right }
         }, completion: {

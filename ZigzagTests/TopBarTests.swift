@@ -136,6 +136,44 @@ struct TopBarTests {
         #expect(topBar.appearance == nil)
     }
 
+    @Test func underThePagesColorTheCardReachesUpUnderTheBar() {
+        let sidebar = SidebarView()
+        let root = BrowserRootView(sidebar: sidebar)
+        root.frame = window
+        sidebar.holdsAddress = false
+        root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
+        root.showsTopBar = true
+        root.layoutSubtreeIfNeeded()
+        let page = root.cardFrame
+        #expect(root.card.frame == page && root.card.band == 0)
+
+        root.paintTopBar(.black)
+        root.layoutSubtreeIfNeeded()
+        // One card: its top is the bar's, in the page's color, and the page itself stays where it was.
+        #expect(root.card.frame.minY == root.topBar.frame.minY && root.card.frame.maxY == page.maxY)
+        #expect(root.card.frame.minX == page.minX && root.card.frame.width == page.width)
+        #expect(root.card.band == page.minY - root.topBar.frame.minY)
+        #expect(root.card.bandColor == .black && root.topBar.pageColor == .black)
+        #expect(root.cardFrame == page)
+
+        // Two panes have two colors: the plain bar.
+        root.splitRatio = 0.5
+        root.layoutSubtreeIfNeeded()
+        #expect(root.card.band == 0 && root.topBar.pageColor == nil)
+        root.splitRatio = nil
+        root.layoutSubtreeIfNeeded()
+        #expect(root.card.band > 0)
+
+        // No color, or the setting off: as before.
+        root.paintTopBar(nil)
+        root.layoutSubtreeIfNeeded()
+        #expect(root.card.frame == page && root.card.band == 0 && root.card.bandColor == nil)
+        root.paintTopBar(.white)
+        root.showsTopBar = false
+        root.layoutSubtreeIfNeeded()
+        #expect(root.card.band == 0 && root.topBar.pageColor == nil)
+    }
+
     @Test func offTheLayoutIsUnchanged() {
         #expect(BrowserRootView.pageArea(in: window, sidebarVisible: true, sidebarWidth: 240, edgeToEdge: false, borderless: true, topBar: false)
                 == NSRect(x: 240, y: 0, width: 1040, height: 800))

@@ -15,6 +15,13 @@ final class PageCardView: NSView {
     /// In split view each pane gets its own small toolbar.
     let header = PaneHeaderView()
     var showsHeader = false { didSet { header.isHidden = !showsHeader; needsLayout = true } }
+    /// Under the bar above the page, the card's top this tall is the bar's, in the page's own color (`bandColor`), so
+    /// the bar and the page read as one card: its corners, edge and shadow are the card's, and it moves with it.
+    var band: CGFloat = 0 { didSet { if band != oldValue { needsLayout = true } } }
+    var bandColor: NSColor? { didSet { if bandColor != oldValue { refreshColors() } } }
+    private let bandLayer = CALayer()
+    /// How far down the card the page starts: under the bar's band and a split pane's header.
+    private var contentTop: CGFloat { band + (showsHeader ? PaneHeaderView.height : 0) }
     /// Reader, over the page, which stays loaded underneath.
     private(set) var overlay: NSView?
     /// What covers the shown tab's page: its PDF viewer, over WebKit's own, or Settings.
@@ -142,7 +149,7 @@ final class PageCardView: NSView {
     }
 
     private func layoutProgress() {
-        let top = showsHeader ? PaneHeaderView.height : 0
+        let top = contentTop
         progressLine.bounds = CGRect(x: 0, y: 0, width: clip.bounds.width * progress, height: 2)
         progressLine.position = CGPoint(x: 0, y: clip.bounds.height - top)
     }
@@ -219,6 +226,7 @@ final class PageCardView: NSView {
         placeholder.imageAlignment = .alignTop
         placeholder.isHidden = true
         clip.addSubview(placeholder)
+        clip.layer?.addSublayer(bandLayer)
 
         edge.cornerRadius = Tokens.Radius.card
         edge.cornerCurve = .continuous
@@ -238,9 +246,11 @@ final class PageCardView: NSView {
         super.layout()
         Tokens.Motion.withoutAnimation {
             clip.frame = bounds
-            let top = showsHeader ? PaneHeaderView.height : 0
-            // The clip isn't flipped: the header sits at its top edge, the page fills the rest below.
-            header.frame = NSRect(x: 0, y: clip.bounds.height - PaneHeaderView.height, width: clip.bounds.width, height: PaneHeaderView.height)
+            let top = contentTop
+            // The clip isn't flipped: the band and then the header sit at its top edge, the page fills the rest below.
+            bandLayer.frame = CGRect(x: 0, y: clip.bounds.height - band, width: clip.bounds.width, height: band)
+            bandLayer.isHidden = band == 0
+            header.frame = NSRect(x: 0, y: clip.bounds.height - band - PaneHeaderView.height, width: clip.bounds.width, height: PaneHeaderView.height)
             let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
             // A page in full screen (a video's) is in WebKit's own window, which sizes it: sized to the card from here, it
             // would no longer fill the screen.
@@ -278,6 +288,7 @@ final class PageCardView: NSView {
         paintProgress()
         Tokens.Motion.withoutAnimation {
             clip.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
+            bandLayer.backgroundColor = bandColor.map { cgColor($0) }
             edge.borderColor = cgColor(Tokens.Color.cardEdge)
             // Meeting the window's edges, the page's own edge is its outline: a drawn one runs along the window's edge
             // and round the corners as an extra line.
@@ -301,7 +312,7 @@ final class PageCardView: NSView {
         // A page whose video is in full screen stays in WebKit's window, which puts it back here when that ends: taken
         // out now, the full screen would be left without it.
         if let newWebView, newWebView.fullscreenState == .notInFullscreen {
-            let top = showsHeader ? PaneHeaderView.height : 0
+            let top = contentTop
             newWebView.frame = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
             newWebView.autoresizingMask = [.width, .height]
             clip.addSubview(newWebView, positioned: .below, relativeTo: placeholder)
