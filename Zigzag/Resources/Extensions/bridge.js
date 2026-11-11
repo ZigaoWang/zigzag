@@ -75,7 +75,8 @@
   // the sender's Chrome extension Origin and this profile's cookies, syncing response cookie changes back.
   // Native code checks current site access; without it, the original fetch runs. No vendor is singled out.
   // Upload streams, event streams, explicit referrers, integrity and manual redirects stay with WebKit.
-  // Cross-origin redirects cannot use this buffered transport.
+  // A read that redirects to another origin or is too big to carry whole is answered { fallback } and runs
+  // here as the original fetch; a write that would do either fails, as it may not be sent twice.
   if (typeof globalThis.fetch === 'function') {
     const nativeFetch = globalThis.fetch.bind(globalThis);
     const metadata = (response, answer) => {
