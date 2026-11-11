@@ -36,6 +36,8 @@ final class Tab: NSObject {
         case pdf
         /// Settings came or went over its page.
         case settings
+        /// Dark pages began or stopped drawing its page dark (`darkPage`).
+        case darkPage
     }
 
     let id: UUID
@@ -49,6 +51,9 @@ final class Tab: NSObject {
     private(set) var title: String
     private(set) var favicon: NSImage?
     private(set) var themeColor: NSColor?
+    /// What dark pages found on the page (`DarkPages`): whether Zigzag draws it dark, whether it's dark on its own,
+    /// and its color as drawn. Nil until the page has been looked at, and while dark pages are off.
+    private(set) var darkPage: DarkPages.State?
     private(set) var isLoading = false
     private(set) var progress: Double = 0
     private(set) var canGoBack = false
@@ -226,6 +231,7 @@ final class Tab: NSObject {
         #endif
         self.webView = webView
         observe(webView)
+        DarkPages.attach(to: webView)
 
         if Self.isExtensionPage(url), let url {
             // Extension pages always load fresh: their saved history state can come back as a blank page, and one
@@ -287,6 +293,16 @@ final class Tab: NSObject {
             if case .success(let value) = result, let state = PageState(value, url: webView.url) { self.pageState = state }
             completion?(self.pageState)
         }
+    }
+
+    /// The page script said what it found. Whatever colors itself after the page (the bar above it) hears of it as
+    /// `.darkPage`, and as `DarkPages.pageDarkenedNotification`.
+    func darkPageChanged(_ state: DarkPages.State) {
+        guard state != darkPage else { return }
+        let wasDarkened = darkPage?.darkened ?? false
+        darkPage = state
+        changed.send(.darkPage)
+        if state.darkened != wasDarkened { NotificationCenter.default.post(name: DarkPages.pageDarkenedNotification, object: self) }
     }
 
     /// Shown again: unless its page is loading back, what was read as you left it isn't needed.
