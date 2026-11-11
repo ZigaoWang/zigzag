@@ -886,7 +886,9 @@ nonisolated enum ExtensionWrite {
         let url = input.url
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil
-        configuration.timeoutIntervalForResource = 30
+        // A slow upload keeps going while bytes move, as in a browser; a server that goes quiet still ends it.
+        configuration.timeoutIntervalForRequest = 60
+        configuration.timeoutIntervalForResource = 600
         configuration.proxyConfigurations = proxies
         let jar = configuration.httpCookieStorage!
         jar.cookieAcceptPolicy = .onlyFromMainDocumentDomain
