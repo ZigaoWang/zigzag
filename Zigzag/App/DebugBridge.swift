@@ -712,8 +712,10 @@ enum DebugBridge {
             controller.selectedWebView?.callAsyncJavaScript("return window.__zigzagDark ? JSON.stringify(window.__zigzagDark.state()) : 'none'",
                                                             arguments: [:], in: nil, in: DarkPages.world) { result in
                 let tab = controller.tabManager.selectedTab?.darkPage
-                debugLog("darkstate => \(result) tab=\(String(describing: tab))")
+                debugLog("darkstate => \(result) tab=\(String(describing: tab)) analysis=\(DarkPages.lastAnalysis)")
             }
+        // darkpalettes forget: drops the profile's dark palettes, as clearing History does.
+        case "darkpalettes": if arg == "forget" { DarkPalettes.forget(in: controller.tabManager.profile.store) }
         case "resize":
             let n = arg.split(separator: " ").compactMap { Double($0) }
             if n.count == 2, let window = controller.window {

@@ -6,9 +6,11 @@ import WebKit
 /// Settings › Appearance › Dark pages turns it on always, while the Mac is dark, or not at all, and the site panel
 /// turns it on or off for one site. Where it's on, the page is first told dark is preferred (the web view's
 /// appearance is dark, so `prefers-color-scheme: dark` matches and a site with its own dark theme uses it). Only a
-/// page that still draws itself light is darkened, by dark-pages.js: one filter on the page's root, with pictures
-/// and video turned back. That's drawn by WebKit on the GPU, with no script per element, so pages stay as fast as
-/// they were. Every frame gets the script: a frame from elsewhere (a player, a map, a widget) is turned back by the
+/// page that still draws itself light is darkened, by dark-pages.js. The first time a site is seen that's one filter on
+/// the page's root, with pictures and video turned back, drawn by WebKit on the GPU with no script per element; once
+/// the page is idle its colors are read and turned into a dark palette for the site (`DarkPalettes`), and from the
+/// next visit on the page is drawn with that from its first frame: the site's own colors made dark, with pictures
+/// untouched and nothing watching the page. Where a palette doesn't cover a page, the filter stays. Every frame gets the script: a frame from elsewhere (a player, a map, a widget) is turned back by the
 /// page around it and darkens itself, or not, as a page would. Pure black backgrounds draws white as black instead of
 /// a dark gray. Reader has its own themes and its own web view, and isn't touched.
 enum DarkPages {
@@ -204,29 +206,64 @@ enum DarkPages {
         scope.flatMap { nativeSites[$0] } ?? []
     }
 
-    private static let source: String = {
-        guard let url = Bundle.main.url(forResource: "dark-pages", withExtension: "js") else { return "" }
+    static func resource(_ name: String) -> String {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "js") else { return "" }
         return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
-    }()
-
-    /// The choices as the page script reads them, for pages in this store.
-    static func config(for store: WKWebsiteDataStore?) -> [String: Any] {
-        let black = pureBlack
-        return ["on": wants(mode: mode, systemIsDark: systemIsDark, site: nil), "sitesOn": sitesOn.sorted(), "sitesOff": sitesOff.sorted(),
-                "native": nativeSites(in: nativeScope(of: store)).sorted(), "black": black, "strength": strength(black: black),
-                "root": rootCSS(black: black), "canvas": canvasCSS, "media": mediaCSS(black: black),
-                "marks": ["image": imageMark, "before": beforeMark, "after": afterMark, "frame": frameMark]]
     }
 
-    private static func configJSON(for store: WKWebsiteDataStore?) -> String {
-        (try? JSONSerialization.data(withJSONObject: config(for: store), options: [.sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    /// The palette's colors and the page script around them, as one script.
+    private static let source: String = {
+        let palette = resource("dark-palette").trimmingCharacters(in: .whitespacesAndNewlines)
+        return resource("dark-pages").replacingOccurrences(of: "__PALETTE__", with: palette.isEmpty ? "null" : palette)
+    }()
+
+    /// How long after a page has loaded its colors are read (tests wait less).
+    static var paletteDelay = 1200
+
+    /// The site's palette a page at `url` in this store starts with: its own, for the backgrounds chosen now.
+    static func palette(for store: WKWebsiteDataStore?, url: URL?) -> DarkPalettes.Entry? {
+        DarkPalettes.entry(origin: DarkPalettes.origin(of: url), black: pureBlack, scope: nativeScope(of: store))
+    }
+
+    /// The choices as the page script reads them, for pages in this store, going to `url` (the site whose palette
+    /// comes with them).
+    static func config(for store: WKWebsiteDataStore?, url: URL? = nil) -> [String: Any] {
+        let black = pureBlack
+        var config: [String: Any] = [
+            "on": wants(mode: mode, systemIsDark: systemIsDark, site: nil), "sitesOn": sitesOn.sorted(), "sitesOff": sitesOff.sorted(),
+            "native": nativeSites(in: nativeScope(of: store)).sorted(), "black": black, "strength": strength(black: black),
+            "root": rootCSS(black: black), "canvas": canvasCSS, "media": mediaCSS(black: black),
+            "marks": ["image": imageMark, "before": beforeMark, "after": afterMark, "frame": frameMark],
+            "learn": nativeScope(of: store) != nil, "paletteDelay": paletteDelay, "palette": NSNull()]
+        if let entry = palette(for: store, url: url) {
+            config["palette"] = ["origin": entry.origin, "black": entry.black, "css": entry.css, "invert": entry.invert,
+                                 "fingerprints": entry.fingerprints, "verified": entry.verified]
+        }
+        return config
+    }
+
+    private static func configJSON(for store: WKWebsiteDataStore?, url: URL?) -> String {
+        (try? JSONSerialization.data(withJSONObject: config(for: store, url: url), options: [.sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    }
+
+    /// Which palette a web view's script was given, to tell when the page it's going to has another.
+    static func paletteKey(_ entry: DarkPalettes.Entry?) -> String? {
+        entry.map { "\($0.origin)|\($0.black)|\($0.revision)" }
+    }
+
+    /// Whether a page going to `origin` needs the script put in again for its palette: when its site has one other
+    /// than the one given, or was given one that's gone. Going anywhere else, the one given is simply not used.
+    static func paletteChanged(given: String?, now: String?, origin: String?) -> Bool {
+        if let now { return now != given }
+        guard let given, let origin else { return false }
+        return given.hasPrefix(origin + "|")
     }
 
     /// The first line of the page script, so it can be told from a web view's other scripts at a glance.
     static let scriptMark = "/* zigzag dark pages */\n"
 
-    static func script(for store: WKWebsiteDataStore?) -> WKUserScript {
-        WKUserScript(source: scriptMark + source.replacingOccurrences(of: "__CONFIG__", with: configJSON(for: store)),
+    static func script(for store: WKWebsiteDataStore?, url: URL? = nil) -> WKUserScript {
+        WKUserScript(source: scriptMark + source.replacingOccurrences(of: "__CONFIG__", with: configJSON(for: store, url: url)),
                      injectionTime: .atDocumentStart, forMainFrameOnly: false, in: world)
     }
 
@@ -246,8 +283,9 @@ enum DarkPages {
             others.forEach(controller.addUserScript)
         }
         let store = webView.configuration.websiteDataStore
-        controller.addUserScript(script(for: store))
-        installed[ObjectIdentifier(controller)] = Installed(generation: generation, native: nativeSites(in: nativeScope(of: store)))
+        controller.addUserScript(script(for: store, url: webView.url))
+        installed[ObjectIdentifier(controller)] = Installed(generation: generation, native: nativeSites(in: nativeScope(of: store)),
+                                                            palette: paletteKey(palette(for: store, url: webView.url)))
     }
 
     /// Counts up each time the choices change (the setting, a site's own, the Mac's appearance): a web view whose
@@ -258,6 +296,8 @@ enum DarkPages {
         var generation: Int
         /// The profile's sites seen dark, then.
         var native: Set<String>
+        /// The palette that came with it (`paletteKey`).
+        var palette: String?
     }
     private static var installed: [ObjectIdentifier: Installed] = [:]
 
@@ -272,8 +312,12 @@ enum DarkPages {
     private static func installIfStale(in webView: WKWebView) {
         let key = ObjectIdentifier(webView.configuration.userContentController)
         guard let given = installed[key], given.generation == generation else { install(in: webView); return }
-        let now = nativeSites(in: nativeScope(of: webView.configuration.websiteDataStore))
-        if siteChanged(site(of: webView.url), given: given.native, now: now) { install(in: webView) }
+        let store = webView.configuration.websiteDataStore
+        let now = nativeSites(in: nativeScope(of: store))
+        if siteChanged(site(of: webView.url), given: given.native, now: now) { install(in: webView); return }
+        if paletteChanged(given: given.palette, now: paletteKey(palette(for: store, url: webView.url)), origin: DarkPalettes.origin(of: webView.url)) {
+            install(in: webView)
+        }
     }
 
     private final class Entry {
@@ -297,6 +341,8 @@ enum DarkPages {
         install(in: webView)
         controller.removeScriptMessageHandler(forName: messageName, contentWorld: world)
         controller.add(Messages.shared, contentWorld: world, name: messageName)
+        controller.removeScriptMessageHandler(forName: sheetMessageName, contentWorld: world)
+        controller.addScriptMessageHandler(Sheets.shared, contentWorld: world, name: sheetMessageName)
         let entry = Entry(webView)
         // Going to another site, its own choice applies before its page starts.
         entry.observation = webView.observe(\.url, options: [.new]) { [weak entry] webView, _ in
@@ -355,7 +401,7 @@ enum DarkPages {
                 guard let webView else { return }
                 installIfStale(in: webView)
                 webView.callAsyncJavaScript("if (window.__zigzagDark) window.__zigzagDark.set(config);",
-                                            arguments: ["config": config(for: webView.configuration.websiteDataStore)],
+                                            arguments: ["config": config(for: webView.configuration.websiteDataStore, url: webView.url)],
                                             in: nil, in: world) { _ in }
             }
         }
@@ -376,6 +422,8 @@ enum DarkPages {
         /// The page's background as it's drawn now, darkened or not.
         var color: NSColor?
         var site: String
+        /// Drawn with the site's palette rather than the filter.
+        var palette = false
     }
 
     /// What a page in this store found: a site it saw dark, or saw light, joins or leaves its profile's list.
@@ -405,9 +453,63 @@ enum DarkPages {
 
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
             guard message.frameInfo.isMainFrame, let body = message.body as? [String: Any], let webView = message.webView else { return }
+            if body["kind"] as? String == "palette" {
+                DarkPages.receivedPalette(body, origin: DarkPages.origin(of: message.frameInfo.securityOrigin), from: webView)
+                return
+            }
             let state = State(darkened: body["darkened"] as? Bool ?? false, native: body["native"] as? Bool ?? false,
-                              color: (body["color"] as? String).flatMap(DarkPages.color(hex:)), site: body["site"] as? String ?? "")
+                              color: (body["color"] as? String).flatMap(DarkPages.color(hex:)), site: body["site"] as? String ?? "",
+                              palette: body["palette"] as? Bool ?? false)
             DarkPages.received(state, from: webView)
+        }
+    }
+
+    // MARK: Palettes
+
+    static let sheetMessageName = "zigzagDarkSheet"
+    /// The last palette a page sent, and how long reading its site took (debug, tests).
+    static private(set) var lastAnalysis: [String: Any] = [:]
+
+    static func origin(of security: WKSecurityOrigin) -> String {
+        let host = security.host.lowercased()
+        let usual = security.protocol == "https" ? 443 : security.protocol == "http" ? 80 : 0
+        return "\(security.protocol.lowercased())://\(host)" + (security.port == 0 || security.port == usual ? "" : ":\(security.port)")
+    }
+
+    /// A page read its site's colors (or drew them, and says whether they covered it): kept for the site in its
+    /// profile, for the pages loaded there next. Never from a private window.
+    fileprivate static func receivedPalette(_ body: [String: Any], origin: String, from webView: WKWebView) {
+        guard let scope = nativeScope(of: webView.configuration.websiteDataStore), DarkPalettes.origin(of: webView.url) == origin,
+              let fingerprint = body["fingerprint"] as? String, let black = body["black"] as? Bool else { return }
+        let old = DarkPalettes.entry(origin: origin, black: black, scope: scope)
+        let entry: DarkPalettes.Entry
+        if let ok = body["verified"] as? Bool {
+            guard let old else { return }
+            entry = DarkPalettes.verified(old, fingerprint: fingerprint, ok: ok)
+        } else {
+            let rules = (body["rules"] as? [Any] ?? []).compactMap { $0 as? String }
+            entry = DarkPalettes.merged(old, origin: origin, black: black, fingerprint: fingerprint, rules: rules,
+                                        invert: body["invert"] as? Bool ?? rules.isEmpty)
+            lastAnalysis = (body["stats"] as? [String: Any] ?? [:]).merging(["origin": origin, "rules": entry.rules.count, "bytes": entry.css.utf8.count]) { $1 }
+        }
+        guard entry != old else { return }
+        DarkPalettes.store(entry, scope: scope)
+    }
+
+    /// Palettes were cleared: every web view's script is put in again as it next goes to a page.
+    static func palettesForgotten() { generation += 1 }
+
+    /// Fetches a sheet the page can't read (from elsewhere, without CORS) for a page reading its colors.
+    private final class Sheets: NSObject, WKScriptMessageHandlerWithReply {
+        static let shared = Sheets()
+
+        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
+            guard message.frameInfo.isMainFrame, let webView = message.webView, nativeScope(of: webView.configuration.websiteDataStore) != nil,
+                  let href = message.body as? String, let url = URL(string: href), DarkPalettes.fetchable(url) else { replyHandler(nil, nil); return }
+            Task {
+                let text = await DarkPalettes.fetchSheet(url)
+                replyHandler(text, nil)
+            }
         }
     }
 

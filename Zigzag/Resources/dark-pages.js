@@ -1,8 +1,16 @@
 // Dark pages (Settings › Appearance): a light page is drawn dark, one that's already dark is left alone.
 // Runs in Zigzag's own script world, in every frame, from the start of the document. DarkPages.swift puts the
-// choices in __CONFIG__: { on: default for sites without a choice, sitesOn, sitesOff, native: sites last seen
+// choices in `config` below: { on: default for sites without a choice, sitesOn, sitesOff, native: sites last seen
 // already dark, black: Pure black backgrounds, strength: how far white is turned over, root, canvas, media: the
-// style's parts, marks: the attributes it looks for }.
+// style's parts, marks: the attributes it looks for, palette: the site's own dark palette if one was made, learn:
+// whether one may be made here (never in a private window), paletteDelay }.
+//
+// A palette (#134): the first time a light site is seen, once it has loaded and the page is idle, its style sheets are
+// read and its colors turned into a dark set (dark-palette.js, put in as `palette` below), as a style sheet Zigzag
+// keeps for the site. From the next visit on that sheet is the page's look from its first frame: plain overrides of
+// the site's own colors, with no filter, so pictures and video are simply left alone, and nothing watches the page.
+// The first visit it's drawn with checks how much of the page came out dark, and goes back to the filter for good
+// if too little did. Later visits only check, when idle, whether the site's style changed, and read it again if so.
 //
 // How: the whole page goes through one filter on the root (inverted, then its hues turned back), and pictures,
 // video and the like are turned back again, so they look as they are. A filter on the root keeps fixed headers in
@@ -18,6 +26,7 @@
 (() => {
   if (window.__zigzagDark) return;
   const config = __CONFIG__;
+  const palette = __PALETTE__;
   const marks = config.marks;
   const isTop = window === window.top;
   const type = document.contentType || '';
@@ -45,9 +54,16 @@
   // null until the page has been looked at.
   let native = isTop && matches(site, config.native) ? true : null;
   let darkened = false;
+  // Drawn by the site's palette rather than the filter.
+  let usingPalette = false;
+  // The palette left too much of this page light: the filter for the rest of this visit.
+  let refused = false;
   let lastSent = '';
 
-  const css = () => config.root + (isTop ? config.canvas : '') + config.media;
+  // Only the top page, and only the palette made for this site with these backgrounds.
+  const paletteFits = () => isTop && !refused && !!config.palette && config.palette.origin === location.origin
+    && config.palette.black === config.black && !config.palette.invert && !!config.palette.css;
+  const css = () => (usingPalette ? config.palette.css + '\n' : config.root + (isTop ? config.canvas : '') + config.media);
   const style = document.createElement('style');
   style.setAttribute('data-zigzag-dark', '');
 
@@ -58,7 +74,7 @@
   let shadowSheet = null;
   try { shadowSheet = new CSSStyleSheet(); } catch (e) {}
   const shadowStyles = [];
-  const shadowCSS = () => (darkened ? config.media : '');
+  const shadowCSS = () => (darkened && !usingPalette ? config.media : '');
   const restyleShadows = () => {
     const text = shadowCSS();
     if (shadowSheet) { try { shadowSheet.replaceSync(text); } catch (e) {} }
@@ -86,9 +102,16 @@
     if (root && style.parentNode !== root) root.appendChild(style);
   };
   const apply = (on) => {
-    if (on === darkened) { if (on) put(); return; }
+    const how = on && paletteFits();
+    if (on === darkened && how === usingPalette) { if (on) put(); return; }
     darkened = on;
-    if (on) { style.textContent = css(); put(); scanSoon(document.documentElement); } else { style.textContent = ''; style.remove(); }
+    usingPalette = how;
+    if (on) {
+      style.textContent = css();
+      put();
+      if (!usingPalette) scanSoon(document.documentElement);
+    } else { style.textContent = ''; style.remove(); }
+    watch();
     restyleShadows();
     send();
   };
@@ -174,7 +197,7 @@
   let list = [], at = 0;
   let scanning = false;
   const scanSoon = (root) => {
-    if (!root || !darkened) return;
+    if (!root || !darkened || usingPalette) return;
     roots.push(root);
     if (!scanning) { scanning = true; idle(scan); }
   };
@@ -210,7 +233,7 @@
     }
   };
   const scan = (deadline) => {
-    if (!darkened) { roots.length = 0; list = []; at = 0; scanning = false; return; }
+    if (!darkened || usingPalette) { roots.length = 0; list = []; at = 0; scanning = false; return; }
     let n = 0;
     while (true) {
       if (at >= list.length) {
@@ -302,7 +325,7 @@
     // The page's color as it's drawn: its own, put through the filter when darkened.
     const c = document.body ? backgroundOf(document.body) : canvas();
     let [r, g, b] = c;
-    if (darkened) {
+    if (darkened && !usingPalette) {
       const k = config.strength;
       [r, g, b] = [r, g, b].map((v) => k * (255 - v) + (1 - k) * v);
       // hue-rotate(180deg) leaves gray alone and turns a color to its opposite; the page's background is nearly
@@ -315,11 +338,131 @@
   // Only the top page tells Zigzag; a frame's look is the page's business.
   const send = () => {
     if (!isTop) return;
-    const message = { darkened, native: native === true, color: colorOf(), site };
+    const message = { darkened, native: native === true, color: colorOf(), site, palette: usingPalette };
     const key = JSON.stringify(message);
     if (key === lastSent) return;
     lastSent = key;
     try { window.webkit.messageHandlers.zigzagDark.postMessage(message); } catch (e) {}
+  };
+
+  // MARK: Palette
+
+  // Only a top page on the web, in a profile that keeps things (never a private window).
+  const learnable = () => isTop && config.learn === true && /^https?:$/.test(location.protocol);
+  const ownSheet = (sheet) => {
+    const node = sheet.ownerNode;
+    return node === style || !!(node && node.hasAttribute && node.hasAttribute('data-zigzag-dark'));
+  };
+  // What the page's style is made of, cheaply: each sheet's address and how many rules it has, each <style>'s length.
+  const pieces = () => {
+    const out = [];
+    for (const sheet of document.styleSheets) {
+      if (ownSheet(sheet)) continue;
+      if (sheet.href) {
+        let n = '?';
+        try { n = sheet.cssRules.length; } catch (e) {}
+        out.push('h ' + sheet.href.split('#')[0] + ' ' + n);
+      } else {
+        const node = sheet.ownerNode;
+        out.push('i ' + (node && node.textContent ? node.textContent.length : 0));
+      }
+    }
+    const own = document.documentElement && document.documentElement.getAttribute('style');
+    if (own) out.push('r ' + own.length);
+    return out;
+  };
+  // How much of the page came out dark with the palette on: a grid of points, each one's background, and the ink
+  // of the ones with text. True when nearly all of it did.
+  const covered = () => {
+    if (pageIsDark() !== true) return false;
+    const w = innerWidth, h = innerHeight;
+    let all = 0, bad = 0;
+    for (let i = 1; i <= 4; i++) {
+      for (let j = 1; j <= 4; j++) {
+        let el = document.elementFromPoint((w * i) / 5, (h * j) / 5);
+        while (el && el.parentElement && skip.test(el.tagName)) el = el.parentElement;
+        if (!el) continue;
+        all++;
+        const bg = backgroundOf(el);
+        if (luminance(bg) > 0.3) { bad++; continue; }
+        const hasText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+        const ink = hasText && parse(getComputedStyle(el).color);
+        if (ink && palette.contrast(ink, bg) < 3) bad++;
+      }
+    }
+    return bad <= Math.max(1, all * 0.15);
+  };
+  // A sheet from elsewhere that the page can't read (no CORS): Zigzag fetches its text, without cookies.
+  const fetchRules = async (href) => {
+    try {
+      const text = await window.webkit.messageHandlers.zigzagDarkSheet.postMessage(href);
+      if (typeof text !== 'string' || !text) return null;
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(text);
+      return sheet.cssRules;
+    } catch (e) { return null; }
+  };
+  const tellPalette = (message) => {
+    try { window.webkit.messageHandlers.zigzagDark.postMessage(Object.assign({ kind: 'palette', black: config.black }, message)); } catch (e) {}
+  };
+  let analysis = null;
+  // Reading the sheets takes no more than this much of the page's idle time, all told.
+  const budget = 400;
+  const analyse = async (fp) => {
+    const began = performance.now();
+    let busy = 0;
+    const state = palette.start();
+    const lists = [];
+    let fetched = 0, unread = 0;
+    for (const sheet of [...document.styleSheets, ...(document.adoptedStyleSheets || [])]) {
+      if (ownSheet(sheet) || sheet.disabled) continue;
+      const media = sheet.media && sheet.media.mediaText;
+      if (palette.skips(media)) continue;
+      let rules = null;
+      try { rules = sheet.cssRules; } catch (e) {}
+      if (!rules && sheet.href && fetched < 16) { fetched++; rules = await fetchRules(sheet.href); }
+      if (!rules) { unread++; continue; }
+      lists.push([rules, media ? ['@media ' + media] : []]);
+    }
+    // Read in the page's order: the last added is read first.
+    for (const [rules, media] of lists.reverse()) palette.add(state, rules, media);
+    const finished = await new Promise((done) => {
+      const step = (deadline) => {
+        if (!darkened) { done(false); return; }
+        const t0 = performance.now();
+        const over = palette.collect(state, () => deadline.timeRemaining() > 1 && performance.now() - t0 < 10);
+        busy += performance.now() - t0;
+        if (over) done(true); else if (busy > budget) done(false); else idle(step);
+      };
+      idle(step);
+    });
+    if (!darkened) return;
+    const t1 = performance.now();
+    const made = finished ? palette.generate(state, config.black) : null;
+    busy += performance.now() - t1;
+    analysis = { ms: Math.round(busy * 10) / 10, wall: Math.round(performance.now() - began), rules: state.rules,
+      colors: made ? made.colors : 0, sheets: lists.length, fetched, unread, finished };
+    // Nothing to go on (too much to read, or no colors of its own): the filter, until the site's style changes.
+    const useless = !made || made.colors === 0 || made.capped;
+    tellPalette({ fingerprint: fp, rules: useless ? [] : made.rules, invert: useless, stats: analysis });
+  };
+  let looked = false;
+  const paletteSoon = () => {
+    if (looked || !learnable()) return;
+    looked = true;
+    setTimeout(() => idle(() => {
+      if (!darkened) return;
+      const fp = palette.fingerprint(pieces());
+      const p = config.palette;
+      const known = p && p.origin === location.origin && p.black === config.black ? p : null;
+      const seen = !!known && known.fingerprints.includes(fp);
+      if (usingPalette && (!seen || !known.verified)) {
+        const ok = covered();
+        if (!ok) { refused = true; apply(true); }
+        if (seen) { tellPalette({ fingerprint: fp, verified: ok }); return; }
+      }
+      if (!seen) analyse(fp).catch(() => {});
+    }), config.paletteDelay || 1200);
   };
 
   // MARK: When to look
@@ -329,17 +472,20 @@
     clearTimeout(checkTimer);
     checkTimer = setTimeout(check, delay);
   };
-  // Darkened from the first moment, unless the site was last seen dark: no white page first.
-  if (wanted && native !== true) apply(true); else send();
   // A theme switched on the page itself (a class or data-theme on the root or body) is looked at again.
   const themes = new MutationObserver(() => checkSoon(150));
   const watchThemes = (el) => themes.observe(el, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-color-mode', 'data-mode'] });
   let watchedBody = null;
-  // New elements, in the page and in its shadow roots: only noted here, looked at when idle.
+  let watchedRoot = null;
+  // New elements, in the page and in its shadow roots: only noted here, looked at when idle. Drawn by a palette or
+  // not darkened, only the root and the body arriving (or the root put back) are watched, not every change.
+  let watching = '';
   const added = new MutationObserver((records) => {
     if (darkened && style.parentNode !== document.documentElement) put();
+    const root = document.documentElement;
+    if (watching === 'top' && root && root !== watchedRoot) { watchedRoot = root; added.observe(root, { childList: true }); }
     if (document.body && document.body !== watchedBody) { watchedBody = document.body; watchThemes(watchedBody); checkSoon(60); }
-    if (!darkened) return;
+    if (!darkened || usingPalette) return;
     for (const r of records) {
       for (const node of r.addedNodes) {
         if (node.nodeType !== 1 || node === style) continue;
@@ -348,15 +494,32 @@
       }
     }
   });
-  // The root can be put back by a page that writes itself over (document.write), taking the style with it.
-  added.observe(document, { childList: true, subtree: true });
+  const watch = () => {
+    const want = darkened && !usingPalette ? 'all' : 'top';
+    if (want === watching) return;
+    watching = want;
+    added.disconnect();
+    watchedRoot = null;
+    if (want === 'all') {
+      added.observe(document, { childList: true, subtree: true });
+      for (const root of shadowRoots) added.observe(root, { childList: true, subtree: true });
+    } else {
+      // The root can be put back by a page that writes itself over (document.write), taking the style with it.
+      added.observe(document, { childList: true });
+      if (document.documentElement) { watchedRoot = document.documentElement; added.observe(watchedRoot, { childList: true }); }
+    }
+  };
+  // Darkened from the first moment, unless the site was last seen dark: no white page first.
+  if (wanted && native !== true) apply(true); else send();
+  watch();
   if (document.documentElement) watchThemes(document.documentElement);
   document.addEventListener('DOMContentLoaded', () => check());
   addEventListener('load', () => {
     check();
     setTimeout(check, 600);
     setTimeout(check, 2000);
-    if (darkened) idle(() => { try { lateHosts(document); } catch (e) {} });
+    if (darkened && !usingPalette) idle(() => { try { lateHosts(document); } catch (e) {} });
+    paletteSoon();
   });
   addEventListener('pageshow', (e) => { if (e.persisted) check(); });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => checkSoon(100));
@@ -365,12 +528,19 @@
     // Zigzag's choice changed (a setting, the site's own row, the Mac's appearance).
     set(config2) {
       Object.assign(config, config2);
-      if (darkened) style.textContent = css();
+      if (darkened) {
+        const was = usingPalette;
+        usingPalette = paletteFits();
+        style.textContent = css();
+        watch();
+        if (was && !usingPalette) scanSoon(document.documentElement);
+      }
       restyleShadows();
       check();
       tellFrames();
     },
     check,
-    state: () => ({ wanted, darkened, native, color: colorOf(), frames: frames.size, shadowRoots: shadowRoots.size }),
+    state: () => ({ wanted, darkened, native, color: colorOf(), frames: frames.size, shadowRoots: shadowRoots.size,
+      palette: usingPalette, refused, analysis }),
   };
 })();
