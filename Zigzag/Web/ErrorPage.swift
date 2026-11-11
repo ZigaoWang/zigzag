@@ -60,6 +60,16 @@ enum ErrorPage {
         }
     }
 
+    /// A response that's only a server error with nothing in it, as a proxy on this Mac sends for an address it
+    /// can't reach: shown as a broken page rather than a blank one. A real error page from a site has a body, and
+    /// is shown as the site sent it.
+    static func emptyServerFailure(_ response: URLResponse) -> NSError? {
+        guard let http = response as? HTTPURLResponse, http.statusCode >= 500, http.expectedContentLength == 0 else { return nil }
+        var info: [String: Any] = [NSLocalizedDescriptionKey: "HTTP \(http.statusCode) \(HTTPURLResponse.localizedString(forStatusCode: http.statusCode))"]
+        if let url = http.url { info[NSURLErrorFailingURLErrorKey] = url }
+        return NSError(domain: NSURLErrorDomain, code: NSURLErrorBadServerResponse, userInfo: info)
+    }
+
     // MARK: - What it says
 
     /// The kinds a proxy on this Mac would cause, for a site out on the web: the proxy answers for every address,

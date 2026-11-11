@@ -1047,6 +1047,15 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse) async -> WKNavigationResponsePolicy {
         let response = navigationResponse.response
+        // A server error with nothing in it (a proxy on this Mac that couldn't reach the site) would be a blank
+        // page: the error page says what happened instead, once this load has stopped.
+        if navigationResponse.isForMainFrame, let failure = ErrorPage.emptyServerFailure(response) {
+            DispatchQueue.main.async { [weak self, weak webView] in
+                guard let self, let webView, self.webView === webView else { return }
+                self.handle(failure, in: webView)
+            }
+            return .cancel
+        }
         let mime = (response.mimeType ?? "").lowercased()
         let disposition = ((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? "").lowercased()
         // A web page is shown, always. WebKit can briefly say it can't show HTML (a response handed over by a
