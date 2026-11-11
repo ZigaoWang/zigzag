@@ -357,6 +357,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func importFromBrowser(_ sender: Any?) { ImportWindowController.show() }
 
     @objc func showPasswords(_ sender: Any?) { PasswordsWindowController.show() }
+
+    /// Window › Keep on Top, for the window in front.
+    @objc func toggleKeepOnTop(_ sender: Any?) {
+        guard let window = KeepOnTop.frontWindow, KeepOnTop.applies(to: window) else { return }
+        KeepOnTop.toggle(window)
+    }
 }
 
 extension AppDelegate: NSMenuItemValidation {
@@ -372,6 +378,11 @@ extension AppDelegate: NSMenuItemValidation {
         // Already your browser: nothing to offer, so it isn't there (as in Safari and Chrome).
         if menuItem.action == #selector(makeDefaultBrowser(_:)) { menuItem.isHidden = DefaultBrowser.isDefault; return true }
         if menuItem.action == #selector(closeTab(_:)) { return NSApp.keyWindow?.styleMask.contains(.closable) ?? false }
+        if menuItem.action == #selector(toggleKeepOnTop(_:)) {
+            let window = KeepOnTop.frontWindow
+            menuItem.state = window.map(KeepOnTop.isOn) == true ? .on : .off
+            return KeepOnTop.applies(to: window)
+        }
         return true
     }
 }

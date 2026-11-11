@@ -6696,6 +6696,17 @@
         }
       }
     },
+    "Keep on Top" : {
+      "comment" : "Window menu item and the pin button's tooltip in a pop-up and Zigzag Mini: keeps the window above all other windows, other apps' too. Checked while on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保持置顶"
+          }
+        }
+      }
+    },
     "Keep videos playing when you switch tabs" : {
       "comment" : "A setting in Settings › Tabs.",
       "localizations" : {

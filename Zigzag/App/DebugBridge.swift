@@ -245,6 +245,21 @@ enum DebugBridge {
         }
     }
 
+    /// keepontop [mini|popup] (Window › Keep on Top for the newest Zigzag Mini or pop-up, else the front window),
+    /// windowmenu [mini|popup] (Zigzag and that window in front, the Window menu shown over it for four seconds).
+    private static func runKeepOnTop(_ name: String, _ arg: String) {
+        let window = arg == "mini" ? MiniWindowController.all.last?.window
+            : arg == "popup" ? PopupWindowController.all.last?.window : KeepOnTop.frontWindow
+        guard let window else { return }
+        if name == "keepontop" { KeepOnTop.toggle(window); return }
+        guard let menu = NSApp.windowsMenu, let view = window.contentView else { return }
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+        let close = Timer(timeInterval: 4, repeats: false) { _ in MainActor.assumeIsolated { NSApp.windowsMenu?.cancelTracking() } }
+        RunLoop.main.add(close, forMode: .common)
+        DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 80, y: view.isFlipped ? 60 : view.bounds.height - 60), in: view) }
+    }
+
     static func run(_ command: String) {
         let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
         guard let name = parts.first else { return }
@@ -252,6 +267,7 @@ enum DebugBridge {
         // Zigzag Mini windows come first: they work with no browser window open, and must not bring one forward.
         if name.hasPrefix("mini") { runMini(name, arg); return }
         if name == "windowsdump" { dumpWindows(to: arg); return }
+        if name == "keepontop" || name == "windowmenu" { runKeepOnTop(name, arg); return }
         if name == "relayout" {
             // relayout: every browser window lays its pages out again, as a resize would, without coming forward.
             WindowManager.shared.controllers.forEach { $0.root.needsLayout = true; $0.root.card.needsLayout = true; $0.root.secondCard.needsLayout = true }

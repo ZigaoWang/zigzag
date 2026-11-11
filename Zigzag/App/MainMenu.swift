@@ -192,6 +192,8 @@ enum MainMenu {
         let window = submenu(String(localized: "Window", comment: "A menu in the menu bar."), [
             item(String(localized: "Minimize", comment: "Window menu item."), #selector(NSWindow.performMiniaturize(_:)), "m"),
             item(String(localized: "Zoom", comment: "Window menu item."), #selector(NSWindow.performZoom(_:)), ""),
+            // No key: ⌥⌘T is Translate Page, and there's no common one for this.
+            item(KeepOnTop.title, #selector(AppDelegate.toggleKeepOnTop(_:)), ""),
             .separator(),
             item(String(localized: "Downloads", comment: "Window menu item."), #selector(C.showDownloads(_:)), "l", [.command, .option]),
             .separator(),
