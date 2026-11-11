@@ -571,6 +571,8 @@ enum DebugBridge {
                 controller.tabManager.makeSplit(tab, with: list[n])
             }
         case "unsplit": controller.closeSplitView(nil)
+        // splitorient: side by side to stacked or back, as the split's own button does.
+        case "splitorient": controller.toggleSplitOrientation(nil)
         case "closetab": controller.closeTab(nil)
         case "flydownload": controller.debugFlyDownload(arg.isEmpty ? "Shanghai Guide.pdf" : arg)
         case "readerjs":
