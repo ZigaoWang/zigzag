@@ -117,6 +117,21 @@ nonisolated enum TabTree {
         return result
     }
 
+    /// A closed tab put back at `index`: under `parent` where that keeps the groups whole, and taking back the tabs
+    /// that were under it (`children`, which moved up a level when it closed) if they still follow it, at its level.
+    static func reinserting(_ id: UUID, at index: Int, parent: UUID?, children: Set<UUID>, in nodes: [Node]) -> [Node] {
+        var result = nodes
+        let at = min(max(index, 0), result.count)
+        let placed = self.parent(at: at, preferring: parent, in: result)
+        result.insert(Node(id: id, parent: placed), at: at)
+        var next = at + 1
+        while next < result.count, children.contains(result[next].id), result[next].parent == placed {
+            result[next].parent = id
+            next = subtreeEnd(at: next, in: result)
+        }
+        return result
+    }
+
     /// A tab moved with everything under it, as one run, to `index` in the list without that run, under `parent`
     /// (nil: the top level; a parent that would break a run is passed over for one that doesn't).
     static func moving(_ id: UUID, to index: Int, parent: UUID?, in nodes: [Node]) -> [Node] {

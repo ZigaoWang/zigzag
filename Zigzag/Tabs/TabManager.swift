@@ -974,17 +974,14 @@ final class TabManager {
         tab.customTitle = closed.customTitle
         tab.host = host
         watch(tab)
-        var list = tabsBySpace[space] ?? []
-        let at = min(closed.index, list.count)
-        tab.parentID = TabTree.parent(at: at, preferring: space == closed.spaceID ? closed.parentID : nil, in: treeNodes(in: space))
-        list.insert(tab, at: at)
+        let at = min(closed.index, tabs(in: space).count)
         // The tabs that were under it and moved up a level when it closed go back under it, if they still follow it.
-        var next = at + 1
-        while next < list.count, closed.childIDs.contains(list[next].id), list[next].parentID == tab.parentID {
-            list[next].parentID = tab.id
-            next = TabTree.subtreeEnd(at: next, in: list.map { TabTree.Node(id: $0.id, parent: $0.parentID) })
-        }
-        tabsBySpace[space] = list
+        // Its parent and those tabs may have closed and come back too (closing many at once, then ⌘Z): they're found
+        // by the ids they have now.
+        let nodes = TabTree.reinserting(tab.id, at: at, parent: space == closed.spaceID ? closed.parentID.map(reopenedID) : nil,
+                                        children: Set(closed.childIDs.map(reopenedID)), in: treeNodes(in: space))
+        tabsBySpace[space, default: []].insert(tab, at: at)
+        applyTree(nodes, in: space)
         // A reopened tab is a new tab: its partner, closed with it and back first, is found by the id it had.
         reopenedAs[closed.id] = tab.id
         if reopenedAs.count > 500 { reopenedAs = [closed.id: tab.id] }
@@ -1004,6 +1001,14 @@ final class TabManager {
     }
 
     // MARK: Moving
+
+    /// The id a closed tab has now: itself, or the tab it reopened as (and so on, if that one closed and came back).
+    private func reopenedID(_ id: UUID) -> UUID {
+        var id = id
+        var seen: Set<UUID> = [id]
+        while let next = reopenedAs[id], seen.insert(next).inserted { id = next }
+        return id
+    }
 
     /// Takes a tab out of its list (pinned, made a favorite, moved away): the tabs under it move up a level.
     private func removeFromList(_ tab: Tab) {

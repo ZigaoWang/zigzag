@@ -140,6 +140,40 @@ struct NestedTabsTests {
         #expect(TabTree.hasChildren(a, in: tree) && !TabTree.hasChildren(c, in: tree))
     }
 
+    @Test func closingManyAndPuttingThemBackKeepsTheirNesting() {
+        // a, b under it, c under b, closed together (a first): each closes with its own tab lifted a level.
+        var nodes = [node(a), node(b, a), node(c, b), node(e)]
+        var records: [(id: UUID, index: Int, parent: UUID?, children: [UUID])] = []
+        for id in [a, b, c] {
+            let i = nodes.firstIndex { $0.id == id }!
+            records.append((id, i, nodes[i].parent, nodes.filter { $0.parent == id }.map(\.id)))
+            nodes = TabTree.removing(id, from: nodes)
+        }
+        #expect(nodes == [node(e)])
+        // Put back in reverse, each as a new tab with a new id: the ones already back are found by the ids they have now.
+        var now: [UUID: UUID] = [:]
+        for record in records.reversed() {
+            let id = UUID()
+            nodes = TabTree.reinserting(id, at: record.index, parent: record.parent.map { now[$0] ?? $0 },
+                                        children: Set(record.children.map { now[$0] ?? $0 }), in: nodes)
+            now[record.id] = id
+        }
+        let (newA, newB, newC) = (now[a]!, now[b]!, now[c]!)
+        #expect(nodes == [node(newA), node(newB, newA), node(newC, newB), node(e)])
+    }
+
+    @Test func aTabPutBackUnderAParentThatIsBackFirst() {
+        // c closed, then b; ⇧⌘T brings b back first, then c, which goes under b again.
+        var nodes = TabTree.removing(c, from: tree)
+        nodes = TabTree.removing(b, from: nodes)
+        let newB = UUID()
+        nodes = TabTree.reinserting(newB, at: 1, parent: a, children: [], in: nodes)
+        let newC = UUID()
+        nodes = TabTree.reinserting(newC, at: 2, parent: newB, children: [], in: nodes)
+        #expect(nodes == [node(a), node(newB, a), node(newC, newB), node(d, a), node(e)])
+        #expect(TabTree.repaired(nodes) == nodes)
+    }
+
     // MARK: Saving
 
     @Test func aSessionFromBeforeNestedTabsOpens() throws {
