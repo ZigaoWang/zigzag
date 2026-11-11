@@ -18,8 +18,9 @@ nonisolated struct PageState: Equatable, Sendable {
     let fields: [Field]
     /// Something you typed is still there: a field above, or text in an editor (a rich reply box) you wrote in.
     let hasTypedText: Bool
-    /// The page puts itself where you were (history.scrollRestoration = "manual"), as a forum that keeps the post
-    /// you're reading in its address does: its scrolling is left to it.
+    /// The page handles its own scrolling (history.scrollRestoration = "manual"), as a forum that keeps the post
+    /// you're reading in its address does: it's given a moment to put itself there, and only a page that stays at
+    /// the top (a topic list, which never does) is scrolled back for it.
     let placesItself: Bool
 
     init(url: URL, scroll: CGPoint, fields: [Field] = [], hasTypedText: Bool = false, placesItself: Bool = false) {
@@ -47,7 +48,7 @@ nonisolated struct PageState: Equatable, Sendable {
 
     /// The arguments `restorer` takes.
     var restoreArguments: [String: Any] {
-        ["x": Double(scroll.x), "y": placesItself ? 0.0 : Double(scroll.y), "fields": fields.map { [$0.selector, $0.value] }]
+        ["x": Double(scroll.x), "y": Double(scroll.y), "waits": placesItself, "fields": fields.map { [$0.selector, $0.value] }]
     }
 
     /// Notes which fields you typed into (the page's own script filling one in doesn't count). In Zigzag's own
@@ -111,14 +112,16 @@ nonisolated struct PageState: Equatable, Sendable {
 
     /// Puts the page back: what you typed into fields that are empty again, and the scroll, unless the page has put
     /// itself somewhere or you've scrolled or typed since. Tried again as the page builds, for up to five seconds.
+    /// `waits`: a page that does its own scrolling gets a second and a half to put itself somewhere first.
     static let restorer = """
     \(fieldRules)
+    const waitFor = waits ? 6 : 0;
     let moved = false;
     const stop = () => { moved = true; };
     for (const kind of ['wheel', 'keydown', 'mousedown', 'touchstart']) addEventListener(kind, stop, { capture: true, once: true });
     const setter = (el) => Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value')?.set;
     let left = fields.slice(), scrolled = y < 1 && x < 1, lastY = scrollY;
-    for (let i = 0; i < 20 && !(scrolled && left.length === 0); i++) {
+    for (let i = 0; i < 20 + waitFor && !(scrolled && left.length === 0); i++) {
       left = left.filter(([selector, value]) => {
         let el = null;
         try { el = document.querySelector(selector); } catch (e) { return false; }
@@ -136,7 +139,9 @@ nonisolated struct PageState: Equatable, Sendable {
       if (!scrolled) {
         // The page moved on its own, or you did: it's where it should be.
         if (moved || (i > 0 && Math.abs(scrollY - lastY) > 1)) scrolled = true;
-        else {
+        // Its own scrolling took it somewhere already (the post you were reading).
+        else if (waitFor && i <= waitFor && Math.abs(scrollY) > 1) scrolled = true;
+        else if (i >= waitFor) {
           scrollTo(x, y);
           if (Math.abs(scrollY - y) < 2 && Math.abs(scrollX - x) < 2) scrolled = true;
         }

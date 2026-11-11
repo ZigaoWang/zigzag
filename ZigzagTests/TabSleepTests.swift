@@ -100,12 +100,15 @@ struct TabSleepTests {
         #expect(PageState(result, url: nil) == nil)
     }
 
-    @Test func aPageThatPlacesItselfKeepsItsOwnScroll() throws {
-        let url = try #require(URL(string: "https://linux.do/t/topic/123/40"))
+    @Test func aPageThatPlacesItselfIsGivenTheChanceFirst() throws {
+        // A Discourse topic list says it scrolls itself but comes back at the top after a reload: its place is still
+        // passed, so it's put back once the page has had its moment and stayed at the top.
+        let url = try #require(URL(string: "https://meta.discourse.org/latest"))
         let state = PageState(url: url, scroll: CGPoint(x: 0, y: 9000), placesItself: true)
-        #expect(state.restoreArguments["y"] as? Double == 0)
+        #expect(state.restoreArguments["y"] as? Double == 9000)
+        #expect(state.restoreArguments["waits"] as? Bool == true)
         #expect(!state.hasTypedText)
-        #expect(PageState(url: url, scroll: CGPoint(x: 0, y: 9000)).restoreArguments["y"] as? Double == 9000)
+        #expect(PageState(url: url, scroll: CGPoint(x: 0, y: 9000)).restoreArguments["waits"] as? Bool == false)
     }
 
     @Test func pageStateBelongsToTheSamePageOnly() throws {
