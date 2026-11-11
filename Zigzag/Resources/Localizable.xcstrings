@@ -2263,7 +2263,7 @@
       }
     },
     "Allow JavaScript from Apple Events" : {
-      "comment" : "A setting in Settings › General, under Automation, as Safari names it.",
+      "comment" : "A setting in Settings › Automation, under Scripts, as Safari names it.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2417,7 +2417,7 @@
       }
     },
     "Apps send it in the Authorization header. A new key disconnects every app." : {
-      "comment" : "Explanation under “Key” in Settings › General › Automation.",
+      "comment" : "Explanation under “Key” in Settings › Automation.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2428,7 +2428,7 @@
       }
     },
     "Apps you connect over MCP, on this Mac only, can open, read and use your tabs. Never private windows, passwords or Zigzag’s own pages." : {
-      "comment" : "Explanation under “Let AI apps use Zigzag” in Settings › General.",
+      "comment" : "Explanation under “Let AI apps use Zigzag” in Settings › Automation.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2648,7 +2648,7 @@
       }
     },
     "Automation" : {
-      "comment" : "A heading in Settings › General: what scripts and Shortcuts may do in Zigzag.",
+      "comment" : "A section of Settings: AI apps over MCP, and what scripts and Shortcuts may do in Zigzag.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4172,6 +4172,34 @@
         }
       }
     },
+    "Connect an App" : {
+      "comment" : "A heading in Settings › Automation: how to connect an AI app to Zigzag over MCP.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接应用"
+          }
+        }
+      }
+    },
+    "Connect to Zigzag, my web browser, as an MCP server. Use the HTTP transport at %@ and send this header with every request: %@. It works on this Mac only. Once connected, you can list my tabs, open, read and screenshot pages, and click, type and scroll in them. Zigzag never lets you use private windows, passwords or its own pages, and I can stop you on any tab. If you can’t add an MCP server yourself, tell me where to add it in your settings." : {
+      "comment" : "Copied by Copy Prompt in Settings › Automation, to paste into an AI app's chat so it connects to Zigzag. The first placeholder is the server's address, the second the Authorization header with its key; keep both as they are.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Connect to Zigzag, my web browser, as an MCP server. Use the HTTP transport at %1$@ and send this header with every request: %2$@. It works on this Mac only. Once connected, you can list my tabs, open, read and screenshot pages, and click, type and scroll in them. Zigzag never lets you use private windows, passwords or its own pages, and I can stop you on any tab. If you can’t add an MCP server yourself, tell me where to add it in your settings."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以 MCP 服务器的方式连接 Zigzag，也就是我的网页浏览器。使用 HTTP 传输，地址是 %@，每个请求都带上这个请求头：%@。它只在这台 Mac 上可用。连接后，你可以列出我的标签页，打开、读取页面和截图，并在页面中点按、输入和滚动。Zigzag 不会让你使用无痕浏览窗口、密码或它自己的页面，我也可以随时在任何标签页上让你停下。如果你无法自己添加 MCP 服务器，请告诉我在你的设置中哪里添加。"
+          }
+        }
+      }
+    },
     "Contents" : {
       "comment" : "Switch in the PDF viewer's sidebar: shows the document's table of contents.",
       "localizations" : {
@@ -4294,7 +4322,7 @@
       }
     },
     "Copy Header" : {
-      "comment" : "Button in Settings › General › Automation: copies the Authorization header, with the key, that an AI app sends.",
+      "comment" : "Button in Settings › Automation: copies the Authorization header, with the key, that an AI app sends.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4333,6 +4361,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拷贝密码"
+          }
+        }
+      }
+    },
+    "Copy Prompt" : {
+      "comment" : "Button in Settings › Automation › Connect an App: copies a prompt to paste into an AI app's chat, so it connects to Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝提示词"
+          }
+        }
+      }
+    },
+    "Copy Setup" : {
+      "comment" : "Button in Settings › Automation › Connect an App: copies the JSON setup, with the address and key, that MCP apps take.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝配置"
           }
         }
       }
@@ -4580,7 +4630,7 @@
       }
     },
     "Couldn’t start. Port %lld may be in use by another app." : {
-      "comment" : "Under “Server address” in Settings › General › Automation when Zigzag's MCP server couldn't start. The placeholder is a port number.",
+      "comment" : "Under “Server address” in Settings › Automation when Zigzag's MCP server couldn't start. The placeholder is a port number.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6355,6 +6405,17 @@
         }
       }
     },
+    "How it works" : {
+      "comment" : "A row in Settings › Automation, beside Learn More, which opens the guide.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用说明"
+          }
+        }
+      }
+    },
     "If it’s a server on your Mac, check that it’s running, then try again." : {
       "comment" : "Message on the page Zigzag shows when a server on this Mac (localhost) refuses the connection.",
       "localizations" : {
@@ -6801,13 +6862,13 @@
         }
       }
     },
-    "JavaScript from Apple Events is turned off. To allow it, turn on “Allow JavaScript from Apple Events” in Zigzag’s Settings › General." : {
+    "JavaScript from Apple Events is turned off. To allow it, turn on “Allow JavaScript from Apple Events” in Zigzag’s Settings › Automation." : {
       "comment" : "Error a script gets when it runs JavaScript in a page before the setting is on. The setting's name is in quotes.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "来自 Apple 事件的 JavaScript 已关闭。如要允许，请在 Zigzag 的“设置 › 通用”中打开“允许来自 Apple 事件的 JavaScript”。"
+            "value" : "来自 Apple 事件的 JavaScript 已关闭。如要允许，请在 Zigzag 的“设置 › 自动化”中打开“允许来自 Apple 事件的 JavaScript”。"
           }
         }
       }
@@ -6936,7 +6997,7 @@
       }
     },
     "Key" : {
-      "comment" : "A row in Settings › General › Automation, shown while AI apps may use Zigzag: the secret key an app sends.",
+      "comment" : "A row in Settings › Automation, shown while AI apps may use Zigzag: the secret key an app sends.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7078,8 +7139,19 @@
         }
       }
     },
+    "Learn More" : {
+      "comment" : "Button in Settings › Automation: opens the guide to AI apps and MCP in a new tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "了解更多"
+          }
+        }
+      }
+    },
     "Let AI apps use Zigzag" : {
-      "comment" : "A setting in Settings › General, under Automation: turns on Zigzag's MCP server, for AI apps on this Mac.",
+      "comment" : "A setting in Settings › Automation: turns on Zigzag's MCP server, for AI apps on this Mac.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9059,6 +9131,17 @@
         }
       }
     },
+    "Or paste this into the app’s chat, and it can set itself up." : {
+      "comment" : "Explanation under “Prompt” in Settings › Automation › Connect an App.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "或者把它粘贴到应用的聊天中，让应用自己完成设置。"
+          }
+        }
+      }
+    },
     "Or press Esc to go back" : {
       "comment" : "Under a hint in the getting-started guide, a card in the window, while the tab overview is open. Esc is the key.",
       "localizations" : {
@@ -9457,6 +9540,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "粘贴并搜索"
+          }
+        }
+      }
+    },
+    "Paste it where the app adds MCP servers. Most apps take this form." : {
+      "comment" : "Explanation under “Setup” in Settings › Automation › Connect an App.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴到应用添加 MCP 服务器的地方。大多数应用都接受这种格式。"
           }
         }
       }
@@ -9960,6 +10054,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "个人资料"
+          }
+        }
+      }
+    },
+    "Prompt" : {
+      "comment" : "A row in Settings › Automation › Connect an App: a prompt to paste into an AI app's chat.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提示词"
           }
         }
       }
@@ -10757,7 +10862,7 @@
       }
     },
     "Reset Key" : {
-      "comment" : "Button in Settings › General › Automation: makes a new key for AI apps, which disconnects every app using the old one.",
+      "comment" : "Button in Settings › Automation: makes a new key for AI apps, which disconnects every app using the old one.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11279,8 +11384,19 @@
         }
       }
     },
+    "Scripts" : {
+      "comment" : "A heading in Settings › Automation: what AppleScript and Shortcuts may do in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本"
+          }
+        }
+      }
+    },
     "Scripts and apps you allow in Privacy & Security › Automation can then read and change any page you have open, signed in or not. Never in private windows." : {
-      "comment" : "Explanation under “Allow JavaScript from Apple Events” in Settings › General.",
+      "comment" : "Explanation under “Allow JavaScript from Apple Events” in Settings › Automation.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11654,7 +11770,7 @@
       }
     },
     "Server address" : {
-      "comment" : "A row in Settings › General › Automation, shown while AI apps may use Zigzag: the MCP server's address, to give an app.",
+      "comment" : "A row in Settings › Automation, shown while AI apps may use Zigzag: the MCP server's address, to give an app.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11715,6 +11831,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设置…"
+          }
+        }
+      }
+    },
+    "Setup" : {
+      "comment" : "A row in Settings › Automation › Connect an App: the JSON setup to paste into an AI app.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配置"
           }
         }
       }
@@ -14882,6 +15009,17 @@
         }
       }
     },
+    "What apps can do, what they never touch, and what to try when one can’t connect." : {
+      "comment" : "Explanation under “How it works” in Settings › Automation.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用能做什么、绝不会碰什么，以及连接不上时可以试试什么。"
+          }
+        }
+      }
+    },
     "What couldn’t come over is below." : {
       "comment" : "Import window when some extensions couldn't be added, which the list below explains.",
       "localizations" : {
@@ -15821,6 +15959,17 @@
         }
       }
     },
+    "applescript osascript shortcuts apple events" : {
+      "comment" : "Words that find the Allow JavaScript from Apple Events setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "applescript osascript shortcuts apple events 脚本 快捷指令 Apple 事件 苹果事件"
+          }
+        }
+      }
+    },
     "backup undo update rollback" : {
       "comment" : "Words that find the restore row with Find a setting in Settings. Not shown.",
       "localizations" : {
@@ -16448,6 +16597,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "macOS 需要你的许可才能读取它"
+          }
+        }
+      }
+    },
+    "mcp ai agent automation api" : {
+      "comment" : "Words that find Settings › Automation with Find a setting, separated by spaces. Add your language's words for them. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mcp ai agent automation api 自动化 智能体 人工智能 代理 接口"
           }
         }
       }

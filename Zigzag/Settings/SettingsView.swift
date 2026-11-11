@@ -574,7 +574,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
 enum SettingsPane: String, CaseIterable {
     case general, appearance, tabs, spaces, profiles, search, mini, passwords, privacy, translation, extensions
     case websiteData = "website-data"
-    case shortcuts
+    case shortcuts, automation
 
     var title: String {
         switch self {
@@ -591,6 +591,15 @@ enum SettingsPane: String, CaseIterable {
         case .extensions: String(localized: "Extensions", comment: "A section of Settings.")
         case .websiteData: String(localized: "Website Data", comment: "A section of Settings, there with more than one profile: what websites keep on this Mac in the profile chosen, and clearing it.")
         case .shortcuts: String(localized: "Shortcuts", comment: "A section of Settings: keyboard shortcuts.")
+        case .automation: String(localized: "Automation", comment: "A section of Settings: AI apps over MCP, and what scripts and Shortcuts may do in Zigzag.")
+        }
+    }
+
+    /// More words "Find a setting" knows the whole section by.
+    var keywords: String {
+        switch self {
+        case .automation: String(localized: "mcp ai agent automation api", comment: "Words that find Settings › Automation with Find a setting, separated by spaces. Add your language's words for them. Not shown.")
+        default: ""
         }
     }
 
@@ -609,6 +618,7 @@ enum SettingsPane: String, CaseIterable {
         case .extensions: "puzzlepiece.extension"
         case .websiteData: "internaldrive"
         case .shortcuts: "command"
+        case .automation: "point.3.connected.trianglepath.dotted"
         }
     }
 
@@ -675,7 +685,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private let versionGroup = FormGroup()
     private let generalGroup = FormGroup()
-    private let automationGroup = FormGroup()
+    /// Settings › Automation: AI apps, connecting one, and scripts.
+    private let aiGroup = FormGroup()
+    private let connectGroup = FormGroup()
+    private let scriptsGroup = FormGroup()
     private let tabsGroup = FormGroup()
     private let searchGroup = FormGroup()
     private let blockingGroup = FormGroup()
@@ -772,28 +785,56 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             Self.copy(MCPService.address)
             copy?.flash(String(localized: "Copied", comment: "Shown on a Copy button for a moment after it copies."))
         }
-        let row = FormRow(title: String(localized: "Server address", comment: "A row in Settings › General › Automation, shown while AI apps may use Zigzag: the MCP server's address, to give an app."),
+        let row = FormRow(title: String(localized: "Server address", comment: "A row in Settings › Automation, shown while AI apps may use Zigzag: the MCP server's address, to give an app."),
                           detail: MCPService.address, control: copy)
         row.keywords = Self.aiAppsKeywords
         return row
     }()
     private lazy var aiKeyRow: FormRow = {
-        let copy = PillButton(title: String(localized: "Copy Header", comment: "Button in Settings › General › Automation: copies the Authorization header, with the key, that an AI app sends."))
+        let copy = PillButton(title: String(localized: "Copy Header", comment: "Button in Settings › Automation: copies the Authorization header, with the key, that an AI app sends."))
         copy.onClick = { [weak copy] _ in
             Self.copy(MCPService.authorizationHeader)
             copy?.flash(String(localized: "Copied", comment: "Shown on a Copy button for a moment after it copies."))
         }
-        let reset = PillButton(title: String(localized: "Reset Key", comment: "Button in Settings › General › Automation: makes a new key for AI apps, which disconnects every app using the old one."))
+        let reset = PillButton(title: String(localized: "Reset Key", comment: "Button in Settings › Automation: makes a new key for AI apps, which disconnects every app using the old one."))
         reset.onClick = { [weak reset] _ in
             MCPService.resetKey()
             reset?.flash(String(localized: "Key Reset", comment: "Shown on the Reset Key button for a moment after it makes a new key."))
         }
         let buttons = NSStackView(views: [copy, reset])
         buttons.spacing = Tokens.Space.x2
-        let row = FormRow(title: String(localized: "Key", comment: "A row in Settings › General › Automation, shown while AI apps may use Zigzag: the secret key an app sends."),
+        let row = FormRow(title: String(localized: "Key", comment: "A row in Settings › Automation, shown while AI apps may use Zigzag: the secret key an app sends."),
                           detail: String(localized: "Apps send it in the Authorization header. A new key disconnects every app.",
-                                         comment: "Explanation under “Key” in Settings › General › Automation."),
+                                         comment: "Explanation under “Key” in Settings › Automation."),
                           control: buttons)
+        row.keywords = Self.aiAppsKeywords
+        return row
+    }()
+    /// The setup most MCP apps take as JSON, with the address and key filled in.
+    private lazy var aiSetupRow: FormRow = {
+        let copy = PillButton(title: String(localized: "Copy Setup", comment: "Button in Settings › Automation › Connect an App: copies the JSON setup, with the address and key, that MCP apps take."))
+        copy.onClick = { [weak copy] _ in
+            Self.copy(MCPSetup.configuration(address: MCPService.address, token: MCPService.token))
+            copy?.flash(String(localized: "Copied", comment: "Shown on a Copy button for a moment after it copies."))
+        }
+        let row = FormRow(title: String(localized: "Setup", comment: "A row in Settings › Automation › Connect an App: the JSON setup to paste into an AI app."),
+                          detail: String(localized: "Paste it where the app adds MCP servers. Most apps take this form.",
+                                         comment: "Explanation under “Setup” in Settings › Automation › Connect an App."),
+                          control: copy)
+        row.keywords = Self.aiAppsKeywords + " json config"
+        return row
+    }()
+    /// A short prompt for an app's chat, so the app connects itself.
+    private lazy var aiPromptRow: FormRow = {
+        let copy = PillButton(title: String(localized: "Copy Prompt", comment: "Button in Settings › Automation › Connect an App: copies a prompt to paste into an AI app's chat, so it connects to Zigzag."))
+        copy.onClick = { [weak copy] _ in
+            Self.copy(MCPSetup.prompt(address: MCPService.address, token: MCPService.token))
+            copy?.flash(String(localized: "Copied", comment: "Shown on a Copy button for a moment after it copies."))
+        }
+        let row = FormRow(title: String(localized: "Prompt", comment: "A row in Settings › Automation › Connect an App: a prompt to paste into an AI app's chat."),
+                          detail: String(localized: "Or paste this into the app’s chat, and it can set itself up.",
+                                         comment: "Explanation under “Prompt” in Settings › Automation › Connect an App."),
+                          control: copy)
         row.keywords = Self.aiAppsKeywords
         return row
     }()
@@ -918,24 +959,38 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // There's no startup setting: your tabs always come back. Quitting is the nearest, and where people look.
         quitRow.keywords = String(localized: "startup launch on start restore reopen session close quit", comment: "Words that find the Ask before quitting setting with Find a setting in Settings. Zigzag has no startup setting (tabs always come back), so words about starting up find this row. Not shown.")
         generalGroup.add(quitRow)
-        scriptJavaScriptToggle.onChange = { on in Scripting.allowsJavaScript = on }
-        automationGroup.add(FormRow(title: String(localized: "Allow JavaScript from Apple Events", comment: "A setting in Settings › General, under Automation, as Safari names it."),
-                                    detail: String(localized: "Scripts and apps you allow in Privacy & Security › Automation can then read and change any page you have open, signed in or not. Never in private windows.",
-                                                   comment: "Explanation under “Allow JavaScript from Apple Events” in Settings › General."),
-                                    control: scriptJavaScriptToggle))
+
+        // Automation
         aiAppsToggle.onChange = { [weak self] on in
             MCPService.setOn(on)
             self?.refreshAIApps()
         }
-        let aiRow = FormRow(title: String(localized: "Let AI apps use Zigzag", comment: "A setting in Settings › General, under Automation: turns on Zigzag's MCP server, for AI apps on this Mac."),
+        let aiRow = FormRow(title: String(localized: "Let AI apps use Zigzag", comment: "A setting in Settings › Automation: turns on Zigzag's MCP server, for AI apps on this Mac."),
                             detail: String(localized: "Apps you connect over MCP, on this Mac only, can open, read and use your tabs. Never private windows, passwords or Zigzag’s own pages.",
-                                           comment: "Explanation under “Let AI apps use Zigzag” in Settings › General."),
+                                           comment: "Explanation under “Let AI apps use Zigzag” in Settings › Automation."),
                             control: aiAppsToggle)
         aiRow.keywords = Self.aiAppsKeywords
-        automationGroup.add(aiRow)
-        automationGroup.add(aiAddressRow)
-        automationGroup.add(aiKeyRow)
+        aiGroup.add(aiRow)
+        aiGroup.add(aiAddressRow)
+        aiGroup.add(aiKeyRow)
+        connectGroup.add(aiSetupRow)
+        connectGroup.add(aiPromptRow)
+        let guide = PillButton(title: String(localized: "Learn More", comment: "Button in Settings › Automation: opens the guide to AI apps and MCP in a new tab."))
+        guide.onClick = { [weak self] _ in self?.openAutomationGuide() }
+        let guideRow = FormRow(title: String(localized: "How it works", comment: "A row in Settings › Automation, beside Learn More, which opens the guide."),
+                               detail: String(localized: "What apps can do, what they never touch, and what to try when one can’t connect.",
+                                              comment: "Explanation under “How it works” in Settings › Automation."),
+                               control: guide)
+        guideRow.keywords = Self.aiAppsKeywords + " help docs guide"
+        connectGroup.add(guideRow)
         aiAppsToken = MCPService.changed.observe { [weak self] in self?.refreshAIApps() }
+        scriptJavaScriptToggle.onChange = { on in Scripting.allowsJavaScript = on }
+        let scriptRow = FormRow(title: String(localized: "Allow JavaScript from Apple Events", comment: "A setting in Settings › Automation, under Scripts, as Safari names it."),
+                                detail: String(localized: "Scripts and apps you allow in Privacy & Security › Automation can then read and change any page you have open, signed in or not. Never in private windows.",
+                                               comment: "Explanation under “Allow JavaScript from Apple Events” in Settings › Automation."),
+                                control: scriptJavaScriptToggle)
+        scriptRow.keywords = String(localized: "applescript osascript shortcuts apple events", comment: "Words that find the Allow JavaScript from Apple Events setting with Find a setting in Settings. Not shown.")
+        scriptsGroup.add(scriptRow)
 
         // Appearance
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
@@ -1849,7 +1904,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     // The groups' headings, each said once for the page and its search.
     private static var updatesHeading: String { String(localized: "Updates", comment: "A heading in Settings › General: Zigzag's version and how it updates.") }
-    private static var automationHeading: String { String(localized: "Automation", comment: "A heading in Settings › General: what scripts and Shortcuts may do in Zigzag.") }
+    private static var connectHeading: String { String(localized: "Connect an App", comment: "A heading in Settings › Automation: how to connect an AI app to Zigzag over MCP.") }
+    private static var scriptsHeading: String { String(localized: "Scripts", comment: "A heading in Settings › Automation: what AppleScript and Shortcuts may do in Zigzag.") }
     private static var spacesHeading: String { String(localized: "Your Spaces", comment: "A heading in Settings › Spaces.") }
     private static var profilesHeading: String { String(localized: "Your Profiles", comment: "A heading in Settings › Profiles.") }
     private static var unlistedHeading: String { String(localized: "Not Listed", comment: "A heading in Settings › Profiles, over data left on this Mac by profiles that are no longer in the list.") }
@@ -1906,7 +1962,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Each section's groups and their headings, as a search goes through them.
     private func groups(of pane: SettingsPane) -> [(title: String?, group: FormGroup)] {
         switch pane {
-        case .general: [(nil, generalGroup), (Self.automationHeading, automationGroup), (Self.updatesHeading, versionGroup)]
+        case .general: [(nil, generalGroup), (Self.updatesHeading, versionGroup)]
         case .appearance: [(nil, appearanceGroup)]
         case .tabs: [(nil, tabsGroup)]
         case .search: [(nil, searchGroup)]
@@ -1919,6 +1975,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .translation: [(nil, translationGroup), (Self.alwaysTranslateHeading, alwaysGroup)]
         case .extensions: [(installedHeading, extensionsGroup), (Self.otherProfilesHeading, otherProfilesGroup), (nil, developerGroup)]
         case .shortcuts: shortcutGroups.map { ($0.0, $0.1) }
+        case .automation: [(nil, aiGroup), (Self.connectHeading, connectGroup), (Self.scriptsHeading, scriptsGroup)]
         }
     }
 
@@ -1988,7 +2045,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // A search: what matches, from every section, under the section's name.
         let words = searchWords
         for pane in SettingsPane.allCases {
-            for (title, group) in groups(of: pane) { group.filter(words, names: [pane.title, title ?? ""]) }
+            for (title, group) in groups(of: pane) { group.filter(words, names: [pane.title, pane.keywords, title ?? ""]) }
         }
         if isSearching {
             var found = false
@@ -2016,7 +2073,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
 
         switch pane {
-        case .general, .appearance, .tabs, .search, .mini:
+        case .general, .appearance, .tabs, .search, .mini, .automation:
             for (title, group) in groups(of: pane) { section(title, group) }
         case .spaces:
             section(Self.spacesHeading, spacesGroup, accessory: addSpaceButton)
@@ -2118,6 +2175,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         String(localized: "mcp ai agent automation model context protocol server", comment: "Words that find the Let AI apps use Zigzag setting with Find a setting in Settings. Not shown.")
     }
 
+    /// The guide to AI apps and MCP, docs/automation.md, in a new tab of the window Settings is in.
+    static let automationGuide = URL(string: "https://github.com/ZigaoWang/zigzag/blob/main/docs/automation.md")!
+
+    private func openAutomationGuide() {
+        guard let controller = browser else { return }
+        controller.tabManager.newTab(url: Self.automationGuide)
+        controller.window?.makeKeyAndOrderFront(nil)
+    }
+
     private static func copy(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
@@ -2126,13 +2192,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// The address and key show only while AI apps may use Zigzag; the address says so if the server couldn't start.
     private func refreshAIApps() {
         let shown = MCPService.isOn
+        // Turned on or off elsewhere (another Settings tab): the switch follows.
+        if aiAppsToggle.isOn != shown { aiAppsToggle.isOn = shown }
         let detail = MCPService.problem == nil ? MCPService.address
             : String(localized: "Couldn’t start. Port \(Int(MCPService.port)) may be in use by another app.",
-                     comment: "Under “Server address” in Settings › General › Automation when Zigzag's MCP server couldn't start. The placeholder is a port number.")
-        guard aiAddressRow.isAvailable != shown || aiKeyRow.isAvailable != shown || aiAddressRow.detailText != detail else { return }
+                     comment: "Under “Server address” in Settings › Automation when Zigzag's MCP server couldn't start. The placeholder is a port number.")
+        let rows = [aiAddressRow, aiKeyRow, aiSetupRow, aiPromptRow]
+        guard rows.contains(where: { $0.isAvailable != shown }) || aiAddressRow.detailText != detail else { return }
         aiAddressRow.detailText = detail
-        aiAddressRow.isAvailable = shown
-        aiKeyRow.isAvailable = shown
+        rows.forEach { $0.isAvailable = shown }
         laidOutWidth = -1
         needsLayout = true
     }

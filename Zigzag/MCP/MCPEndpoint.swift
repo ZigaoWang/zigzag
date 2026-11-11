@@ -214,7 +214,7 @@ nonisolated final class MCPEndpoint: @unchecked Sendable {
         }
         guard MCPAccess.authorized(request.header("authorization"), token: currentToken) else {
             return .json(401, RPCError.response(id: nil, code: RPCError.invalidRequest,
-                                                message: "Unauthorized. Send the key from Zigzag's Settings › General › Automation as Authorization: Bearer <key>."),
+                                                message: "Unauthorized. Send the key from Zigzag's Settings › Automation as Authorization: Bearer <key>."),
                          headers: [("WWW-Authenticate", "Bearer")])
         }
         switch request.method {

@@ -3,9 +3,9 @@ import WebKit
 
 /// AppleScript, Shortcuts and `osascript` drive Zigzag the way they drive Safari, through Resources/Zigzag.sdef: its
 /// windows, their tabs in every space, and the pages in them. Private windows are never there at all, and running
-/// JavaScript in a page waits until you allow it in Settings › General, as Safari's Develop menu has it.
+/// JavaScript in a page waits until you allow it in Settings › Automation, as Safari's Develop menu has it.
 enum Scripting {
-    /// Settings › General › Automation. Off until you turn it on: a script that can run JavaScript can read and change
+    /// Settings › Automation. Off until you turn it on: a script that can run JavaScript can read and change
     /// anything on your pages, signed in or not.
     static var allowsJavaScript: Bool {
         get { UserDefaults.standard.bool(forKey: "AllowJavaScriptFromAppleEvents") }
@@ -88,7 +88,7 @@ enum Scripting {
     static func message(for refusal: Refusal) -> String {
         switch refusal {
         case .turnedOff:
-            String(localized: "JavaScript from Apple Events is turned off. To allow it, turn on “Allow JavaScript from Apple Events” in Zigzag’s Settings › General.",
+            String(localized: "JavaScript from Apple Events is turned off. To allow it, turn on “Allow JavaScript from Apple Events” in Zigzag’s Settings › Automation.",
                    comment: "Error a script gets when it runs JavaScript in a page before the setting is on. The setting's name is in quotes.")
         case .privateWindow:
             String(localized: "Scripts can’t run JavaScript in a private window.", comment: "Error a script gets when it runs JavaScript in a private window's tab.")

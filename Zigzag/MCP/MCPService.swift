@@ -1,6 +1,6 @@
 import AppKit
 
-/// Settings › General › Automation › Let AI apps use Zigzag: an MCP server on this Mac only, off until you turn it
+/// Settings › Automation › Let AI apps use Zigzag: an MCP server on this Mac only, off until you turn it
 /// on. Off, nothing listens at all. On, apps that have its key can list, open, read and use your tabs.
 @MainActor
 enum MCPService {

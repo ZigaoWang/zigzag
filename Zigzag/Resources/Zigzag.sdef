@@ -190,7 +190,7 @@
 			</responds-to>
 		</class>
 
-		<command name="do JavaScript" code="ZgzgDoJS" description="Run JavaScript in a tab's page, as Safari does, and return its result as text. Turned off until you allow it in Settings › General › Automation.">
+		<command name="do JavaScript" code="ZgzgDoJS" description="Run JavaScript in a tab's page, as Safari does, and return its result as text. Turned off until you allow it in Settings › Automation.">
 			<cocoa class="ZigzagJavaScriptCommand"/>
 			<direct-parameter type="text" description="The JavaScript. Its last value is the result; with await or return at the top, it runs as an async function and its returned value is the result."/>
 			<parameter name="in" code="dcnm" type="specifier" optional="yes" description="The tab to run it in. The front window's current tab without it.">

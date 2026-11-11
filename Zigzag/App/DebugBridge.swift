@@ -378,7 +378,7 @@ enum DebugBridge {
         if name.hasPrefix("mini") { runMini(name, arg); return }
         if name == "windowsdump" { dumpWindows(to: arg); return }
         if name == "keepontop" || name == "windowmenu" { runKeepOnTop(name, arg); return }
-        // mcp on|off|reset|state <path>: Settings › General › Let AI apps use Zigzag, Reset Key, and the server's state (JSON).
+        // mcp on|off|reset|state <path>: Settings › Automation › Let AI apps use Zigzag, Reset Key, and the server's state (JSON).
         if name == "mcp" {
             let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
             switch f.first ?? "" {
