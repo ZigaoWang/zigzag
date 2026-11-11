@@ -155,6 +155,11 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     func show(query newQuery: String? = nil, focus: Bool = true, animated: Bool = true) {
         guard let window else { return }
         if let newQuery { query = newQuery; field.stringValue = newQuery }
+        // With their shortcuts, as the sidebar's buttons say theirs; read each time, since shortcuts can be changed.
+        previousButton.toolTip = Shortcuts.tooltip(String(localized: "Previous", comment: "Tooltip of the find bar's button that goes to the previous match."),
+                                                   for: #selector(BrowserWindowController.findPreviousMatch(_:)))
+        nextButton.toolTip = Shortcuts.tooltip(String(localized: "Next", comment: "Tooltip of the find bar's button that goes to the next match."),
+                                               for: #selector(BrowserWindowController.findNextMatch(_:)))
         if !isVisible {
             isVisible = true
             panel.frame = frame
