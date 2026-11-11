@@ -1803,7 +1803,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 guard !shown.isEmpty else { continue }
                 found = true
                 let heading = Label(pane.title, font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
-                heading.frame = NSRect(x: pad - Label.inset, y: y, width: contentWidth, height: heading.lineHeight)
+                heading.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y, width: contentWidth - Tokens.Page.groupPad, height: heading.lineHeight)
                 documentView.addSubview(heading)
                 y = heading.frame.maxY + Tokens.Space.x3
                 for (title, group) in shown { section(title, group) }
@@ -1813,7 +1813,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 let words = settingSearch.stringValue.trimmingCharacters(in: .whitespaces)
                 let none = Label(String(localized: "No settings match “\(words)”.", comment: "In Settings when Find a setting finds nothing; what was typed."),
                                  font: Tokens.Font.row(), color: Tokens.Color.textSecondary)
-                none.frame = NSRect(x: pad - Label.inset, y: y, width: contentWidth, height: none.lineHeight)
+                none.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y, width: contentWidth - Tokens.Page.groupPad, height: none.lineHeight)
                 documentView.addSubview(none)
                 y = none.frame.maxY + Tokens.Space.x6
             }
@@ -1866,16 +1866,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 }
             }
             let rw = resetAll.fittingWidth, rh = Tokens.Page.controlHeight
-            resetAll.frame = NSRect(x: pad + contentWidth - rw, y: y, width: rw, height: rh)
+            resetAll.frame = NSRect(x: pad + contentWidth - Tokens.Page.groupPad - rw, y: y, width: rw, height: rh)
             documentView.addSubview(resetAll)
             let hint = Label(String(localized: "Click a shortcut to change or remove it. To find one, type its name or keys in Find a setting.",
                                     comment: "Hint at the top of Settings › Shortcuts. “Find a setting” is the search field's placeholder."),
                              font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
             hint.lineBreakMode = .byTruncatingTail
             hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y + (rh - hint.lineHeight) / 2,
-                                width: max(0, contentWidth - rw - Tokens.Space.x4 - Tokens.Page.groupPad), height: hint.lineHeight)
+                                width: max(0, contentWidth - rw - Tokens.Space.x4 - Tokens.Page.groupPad * 2), height: hint.lineHeight)
             documentView.addSubview(hint)
-            y += rh
+            y += rh + Tokens.Space.x2
             for (title, group) in shortcutGroups { section(title, group) }
         }
         finishDocument(y, width: width)
@@ -2480,11 +2480,11 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         }
         let width = max(0, x - pad - Tokens.Space.x4)
         if note.isHidden {
-            title.frame = NSRect(x: pad, y: (bounds.height - title.lineHeight) / 2, width: width, height: title.lineHeight)
+            title.frame = NSRect(x: pad - Label.inset, y: (bounds.height - title.lineHeight) / 2, width: width, height: title.lineHeight)
         } else {
             let block = title.lineHeight + note.lineHeight
-            title.frame = NSRect(x: pad, y: (bounds.height - block) / 2, width: width, height: title.lineHeight)
-            note.frame = NSRect(x: pad, y: title.frame.maxY, width: width, height: note.lineHeight)
+            title.frame = NSRect(x: pad - Label.inset, y: (bounds.height - block) / 2, width: width, height: title.lineHeight)
+            note.frame = NSRect(x: pad - Label.inset, y: title.frame.maxY, width: width, height: note.lineHeight)
         }
     }
 
