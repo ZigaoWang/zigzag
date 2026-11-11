@@ -51,10 +51,23 @@ enum ContentBlocker {
     /// Looks up the compiled lists, compiling the bundled ones if this version hasn't been compiled yet.
     static func prepare() {
         let store = WKContentRuleListStore.default()!
-        store.compileContentRuleList(forIdentifier: "zigzag-trackers-1", encodedContentRuleList: fallbackJSON) { list, _ in
+        // The small built-in list, until the full one is ready: compiled once per version, then looked up. Compiling
+        // it on every launch held the main thread for a few hundred milliseconds as Zigzag started (#89).
+        let fallbackID = "zigzag-trackers-" + String(Data(fallbackJSON.utf8).hashValueStable, radix: 36)
+        let useFallback: @MainActor (WKContentRuleList?) -> Void = { list in
+            fallbackList = list
+            if ruleList == nil, list != nil { changed.send() }
+        }
+        store.lookUpContentRuleList(forIdentifier: fallbackID) { list, _ in
             MainActor.assumeIsolated {
-                fallbackList = list
-                if ruleList == nil { changed.send() }
+                if let list { useFallback(list); return }
+                store.compileContentRuleList(forIdentifier: fallbackID, encodedContentRuleList: fallbackJSON) { list, _ in
+                    MainActor.assumeIsolated {
+                        useFallback(list)
+                        // Earlier versions' copies of it (and the one every launch used to rewrite) go.
+                        removeOld(withPrefix: "zigzag-trackers-", keeping: fallbackID)
+                    }
+                }
             }
         }
         guard let info = Bundle.main.url(forResource: "blocklist.info", withExtension: "json"),
@@ -94,10 +107,14 @@ enum ContentBlocker {
     }
 
     private static func removeOldVersions(keeping current: String) {
+        removeOld(withPrefix: identifierPrefix, keeping: current)
+    }
+
+    private static func removeOld(withPrefix prefix: String, keeping current: String) {
         let store = WKContentRuleListStore.default()!
         store.getAvailableContentRuleListIdentifiers { identifiers in
             MainActor.assumeIsolated {
-                for id in identifiers ?? [] where id.hasPrefix(identifierPrefix) && id != current {
+                for id in identifiers ?? [] where id.hasPrefix(prefix) && id != current {
                     store.removeContentRuleList(forIdentifier: id) { _ in }
                 }
             }
