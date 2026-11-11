@@ -459,8 +459,14 @@ extension ExtensionBridgeTests {
         let server = try SessionTestServer(redirectTarget: targetURL.absoluteString)
         let url = try await server.start()
         defer { server.listener.cancel() }
-        await #expect(throws: (any Error).self) {
-            try await ExtensionFetchRequests().response(["method": method], url: url.appendingPathComponent("redirect"), extensionID: "test", store: .nonPersistent())
+        // A write fails; a read goes to WebKit's own fetch, which follows it without the site's SameSite cookies.
+        if method == "GET" {
+            let answer = try await ExtensionFetchRequests().response(["method": method], url: url.appendingPathComponent("redirect"), extensionID: "test", store: .nonPersistent())
+            #expect((answer as? [String: Any])?["fallback"] as? Bool == true)
+        } else {
+            await #expect(throws: (any Error).self) {
+                try await ExtensionFetchRequests().response(["method": method], url: url.appendingPathComponent("redirect"), extensionID: "test", store: .nonPersistent())
+            }
         }
         #expect(target.requests.withLock { $0 } == 0)
         let local = try SessionTestServer()

@@ -771,11 +771,19 @@ final class ExtensionFetchRequests {
         globalThis.__zigzagFetchAbort = controller;
         const timeout = setTimeout(() => controller.abort(), 30000);
         try {
-          const response = await fetch(url.href, {
-            method, headers, body: options.body,
-            credentials: 'include', cache: options.cache || 'default', mode: 'same-origin',
-            redirect: options.redirect || 'follow', referrerPolicy: 'no-referrer', signal: controller.signal
-          });
+          let response;
+          try {
+            response = await fetch(url.href, {
+              method, headers, body: options.body,
+              credentials: 'include', cache: options.cache || 'default', mode: 'same-origin',
+              redirect: options.redirect || 'follow', referrerPolicy: 'no-referrer', signal: controller.signal
+            });
+          } catch (error) {
+            // A redirect to another origin, which this page can't follow with the site's cookies, or no answer:
+            // a read is safe to ask again, so WebKit's own fetch takes it, as it did before Zigzag stepped in.
+            if (controller.signal.aborted || options.redirect === 'error') throw error;
+            return { fallback: true };
+          }
           // Too big to hand over in one piece: WebKit's own fetch streams it instead.
           if (Number(response.headers.get('content-length')) > limit) { controller.abort(); return { fallback: true }; }
           const chunks = [];
