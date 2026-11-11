@@ -7613,7 +7613,7 @@
       }
     },
     "New Space" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nButton beside Your Spaces in Settings › Spaces.\nItem in a space's context menu.\nUndo action name, shown in the Edit menu as Undo New Space.\nView menu item.\nWhat Edit › Undo undoes after a space is added.",
+      "comment" : "A command in the command bar, named as in the menu bar.\nButton beside Your Spaces in Settings › Spaces.\nItem in a space's context menu.\nTooltip of the button that adds a space, at the bottom of the sidebar.\nUndo action name, shown in the Edit menu as Undo New Space.\nView menu item.\nWhat Edit › Undo undoes after a space is added.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
