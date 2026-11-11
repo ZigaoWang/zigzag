@@ -12164,6 +12164,17 @@
         }
       }
     },
+    "Spaces on the same profile share sign-ins, extensions and history." : {
+      "comment" : "Note under the Profile row in a space's editor, saying what being on the same profile means.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一描述文件中的空间共用登录状态、扩展和历史记录。"
+          }
+        }
+      }
+    },
     "Speech" : {
       "comment" : "Submenu of the Edit menu.",
       "localizations" : {

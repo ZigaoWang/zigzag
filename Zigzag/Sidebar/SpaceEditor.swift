@@ -1471,6 +1471,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     /// The profile the space is on: its sign-ins, extensions and website data.
     private let profileLabel = SpaceLookEditor.rowLabel(String(localized: "Profile", comment: "Label in a space's editor, before the choice of the profile the space is on."))
     private let profileButton = DropdownButton()
+    /// What a profile is, in a line under its row: enough to choose one without a trip to Settings.
+    private let profileNote = NSTextField.dialogText(String(localized: "Spaces on the same profile share sign-ins, extensions and history.", comment: "Note under the Profile row in a space's editor, saying what being on the same profile means."), font: Tokens.Font.detail())
     /// While a question it asked is up (moving the space's tabs to another profile, a new profile's name), clicks
     /// and keys are that question's: the editor stays as it is under it.
     private var isAsking = false
@@ -1491,7 +1493,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         nameBackground.wantsLayer = true
         nameBackground.layer?.cornerCurve = .continuous
         nameBackground.layer?.cornerRadius = Tokens.Radius.row
-        [nameBackground, nameField, editor, iconButton, profileLabel, profileButton].forEach { addSubview($0) }
+        [nameBackground, nameField, editor, iconButton, profileLabel, profileButton, profileNote].forEach { addSubview($0) }
         refreshProfiles()
         profileButton.onSelect = { [weak self] index in self?.chooseProfile(at: index) }
         profileButton.actions = [DropdownButton.Action(title: String(localized: "New Profile…", comment: "Item at the end of the Profile menu in a space's editor: makes a profile and puts the space on it."), symbol: "plus") { [weak self] in
@@ -1523,8 +1525,9 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private let pad = Tokens.Space.x3
     private let nameHeight = Tokens.Metric.rowHeight
 
-    /// The Profile row, with the space under it.
-    private var profileRowHeight: CGFloat { Tokens.Page.controlHeight + Tokens.Space.x3 }
+    /// The Profile row and its note, with the space under them.
+    private var profileRowHeight: CGFloat { Tokens.Page.controlHeight + Tokens.Space.x1 + profileNoteHeight + Tokens.Space.x3 }
+    private var profileNoteHeight: CGFloat { profileNote.wrappedHeight(Self.width - pad * 2) }
 
     var contentHeight: CGFloat { pad + nameHeight + Tokens.Space.x3 + profileRowHeight + (iconGrid != nil ? IconGrid.height : editor.preferredHeight) + pad }
 
@@ -1592,6 +1595,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         profileLabel.frame = NSRect(x: pad, y: rowY + round((rowH - lh) / 2), width: editor.labelWidth, height: lh)
         let menuWidth = min(profileButton.intrinsicContentSize.width, width - editor.labelWidth)
         profileButton.frame = NSRect(x: pad + width - menuWidth, y: rowY, width: menuWidth, height: rowH)
+        profileNote.frame = NSRect(x: pad, y: rowY + rowH + Tokens.Space.x1, width: width, height: profileNoteHeight)
         let below = rowY + profileRowHeight
         editor.frame = NSRect(x: pad, y: below, width: width, height: editor.preferredHeight)
         iconGrid?.frame = NSRect(x: pad, y: below, width: width, height: IconGrid.height)
