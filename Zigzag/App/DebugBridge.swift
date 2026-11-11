@@ -810,13 +810,6 @@ enum DebugBridge {
             controller.selectedWebView?.evaluateJavaScript(arg) { result, error in
                 debugLog("js => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
             }
-        case "popupjs":
-            // Runs a script in the extension popup that's showing, to drive a real extension as you would.
-            if #available(macOS 15.4, *) {
-                extensions(in: controller).lastAction?.popupWebView?.evaluateJavaScript(arg) { result, error in
-                    debugLog("popupjs => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
-                }
-            }
         case "slowmo":
             // slowmo <factor>: every animation in the window runs that many times slower, to film and judge it.
             let factor = max(1, Float(arg) ?? 1)
@@ -993,41 +986,6 @@ enum DebugBridge {
                 NSApp.postEvent(e, atStart: false)
             }
         case "listscroll": controller.sidebar.debugListScroll(Double(arg).map { CGFloat($0) })
-        case "menukey":
-            // menukey <char> [cmd|shift|ctrl|opt...]: the key equivalent as the menu bar sees it, then as the window does
-            // (which is where a real key press goes), logging which one took it.
-            let f = arg.split(separator: " ").map(String.init)
-            guard let ch = f.first, let window = controller.window else { break }
-            var flags: NSEvent.ModifierFlags = []
-            for m in f.dropFirst() {
-                switch m { case "cmd": flags.insert(.command); case "shift": flags.insert(.shift); case "ctrl": flags.insert(.control); case "opt": flags.insert(.option); default: break }
-            }
-            let codes: [String: UInt16] = ["w": 13, "t": 17, "c": 8, "d": 2, "z": 6, "l": 37]
-            guard let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
-                                           windowNumber: window.windowNumber, context: nil, characters: ch, charactersIgnoringModifiers: ch,
-                                           isARepeat: false, keyCode: codes[ch] ?? 0) else { break }
-            if NSApp.isActive, NSApp.keyWindow === window {
-                // Frontmost: the real path, window first, then the menu bar.
-                let handled = window.performKeyEquivalent(with: e)
-                debugLog("menukey \(arg): handled=\(handled) tabs=\(controller.tabManager.currentTabs.count) selected=\(controller.tabManager.selectedTab?.displayTitle ?? "nil")")
-                break
-            }
-            // Behind another app there's no key window for the menu to send to, so do what it would: find the item with
-            // this key, then the first responder in this window's chain that takes its action, validated as a menu would.
-            func find(in menu: NSMenu) -> NSMenuItem? {
-                for item in menu.items {
-                    if let sub = item.submenu, let found = find(in: sub) { return found }
-                    if item.keyEquivalent == ch, item.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask) == flags, item.action != nil { return item }
-                }
-                return nil
-            }
-            guard let menuItem = NSApp.mainMenu.flatMap(find(in:)), let action = menuItem.action else { debugLog("menukey \(arg): no item"); break }
-            var responder: NSResponder? = window.firstResponder ?? window
-            while let r = responder, !r.responds(to: action) { responder = r.nextResponder }
-            let target: AnyObject? = responder ?? (NSApp.responds(to: action) ? NSApp : NSApp.delegate as AnyObject?)
-            let enabled = (target as? NSMenuItemValidation)?.validateMenuItem(menuItem) ?? true
-            if enabled { NSApp.sendAction(action, to: target, from: menuItem) }
-            debugLog("menukey \(arg): item=\(menuItem.title) target=\(target.map { "\(type(of: $0))" } ?? "nil") enabled=\(enabled) tabs=\(controller.tabManager.currentTabs.count) selected=\(controller.tabManager.selectedTab?.displayTitle ?? "nil") peek=\(controller.peek.isVisible) bar=\(controller.commandBar.isVisible)")
         case "tlshot":
             if let image = (controller.window as? BrowserWindow)?.trafficLightsImage(), let tiff = image.tiffRepresentation,
                let rep = NSBitmapImageRep(data: tiff), let png = rep.representation(using: .png, properties: [:]) {
@@ -1124,7 +1082,6 @@ enum DebugBridge {
             let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
             guard f.count == 2, let page = URL(string: f[1]), #available(macOS 15.4, *) else { break }
             Task { @MainActor in await DebugBridge.extensionTest(f[0], page: page, in: controller) }
-        case "reader": controller.toggleReader()
         case "ua": controller.selectedWebView?.customUserAgent = arg.isEmpty ? nil : arg; controller.selectedWebView?.reload()
         case "readerstyle":
             func find(_ v: NSView) -> ReaderControls? { (v as? ReaderControls) ?? v.subviews.lazy.compactMap(find).first }
@@ -1218,7 +1175,6 @@ enum DebugBridge {
         case "settingsid":
             // Settings is a tab now: its window is the browser window it's in.
             if let w = controller.window { try? "\(w.windowNumber)".write(toFile: arg, atomically: true, encoding: .utf8) }
-        case "editspace": controller.openSpaceEditor(controller.tabManager.currentSpaceID, anchor: arg == "dot" ? controller.sidebar.dot(for: controller.tabManager.currentSpaceID) : controller.sidebar.list.headerView)
         case "pagemove":
             let n = arg.split(separator: " ").compactMap { Double($0) }
             if n.count == 2, let window = controller.window, let webView = controller.selectedWebView,
@@ -1227,7 +1183,6 @@ enum DebugBridge {
                                           eventNumber: 0, clickCount: 0, pressure: 0) {
                 webView.mouseMoved(with: e)
             }
-        case "closetab": controller.closeTab(nil)
         case "closematching":
             // closematching <text>: closes this space's tabs whose title or address contains the text.
             let doomed = controller.tabManager.currentTabs.filter { $0.displayTitle.contains(arg) || ($0.url?.absoluteString.contains(arg) ?? false) }
@@ -1345,7 +1300,6 @@ enum DebugBridge {
         case "flash":
             func walk(_ v: NSView) { if let s = v as? NSScrollView { s.flashScrollers() }; v.subviews.forEach(walk) }
             if let root = controller.window?.contentView { walk(root) }
-        case "private": WindowManager.shared.newWindow(url: URL(string: arg), isPrivate: true)
         case "shortcutsaudit":
             debugLog("custom shortcuts: " + Shortcuts.allItems.filter(Shortcuts.isCustom).map { "\($0.title)=\($0.keyEquivalent)" }.joined(separator: ", "))
         case "removespaceundo":
@@ -1476,14 +1430,7 @@ enum DebugBridge {
                 let owner = WindowManager.shared.controllers.first { $0.tabManager.bookmarkTab(for: favorite.id) != nil } ?? controller
                 owner.tabManager.unbookmark(favorite.id, toIndex: 0)
             }
-        case "split":
-            let tabs = controller.tabManager.currentTabs
-            if let current = controller.tabManager.selectedTab, let other = tabs.first(where: { $0 !== current }) {
-                controller.tabManager.makeSplit(current, with: other)
-            }
         case "save": WindowManager.shared.saveNow()
-        case "quit": NSApp.terminate(nil)
-        case "materials": MaterialsShowcase.debug(arg)
         default: break
         }
     }
