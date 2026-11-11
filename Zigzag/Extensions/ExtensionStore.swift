@@ -144,8 +144,10 @@ enum ExtensionStore {
         set {
             UserDefaults.standard.set(Array(newValue).sorted(), forKey: offSitesKey)
             guard #available(macOS 15.4, *) else { return }
+            // Only profiles whose extensions are running: one that isn't started reads the sites when it starts.
             for profile in Profiles.shared.all {
-                for id in profile.installs.installedIDs { profile.extensions.applySiteAccess(id) }
+                guard let host = profile.startedExtensions else { continue }
+                for id in profile.installs.installedIDs { host.applySiteAccess(id) }
             }
         }
     }
