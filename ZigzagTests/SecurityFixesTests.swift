@@ -53,6 +53,34 @@ struct SecurityFixesTests {
         #expect(NativeMessagingHost.manifest(named: "/tmp/evil") == nil)
     }
 
+    @Test func hostFoldersCoverWhere1PasswordWrites() {
+        let home = URL(fileURLWithPath: "/Users/someone", isDirectory: true)
+        let paths = NativeMessagingHost.searchFolders(home: home).map(\.path)
+        let support = "/Users/someone/Library/Application Support/"
+        for browser in ["Google/Chrome", "Google/Chrome Beta", "Google/Chrome Dev", "Google/Chrome Canary",
+                        "Microsoft Edge", "Microsoft Edge Beta", "Microsoft Edge Dev", "Microsoft Edge Canary",
+                        "Vivaldi", "Vivaldi Snapshot", "Arc/User Data"] {
+            #expect(paths.contains(support + browser + "/NativeMessagingHosts"), "\(browser)")
+        }
+        #expect(paths.first == support + "Google/Chrome/NativeMessagingHosts")
+        #expect(paths.last == "/Library/Google/Chrome/NativeMessagingHosts")
+        // Firefox's manifests list Firefox add-ons, not Chrome origins.
+        #expect(!paths.contains { $0.contains("Mozilla") })
+    }
+
+    @Test func manifestIsFoundInAnyFolderFirstOneWins() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("SecurityFixesTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = root.appendingPathComponent("chrome"), second = root.appendingPathComponent("arc")
+        for dir in [first, second] { try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
+        try Data(#"{"path": "/arc"}"#.utf8).write(to: second.appendingPathComponent("com.example.host.json"))
+        #expect(NativeMessagingHost.manifest(named: "com.example.host", in: [first, second])?["path"] as? String == "/arc")
+        try Data(#"{"path": "/chrome"}"#.utf8).write(to: first.appendingPathComponent("com.example.host.json"))
+        #expect(NativeMessagingHost.manifest(named: "com.example.host", in: [first, second])?["path"] as? String == "/chrome")
+        #expect(NativeMessagingHost.manifest(named: "com.example.other", in: [first, second]) == nil)
+        #expect(NativeMessagingHost.manifest(named: "../arc/com.example.host", in: [first]) == nil)
+    }
+
     @Test func extensionSiteRequestsStayWithinAccess() throws {
         let pattern = { (s: String) in try WKWebExtension.MatchPattern(string: s) }
         let all = try pattern("<all_urls>")
