@@ -5,6 +5,12 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-11
+
+### Fixed
+- Favorites keep their page when you leave them. An everyday memory warning from macOS no longer puts them to sleep, only a critical one does, and a favorite busy in the background is pointed out instead. ([#65](https://github.com/ZigaoWang/zigzag/issues/65), [#88](https://github.com/ZigaoWang/zigzag/issues/88))
+- A page that does come back, after a crash or a real memory shortage, returns to where you were, forums like Discourse included, and switching spaces remembers your place too. ([#88](https://github.com/ZigaoWang/zigzag/issues/88))
+
 ## [0.8.0] - 2026-11-11
 
 ### New
