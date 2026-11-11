@@ -122,12 +122,31 @@ nonisolated struct GroupListing<Key: Equatable> {
 /// A row "Find a setting" can find, by the words it shows.
 protocol SettingsSearchable { var searchText: String { get } }
 
+/// A row's delete button (a space's, a profile's, an extension's trash): one rule for all of them. It shows while
+/// the row is pointed at or something in it has keyboard focus, and always while VoiceOver is on, which has no
+/// pointer to bring it. Hidden, it keeps its place, so nothing in the row moves when it comes; with Full Keyboard
+/// Access on it stays in the Tab order, see-through until Tab reaches it.
+enum RowDelete {
+    static func shows(hovered: Bool, focused: Bool, voiceOver: Bool) -> Bool { hovered || focused || voiceOver }
+
+    static func apply(_ button: NSView, shows: Bool, keyboardAccess: Bool = InteractiveView.keyboardAccess) {
+        button.alphaValue = shows ? 1 : 0
+        button.isHidden = !shows && !keyboardAccess
+    }
+
+    static var voiceOver: Bool { NSWorkspace.shared.isVoiceOverEnabled }
+}
+
 /// A row of settings: its name (and a line saying more, which wraps) at the left, its control at the right. Rows grow
 /// to fit what they say, so nothing is cut off. A picture goes before the name only where the row is a thing with a
 /// face of its own: an extension, a site.
 final class FormRow: NSView, SettingsSearchable {
     /// Off for now: hidden, and kept hidden by "Find a setting".
     var isAvailable = true { didSet { isHidden = !isAvailable } }
+    /// Its delete button, if it has one, shown by `RowDelete`'s rule.
+    private weak var deleteButton: InteractiveView?
+    private var hoverArea: NSTrackingArea?
+    private var isHovered = false { didSet { if oldValue != isHovered { refreshDelete() } } }
     var searchText: String { [title.stringValue, detail.stringValue, keywords].joined(separator: " ") }
     /// More words "Find a setting" knows the row by, like its button's.
     var keywords = ""
@@ -158,6 +177,52 @@ final class FormRow: NSView, SettingsSearchable {
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
+
+    /// The row's trash, in its control: shown on hover, with keyboard focus anywhere in the row, and to VoiceOver.
+    /// The stack it's in keeps its room while it's hidden.
+    func revealsOnHover(_ button: InteractiveView) {
+        deleteButton = button
+        (button.superview as? NSStackView)?.detachesHiddenViews = false
+        var controls: [InteractiveView] = []
+        func collect(_ view: NSView) {
+            if let control = view as? InteractiveView { controls.append(control) }
+            view.subviews.forEach(collect)
+        }
+        collect(control)
+        for control in controls where control === button || control.keyboardFocusChanged == nil {
+            control.keyboardFocusChanged = { [weak self] _ in self?.refreshDelete() }
+        }
+        refreshDelete()
+    }
+
+    private func refreshDelete() {
+        guard let deleteButton else { return }
+        var focused = false
+        func scan(_ view: NSView) {
+            if (view as? InteractiveView)?.hasKeyboardFocus == true { focused = true }
+            view.subviews.forEach(scan)
+        }
+        scan(control)
+        RowDelete.apply(deleteButton, shows: RowDelete.shows(hovered: isHovered, focused: focused, voiceOver: RowDelete.voiceOver))
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        guard deleteButton != nil else { return }
+        if let hoverArea { removeTrackingArea(hoverArea) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        hoverArea = area
+        if let window, window.isVisible { isHovered = bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)) }
+    }
+
+    override func mouseEntered(with event: NSEvent) { isHovered = true }
+    override func mouseExited(with event: NSEvent) { isHovered = false }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        refreshDelete()
+    }
 
     private let pad = Tokens.Page.groupPad
     /// A picture's side: an extension's icon, a site's favicon.
@@ -303,7 +368,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         layer?.cornerCurve = .continuous
         tile.image = Self.tile(for: space)
         detail.stringValue = Self.summary(of: space)
-        deleteButton.isHidden = true
+        RowDelete.apply(deleteButton, shows: false)
         deleteButton.isEnabled = Library.shared.spaces.count > 1
         [tile, name, detail, deleteButton, editButton].forEach { addSubview($0) }
         // The row and its Edit button both open the same editor the sidebar uses.
@@ -317,6 +382,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
             SpaceSettingsRow.confirmDelete(self.spaceID, in: host)
         }
         deleteButton.keyboardFocusChanged = { [weak self] _ in self?.stateDidChange(animated: false) }
+        editButton.keyboardFocusChanged = { [weak self] _ in self?.stateDidChange(animated: false) }
         setAccessibilityRole(.row)
         setAccessibilityLabel(space.name)
     }
@@ -340,7 +406,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         let ew = editButton.fittingWidth, eh = Tokens.Page.controlHeight
         editButton.frame = NSRect(x: bounds.width - pad - ew, y: (bounds.height - eh) / 2, width: ew, height: eh)
         let b = deleteButton.frame.width
-        deleteButton.frame.origin = NSPoint(x: editButton.frame.minX - Tokens.Space.x1 - b, y: (bounds.height - b) / 2)
+        deleteButton.frame.origin = NSPoint(x: editButton.frame.minX - Tokens.Space.x2 - b, y: (bounds.height - b) / 2)
         let x = tile.frame.maxX + Tokens.Space.x3 - Label.inset
         // The name has the room up to Edit while Delete isn't showing: a narrow page cuts it short only on hover.
         let end = deleteButton.alphaValue > 0 ? deleteButton.frame.minX : editButton.frame.minX
@@ -435,11 +501,10 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     override func resetCursorRects() { if isLifted { addCursorRect(bounds, cursor: .closedHand) } }
 
     override func stateDidChange(animated: Bool) {
-        // Delete shows on hover, or once Tab brings keyboard focus to it. With Full Keyboard Access on it stays in
-        // the Tab order, see-through until then.
-        let showsDelete = (isHovered || deleteButton.hasKeyboardFocus) && !isLifted && !Self.isReordering
-        deleteButton.isHidden = !showsDelete && !(NSApp.isFullKeyboardAccessEnabled && !isLifted)
-        deleteButton.alphaValue = showsDelete ? 1 : 0
+        // Delete as on every row with one (`RowDelete`), never while the row is carried.
+        let focused = deleteButton.hasKeyboardFocus || editButton.hasKeyboardFocus
+        let showsDelete = RowDelete.shows(hovered: isHovered, focused: focused, voiceOver: RowDelete.voiceOver) && !isLifted && !Self.isReordering
+        RowDelete.apply(deleteButton, shows: showsDelete, keyboardAccess: InteractiveView.keyboardAccess && !isLifted)
         needsLayout = true
         // At rest a space reads like every other row in Settings: no fill of its own. Carried, it's a card above
         // the others, solid at once so nothing shows through it.
@@ -1395,6 +1460,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
         }
         let row = FormRow(title: ext.displayName ?? id, detail: detail.isEmpty ? "" : Words.list(detail), icon: ext.icon(for: NSSize(width: 24, height: 24)), control: stack)
+        row.revealsOnHover(remove)
         row.toolTip = limitsNote
         return row
     }
@@ -1427,11 +1493,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let library = Library.shared
         for profile in library.profiles {
             var controls: [NSView] = []
+            var trash: IconButton?
             if !profile.isDefault {
                 let delete = IconButton(symbol: "trash", size: .compact,
                                         toolTip: String(localized: "Delete Profile", comment: "Button of the sheet that deletes a profile, and tooltip of the trash button on a profile's row in Settings › Profiles."))
                 delete.onClick = { [weak self] _ in if let self { ProfileSheets.confirmDelete(profile.id, in: self) } }
                 controls.append(delete)
+                trash = delete
             }
             let edit = PillButton(title: String(localized: "Edit…", comment: "Button on a profile's row in Settings › Profiles: opens the sheet that renames it and changes its color."))
             edit.onClick = { [weak self] _ in if let self { ProfileSheets.edit(profile.id, in: self) } }
@@ -1443,7 +1511,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let extensions = Profiles.shared.profile(profile.id).installs.installedIDs.count
             let detail = Words.list([String(localized: "\(spaces) spaces", comment: "Under a profile's name in Settings › Profiles: how many spaces are on it."),
                                      String(localized: "\(extensions) extensions", comment: "Under a profile's name in Settings › Profiles: how many extensions it has.")])
-            profilesGroup.add(FormRow(title: profile.displayName, detail: detail, icon: ProfileSheets.tile(for: profile), control: stack))
+            let row = FormRow(title: profile.displayName, detail: detail, icon: ProfileSheets.tile(for: profile), control: stack)
+            if let trash { row.revealsOnHover(trash) }
+            profilesGroup.add(row)
         }
         layoutSubtreeIfNeeded()
         if pane == .profiles || isSearching { layoutDocument() }
@@ -1479,9 +1549,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 }
                 let stack = NSStackView(views: [delete, restore])
                 stack.spacing = Tokens.Space.x2
-                self.unlistedGroup.add(FormRow(title: String(localized: "Data from a profile that’s no longer listed", comment: "Title of a row in Settings › Profiles, for data left on this Mac by a profile that's in no list."),
-                                               detail: String(localized: "Extensions, sign-ins and history kept on this Mac", comment: "Under the title of a row in Settings › Profiles, for data left by a profile that's in no list."),
-                                               icon: NSImage(systemSymbolName: "questionmark.folder", accessibilityDescription: nil), control: stack))
+                let row = FormRow(title: String(localized: "Data from a profile that’s no longer listed", comment: "Title of a row in Settings › Profiles, for data left on this Mac by a profile that's in no list."),
+                                  detail: String(localized: "Extensions, sign-ins and history kept on this Mac", comment: "Under the title of a row in Settings › Profiles, for data left by a profile that's in no list."),
+                                  icon: NSImage(systemSymbolName: "questionmark.folder", accessibilityDescription: nil), control: stack)
+                row.revealsOnHover(delete)
+                self.unlistedGroup.add(row)
             }
             self.layoutSubtreeIfNeeded()
             if self.pane == .profiles || self.isSearching { self.layoutDocument() }
