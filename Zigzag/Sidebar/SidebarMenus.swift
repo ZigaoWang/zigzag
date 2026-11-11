@@ -381,7 +381,7 @@ enum SidebarMenus {
         case .newTab: String(localized: "New Tab", comment: "Item in the menu of the sidebar's + and its empty space.")
         case .newFolder: String(localized: "New Folder", comment: "Item in a space's context menu.")
         case .editSpace: String(localized: "Edit Space…", comment: "Item in a space's context menu.")
-        case .newSpace: String(localized: "New Space…", comment: "Item in the menu of the sidebar's + and its empty space: adds a space and opens it to be named.")
+        case .newSpace: String(localized: "New Space", comment: "Item in the menu of the sidebar's + and its empty space: adds a space and opens it to be named.")
         case .separator: ""
         }
     }

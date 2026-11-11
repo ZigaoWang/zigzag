@@ -31,7 +31,9 @@ struct SidebarMenuTests {
         #expect(SidebarMenus.action(of: .editSpace) == #selector(BrowserWindowController.renameSpace(_:)))
         // No menu bar item makes a folder, so it shows no shortcut rather than an invented one.
         #expect(SidebarMenus.action(of: .newFolder) == nil)
-        #expect(SidebarMenus.title(of: .newSpace).hasSuffix("…"))
+        // New Space makes the space at once, as New Folder does: no ellipsis, the same as in the menu bar.
+        #expect(SidebarMenus.title(of: .newSpace) == String(localized: "New Space", comment: "View menu item."))
+        #expect(SidebarMenus.title(of: .editSpace).hasSuffix("…"))
     }
 
     // MARK: The drawn menu
@@ -51,7 +53,7 @@ struct SidebarMenuTests {
     }
 
     private func entries(_ chosen: @escaping (String) -> Void) -> [MenuPanel.Entry] {
-        ["New Tab", "New Folder", "New Space…"].map { title in
+        ["New Tab", "New Folder", "New Space"].map { title in
             .item(MenuPanel.Item(title: title, symbol: "plus", shortcut: title == "New Tab" ? "⌘T" : "") { chosen(title) })
         }
     }
@@ -65,7 +67,7 @@ struct SidebarMenuTests {
         #expect(abs(frame.maxX - button.maxX) < 0.5)
         #expect(frame.minY >= button.maxY)
         #expect(frame.minY - button.maxY <= Tokens.Space.x1 + 0.5)
-        #expect(menu.itemTitles == ["New Tab", "New Folder", "New Space…"])
+        #expect(menu.itemTitles == ["New Tab", "New Folder", "New Space"])
         _ = window
     }
 
@@ -106,7 +108,7 @@ struct SidebarMenuTests {
         #expect(menu.handleKey(key(119, in: window)))
         #expect(menu.highlightedIndex == 2)
         #expect(menu.handleKey(key(36, "\r", in: window)))
-        #expect(picked == "New Space…")
+        #expect(picked == "New Space")
         #expect(MenuPanel.current == nil)
 
         let again = try #require(MenuPanel.show(entries { picked = $0 }, from: anchor, placement: .aboveTrailing))

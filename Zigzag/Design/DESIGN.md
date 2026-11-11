@@ -329,7 +329,7 @@ something came from, answers at once, and can be interrupted.
   `Metric.controlHeight` tall with `Radius.row`, inset 4pt; every item has its picture slot, a neutral globe where a
   site's icon is missing; the chosen item has a check at its trailing end in the window's accent. An item's shortcut,
   as the menu bar has it now, sits at the trailing end in `textTertiary`, as the Mac's menus set it. The sidebar's +
-  opens its menu (New Tab, New Folder, New Space…) 4pt above it, the trailing edges lined up; a right-click on the
+  opens its menu (New Tab, New Folder, New Space) 4pt above it, the trailing edges lined up; a right-click on the
   sidebar's empty space opens the same items, with Edit Space…, under the pointer. Keys: Up and Down,
   Home and End, Return or Space to choose, Esc or Tab to close, typing to jump to a name. VoiceOver reads it as a menu
   of menu items and speaks the item the keys reach. A click outside closes it and goes no further. Panels under it
