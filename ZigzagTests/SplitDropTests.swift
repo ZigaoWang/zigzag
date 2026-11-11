@@ -33,4 +33,18 @@ struct SplitDropTests {
         #expect(!TabManager.canSplit(blank, onto: tab))
         #expect(!TabManager.canSplit(tab, onto: blank))
     }
+
+    /// A split shows in one row: a pinned page split beside a tab carries it in its own row, so neither page shows twice.
+    @Test func aSplitShowsInOneRow() {
+        let a = UUID(), b = UUID(), c = UUID(), d = UUID(), pin = UUID()
+        // Two tabs: the right one rides in the left one's row.
+        #expect(SidebarListView.ridingTabs(tabs: [a, b], splits: [(a, b)], pinned: []) == [b])
+        // A pinned page beside a tab, either side: the tab rides in the pinned row.
+        #expect(SidebarListView.ridingTabs(tabs: [c], splits: [(pin, c)], pinned: [pin]) == [c])
+        #expect(SidebarListView.ridingTabs(tabs: [c], splits: [(c, pin)], pinned: [pin]) == [c])
+        // Tabs on their own keep their rows.
+        #expect(SidebarListView.ridingTabs(tabs: [a, b, d], splits: [], pinned: []).isEmpty)
+        // A right half whose left half isn't in this list keeps a row of its own.
+        #expect(SidebarListView.ridingTabs(tabs: [b], splits: [(a, b)], pinned: []).isEmpty)
+    }
 }

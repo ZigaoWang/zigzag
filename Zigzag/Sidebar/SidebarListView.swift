@@ -281,9 +281,8 @@ final class SidebarListView: NSView {
         let tabs = manager.tabs(in: spaceID)
         if hasPinnedRows || !tabs.isEmpty { result.append(.separator) }
         result.append(.newTab)
-        // The right half of a split rides in its left half's row, when that row is here to carry it.
-        let rowIDs = Set(tabs.map(\.id))
-        let rightHalves = Set(manager.splits.filter { rowIDs.contains($0.left) }.map(\.right))
+        let rightHalves = Self.ridingTabs(tabs: tabs.map(\.id), splits: manager.splits.map { ($0.left, $0.right) },
+                                          pinned: Set(manager.splits.flatMap { [$0.left, $0.right] }.filter { manager.tab(with: $0)?.bookmarkID != nil }))
         // Nested tabs are set in under the tab they're under, up to two levels. A folded tab hides the tabs under it but
         // the one you're on, as a shut folder does.
         let levels = TabTree.levels(manager.treeNodes(in: spaceID))
@@ -303,6 +302,20 @@ final class SidebarListView: NSView {
             if let level = levels[tab.id], level > 0 { rowDepth[.tab(tab.id)] = TabTree.shownLevel(level) }
         }
         return result
+    }
+
+    /// The tabs that ride in another row instead of having their own: the right half of a split whose left half has a
+    /// row here, and a tab split beside a pinned page, which shows in that page's row, as in Arc, so the page shows
+    /// once and one row is lit. `pinned` are the pinned pages' tabs.
+    nonisolated static func ridingTabs(tabs: [UUID], splits: [(left: UUID, right: UUID)], pinned: Set<UUID>) -> Set<UUID> {
+        let rows = Set(tabs)
+        var riding: Set<UUID> = []
+        for pair in splits {
+            if pinned.contains(pair.left) { riding.insert(pair.right) }
+            else if pinned.contains(pair.right) { riding.insert(pair.left) }
+            else if rows.contains(pair.left) { riding.insert(pair.right) }
+        }
+        return riding.intersection(rows)
     }
 
     /// How deep each tab of the space on show is nested, as the list was last built.
@@ -855,8 +868,14 @@ final class SidebarListView: NSView {
                 if self.mark(item, with: event) { return }
                 // A pinned split row: each half opens its own page, and both open side by side.
                 var opening = id
-                if row.half(at: row.convert(event.locationInWindow, from: nil)) == 1, let pinned = Library.shared.pinnedSplit(containing: id) {
-                    opening = pinned.right
+                if row.half(at: row.convert(event.locationInWindow, from: nil)) == 1 {
+                    if let pinned = Library.shared.pinnedSplit(containing: id) {
+                        opening = pinned.right
+                    } else if let partner = row.partner, partner.bookmarkID == nil {
+                        // The tab split beside it, riding in this row.
+                        self.delegate?.listSelect(partner)
+                        return
+                    }
                 }
                 if let bookmark = Library.shared.bookmark(opening) { self.delegate?.listOpenBookmark(bookmark) }
             }
@@ -953,13 +972,15 @@ final class SidebarListView: NSView {
             } else {
                 row.configure(pinnedPartner: nil, icon: nil, unloaded: false)
             }
-            row.configure(partner: partner)
+            // Split beside a tab, it carries that tab too: the page shows once, in its own place.
+            let beside = pinned == nil ? tab.flatMap(manager.partner(of:)) : nil
+            row.configure(partner: partner ?? beside)
+            row.partnerLeads = beside != nil && tab.flatMap(manager.split(for:))?.left == beside?.id
             row.isUnloaded = tab == nil && partner == nil
             row.setAccessibilityDisclosureLevel(rowDepth[item] ?? 0)
-            // Beside a tab, it's on screen while that tab is: the tab's row carries the pair, and this one stays lit.
-            let beside = tab.flatMap(manager.partner(of:))
-            row.isSelected = (tab != nil && tab === selected) || (partner != nil && partner === selected) || (beside != nil && beside === selected)
-            row.focusedHalf = partner != nil && partner === selected ? 1 : 0
+            let other = partner ?? beside
+            row.isSelected = (tab != nil && tab === selected) || (other != nil && other === selected)
+            row.focusedHalf = other != nil && other === selected ? 1 : 0
             row.isMarked = marked.contains(item)
         default:
             break
@@ -1015,7 +1036,7 @@ final class SidebarListView: NSView {
     private func rowItem(for tab: Tab) -> SidebarItem? {
         if let id = tab.bookmarkID { return .bookmark(Self.rowID(id)) }
         if items.contains(.tab(tab.id)) { return .tab(tab.id) }
-        return manager?.partner(of: tab).map { .tab($0.id) }
+        return manager?.partner(of: tab).map { partner in partner.bookmarkID.map { .bookmark(Self.rowID($0)) } ?? .tab(partner.id) }
     }
 
     /// After the list changes, picked rows stay picked: one that became the other kind (a tab pinned, a pinned page
@@ -1099,7 +1120,10 @@ final class SidebarListView: NSView {
     private var currentItem: SidebarItem? {
         guard let tab = manager?.selectedTab else { return nil }
         if let id = tab.bookmarkID.map(Self.rowID), items.contains(.bookmark(id)) { return .bookmark(id) }
-        return items.contains(.tab(tab.id)) ? .tab(tab.id) : nil
+        if items.contains(.tab(tab.id)) { return .tab(tab.id) }
+        // A tab riding in the row of the pinned page it's split beside.
+        if let id = manager?.partner(of: tab)?.bookmarkID.map(Self.rowID), items.contains(.bookmark(id)) { return .bookmark(id) }
+        return nil
     }
 
     func clearMarks() {
@@ -1203,7 +1227,8 @@ final class SidebarListView: NSView {
             let tab = manager?.tab(with: id)
             urls = [tab?.url, tab.flatMap { manager?.partner(of: $0) }?.url]
         case .bookmark(let id):
-            urls = [Library.shared.bookmark(id)?.url, manager?.bookmarkTab(for: id)?.url]
+            let tab = manager?.bookmarkTab(for: id)
+            urls = [Library.shared.bookmark(id)?.url, tab?.url, tab.flatMap { manager?.partner(of: $0) }?.url]
             if let pair = Library.shared.pinnedSplit(containing: id) {
                 urls += [Library.shared.bookmark(pair.left)?.url, Library.shared.bookmark(pair.right)?.url]
             }
@@ -1232,7 +1257,9 @@ final class SidebarListView: NSView {
             case .tab(let id): name = "tab:" + (manager.tab(with: id).map { tab in [tab] + (manager.partner(of: tab).map { [$0] } ?? []) }?.map(\.displayTitle).joined(separator: "|") ?? "")
             case .bookmark(let id):
                 let ids = Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id]
-                name = "pin:" + ids.compactMap { Library.shared.bookmark($0)?.title }.joined(separator: "|")
+                var titles: [String] = ids.compactMap { Library.shared.bookmark($0)?.title }
+                if let beside = manager.bookmarkTab(for: id).flatMap(manager.partner(of:)), beside.bookmarkID == nil { titles.append(beside.displayTitle) }
+                name = "pin:" + titles.joined(separator: "|")
             case .folder(let id): name = "folder:" + (Library.shared.folder(id)?.name ?? "")
             case .newTab: name = "newtab"
             case .header: name = "header"
@@ -1299,7 +1326,9 @@ final class SidebarListView: NSView {
     /// The row showing a tab: its own, its pinned page's, or for the right half of a split, the row of the pair.
     func row(for tab: Tab) -> NSView? {
         if let bookmarkID = tab.bookmarkID { return madeRow(.bookmark(Self.rowID(bookmarkID))) }
-        return madeRow(.tab(tab.id)) ?? manager?.partner(of: tab).flatMap { madeRow(.tab($0.id)) }
+        return madeRow(.tab(tab.id)) ?? manager?.partner(of: tab).flatMap { partner in
+            partner.bookmarkID.map { madeRow(.bookmark(Self.rowID($0))) } ?? madeRow(.tab(partner.id))
+        }
     }
 
     /// The row showing a pinned page (a pinned split's row for either of its pages).

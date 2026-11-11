@@ -1172,8 +1172,8 @@ final class TabManager {
         return self.tab(with: pair.left == tab.id ? pair.right : pair.left)
     }
 
-    /// Ordinary tabs split, the two pinned pages of a pinned split, and a pinned page with a tab: the tab's row
-    /// carries that pair. A favorite belongs to every space, and two pinned pages to rows of their own, so neither
+    /// Ordinary tabs split, the two pinned pages of a pinned split, and a pinned page with a tab: the pinned page's
+    /// row carries that pair. A favorite belongs to every space, and two pinned pages to rows of their own, so neither
     /// has one row to carry it.
     func canSplit(_ tab: Tab, with other: Tab) -> Bool {
         guard tab !== other else { return false }

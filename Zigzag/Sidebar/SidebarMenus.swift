@@ -186,6 +186,10 @@ enum SidebarMenus {
             controller.libraryChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.makeFavorite(bookmark.id, in: manager.profile.id) }
             live?.isFavorite = true
         })
+        // Split beside a tab, its row carries the pair, so it ends the split here as a tab's row does.
+        if pinned == nil, let live, manager.split(for: live) != nil {
+            menu.addItem(Item(String(localized: "Separate Tabs", comment: "Item in a tab's context menu in the sidebar. Ends the split view the tab is in.")) { controller.unsplitWithUndo(live) })
+        }
         // Beside the tab you're on, as a tab opens; not loaded yet, it opens at its pinned address.
         if pinned == nil, let current = manager.selectedTab, current.bookmarkID == nil, live.map({ manager.split(for: $0) == nil }) ?? true {
             menu.addItem(Item(String(localized: "Open in Split View", comment: "Item in a pinned tab's context menu in the sidebar. Shows this pinned tab beside the current one.")) { controller.splitWithUndo(current, with: manager.pageTab(for: bookmark)) })
