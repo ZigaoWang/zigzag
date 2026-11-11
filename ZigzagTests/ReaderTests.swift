@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WebKit
 @testable import Zigzag
 
 /// Reader's header facts (title, author, date, language), the choices it remembers, and how they reach the page.
@@ -81,5 +82,15 @@ struct ReaderTests {
         #expect(page.contains("<h1 class=\"title\">A title</h1>"))
         #expect(page.contains("<span class=\"author\">Ada</span><time>March 3, 2024</time>"))
         #expect(page.contains("style=\"--size: 20px; --measure: 34em\""))
+    }
+
+    /// The reading page is in the store of the page it reads, never one every reading page shares: the article's
+    /// pictures would carry a site's cookies from one profile to another, and out of a private window.
+    @Test func aReadingPageIsInItsPagesStore() {
+        let one = WKWebsiteDataStore.nonPersistent(), other = WKWebsiteDataStore.nonPersistent()
+        let first = ReaderView(store: one), second = ReaderView(store: other)
+        #expect(first.webView.configuration.websiteDataStore === one)
+        #expect(second.webView.configuration.websiteDataStore === other)
+        #expect(first.webView.configuration.defaultWebpagePreferences.allowsContentJavaScript == false)
     }
 }

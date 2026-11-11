@@ -504,10 +504,11 @@ final class ReaderView: NSView {
     private var articleURL: URL?
     private var scrollMonitor: Any?
 
-    override init(frame: NSRect) {
-        webView = WKWebView(frame: .zero, configuration: Self.configuration())
+    /// `store`: the one the page it reads is in (its profile's, or its private window's).
+    init(store: WKWebsiteDataStore) {
+        webView = WKWebView(frame: .zero, configuration: Self.configuration(store: store))
 
-        super.init(frame: frame)
+        super.init(frame: .zero)
         webView.setValue(false, forKey: "drawsBackground")
         addSubview(webView)
         addSubview(controls)
@@ -534,21 +535,23 @@ final class ReaderView: NSView {
         controls.theme = preferences.theme
     }
 
-    /// One private store for every reading page: a fresh one each time starts a new web process, which is most of
-    /// a second before anything shows. Scripts stay off.
-    private static let store = WKWebsiteDataStore.nonPersistent()
-    private static func configuration() -> WKWebViewConfiguration {
+    /// In the store of the page it reads, so the article's pictures are fetched as the page fetched them: one store
+    /// shared by every reading page would carry a site's cookies from one profile to another, and out of a private
+    /// window. Scripts stay off.
+    static func configuration(store: WKWebsiteDataStore) -> WKWebViewConfiguration {
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = false
         configuration.websiteDataStore = store
         return configuration
     }
 
-    /// A reading page kept loaded in the background, so the first Reader of the session is as quick as the rest.
+    /// A reading page kept loaded in the background in the store Reader will next use, so its web process is
+    /// already up when Reader opens, most of a second sooner. Not for a private window: it would keep the window's
+    /// store, and what's in it, after the window closes.
     private static var warm: WKWebView?
-    static func prewarm() {
-        guard warm == nil else { return }
-        let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 10, height: 10), configuration: configuration())
+    static func prewarm(for store: WKWebsiteDataStore) {
+        guard store.isPersistent, warm?.configuration.websiteDataStore !== store else { return }
+        let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 10, height: 10), configuration: configuration(store: store))
         view.loadHTMLString("<!doctype html><title></title>", baseURL: nil)
         warm = view
     }
