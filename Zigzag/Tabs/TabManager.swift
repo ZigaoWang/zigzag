@@ -76,6 +76,8 @@ final class TabManager {
         /// the one again and takes the others back, if they're still where it left them.
         var parentID: UUID? = nil
         var childIDs: [UUID] = []
+        /// Whether the tabs under it were folded away, so they come back folded.
+        var isCollapsed = false
     }
 
     /// Private windows share one throwaway store between their tabs, gone when the window closes.
@@ -942,7 +944,8 @@ final class TabManager {
     private func closedRecord(of tab: Tab, at index: Int, split pair: SplitPair?) -> ClosedTab {
         ClosedTab(id: tab.id, url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
                   interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle, split: pair, lastActivated: tab.lastActivated,
-                  parentID: tab.parentID, childIDs: tabs(in: tab.spaceID).filter { $0.parentID == tab.id }.map(\.id))
+                  parentID: tab.parentID, childIDs: tabs(in: tab.spaceID).filter { $0.parentID == tab.id }.map(\.id),
+                  isCollapsed: tab.isCollapsed)
     }
 
     /// Returns the ordinary tabs' ids in the order they closed: reopening in reverse puts each back where it was.
@@ -1010,6 +1013,7 @@ final class TabManager {
         let tab = Tab(url: closed.url, title: closed.title, spaceID: space, interactionState: closed.interactionState,
                       lastActivated: closed.lastActivated)
         tab.customTitle = closed.customTitle
+        tab.isCollapsed = closed.isCollapsed
         tab.host = host
         watch(tab)
         let at = min(closed.index, tabs(in: space).count)
