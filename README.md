@@ -76,7 +76,7 @@ Zigzag is a beta. It's my everyday browser, but you'll find bugs. Things Arc use
 
 - No sync between Macs or to iPhone. Passwords sync through iCloud Keychain; spaces and tabs don't.
 - Space icons don't come over from Arc; pick them again in Zigzag. Space colors come over as the nearest Zigzag color.
-- No Boosts, Easels, Notes, or AI features.
+- No Boosts, Easels or Notes, and no AI built into the browser: AI apps can use Zigzag over MCP only if you turn it on.
 - A few Chrome extension APIs aren't there yet: tab groups, debugger settings, Chrome's own Google account sign-in (`identity.getAuthToken`), and the old request-blocking webRequest. Proxy extensions can set a fixed HTTP, HTTPS or SOCKS5 proxy but not a PAC script, so FoxyProxy's Proxy by Patterns mode doesn't work.
 - The ad blocking lists update with Zigzag, not on their own.
 - macOS 15.4 or later only.
