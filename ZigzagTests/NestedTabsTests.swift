@@ -174,6 +174,18 @@ struct NestedTabsTests {
         #expect(TabTree.repaired(nodes) == nodes)
     }
 
+    @Test func aSplitHalfStandsAtTheTopLevelWithoutBreakingItsGroup() {
+        // b becomes half of a split: c moves up under a where it is, b goes after a's group, and d stays in it.
+        let lifted = TabTree.liftingToTopLevel(b, in: tree)
+        #expect(lifted == [node(a), node(c, a), node(d, a), node(b), node(e)])
+        #expect(TabTree.repaired(lifted) == lifted)
+        // A tab at the top level stays put; the tabs under it move up a level.
+        #expect(TabTree.liftingToTopLevel(a, in: tree) == [node(a), node(b), node(c, b), node(d), node(e)])
+        // A deep tab goes after the whole group it was in.
+        #expect(TabTree.liftingToTopLevel(c, in: tree) == [node(a), node(b, a), node(d, a), node(c), node(e)])
+        #expect(TabTree.liftingToTopLevel(f, in: tree) == tree)
+    }
+
     // MARK: Saving
 
     @Test func aSessionFromBeforeNestedTabsOpens() throws {

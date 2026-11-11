@@ -230,6 +230,8 @@ final class TabManager {
         // the page it came from waits in the list. A pinned split keeps its pages; the new tab shows on its own.
         if select, let opener, opener.bookmarkID == nil, opener.spaceID == space, let index = splits.firstIndex(where: { $0.left == opener.id || $0.right == opener.id }) {
             if splits[index].left == opener.id { splits[index].left = tab.id } else { splits[index].right = tab.id }
+            // Half of the split now, it's a row of its own, not one nested under the page it came from.
+            liftToTopLevel(tab)
         }
         changed.send(.structure)
         if select {
@@ -1192,9 +1194,8 @@ final class TabManager {
         }
         // A split is one row at the top level: tabs nested under either half move up a level, where they are, as
         // they do when their page is pinned or leaves for another space.
-        liftChildren(of: tab)
-        liftChildren(of: other)
-        repairTree(in: tab.spaceID)
+        liftToTopLevel(tab)
+        liftToTopLevel(other)
         splits.append(otherOnRight ? SplitPair(left: tab.id, right: other.id) : SplitPair(left: other.id, right: tab.id))
         Tutorial.complete("split")
         other.ensureWebView()
@@ -1376,6 +1377,12 @@ final class TabManager {
             for child in tabs(in: tab.spaceID) where child.parentID == tab.id { child.parentID = tab.parentID }
         }
         tab.parentID = nil
+    }
+
+    /// Half of a split: one row of its own at the top level. See `TabTree.liftingToTopLevel`.
+    private func liftToTopLevel(_ tab: Tab) {
+        guard tab.bookmarkID == nil else { tab.parentID = nil; return }
+        applyTree(TabTree.liftingToTopLevel(tab.id, in: treeNodes(in: tab.spaceID)), in: tab.spaceID)
     }
 
     func hasNestedTabs(_ tab: Tab) -> Bool { tab.bookmarkID == nil && tabs(in: tab.spaceID).contains { $0.parentID == tab.id } }

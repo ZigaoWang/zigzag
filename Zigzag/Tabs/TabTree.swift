@@ -132,6 +132,26 @@ nonisolated enum TabTree {
         return result
     }
 
+    /// A tab that has to stand at the top level (half of a split, which is one row of its own): the tabs right under
+    /// it move up a level where they are, and a tab that was nested goes just after the group it was in, so the tabs
+    /// after it in that group stay in it.
+    static func liftingToTopLevel(_ id: UUID, in nodes: [Node]) -> [Node] {
+        guard let index = nodes.firstIndex(where: { $0.id == id }) else { return nodes }
+        guard nodes[index].parent != nil else {
+            var result = nodes
+            for i in result.indices where result[i].parent == id { result[i].parent = nil }
+            return result
+        }
+        let levels = self.levels(nodes)
+        var root = index
+        while root > 0, (levels[nodes[root].id] ?? 0) > 0 { root -= 1 }
+        let rootID = nodes[root].id
+        var result = removing(id, from: nodes)
+        guard let rootIndex = result.firstIndex(where: { $0.id == rootID }) else { return nodes }
+        result.insert(Node(id: id, parent: nil), at: subtreeEnd(at: rootIndex, in: result))
+        return result
+    }
+
     /// A tab moved with everything under it, as one run, to `index` in the list without that run, under `parent`
     /// (nil: the top level; a parent that would break a run is passed over for one that doesn't).
     static func moving(_ id: UUID, to index: Int, parent: UUID?, in nodes: [Node]) -> [Node] {
