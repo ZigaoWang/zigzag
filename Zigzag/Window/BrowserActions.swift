@@ -333,10 +333,6 @@ extension BrowserWindowController: NSMenuItemValidation {
         if let peek = peekController, peek.isVisible { peek.goForward(); return }
         selectedTab?.goForward()
     }
-    @objc func searchHistory(_ sender: Any?) {
-        if commandBar.isVisible && commandBar.mode == .history { commandBar.dismiss(); return }
-        commandBar.show(mode: .history)
-    }
 
     // MARK: Bookmarks
 

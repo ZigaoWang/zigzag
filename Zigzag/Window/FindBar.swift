@@ -4,7 +4,6 @@ import WebKit
 /// A floating text field we draw ourselves: no bezel, our font, our colors.
 final class PlainTextField: NSTextField {
     var onCancel: (() -> Void)?
-    var onCommand: ((Selector) -> Bool)?
     /// Room at the sides for a selection and the first letter to draw whole (the address). Zero for fields lined up
     /// with a label they replace, like renaming.
     var textInset: CGFloat = 0
@@ -402,9 +401,6 @@ class FloatingPanelView: NSView {
     }
 
     override var isFlipped: Bool { true }
-
-    /// Empties the panel so it can show something else in the same place.
-    func removeContent() { surface.subviews.forEach { $0.removeFromSuperview() } }
 
     /// Content goes in the surface so it is clipped to the rounded shape.
     override func addSubview(_ view: NSView) {

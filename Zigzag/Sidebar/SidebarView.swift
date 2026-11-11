@@ -772,7 +772,6 @@ final class SidebarView: NSView {
     private let topSeparator = ColorView(color: Tokens.Color.separator)
     /// Width reserved on the left of the top row for the traffic lights.
     var trafficLightsWidth: CGFloat = 52 { didSet { needsLayout = true } }
-    var showsTrafficLights = true { didSet { needsLayout = true } }
     /// Back, forward, reload and the address are here, under the traffic lights; false while they're in the bar above
     /// the page (`TopBarView`), and the favorites and tabs move up into the address's place.
     var holdsAddress = true {

@@ -180,11 +180,6 @@ enum ExtensionStore {
         string.count == 32 && string.allSatisfy { ("a"..."p").contains($0) }
     }
 
-    static var isOnePasswordAppInstalled: Bool {
-        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") != nil
-            || FileManager.default.fileExists(atPath: "/Applications/1Password.app")
-    }
-
     /// WebKit keeps a service worker background's registration from one launch to the next, and on a later launch
     /// can bring it back without running its script: WebKit says the background loaded, but it never starts, and the
     /// extension's popup waits forever (1Password, from the second launch on). Chrome starts each worker afresh at

@@ -10,7 +10,6 @@ protocol TabHost: AnyObject {
     func tabDidRequestClose(_ tab: Tab)
     /// Back from a tab a link opened, with no page before this one in it.
     func tabWantsToReturnToOpener(_ tab: Tab)
-    func tabDidChangeFullscreen(_ tab: Tab, isFullscreen: Bool)
     func tab(_ tab: Tab, hoveringLink url: URL?)
     /// Its floating video's Return button: bring it on screen, so the video can go back into the page.
     func tabWantsToBeShown(_ tab: Tab)
@@ -857,13 +856,6 @@ final class Tab: NSObject {
                 }
             }
         }
-    }
-
-    // MARK: Restoring visible state from a saved session
-
-    func restoreDisplayState(title: String?, url: URL?) {
-        if let title { self.title = title }
-        if let url { self.url = url }
     }
 }
 

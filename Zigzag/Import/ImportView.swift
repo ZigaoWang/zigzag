@@ -923,20 +923,6 @@ private final class ImportHero: NSView {
         detail.textColor = theme.tint.withAlphaComponent(0.7)
     }
 
-    func showWordmark(drawIn: Bool) {
-        applyTheme()
-        layoutSubtreeIfNeeded()
-        // The one time the wordmark writes itself in: the very first time Zigzag opens.
-        Brand.enter([surface])
-        if drawIn {
-            wordmark.drawIn(delay: 0.25)
-            surface.watermark.drawIn(delay: 1.25)
-        } else {
-            Brand.enter([wordmark], delay: 0.04)
-            surface.watermark.drawIn(delay: 0.2)
-        }
-    }
-
     /// The big line, in a face of its own size: the label lays out its line by its font, so a smaller text set
     /// over the larger face would sit low and run into the caption.
     private func setCount(_ text: String, size: CGFloat) {

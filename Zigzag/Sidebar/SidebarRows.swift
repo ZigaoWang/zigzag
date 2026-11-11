@@ -859,11 +859,6 @@ final class SpaceHeaderView: InteractiveView {
     /// The icon before a space's name: about the name's x-height and a little more, so the two read as one.
     static let iconSide: CGFloat = 20
 
-    /// Whether a click lands on the chevron (or just past the name, where it shows), rather than on the name.
-    func isOnChevron(_ event: NSEvent) -> Bool {
-        canCollapse && convert(event.locationInWindow, from: nil).x >= label.frame.maxX
-    }
-
     override func stateDidChange(animated: Bool) {
         // The name in light type and the space's own ink, quietly fuller under the pointer; its icon a step back.
         let ink = Brand.Theme.for(self).ink

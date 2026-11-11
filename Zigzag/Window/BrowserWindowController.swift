@@ -435,15 +435,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
     }
 
-    /// Live preview while dragging the hue slider: recolors without saving.
-    func previewSpaceColor(background: NSColor, swatch: NSColor, for spaceID: UUID) {
-        if spaceID == tabManager.currentSpaceID {
-            root.setColor(background, animated: false)
-            root.sidebarContainer.tint = background
-        }
-        sidebar.previewDotColor(swatch, for: spaceID)
-    }
-
     private func historyMenu(back: Bool) -> NSMenu? {
         guard let webView = selectedWebView else { return nil }
         let list = webView.backForwardList
@@ -477,13 +468,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.previewDotColor(draft.swatch, for: draft.id)
         guard draft.id == tabManager.currentSpaceID, !tabManager.isPrivate else { return }
         render(draft, animated: false)
-    }
-
-    /// While the grain is being dragged in the space editor: the window shows it live.
-    func previewSpaceGrain(_ grain: Double, for spaceID: UUID) {
-        guard spaceID == tabManager.currentSpaceID, !tabManager.isPrivate else { return }
-        root.setGrain(grain, animated: false)
-        root.sidebarContainer.grain = grain
     }
 
     @objc private func displayOptionsChanged() { applySpaceColor(animated: false) }
@@ -1720,8 +1704,6 @@ extension BrowserWindowController: TabHost {
         if tabManager.selectedTab !== tab { tabManager.select(tab) }
     }
 
-    func tabDidChangeFullscreen(_ tab: Tab, isFullscreen: Bool) {}
-
     func tab(_ tab: Tab, hoveringLink url: URL?) {
         guard tab === tabManager.selectedTab || tab.isPeek else { return }
         // Nothing about the page while a panel is over it.
@@ -1903,12 +1885,6 @@ extension BrowserWindowController: SidebarDelegate {
     }
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
         previews.hover(tab, row: row, bookmark: bookmark)
-    }
-    func listRenameSpace() { renameSpace(nil) }
-    func listEditSpace(anchor: NSView) {
-        // A private window's space is borrowed: it's edited from a normal window.
-        guard !tabManager.isPrivate else { return }
-        openSpaceEditor(tabManager.currentSpaceID, anchor: anchor)
     }
     func listDragHoverSpace(at windowPoint: NSPoint) -> UUID? { sidebar.spaceDot(at: windowPoint) }
     func listDragEnded() {

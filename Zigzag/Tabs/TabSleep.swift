@@ -51,8 +51,6 @@ nonisolated enum PageStop: Equatable, Sendable {
         }
     }
 
-    var isMemory: Bool { self == .pageMemory || self == .macMemory }
-
     /// For Help › Report a Problem.
     var detail: String {
         switch self {

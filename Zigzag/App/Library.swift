@@ -521,19 +521,6 @@ final class Library {
         commit()
     }
 
-    func setAppearance(_ appearance: String?, for id: UUID) {
-        guard let i = index(of: id) else { return }
-        spaces[i].appearance = appearance
-        commit()
-    }
-
-    func setSecondHue(_ hue: Double?, intensity: Double? = nil, for id: UUID) {
-        guard let i = index(of: id) else { return }
-        spaces[i].hue2 = hue.map { $0.truncatingRemainder(dividingBy: 1) }
-        spaces[i].intensity2 = hue == nil ? nil : intensity ?? spaces[i].intensity2
-        commit()
-    }
-
     /// Everything about how a space looks, from the space editor, in one save.
     func setLook(_ look: SpaceInfo) {
         guard let i = index(of: look.id) else { return }
@@ -552,18 +539,6 @@ final class Library {
         spaces[i].glass = nil
         spaces[i].grain = look.grain
         spaces[i].appearance = look.appearance
-        commit()
-    }
-
-    func setSecondBrightness(_ brightness: Double?, for id: UUID) {
-        guard let i = index(of: id) else { return }
-        spaces[i].brightness2 = brightness
-        commit()
-    }
-
-    func setGradientAngle(_ angle: Double, for id: UUID) {
-        guard let i = index(of: id) else { return }
-        spaces[i].angle = angle
         commit()
     }
 
@@ -1320,13 +1295,6 @@ final class Library {
         for bookmark in bookmarks where !placed.contains(bookmark.id) { result.append(bookmark) }
         for f in folders.indices { folders[f].bookmarkIDs = result.map(\.id).filter { folders[f].bookmarkIDs.contains($0) } }
         return (result, folders)
-    }
-
-    /// Replaces everything with imported spaces (used by Arc import, only when the library is untouched).
-    func replaceSpaces(_ newSpaces: [SpaceInfo]) {
-        guard !newSpaces.isEmpty else { return }
-        spaces = newSpaces
-        commit()
     }
 
     /// Spaces, bookmarks and favorites as they are now, for undo.

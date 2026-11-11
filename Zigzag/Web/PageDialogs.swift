@@ -318,10 +318,4 @@ enum SearchFolding {
             host.contains(engine.host) && url.path().hasPrefix(engine.path) && items.contains { $0.name == engine.param && !($0.value ?? "").isEmpty }
         }
     }
-
-    /// Search engines route result clicks through redirects; a result is anything off the engine's host.
-    static func isResultNavigation(from tabURL: URL?, to url: URL) -> Bool {
-        guard let tabURL, isSearchResultsPage(tabURL) else { return false }
-        return HistoryStore.normalizedHost(tabURL) != HistoryStore.normalizedHost(url)
-    }
 }

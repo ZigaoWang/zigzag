@@ -673,7 +673,6 @@ extension MiniWindowController: TabHost {
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
     }
-    func tabDidChangeFullscreen(_ tab: Tab, isFullscreen: Bool) {}
 
     func tab(_ tab: Tab, hoveringLink url: URL?) {
         linkStatus.show(url, in: overlay.bounds)

@@ -25,8 +25,6 @@ protocol SidebarListDelegate: AnyObject {
     func listMenu(for item: SidebarItem) -> NSMenu?
     /// The menu for several picked rows at once.
     func listMenu(forMarked items: [SidebarItem]) -> NSMenu?
-    func listRenameSpace()
-    func listEditSpace(anchor: NSView)
     /// Returns the space under a window point while dragging (the space dots), highlighting it.
     func listDragHoverSpace(at windowPoint: NSPoint) -> UUID?
     /// The drag is over: nothing is highlighted for it any more (the dots, the favorites, the page).
