@@ -241,6 +241,9 @@ enum Tokens {
         static let glyph: CGFloat = 13
         static let addressText: CGFloat = TypeSize.label
         static let addressHeight: CGFloat = 22
+        /// The least room a pane's address keeps before its strip folds its own buttons away (as the sidebar's
+        /// address keeps for its host).
+        static let addressMinWidth: CGFloat = 72
     }
 
     enum Page {

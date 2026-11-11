@@ -15,6 +15,8 @@ final class PaneHeaderView: NSView {
     let close = PaneHeaderView.button("rectangle.split.2x1.slash", toolTip: String(localized: "Separate Tabs", comment: "Tooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs."))
     /// Closes this pane's page; the other one fills the window, as closing either half from the sidebar does.
     let closeTab = PaneHeaderView.button("xmark", toolTip: String(localized: "Close Tab", comment: "Tooltip of a button in the strip on top of each page of a split view: closes that page's tab, leaving the other page."))
+    /// Where the split's own buttons go when the pane is too narrow for them beside its address.
+    let more = PaneHeaderView.button("ellipsis", toolTip: String(localized: "More", comment: "Tooltip of a button in the strip on top of each page of a narrow split view: opens a menu with the split's buttons that don't fit."))
     /// The page's address: click it to edit it, as the sidebar's address does for the page you're in.
     let address = PaneAddressView()
     private let line = ColorView(color: Tokens.Color.separator)
@@ -42,7 +44,8 @@ final class PaneHeaderView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [back, forward, reload, address, swap, orientation, close, closeTab, line].forEach { addSubview($0) }
+        [back, forward, reload, address, swap, orientation, close, more, closeTab, line].forEach { addSubview($0) }
+        more.onClick = { [weak self] _ in self?.showMore() }
         back.onClick = { [weak self] _ in self?.tab?.goBack() }
         forward.onClick = { [weak self] _ in self?.tab?.goForward() }
         reload.onClick = { [weak self] _ in
@@ -97,6 +100,58 @@ final class PaneHeaderView: NSView {
         needsLayout = true
     }
 
+    /// What the strip shows at a width, most first: its buttons give way one step at a time so the address keeps
+    /// `Pane.addressMinWidth` and the close button is never cut. Swap and the layout go into ⋯ first, then Separate,
+    /// then Forward, then Reload; Back and close stay.
+    enum Fit: Int, CaseIterable, Comparable {
+        case all, splitInMore, separateInMore, noForward, noReload
+        static func < (a: Fit, b: Fit) -> Bool { a.rawValue < b.rawValue }
+        var showsForward: Bool { self < .noForward }
+        var showsReload: Bool { self < .noReload }
+        var showsSplitButtons: Bool { self == .all }
+        var showsSeparate: Bool { self < .separateInMore }
+        var showsMore: Bool { self > .all }
+        /// Buttons at the leading end, and at the trailing end before the close button.
+        var leading: Int { 1 + (showsForward ? 1 : 0) + (showsReload ? 1 : 0) }
+        var trailing: Int { (showsSplitButtons ? 2 : 0) + (showsSeparate ? 1 : 0) + (showsMore ? 1 : 0) }
+    }
+
+    /// The first fit, most buttons first, that leaves the address its room. Swap and the layout stay out only while
+    /// the address shows whole, up to twice `Pane.addressMinWidth`; the rest give way only to keep it that minimum.
+    /// Too narrow for any, the fewest buttons.
+    static func fit(width: CGFloat, edge: CGFloat, address: CGFloat) -> Fit {
+        let b = Tokens.Pane.button, gap = Tokens.Space.x2
+        for fit in Fit.allCases {
+            let need = min(address, Tokens.Pane.addressMinWidth * (fit == .all ? 2 : 1))
+            let lo = edge + CGFloat(fit.leading) * b + gap
+            let hi = width - edge - b - gap - CGFloat(fit.trailing) * b - gap
+            if hi - lo >= need { return fit }
+        }
+        return .noReload
+    }
+
+    private var currentFit = Fit.all
+
+    /// The buttons the strip has no room for, in its own menu under ⋯.
+    private func showMore() {
+        if let open = MenuPanel.current, open.anchor === more { open.close(); return }
+        func item(_ button: IconButton, title: String? = nil) -> MenuPanel.Entry {
+            .item(.init(title: title ?? button.toolTip ?? "", symbol: button.symbol, isEnabled: button.isEnabled) { [weak button] in
+                if let button, let event = NSApp.currentEvent { button.onClick?(event) }
+            })
+        }
+        var entries: [MenuPanel.Entry] = []
+        if !currentFit.showsForward { entries.append(item(forward)) }
+        if !currentFit.showsReload { entries.append(item(reload)) }
+        if !entries.isEmpty { entries.append(.separator) }
+        entries += [item(swap), item(orientation)]
+        if !currentFit.showsSeparate {
+            entries.append(item(close, title: String(localized: "Separate Tabs", comment: "Tooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs.")))
+        }
+        more.isSelected = true
+        MenuPanel.show(entries, from: more) { [weak self] in self?.more.isSelected = false }
+    }
+
     override func layout() {
         super.layout()
         let b = Tokens.Pane.button
@@ -104,30 +159,34 @@ final class PaneHeaderView: NSView {
         // middle line, the traffic lights' line.
         let edge = isInBar ? 0 : floor((bounds.height - Tokens.Metric.hairline - b) / 2)
         let y = isInBar ? round((bounds.height - b) / 2) : edge
+        let fit = Self.fit(width: bounds.width, edge: edge, address: address.text.isEmpty ? 0 : address.fittingWidth)
+        currentFit = fit
+        forward.isHidden = !fit.showsForward
+        reload.isHidden = !fit.showsReload
+        swap.isHidden = !fit.showsSplitButtons
+        orientation.isHidden = !fit.showsSplitButtons
+        close.isHidden = !fit.showsSeparate
+        more.isHidden = !fit.showsMore
         var x = edge
-        for button in [back, forward, reload] {
+        for button in [back, forward, reload] where !button.isHidden {
             button.frame = NSRect(x: x, y: y, width: b, height: b)
             x += b
         }
         closeTab.frame = NSRect(x: bounds.width - edge - b, y: y, width: b, height: b)
         // A little room between the split's own buttons and the one that closes the page, so it isn't hit by mistake.
-        close.frame = NSRect(x: closeTab.frame.minX - Tokens.Space.x2 - b, y: y, width: b, height: b)
-        orientation.frame = NSRect(x: close.frame.minX - b, y: y, width: b, height: b)
-        swap.frame = NSRect(x: orientation.frame.minX - b, y: y, width: b, height: b)
-        [back, forward, reload, swap, orientation, close, closeTab].forEach { $0.radius = Tokens.Radius.control }
-        // The address pill is centered on the pane, and as wide as its text, within the room the buttons leave.
-        let h = Tokens.Pane.addressHeight
-        let pillWidth: CGFloat, pillX: CGFloat
-        if let center = addressCenter {
-            // Over its pane's middle as far as the buttons allow, else nudged clear of them.
-            let lo = x + Tokens.Space.x2, hi = swap.frame.minX - Tokens.Space.x2
-            pillWidth = max(0, min(hi - lo, address.fittingWidth))
-            pillX = min(max(center - pillWidth / 2, lo), hi - pillWidth)
-        } else {
-            let room = max(0, min(bounds.midX - x, swap.frame.minX - bounds.midX) - Tokens.Space.x2) * 2
-            pillWidth = min(room, address.fittingWidth)
-            pillX = bounds.midX - pillWidth / 2
+        var trailing = closeTab.frame.minX - Tokens.Space.x2
+        for button in [more, close, orientation, swap] where !button.isHidden {
+            button.frame = NSRect(x: trailing - b, y: y, width: b, height: b)
+            trailing -= b
         }
+        [back, forward, reload, swap, orientation, close, more, closeTab].forEach { $0.radius = Tokens.Radius.control }
+        // The address pill is centered over its pane, as wide as its text, within the room the buttons leave, and
+        // nudged clear of them where centering would cut it.
+        let h = Tokens.Pane.addressHeight
+        let center = addressCenter ?? bounds.midX
+        let lo = x + Tokens.Space.x2, hi = trailing - Tokens.Space.x2
+        let pillWidth = max(0, min(hi - lo, address.fittingWidth))
+        let pillX = min(max(center - pillWidth / 2, lo), hi - pillWidth)
         address.frame = NSRect(x: round(pillX), y: y + (b - h) / 2, width: pillWidth, height: h)
         address.isHidden = address.text.isEmpty || pillWidth < PaneAddressView.padding * 3
         line.frame = NSRect(x: 0, y: bounds.height - Tokens.Metric.hairline, width: bounds.width, height: Tokens.Metric.hairline)
