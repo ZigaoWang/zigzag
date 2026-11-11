@@ -867,19 +867,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         floatingDownloads.dismiss()
     }
 
-    /// The bar above the page in the shown page's color: its background (a site's theme color can be its header's,
-    /// and stay light on a page that turned dark), else its theme color. None over what covers the page (a PDF,
+    /// The bar above the page in the shown page's color (`Tab.pageColor`). None over what covers the page (a PDF,
     /// Settings, Reader), which has a color of its own: the bar is the plain one then.
     private func paintTopBar() {
         let covered = reader != nil && readerCard === root.card
-        root.paintTopBar(covered ? nil : Self.pageColor(of: shownTab))
-    }
-
-    static func pageColor(of tab: Tab?) -> NSColor? {
-        guard let tab, let webView = tab.webView, tab.pdfViewer == nil, tab.settingsView == nil else { return nil }
-        // Drawn dark by Zigzag: the page's own colors are still light underneath, so the bar takes the color as drawn.
-        if let dark = tab.darkPage, dark.darkened, let color = dark.color { return color }
-        return webView.underPageBackgroundColor ?? tab.themeColor
+        root.paintTopBar(covered ? nil : shownTab?.pageColor)
     }
 
     /// Where popovers that belong to the address bar (extension popups) open from: the address bar while the sidebar

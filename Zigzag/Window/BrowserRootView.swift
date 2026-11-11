@@ -652,7 +652,6 @@ final class BrowserRootView: SpaceFrameView {
         let left = cardViewFrame(panes.left)
         card.frame = left
         card.band = left.height - panes.left.height
-        card.bandColor = paintsTopBar ? pageColor : nil
         topBar.pageColor = paintsTopBar ? pageColor : nil
         let attached = sidebarVisible && Self.isBorderless
         card.squaresRightCorners = windowCorners(of: left, attached: attached)

@@ -178,7 +178,7 @@ struct TopBarTests {
         #expect(root.card.frame.minY == root.topBar.frame.minY && root.card.frame.maxY == page.maxY)
         #expect(root.card.frame.minX == page.minX && root.card.frame.width == page.width)
         #expect(root.card.band == page.minY - root.topBar.frame.minY)
-        #expect(root.card.bandColor == .black && root.topBar.pageColor == .black)
+        #expect(root.topBar.pageColor == .black)
         #expect(root.cardFrame == page && root.card.pageFrame == page)
 
         // Two panes have two colors: the plain bar.
@@ -192,7 +192,7 @@ struct TopBarTests {
         // No color, or the setting off: as before.
         root.paintTopBar(nil)
         root.layoutSubtreeIfNeeded()
-        #expect(root.card.frame == page && root.card.band == 0 && root.card.bandColor == nil)
+        #expect(root.card.frame == page && root.card.band == 0)
         root.paintTopBar(.white)
         root.showsTopBar = false
         root.layoutSubtreeIfNeeded()
