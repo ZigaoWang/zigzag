@@ -23,6 +23,18 @@ final class PaneHeaderView: NSView {
     static let height = Tokens.Pane.height
     /// Clicked the address: edit this pane's page's address (the window focuses the pane first).
     var onEditAddress: ((Tab) -> Void)?
+    /// Up in the bar above the page (`TopBarView.strips`) instead of on the pane's card: the bar's height, on the
+    /// window's frame, no hairline, and like the bar it moves the window and zooms it on a double-click.
+    var isInBar = false {
+        didSet {
+            guard isInBar != oldValue else { return }
+            line.isHidden = isInBar
+            needsLayout = true
+        }
+    }
+    /// In the bar, where the address centers, from the strip's leading edge: over the middle of its pane, which can
+    /// start under the traffic lights. Nil centers it on the strip.
+    var addressCenter: CGFloat? { didSet { if addressCenter != oldValue { needsLayout = true } } }
 
     static func button(_ symbol: String, toolTip: String) -> IconButton {
         IconButton(symbol: symbol, size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph, toolTip: toolTip)
@@ -46,6 +58,10 @@ final class PaneHeaderView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { isInBar }
+    override func mouseDown(with event: NSEvent) {
+        if isInBar { window?.titleBarMouseDown(event) } else { super.mouseDown(with: event) }
+    }
 
     func setVertical(_ vertical: Bool) {
         orientation.symbol = vertical ? "rectangle.split.2x1" : "rectangle.split.1x2"
@@ -84,8 +100,10 @@ final class PaneHeaderView: NSView {
     override func layout() {
         super.layout()
         let b = Tokens.Pane.button
-        let edge = floor((bounds.height - Tokens.Metric.hairline - b) / 2)
-        let y = edge
+        // In the bar, the buttons start and end at the strip's edges (the bar sets them where its own would be), on its
+        // middle line, the traffic lights' line.
+        let edge = isInBar ? 0 : floor((bounds.height - Tokens.Metric.hairline - b) / 2)
+        let y = isInBar ? round((bounds.height - b) / 2) : edge
         var x = edge
         for button in [back, forward, reload] {
             button.frame = NSRect(x: x, y: y, width: b, height: b)
@@ -98,10 +116,19 @@ final class PaneHeaderView: NSView {
         swap.frame = NSRect(x: orientation.frame.minX - b, y: y, width: b, height: b)
         [back, forward, reload, swap, orientation, close, closeTab].forEach { $0.radius = Tokens.Radius.control }
         // The address pill is centered on the pane, and as wide as its text, within the room the buttons leave.
-        let room = max(0, min(bounds.midX - x, swap.frame.minX - bounds.midX) - Tokens.Space.x2) * 2
-        let pillWidth = min(room, address.fittingWidth)
         let h = Tokens.Pane.addressHeight
-        address.frame = NSRect(x: round(bounds.midX - pillWidth / 2), y: y + (b - h) / 2, width: pillWidth, height: h)
+        let pillWidth: CGFloat, pillX: CGFloat
+        if let center = addressCenter {
+            // Over its pane's middle as far as the buttons allow, else nudged clear of them.
+            let lo = x + Tokens.Space.x2, hi = swap.frame.minX - Tokens.Space.x2
+            pillWidth = max(0, min(hi - lo, address.fittingWidth))
+            pillX = min(max(center - pillWidth / 2, lo), hi - pillWidth)
+        } else {
+            let room = max(0, min(bounds.midX - x, swap.frame.minX - bounds.midX) - Tokens.Space.x2) * 2
+            pillWidth = min(room, address.fittingWidth)
+            pillX = bounds.midX - pillWidth / 2
+        }
+        address.frame = NSRect(x: round(pillX), y: y + (b - h) / 2, width: pillWidth, height: h)
         address.isHidden = address.text.isEmpty || pillWidth < PaneAddressView.padding * 3
         line.frame = NSRect(x: 0, y: bounds.height - Tokens.Metric.hairline, width: bounds.width, height: Tokens.Metric.hairline)
     }

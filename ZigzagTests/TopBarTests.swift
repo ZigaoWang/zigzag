@@ -249,4 +249,123 @@ struct TopBarTests {
         #expect(root.topBar.isHidden)
         #expect(sidebar.address.frame.minY == Tokens.Sidebar.addressTop)
     }
+
+    // MARK: Split view (#97)
+
+    @Test func inSplitViewEachPanesStripIsTheBarOverItsPane() throws {
+        let lights: CGFloat = 52
+        let panes: [ClosedRange<CGFloat>] = [0...639, 640...1280]
+        let strips = TopBarView.stripFrames(panes: panes, sidebarButton: true, trafficLightsWidth: lights,
+                                            leadingInset: 0, inset: Tokens.Sidebar.edge)
+        #expect(strips.count == 2)
+        // The bar's height, on the lights' line.
+        for strip in strips { #expect(strip.frame.minY == 0 && strip.frame.height == bar && strip.frame.midY == Tokens.Sidebar.lightsCenter) }
+        // The first starts after the lights and the sidebar's toggle, where the bar's own back button would be.
+        let own = TopBarView.frames(width: 1280, buttons: 3, sidebarButton: true, trafficLightsWidth: lights, trailingInset: Tokens.Sidebar.edge)
+        let toggle = try #require(own.sidebarButton)
+        #expect(strips[0].frame.minX == toggle.maxX && strips[0].frame.minX == own.buttons[0].minX)
+        #expect(strips[0].frame.maxX == 639 - Tokens.Sidebar.edge)
+        // The second keeps the inset from its pane's edges, the window's edge included.
+        #expect(strips[1].frame.minX == 640 + Tokens.Sidebar.edge && strips[1].frame.maxX == 1280 - Tokens.Sidebar.edge)
+        // Each address centers over its pane's middle, not the strip's.
+        #expect(strips[0].frame.minX + strips[0].addressCenter == 319.5)
+        #expect(strips[1].frame.minX + strips[1].addressCenter == 960)
+        // With the sidebar shown there's nothing at the row's leading end: the first starts at its pane, framed.
+        let framed = TopBarView.stripFrames(panes: [0...500, 508...1032], trafficLightsWidth: 0, leadingInset: 0, inset: 0)
+        #expect(framed[0].frame.minX == 0 && framed[1].frame.minX == 508 && framed[1].frame.maxX == 1032)
+    }
+
+    private func splitRoot(vertical: Bool = false) -> (BrowserRootView, SidebarView) {
+        let sidebar = SidebarView()
+        let root = BrowserRootView(sidebar: sidebar)
+        root.frame = window
+        sidebar.holdsAddress = false
+        root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
+        root.showsTopBar = true
+        root.splitRatio = 0.5
+        root.splitVertical = vertical
+        root.card.showsHeader = true
+        root.secondCard.showsHeader = true
+        root.layoutSubtreeIfNeeded()
+        return (root, sidebar)
+    }
+
+    @Test func inSplitViewThePanesStripsTakeTheBarsRow() {
+        let (root, sidebar) = splitRoot()
+        let panes = root.paneFrames
+        #expect(root.stripsInBar)
+        // The bar's own back, forward, reload and address step aside: one set of controls per page.
+        #expect(sidebar.addressButtons.allSatisfy(\.isHidden) && sidebar.address.isHidden)
+        for (card, pane) in [(root.card, panes.left), (root.secondCard, panes.right!)] {
+            let strip = card.header
+            #expect(strip.superview === root.topBar && strip.isInBar && !strip.isHidden)
+            let frame = strip.convert(strip.bounds, to: root)
+            // In the bar's row, over its own pane, on the lights' line.
+            #expect(frame.minY == root.topBar.frame.minY && frame.height == bar)
+            #expect(frame.midY == root.topBar.frame.minY + Tokens.Sidebar.lightsCenter)
+            #expect(frame.minX >= pane.minX && frame.maxX <= pane.maxX)
+            // The page starts right under the bar, with no strip of its own: the row the bar gave up.
+            #expect(card.frame.minY == root.topBar.frame.maxY && card.pageFrame.minY == root.topBar.frame.maxY)
+        }
+        // A click on a strip picks its pane.
+        #expect(root.paneTargets.left.minY == root.topBar.frame.minY && root.paneTargets.right?.minY == root.topBar.frame.minY)
+    }
+
+    @Test func stackedOnlyTheTopPanesStripGoesUp() {
+        let (root, sidebar) = splitRoot(vertical: true)
+        #expect(root.card.header.superview === root.topBar)
+        // The bottom pane has no row above it: it keeps its strip on its card.
+        #expect(root.secondCard.header.superview !== root.topBar && root.secondCard.header.isDescendant(of: root.secondCard))
+        #expect(!root.secondCard.header.isHidden && !root.secondCard.header.isInBar)
+        #expect(sidebar.address.isHidden)
+        #expect(root.paneTargets.right == root.paneFrames.right)
+    }
+
+    @Test func outOfSplitOrWithTheBarOffTheStripsGoBack() {
+        var (root, sidebar) = splitRoot()
+        root.splitRatio = nil
+        root.card.showsHeader = false
+        root.secondCard.showsHeader = false
+        root.layoutSubtreeIfNeeded()
+        #expect(!root.stripsInBar)
+        #expect(root.card.header.isDescendant(of: root.card) && root.card.header.isHidden && !root.card.header.isInBar)
+        #expect(sidebar.addressButtons.allSatisfy { !$0.isHidden && $0.alphaValue == 1 } && !sidebar.address.isHidden)
+        #expect(root.card.header.alphaValue == 1)
+
+        // The setting turned off while split: the strips go back on their cards, and the sidebar's controls show again.
+        (root, sidebar) = splitRoot()
+        sidebar.holdsAddress = true
+        root.showsTopBar = false
+        root.layoutSubtreeIfNeeded()
+        for card in [root.card, root.secondCard] {
+            #expect(card.header.isDescendant(of: card) && !card.header.isHidden && !card.header.isInBar)
+            #expect(card.header.frame.height == PaneHeaderView.height)
+        }
+        #expect(sidebar.address.superview === sidebar && !sidebar.address.isHidden)
+        #expect(sidebar.addressButtons.allSatisfy { !$0.isHidden })
+        // And on again.
+        sidebar.holdsAddress = false
+        root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
+        root.showsTopBar = true
+        root.layoutSubtreeIfNeeded()
+        #expect(root.card.header.superview === root.topBar && sidebar.address.isHidden)
+    }
+
+    @Test func theStripOfThePaneYoureNotInDimsInTheBarToo() {
+        let (root, _) = splitRoot()
+        root.secondCard.isUnfocusedPane = true
+        #expect(root.secondCard.header.alphaValue == Tokens.Color.unfocusedPaneAlpha && root.card.header.alphaValue == 1)
+    }
+
+    @Test func withTheSidebarHiddenTheFirstStripStartsAfterTheLightsAndToggle() {
+        let (root, _) = splitRoot()
+        root.setSidebarVisible(false, animated: false)
+        root.topBar.trafficLightsWidth = 52
+        root.topBar.showsSidebarButton = true
+        root.layoutSubtreeIfNeeded()
+        let strip = root.card.header.convert(root.card.header.bounds, to: root)
+        let toggle = root.topBar.sidebarButton.convert(root.topBar.sidebarButton.bounds, to: root)
+        #expect(strip.minX == toggle.maxX && toggle.minX > Tokens.Sidebar.lightsX + 52)
+        #expect(root.card.frame.minX == 0 && root.card.frame.minY == root.topBar.frame.maxY)
+    }
 }

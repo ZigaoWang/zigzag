@@ -885,6 +885,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Where popovers that belong to the address bar (extension popups) open from: the address bar while the sidebar
     /// shows, or the top left of the page while it's hidden, so they never open off screen.
     var addressAnchor: (view: NSView, rect: NSRect) {
+        // In split view the panes' strips stand in for the bar's address: from the address of the pane you're in.
+        if root.stripsInBar {
+            let address = focusedPaneAddress
+            if !address.isHidden { return (address, address.bounds) }
+            let pane = focusedPaneFrame
+            return (root.overlay, NSRect(x: pane.minX + Tokens.Space.x3, y: pane.minY + Tokens.Space.x2, width: 1, height: 1))
+        }
         // Above the page, from the address's end, where the Site Controls and the extensions are.
         if root.showsTopBar {
             let button = sidebar.address.siteControlsButton
@@ -908,6 +915,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return ExtensionCenter.holdsSidebar(in: window)
     }
 
+    /// The address in the strip of the split pane you're in.
+    var focusedPaneAddress: NSView { (root.secondCard.isFocusedPane ? root.secondCard : root.card).header.address }
+
     /// The page you're working in: the whole page area, or in split view the focused pane.
     var focusedPaneFrame: NSRect {
         guard let tab = tabManager.selectedTab, let pair = tabManager.split(for: tab), root.splitRatio != nil else { return root.cardFrame }
@@ -925,7 +935,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// In split view, clicking a pane makes its tab the one you're working in.
     func focusPane(at windowPoint: NSPoint) {
         guard let tab = tabManager.selectedTab, let partner = tabManager.partner(of: tab), let pair = tabManager.split(for: tab) else { return }
-        let panes = root.paneFrames
+        // A pane's strip up in the bar above the page is that pane's too.
+        let panes = root.paneTargets
         let point = root.convert(windowPoint, from: nil)
         // Clicks on what floats over the page (find, the command bar, a prompt) are for it, not the pane below.
         if let base = root.overlay.superview, root.overlay.hitTest(base.convert(windowPoint, from: nil)) != nil { return }
@@ -2262,6 +2273,9 @@ extension BrowserWindowController: CommandBarHost {
     /// shows docked.
     func commandBarAnchor(asked: NSView?) -> NSView? {
         if let asked { return asked }
+        // In split view under the bar, the bar's address steps aside: the address of the pane you're in, as ⌘L edits
+        // that pane's page.
+        if root.stripsInBar { return focusedPaneAddress.isHidden ? nil : focusedPaneAddress }
         if root.showsTopBar { return sidebar.address }
         return root.sidebarVisible && !root.isSidebarFloatingVisible ? sidebar.address : nil
     }

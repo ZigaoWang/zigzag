@@ -14,7 +14,26 @@ final class PageCardView: NSView {
     var isUnfocusedPane = false { didSet { refreshColors() } }
     /// In split view each pane gets its own small toolbar.
     let header = PaneHeaderView()
-    var showsHeader = false { didSet { header.isHidden = !showsHeader; needsLayout = true } }
+    var showsHeader = false { didSet { if !liftsHeader { header.isHidden = !showsHeader }; needsLayout = true } }
+    /// Lent to the bar above the page (`BrowserRootView`): the header sits in the bar's row instead, and the page starts
+    /// at the card's top. Given back, it's on the card again.
+    var liftsHeader = false {
+        didSet {
+            guard liftsHeader != oldValue else { return }
+            if !liftsHeader {
+                header.isInBar = false
+                header.addressCenter = nil
+                header.alphaValue = headerAlpha
+                clip.addSubview(header)
+                header.isHidden = !showsHeader
+            }
+            needsLayout = true
+        }
+    }
+    /// The header's strength: dimmed on the pane you're not in.
+    var headerAlpha: CGFloat { isUnfocusedPane ? Tokens.Color.unfocusedPaneAlpha : 1 }
+    /// Whether the header takes the top of the card.
+    private var headerOnCard: Bool { showsHeader && !liftsHeader }
     /// Under the bar above the page, the card's top this tall is the bar's, in the page's own color (`bandColor`), so
     /// the bar and the page read as one card: its corners, edge and shadow are the card's, and it moves with it.
     var band: CGFloat = 0 { didSet { if band != oldValue { needsLayout = true } } }
@@ -23,7 +42,7 @@ final class PageCardView: NSView {
     /// The page's part of the card, in the superview's terms: under the band.
     var pageFrame: NSRect { NSRect(x: frame.minX, y: frame.minY + band, width: frame.width, height: max(0, frame.height - band)) }
     /// How far down the card the page starts: under the bar's band and a split pane's header.
-    private var contentTop: CGFloat { band + (showsHeader ? PaneHeaderView.height : 0) }
+    private var contentTop: CGFloat { band + (headerOnCard ? PaneHeaderView.height : 0) }
     /// Reader, over the page, which stays loaded underneath.
     private(set) var overlay: NSView?
     /// What covers the shown tab's page: its PDF viewer, over WebKit's own, or Settings.
@@ -190,10 +209,11 @@ final class PageCardView: NSView {
         overlay = view
         if let view {
             // Placed at once and kept in step with the card, so nothing of the page shows around it.
-            let top = showsHeader ? PaneHeaderView.height : 0
+            let top = headerOnCard ? PaneHeaderView.height : 0
             view.frame = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
             view.autoresizingMask = [.width, .height]
-            clip.addSubview(view, positioned: .below, relativeTo: header)
+            // Under the header while it's on the card; lent to the bar, the header isn't here.
+            if header.superview === clip { clip.addSubview(view, positioned: .below, relativeTo: header) } else { clip.addSubview(view) }
         }
     }
 
@@ -252,7 +272,9 @@ final class PageCardView: NSView {
             // The clip isn't flipped: the band and then the header sit at its top edge, the page fills the rest below.
             bandLayer.frame = CGRect(x: 0, y: clip.bounds.height - band, width: clip.bounds.width, height: band)
             bandLayer.isHidden = band == 0
-            header.frame = NSRect(x: 0, y: clip.bounds.height - band - PaneHeaderView.height, width: clip.bounds.width, height: PaneHeaderView.height)
+            if !liftsHeader {
+                header.frame = NSRect(x: 0, y: clip.bounds.height - band - PaneHeaderView.height, width: clip.bounds.width, height: PaneHeaderView.height)
+            }
             let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
             // A page in full screen (a video's) is in WebKit's own window, which sizes it: sized to the card from here, it
             // would no longer fill the screen.
@@ -295,7 +317,7 @@ final class PageCardView: NSView {
             // Meeting the window's edges, the page's own edge is its outline: a drawn one runs along the window's edge
             // and round the corners as an extra line.
             edge.borderWidth = isAttached ? 0 : Tokens.Metric.hairline
-            header.alphaValue = isUnfocusedPane ? Tokens.Color.unfocusedPaneAlpha : 1
+            header.alphaValue = headerAlpha
             layer?.shadowColor = cgColor(isAttached ? Tokens.Color.sheetContact : Tokens.Color.cardShadow)
             layer?.shadowOpacity = castsShadow ? 1 : 0
             layer?.shadowRadius = isAttached ? Tokens.Shadow.sheetContact : Tokens.Shadow.cardRadius

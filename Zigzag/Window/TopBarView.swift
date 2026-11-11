@@ -89,9 +89,7 @@ final class TopBarView: NSView {
     static func frames(width: CGFloat, buttons: Int, sidebarButton: Bool = false, trafficLightsWidth: CGFloat,
                        leadingInset: CGFloat = Tokens.Sidebar.edge, trailingInset: CGFloat) -> Frames {
         let mid = height / 2, b = Tokens.Sidebar.button
-        let glyph = Tokens.Symbol.inkSize(sidebarButton ? "sidebar.left" : "chevron.left", size: Tokens.Sidebar.glyph).width
-        var x = trafficLightsWidth > 0
-            ? round(Tokens.Sidebar.lightsX + trafficLightsWidth + Tokens.Sidebar.lightsGap - (b - glyph) / 2) : leadingInset
+        var x = leadX(sidebarButton: sidebarButton, trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset)
         func next() -> NSRect {
             defer { x += b }
             return NSRect(x: x, y: mid - b / 2, width: b, height: b)
@@ -103,12 +101,69 @@ final class TopBarView: NSView {
                       address: NSRect(x: start, y: round(mid - h / 2), width: max(0, width - trailingInset - start), height: h))
     }
 
+    /// Where the first control goes: its glyph `Sidebar.lightsGap` after the traffic lights, or `leadingInset` in.
+    private static func leadX(sidebarButton: Bool, trafficLightsWidth: CGFloat, leadingInset: CGFloat) -> CGFloat {
+        let b = Tokens.Sidebar.button
+        let glyph = Tokens.Symbol.inkSize(sidebarButton ? "sidebar.left" : "chevron.left", size: Tokens.Sidebar.glyph).width
+        return trafficLightsWidth > 0 ? round(Tokens.Sidebar.lightsX + trafficLightsWidth + Tokens.Sidebar.lightsGap - (b - glyph) / 2) : leadingInset
+    }
+
+    /// The inset the controls keep from the page's edges: none framed, `Sidebar.edge` where the page meets the
+    /// window's edge, so nothing comes closer to it than that.
+    static func edgeInset(page: NSRect, window: NSRect) -> CGFloat { max(0, Tokens.Sidebar.edge - (window.maxX - page.maxX)) }
+
     /// Where the bar's controls start and end, from its own edges: the page's edges, pulled in by one inset on both
     /// ends, enough that the address never comes closer than `Sidebar.edge` to the window's edge. Framed, that's the
     /// page's edges themselves; borderless, the page meets the window, so they sit `Sidebar.edge` inside it.
     static func insets(bar: NSRect, page: NSRect, window: NSRect) -> (leading: CGFloat, trailing: CGFloat) {
-        let inset = max(0, Tokens.Sidebar.edge - (window.maxX - page.maxX))
+        let inset = edgeInset(page: page, window: window)
         return (page.minX - bar.minX + inset, bar.maxX - page.maxX + inset)
+    }
+
+    // MARK: Split view
+
+    /// In split view, each pane's own strip (`PaneHeaderView`) is the bar over that pane, in place of the bar's own
+    /// buttons and address, which would belong to neither page: one set of controls per page, in one row.
+    private(set) var strips: [PaneHeaderView] = []
+    /// Each strip's pane, its left and right edges in the bar's terms, in order with `strips`.
+    private var stripPanes: [ClosedRange<CGFloat>] = []
+    /// How far in from its pane's edges a strip keeps: the bar's own inset from the page's (`edgeInset`).
+    var stripInset: CGFloat = 0 { didSet { if stripInset != oldValue { needsLayout = true } } }
+
+    /// Takes the panes' strips into the row, over these panes (none: the row is the bar's own again). The bar's own
+    /// controls are left as they are: the window fades them out or in (`ownControls`).
+    func setStrips(_ strips: [PaneHeaderView], panes: [ClosedRange<CGFloat>]) {
+        for strip in strips {
+            if strip.superview !== self { addSubview(strip) }
+            strip.isInBar = true
+            strip.isHidden = false
+        }
+        if strips != self.strips || panes != stripPanes { needsLayout = true }
+        self.strips = strips
+        stripPanes = panes
+    }
+
+    /// The bar's own back, forward, reload and address, which step aside for the panes' strips.
+    var ownControls: [NSView] { buttons + [address].compactMap { $0 } }
+
+    struct Strip: Equatable {
+        var frame: NSRect
+        /// Its pane's middle, from the strip's leading edge: where its address centers.
+        var addressCenter: CGFloat
+    }
+
+    /// Each pane's strip: the bar's height, over its pane, `inset` in from the pane's edges, and clear of the traffic
+    /// lights and the sidebar's toggle at the row's leading end, so the first pane's back button is where the bar's
+    /// own would be.
+    static func stripFrames(panes: [ClosedRange<CGFloat>], sidebarButton: Bool = false, trafficLightsWidth: CGFloat,
+                            leadingInset: CGFloat, inset: CGFloat) -> [Strip] {
+        let start = leadX(sidebarButton: sidebarButton, trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset)
+            + (sidebarButton ? Tokens.Sidebar.button : 0)
+        return panes.map { pane in
+            let minX = max(pane.lowerBound + inset, start), maxX = max(minX, pane.upperBound - inset)
+            return Strip(frame: NSRect(x: minX, y: 0, width: maxX - minX, height: height),
+                         addressCenter: (pane.lowerBound + pane.upperBound) / 2 - minX)
+        }
     }
 
     /// Each control showing here and where it goes.
@@ -124,13 +179,24 @@ final class TopBarView: NSView {
         }
         for (button, rect) in zip(buttons, frames.buttons) where button.superview === self { places.append((button, rect)) }
         if let address, address.superview === self { places.append((address, frames.address)) }
+        for (strip, place) in zip(strips, stripPlaces) where strip.superview === self { places.append((strip, place.frame)) }
         return places
+    }
+
+    private var stripPlaces: [Strip] {
+        Self.stripFrames(panes: stripPanes, sidebarButton: showsSidebarButton, trafficLightsWidth: trafficLightsWidth,
+                         leadingInset: leadingInset, inset: stripInset)
+    }
+
+    private func centerStripAddresses() {
+        for (strip, place) in zip(strips, stripPlaces) { strip.addressCenter = place.addressCenter }
     }
 
     override func layout() {
         super.layout()
         guard !isSliding else { return }
         for place in places { place.view.frame = place.frame }
+        centerStripAddresses()
     }
 
     /// While the controls glide (`slideControls`), layout leaves them to it.
@@ -138,7 +204,7 @@ final class TopBarView: NSView {
 
     /// Where each control showing is now, in the superview's terms: taken before the sidebar comes or goes.
     var controlPositions: [ObjectIdentifier: NSRect] {
-        Dictionary(uniqueKeysWithValues: ([sidebarButton] + buttons + [address].compactMap { $0 })
+        Dictionary(uniqueKeysWithValues: ([sidebarButton] + buttons + [address].compactMap { $0 } + (strips as [NSView]))
             .filter { $0.superview === self && !$0.isHidden }
             .map { (ObjectIdentifier($0), $0.frame.offsetBy(dx: frame.minX, dy: frame.minY)) })
     }
@@ -149,6 +215,7 @@ final class TopBarView: NSView {
     func slideControls(from old: [ObjectIdentifier: NSRect], curve: Tokens.Motion.Curve) {
         isSliding = true
         let places = places
+        centerStripAddresses()
         for place in places {
             let start = old[ObjectIdentifier(place.view)]?.offsetBy(dx: -frame.minX, dy: -frame.minY) ?? place.frame
             Tokens.Motion.withoutAnimation { place.view.frame = start }

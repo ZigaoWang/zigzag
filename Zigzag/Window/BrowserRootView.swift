@@ -301,6 +301,7 @@ final class BrowserRootView: SpaceFrameView {
         splitVertical = vertical
         // Like the sidebar, a split moves the window's layout: it animates from the keyboard too.
         guard animated, !Tokens.Motion.reduceMotion, window != nil else { needsLayout = true; return }
+        placeStrips(animated: true)
         // Closing: the pane that goes stays where it is and fades while the other grows over its place.
         let closingFrame = wasSplit && ratio == nil ? secondCard.frame : nil
         if closingFrame != nil { secondCardLeaving = true }
@@ -723,6 +724,7 @@ final class BrowserRootView: SpaceFrameView {
 
     override func layout() {
         super.layout()
+        placeStrips(animated: false)
         layoutCards()
         layoutTopBar()
         sidebarContainer.frame = sidebarFrame
@@ -750,6 +752,76 @@ final class BrowserRootView: SpaceFrameView {
         let bar = topBarSlideFrame ?? topBarFrame
         topBar.frame = bar
         (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: pageAreaFrame, window: bounds)
+        let panes = paneFrames
+        let over = liftedCards.map { $0 === card ? panes.left : panes.right ?? panes.left }
+        topBar.setStrips(liftedCards.map(\.header), panes: over.map { ($0.minX - bar.minX)...max($0.minX, $0.maxX) - bar.minX })
+        topBar.stripInset = TopBarView.edgeInset(page: cardFrame, window: bounds)
+    }
+
+    // MARK: Split view under the bar
+
+    /// The cards whose strips are up in the bar's row now.
+    private var liftedCards: [PageCardView] = []
+    private var stripFades = 0
+
+    /// Under the bar above the page, a split's strips are the bar: each pane's moves up into the bar's row, over its
+    /// pane, and the bar's own back, forward, reload and address, which would belong to neither page, step aside.
+    /// Stacked, the top pane's goes up; the bottom one keeps its own on its card.
+    private var cardsForBar: [PageCardView] {
+        guard showsTopBar, splitRatio != nil else { return [] }
+        return splitVertical ? [card] : [card, secondCard]
+    }
+
+    /// Whether the panes' strips are in the bar's row.
+    var stripsInBar: Bool { !liftedCards.isEmpty }
+
+    /// Moves the strips up into the bar or gives them back to their cards. Into a split or out of one, the bar holds
+    /// still and its own controls and the strips cross-fade in place as the panes slide (the first pane's back, forward
+    /// and reload come in where the bar's were); anything else changes at once.
+    private func placeStrips(animated: Bool) {
+        let cards = cardsForBar
+        guard cards != liftedCards else { return }
+        let entering = liftedCards.isEmpty, leaving = cards.isEmpty
+        liftedCards = cards
+        stripFades += 1
+        let fade = stripFades
+        for card in cards { card.liftsHeader = true }
+        placeTopBar()
+        let given = [card, secondCard].filter { $0.liftsHeader && !cards.contains($0) }
+        let own = topBar.ownControls
+        guard animated, entering || leaving, window != nil, !Tokens.Motion.reduceMotion else {
+            Tokens.Motion.withoutAnimation {
+                given.forEach { $0.liftsHeader = false }
+                cards.forEach { $0.header.alphaValue = $0.headerAlpha }
+                own.forEach { $0.alphaValue = 1; $0.isHidden = !cards.isEmpty }
+            }
+            return
+        }
+        Tokens.Motion.withoutAnimation {
+            if entering { cards.forEach { $0.header.alphaValue = 0 } } else { own.forEach { $0.alphaValue = 0; $0.isHidden = false } }
+            topBar.layoutSubtreeIfNeeded()
+        }
+        Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, {
+            for card in cards { card.header.animator().alphaValue = card.headerAlpha }
+            for card in given { card.header.animator().alphaValue = 0 }
+            for view in own { view.animator().alphaValue = entering ? 0 : 1 }
+        }, completion: {
+            // Not if another change took over meanwhile: that one settles it.
+            guard self.stripFades == fade else { return }
+            given.forEach { $0.liftsHeader = false }
+            if entering { own.forEach { $0.isHidden = true; $0.alphaValue = 1 } }
+        })
+    }
+
+    /// Where a click picks a pane in split view: the pane, and its strip up in the bar.
+    var paneTargets: (left: NSRect, right: NSRect?) {
+        var panes = paneFrames
+        guard stripsInBar else { return panes }
+        let top = topBarFrame.minY
+        func lifted(_ pane: NSRect) -> NSRect { NSRect(x: pane.minX, y: top, width: pane.width, height: pane.maxY - top) }
+        panes.left = lifted(panes.left)
+        if !splitVertical, let right = panes.right { panes.right = lifted(right) }
+        return panes
     }
 
     /// While the sidebar slides, the bar holds still over both where it was and where it's going, and only its
