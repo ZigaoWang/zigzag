@@ -21,14 +21,14 @@ to touch. Warm and friendly, never techy: no monospace, no capitals for effect, 
 - **Case, decided once.** Every word Zigzag says is in its normal case, titles included: "History", "Downloads",
   buttons, labels, menu items, tooltips ("New Tab", "Clear", "Close Duplicates"). No lowercase styling. Content keeps
   its own case: a page's title, a site's name, what you typed.
-- **Confident contrast.** The space's name is 26 light against 13pt rows and 11pt labels, nothing in between.
+- **Confident contrast.** Rows at 13pt and labels at 11pt, nothing in between; the space's name is the one heading
+  over them, a semibold step at the rows' size, or 26 light where it's set large.
 - **Line drawings** (`LineGlyph`): where a stock symbol says too little, Zigzag draws its own on a 16pt square with
   one 1.1pt stroke, round caps and joins, 1.5pt margins: the sidebar toggle, the plus for new tab and new space,
   downloads (its circle shares the stroke, so the progress ring lies on it). Every other symbol is SF's light weight.
 - **No extra accent color.** What's on or chosen takes the space's own accent (`Brand.Theme.accent`); there is no
   separate warm or orange accent anywhere.
-- **Small details that work:** the space keys' numbers set in tabular figures like a dial's markings; the tick under
-  the current key; the selected card's top edge catching the light by one pixel at night (`Chrome.rim`, `setCardRim`; by day the card is too near white for a lit edge to read at 1x, so it has none); a
+- **Small details that work:** the space dots, the one you're in stretched into a short pill; the selected card's top edge catching the light by one pixel at night (`Chrome.rim`, `setCardRim`; by day the card is too near white for a lit edge to read at 1x, so it has none); a
   hairline under the toolbar only while the list is scrolled under it.
 - **Edges.** The sidebar has three, and everything sits on one of them: the container edge (6pt: the address field,
   the favorites, the cards), the icon column (12pt: the traffic lights, the address's host, every icon, the
@@ -90,8 +90,11 @@ Mac-like. The browser window's chrome (the sidebar and a split pane's header) is
 `Tokens.Sidebar` and `Tokens.Pane`, in the table after these. Nothing else picks a size.
 
 SF Pro, one weight per role. Secondary text is light gray and never bold; selection never changes weight. The
-space's name in the sidebar is the one heading there: 26 light, tracked tight, in the case you typed it (`Font.spaceName`), in the
-space's own ink (`Brand.Theme.ink`), low in a 36pt slot.
+space's name in the sidebar is the one heading there, in the case you typed it and the space's own ink
+(`Brand.Theme.ink`): 13 semibold in a row's 30pt slot (`SpaceHeaderView.nameFont`), the start for a new install, a plain
+heading anyone coming from Arc reads at a glance; or, with Large space names (Settings › Appearance, or the name's
+right-click), 26 light, tracked tight (`Font.spaceName`), low in a 36pt slot. Someone who used Zigzag before small
+became the start keeps the large names they had (`settleSpaceNameStyle`).
 
 | Text | Token | Size, weight | For |
 |---|---|---|---|
@@ -130,13 +133,13 @@ The browser window's compact scale (`Tokens.Sidebar`, `Tokens.Pane`):
 | Toolbar | 14pt glyphs in 26pt buttons (`Sidebar.glyph`, `button`), no fill at rest, a radius-6 hover fill; every glyph's ink on the traffic lights' center line (`Sidebar.lightsCenter`, 22), reload's ink as far from the right edge as the lights from the left |
 | Address | 30pt soft field, radius 8, `Chrome.field` and no line, the host at 13pt 10pt in, its buttons 26pt with 14pt glyphs; up to 3 pinned extensions before Site Controls, dragged to reorder as the space icons are (the pin stays faint in its place, a see-through copy follows the pointer, a 2pt accent line marks the gap), hiding from the left before the host or the prompt is cut (and never below 72pt for it), each pin the same 26pt button as Reader and Site Controls with the extension's icon at 16pt in the middle, 2pt between every button; a count is a 12pt dark pill with 9pt semibold white figures in the button's bottom-right corner, 1pt inside it (the same pill, 3pt in, on a Site Controls tile); in Site Controls a 16pt round pin button (control fill, hairline, 9pt glyph, 20pt target) 2pt inside the tile's top-right corner, the top-left when the tile has a count: always there and filled (pin.fill) while pinned, an outline pin on hover otherwise, dimmed at the limit, and Pin to Address in the tile's menu; the accent ring from the keyboard |
 | Favorites | As many to a row as fit 56pt wide (3 at the usual width), or 2, 3 or 4 as chosen in Settings; 36pt soft tiles 6pt apart, 18pt icons, radius 8, `Chrome.field`; a fine `Chrome.openEdge` while the page is open, the card while it's the one you're on; the × chip 14pt, 3pt inside the corner |
-| Space name | 26 light, as typed (`Font.spaceName`), kern -0.6, 36pt slot, its ink on the icon column |
+| Space name | As typed, its ink on the icon column: 13 semibold in a 30pt slot; large, 26 light (`Font.spaceName`), kern -0.6, 36pt slot |
 | Rows | 13pt text (`Font.sidebarRow`), 30pt tall, 2pt apart, 16pt favicons; icons at 12pt from the sidebar's edge, titles at 36; a pinned page that's open has a fine `Chrome.openEdge`, as a favorite does |
 | Selected row | `Chrome.card` with a 1px `Chrome.cardEdge` and a shadow-sm, radius 6; hover is `Chrome.hover`, pressed `Chrome.pressed` |
 | Row buttons | 20pt targets, 11pt glyphs: close, and a speaker beside the half that plays |
 | Section labels | 11pt medium, the space's quiet ink, on the icon column, low in a 24pt slot; Clear at its end in the same ink |
-| Bottom bar | 14pt glyphs in 26pt buttons; a space key for each space (`SpaceDotView`): an 18pt matte key, radius 5, its number in 10pt tabular figures; the current key lit and pressed in, a 5pt `Color.live` tick under it |
-| Pane header (split) | 30pt tall, 13pt glyphs in 24pt buttons, the address at 12pt in a 22pt field |
+| Bottom bar | 14pt glyphs in 26pt buttons; a space dot for each space (`SpaceDotView`) in a 26pt target: a 6pt dot in the space's ink at rest, the one you're in stretched into a 16pt pill in full ink, eased over `standard`; a space with an icon shows it at 14pt in place of its dot, brightest when it's yours. No numbers: the tooltip names the space and its ⌃ key, and holding ⌃ shows the numbers just above |
+| Pane header (split) | 30pt tall, 13pt glyphs in 24pt buttons, the address at 12pt in a 22pt field; narrow, swap and the layout fold into ⋯ first, then Separate, Forward and Reload, so the address keeps 72pt (`Pane.addressMinWidth`) and × is never cut |
 
 ## Spacing
 
@@ -179,10 +182,10 @@ One look for each state, everywhere:
 - Rest: nothing (rows), `fieldFill` (fields, plain pills), `Chrome.field` (the sidebar's address and favorites), `glassFill` (glass tiles).
 - Hover: on the frame `Chrome.hover` (rows, the toolbar's buttons, the space dots); elsewhere `Color.hoverFill`
   (rows, quiet buttons), `controlHover` (outlined buttons, dropdowns), `glassHover` (tiles), a step lighter on the
-  dark primary. Instant both ways, in and out: a fade on something you sweep past all day reads as lag.
+  primary. Instant both ways, in and out: a fade on something you sweep past all day reads as lag.
 - Pressed: a step darker (`pressedFill`, `controlPressed`, `primaryPressed`, `Chrome.pressed` on the frame) at
   once; the address and the favorites step back from their hover to `Chrome.fieldPressed`, never below the field at
-  rest. Things that read as objects (space keys, pill buttons, favorites) sink (`pressSinks`, `showSink`): down
+  rest. Things that read as objects (space dots, pill buttons, favorites) sink (`pressSinks`, `showSink`): down
   `Motion.pressSink` (1pt) in `pressIn` (80ms), eased out, and back over `pressSettle` (180ms), eased out, with
   weight and no bounce. Rows and small icon buttons give instead (`pressScales`, `showPress`): to
   `Motion.pressScale` (0.97) and a critically damped spring back. Both start from wherever they are, and the action
@@ -270,9 +273,10 @@ something came from, answers at once, and can be interrupted.
   `Sidebar.lightsGap` (12) to the toggle's glyph, then back, forward and reload at the trailing end, every glyph's
   ink centered on the lights' line (`Symbol.inkOffset`), in `Color.chromeIcon`, no fill until the pointer is on it.
   The address: a soft field of the space's color (`Chrome.field`, the host in `textPrimary`, its own small buttons, any pinned extensions by Site Controls at its right,
-  the accent ring from the keyboard). Favorites: small soft tiles four to a row in the same look. The space's name,
-  26 light, over its pinned tabs. The tab you're on: the light card of the color, which slides when you pick another. A split row shows both pages, each half with its icon, its title and, while that page
-  plays or is muted, its own speaker. A pinned page that has wandered reads "<its name> / <the page it's on>". Then
+  the accent ring from the keyboard). Favorites: small soft tiles four to a row in the same look. The space's name
+  over its pinned tabs. The tab you're on: the light card of the color, which slides when you pick another. A split row shows both pages, each half with its icon, its title and, while that page
+  plays or is muted, its own speaker; a pinned page split beside a tab carries the pair in its own row, so each page
+  shows once and one row is lit. A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +.
 - **Pane header** (split view): on the page card, 30 tall: back, forward and reload, the address centered in a small
   field, and the split's own buttons. Everything in it is its own pane's page: its buttons act on it, its loading
@@ -361,8 +365,10 @@ something came from, answers at once, and can be interrupted.
 - **Buttons** (`ButtonLook`, `applyButtonLook`), capsules `Metric.controlHeight` (28) tall, `Font.control()`:
   - Secondary (`PillButton` `.plain`, `TextButton.form`): `controlFill` (white; a lighter step of the surface in
     dark mode), a hairline `controlEdge` and a faint `controlShadow` (1.5pt, 0.5 down). A symbol may lead the title.
-  - Primary (`PillButton` `.prominent`, `PrimaryButton`): the one thing to do on a surface, a dark filled pill
-    (`primaryFill`, light in dark mode) with `onPrimary` text, whatever the space; red only for what can't be undone.
+  - Primary (`PillButton` `.prominent`, `PrimaryButton`): the one thing to do on a surface, a pill filled with the
+    space's accent (`Brand.Theme.accent`) and its `onAccent` text, a step lighter under the pointer and deeper
+    pressed, as a switch that's on; red only for what can't be undone. `Color.primaryFill` (dark, light at night) is
+    left only for the plain `ButtonLook.primary` with no tint.
   - Quiet (`.quiet`): no fill until the pointer is over it.
   `PrimaryButton` and `TextButton` draw the same looks for the forms that still use them; new code uses `PillButton`.
 - **Switch** (`Toggle`): a slide switch, 34 by 20: a matte recessed track (shade under its upper lip, a hairline
@@ -440,7 +446,7 @@ new material. They get rebuilt from scratch to match the sidebar's language, not
 ## The voice
 
 Zigzag speaks in one type style: SF Pro Light, tracked in by 2.3% of its size, in normal case. It's what makes the app
-feel like itself, so it's used only where the app is naming something: a space's name (26), a page's title (26), a
+feel like itself, so it's used only where the app is naming something: a space's name set large (26), a page's title (26), a
 panel's title (Downloads, 26), the welcome (`Welcome.titleSize`), and in its own case the address bar's text (22 for a
 new tab, the sidebar's size over the address). Everything else is SF Pro Regular in normal case.
 
