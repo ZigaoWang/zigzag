@@ -170,7 +170,7 @@ struct TopBarTests {
         #expect(root.card.frame.minX == page.minX && root.card.frame.width == page.width)
         #expect(root.card.band == page.minY - root.topBar.frame.minY)
         #expect(root.card.bandColor == .black && root.topBar.pageColor == .black)
-        #expect(root.cardFrame == page)
+        #expect(root.cardFrame == page && root.card.pageFrame == page)
 
         // Two panes have two colors: the plain bar.
         root.splitRatio = 0.5

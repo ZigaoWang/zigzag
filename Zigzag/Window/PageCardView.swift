@@ -20,6 +20,8 @@ final class PageCardView: NSView {
     var band: CGFloat = 0 { didSet { if band != oldValue { needsLayout = true } } }
     var bandColor: NSColor? { didSet { if bandColor != oldValue { refreshColors() } } }
     private let bandLayer = CALayer()
+    /// The page's part of the card, in the superview's terms: under the band.
+    var pageFrame: NSRect { NSRect(x: frame.minX, y: frame.minY + band, width: frame.width, height: max(0, frame.height - band)) }
     /// How far down the card the page starts: under the bar's band and a split pane's header.
     private var contentTop: CGFloat { band + (showsHeader ? PaneHeaderView.height : 0) }
     /// Reader, over the page, which stays loaded underneath.

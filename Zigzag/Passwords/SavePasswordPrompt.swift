@@ -302,7 +302,7 @@ extension BrowserWindowController {
     func pageFrame(showing tab: Tab) -> NSRect? {
         guard let webView = tab.webView else { return nil }
         for card in [root.card, root.secondCard] where !card.isHidden && card.alphaValue > 0 && webView.isDescendant(of: card) {
-            return root.overlay.convert(card.frame, from: card.superview)
+            return root.overlay.convert(card.pageFrame, from: card.superview)
         }
         return nil
     }
