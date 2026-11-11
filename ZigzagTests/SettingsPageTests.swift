@@ -35,17 +35,35 @@ struct SettingsPageTests {
         #expect(SettingsPage.pane(for: URL(string: "zigzag://settings/search")) == .search)
         #expect(SettingsPage.pane(for: URL(string: "zigzag://settings/mini")) == .mini)
         #expect(SettingsPage.url(for: .mini).absoluteString == "zigzag://settings/mini")
+        #expect(SettingsPage.pane(for: URL(string: "zigzag://settings/automation")) == .automation)
     }
 
     @Test func theColumnKeepsItsOrder() {
-        #expect(SettingsPane.allCases == [.general, .appearance, .tabs, .spaces, .profiles, .search, .mini, .passwords, .privacy,
-                                          .translation, .extensions, .websiteData, .shortcuts])
+        #expect(SettingsPane.allCases == [.general, .appearance, .tabs, .spaces, .profiles, .search, .mini, .translation, .passwords,
+                                          .privacy, .websiteData, .extensions, .shortcuts, .automation])
+    }
+
+    @Test func theColumnIsInGroups() {
+        let groups = SettingsPane.columnGroups(manyProfiles: false)
+        #expect(groups.shared == [[.general, .appearance, .tabs, .spaces, .profiles], [.search, .mini, .translation],
+                                  [.passwords, .privacy], [.extensions, .shortcuts, .automation]])
+        #expect(groups.profile.isEmpty)
+        // A gap before each group but the first.
+        #expect(SettingsPane.groupStarts(manyProfiles: false) == [.search, .passwords, .extensions])
+    }
+
+    @Test func withMoreProfilesExtensionsLeavesItsGroup() {
+        let groups = SettingsPane.columnGroups(manyProfiles: true)
+        #expect(groups.shared == [[.general, .appearance, .tabs, .spaces, .profiles], [.search, .mini, .translation],
+                                  [.passwords, .privacy], [.shortcuts, .automation]])
+        #expect(groups.profile == [.extensions, .websiteData])
+        #expect(SettingsPane.groupStarts(manyProfiles: true) == [.search, .passwords, .shortcuts])
     }
 
     @Test func withOneProfileTheColumnIsAsItWasBeforeProfiles() {
         let column = SettingsPane.column(manyProfiles: false)
-        #expect(column.shared == [.general, .appearance, .tabs, .spaces, .profiles, .search, .mini, .passwords, .privacy,
-                                  .translation, .extensions, .shortcuts])
+        #expect(column.shared == [.general, .appearance, .tabs, .spaces, .profiles, .search, .mini, .translation, .passwords, .privacy,
+                                  .extensions, .shortcuts, .automation])
         #expect(column.profile.isEmpty)
         // What websites keep is in Privacy, and an address that names Website Data opens it there.
         #expect(SettingsPane.websiteData(manyProfiles: false) == .privacy)
@@ -56,8 +74,8 @@ struct SettingsPageTests {
     @Test func withMoreProfilesTheSectionsAboutOneStandApart() {
         let column = SettingsPane.column(manyProfiles: true)
         #expect(column.profile == [.extensions, .websiteData])
-        #expect(column.shared == [.general, .appearance, .tabs, .spaces, .profiles, .search, .mini, .passwords, .privacy,
-                                  .translation, .shortcuts])
+        #expect(column.shared == [.general, .appearance, .tabs, .spaces, .profiles, .search, .mini, .translation, .passwords, .privacy,
+                                  .shortcuts, .automation])
         // Every section is listed once.
         #expect(Set(column.shared + column.profile) == Set(SettingsPane.allCases))
         #expect(SettingsPane.websiteData(manyProfiles: true) == .websiteData)
@@ -145,5 +163,20 @@ struct SettingsSearchTests {
             settings.debugFind(words)
             #expect(settings.debugFound.contains(row), "“\(words)” should find \(row)")
         }
+    }
+
+    /// Automation is found by the words people use for it, and its rows still are once they moved out of General.
+    @Test func findsAutomation() {
+        let settings = SettingsView(pane: .general)
+        for words in ["mcp", "ai", "agent", "automation", "api"] {
+            settings.debugFind(words)
+            #expect(settings.debugFound.contains("Let AI apps use Zigzag"), "“\(words)” should find Let AI apps use Zigzag")
+        }
+        settings.debugFind("apple events")
+        #expect(settings.debugFound.contains("Allow JavaScript from Apple Events"))
+        settings.debugFind("applescript")
+        #expect(settings.debugFound.contains("Allow JavaScript from Apple Events"))
+        settings.debugFind("mcp guide")
+        #expect(settings.debugFound.contains("How it works"))
     }
 }
