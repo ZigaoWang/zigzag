@@ -53,6 +53,34 @@ struct YouTubeAdsTests {
         #expect(seen.overflow == "")
     }
 
+    /// YouTube's dialog swallows the wheel while it's open: hiding it left the page taking clicks but not scrolling.
+    private static let lockingDialog = """
+        <script>
+          window.wheelBlocked = 0;
+          document.addEventListener('wheel', (e) => {
+            const d = document.querySelector('tp-yt-paper-dialog');
+            if (d && d.opened) { e.preventDefault(); window.wheelBlocked++; }
+          }, { capture: true, passive: false });
+          customElements.define('tp-yt-paper-dialog', class extends HTMLElement {
+            connectedCallback() { this.opened = true; this.setAttribute('opened', ''); }
+            close() { this.opened = false; this.removeAttribute('opened'); }
+          });
+        </script>
+        """
+
+    @Test func aHiddenBlockerWarningNoLongerLocksScrolling() async throws {
+        let webView = try await page(dialog: Self.lockingDialog
+            + "<tp-yt-paper-dialog><ytd-enforcement-message-view-model>Ad blockers are not allowed</ytd-enforcement-message-view-model></tp-yt-paper-dialog>")
+        let opened = try await webView.callAsyncJavaScript("return document.querySelector('tp-yt-paper-dialog').opened", arguments: [:], in: nil, contentWorld: .page) as? Bool
+        #expect(opened == false)
+    }
+
+    @Test func aDialogYouTubeShowsStaysOpen() async throws {
+        let webView = try await page(dialog: Self.lockingDialog + "<tp-yt-paper-dialog style=\"display: block; width: 300px; height: 200px\">Share</tp-yt-paper-dialog>")
+        let opened = try await webView.callAsyncJavaScript("return document.querySelector('tp-yt-paper-dialog').opened", arguments: [:], in: nil, contentWorld: .page) as? Bool
+        #expect(opened == true)
+    }
+
     @Test func aDialogYouTubeShowsKeepsItsBackdrop() async throws {
         let webView = try await page(dialog: "<tp-yt-paper-dialog style=\"display: block; width: 300px; height: 200px\">Share</tp-yt-paper-dialog>")
         let seen = try await look(webView)

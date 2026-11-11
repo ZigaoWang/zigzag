@@ -131,7 +131,21 @@
     const look = getComputedStyle(element);
     return box.width > 0 && box.height > 0 && look.display !== 'none' && look.visibility !== 'hidden';
   };
+  // The dialog itself is closed too, not only hidden: while YouTube's dialog thinks it's open it also locks the page's
+  // scrolling (its overlay swallows the wheel and the scroll keys), so the page took clicks but wouldn't scroll.
+  // Only a dialog Zigzag hid is closed: the blocker warning, or a note left out above; any dialog YouTube shows is
+  // left alone.
+  const ours = (dialog) => !!dialog.querySelector('ytd-enforcement-message-view-model') || !!dialog.dataset.zigzagQuiet
+    || !!dialog.querySelector('[data-zigzag-quiet]') || !!dialog.closest('[data-zigzag-quiet]');
+  const closeHiddenDialogs = () => {
+    for (const dialog of document.querySelectorAll('tp-yt-paper-dialog')) {
+      const open = dialog.opened === true || dialog.hasAttribute('opened');
+      if (!open || !ours(dialog)) continue;
+      try { if (typeof dialog.close === 'function') dialog.close(); else dialog.opened = false; } catch (e) {}
+    }
+  };
   const freePage = () => {
+    closeHiddenDialogs();
     const backdrops = document.querySelectorAll('tp-yt-iron-overlay-backdrop');
     if (!backdrops.length) return;
     const dialogOpen = [...document.querySelectorAll('tp-yt-paper-dialog, ytd-popup-container > *')].some(shown);
