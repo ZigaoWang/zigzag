@@ -390,6 +390,16 @@ enum DebugBridge {
         case "spaceswitcher": controller.debugSpaceSwitcher(arg)
         case "appearance":
             NSApp.appearance = arg == "dark" ? NSAppearance(named: .darkAqua) : arg == "light" ? NSAppearance(named: .aqua) : nil
+        // darkpages off|system|always: Settings › Appearance › Dark pages. darksite on|off|follow: the site panel's
+        // Dark page row for the page in front. darkstate: what the page script found there, in the debug log.
+        case "darkpages": if let mode = DarkPages.Mode(rawValue: arg) { DarkPages.mode = mode }
+        case "darksite": DarkPages.setChoice(arg == "follow" ? nil : arg == "on", for: controller.tabManager.selectedTab?.url)
+        case "darkstate":
+            controller.selectedWebView?.callAsyncJavaScript("return window.__zigzagDark ? JSON.stringify(window.__zigzagDark.state()) : 'none'",
+                                                            arguments: [:], in: nil, in: DarkPages.world) { result in
+                let tab = controller.tabManager.selectedTab?.darkPage
+                debugLog("darkstate => \(result) tab=\(String(describing: tab))")
+            }
         case "resize":
             let n = arg.split(separator: " ").compactMap { Double($0) }
             if n.count == 2, let window = controller.window {
