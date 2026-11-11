@@ -12,10 +12,14 @@
   if (window.__zigzagDark) return;
   const config = __CONFIG__;
   const type = document.contentType || '';
+  // A page left alone still says so: what Zigzag heard about the page before this one doesn't hold here.
+  const leftAlone = () => {
+    try { window.webkit.messageHandlers.zigzagDark.postMessage({ darkened: false, native: false, site: '' }); } catch (e) {}
+  };
   // A picture, video or PDF opened on its own has nothing to darken.
-  if (!/html|xml|text\/plain/.test(type)) return;
+  if (!/html|xml|text\/plain/.test(type)) { leftAlone(); return; }
   // Web pages, files and Zigzag's own pages; an extension's own page is its own business.
-  if (!/^(https?|file|about|zigzag):$/.test(location.protocol)) return;
+  if (!/^(https?|file|about|zigzag):$/.test(location.protocol)) { leftAlone(); return; }
 
   const siteOf = (host) => host.toLowerCase().replace(/^www\./, '');
   const matches = (site, list) => list.some((s) => site === s || site.endsWith('.' + s));
@@ -110,7 +114,8 @@
 
   const check = () => {
     wanted = choice();
-    if (!wanted) { apply(false); return; }
+    // Not wanted here: said, so a bar colored after the last page's darkened look doesn't keep it.
+    if (!wanted) { apply(false); send(); return; }
     // Looked at as the page draws itself: our style forces a light color-scheme, which a page drawn with
     // light-dark() would follow. Off and on again in one go, so nothing is drawn in between.
     const sheet = darkened && style.sheet;
@@ -190,7 +195,7 @@
     checkTimer = setTimeout(check, delay);
   };
   // Darkened from the first moment, unless the site was last seen dark: no white page first.
-  if (wanted && native !== true) apply(true);
+  if (wanted && native !== true) apply(true); else send();
   // A theme switched on the page itself (a class or data-theme on the root or body) is looked at again.
   const themes = new MutationObserver(() => checkSoon(150));
   const watchThemes = (el) => themes.observe(el, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-color-mode', 'data-mode'] });

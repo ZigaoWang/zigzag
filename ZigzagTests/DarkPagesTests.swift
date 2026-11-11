@@ -159,6 +159,59 @@ struct DarkPagesTests {
         #expect(state["native"] as? Bool == true)
     }
 
+    // MARK: What a page says
+
+    private final class Heard: NSObject, WKScriptMessageHandler {
+        var messages: [[String: Any]] = []
+        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+            if let body = message.body as? [String: Any] { messages.append(body) }
+        }
+    }
+
+    /// What the page script tells Zigzag about a page loaded with dark pages on Always, with these sites turned off.
+    private func heard(loading load: (WKWebView) -> Void, sitesOff: [String] = []) async throws -> [[String: Any]] {
+        let name = "DarkPagesTests-\(UUID().uuidString)"
+        let saved = DarkPages.defaults
+        DarkPages.defaults = UserDefaults(suiteName: name)!
+        defer {
+            DarkPages.defaults.removePersistentDomain(forName: name)
+            DarkPages.defaults = saved
+        }
+        DarkPages.mode = .always
+        DarkPages.sitesOff = Set(sitesOff)
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let heard = Heard()
+        configuration.userContentController.add(heard, contentWorld: DarkPages.world, name: DarkPages.messageName)
+        configuration.userContentController.addUserScript(DarkPages.script(for: configuration.websiteDataStore))
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+        let loading = Loading()
+        webView.navigationDelegate = loading
+        await withCheckedContinuation { done in
+            loading.done = done
+            load(webView)
+        }
+        try await Task.sleep(for: .milliseconds(300))
+        return heard.messages
+    }
+
+    /// A page on a site turned off says it isn't darkened: the tab would otherwise keep the darkened look of the page
+    /// before it, and the bar above it that look's color.
+    @Test func aPageOnASiteTurnedOffSaysItIsNotDarkened() async throws {
+        let messages = try await heard(loading: { $0.loadHTMLString("<html><body><p>Light</p></body></html>", baseURL: URL(string: "https://off.test/")) },
+                                       sitesOff: ["off.test"])
+        #expect(!messages.isEmpty)
+        #expect(messages.allSatisfy { $0["darkened"] as? Bool == false })
+    }
+
+    @Test func aPictureOnItsOwnSaysItIsNotDarkened() async throws {
+        let png = NSImage(size: NSSize(width: 4, height: 4), flipped: false) { rect in NSColor.red.setFill(); rect.fill(); return true }
+        let data = try #require(png.tiffRepresentation.flatMap { NSBitmapImageRep(data: $0)?.representation(using: .png, properties: [:]) })
+        let messages = try await heard(loading: { $0.load(data, mimeType: "image/png", characterEncodingName: "", baseURL: URL(string: "https://picture.test/a.png")!) })
+        #expect(messages.contains { $0["darkened"] as? Bool == false })
+        #expect(!messages.contains { $0["darkened"] as? Bool == true })
+    }
+
     // MARK: Sites seen dark
 
     /// Whether a page was darkened from its first moment is something the page can see, so the sites seen dark in

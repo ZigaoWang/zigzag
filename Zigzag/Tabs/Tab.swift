@@ -59,7 +59,8 @@ final class Tab: NSObject {
     private(set) var favicon: NSImage?
     private(set) var themeColor: NSColor?
     /// What dark pages found on the page (`DarkPages`): whether Zigzag draws it dark, whether it's dark on its own,
-    /// and its color as drawn. Nil until the page has been looked at, and while dark pages are off.
+    /// and its color as drawn. Nil until a page has been looked at; a page left alone (dark pages off there, a picture
+    /// opened on its own) says it isn't darkened.
     private(set) var darkPage: DarkPages.State?
     private(set) var isLoading = false
     private(set) var progress: Double = 0
