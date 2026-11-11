@@ -683,7 +683,9 @@ enum DebugBridge {
             NSApp.appearance = arg == "dark" ? NSAppearance(named: .darkAqua) : arg == "light" ? NSAppearance(named: .aqua) : nil
         // darkpages off|system|always: Settings › Appearance › Dark pages. darksite on|off|follow: the site panel's
         // Dark page row for the page in front. darkstate: what the page script found there, in the debug log.
+        // darkblack on|off: Settings › Appearance › Pure black backgrounds.
         case "darkpages": if let mode = DarkPages.Mode(rawValue: arg) { DarkPages.mode = mode }
+        case "darkblack": DarkPages.pureBlack = arg == "on"
         case "darksite": DarkPages.setChoice(arg == "follow" ? nil : arg == "on", for: controller.tabManager.selectedTab?.url)
         // keepawake on|off: the site panel's Keep tabs awake row for the page in front.
         case "keepawake": KeepAwake.set(arg == "on", for: controller.tabManager.selectedTab?.url)
