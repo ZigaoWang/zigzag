@@ -1956,14 +1956,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let rw = resetAll.fittingWidth, rh = Tokens.Page.controlHeight
             resetAll.frame = NSRect(x: pad + contentWidth - Tokens.Page.groupPad - rw, y: y, width: rw, height: rh)
             documentView.addSubview(resetAll)
-            let hint = Label(String(localized: "Click a shortcut to change or remove it. To find one, type its name or keys in Find a setting.",
-                                    comment: "Hint at the top of Settings › Shortcuts. “Find a setting” is the search field's placeholder."),
-                             font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
-            hint.lineBreakMode = .byTruncatingTail
-            hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y + (rh - hint.lineHeight) / 2,
-                                width: max(0, contentWidth - Tokens.Page.groupPad * 2 - (resetAll.isHidden ? 0 : rw + Tokens.Space.x4)), height: hint.lineHeight)
+            // Wraps on a narrow page rather than losing its end, its first line beside Reset All.
+            let hint = NSTextField(wrappingLabelWithString: String(localized: "Click a shortcut to change or remove it. To find one, type its name or keys in Find a setting.",
+                                                                   comment: "Hint at the top of Settings › Shortcuts. “Find a setting” is the search field's placeholder."))
+            hint.font = Tokens.Font.detail()
+            hint.textColor = Tokens.Color.textSecondary
+            hint.isSelectable = false
+            let hintWidth = max(0, contentWidth - Tokens.Page.groupPad * 2 - (resetAll.isHidden ? 0 : rw + Tokens.Space.x4)) + Label.inset * 2
+            let hintHeight = ceil(hint.sizeThatFits(NSSize(width: hintWidth, height: 400)).height)
+            let lineHeight = ceil(hint.font.map { NSLayoutManager().defaultLineHeight(for: $0) } ?? hintHeight)
+            hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y + round((rh - lineHeight) / 2), width: hintWidth, height: hintHeight)
             documentView.addSubview(hint)
-            y += rh + Tokens.Space.x2
+            y = max(y + rh, hint.frame.maxY) + Tokens.Space.x2
             for (title, group) in shortcutGroups { section(title, group) }
         }
         finishDocument(y, width: width)
