@@ -294,9 +294,6 @@ private final class StepPage: NSView {
         Motion.fade(self, from: 0, to: 1, duration: Tokens.Motion.large, delay: 0.1)
     }
 
-    /// The right side follows your space's color as soon as you pick one.
-    func retint() {}
-
     private func refresh() {
         next.title = content.primaryTitle
         next.isEnabled = content.primaryEnabled && !content.isBusy
@@ -717,7 +714,6 @@ private final class BrowserRow: InteractiveView {
     private(set) var needsAccess = false
 
     var isFinished: Bool { if case .done(let s) = state { s.problems.isEmpty } else { false } }
-    var hasProblem: Bool { if case .done(let s) = state { !s.problems.isEmpty } else { needsAccess } }
 
     private let box = ColorView(color: .clear)
     private let tick = NSImageView()
@@ -843,14 +839,6 @@ private final class BrowserRow: InteractiveView {
             refresh()
             superview?.superview?.needsLayout = true
         }
-    }
-
-    /// Safari's export stands in for Safari itself: it holds passwords, bookmarks and history.
-    func useFile(_ url: URL) {
-        source = ImportCoordinator.fileSource(url)
-        needsAccess = false
-        isChosen = true
-        detail.stringValue = url.lastPathComponent
     }
 
     /// A line under the row, for a step to take.
@@ -1589,12 +1577,6 @@ private final class PickTile: InteractiveView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    func setWorking(_ working: Bool) {
-        spinner.isHidden = !working
-        working ? spinner.startLooping() : spinner.stopLooping()
-        needsLayout = true
-    }
-
     private func refresh() {
         // Quiet at rest, a soft accent wash and a check when picked: the icon does the talking.
         let fill = isPicked ? Onboard.accent.withAlphaComponent(0.12) : Onboard.tint.withAlphaComponent(isHovered && !isLocked ? 0.06 : 0)
@@ -1721,8 +1703,6 @@ private func appTileFull(_ art: NSImage) -> NSImage {
     }
 }
 
-private func loadIcons(_ pairs: [(PickTile, URL)]) { for (tile, url) in pairs { loadIcon(tile, site: url) } }
-
 // MARK: - Everyday sites
 
 /// The sites people open every day, as tiles: the ones you pick become favorites at the top of the sidebar.
@@ -1831,223 +1811,6 @@ final class SitesPicker: StepContent {
     }
 }
 
-// MARK: - Extensions
-
-/// Popular extensions in a list like the import step's: tick the ones you use, and each row shows its install
-/// as it happens: a spinner, then Added, or what went wrong.
-private final class ExtensionsPicker: StepContent {
-    private static let suggestions: [(id: String, name: String, kind: String, site: String, app: String?)] = [
-        // A password app on your Mac fills nothing in a browser by itself: its browser extension is what does.
-        (ExtensionStore.onePasswordID, "1Password", String(localized: "Needed to fill from the 1Password app", comment: "Under 1Password in the welcome window’s list of extensions. 1Password is a product name."), "https://1password.com", "com.1password.1password"),
-        ("nngceckbapebfimnlniiiahkandclblb", "Bitwarden", String(localized: "Needed to fill from Bitwarden", comment: "Under Bitwarden in the welcome window’s list of extensions. Bitwarden is a product name."), "https://bitwarden.com", "com.bitwarden.desktop"),
-        ("kbfnbcaeplbcioakkpcpgfkobkghlhen", "Grammarly", String(localized: "Checks your writing", comment: "Under Grammarly in the welcome window’s list of extensions."), "https://www.grammarly.com", nil),
-        ("eimadpbcbfnmbkopoojfekhnkhdbieeh", "Dark Reader", String(localized: "Dark mode for every site", comment: "Under Dark Reader in the welcome window’s list of extensions."), "https://darkreader.org", nil),
-        ("knheggckgoiihginacbkhaalnibhilkk", "Notion Web Clipper", String(localized: "Saves pages to Notion", comment: "Under Notion Web Clipper in the welcome window’s list of extensions. Notion is a product name."), "https://www.notion.so", nil),
-        ("aapbdbdomjkkjkaonfhkkikfgjllcleb", "Google Translate", String(localized: "Translates what you select", comment: "Under Google Translate in the welcome window’s list of extensions."), "https://translate.google.com", nil),
-    ]
-    private let list = ColorView(color: .clear)
-    private var rows: [(ExtensionRow, String)] = []
-    private var separators: [ColorView] = []
-    private var installing = false
-    private var finished = false
-    private let note = Label(String(localized: "Sign in to each one after it’s added.", comment: "Note under the welcome window’s list of extensions."), font: Tokens.Font.small(), color: Onboard.dim(0.65))
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        list.wantsLayer = true
-        list.layer?.cornerRadius = Tokens.Radius.tile
-        list.layer?.cornerCurve = .continuous
-        list.layer?.borderWidth = 0
-        addSubview(list)
-        var installed: Set<String> = []
-        if #available(macOS 15.4, *) { installed = Set(Profiles.shared.default.extensions.installed.keys) }
-        for (i, s) in Self.suggestions.enumerated() {
-            let row = ExtensionRow(name: s.name, kind: s.kind)
-            if installed.contains(s.id) { row.state = .added }
-            row.onChange = { [weak self] in self?.showChosen() }
-            list.addSubview(row)
-            rows.append((row, s.id))
-            if i > 0 {
-                let line = ColorView(color: Onboard.tint.withAlphaComponent(0.09))
-                list.addSubview(line)
-                separators.append(line)
-            }
-            let tile = row.iconTile
-            if let site = URL(string: s.site) {
-                loadIcon(tile, site: site, app: s.app.flatMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) })
-            }
-        }
-        note.alignment = .left
-        addSubview(note)
-        for delay in [0.4, 1.2, 2.5] { DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.showChosen() } }
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    private var toAdd: [(ExtensionRow, String)] { rows.filter { $0.0.isChosen && $0.0.state == .idle } }
-
-    /// The window on the right shows each extension you pick, as you pick it.
-    private func showChosen() {
-        preview.extensions = rows.filter { $0.0.isChosen || $0.0.state == .added }.compactMap { $0.0.iconTile.icon.image }
-        onChange?()
-    }
-    override var primaryTitle: String {
-        installing ? String(localized: "Adding…", comment: "Main button of the welcome window’s extensions step while it adds them.")
-            : toAdd.isEmpty ? String(localized: "Continue", comment: "Main button of a step in the welcome window.")
-            : String(localized: "Add \(toAdd.count)", comment: "Main button of the welcome window’s extensions step: add the ones picked, with how many.")
-    }
-    override var isBusy: Bool { installing }
-
-    override func commit(_ done: @escaping () -> Void) {
-        let work = toAdd
-        guard !work.isEmpty else { done(); return }
-        installing = true
-        rows.forEach { $0.0.isLocked = true }
-        work.forEach { $0.0.state = .waiting }
-        onChange?()
-        Task { @MainActor in
-            var failed = false
-            for (row, id) in work {
-                row.state = .working
-                switch await ExtensionStore.install(id, in: Profiles.shared.default) {
-                case .success: row.state = .added
-                case .failure(let error):
-                    failed = true
-                    row.state = .failed(error.reason)
-                }
-            }
-            self.installing = false
-            self.rows.forEach { $0.0.isLocked = false }
-            if failed {
-                // Say so and wait: Next then moves on.
-                self.note.stringValue = String(localized: "Some couldn’t be added. You can add them later from the Chrome Web Store.", comment: "Welcome window’s extensions step, when some failed. Chrome Web Store is Google’s name.")
-                self.onChange?()
-            } else {
-                // A beat to see them all marked Added, then on.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { done() }
-            }
-        }
-    }
-
-    override func preferredHeight(for width: CGFloat) -> CGFloat { CGFloat(rows.count) * 50 + 12 + note.lineHeight }
-
-    override func layout() {
-        super.layout()
-        let width = bounds.width, rowH: CGFloat = 50
-        list.frame = NSRect(x: 0, y: 0, width: width, height: CGFloat(rows.count) * rowH)
-        for (i, (row, _)) in rows.enumerated() {
-            row.frame = NSRect(x: 0, y: CGFloat(i) * rowH, width: width, height: rowH)
-            if i > 0 { separators[i - 1].frame = NSRect(x: 62, y: CGFloat(i) * rowH, width: width - 62, height: Tokens.Metric.hairline) }
-        }
-        note.frame = NSRect(x: 2, y: list.frame.maxY + 12, width: width, height: note.lineHeight)
-    }
-
-}
-
-/// One suggested extension: checkbox, icon, name and what it does; on the right, how adding it went.
-private final class ExtensionRow: InteractiveView {
-    enum State: Equatable { case idle, waiting, working, added, failed(String) }
-    var state = State.idle { didSet { refresh() } }
-    var isChosen = false { didSet { refresh() } }
-    override func accessibilityValue() -> Any? { isChosen ? 1 : 0 }
-    var isLocked = false
-    var onChange: (() -> Void)?
-    /// Holds the icon; borrowed for loading.
-    let iconTile = PickTile(name: "")
-    private let box = ColorView(color: .clear)
-    private let tick = NSImageView()
-    private let name: Label
-    private let kind: Label
-    private let status = Label("", font: Tokens.Font.small(.medium), color: Onboard.ink)
-    private let statusIcon = NSImageView()
-    private let spinner = Spinner()
-
-    /// What the extension does, shown under its name until adding it fails and the reason takes its place.
-    private let detailText: String
-
-    init(name text: String, kind detail: String) {
-        detailText = detail
-        name = Label(text, font: Tokens.Font.body(.semibold), color: Onboard.ink)
-        kind = Label(detail, font: Tokens.Font.small(), color: Onboard.dim(0.62))
-        super.init(frame: .zero)
-        box.wantsLayer = true
-        box.layer?.cornerRadius = Tokens.Radius.control
-        box.layer?.borderWidth = Tokens.Metric.fieldRing
-        tick.image = Tokens.Symbol.image("checkmark", size: 10)
-        tick.contentTintColor = Onboard.onAccent
-        box.addSubview(tick)
-        status.alignment = .right
-        [box, iconTile.icon, name, kind, status, statusIcon, spinner].forEach { addSubview($0) }
-        onClick = { [weak self] _ in
-            guard let self, !self.isLocked, self.state == .idle || { if case .failed = self.state { true } else { false } }() else { return }
-            if case .failed = self.state { self.state = .idle }
-            self.isChosen.toggle()
-            self.onChange?()
-        }
-        setAccessibilityRole(.checkBox)
-        setAccessibilityLabel(text)
-        refresh()
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-    override var isFlipped: Bool { true }
-    override func stateDidChange(animated: Bool) { refresh() }
-
-    private func refresh() {
-        let added = state == .added
-        let on = isChosen || added
-        Onboard.tintCheckbox(box, on: on)
-        tick.isHidden = !on
-        box.alphaValue = added ? 0.5 : 1
-        layer?.backgroundColor = isHovered && state == .idle && !isLocked ? cgColor(Onboard.tint.withAlphaComponent(0.05)) : nil
-        statusIcon.isHidden = true
-        status.textColor = Onboard.ink
-        kind.stringValue = detailText
-        toolTip = nil
-        switch state {
-        case .idle: status.stringValue = ""
-        case .waiting: status.stringValue = String(localized: "Waiting", comment: "By an extension in the welcome window while others are added first."); status.textColor = Onboard.dim(0.55)
-        case .working: status.stringValue = String(localized: "Adding", comment: "By an extension in the welcome window while it’s added.")
-        case .added:
-            status.stringValue = String(localized: "Added", comment: "By an extension in the welcome window once it’s added.")
-            statusIcon.image = Tokens.Symbol.image("checkmark.circle.fill", size: 15)
-            statusIcon.contentTintColor = Tokens.Color.success
-            statusIcon.isHidden = false
-        case .failed(let message):
-            status.stringValue = String(localized: "Couldn’t add", comment: "By an extension in the welcome window when it couldn’t be added.")
-            status.textColor = Tokens.Color.caution
-            // Why, where you're already looking, not only on hover.
-            kind.stringValue = message
-            toolTip = message
-        }
-        state == .working ? spinner.startAnimation(nil) : spinner.stopAnimation(nil)
-        needsLayout = true
-    }
-
-    override func layout() {
-        super.layout()
-        let h = bounds.height, pad = Tokens.Space.x4
-        box.frame = NSRect(x: pad, y: (h - 18) / 2, width: 18, height: 18)
-        tick.frame = box.bounds.insetBy(dx: 3, dy: 3)
-        iconTile.icon.frame = NSRect(x: box.frame.maxX + 10, y: (h - 38) / 2, width: 38, height: 38)
-        let x = iconTile.icon.frame.maxX + 10
-        var right = bounds.width - pad
-        if !statusIcon.isHidden {
-            statusIcon.frame = NSRect(x: right - 15, y: (h - 15) / 2, width: 15, height: 15)
-            right = statusIcon.frame.minX - 6
-        }
-        if !spinner.isHidden || state == .working {
-            spinner.frame = NSRect(x: right - 16, y: (h - 16) / 2, width: 16, height: 16)
-            right = spinner.frame.minX - 6
-        }
-        let sw = status.textWidth + 2
-        status.frame = NSRect(x: right - sw, y: (h - status.lineHeight) / 2, width: sw, height: status.lineHeight)
-        let block = name.lineHeight + 1 + kind.lineHeight
-        name.frame = NSRect(x: x, y: (h - block) / 2, width: status.frame.minX - x - 8, height: name.lineHeight)
-        kind.frame = NSRect(x: x, y: name.frame.maxY + 1, width: status.frame.minX - x - 8, height: kind.lineHeight)
-    }
-}
-
 // MARK: - Ads
 
 /// Two clear answers, one picked, over a page that shows the difference: with ads, banners and a pop-up crowd
@@ -2078,66 +1841,6 @@ private final class AdsPicker: StepContent {
     override func layout() {
         super.layout()
         Onboard.layoutAnswers([yes, no], in: bounds)
-    }
-}
-
-/// A choice you can only pick one of: a ring, a title and a line.
-private final class ChoiceCard: InteractiveView {
-    var isChosen = false { didSet { refresh() } }
-    private let ring = ColorView(color: .clear)
-    private let dot = ColorView(color: Onboard.accent)
-    private let title: Label
-    private let detail: Label
-    private let badge = Label(String(localized: "Recommended", comment: "Badge on the suggested answer in the welcome window."), font: Tokens.Font.small(.semibold), color: NSColor.white)
-    private let badgeFill = ColorView(color: Onboard.accent)
-
-    init(title text: String, detail line: String, recommended: Bool) {
-        title = Label(text, font: Tokens.Font.body(.semibold), color: Onboard.ink)
-        detail = Label(line, font: Tokens.Font.small(), color: Onboard.dim(0.65))
-        super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.panel
-        layer?.cornerCurve = .continuous
-        ring.wantsLayer = true
-        ring.layer?.cornerRadius = 10
-        ring.layer?.borderWidth = Tokens.Metric.fieldRing
-        dot.wantsLayer = true
-        dot.layer?.cornerRadius = 5
-        ring.addSubview(dot)
-        badgeFill.wantsLayer = true
-        badgeFill.layer?.cornerRadius = Tokens.Radius.control
-        badge.alignment = .center
-        badgeFill.addSubview(badge)
-        badgeFill.isHidden = !recommended
-        [ring, title, detail, badgeFill].forEach { addSubview($0) }
-        setAccessibilityRole(.radioButton)
-        setAccessibilityLabel(text)
-        refresh()
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-    override var isFlipped: Bool { true }
-    override func stateDidChange(animated: Bool) { refresh() }
-
-    private func refresh() {
-        layer?.backgroundColor = cgColor(Onboard.tint.withAlphaComponent(isChosen ? 0.16 : (isHovered ? 0.09 : 0.05)))
-        layer?.borderWidth = isChosen ? 1.5 : 0
-        layer?.borderColor = cgColor(Onboard.tint.withAlphaComponent(0.7))
-        ring.layer?.borderColor = cgColor(Onboard.tint.withAlphaComponent(isChosen ? 1 : 0.45))
-        dot.isHidden = !isChosen
-    }
-
-    override func layout() {
-        super.layout()
-        ring.frame = NSRect(x: 20, y: (bounds.height - 20) / 2, width: 20, height: 20)
-        dot.frame = NSRect(x: 5, y: 5, width: 10, height: 10)
-        let x = ring.frame.maxX + 16
-        let block = title.lineHeight + 2 + detail.lineHeight
-        title.frame = NSRect(x: x, y: (bounds.height - block) / 2, width: min(title.textWidth + 4, bounds.width - x - 12), height: title.lineHeight)
-        detail.frame = NSRect(x: x, y: title.frame.maxY + 2, width: bounds.width - x - 16, height: detail.lineHeight)
-        let bw = badge.textWidth + 14
-        // Top right, clear of the title however narrow the card.
-        badgeFill.frame = NSRect(x: bounds.width - bw - 10, y: 10, width: bw, height: 20)
-        badge.frame = NSRect(x: 0, y: (20 - badge.lineHeight) / 2, width: bw, height: badge.lineHeight)
     }
 }
 

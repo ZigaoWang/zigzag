@@ -1777,17 +1777,6 @@
         }
       }
     },
-    "Add %lld" : {
-      "comment" : "Main button of the welcome window’s extensions step: add the ones picked, with how many.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加 %lld 个"
-          }
-        }
-      }
-    },
     "Add %lld Extensions" : {
       "comment" : "Button in the Import window that adds the extensions found: how many.",
       "localizations" : {
@@ -1964,17 +1953,6 @@
         }
       }
     },
-    "Added" : {
-      "comment" : "By an extension in the welcome window once it’s added.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已添加"
-          }
-        }
-      }
-    },
     "Added %@" : {
       "comment" : "Toast after an extension is added. The name is the extension's.",
       "localizations" : {
@@ -2019,17 +1997,6 @@
         }
       }
     },
-    "Adding" : {
-      "comment" : "By an extension in the welcome window while it’s added.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在添加"
-          }
-        }
-      }
-    },
     "Adding %@, %lld of %lld…" : {
       "comment" : "Import window, under Extensions while they're added one at a time: the extension's name, which one, then how many.",
       "localizations" : {
@@ -2059,7 +2026,7 @@
       }
     },
     "Adding…" : {
-      "comment" : "Main button of the welcome window’s extensions step while it adds them.\nToast while an extension is being added.",
+      "comment" : "Toast while an extension is being added.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -3281,17 +3248,6 @@
         }
       }
     },
-    "Checks your writing" : {
-      "comment" : "Under Grammarly in the welcome window’s list of extensions.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "检查你的写作"
-          }
-        }
-      }
-    },
     "Choices you make for one site, like allowing ads, a camera or notifications, show up here." : {
       "comment" : "Explanation under “None yet” in Settings › Privacy.",
       "localizations" : {
@@ -4254,17 +4210,6 @@
         }
       }
     },
-    "Couldn’t add" : {
-      "comment" : "By an extension in the welcome window when it couldn’t be added.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未能添加"
-          }
-        }
-      }
-    },
     "Couldn’t add these:" : {
       "comment" : "Import window, under Extensions, before the ones that couldn't be added, each on its own line with why.",
       "localizations" : {
@@ -4569,17 +4514,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "深色页面"
-          }
-        }
-      }
-    },
-    "Dark mode for every site" : {
-      "comment" : "Under Dark Reader in the welcome window’s list of extensions.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "为每个网站开启深色模式"
           }
         }
       }
@@ -7535,28 +7469,6 @@
         }
       }
     },
-    "Needed to fill from Bitwarden" : {
-      "comment" : "Under Bitwarden in the welcome window’s list of extensions. Bitwarden is a product name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从 Bitwarden 填写时需要"
-          }
-        }
-      }
-    },
-    "Needed to fill from the 1Password app" : {
-      "comment" : "Under 1Password in the welcome window’s list of extensions. 1Password is a product name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从 1Password App 填写时需要"
-          }
-        }
-      }
-    },
     "Needs attention" : {
       "comment" : "VoiceOver value of an extension's button in the site panel when the extension asks for attention.",
       "localizations" : {
@@ -9958,17 +9870,6 @@
         }
       }
     },
-    "Recommended" : {
-      "comment" : "Badge on the suggested answer in the welcome window.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "推荐"
-          }
-        }
-      }
-    },
     "Recording tabs" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
       "localizations" : {
@@ -10921,17 +10822,6 @@
         }
       }
     },
-    "Saves pages to Notion" : {
-      "comment" : "Under Notion Web Clipper in the welcome window’s list of extensions. Notion is a product name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将页面存储到 Notion"
-          }
-        }
-      }
-    },
     "Saving and Filling in %@" : {
       "comment" : "A heading in Settings › Passwords, with more than one profile: whether Zigzag offers to save and fill passwords in the profile. The placeholder is a profile's name.",
       "localizations" : {
@@ -11812,17 +11702,6 @@
         }
       }
     },
-    "Sign in to each one after it’s added." : {
-      "comment" : "Note under the welcome window’s list of extensions.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每个扩展添加后，请分别登录。"
-          }
-        }
-      }
-    },
     "Sign-ins" : {
       "comment" : "Choice in the Import window: bring over the sites you're signed in to.",
       "localizations" : {
@@ -12061,17 +11940,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "部分内容不安全"
-          }
-        }
-      }
-    },
-    "Some couldn’t be added. You can add them later from the Chrome Web Store." : {
-      "comment" : "Welcome window’s extensions step, when some failed. Chrome Web Store is Google’s name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "有些扩展未能添加。你可以稍后从 Chrome 网上应用店添加。"
           }
         }
       }
@@ -13644,17 +13512,6 @@
         }
       }
     },
-    "Translates what you select" : {
-      "comment" : "Under Google Translate in the welcome window’s list of extensions.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "翻译你选中的内容"
-          }
-        }
-      }
-    },
     "Translating from %@…" : {
       "comment" : "Toast while a page is translated. The language is its name, like French.",
       "localizations" : {
@@ -14475,7 +14332,7 @@
       }
     },
     "Waiting" : {
-      "comment" : "By a browser in the welcome window while another one is imported first.\nBy an extension in the welcome window while others are added first.",
+      "comment" : "By a browser in the welcome window while another one is imported first.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
