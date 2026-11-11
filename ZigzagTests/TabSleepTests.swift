@@ -62,6 +62,47 @@ struct TabSleepTests {
         #expect(TabSleep.sleepers([away, recent, typed], awake: 3, memory: .critical) == [away.id])
     }
 
+    // MARK: A site kept awake (#91)
+
+    private func kept(_ unseen: TimeInterval, favorite: Bool = false, typed: Bool = false) -> TabSleep.Candidate {
+        TabSleep.Candidate(id: UUID(), unseen: unseen, mustStay: false, hasTypedText: typed, isFavorite: favorite, keptAwake: true)
+    }
+
+    @Test func aSiteKeptAwakeNeverSleepsForBeingIdleOrOneOfMany() {
+        let tabs = (0..<30).map { kept(TimeInterval(2 + $0) * 60 * minute) }
+        #expect(TabSleep.sleepers(tabs, awake: 40, memory: .normal).isEmpty)
+        #expect(TabSleep.sleepers([kept(5 * 60 * minute, favorite: true)], awake: 40, memory: .normal).isEmpty)
+    }
+
+    @Test func aSiteKeptAwakeStaysAwakeOnMacOSFirstMemoryWarning() {
+        let awake = kept(30 * minute), other = tab(30 * minute)
+        #expect(TabSleep.sleepers([awake, other], awake: 3, memory: .low) == [other.id])
+    }
+
+    @Test func atCriticalMemoryASiteKeptAwakeWaitsForEverythingElse() {
+        let awake = kept(3 * 60 * minute), other = tab(30 * minute)
+        let favorite = TabSleep.Candidate(id: UUID(), unseen: 30 * minute, mustStay: false, hasTypedText: false, isFavorite: true)
+        // Others first, favorites among them, however much longer the kept one has been unseen.
+        #expect(TabSleep.sleepers([awake, other, favorite], awake: 3, memory: .critical) == [other.id, favorite.id])
+    }
+
+    @Test func atCriticalMemoryASiteKeptAwakeGoesOneAtATimeLongestUnseenFirst() {
+        let older = kept(2 * 60 * minute), newer = kept(60 * minute, favorite: true)
+        let recent = kept(2 * minute), typed = kept(3 * 60 * minute, typed: true)
+        let onScreen = TabSleep.Candidate(id: UUID(), unseen: 4 * 60 * minute, mustStay: true, hasTypedText: false, keptAwake: true)
+        let tabs = [newer, recent, typed, older, onScreen]
+        #expect(TabSleep.sleepers(tabs, awake: 5, memory: .critical) == [older.id])
+        #expect(TabSleep.sleepers(tabs.filter { $0.id != older.id }, awake: 4, memory: .critical) == [newer.id])
+        // Left a moment ago, typed in or on screen: stays, as for any tab.
+        #expect(TabSleep.sleepers([recent, typed, onScreen], awake: 3, memory: .critical).isEmpty)
+    }
+
+    @Test func aBusyTabKeptAwakeIsOnlyPointedOut() {
+        #expect(!EnergyWatch.staysAwake(extensionPage: false, playing: false, inUse: false, notifies: false, favorite: false, keptAwake: false, typed: false))
+        #expect(EnergyWatch.staysAwake(extensionPage: false, playing: false, inUse: false, notifies: false, favorite: false, keptAwake: true, typed: false))
+        #expect(EnergyWatch.staysAwake(extensionPage: false, playing: false, inUse: false, notifies: false, favorite: true, keptAwake: false, typed: false))
+    }
+
     @Test func webKitReasonsAreToldApart() {
         #expect(PageStop(webKitReason: 0, lowOnMemoryAgo: nil) == .pageMemory)
         #expect(PageStop(webKitReason: 1, lowOnMemoryAgo: nil) == .processor)
@@ -117,5 +158,62 @@ struct TabSleepTests {
         #expect(state.belongs(to: URL(string: "https://example.com/a?b=1#end")))
         #expect(!state.belongs(to: URL(string: "https://example.com/a?b=2")))
         #expect(!state.belongs(to: nil))
+    }
+}
+
+/// The sites kept awake in their site controls: kept, covering subdomains, forgotten, and never chosen in a private
+/// window (#91).
+@MainActor
+@Suite(.serialized)
+struct KeepAwakeTests {
+    private func withDefaults(_ body: () throws -> Void) rethrows {
+        let name = "KeepAwakeTests-\(UUID().uuidString)"
+        let saved = KeepAwake.defaults
+        KeepAwake.defaults = UserDefaults(suiteName: name)!
+        defer {
+            KeepAwake.defaults.removePersistentDomain(forName: name)
+            KeepAwake.defaults = saved
+        }
+        try body()
+    }
+
+    @Test func aSiteKeptAwakeIsKeptAndCoversItsSubdomains() {
+        withDefaults {
+            KeepAwake.set(true, for: URL(string: "https://www.example.com/inbox"))
+            #expect(KeepAwake.sites == ["example.com"])
+            #expect(KeepAwake.defaults.stringArray(forKey: "KeepAwakeSites") == ["example.com"])
+            #expect(KeepAwake.isOn(for: URL(string: "https://example.com/")))
+            #expect(KeepAwake.isOn(for: URL(string: "https://mail.example.com/")))
+            #expect(!KeepAwake.isOn(for: URL(string: "https://example.org/")))
+            #expect(!KeepAwake.isOn(for: URL(string: "https://notexample.com/")))
+            #expect(!KeepAwake.isOn(for: nil))
+        }
+    }
+
+    @Test func turningItOffOnASubdomainTakesAwayWhatCoveredIt() {
+        withDefaults {
+            KeepAwake.set(true, for: URL(string: "https://example.com/"))
+            KeepAwake.set(true, for: URL(string: "https://other.org/"))
+            KeepAwake.set(false, for: URL(string: "https://mail.example.com/"))
+            #expect(KeepAwake.sites == ["other.org"])
+            #expect(!KeepAwake.isOn(for: URL(string: "https://example.com/")))
+        }
+    }
+
+    @Test func turningItOnTwiceKeepsOneEntry() {
+        withDefaults {
+            KeepAwake.set(true, for: URL(string: "https://example.com/a"))
+            KeepAwake.set(true, for: URL(string: "https://www.example.com/b"))
+            #expect(KeepAwake.sites == ["example.com"])
+        }
+    }
+
+    @Test func aPrivateWindowIsNotOfferedTheChoice() {
+        let page = URL(string: "https://example.com/")
+        #expect(KeepAwake.isOffered(for: page, isPrivate: false))
+        #expect(!KeepAwake.isOffered(for: page, isPrivate: true))
+        #expect(KeepAwake.isOffered(for: URL(string: "http://localhost:3000/"), isPrivate: false))
+        #expect(!KeepAwake.isOffered(for: URL(string: "webkit-extension://abc/popup.html"), isPrivate: false))
+        #expect(!KeepAwake.isOffered(for: nil, isPrivate: false))
     }
 }

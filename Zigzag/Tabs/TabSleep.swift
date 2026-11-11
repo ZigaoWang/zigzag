@@ -12,6 +12,10 @@ import Foundation
 /// A favorite never sleeps for being idle or one of many, as in Arc: it's the page you keep coming back to, so it
 /// stays as you left it. Only memory running critically short puts it to sleep; macOS's first warning, which a Mac
 /// in everyday use gives often, doesn't.
+///
+/// A site you keep awake (its site controls, `KeepAwake`) never sleeps for being idle or one of many either, favorite
+/// or not. When memory is critically short it's the last to go: one at a time, and only once nothing else is left to
+/// sleep, since a Mac that runs out ends a page itself, maybe the one you're looking at.
 nonisolated enum TabSleep {
     struct Candidate: Sendable {
         let id: UUID
@@ -21,6 +25,8 @@ nonisolated enum TabSleep {
         let mustStay: Bool
         let hasTypedText: Bool
         var isFavorite = false
+        /// From a site kept awake in its site controls.
+        var keptAwake = false
     }
 
     /// What macOS last said of memory, within `MemoryPressure.lasts`.
@@ -41,8 +47,13 @@ nonisolated enum TabSleep {
     static func sleepers(_ tabs: [Candidate], awake: Int, memory: Memory) -> [UUID] {
         var awake = awake
         var out: [UUID] = []
+        var keptAwake: UUID?
         let lowOnMemory = memory != .normal
         for tab in tabs.sorted(by: { $0.unseen > $1.unseen }) where !tab.mustStay && !tab.hasTypedText {
+            if tab.keptAwake {
+                if memory == .critical, tab.unseen > lowOnMemoryIdle, keptAwake == nil { keptAwake = tab.id }
+                continue
+            }
             if tab.isFavorite {
                 guard memory == .critical, tab.unseen > lowOnMemoryIdle else { continue }
             } else {
@@ -51,7 +62,42 @@ nonisolated enum TabSleep {
             out.append(tab.id)
             awake -= 1
         }
+        // A site kept awake gives way last: the longest unseen, one each time.
+        if out.isEmpty, let keptAwake { out.append(keptAwake) }
         return out
+    }
+}
+
+/// Sites whose tabs stay awake in the background, chosen in the site controls (Settings › Privacy › Sites lists
+/// them). A site covers its subdomains, as the other choices for a site do. Not chosen in a private window, so a
+/// private visit never ends up in the list; a private window's tabs still follow it.
+enum KeepAwake {
+    /// Where the list is kept; tests use their own.
+    static var defaults: UserDefaults = .standard
+    private static let key = "KeepAwakeSites"
+
+    /// Hosts without "www.".
+    static var sites: Set<String> {
+        get { Set(defaults.stringArray(forKey: key) ?? []) }
+        set { defaults.set(Array(newValue).sorted(), forKey: key) }
+    }
+
+    static func isOn(for url: URL?) -> Bool {
+        guard let site = ContentBlocker.site(of: url) else { return false }
+        return sites.contains { site == $0 || site.hasSuffix("." + $0) }
+    }
+
+    /// Whether the site controls offer the choice: for a web page, and not in a private window.
+    static func isOffered(for url: URL?, isPrivate: Bool) -> Bool {
+        !isPrivate && ["http", "https"].contains(url?.scheme?.lowercased() ?? "")
+    }
+
+    /// Off takes away whatever covered the site, its parent domain's choice included, so it's off here at once.
+    static func set(_ on: Bool, for url: URL?) {
+        guard let site = ContentBlocker.site(of: url) else { return }
+        var kept = sites.filter { !(site == $0 || site.hasSuffix("." + $0)) }
+        if on { kept.insert(site) }
+        sites = kept
     }
 }
 

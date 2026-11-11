@@ -379,6 +379,15 @@ final class SitePanel: FloatingPanelView {
                 DarkPages.setChoice(on, for: self.url)
             })
         }
+        // The site's tabs never sleep in the background (TabSleep, EnergyWatch). Not in a private window: its site
+        // would be kept in the list.
+        if KeepAwake.isOffered(for: url, isPrivate: isPrivate) {
+            rows.append(.toggle(String(localized: "Keep tabs awake", comment: "Row in the site panel's This Site group: this site's tabs never go to sleep in the background to save memory."),
+                                on: KeepAwake.isOn(for: url), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                guard let self else { return }
+                KeepAwake.set(on, for: self.url)
+            })
+        }
         if let language = tab.foreignLanguage {
             let name = PageTranslator.name(of: language)
             let always = String(localized: "Always translated", comment: "Under a language's name in the site panel's This Site group: pages in it are always translated.")

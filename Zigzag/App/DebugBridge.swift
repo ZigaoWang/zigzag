@@ -545,6 +545,8 @@ enum DebugBridge {
         // Dark page row for the page in front. darkstate: what the page script found there, in the debug log.
         case "darkpages": if let mode = DarkPages.Mode(rawValue: arg) { DarkPages.mode = mode }
         case "darksite": DarkPages.setChoice(arg == "follow" ? nil : arg == "on", for: controller.tabManager.selectedTab?.url)
+        // keepawake on|off: the site panel's Keep tabs awake row for the page in front.
+        case "keepawake": KeepAwake.set(arg == "on", for: controller.tabManager.selectedTab?.url)
         case "darkstate":
             controller.selectedWebView?.callAsyncJavaScript("return window.__zigzagDark ? JSON.stringify(window.__zigzagDark.state()) : 'none'",
                                                             arguments: [:], in: nil, in: DarkPages.world) { result in

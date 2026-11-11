@@ -1689,13 +1689,13 @@
         }
       }
     },
-    "A tab you’re not using that keeps working hard sleeps until you open it again." : {
-      "comment" : "Explanation under “Put busy background tabs to sleep” in Settings › Tabs.",
+    "A tab you’re not using that keeps working hard sleeps until you open it again. To keep a site’s tabs awake, turn on Keep tabs awake in its site controls." : {
+      "comment" : "Explanation under “Put busy background tabs to sleep” in Settings › Tabs. Keep tabs awake is the row in the site panel; site controls is the panel by the address.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没在用却一直占用大量资源的标签页会休眠，再次打开时唤醒。"
+            "value" : "没在用却一直占用大量资源的标签页会休眠，再次打开时唤醒。要让某个网站的标签页保持唤醒，请在它的网站设置中打开“标签页保持唤醒”。"
           }
         }
       }
@@ -2080,13 +2080,13 @@
         }
       }
     },
-    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, and dark pages follow your setting again." : {
+    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, dark pages follow your setting again, and every site’s tabs can sleep in the background." : {
       "comment" : "Message of the sheet that forgets the choices made for single sites.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放会恢复为 100%，深色网页也会重新跟随你的设置。"
+            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放会恢复为 100%，深色网页会重新跟随你的设置，所有网站的标签页也会在后台照常休眠。"
           }
         }
       }
@@ -6637,6 +6637,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保持置顶"
+          }
+        }
+      }
+    },
+    "Keep tabs awake" : {
+      "comment" : "Row in the site panel's This Site group: this site's tabs never go to sleep in the background to save memory.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签页保持唤醒"
           }
         }
       }
@@ -16212,6 +16223,17 @@
         }
       }
     },
+    "sleep asleep memory energy keep awake active exclude site" : {
+      "comment" : "Words that find the Put busy background tabs to sleep setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "休眠 睡眠 内存 耗电 保持唤醒 活跃 排除 网站 sleep asleep memory energy keep awake active exclude site"
+          }
+        }
+      }
+    },
     "spaces" : {
       "comment" : "Item in the short list of what a browser holds, in the Import window: Arc's spaces.",
       "localizations" : {
@@ -16219,6 +16241,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "空间"
+          }
+        }
+      }
+    },
+    "tabs kept awake" : {
+      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its tabs never go to sleep in the background.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签页保持唤醒"
           }
         }
       }

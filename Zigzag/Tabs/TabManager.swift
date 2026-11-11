@@ -1433,8 +1433,8 @@ final class TabManager {
     /// and at once when macOS says memory is short.
     func sleepIdleTabs() {
         // Kept awake: what's on screen (both halves of a split), anything in a call or floating, and sites that notify.
-        // Favorites too, unless memory is critically short (TabSleep). Other spaces' pages sleep like any tab once
-        // idle; their snapshots still show while you swipe to them.
+        // Favorites and sites kept awake too, unless memory is critically short (TabSleep). Other spaces' pages sleep
+        // like any tab once idle; their snapshots still show while you swipe to them.
         var selectedIDs = Set([selectedTab?.id].compactMap { $0 })
         for id in Array(selectedIDs) { if let tab = tab(with: id), let other = partner(of: tab) { selectedIDs.insert(other.id) } }
         let live = allTabs.filter { !$0.isSuspended }
@@ -1443,12 +1443,15 @@ final class TabManager {
         let candidates = live.map {
             TabSleep.Candidate(id: $0.id, unseen: now.timeIntervalSince($0.lastActivated),
                                mustStay: selectedIDs.contains($0.id) || $0.isPlayingAudio || $0.isInUse || $0.notifiesUser,
-                               hasTypedText: $0.pageState?.hasTypedText == true, isFavorite: $0.isFavorite)
+                               hasTypedText: $0.pageState?.hasTypedText == true, isFavorite: $0.isFavorite,
+                               keptAwake: KeepAwake.isOn(for: $0.url))
         }
         for id in TabSleep.sleepers(candidates, awake: live.count, memory: memory) {
             guard let tab = live.first(where: { $0.id == id }) else { continue }
             let unseen = now.timeIntervalSince(tab.lastActivated)
-            tab.suspend(because: unseen > TabSleep.idle ? "unseen for an hour"
+            // A favorite or a site kept awake sleeps only for memory, however long unseen.
+            let shielded = tab.isFavorite || KeepAwake.isOn(for: tab.url)
+            tab.suspend(because: unseen > TabSleep.idle && !shielded ? "unseen for an hour"
                         : memory != .normal ? "Mac low on memory" : "more than \(TabSleep.crowd) tabs awake")
         }
         // Each space keeps the page it shows out of the archive, as before.

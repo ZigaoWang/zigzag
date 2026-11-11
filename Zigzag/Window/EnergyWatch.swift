@@ -97,6 +97,13 @@ final class EnergyWatch {
         WindowManager.shared.controllers.first { $0.tabManager.allTabs.contains { $0 === tab } }
     }
 
+    /// Whether a busy background tab is only pointed out, not put to sleep: an extension's own page, one playing or in
+    /// a call, a site that notifies, a favorite, a site kept awake in its site controls, or one with something typed.
+    nonisolated static func staysAwake(extensionPage: Bool, playing: Bool, inUse: Bool, notifies: Bool, favorite: Bool,
+                                       keptAwake: Bool, typed: Bool) -> Bool {
+        extensionPage || playing || inUse || notifies || favorite || keptAwake || typed
+    }
+
     /// A page process busy in the background: its tabs that can sleep, sleep; one that can't is only pointed out.
     /// Tabs of a site share a process, so all of that site's background tabs count.
     private func settle(_ pid: Int32, tab busiest: Tab, url: URL, in controller: BrowserWindowController) {
@@ -109,8 +116,9 @@ final class EnergyWatch {
             let kept = [selected, selected.flatMap(owner.tabManager.partner(of:))].compactMap { $0 }
             for tab in owner.tabManager.allTabs where tab.webView.flatMap(Self.processID) == pid && !Self.isOnScreen(tab, in: owner)
                 && !kept.contains(where: { $0 === tab }) {
-                let mustStay = url.scheme == "webkit-extension" || tab.isPlayingAudio || tab.isInUse || tab.notifiesUser || tab.isFavorite
-                    || tab.pageState?.hasTypedText == true
+                let mustStay = Self.staysAwake(extensionPage: url.scheme == "webkit-extension", playing: tab.isPlayingAudio, inUse: tab.isInUse,
+                                               notifies: tab.notifiesUser, favorite: tab.isFavorite, keptAwake: KeepAwake.isOn(for: tab.url),
+                                               typed: tab.pageState?.hasTypedText == true)
                 if mustStay { awake.append(tab) } else if now.timeIntervalSince(tab.lastActivated) <= Self.recentlySeen { soon = true } else {
                     tab.suspend(because: "using a lot of energy")
                     slept.append(tab)

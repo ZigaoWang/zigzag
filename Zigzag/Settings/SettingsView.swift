@@ -863,9 +863,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                               detail: String(localized: "They leave the sidebar. Type a few letters in the address bar to bring one back.", comment: "Explanation under “Archive tabs you haven’t used” in Settings › Tabs."),
                               control: archiveAfter))
         energyToggle.onChange = { on in EnergyWatch.sleepsBusyTabs = on }
-        tabsGroup.add(FormRow(title: String(localized: "Put busy background tabs to sleep", comment: "A setting in Settings › Tabs."),
-                              detail: String(localized: "A tab you’re not using that keeps working hard sleeps until you open it again.", comment: "Explanation under “Put busy background tabs to sleep” in Settings › Tabs."),
-                              control: energyToggle))
+        let energyRow = FormRow(title: String(localized: "Put busy background tabs to sleep", comment: "A setting in Settings › Tabs."),
+                                detail: String(localized: "A tab you’re not using that keeps working hard sleeps until you open it again. To keep a site’s tabs awake, turn on Keep tabs awake in its site controls.",
+                                               comment: "Explanation under “Put busy background tabs to sleep” in Settings › Tabs. Keep tabs awake is the row in the site panel; site controls is the panel by the address."),
+                                control: energyToggle)
+        energyRow.keywords = String(localized: "sleep asleep memory energy keep awake active exclude site", comment: "Words that find the Put busy background tabs to sleep setting with Find a setting in Settings. Not shown.")
+        tabsGroup.add(energyRow)
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
         let videoRow = FormRow(title: String(localized: "Keep videos playing when you switch tabs", comment: "A setting in Settings › Tabs."),
                                detail: String(localized: "A playing video follows you in a small player.", comment: "Explanation under “Keep videos playing when you switch tabs” in Settings › Tabs."),
@@ -2131,12 +2134,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
         // The choices made one site at a time, which otherwise have nowhere to be seen.
         let nothingChosen = ContentBlocker.allowedSites.isEmpty && ExtensionStore.extensionsOffSites.isEmpty && SitePermissions.sites.isEmpty
-            && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty
+            && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty && KeepAwake.sites.isEmpty
         let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
         sitesReset = nothingChosen ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: String(localized: "Reset choices made for single sites?", comment: "Title of the sheet that forgets the choices made for single sites."),
-                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, and dark pages follow your setting again.",
+                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, dark pages follow your setting again, and every site’s tabs can sleep in the background.",
                                           comment: "Message of the sheet that forgets the choices made for single sites."),
                           action: String(localized: "Reset All", comment: "Button of the sheet that forgets the choices made for single sites.")) {
                 ContentBlocker.allowedSites = []
@@ -2144,6 +2147,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 SitePermissions.forgetAll()
                 ZoomLevels.resetAll()
                 DarkPages.forgetAll()
+                KeepAwake.sites = []
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
@@ -2159,7 +2163,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // shares a row with the host's other choices, and anything else in full (http://localhost:3000).
         let origins = Dictionary(SitePermissions.sites.map { (SiteOrigin.label($0), $0) }, uniquingKeysWith: { a, _ in a })
         let sites = Set(origins.keys).union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites).union(ZoomLevels.all.keys)
-            .union(DarkPages.sitesOn).union(DarkPages.sitesOff)
+            .union(DarkPages.sitesOn).union(DarkPages.sitesOff).union(KeepAwake.sites)
         var listed = 0, more = 0
         for site in sites.sorted() {
             var said: [String] = []
@@ -2189,6 +2193,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             } else if DarkPages.sitesOff.contains(site) {
                 said.append(String(localized: "dark page off", comment: "A choice made for a site in Settings › Privacy, in a list of them: its pages are never drawn dark."))
             }
+            if KeepAwake.sites.contains(site) {
+                said.append(String(localized: "tabs kept awake", comment: "A choice made for a site in Settings › Privacy, in a list of them: its tabs never go to sleep in the background."))
+            }
             guard !said.isEmpty else { continue }
             // The first 30 by name, as with site data, then the rest on request.
             guard sitesShowAll || listed < 30 else { more += 1; continue }
@@ -2205,6 +2212,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 ExtensionStore.extensionsOffSites = off
                 ZoomLevels.forget(host: site)
                 DarkPages.setChoice(nil, for: URL(string: "https://\(site)"))
+                var awake = KeepAwake.sites
+                awake.remove(site)
+                KeepAwake.sites = awake
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
