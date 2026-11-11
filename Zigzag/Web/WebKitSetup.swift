@@ -55,6 +55,8 @@ enum WebKitSetup {
             configuration.userContentController.add(PasswordCapture.shared, contentWorld: .defaultClient, name: PasswordCapture.messageName)
             configuration.userContentController.addUserScript(Autofill.script)
             configuration.userContentController.add(Autofill.shared, contentWorld: .defaultClient, name: Autofill.messageName)
+            // Safari's key icon in sign-in fields, where WebKit lets an app draw it.
+            if #available(macOS 27, *) { AutofillKeyIcon.install(in: configuration.userContentController) }
             configuration.userContentController.addUserScript(PageFrames.script)
             configuration.userContentController.add(PageFrames.shared, contentWorld: .defaultClient, name: PageFrames.messageName)
             configuration.userContentController.addUserScript(PageVideos.script)

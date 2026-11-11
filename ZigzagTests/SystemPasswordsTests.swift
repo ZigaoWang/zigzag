@@ -302,4 +302,52 @@ struct SystemPasswordsTests {
         #expect(!SystemPasswordPicker.isTyping(key(at: now - 5)))
         #expect(!SystemPasswordPicker.isTyping(nil))
     }
+
+    // MARK: macOS 27: the key icon
+
+    @Test func signInFieldsGetTheKeyIcon() async throws {
+        guard #available(macOS 27, *) else { return }
+        let html = """
+        <form><input id='u' name='username' autocomplete='username'><input id='p' type='password'>
+        <input id='q' type='search' name='q'><input id='n' type='password' autocomplete='new-password'></form>
+        """
+        func icons(_ on: Bool) async throws -> [String] {
+            let (webView, _, _) = await page(html) { configuration in
+                configuration.userContentController.addUserScript(AutofillKeyIcon.script)
+                configuration.userContentController.addScriptMessageHandler(AutofillKeyIcon.Asker { _ in on }, contentWorld: AutofillKeyIcon.world, name: AutofillKeyIcon.messageName)
+            }
+            try await wait(0.3)
+            let types = try await webView.callAsyncJavaScript("return ['u', 'p', 'q', 'n'].map((id) => document.getElementById(id).autofillButtonType)",
+                                                              arguments: [:], in: nil, contentWorld: AutofillKeyIcon.world) as? [String]
+            return types ?? []
+        }
+        #expect(try await icons(true) == ["credentials", "credentials", "none", "none"])
+        // Off when Zigzag doesn't fill passwords in the profile.
+        #expect(try await icons(false) == ["none", "none", "none", "none"])
+    }
+
+    @Test func aClickOnTheKeyIconOpensTheMenu() async throws {
+        guard #available(macOS 27, *) else { return }
+        let heard = Heard()
+        let (webView, window, _) = await page(form) { configuration in
+            configuration.userContentController.addUserScript(Autofill.script)
+            configuration.userContentController.add(heard, contentWorld: .defaultClient, name: Autofill.messageName)
+            configuration.userContentController.addUserScript(AutofillKeyIcon.script)
+            configuration.userContentController.addScriptMessageHandler(AutofillKeyIcon.Asker { _ in true }, contentWorld: AutofillKeyIcon.world, name: AutofillKeyIcon.messageName)
+        }
+        try await wait(0.3)
+        let rect = try #require(try await webView.callAsyncJavaScript("const r = document.getElementById('p').getBoundingClientRect(); return [r.left, r.top, r.width, r.height]",
+                                                                      arguments: [:], in: nil, contentWorld: .page) as? [Double])
+        // The icon sits at the field's right end.
+        window.makeFirstResponder(webView)
+        let point = webView.convert(NSPoint(x: rect[0] + rect[2] - 10, y: webView.isFlipped ? rect[1] + rect[3] / 2 : webView.bounds.height - rect[1] - rect[3] / 2), to: nil)
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                        windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+            if type == .leftMouseDown { webView.mouseDown(with: event) } else { webView.mouseUp(with: event) }
+        }
+        try await wait(0.3)
+        _ = try await webView.callAsyncJavaScript("return 1", arguments: [:], in: nil, contentWorld: .defaultClient)
+        #expect(heard.kinds.contains("focus"))
+    }
 }

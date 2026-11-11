@@ -215,3 +215,70 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
         return false
     }
 }
+
+/// macOS 27 and later: sign-in fields show Safari's key icon. A click on it is a click on the field, so it opens
+/// Zigzag's password menu there, with Passwords… in it, as a click anywhere in the field does.
+@available(macOS 27, *)
+enum AutofillKeyIcon {
+    static let messageName = "zigzagAutofillKey"
+
+    /// A world of Zigzag's own where fields can be given the icon; pages can't.
+    static let world: WKContentWorld = {
+        let configuration = WKContentWorld.Configuration()
+        configuration.autofillScriptingEnabled = true
+        return WKContentWorld(configuration: configuration)
+    }()
+
+    static var script: WKUserScript {
+        WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: world)
+    }
+
+    static func install(in controller: WKUserContentController) {
+        controller.addUserScript(script)
+        controller.addScriptMessageHandler(Asker.shared, contentWorld: world, name: messageName)
+    }
+
+    /// Answers the page script's one question: does Zigzag fill passwords in this page's profile?
+    final class Asker: NSObject, WKScriptMessageHandlerWithReply {
+        static let shared = Asker { webView in
+            guard let webView = webView as? BrowserWebView else { return false }
+            return Autofill.isOn(in: Profiles.shared.profile(ofPage: webView))
+        }
+        private let isOn: (WKWebView?) -> Bool
+        init(isOn: @escaping (WKWebView?) -> Bool) { self.isOn = isOn }
+
+        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) async -> (Any?, String?) {
+            guard message.frameInfo.isMainFrame else { return (false, nil) }
+            return (isOn(message.webView), nil)
+        }
+    }
+
+    /// Marks the sign-in fields, now and as the page adds them.
+    static let source = """
+    (() => {
+      if (window.__zigzagKeyIcons) return;
+      window.__zigzagKeyIcons = true;
+      \(Autofill.signInCheck)
+      const marked = new WeakSet();
+      const mark = () => {
+        for (const el of document.querySelectorAll('input')) {
+          const wanted = signIn(el);
+          if (wanted && el.autofillButtonType === 'none') { el.autofillButtonType = 'credentials'; marked.add(el); }
+          else if (!wanted && marked.has(el)) { el.autofillButtonType = 'none'; marked.delete(el); }
+        }
+      };
+      let queued = false;
+      const later = () => {
+        if (queued) return;
+        queued = true;
+        setTimeout(() => { queued = false; mark(); }, 250);
+      };
+      window.webkit.messageHandlers.\(messageName).postMessage('on').then((on) => {
+        if (on !== true) return;
+        mark();
+        new MutationObserver(later).observe(document.documentElement, { childList: true, subtree: true, attributes: true,
+          attributeFilter: ['type', 'autocomplete', 'disabled', 'readonly', 'name', 'id'] });
+      }).catch(() => {});
+    })();
+    """
+}
