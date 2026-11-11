@@ -44,7 +44,13 @@ final class Tab: NSObject {
     private(set) var spaceID: UUID
     /// Set when this tab is the live page behind a bookmark. Such tabs live in the bookmark row, not the tab list.
     /// A favorite's page belongs in the favorite's profile, which is known only once this is.
-    var bookmarkID: UUID? { didSet { if bookmarkID != oldValue, isFavorite { settleProfile() } } }
+    var bookmarkID: UUID? {
+        didSet {
+            guard bookmarkID != oldValue else { return }
+            if isFavorite { settleProfile() }
+            refreshChosenIcon()
+        }
+    }
     /// Set when this tab is the live page behind a favorite tile.
     var isFavorite = false { didSet { if isFavorite != oldValue { settleProfile() } } }
     /// The tab this one sits under in the list (nested tabs); nil at the top level. Pinned pages and favorites never
@@ -254,6 +260,34 @@ final class Tab: NSObject {
     var landingUntil: Date?
     var pinnedLanding: URL?
     var customTitle: String? { didSet { if oldValue != customTitle { changed.send(.title); changed.send(.renamed) } } }
+    /// An icon you gave the tab (an SF Symbol's name, or an emoji), drawn instead of its site's. The page of a pinned
+    /// tab or a favorite shows that one's icon instead (`chosenIcon`).
+    var customIcon: String? { didSet { if oldValue != customIcon { refreshChosenIcon() } } }
+    /// The icon you chose that stands for it, or nil for its site's. Kept up to date (`refreshChosenIcon`), and
+    /// says `.favicon` when it changes, as a new site icon does.
+    private(set) var chosenIcon: String?
+
+    /// Looks again at which chosen icon shows: after its own changes, it becomes or stops being a pinned page's or a
+    /// favorite's, or the library changes (that page given an icon, or ⌘Z taking one back).
+    func refreshChosenIcon() {
+        let icon = Self.chosenIcon(own: customIcon, bookmarkID: bookmarkID) { Library.shared.bookmark($0) }
+        guard icon != chosenIcon else { return }
+        chosenIcon = icon
+        changed.send(.favicon)
+    }
+
+    /// A pinned page's or favorite's page shows the icon given to that page, or its site's if it has none, whatever
+    /// the tab had of its own; any other tab shows its own.
+    static func chosenIcon(own: String?, bookmarkID: UUID?, bookmark: (UUID) -> Bookmark?) -> String? {
+        guard let bookmarkID else { return own }
+        return bookmark(bookmarkID)?.icon
+    }
+
+    /// What stands for the tab wherever it's drawn (its row, a favorite's tile, the switcher, the command bar): the
+    /// icon you chose, else its site's.
+    var displayIcon: NSImage? { Self.displayIcon(chosen: chosenIcon, favicon: favicon) }
+
+    static func displayIcon(chosen: String?, favicon: NSImage?) -> NSImage? { chosen.map(IconChoice.pageIcon) ?? favicon }
 
     var displayTitle: String {
         if let customTitle, !customTitle.isEmpty { return customTitle }

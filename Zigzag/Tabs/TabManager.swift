@@ -68,6 +68,7 @@ final class TabManager {
         let index: Int
         let interactionState: Data?
         var customTitle: String? = nil
+        var customIcon: String? = nil
         /// The split it was half of, so bringing it back puts it beside its partner again.
         var split: SplitPair? = nil
         /// When it was last looked at: brought back, it's as recent as it was, so Clear and the fading see it so too.
@@ -639,10 +640,11 @@ final class TabManager {
             }
         }
         // Bookmarks moved to another space carry their live tab; one that became, or stopped being, a favorite
-        // (undo, another window) says so.
+        // (undo, another window) says so, as does one given an icon.
         for (id, tab) in bookmarkTabs {
             if let space = Library.shared.spaceID(ofBookmark: id) { tab.setSpace(space) }
             tab.isFavorite = Library.shared.isFavorite(id)
+            tab.refreshChosenIcon()
         }
         // Pinned pages stop being a pinned split (separated, one made a favorite, undo, another window): the split on
         // screen ends with it.
@@ -942,10 +944,7 @@ final class TabManager {
     }
 
     private func closedRecord(of tab: Tab, at index: Int, split pair: SplitPair?) -> ClosedTab {
-        ClosedTab(id: tab.id, url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
-                  interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle, split: pair, lastActivated: tab.lastActivated,
-                  parentID: tab.parentID, childIDs: tabs(in: tab.spaceID).filter { $0.parentID == tab.id }.map(\.id),
-                  isCollapsed: tab.isCollapsed)
+        ClosedTab(tab, at: index, split: pair, childIDs: tabs(in: tab.spaceID).filter { $0.parentID == tab.id }.map(\.id))
     }
 
     /// Returns the ordinary tabs' ids in the order they closed: reopening in reverse puts each back where it was.
@@ -1012,8 +1011,7 @@ final class TabManager {
         let space = Library.shared.space(closed.spaceID) != nil ? closed.spaceID : currentSpaceID
         let tab = Tab(url: closed.url, title: closed.title, spaceID: space, interactionState: closed.interactionState,
                       lastActivated: closed.lastActivated)
-        tab.customTitle = closed.customTitle
-        tab.isCollapsed = closed.isCollapsed
+        closed.apply(to: tab)
         tab.host = host
         watch(tab)
         let at = min(closed.index, tabs(in: space).count)
@@ -1543,5 +1541,21 @@ final class TabManager {
             tab.close()
         }
         changed.send(.structure)
+    }
+}
+
+extension TabManager.ClosedTab {
+    /// A tab as it closed, at `index` in its space's list, with the tabs that were under it.
+    init(_ tab: Tab, at index: Int, split pair: TabManager.SplitPair? = nil, childIDs: [UUID] = []) {
+        self.init(id: tab.id, url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
+                  interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle, customIcon: tab.customIcon, split: pair,
+                  lastActivated: tab.lastActivated, parentID: tab.parentID, childIDs: childIDs, isCollapsed: tab.isCollapsed)
+    }
+
+    /// What it had beyond its page, back on the tab that reopens it.
+    func apply(to tab: Tab) {
+        tab.customTitle = customTitle
+        tab.customIcon = customIcon
+        tab.isCollapsed = isCollapsed
     }
 }

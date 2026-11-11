@@ -10,6 +10,8 @@ nonisolated struct SessionState: Codable, Sendable {
         var createdAt: Date
         /// A name you gave the tab; older sessions don't have one.
         var customTitle: String? = nil
+        /// An icon you gave the tab; older sessions don't have one.
+        var customIcon: String? = nil
         /// The tab it's nested under, and whether the tabs under it are folded away; sessions from before nested tabs
         /// have neither, and their tabs come back at the top level.
         var parentID: UUID? = nil
@@ -303,10 +305,7 @@ final class WindowManager {
         let manager = controller.tabManager
         let fullScreen = controller.window?.styleMask.contains(.fullScreen) == true
         let frame = (fullScreen ? controller.windowedFrame : nil) ?? controller.window?.frame ?? .zero
-        func state(_ tab: Tab, parent: UUID? = nil) -> SessionState.TabState {
-            SessionState.TabState(id: tab.id, url: tab.url, title: tab.title.isEmpty ? tab.displayTitle : tab.title, lastActivated: tab.lastActivated,
-                                  createdAt: tab.createdAt, customTitle: tab.customTitle, parentID: parent, collapsed: tab.isCollapsed ? true : nil)
-        }
+        func state(_ tab: Tab, parent: UUID? = nil) -> SessionState.TabState { SessionState.TabState(tab, parent: parent) }
         let spaces = Library.shared.spaces.map { space in
             let tabs = manager.tabs(in: space.id)
             // New tabs with no page aren't kept: the tabs under one come back a level up, as if it had closed.
@@ -417,9 +416,7 @@ final class WindowManager {
         let interaction = history ?? (try? Data(contentsOf: Paths.tabState.appendingPathComponent(state.id.uuidString)))
         let tab = Tab(id: state.id, url: state.url, title: state.title, spaceID: spaceID, interactionState: interaction,
                       lastActivated: state.lastActivated, createdAt: state.createdAt)
-        tab.customTitle = state.customTitle
-        tab.parentID = state.parentID
-        tab.isCollapsed = state.collapsed ?? false
+        state.apply(to: tab)
         return tab
     }
 
@@ -427,5 +424,22 @@ final class WindowManager {
         saveNow(synchronously: true)
         isTerminating = true
         Library.shared.saveNow()
+    }
+}
+
+@MainActor extension SessionState.TabState {
+    /// A tab as the session keeps it, under `parent` in the list.
+    init(_ tab: Tab, parent: UUID? = nil) {
+        self.init(id: tab.id, url: tab.url, title: tab.title.isEmpty ? tab.displayTitle : tab.title, lastActivated: tab.lastActivated,
+                  createdAt: tab.createdAt, customTitle: tab.customTitle, customIcon: tab.customIcon, parentID: parent,
+                  collapsed: tab.isCollapsed ? true : nil)
+    }
+
+    /// What the session kept beyond the page itself, back on the tab made from it.
+    func apply(to tab: Tab) {
+        tab.customTitle = customTitle
+        tab.customIcon = customIcon
+        tab.parentID = parentID
+        tab.isCollapsed = collapsed ?? false
     }
 }
