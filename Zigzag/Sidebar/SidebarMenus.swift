@@ -337,14 +337,16 @@ enum SidebarMenus {
             let anchor = controller.sidebar.dot(for: id) ?? controller.sidebar.list.headerView
             controller.openSpaceEditor(id, anchor: anchor)
         })
-        // How every space's name shows, large or a plain heading, right where you see it.
-        let large = Item(String(localized: "Large Space Names", comment: "Item in a space's context menu. A checkmark item: shows every space's name large at the top of the sidebar.")) { SpaceHeaderView.isLarge.toggle() }
-        large.state = SpaceHeaderView.isLarge ? .on : .off
-        menu.addItem(large)
         _ = space
         if id == controller.tabManager.currentSpaceID {
             menu.addItem(Item(String(localized: "New Folder", comment: "Item in a space's context menu.")) { controller.newFolder() })
         }
+        // How every space's name shows, large or a plain heading, right where you see it. A setting, so it stands
+        // apart from the actions, as a menu's checkmark items do.
+        menu.addItem(.separator())
+        let large = Item(String(localized: "Large Space Names", comment: "Item in a space's context menu. A checkmark item: shows every space's name large at the top of the sidebar.")) { SpaceHeaderView.isLarge.toggle() }
+        large.state = SpaceHeaderView.isLarge ? .on : .off
+        menu.addItem(large)
         menu.addItem(.separator())
         menu.addItem(Item(String(localized: "New Space", comment: "Item in a space's context menu.")) { controller.newSpace(nil) })
         menu.addItem(Item(String(localized: "Delete Space", comment: "Item in a space's context menu."), enabled: Library.shared.spaces.count > 1) {
