@@ -796,6 +796,25 @@ nonisolated enum ExtensionWrite {
         let origin: String
     }
 
+    /// Whether a page's script could set this header, by the Fetch standard's forbidden request headers. An
+    /// extension can message the bridge directly rather than through fetch, so no Headers object checked it.
+    static func mayBeSet(_ name: String, _ value: String) -> Bool {
+        let token = CharacterSet(charactersIn: "!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        guard !name.isEmpty, name.unicodeScalars.allSatisfy(token.contains),
+              !value.unicodeScalars.contains(where: { ["\r", "\n", "\0"].contains($0) }) else { return false }
+        let lower = name.lowercased()
+        let forbidden: Set = ["accept-charset", "accept-encoding", "access-control-request-headers", "access-control-request-method",
+                              "access-control-request-private-network", "connection", "content-length", "cookie", "cookie2", "date",
+                              "dnt", "expect", "host", "keep-alive", "origin", "referer", "set-cookie", "te", "trailer",
+                              "transfer-encoding", "upgrade", "via"]
+        if forbidden.contains(lower) || lower.hasPrefix("proxy-") || lower.hasPrefix("sec-") { return false }
+        // A method override is fine unless it names a method fetch itself refuses.
+        if ["x-http-method", "x-http-method-override", "x-method-override"].contains(lower) {
+            return !value.split(separator: ",").contains { ["CONNECT", "TRACE", "TRACK"].contains($0.trimmingCharacters(in: .whitespaces).uppercased()) }
+        }
+        return true
+    }
+
     /// Cookies that go back to the profile: those the server set or changed, and those it deleted.
     typealias Apply = @MainActor @Sendable (_ set: [HTTPCookie], _ deleted: [HTTPCookie]) async -> Void
 
@@ -830,12 +849,7 @@ nonisolated enum ExtensionWrite {
         case "force-cache": request.cachePolicy = .returnCacheDataElseLoad
         default: break
         }
-        for header in input.headers {
-            let name = header[0].lowercased()
-            if ["cookie", "cookie2", "origin", "referer", "host", "content-length", "connection", "transfer-encoding"].contains(name)
-                || name.hasPrefix("sec-") || name.hasPrefix("proxy-") { continue }
-            request.setValue(header[1], forHTTPHeaderField: header[0])
-        }
+        for header in input.headers where mayBeSet(header[0], header[1]) { request.setValue(header[1], forHTTPHeaderField: header[0]) }
         request.setValue(input.origin, forHTTPHeaderField: "Origin")
         var redirected = false
         for _ in 0..<20 {

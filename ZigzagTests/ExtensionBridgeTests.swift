@@ -337,6 +337,25 @@ extension ExtensionBridgeTests {
         #expect(!headers.contains { $0[0] == "set-cookie" })
     }
 
+    /// Headers a page's fetch may not set stay out of writes, even sent straight to the bridge, as do split lines.
+    @Test func writesDropHeadersFetchForbids() {
+        for name in ["Cookie", "cookie2", "Origin", "Referer", "Host", "Content-Length", "Connection", "Transfer-Encoding", "TE", "Trailer",
+                     "Upgrade", "Via", "Keep-Alive", "Expect", "Date", "DNT", "Accept-Encoding", "Accept-Charset", "Set-Cookie",
+                     "Access-Control-Request-Method", "Access-Control-Request-Headers", "Sec-Fetch-Site", "Proxy-Authorization"] {
+            #expect(!ExtensionWrite.mayBeSet(name, "x"), "\(name)")
+        }
+        for name in ["Content-Type", "Authorization", "Accept", "Accept-Language", "X-Requested-With", "User-Agent"] {
+            #expect(ExtensionWrite.mayBeSet(name, "x"), "\(name)")
+        }
+        #expect(!ExtensionWrite.mayBeSet("X-Test", "a\r\nInjected: yes"))
+        #expect(!ExtensionWrite.mayBeSet("X-Test", "a\nb"))
+        #expect(!ExtensionWrite.mayBeSet("X Test", "a"))
+        #expect(!ExtensionWrite.mayBeSet("X-Test:", "a"))
+        #expect(!ExtensionWrite.mayBeSet("", "a"))
+        #expect(!ExtensionWrite.mayBeSet("X-HTTP-Method-Override", "get, trace"))
+        #expect(ExtensionWrite.mayBeSet("X-HTTP-Method-Override", "DELETE"))
+    }
+
     /// A proxy an extension set through chrome.proxy carries writes too, so they never leave by your own address.
     @Test func writesGoThroughTheProfilesProxy() async throws {
         let proxy = try SessionTestServer()
