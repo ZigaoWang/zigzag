@@ -219,3 +219,55 @@ import Testing
         #expect(Date().timeIntervalSince(start) < 1)
     }
 }
+
+/// The session is written off the main thread, and only when it says something new (#89).
+struct SessionSaveTests {
+    private func file() throws -> URL {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-session-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder.appendingPathComponent("Session.json")
+    }
+
+    private func state(_ url: String, title: String = "Page") -> SessionState {
+        let tab = SessionState.TabState(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, url: URL(string: url), title: title,
+                                        lastActivated: Date(timeIntervalSince1970: 100), createdAt: Date(timeIntervalSince1970: 50))
+        let space = SessionState.SpaceTabs(spaceID: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!, tabs: [tab], selectedTabID: tab.id)
+        let window = SessionState.WindowState(frame: [0, 0, 800, 600], sidebarVisible: true, sidebarWidth: 240,
+                                              currentSpaceID: space.spaceID, spaces: [space], bookmarkTabs: [])
+        return SessionState(windows: [window])
+    }
+
+    @Test func theSameSessionIsWrittenOnce() throws {
+        let file = try file(), writer = SessionFileWriter()
+        #expect(writer.write(state("https://example.com/a"), to: file))
+        #expect(!writer.write(state("https://example.com/a"), to: file))
+        #expect(JSONStore.load(SessionState.self, from: file)?.windows.first?.spaces.first?.tabs.first?.url?.absoluteString == "https://example.com/a")
+    }
+
+    @Test func aChangedSessionIsWritten() throws {
+        let file = try file(), writer = SessionFileWriter()
+        writer.write(state("https://example.com/a"), to: file)
+        #expect(writer.write(state("https://example.com/b"), to: file))
+        #expect(writer.write(state("https://example.com/b", title: "Renamed"), to: file))
+        #expect(JSONStore.load(SessionState.self, from: file)?.windows.first?.spaces.first?.tabs.first?.title == "Renamed")
+    }
+
+    @Test func aWriteThatFailedIsTriedAgain() throws {
+        let writer = SessionFileWriter()
+        let nowhere = URL(fileURLWithPath: "/nonexistent-\(UUID().uuidString)/Session.json")
+        #expect(!writer.write(state("https://example.com/a"), to: nowhere))
+        let file = try file()
+        #expect(writer.write(state("https://example.com/a"), to: file))
+    }
+
+    @Test func writtenOffTheMainThreadInOrder() async throws {
+        let file = try file(), writer = SessionFileWriter()
+        let queue = DispatchQueue(label: "test.session")
+        for i in 0..<20 {
+            let next = state("https://example.com/\(i)")
+            queue.async { writer.write(next, to: file) }
+        }
+        await withCheckedContinuation { done in queue.async { done.resume() } }
+        #expect(JSONStore.load(SessionState.self, from: file)?.windows.first?.spaces.first?.tabs.first?.url?.absoluteString == "https://example.com/19")
+    }
+}

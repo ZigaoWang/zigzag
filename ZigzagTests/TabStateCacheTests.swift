@@ -6,33 +6,30 @@ import Testing
 struct TabStateCacheTests {
     let a = UUID(), b = UUID(), c = UUID()
 
-    /// Two tabs saved once, `a` on screen.
+    /// Two tabs saved once.
     private func savedOnce() -> TabStateCache {
         var cache = TabStateCache()
         _ = cache.update(a, with: Data([1]))
         _ = cache.update(b, with: Data([2]))
-        cache.finish(keeping: [a, b], shown: [a])
+        cache.finish(keeping: [a, b])
         return cache
     }
 
     @Test func afterOneNavigationOnlyThatTabIsEncoded() {
-        var cache = savedOnce()
-        // a stops being shown (b is now), so it's checked once more; then only what navigates or shows.
-        cache.finish(keeping: [a, b], shown: [b])
-        #expect(!cache.needsEncoding(a, navigated: false, shown: false))
-        #expect(cache.needsEncoding(a, navigated: true, shown: false))
-        #expect(cache.needsEncoding(b, navigated: false, shown: true))
+        let cache = savedOnce()
+        #expect(!cache.needsEncoding(a, changed: false))
+        #expect(cache.needsEncoding(a, changed: true))
+        #expect(!cache.needsEncoding(b, changed: false))
     }
 
-    @Test func aTabJustLeftIsEncodedOnceMore() {
+    @Test func thePageOnScreenIsntEncodedAgainUntilItChanges() {
+        // It was encoded at every save before (#89), for a scroll that may never have happened: a scroll now says so.
         let cache = savedOnce()
-        // Scrolled while on screen, then switched away before the next save: that save still asks for it.
-        #expect(cache.needsEncoding(a, navigated: false, shown: false))
-        #expect(!cache.needsEncoding(b, navigated: false, shown: false))
+        #expect(!cache.needsEncoding(a, changed: false))
     }
 
     @Test func aNewTabIsAlwaysEncoded() {
-        #expect(savedOnce().needsEncoding(c, navigated: false, shown: false))
+        #expect(savedOnce().needsEncoding(c, changed: false))
     }
 
     @Test func onlyChangedDataIsWritten() {
@@ -46,8 +43,8 @@ struct TabStateCacheTests {
 
     @Test func closedTabsAreForgotten() {
         var cache = savedOnce()
-        cache.finish(keeping: [a], shown: [])
+        cache.finish(keeping: [a])
         #expect(cache.saved[b] == nil)
-        #expect(cache.needsEncoding(b, navigated: false, shown: false))
+        #expect(cache.needsEncoding(b, changed: false))
     }
 }

@@ -1111,7 +1111,7 @@ final class TabManager {
 
     // MARK: Split view
 
-    struct SplitPair: Codable, Equatable {
+    nonisolated struct SplitPair: Codable, Equatable, Sendable {
         var left: UUID
         var right: UUID
         /// Share of the width (or height, when vertical) the first pane gets.

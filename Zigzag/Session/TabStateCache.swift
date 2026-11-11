@@ -1,15 +1,15 @@
 import Foundation
 
 /// The back/forward data last saved for each tab, so a session save asks WebKit to encode only the tabs that could
-/// have changed since: ones that navigated, ones on screen (you may have scrolled), and ones that were on screen at
-/// the last save (scrolled, then left). The rest keep the data they had, which is what an encode would give again.
+/// have changed since: ones that went somewhere or were scrolled. The rest keep the data they had, which is what an
+/// encode would give again. The page on screen used to be encoded at every save in case it had been scrolled, a few
+/// hundred kilobytes each time for a long history, while a page rewriting its address kept the saves coming (#89).
 struct TabStateCache {
     private(set) var saved: [UUID: Data] = [:]
-    private var shownLastTime: Set<UUID> = []
 
     /// Whether this save has to encode the tab again.
-    func needsEncoding(_ id: UUID, navigated: Bool, shown: Bool) -> Bool {
-        navigated || shown || shownLastTime.contains(id) || saved[id] == nil
+    func needsEncoding(_ id: UUID, changed: Bool) -> Bool {
+        changed || saved[id] == nil
     }
 
     /// Takes a freshly encoded state; true when it differs from what's on disk, so it has to be written.
@@ -21,9 +21,8 @@ struct TabStateCache {
         return true
     }
 
-    /// After a save: forgets closed tabs, and remembers which tabs were on screen.
-    mutating func finish(keeping ids: Set<UUID>, shown: Set<UUID>) {
+    /// After a save: forgets closed tabs.
+    mutating func finish(keeping ids: Set<UUID>) {
         for id in saved.keys where !ids.contains(id) { saved[id] = nil }
-        shownLastTime = shown
     }
 }

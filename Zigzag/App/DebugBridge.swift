@@ -1532,7 +1532,7 @@ enum DebugBridge {
                 let owner = WindowManager.shared.controllers.first { $0.tabManager.bookmarkTab(for: favorite.id) != nil } ?? controller
                 owner.tabManager.unbookmark(favorite.id, toIndex: 0)
             }
-        case "save": WindowManager.shared.saveNow()
+        case "save": WindowManager.shared.saveNow(synchronously: true)
         default: break
         }
     }

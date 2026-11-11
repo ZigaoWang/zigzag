@@ -425,6 +425,9 @@ final class Tab: NSObject {
     /// History snapshot for session restore. Cheap when the web view is suspended.
     /// Went somewhere since the session was last saved, so its back/forward data has to be encoded again.
     var navigatedSinceSave = true
+    /// Scrolled, clicked or typed in since the session was last saved: where you are on the page is in its
+    /// back/forward data too.
+    var scrolledSinceSave = false
 
     var interactionStateForSaving: Data? {
         if let webView { return webView.interactionState as? Data }

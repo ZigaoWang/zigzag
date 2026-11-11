@@ -61,9 +61,19 @@ nonisolated enum JSONStore {
     /// Whether it was written: for what must be on disk before something that can't be undone goes ahead.
     @discardableResult
     static func save<T: Encodable>(_ value: T, to url: URL) -> Bool {
+        guard let data = encode(value) else { return false }
+        return write(data, to: url)
+    }
+
+    /// What `save` writes, for comparing with what was written last.
+    static func encode<T: Encodable>(_ value: T) -> Data? {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .secondsSince1970
-        guard let data = try? encoder.encode(value) else { return false }
+        return try? encoder.encode(value)
+    }
+
+    @discardableResult
+    static func write(_ data: Data, to url: URL) -> Bool {
         do {
             try data.write(to: url, options: .atomic)
             return true

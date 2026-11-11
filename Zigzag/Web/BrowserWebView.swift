@@ -57,7 +57,20 @@ final class BrowserWebView: WKWebView {
     override func scrollWheel(with event: NSEvent) {
         // A sideways swipe to go back or forward is taken here; everything else scrolls the page.
         if swipe.handle(event) { return }
+        owner?.scrolledSinceSave = true
         super.scrollWheel(with: event)
+    }
+
+    // Keys (space, arrows, Page Down) and clicks (the scroll bar, a link to a heading) move the page too: the next
+    // session save encodes where it is now (WindowManager).
+    override func keyDown(with event: NSEvent) {
+        owner?.scrolledSinceSave = true
+        super.keyDown(with: event)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        owner?.scrolledSinceSave = true
+        super.mouseDown(with: event)
     }
 
     /// Three-finger swipes, for Macs set to swipe between pages that way: these come as swipe events, not scrolls.

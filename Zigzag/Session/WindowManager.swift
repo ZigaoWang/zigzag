@@ -1,8 +1,8 @@
 import AppKit
 
 /// Saved state of every window and tab, written often so a crash loses nothing.
-struct SessionState: Codable {
-    struct TabState: Codable {
+nonisolated struct SessionState: Codable, Sendable {
+    nonisolated struct TabState: Codable, Sendable {
         var id: UUID
         var url: URL?
         var title: String
@@ -16,18 +16,18 @@ struct SessionState: Codable {
         var collapsed: Bool? = nil
     }
 
-    struct SpaceTabs: Codable {
+    nonisolated struct SpaceTabs: Codable, Sendable {
         var spaceID: UUID
         var tabs: [TabState]
         var selectedTabID: UUID?
     }
 
-    struct BookmarkTabState: Codable {
+    nonisolated struct BookmarkTabState: Codable, Sendable {
         var bookmarkID: UUID
         var tab: TabState
     }
 
-    struct WindowState: Codable {
+    nonisolated struct WindowState: Codable, Sendable {
         var frame: [Double]
         var sidebarVisible: Bool
         var sidebarWidth: Double
@@ -46,6 +46,22 @@ struct SessionState: Codable {
         var tree = nodes
         for node in nodes where !kept.contains(node.id) { tree = TabTree.removing(node.id, from: tree) }
         return Dictionary(tree.compactMap { node in node.parent.map { (node.id, $0) } }, uniquingKeysWith: { a, _ in a })
+    }
+}
+
+/// Writes the session file, on the queue it's given to: only what differs from what it last wrote, so a page that
+/// keeps rewriting its address doesn't have the file written every few seconds with the same windows and tabs.
+/// Touched only from one serial queue at a time.
+nonisolated final class SessionFileWriter: @unchecked Sendable {
+    private var lastWritten: Data?
+
+    /// Whether the file was written.
+    @discardableResult
+    func write(_ state: SessionState, to url: URL) -> Bool {
+        guard let data = JSONStore.encode(state), data != lastWritten else { return false }
+        guard JSONStore.write(data, to: url) else { return false }
+        lastWritten = data
+        return true
     }
 }
 
@@ -232,41 +248,47 @@ final class WindowManager {
         // Private windows are never written down.
         let saved = controllers.filter { !$0.tabManager.isPrivate }
         guard !saved.isEmpty else { return }
+        // Gathered here, where the windows and tabs are; encoded and written on the writer's queue, and only when
+        // it says something the file doesn't already (a page rewriting its address back and forth).
         let state = SessionState(windows: saved.map(windowState))
-        JSONStore.save(state, to: Paths.session)
         // Back/forward lists live in their own files: opaque and occasionally large. Only changed ones are
         // written, and never on the main thread.
         var keep = Set<UUID>()
-        var shown = Set<UUID>()
         var writes: [(URL, Data)] = []
         for controller in saved {
-            let manager = controller.tabManager
-            // The pages on screen: one may have been scrolled since, which only an encode would see.
-            let onScreen = [manager.selectedTab, manager.selectedTab.flatMap(manager.partner(of:))].compactMap { $0?.id }
-            shown.formUnion(onScreen)
-            for tab in manager.allTabs {
+            for tab in controller.tabManager.allTabs {
                 keep.insert(tab.id)
-                // Only the tabs that could have changed are encoded again: with many tabs, the rest cost nothing.
-                guard tabStates.needsEncoding(tab.id, navigated: tab.navigatedSinceSave, shown: onScreen.contains(tab.id)) else { continue }
+                // Only the tabs that went somewhere or were scrolled are encoded again: with many tabs, the rest cost
+                // nothing, and the page you're reading isn't encoded again every few seconds for nothing.
+                guard tabStates.needsEncoding(tab.id, changed: tab.navigatedSinceSave || tab.scrolledSinceSave) else { continue }
                 tab.navigatedSinceSave = false
+                tab.scrolledSinceSave = false
                 guard let data = tab.interactionStateForSaving, tabStates.update(tab.id, with: data) else { continue }
                 writes.append((Paths.tabState.appendingPathComponent(tab.id.uuidString), data))
             }
         }
-        tabStates.finish(keeping: keep, shown: shown)
-        let directory = Paths.tabState
-        // Frozen copies for the writer's queue, so nothing it reads can change under it.
-        let toWrite = writes, kept = keep
-        if synchronously {
-            stateWriter.sync { Self.writeTabStates(toWrite, keeping: kept, in: directory) }
-        } else {
-            stateWriter.async { Self.writeTabStates(toWrite, keeping: kept, in: directory) }
+        tabStates.finish(keeping: keep)
+        let directory = Paths.tabState, session = Paths.session, writer = sessionWriter
+        // Frozen copies for the writer's queue, so nothing it reads can change under it. With no back/forward list
+        // changed and no tab come or gone, the folder isn't looked through again.
+        let toWrite = writes, kept = keep, tabsChanged = !writes.isEmpty || keep != lastKept
+        lastKept = keep
+        let work: @Sendable () -> Void = {
+            writer.write(state, to: session)
+            if tabsChanged { Self.writeTabStates(toWrite, keeping: kept, in: directory) }
         }
+        if synchronously { stateWriter.sync(execute: work) } else { stateWriter.async(execute: work) }
     }
 
+    /// Waits for the saves on their way to disk, before reading the session back.
+    func finishSaving() { stateWriter.sync {} }
+
     private var tabStates = TabStateCache()
+    /// The tabs the last save kept back/forward files for.
+    private var lastKept: Set<UUID>?
     /// One writer at a time, in order, so an older write can't delete a file a newer one just wrote.
     private let stateWriter = DispatchQueue(label: "Zigzag.tab-states")
+    private let sessionWriter = SessionFileWriter()
 
     /// Runs off the main thread: writes changed back/forward lists and removes ones for closed tabs.
     nonisolated private static func writeTabStates(_ writes: [(URL, Data)], keeping keep: Set<UUID>, in directory: URL) {
@@ -312,6 +334,7 @@ final class WindowManager {
     @discardableResult
     func restoreSession() -> Bool {
         sessionWaiting = false
+        finishSaving()
         guard let state = JSONStore.load(SessionState.self, from: Paths.session), !state.windows.isEmpty else { return false }
         var allIDs = Set<UUID>()
         for windowState in state.windows {
