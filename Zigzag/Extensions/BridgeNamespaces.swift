@@ -692,6 +692,9 @@ final class ExtensionFetchRequests {
         if !["GET", "HEAD"].contains(method) {
             // A website-origin helper gives POST the wrong Origin. A short-lived native session preserves the
             // Chrome extension origin and uses only this profile's cookies, including server-side deletions.
+            // Over plain HTTP that session knows nothing of the sites WebKit keeps on HTTPS (HSTS) and would send
+            // their cookies in the clear, so outside this Mac those stay with WebKit's own fetch.
+            if url.scheme == "http", !Self.isLoopback(url) { return ["fallback": true] }
             let request = try Self.writeRequest(options, url: url, extensionID: extensionID)
             // Only WebKit's cookie store stays on the main thread; the jar, the request and its body leave it.
             let task = Task {
@@ -722,6 +725,13 @@ final class ExtensionFetchRequests {
         guard authorize() else { throw BridgeError("The extension can no longer access this URL.") }
         guard pages[key] != nil else { throw BridgeError("Extension request cancelled.") }
         return try await page.callAsyncJavaScript(Self.requestScript, arguments: ["options": options, "target": url.absoluteString], in: nil, contentWorld: .page)
+    }
+
+    /// This Mac itself, where a developer's own server answers over plain HTTP.
+    static func isLoopback(_ url: URL) -> Bool {
+        let host = (url.host(percentEncoded: false) ?? "").lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        return host == "localhost" || host.hasSuffix(".localhost") || host == "::1" || host.hasPrefix("127.")
+            && host.split(separator: ".").count == 4 && host.split(separator: ".").allSatisfy { UInt8($0) != nil }
     }
 
     /// What a write sends, read from the extension's message here so the rest can leave the main thread.

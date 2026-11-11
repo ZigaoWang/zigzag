@@ -356,6 +356,19 @@ extension ExtensionBridgeTests {
         #expect(ExtensionWrite.mayBeSet("X-HTTP-Method-Override", "DELETE"))
     }
 
+    /// A plain-HTTP write to another machine stays with WebKit, which knows the sites kept on HTTPS.
+    @Test func plainHTTPWritesLeaveThisMacOnlyThroughWebKit() async throws {
+        let response = try await ExtensionFetchRequests().response(["method": "POST", "body": "{}"], url: URL(string: "http://remote.example/write")!,
+                                                                    extensionID: "test", store: .nonPersistent())
+        #expect((response as? [String: Any])?["fallback"] as? Bool == true)
+        for text in ["http://127.0.0.1:8080/", "http://localhost/", "http://dev.localhost/", "http://[::1]:3000/"] {
+            #expect(ExtensionFetchRequests.isLoopback(URL(string: text)!), "\(text)")
+        }
+        for text in ["http://127.0.0.1.evil.example/", "http://localhost.evil.example/", "http://10.0.0.1/", "http://example.com/"] {
+            #expect(!ExtensionFetchRequests.isLoopback(URL(string: text)!), "\(text)")
+        }
+    }
+
     /// A proxy an extension set through chrome.proxy carries writes too, so they never leave by your own address.
     @Test func writesGoThroughTheProfilesProxy() async throws {
         let proxy = try SessionTestServer()
