@@ -120,8 +120,8 @@ final class TabPreviewController {
     init(controller: BrowserWindowController) { self.controller = controller }
 
     func hover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
-        // No preview over an open panel.
-        guard controller?.hasFloatingPanel != true, let row, tab != nil || bookmark != nil else {
+        // No preview over an open panel, or for a tab under the mini player while you point at it or drag it.
+        guard controller?.hasFloatingPanel != true, controller?.miniPlayer.isUnderPointer != true, let row, tab != nil || bookmark != nil else {
             // One about to appear doesn't: leaving the row, or starting to drag it, means you've moved on.
             showWork?.cancel()
             showWork = nil
@@ -142,7 +142,8 @@ final class TabPreviewController {
             let work = DispatchWorkItem { [weak self, weak row] in
                 MainActor.assumeIsolated {
                     // Pressed meanwhile (a click or the start of a drag): no preview.
-                    guard let self, let row, self.isPointer(over: row), NSEvent.pressedMouseButtons == 0 else { return }
+                    guard let self, let row, self.isPointer(over: row), NSEvent.pressedMouseButtons == 0,
+                          self.controller?.miniPlayer.isUnderPointer != true else { return }
                     self.present(tab, bookmark: bookmark, row: row)
                 }
             }
@@ -242,6 +243,8 @@ final class TabPreviewController {
 
     private func checkStillHovering() {
         guard let row, tab?.isClosed != true, controller?.hasFloatingPanel != true else { hide(); return }
+        // Onto the mini player over the row: the preview goes at once, so it never covers the card you're on.
+        if controller?.miniPlayer.isUnderPointer == true { hide(); return }
         // Moving on to the next row cancels this, so only really leaving ends the preview.
         if !isPointer(over: row) { scheduleHide() }
     }

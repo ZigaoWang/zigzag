@@ -38,6 +38,21 @@ final class MiniPlayer {
 
     var isShowing: Bool { model.tab != nil }
 
+    /// The pointer is on the card, or the card is being dragged: the sidebar's hover previews hold off for the tabs
+    /// under it, which you're not pointing at.
+    var isUnderPointer: Bool {
+        guard let card, let window = card.window, card.superview != nil, !card.isHiddenOrHasHiddenAncestor else { return false }
+        #if DEBUG
+        if debugPointerOnCard { return true }
+        #endif
+        if card.isDragging { return true }
+        return card.frame.contains(card.superview!.convert(window.mouseLocationOutsideOfEventStream, from: nil))
+    }
+    #if DEBUG
+    /// Scripted checks: the pointer counts as on the card, wherever the real one is.
+    var debugPointerOnCard = false
+    #endif
+
     // MARK: Moving between tabs
 
     /// The tabs on screen changed: `before` were in the page cards, `after` are going in now (two in a split). Called
@@ -123,6 +138,8 @@ final class MiniPlayer {
         card.onSeek = { [weak self] by in self?.command("seek", [("by", by)]) }
         card.onSeekTo = { [weak self] fraction in self?.command("seekTo", [("f", fraction)]) }
         card.onMoved = { [weak self] in self?.dropped() }
+        // A tab's hover preview never stays over the card you're on.
+        card.onPointer = { [weak self] in self?.controller?.previews.hide() }
         self.card = card
         root.showMiniPlayer(card)
         card.adopt(webView)
@@ -369,6 +386,8 @@ final class MiniPlayerView: NSView {
     var onSeek: ((Double) -> Void)?
     var onSeekTo: ((Double) -> Void)?
     var onMoved: (() -> Void)?
+    /// The pointer came onto the card, or pressed on it.
+    var onPointer: (() -> Void)?
     /// Where it may be dragged, in its superview.
     var dragArea: NSRect = .infinite
     var siteName = "" {
@@ -607,7 +626,7 @@ final class MiniPlayerView: NSView {
         tracking = area
     }
 
-    override func mouseEntered(with event: NSEvent) { keepControls() }
+    override func mouseEntered(with event: NSEvent) { onPointer?(); keepControls() }
     override func mouseMoved(with event: NSEvent) { keepControls() }
     override func mouseExited(with event: NSEvent) {
         guard !isDragging, !progress.isScrubbing else { return }
@@ -656,6 +675,7 @@ final class MiniPlayerView: NSView {
     override func mouseDown(with event: NSEvent) {
         // Twice on the card: back to its tab, as Arc's does.
         if event.clickCount == 2 { pressPoint = nil; onBack?(); return }
+        onPointer?()
         pressPoint = superview?.convert(event.locationInWindow, from: nil)
         pressOrigin = frame.origin
     }
