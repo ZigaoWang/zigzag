@@ -55,6 +55,13 @@ final class MiniPlayer {
         set { UserDefaults.standard.set(newValue?.stored, forKey: "MiniPlayerPlace") }
     }
 
+    /// The card's size as you last left it, by its longer side, for a video of any shape. None until it's first
+    /// resized: it's a third of the page area wide.
+    static var extent: CGFloat? {
+        get { let value = UserDefaults.standard.double(forKey: "MiniPlayerSize"); return value > 0 ? value : nil }
+        set { UserDefaults.standard.set(newValue.map(Double.init), forKey: "MiniPlayerSize") }
+    }
+
     var isShowing: Bool { model.tab != nil }
 
     /// The pointer is on the card, or the card is being dragged: the sidebar's hover previews hold off for the tabs
@@ -163,6 +170,8 @@ final class MiniPlayer {
         card.onSeek = { [weak self] by in self?.command("seek", [("by", by)]) }
         card.onSeekTo = { [weak self] fraction in self?.command("seekTo", [("f", fraction)]) }
         card.onMoved = { [weak self] free in self?.dropped(free: free) }
+        card.onResize = { [weak self] in self?.place() }
+        card.onResized = { [weak self] in self?.resized() }
         // A tab's hover preview never stays over the card you're on.
         card.onPointer = { [weak self] in self?.controller?.previews.hide() }
         self.card = card
@@ -412,7 +421,8 @@ final class MiniPlayer {
         let area = movableArea
         let picture = pictureRect(in: webView)
         let aspect = picture.height > 0 ? picture.width / picture.height : 16 / 9
-        let size = MiniPlayerLayout.cardSize(aspect: aspect, in: controller.root.cardFrame.size)
+        let size = Self.extent.map { MiniPlayerLayout.cardSize(aspect: aspect, extent: $0, in: area.size) }
+            ?? MiniPlayerLayout.cardSize(aspect: aspect, in: controller.root.cardFrame.size)
         // Until it's first moved, at the bottom right of the page.
         let target = MiniPlayerLayout.frame(for: Self.place ?? .corner(.bottomRight), size: size, page: pageArea, in: area)
         card.dragArea = area
@@ -429,6 +439,20 @@ final class MiniPlayer {
         let (target, place) = MiniPlayerLayout.rest(card.frame, free: free, page: pageArea, in: movableArea)
         Self.place = place
         card.settle(at: target)
+    }
+
+    /// Let go after resizing: its size is kept, for the next video too, and it stays in its corner (or, placed
+    /// freely, where it is).
+    private func resized() {
+        guard let card else { return }
+        Self.extent = max(card.frame.width, card.frame.height)
+        switch Self.place ?? .corner(.bottomRight) {
+        case .corner(let corner):
+            Self.place = .corner(corner)
+            card.settle(at: MiniPlayerLayout.frame(for: .corner(corner), size: card.frame.size, page: pageArea, in: movableArea))
+        case .free:
+            dropped(free: true)
+        }
     }
 
     static func siteName(_ url: URL?) -> String {
@@ -524,6 +548,9 @@ final class MiniPlayerView: NSView {
     var onSeekTo: ((Double) -> Void)?
     /// Let go after a drag; true with ⌘ held, to stay where it was let go.
     var onMoved: ((Bool) -> Void)?
+    /// Resized by an edge or a corner: as it goes, and once let go.
+    var onResize: (() -> Void)?
+    var onResized: (() -> Void)?
     /// The pointer came onto the card, or pressed on it.
     var onPointer: (() -> Void)?
     /// Where it may be dragged, in its superview.
@@ -763,6 +790,8 @@ final class MiniPlayerView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard !isGoing, !isHidden, frame.contains(point) else { return nil }
         let local = convert(point, from: superview)
+        // Its edges resize it, over the controls too.
+        if !MiniPlayerLayout.edges(at: local, in: bounds.size).isEmpty { return self }
         if showsControls, let hit = controls.hitTest(local), hit is InteractiveView || hit is MiniPlayerProgress, !hit.isHidden {
             return hit
         }
@@ -820,16 +849,21 @@ final class MiniPlayerView: NSView {
 
     // MARK: Dragging
 
+    /// Moved or resized by the pointer, right now.
     private(set) var isDragging = false
     private var pressPoint: NSPoint?
-    private var pressOrigin: NSPoint = .zero
+    private var pressFrame: NSRect = .zero
+    /// The edges a press took hold of, to resize the card by; none to move it.
+    private var resizing: MiniPlayerLayout.Edges = []
 
     override func mouseDown(with event: NSEvent) {
+        let edges = MiniPlayerLayout.edges(at: convert(event.locationInWindow, from: nil), in: bounds.size)
         // Twice on the card: back to its tab, as Arc's does.
-        if event.clickCount == 2 { pressPoint = nil; onBack?(); return }
+        if event.clickCount == 2, edges.isEmpty { pressPoint = nil; onBack?(); return }
         onPointer?()
         pressPoint = superview?.convert(event.locationInWindow, from: nil)
-        pressOrigin = frame.origin
+        pressFrame = frame
+        resizing = edges
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -837,11 +871,47 @@ final class MiniPlayerView: NSView {
         let point = superview.convert(event.locationInWindow, from: nil)
         let dx = point.x - start.x, dy = point.y - start.y
         if !isDragging {
-            guard hypot(dx, dy) > 4 else { return }
+            // An edge takes hold at once; the card itself after a few points, so a click stays a click.
+            guard !resizing.isEmpty || hypot(dx, dy) > 4 else { return }
             isDragging = true
             layer?.removeAnimation(forKey: "grow")
         }
-        moveTo(NSPoint(x: pressOrigin.x + dx, y: pressOrigin.y + dy))
+        if resizing.isEmpty {
+            moveTo(NSPoint(x: pressFrame.minX + dx, y: pressFrame.minY + dy))
+        } else {
+            resize(by: CGSize(width: dx, height: dy))
+        }
+    }
+
+    /// Its held edges follow the pointer, the video's shape kept.
+    private func resize(by delta: CGSize) {
+        let target = MiniPlayerLayout.resized(pressFrame, from: resizing, by: delta, in: dragArea)
+        guard target != frame else { return }
+        frame = target
+        onResize?()
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        window?.invalidateCursorRects(for: self)
+    }
+
+    /// The resize arrows along its edges and at its corners, as a window's.
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        let w = bounds.width, h = bounds.height, g = MiniPlayerLayout.grip, c = MiniPlayerLayout.cornerGrip
+        guard w > c * 2, h > c * 2 else { return }
+        let zones: [(NSRect, NSCursor.FrameResizePosition)] = [
+            (NSRect(x: c, y: 0, width: w - c * 2, height: g), .top),
+            (NSRect(x: c, y: h - g, width: w - c * 2, height: g), .bottom),
+            (NSRect(x: 0, y: c, width: g, height: h - c * 2), .left),
+            (NSRect(x: w - g, y: c, width: g, height: h - c * 2), .right),
+            (NSRect(x: 0, y: 0, width: c, height: c), .topLeft),
+            (NSRect(x: w - c, y: 0, width: c, height: c), .topRight),
+            (NSRect(x: 0, y: h - c, width: c, height: c), .bottomLeft),
+            (NSRect(x: w - c, y: h - c, width: c, height: c), .bottomRight),
+        ]
+        for (rect, position) in zones { addCursorRect(rect, cursor: .frameResize(position: position, directions: .all)) }
     }
 
     /// Glides to where it comes to rest after a drag, briefly, as a window snaps; at once with Reduce Motion.
@@ -853,6 +923,8 @@ final class MiniPlayerView: NSView {
             self.animator().frame = target
         } completion: { [weak self] in
             self?.isSettling = false
+            // The window may have changed meanwhile: placed again for it.
+            self?.onResize?()
         }
     }
     private(set) var isSettling = false
@@ -866,9 +938,11 @@ final class MiniPlayerView: NSView {
     override func mouseUp(with event: NSEvent) {
         guard pressPoint != nil else { return }
         pressPoint = nil
+        let resized = !resizing.isEmpty
+        resizing = []
         if isDragging {
             isDragging = false
-            onMoved?(event.modifierFlags.contains(.command))
+            if resized { onResized?() } else { onMoved?(event.modifierFlags.contains(.command)) }
         } else {
             keepControls()
         }
@@ -890,6 +964,17 @@ final class MiniPlayerView: NSView {
         case "double": onBack?()
         default: break
         }
+    }
+    /// A drag of these edges (l, r, t, b; "tl" a corner) by this much, let go where it ends.
+    func debugResize(_ edges: String, dx: CGFloat, dy: CGFloat) {
+        let names: [Character: MiniPlayerLayout.Edges] = ["l": .left, "r": .right, "t": .top, "b": .bottom]
+        resizing = MiniPlayerLayout.Edges(edges.compactMap { names[$0] })
+        pressFrame = frame
+        isDragging = true
+        resize(by: CGSize(width: dx, height: dy))
+        isDragging = false
+        resizing = []
+        onResized?()
     }
     /// A drag of the card by this much, let go where it ends (with ⌘ held: `free`).
     func debugDrag(dx: CGFloat, dy: CGFloat, free: Bool = false) {

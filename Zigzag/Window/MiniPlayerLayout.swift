@@ -139,7 +139,7 @@ nonisolated enum MiniPlayerLayout {
     /// The card for a picture of this shape in a page area this big: a third of its width (no smaller than 240, no
     /// bigger than 480), and never more than half its height.
     static func cardSize(aspect: CGFloat, in area: CGSize) -> CGSize {
-        let ratio = min(max(aspect.isFinite && aspect > 0 ? aspect : 16 / 9, aspectRange.lowerBound), aspectRange.upperBound)
+        let ratio = clampedAspect(aspect)
         let room = CGSize(width: max(0, area.width - margin * 2), height: max(0, area.height * heightShare))
         var width = min(max(area.width * widthShare, minimumWidth), maximumWidth, room.width)
         var height = width / ratio
@@ -302,6 +302,81 @@ nonisolated enum MiniPlayerLayout {
         }
         let corner = nearestCorner(to: CGPoint(x: frame.midX, y: frame.midY), in: page)
         return (self.frame(for: .corner(corner), size: frame.size, page: page, in: area), .corner(corner))
+    }
+
+    // MARK: Resizing
+
+    /// The smallest card: room for its controls.
+    static let smallestCard = CGSize(width: 200, height: 112)
+    /// The largest: this much of the window either way.
+    static let largestShare: CGFloat = 0.8
+
+    /// The widths a card of this shape may take in an area this big (where it may go).
+    static func widthRange(aspect: CGFloat, in area: CGSize) -> ClosedRange<CGFloat> {
+        let ratio = clampedAspect(aspect)
+        let lowest = max(smallestCard.width, smallestCard.height * ratio)
+        let highest = max(0, floor(min(area.width * largestShare, area.height * largestShare * ratio)))
+        return min(lowest, highest)...highest
+    }
+
+    /// The card you sized yourself: its longer side `extent` long, for a video of any shape, within `widthRange`.
+    static func cardSize(aspect: CGFloat, extent: CGFloat, in area: CGSize) -> CGSize {
+        let ratio = clampedAspect(aspect)
+        let wanted = ratio >= 1 ? extent : extent * ratio
+        let range = widthRange(aspect: ratio, in: area)
+        let width = round(min(max(wanted, range.lowerBound), range.upperBound))
+        return CGSize(width: width, height: round(width / ratio))
+    }
+
+    static func clampedAspect(_ aspect: CGFloat) -> CGFloat {
+        min(max(aspect.isFinite && aspect > 0 ? aspect : 16 / 9, aspectRange.lowerBound), aspectRange.upperBound)
+    }
+
+    /// The edges a press on the card takes hold of, to resize it by: within `grip` of an edge, two edges within
+    /// `corner` of a corner. `point` is in the card's own points, y running down.
+    struct Edges: OptionSet, Hashable, Sendable {
+        let rawValue: Int
+        static let left = Edges(rawValue: 1), right = Edges(rawValue: 2), top = Edges(rawValue: 4), bottom = Edges(rawValue: 8)
+    }
+
+    static let grip: CGFloat = 5
+    static let cornerGrip: CGFloat = 12
+
+    static func edges(at point: CGPoint, in size: CGSize) -> Edges {
+        guard point.x >= 0, point.y >= 0, point.x <= size.width, point.y <= size.height else { return [] }
+        func near(_ reach: CGFloat) -> Edges {
+            var edges: Edges = []
+            if point.x < reach { edges.insert(.left) } else if point.x > size.width - reach { edges.insert(.right) }
+            if point.y < reach { edges.insert(.top) } else if point.y > size.height - reach { edges.insert(.bottom) }
+            return edges
+        }
+        let corner = near(cornerGrip)
+        if corner.intersection([.left, .right]).isEmpty == false, corner.intersection([.top, .bottom]).isEmpty == false { return corner }
+        return near(grip)
+    }
+
+    /// The card pressed at `frame`, its `edges` dragged `by` this much: the same shape, the opposite edge (or corner)
+    /// staying put, within `widthRange` and inside `area`. Dragging one edge, the side across it that stays is the one
+    /// nearer the area's edge, so a card in a corner stays in it.
+    static func resized(_ frame: CGRect, from edges: Edges, by delta: CGSize, in area: CGRect) -> CGRect {
+        guard !edges.isEmpty, frame.width > 0, frame.height > 0 else { return frame }
+        let ratio = frame.width / frame.height
+        let horizontal = !edges.intersection([.left, .right]).isEmpty, vertical = !edges.intersection([.top, .bottom]).isEmpty
+        let byX = edges.contains(.left) ? frame.width - delta.width : frame.width + delta.width
+        let byY = (edges.contains(.top) ? frame.height - delta.height : frame.height + delta.height) * ratio
+        var width = horizontal && vertical ? max(byX, byY) : horizontal ? byX : byY
+        // Which side stays put, either way.
+        let keepsRight = edges.contains(.left) || (!horizontal && frame.midX > area.midX)
+        let keepsBottom = edges.contains(.top) || (!vertical && frame.midY > area.midY)
+        let fixed = CGPoint(x: keepsRight ? frame.maxX : frame.minX, y: keepsBottom ? frame.maxY : frame.minY)
+        let roomX = keepsRight ? fixed.x - area.minX : area.maxX - fixed.x
+        let roomY = (keepsBottom ? fixed.y - area.minY : area.maxY - fixed.y) * ratio
+        let range = widthRange(aspect: ratio, in: area.size)
+        width = min(max(width, range.lowerBound), range.upperBound, max(range.lowerBound, min(roomX, roomY)))
+        width = round(width)
+        let height = round(width / ratio)
+        let rect = CGRect(x: keepsRight ? fixed.x - width : fixed.x, y: keepsBottom ? fixed.y - height : fixed.y, width: width, height: height)
+        return clamp(rect, in: area)
     }
 
     /// The corner nearest a point.

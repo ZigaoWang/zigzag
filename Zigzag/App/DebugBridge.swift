@@ -319,6 +319,10 @@ enum DebugBridge {
         case "mpdrag":
             let n = arg.split(separator: " ").compactMap { Double($0) }
             if n.count >= 2 { player.card?.debugDrag(dx: n[0], dy: n[1], free: arg.hasSuffix(" free")) }
+        // mpresize <edges> <dx> <dy>: those edges (l, r, t, b, or a corner as "tl") dragged that far and let go.
+        case "mpresize":
+            let f = arg.split(separator: " ").map(String.init)
+            if f.count == 3, let dx = Double(f[1]), let dy = Double(f[2]) { player.card?.debugResize(f[0], dx: dx, dy: dy) }
         case "mpselect": controller.tabManager.select(at: Int(arg) ?? 0)
         case "mpwindow":
             if let window = controller.window {
