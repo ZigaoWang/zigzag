@@ -114,6 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // that couldn't be read come before either: what's new waits a launch.
         if Library.shared.profilesWereSetAside { tellProfilesSetAside() } else if !WhatsNew.offerIfUpdated() { offerDefaultBrowserOnce() }
         DockProgress.shared.start()
+        Tokens.Contrast.start()
         DebugBridge.start()
     }
 

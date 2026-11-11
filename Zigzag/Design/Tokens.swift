@@ -895,58 +895,152 @@ enum Tokens {
         static let full: TimeInterval = 4 * 24 * 60 * 60
     }
 
+    // MARK: - Increase Contrast and Reduce Transparency
+
+    /// System Settings › Accessibility › Display. With Increase Contrast on, every color that has a stronger version
+    /// (`Color.dynamic(light:dark:highLight:highDark:)`: hairlines, edges, separators, quiet text, icons, the chrome's
+    /// fills and the controls' borders) takes it, so text reads at AA or better on its ground in either mode; nothing
+    /// else changes. With Reduce Transparency (or Increase Contrast) on, what floats is opaque. Both are read as they
+    /// are now, so a color resolves to the setting of the moment, and `start` draws every window again when either
+    /// changes.
+    enum Contrast {
+        /// Increase Contrast is on, or forced in a Debug build (`debugOverride`, ZIGZAG_HIGH_CONTRAST=1).
+        nonisolated static var isIncreased: Bool {
+            #if DEBUG
+            if let forced = debugOverride { return forced }
+            #endif
+            return NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+        }
+
+        /// Whether a color drawn in `appearance` takes its high-contrast version: the setting is on, or the appearance
+        /// is one of the Mac's high-contrast ones.
+        nonisolated static func isHigh(_ appearance: NSAppearance) -> Bool {
+            if isIncreased { return true }
+            let name = appearance.bestMatch(from: [.aqua, .darkAqua, .accessibilityHighContrastAqua, .accessibilityHighContrastDarkAqua])
+            return name == .accessibilityHighContrastAqua || name == .accessibilityHighContrastDarkAqua
+        }
+
+        /// Floating things drop their see-through wash: Reduce Transparency is on, or Increase Contrast.
+        nonisolated static var isOpaque: Bool {
+            NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency || isIncreased
+        }
+
+        #if DEBUG
+        /// Debug builds: high-contrast colors forced on (true) or off (false) for this app alone, without changing the
+        /// Mac's setting; nil follows the Mac. ZIGZAG_HIGH_CONTRAST=1 starts with it on; `contrast on|off|system`
+        /// changes it while running.
+        nonisolated(unsafe) static var debugOverride: Bool? = ProcessInfo.processInfo.environment["ZIGZAG_HIGH_CONTRAST"] == "1" ? true : nil
+        #endif
+
+        /// Follows the Mac's display options from launch on.
+        static func start() {
+            NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+                                                              object: nil, queue: .main) { _ in
+                // A turn later, once the windows have heard of it themselves (a see-through frame going solid).
+                DispatchQueue.main.async { MainActor.assumeIsolated { redraw() } }
+            }
+        }
+
+        /// Draws every window again in the colors of the moment: layers keep the color they were given until a view
+        /// sets it again, which Zigzag's views do when their appearance changes, so each of ours is told so. Pages
+        /// are left alone.
+        static func redraw() {
+            for window in NSApp.windows {
+                guard let root = window.contentView?.superview ?? window.contentView else { continue }
+                redraw(root)
+            }
+            Brand.themeChanged.send(())
+        }
+
+        private static func redraw(_ view: NSView) {
+            if let web = NSClassFromString("WKWebView"), view.isKind(of: web) { return }
+            if Bundle(for: type(of: view)) == .main { view.viewDidChangeEffectiveAppearance() }
+            view.needsDisplay = true
+            view.subviews.forEach(redraw)
+        }
+    }
+
     // MARK: - Colors (light and dark designed together)
 
     enum Color {
-        static func dynamic(light: NSColor, dark: NSColor) -> NSColor {
+        nonisolated static func dynamic(light: NSColor, dark: NSColor) -> NSColor {
             NSColor(name: nil) { appearance in
                 appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
             }
         }
 
-        static func hex(_ value: UInt32, alpha: CGFloat = 1) -> NSColor {
+        /// A color with a stronger version for Increase Contrast (`Tokens.Contrast`), by day and at night. Without it
+        /// the color resolves exactly as `dynamic(light:dark:)` does.
+        nonisolated static func dynamic(light: NSColor, dark: NSColor, highLight: NSColor, highDark: NSColor) -> NSColor {
+            NSColor(name: nil) { appearance in
+                let high = Contrast.isHigh(appearance)
+                return appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? (high ? highDark : dark) : (high ? highLight : light)
+            }
+        }
+
+        nonisolated static func hex(_ value: UInt32, alpha: CGFloat = 1) -> NSColor {
             NSColor(srgbRed: CGFloat((value >> 16) & 0xFF) / 255,
                     green: CGFloat((value >> 8) & 0xFF) / 255,
                     blue: CGFloat(value & 0xFF) / 255,
                     alpha: alpha)
         }
 
-        static let textPrimary = dynamic(light: hex(0x000000, alpha: 0.86), dark: hex(0xFFFFFF, alpha: 0.92))
-        static let textSecondary = dynamic(light: hex(0x000000, alpha: 0.54), dark: hex(0xFFFFFF, alpha: 0.56))
-        static let textTertiary = dynamic(light: hex(0x000000, alpha: 0.45), dark: hex(0xFFFFFF, alpha: 0.42))
+        static let textPrimary = dynamic(light: hex(0x000000, alpha: 0.86), dark: hex(0xFFFFFF, alpha: 0.92),
+            highLight: hex(0x000000, alpha: 0.92), highDark: hex(0xFFFFFF, alpha: 0.98))
+        static let textSecondary = dynamic(light: hex(0x000000, alpha: 0.54), dark: hex(0xFFFFFF, alpha: 0.56),
+            highLight: hex(0x000000, alpha: 0.72), highDark: hex(0xFFFFFF, alpha: 0.80))
+        static let textTertiary = dynamic(light: hex(0x000000, alpha: 0.45), dark: hex(0xFFFFFF, alpha: 0.42),
+            highLight: hex(0x000000, alpha: 0.64), highDark: hex(0xFFFFFF, alpha: 0.72))
 
-        static let icon = dynamic(light: hex(0x000000, alpha: 0.62), dark: hex(0xFFFFFF, alpha: 0.66))
+        static let icon = dynamic(light: hex(0x000000, alpha: 0.62), dark: hex(0xFFFFFF, alpha: 0.66),
+            highLight: hex(0x000000, alpha: 0.80), highDark: hex(0xFFFFFF, alpha: 0.84))
         /// The window's own toolbar and bottom bar glyphs: a step crisper than a panel's icons, on any space's color.
-        static let chromeIcon = dynamic(light: hex(0x000000, alpha: 0.72), dark: hex(0xFFFFFF, alpha: 0.78))
+        static let chromeIcon = dynamic(light: hex(0x000000, alpha: 0.72), dark: hex(0xFFFFFF, alpha: 0.78),
+            highLight: hex(0x000000, alpha: 0.86), highDark: hex(0xFFFFFF, alpha: 0.92))
 
         /// Row and button overlays drawn on top of the window background.
-        static let hoverFill = dynamic(light: hex(0x000000, alpha: 0.05), dark: hex(0xFFFFFF, alpha: 0.06))
-        static let pressedFill = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.10))
+        static let hoverFill = dynamic(light: hex(0x000000, alpha: 0.05), dark: hex(0xFFFFFF, alpha: 0.06),
+            highLight: hex(0x000000, alpha: 0.09), highDark: hex(0xFFFFFF, alpha: 0.11))
+        static let pressedFill = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.10),
+            highLight: hex(0x000000, alpha: 0.15), highDark: hex(0xFFFFFF, alpha: 0.17))
         /// A chosen row on a panel or a page: a clear neutral fill with a 1px edge (`selectedEdge`) and a shadow-sm
         /// (`liftShadow`). The sidebar's own rows sit on the frame and use `Tokens.Chrome` instead.
-        static let selectedFill = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.11))
-        static let selectedHoverFill = dynamic(light: hex(0x000000, alpha: 0.11), dark: hex(0xFFFFFF, alpha: 0.13))
-        static let selectedEdge = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0xFFFFFF, alpha: 0.06))
+        static let selectedFill = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.11),
+            highLight: hex(0x000000, alpha: 0.13), highDark: hex(0xFFFFFF, alpha: 0.17))
+        static let selectedHoverFill = dynamic(light: hex(0x000000, alpha: 0.11), dark: hex(0xFFFFFF, alpha: 0.13),
+            highLight: hex(0x000000, alpha: 0.16), highDark: hex(0xFFFFFF, alpha: 0.20))
+        static let selectedEdge = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0xFFFFFF, alpha: 0.06),
+            highLight: hex(0x000000, alpha: 0.32), highDark: hex(0xFFFFFF, alpha: 0.32))
         static let liftShadow = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0x000000, alpha: 0.28))
         /// A split pane's address on the page card: a faint fill and a 1px edge, a step deeper under the pointer.
-        static let chromeFill = dynamic(light: hex(0x000000, alpha: 0.05), dark: hex(0xFFFFFF, alpha: 0.07))
-        static let chromeHover = dynamic(light: hex(0x000000, alpha: 0.075), dark: hex(0xFFFFFF, alpha: 0.10))
-        static let chromeEdge = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.08))
-        static let glassFill = dynamic(light: hex(0xFFFFFF, alpha: 0.32), dark: hex(0xFFFFFF, alpha: 0.06))
-        static let glassHover = dynamic(light: hex(0xFFFFFF, alpha: 0.5), dark: hex(0xFFFFFF, alpha: 0.1))
-        static let glassEdge = dynamic(light: hex(0xFFFFFF, alpha: 0.55), dark: hex(0xFFFFFF, alpha: 0.08))
+        static let chromeFill = dynamic(light: hex(0x000000, alpha: 0.05), dark: hex(0xFFFFFF, alpha: 0.07),
+            highLight: hex(0x000000, alpha: 0.09), highDark: hex(0xFFFFFF, alpha: 0.12))
+        static let chromeHover = dynamic(light: hex(0x000000, alpha: 0.075), dark: hex(0xFFFFFF, alpha: 0.10),
+            highLight: hex(0x000000, alpha: 0.13), highDark: hex(0xFFFFFF, alpha: 0.16))
+        static let chromeEdge = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.08),
+            highLight: hex(0x000000, alpha: 0.32), highDark: hex(0xFFFFFF, alpha: 0.32))
+        static let glassFill = dynamic(light: hex(0xFFFFFF, alpha: 0.32), dark: hex(0xFFFFFF, alpha: 0.06),
+            highLight: hex(0xFFFFFF, alpha: 0.6), highDark: hex(0xFFFFFF, alpha: 0.12))
+        static let glassHover = dynamic(light: hex(0xFFFFFF, alpha: 0.5), dark: hex(0xFFFFFF, alpha: 0.1),
+            highLight: hex(0xFFFFFF, alpha: 0.75), highDark: hex(0xFFFFFF, alpha: 0.18))
+        static let glassEdge = dynamic(light: hex(0xFFFFFF, alpha: 0.55), dark: hex(0xFFFFFF, alpha: 0.08),
+            highLight: hex(0x000000, alpha: 0.3), highDark: hex(0xFFFFFF, alpha: 0.3))
         /// A tile whose page is open in the background: a fine darker edge in place of the usual one.
-        static let openEdge = dynamic(light: hex(0x000000, alpha: 0.16), dark: hex(0xFFFFFF, alpha: 0.2))
+        static let openEdge = dynamic(light: hex(0x000000, alpha: 0.16), dark: hex(0xFFFFFF, alpha: 0.2),
+            highLight: hex(0x000000, alpha: 0.5), highDark: hex(0xFFFFFF, alpha: 0.5))
         /// The keyboard-selected row in floating lists (command bar, downloads).
-        static let highlight = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0xFFFFFF, alpha: 0.09))
-        static let fieldFill = dynamic(light: hex(0x000000, alpha: 0.045), dark: hex(0xFFFFFF, alpha: 0.06))
+        static let highlight = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0xFFFFFF, alpha: 0.09),
+            highLight: hex(0x000000, alpha: 0.12), highDark: hex(0xFFFFFF, alpha: 0.15))
+        static let fieldFill = dynamic(light: hex(0x000000, alpha: 0.045), dark: hex(0xFFFFFF, alpha: 0.06),
+            highLight: hex(0x000000, alpha: 0.08), highDark: hex(0xFFFFFF, alpha: 0.11))
 
         /// The secondary button, a dropdown, a page's search field: white with a hairline and a faint shadow, a lighter
         /// step of the surface in dark mode. Hover is a hair grayer, pressed a step darker; never a scale.
         static let controlFill = dynamic(light: hex(0xFFFFFF), dark: hex(0xFFFFFF, alpha: 0.09))
         static let controlHover = dynamic(light: hex(0xF6F6F7), dark: hex(0xFFFFFF, alpha: 0.13))
         static let controlPressed = dynamic(light: hex(0xECECEE), dark: hex(0xFFFFFF, alpha: 0.06))
-        static let controlEdge = dynamic(light: hex(0x000000, alpha: 0.12), dark: hex(0xFFFFFF, alpha: 0.1))
+        static let controlEdge = dynamic(light: hex(0x000000, alpha: 0.12), dark: hex(0xFFFFFF, alpha: 0.1),
+            highLight: hex(0x000000, alpha: 0.45), highDark: hex(0xFFFFFF, alpha: 0.42))
         static let controlShadow = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0x000000, alpha: 0.3))
         /// The one primary action on a surface: a dark filled pill (light in dark mode), whatever the space.
         static let primaryFill = dynamic(light: hex(0x1D1D1F), dark: hex(0xF2F2F4))
@@ -957,11 +1051,13 @@ enum Tokens {
         /// `Metric.focusGap` outside the control.
         static let focusAlpha: CGFloat = 0.6
 
-        static let separator = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.08))
+        static let separator = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.08),
+            highLight: hex(0x000000, alpha: 0.32), highDark: hex(0xFFFFFF, alpha: 0.30))
 
         /// The page card when there is no page, and its edge.
         static let cardBackground = dynamic(light: hex(0xFFFFFF), dark: hex(0x1E1E20))
-        static let cardEdge = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0xFFFFFF, alpha: 0.07))
+        static let cardEdge = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0xFFFFFF, alpha: 0.07),
+            highLight: hex(0x000000, alpha: 0.32), highDark: hex(0xFFFFFF, alpha: 0.30))
         /// Only shadow in the window: lifts the page off the frame.
         static let cardShadow = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0x000000, alpha: 0.28))
         /// The page beside the sidebar, resting on the frame: soft, falling onto the sidebar along the page's edge.
@@ -972,9 +1068,14 @@ enum Tokens {
         /// A floating surface in a window with no space color (or a white, gray or black one): opaque. Panels in a
         /// colored space lean toward it (`Brand.Theme.panel`).
         static let panelBackground = dynamic(light: hex(0xFCFCFC), dark: hex(0x2A2A2D))
-        /// A small floating thing over a page that has to stay light (the swipe arrows): the panel color, mostly opaque.
-        static let panelWash = dynamic(light: hex(0xFFFFFF, alpha: 0.9), dark: hex(0x1F1F22, alpha: 0.88))
-        static let panelEdge = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.10))
+        /// A small floating thing over a page that has to stay light (the swipe arrows): the panel color, mostly opaque;
+        /// fully, with Reduce Transparency or Increase Contrast (`Contrast.isOpaque`).
+        static let panelWash = NSColor(name: nil) { appearance in
+            let solid = Contrast.isOpaque || Contrast.isHigh(appearance)
+            return appearance.isDark ? hex(0x1F1F22, alpha: solid ? 1 : 0.88) : hex(0xFFFFFF, alpha: solid ? 1 : 0.9)
+        }
+        static let panelEdge = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.10),
+            highLight: hex(0x000000, alpha: 0.4), highDark: hex(0xFFFFFF, alpha: 0.4))
         static let panelShadow = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0x000000, alpha: 0.4))
         static let scrim = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0x000000, alpha: 0.30))
 
@@ -991,7 +1092,8 @@ enum Tokens {
         static let surface = cardBackground
         /// A group of rows on the surface, and its hairline edge.
         static let surfaceGroup = dynamic(light: hex(0xFFFFFF), dark: hex(0x2A2A2D))
-        static let surfaceGroupEdge = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.06))
+        static let surfaceGroupEdge = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.06),
+            highLight: hex(0x000000, alpha: 0.32), highDark: hex(0xFFFFFF, alpha: 0.30))
         /// Behind a PDF's pages and in its sidebar: a shade off the card, so each page stands out as paper.
         static let pdfBackdrop = dynamic(light: hex(0xEDEDF0), dark: hex(0x161618))
         /// Between a PDF's pages while they're drawn dark: a shade lighter than the dark paper, so each still reads as one.
@@ -1011,12 +1113,15 @@ enum Tokens {
         /// A firmer dim than `scrim`, under Peek: a page above the page should read as a layer.
         static let peekScrim = dynamic(light: hex(0x000000, alpha: 0.2), dark: hex(0x000000, alpha: 0.42))
         /// A keycap's fill and edge (`KeyCap`): a touch of the field fill with a hairline, like a key seen from above.
-        static let keyCapFill = dynamic(light: hex(0x000000, alpha: 0.04), dark: hex(0xFFFFFF, alpha: 0.07))
-        static let keyCapEdge = dynamic(light: hex(0x000000, alpha: 0.1), dark: hex(0xFFFFFF, alpha: 0.1))
+        static let keyCapFill = dynamic(light: hex(0x000000, alpha: 0.04), dark: hex(0xFFFFFF, alpha: 0.07),
+            highLight: hex(0x000000, alpha: 0.07), highDark: hex(0xFFFFFF, alpha: 0.11))
+        static let keyCapEdge = dynamic(light: hex(0x000000, alpha: 0.1), dark: hex(0xFFFFFF, alpha: 0.1),
+            highLight: hex(0x000000, alpha: 0.42), highDark: hex(0xFFFFFF, alpha: 0.4))
 
         /// Settings: the window behind grouped rows (System Settings proportions).
         static let formBackground = dynamic(light: hex(0xF2F2F4), dark: hex(0x1E1E20))
-        static let progress = dynamic(light: hex(0x000000, alpha: 0.28), dark: hex(0xFFFFFF, alpha: 0.32))
+        static let progress = dynamic(light: hex(0x000000, alpha: 0.28), dark: hex(0xFFFFFF, alpha: 0.32),
+            highLight: hex(0x000000, alpha: 0.5), highDark: hex(0xFFFFFF, alpha: 0.55))
         static let destructive = NSColor.systemRed
         /// Status: something to fix (a weak password, an import problem).
         static let warning = NSColor.systemOrange
@@ -1049,15 +1154,20 @@ enum Tokens {
     /// space's accent when on. The track never lights up; on and off differ by the knob's place and color.
     enum Switch {
         private static func ink(_ alpha: CGFloat) -> NSColor { Color.hex(0x000000, alpha: alpha) }
-        static let track = Color.dynamic(light: ink(0.075), dark: ink(0.32))
-        static let trackHover = Color.dynamic(light: ink(0.095), dark: ink(0.36))
-        static let trackPressed = Color.dynamic(light: ink(0.115), dark: ink(0.4))
-        static let edge = Color.dynamic(light: ink(0.06), dark: Color.hex(0xFFFFFF, alpha: 0.06))
+        static let track = Color.dynamic(light: ink(0.075), dark: ink(0.32),
+            highLight: ink(0.16), highDark: ink(0.45))
+        static let trackHover = Color.dynamic(light: ink(0.095), dark: ink(0.36),
+            highLight: ink(0.19), highDark: ink(0.5))
+        static let trackPressed = Color.dynamic(light: ink(0.115), dark: ink(0.4),
+            highLight: ink(0.22), highDark: ink(0.55))
+        static let edge = Color.dynamic(light: ink(0.06), dark: Color.hex(0xFFFFFF, alpha: 0.06),
+            highLight: ink(0.4), highDark: Color.hex(0xFFFFFF, alpha: 0.3))
         /// The shade under the track's upper lip, fading out by `recessDepth` of its height.
         static let recess = Color.dynamic(light: ink(0.07), dark: ink(0.25))
         static let recessDepth: CGFloat = 0.55
         static let knob = Color.dynamic(light: Color.hex(0xFBFAF8), dark: Color.hex(0xE9E7E4))
-        static let knobEdge = Color.dynamic(light: ink(0.11), dark: ink(0.3))
+        static let knobEdge = Color.dynamic(light: ink(0.11), dark: ink(0.3),
+            highLight: ink(0.4), highDark: ink(0.5))
         static let knobShadow = Color.dynamic(light: ink(0.18), dark: ink(0.45))
         static let knobShadowRadius: CGFloat = 1
         static let knobShadowDrop: CGFloat = 0.5
@@ -1095,31 +1205,43 @@ enum Tokens {
 
         /// The tab you're on: by day a near-white card lifted by one soft shadow (`cardShadow`, `Shadow.lift`), its edge
         /// only just there, so it reads as a card rather than an outline; at night a lighter step of the space's color.
-        static let card = Color.dynamic(light: white(0.96), dark: white(0.18))
-        static let cardHover = Color.dynamic(light: white(1), dark: white(0.21))
+        static let card = Color.dynamic(light: white(0.96), dark: white(0.18),
+            highLight: white(1), highDark: white(0.24))
+        static let cardHover = Color.dynamic(light: white(1), dark: white(0.21),
+            highLight: white(1), highDark: white(0.27))
         /// At night the card's top edge catches the light: one pixel inside its upper rim (`setCardRim`). By day the
         /// card is nearly white already and a lit edge can't read at 1x, so there is none.
         static let rim = Color.dynamic(light: .clear, dark: white(0.14))
         /// Only just there by night too: the lit rim and the shadow part the card, a bright line all round would
         /// outline it.
-        static let cardEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.035), dark: white(0.035))
+        static let cardEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.035), dark: white(0.035),
+            highLight: Color.hex(0x000000, alpha: 0.3), highDark: white(0.3))
         static let cardShadow = Color.dynamic(light: Color.hex(0x1E2A44, alpha: 0.10), dark: Color.hex(0x000000, alpha: 0.3))
         /// A row or a toolbar button under the pointer: a gentler wash than the card; pressed, a step more.
-        static let hover = Color.dynamic(light: white(0.38), dark: white(0.05))
+        static let hover = Color.dynamic(light: white(0.38), dark: white(0.05),
+            highLight: white(0.62), highDark: white(0.10))
         /// New Tab under the pointer: a lighter wash than a tab's, so the one quiet row stays quiet.
-        static let quietHover = Color.dynamic(light: white(0.22), dark: white(0.03))
+        static let quietHover = Color.dynamic(light: white(0.22), dark: white(0.03),
+            highLight: white(0.45), highDark: white(0.07))
         /// Pressed: a step darker than hover, as a thing pushed in is (`showSink`).
-        static let pressed = Color.dynamic(light: white(0.28), dark: white(0.035))
+        static let pressed = Color.dynamic(light: white(0.28), dark: white(0.035),
+            highLight: white(0.5), highDark: white(0.08))
         /// The address and the favorites: a soft field of the space's color, no line around it.
-        static let field = Color.dynamic(light: white(0.45), dark: white(0.065))
-        static let fieldHover = Color.dynamic(light: white(0.62), dark: white(0.095))
+        static let field = Color.dynamic(light: white(0.45), dark: white(0.065),
+            highLight: white(0.72), highDark: white(0.12))
+        static let fieldHover = Color.dynamic(light: white(0.62), dark: white(0.095),
+            highLight: white(0.85), highDark: white(0.16))
         /// A field or a favorite held down: a step back from its hover, never below the field at rest.
-        static let fieldPressed = Color.dynamic(light: white(0.52), dark: white(0.08))
+        static let fieldPressed = Color.dynamic(light: white(0.52), dark: white(0.08),
+            highLight: white(0.78), highDark: white(0.14))
         /// A space key: its matte face, the hairline around it, and the shade along its lower lip.
-        static let key = Color.dynamic(light: white(0.5), dark: white(0.07))
-        static let keyEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.07), dark: white(0.09))
+        static let key = Color.dynamic(light: white(0.5), dark: white(0.07),
+            highLight: white(0.75), highDark: white(0.12))
+        static let keyEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.07), dark: white(0.09),
+            highLight: Color.hex(0x000000, alpha: 0.4), highDark: white(0.35))
         /// A favorite whose page is open: a fine edge, the only line on a tile.
-        static let openEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.1), dark: white(0.16))
+        static let openEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.1), dark: white(0.16),
+            highLight: Color.hex(0x000000, alpha: 0.45), highDark: white(0.45))
     }
 
     // MARK: - Materials (the tactile kit in Materials.swift; Design/DESIGN.md, "Materials")
@@ -1255,5 +1377,5 @@ enum Tokens {
 }
 
 extension NSAppearance {
-    var isDark: Bool { bestMatch(from: [.darkAqua, .aqua]) == .darkAqua }
+    nonisolated var isDark: Bool { bestMatch(from: [.darkAqua, .aqua]) == .darkAqua }
 }

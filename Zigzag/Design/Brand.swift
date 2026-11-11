@@ -101,21 +101,26 @@ enum Brand {
 
         /// A row's title on the frame: a deep ink of the space's hue by day, a pale one at night (on the curated
         /// colors at least 11.7:1 by day and 7.5:1 at night, under the hover and card washes too).
-        var rowInk: NSColor { inked(day: (0.27, 0.035), night: (0.94, 0.015), plain: Tokens.Color.textPrimary) }
+        var rowInk: NSColor { inked(day: (0.27, 0.035), night: (0.94, 0.015), highDay: (0.2, 0.03), highNight: (0.97, 0.01), plain: Tokens.Color.textPrimary) }
 
         /// A quiet word on the frame ("tabs", "new tab", "clear"): on the curated colors 5.2:1 by day, 4.8:1 at night.
-        var quietInk: NSColor { inked(day: (0.47, 0.04), night: (0.8, 0.025), plain: Tokens.Color.textSecondary) }
+        /// With Increase Contrast, both inks are a step deeper by day and paler at night (`highDay`, `highNight`).
+        var quietInk: NSColor { inked(day: (0.47, 0.04), night: (0.8, 0.025), highDay: (0.36, 0.035), highNight: (0.88, 0.02), plain: Tokens.Color.textSecondary) }
 
         /// The space's ink at an OKLCH lightness and chroma, checked against this space's own frame in each mode,
         /// bare and under the hover and card washes: wherever it would fall under AA (4.5:1), that mode takes the plain
         /// text color instead. Computed per color, so a mid-scale custom shade keeps its ink in whichever mode it can.
-        private func inked(day: (Double, Double), night: (Double, Double), plain: NSColor) -> NSColor {
+        private func inked(day: (Double, Double), night: (Double, Double), highDay: (Double, Double), highNight: (Double, Double),
+                           plain: NSColor) -> NSColor {
             guard let h = surfaceHue, !inkGrounds.isEmpty else { return plain }
             let grounds = inkGrounds
             let dayInk = SpaceColor.tone(hue: h, lightness: day.0, chroma: day.1)
             let nightInk = SpaceColor.tone(hue: h, lightness: night.0, chroma: night.1)
+            let highDayInk = SpaceColor.tone(hue: h, lightness: highDay.0, chroma: highDay.1)
+            let highNightInk = SpaceColor.tone(hue: h, lightness: highNight.0, chroma: highNight.1)
             return NSColor(name: nil) { appearance in
-                let ink = appearance.isDark ? nightInk : dayInk
+                let high = Tokens.Contrast.isHigh(appearance)
+                let ink = appearance.isDark ? (high ? highNightInk : nightInk) : (high ? highDayInk : dayInk)
                 var passes = true
                 var fallback = plain
                 appearance.performAsCurrentDrawingAppearance {
