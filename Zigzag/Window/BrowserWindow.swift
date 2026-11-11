@@ -164,8 +164,9 @@ final class BrowserWindow: NSWindow {
 
     // MARK: Moving the window from the page
 
-    /// ⌥⌘ held over a page: the window moves from anywhere on it, as a title bar would, since a borderless page
-    /// leaves nothing else to hold. Both keys sit side by side, and no page or macOS gesture uses them for dragging.
+    /// ⌥⌘ held anywhere in the window (a page, Settings, the sidebar, an empty space): a drag moves the window, as a
+    /// title bar would, since a borderless page leaves nothing else to hold. Both keys sit side by side, and no page,
+    /// control or macOS gesture uses them for dragging.
     static func isMoveChord(_ flags: NSEvent.ModifierFlags) -> Bool {
         flags.intersection([.command, .option, .control, .shift]) == [.command, .option]
     }
@@ -178,7 +179,7 @@ final class BrowserWindow: NSWindow {
             updateMoveHand(flags: event.modifierFlags, at: event.locationInWindow)
             return false
         case .leftMouseDown:
-            guard Self.isMoveChord(event.modifierFlags), isOverPage(event.locationInWindow) else { return false }
+            guard Self.isMoveChord(event.modifierFlags), isInContent(event.locationInWindow) else { return false }
             // Twice, as on a title bar: the window zooms.
             if event.clickCount == 2 { performZoom(nil) } else { trackMove(from: event) }
             return true
@@ -200,14 +201,15 @@ final class BrowserWindow: NSWindow {
         }
     }
 
-    private func isOverPage(_ point: NSPoint) -> Bool {
-        guard let content = contentView, let hit = content.hitTest(content.convert(point, from: nil)) else { return false }
-        return Self.isInPage(hit)
+    /// Anywhere in the window's content, whatever is under the pointer.
+    private func isInContent(_ point: NSPoint) -> Bool {
+        guard let content = contentView else { return false }
+        return content.bounds.contains(content.convert(point, from: nil))
     }
 
-    /// The open hand while ⌥⌘ is held over a page, so it's clear a drag will move the window.
+    /// The open hand while ⌥⌘ is held over the window, so it's clear a drag will move the window.
     private func updateMoveHand(flags: NSEvent.ModifierFlags, at point: NSPoint) {
-        let wanted = isKeyWindow && Self.isMoveChord(flags) && isOverPage(point)
+        let wanted = isKeyWindow && Self.isMoveChord(flags) && isInContent(point)
         guard wanted != showsMoveHand else { if wanted { NSCursor.openHand.set() }; return }
         showsMoveHand = wanted
         if wanted { NSCursor.openHand.push() } else { NSCursor.pop() }
