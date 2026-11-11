@@ -12,9 +12,22 @@ enum WebStoreButton {
     /// How long a listing's page has to ask before the bar over it shows instead.
     static let grace: TimeInterval = 2
 
-    static let script: WKUserScript = {
-        let source = Bundle.main.url(forResource: "web-store", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
-        return WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page)
+    static let script = WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page)
+
+    /// What only Zigzag knows, for web-store.js: its own words for the store's button, and the Chrome version it
+    /// answers with.
+    static let config = [
+        "add": String(localized: "Add to Zigzag", comment: "The Chrome Web Store's own button, and the bar over its page: installs the extension."),
+        "remove": String(localized: "Remove from Zigzag", comment: "The Chrome Web Store's own button once an extension is in, and the tooltip of the trash button on an extension's row in Settings › Extensions."),
+        "version": ExtensionStore.chromeVersion + ".0.0",
+    ]
+
+    /// web-store.js with `config` filled in.
+    static let source: String = {
+        let file = Bundle.main.url(forResource: "web-store", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        guard let data = try? JSONSerialization.data(withJSONObject: config, options: .sortedKeys),
+              let json = String(data: data, encoding: .utf8) else { return file }
+        return file.replacingOccurrences(of: "const config = {};", with: "const config = \(json);")
     }()
 
     static func attach(to configuration: WKWebViewConfiguration) {
