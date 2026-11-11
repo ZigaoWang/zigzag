@@ -85,6 +85,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         }
     }
     private var browserKeyToken: NSObjectProtocol?
+    private var keepOnTopToken: NSObjectProtocol?
 
     private init(url: URL, origin: NSRect?, overFullScreen: Bool) {
         let spaceID = MiniQuickOpen.space.id
@@ -113,6 +114,13 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         strip.openButton.onClick = { [weak self] _ in self?.openInZigzag() }
         strip.title.onClick = { [weak self] _ in self?.openLocation(nil) }
         strip.copyButton.onClick = { [weak self] _ in self?.copyPageURL(nil) }
+        strip.pinButton.onClick = { [weak self] _ in
+            guard let window = self?.window else { return }
+            KeepOnTop.toggle(window)
+        }
+        keepOnTopToken = NotificationCenter.default.addObserver(forName: KeepOnTop.changed, object: window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshStrip() }
+        }
         strip.spaceChip.onClick = { [weak self] _ in self?.showSpaceMenu() }
         root.card.showLoading(of: tab)
 
@@ -288,6 +296,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         strip.openButton.show(openTitle, keys: Shortcuts.keys(for: #selector(openDocument(_:))))
         strip.openButton.isEnabled = tab.url != nil
         strip.copyButton.isEnabled = tab.url != nil
+        KeepOnTop.refresh(strip.pinButton, for: window)
         strip.needsLayout = true
     }
 
@@ -545,6 +554,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             tab.close()
         }
         if #available(macOS 15.4, *) { ExtensionCenter.miniClosed(self) }
+        keepOnTopToken.map(NotificationCenter.default.removeObserver)
+        keepOnTopToken = nil
         Self.all.removeAll { $0 === self }
     }
 
@@ -735,8 +746,8 @@ final class MiniRootView: SpaceFrameView {
 // MARK: - The top strip
 
 /// The strip on top, as slim as a split view pane's: the traffic lights, the space the page goes to, the page's site
-/// in the middle, and Copy Link and Open in at the right end, lined up with the page's edge. Dragging it moves the
-/// window.
+/// in the middle, and Keep on Top, Copy Link and Open in at the right end, lined up with the page's edge. Dragging it
+/// moves the window.
 final class MiniStripView: NSView {
     let spaceChip = MiniSpaceChip()
     let title = MiniTitleView()
@@ -744,6 +755,12 @@ final class MiniStripView: NSView {
         let button = IconButton(symbol: "link", size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph,
                                 toolTip: Shortcuts.tooltip(String(localized: "Copy Link", comment: "Edit menu item."),
                                                            for: #selector(MiniWindowController.copyPageURL(_:))))
+        button.isChrome = true
+        return button
+    }()
+    /// Window › Keep on Top for this window: a pin, filled while it's on.
+    let pinButton: IconButton = {
+        let button = IconButton(symbol: "pin", size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph, toolTip: KeepOnTop.title)
         button.isChrome = true
         return button
     }()
@@ -756,7 +773,7 @@ final class MiniStripView: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         anchor.isHidden = true
-        [anchor, spaceChip, title, copyButton, openButton].forEach(addSubview)
+        [anchor, spaceChip, title, pinButton, copyButton, openButton].forEach(addSubview)
         setAccessibilityElement(false)
     }
 
@@ -777,15 +794,16 @@ final class MiniStripView: NSView {
         let right = bounds.width - Tokens.Metric.miniFrame
         // Narrow, the shortcut goes first, then the space's name shortens.
         openButton.showsKeys = true
-        if right - left < spaceChip.fittingWidth + b + openButton.fittingWidth + Tokens.Space.x3 { openButton.showsKeys = false }
-        let openWidth = min(openButton.fittingWidth, max(0, right - left - b))
+        if right - left < spaceChip.fittingWidth + b * 2 + openButton.fittingWidth + Tokens.Space.x4 { openButton.showsKeys = false }
+        let openWidth = min(openButton.fittingWidth, max(0, right - left - b * 2))
         openButton.frame = NSRect(x: right - openWidth, y: y, width: openWidth, height: h)
         copyButton.frame = NSRect(x: openButton.frame.minX - Tokens.Space.x1 - b, y: round(mid - b / 2), width: b, height: b)
-        let chipWidth = max(0, min(spaceChip.fittingWidth, copyButton.frame.minX - Tokens.Space.x2 - left))
+        pinButton.frame = NSRect(x: copyButton.frame.minX - b, y: round(mid - b / 2), width: b, height: b)
+        let chipWidth = max(0, min(spaceChip.fittingWidth, pinButton.frame.minX - Tokens.Space.x2 - left))
         spaceChip.frame = NSRect(x: left, y: y, width: chipWidth, height: h)
         // The site stays in the middle of the window, as wide on both sides as the room beside it allows; with too
         // little room it steps aside.
-        let half = max(0, min(bounds.midX - spaceChip.frame.maxX, copyButton.frame.minX - bounds.midX) - Tokens.Space.x2)
+        let half = max(0, min(bounds.midX - spaceChip.frame.maxX, pinButton.frame.minX - bounds.midX) - Tokens.Space.x2)
         var width = min(title.fittingWidth, half * 2)
         if width < Tokens.Space.x10 { width = 0 }
         title.frame = NSRect(x: round(bounds.midX - width / 2), y: y, width: width, height: h)

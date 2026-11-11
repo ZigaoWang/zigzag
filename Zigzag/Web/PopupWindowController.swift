@@ -23,6 +23,13 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     let webView: WKWebView
     private var observations: [NSKeyValueObservation] = []
     private let header = PopupHeaderView()
+    /// Window › Keep on Top for this window, at the strip's right end: a pin, filled while it's on.
+    private let pinButton: IconButton = {
+        let button = IconButton(symbol: "pin", size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph, toolTip: KeepOnTop.title)
+        button.isChrome = true
+        return button
+    }()
+    private var keepOnTopToken: NSObjectProtocol?
     private var parentObserver: Any?
     /// The browser window that opened it, where news about it (a pop-up it tried to open) is shown.
     private(set) weak var parentWindow: NSWindow?
@@ -102,6 +109,22 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         content.addSubview(webView)
         header.frame = NSRect(x: 0, y: 0, width: size.width, height: Self.headerHeight)
         header.autoresizingMask = [.width]
+        let pin = Tokens.Pane.button
+        pinButton.frame = NSRect(x: size.width - Tokens.Space.x2 - pin, y: round((Self.headerHeight - pin) / 2), width: pin, height: pin)
+        pinButton.autoresizingMask = [.minXMargin]
+        content.addSubview(pinButton)
+        header.trailingInset = pin + Tokens.Space.x2
+        pinButton.onClick = { [weak window] _ in
+            guard let window else { return }
+            KeepOnTop.toggle(window)
+        }
+        KeepOnTop.refresh(pinButton, for: window)
+        keepOnTopToken = NotificationCenter.default.addObserver(forName: KeepOnTop.changed, object: window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                KeepOnTop.refresh(self.pinButton, for: self.window)
+            }
+        }
         webView.frame = NSRect(x: 0, y: Self.headerHeight, width: size.width, height: size.height - Self.headerHeight)
         webView.autoresizingMask = [.width, .height]
         webView.uiDelegate = self
@@ -179,6 +202,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         webView.stopLoading()
         if let parentObserver { NotificationCenter.default.removeObserver(parentObserver) }
         parentObserver = nil
+        keepOnTopToken.map(NotificationCenter.default.removeObserver)
+        keepOnTopToken = nil
         if #available(macOS 15.4, *), !isPrivate, Self.open.contains(self) { ExtensionCenter.popupClosed(self) }
         Self.open.remove(self)
     }
