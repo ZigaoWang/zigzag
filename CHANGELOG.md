@@ -5,6 +5,29 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-11
+
+### New
+- Profiles: give a space its own sign-ins, extensions, history and favorites, so two accounts on one site or two wallets live side by side. Spaces on the same profile share everything, and with one profile nothing changes. Choose a space's profile in its editor, where New Profile… makes one. Thanks to [vandenbulckjean](https://github.com/vandenbulckjean) for building it. ([#61](https://github.com/ZigaoWang/zigzag/issues/61))
+- Dark pages: Settings › Appearance can draw light websites dark, always or when your Mac is dark, with a switch for each site in Site Controls. Sites with their own dark theme are left as they are, and pictures and video keep their colors. ([#53](https://github.com/ZigaoWang/zigzag/issues/53))
+- Nested tabs: turn on Settings › Tabs › Open ⌘-clicked links under their tab, and links you open in a new tab sit under the page they came from, folded away when you like. Closing the page moves its tabs up instead of closing them. ([#58](https://github.com/ZigaoWang/zigzag/issues/58))
+- A playing video follows you in a mini player when you switch tabs. Drag it anywhere in the window, minimize it to keep listening, or click its site name to go back. ([#17](https://github.com/ZigaoWang/zigzag/issues/17), [#69](https://github.com/ZigaoWang/zigzag/issues/69))
+- With the address bar above the page, the bar takes the page's own color and reads as one card with it. Thanks to [philigrin](https://github.com/philigrin) for building it. ([#56](https://github.com/ZigaoWang/zigzag/issues/56))
+- Reader sets the article in one calm column, with its source, author and reading time on top, and Find searches the article. ([#47](https://github.com/ZigaoWang/zigzag/issues/47))
+- Each page in split view has its own close button, which leaves the other page. ([#70](https://github.com/ZigaoWang/zigzag/issues/70))
+
+### Fixed
+- Sound Booster, Shazam and other extensions hear streamed tabs like YouTube, and an extension asking for a tab another one is already listening to says which one has it. ([#45](https://github.com/ZigaoWang/zigzag/issues/45))
+- The password menu opens when you click a field, even where the site lays its hint over the field, picking a login fills it, and sign-up fields list your saved logins under Use Strong Password. ([#68](https://github.com/ZigaoWang/zigzag/issues/68))
+- Muting a tab leaves a call's camera and microphone as they were, the speaker shows the page's real state, and a favorite playing sound can be muted from its tile. ([#66](https://github.com/ZigaoWang/zigzag/issues/66))
+- Favorites stay loaded when you leave them, unless your Mac is short of memory. ([#65](https://github.com/ZigaoWang/zigzag/issues/65))
+- With the address bar above the page, the bar shows a sidebar button while the sidebar is hidden, lines up with the page, and stays still as the sidebar slides. ([#67](https://github.com/ZigaoWang/zigzag/issues/67))
+- Picture in Picture's Return button brings its tab back from any tab. Thanks to [micsama](https://github.com/micsama) for the fix. ([#59](https://github.com/ZigaoWang/zigzag/issues/59))
+- VoiceOver and the keyboard can open a space's menu in Settings again. Thanks to [vandenbulckjean](https://github.com/vandenbulckjean) for the fix. ([#54](https://github.com/ZigaoWang/zigzag/issues/54))
+- Text typed into pages keeps its dashes and quotes, and your own text replacements work again. ([#49](https://github.com/ZigaoWang/zigzag/issues/49), [#52](https://github.com/ZigaoWang/zigzag/issues/52))
+- Extensions that look for Chrome's named tab and window constants, like Coupert, work. ([#63](https://github.com/ZigaoWang/zigzag/issues/63))
+- A tab that goes from one site to another drops the last site's icon.
+
 ## [0.7.9] - 2026-11-10
 
 ### New
