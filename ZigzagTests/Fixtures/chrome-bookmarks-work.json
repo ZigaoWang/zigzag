@@ -1,0 +1,14 @@
+{
+  "checksum": "",
+  "roots": {
+    "bookmark_bar": { "children": [
+      { "name": "Tracker", "type": "url", "url": "https://tracker.example.com/" },
+      { "name": "Docs", "type": "url", "url": "https://docs.example.com/" }
+    ], "name": "Bookmarks bar", "type": "folder" },
+    "other": { "children": [
+      { "name": "Wiki", "type": "url", "url": "https://wiki.example.com/" }
+    ], "name": "Other bookmarks", "type": "folder" },
+    "synced": { "children": [], "name": "Mobile bookmarks", "type": "folder" }
+  },
+  "version": 1
+}

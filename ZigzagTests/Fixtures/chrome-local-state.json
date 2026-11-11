@@ -1,0 +1,10 @@
+{
+  "profile": {
+    "info_cache": {
+      "Default": { "name": "Personal", "user_name": "", "active_time": 1762800000.0 },
+      "Profile 1": { "name": "Work", "user_name": "work@example.com", "active_time": 1762900000.0 }
+    },
+    "last_used": "Profile 1",
+    "profiles_order": ["Default", "Profile 1"]
+  }
+}
