@@ -5,6 +5,31 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-11-11
+
+### New
+- Passwords… opens your Mac's AutoFill panel right at the page's field, and macOS fills the login in. It's also in a field's right-click menu under AutoFill, and on the key icon in sign-in fields. ([#132](https://github.com/ZigaoWang/zigzag/issues/132))
+- YouTube ads are blocked without touching YouTube's own dialogs or scrolling. If you use an ad blocker extension like uBlock Origin Lite or AdGuard, it takes over on YouTube. ([#129](https://github.com/ZigaoWang/zigzag/issues/129))
+- Importing from Chrome or another browser with several profiles brings each profile over as its own space, named after it. Importing again adds to the same spaces. ([#131](https://github.com/ZigaoWang/zigzag/issues/131))
+- Help › Keyboard Shortcuts opens the list of shortcuts. ([#122](https://github.com/ZigaoWang/zigzag/issues/122))
+- Settings search finds startup, homepage, dark mode and default browser settings by the words you'd use. ([#121](https://github.com/ZigaoWang/zigzag/issues/121))
+- Tabs that Zigzag put to sleep show a dotted ring round their icon, like Chrome, and say why when you point at them. ([#140](https://github.com/ZigaoWang/zigzag/issues/140))
+
+### Fixed
+- A background tab is never put to sleep for using a lot of energy without warning: Zigzag says it'll sleep in 2 minutes, with Keep Awake to leave it alone. A quiet tab is no longer blamed for another tab's work. ([#140](https://github.com/ZigaoWang/zigzag/issues/140))
+- With a proxy running on your Mac (like Clash), a mistyped address says Zigzag can't open the site and names the proxy, instead of blaming the network. An empty server error shows an error page instead of a blank one. ([#137](https://github.com/ZigaoWang/zigzag/issues/137))
+- The getting started guide matches the app: the overview shows real pages, the guide stays inside the window, and each step names the shortcut you set. ([#133](https://github.com/ZigaoWang/zigzag/issues/133))
+- A pinned page in a split shows as one row in the sidebar. ([#114](https://github.com/ZigaoWang/zigzag/issues/114))
+- Narrow split panes keep the address and the close button. ([#115](https://github.com/ZigaoWang/zigzag/issues/115))
+- Switches fill with your accent color when they're on. ([#116](https://github.com/ZigaoWang/zigzag/issues/116))
+- Site Controls offers Get Extensions when you have none. ([#117](https://github.com/ZigaoWang/zigzag/issues/117))
+- Chinese says 个人资料 for profiles everywhere, and the translate row names the language. ([#118](https://github.com/ZigaoWang/zigzag/issues/118))
+- New Space reads the same everywhere. ([#119](https://github.com/ZigaoWang/zigzag/issues/119))
+- History shows the time once, on each row. ([#120](https://github.com/ZigaoWang/zigzag/issues/120))
+- Site data labels lost a stray full stop. ([#122](https://github.com/ZigaoWang/zigzag/issues/122))
+- The command bar lists Settings once, and rows don't repeat their title in grey. ([#135](https://github.com/ZigaoWang/zigzag/issues/135), [#136](https://github.com/ZigaoWang/zigzag/issues/136))
+- Zigzag Mini's recent list leaves out pages that failed to load. ([#136](https://github.com/ZigaoWang/zigzag/issues/136))
+
 ## [0.8.3] - 2026-11-11
 
 ### New
