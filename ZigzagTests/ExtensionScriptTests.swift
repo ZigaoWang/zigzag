@@ -324,6 +324,26 @@ struct ExtensionScriptTests {
         #expect(context.evaluateScript("__failed").toString() == "undefined")
     }
 
+    @Test func currentTabOutsideATabIsUndefined() {
+        // WebKit answers null in a side panel; Chrome undefined, which Claude's panel checks for exactly (#112).
+        let context = Self.workerWorld(worker: false, setup: """
+        var __current = null;
+        chrome.tabs = { getCurrent: (callback) => { if (callback) { callback(__current); return; } return Promise.resolve(__current); } };
+        globalThis.__zigzagFavicons = (urls) => Promise.resolve(urls.map(() => null));
+        """)
+        context.evaluateScript("""
+        chrome.tabs.getCurrent().then((tab) => { globalThis.__promised = tab; });
+        chrome.tabs.getCurrent((tab) => { globalThis.__called = [tab]; });
+        """)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__promised === undefined && '__promised' in globalThis").toBool())
+        #expect(context.evaluateScript("__called.length === 1 && __called[0] === undefined").toBool())
+        // In a tab, the tab, as before.
+        context.evaluateScript("__current = { id: 7, url: 'https://a.example/' }; chrome.tabs.getCurrent().then((tab) => { globalThis.__inTab = tab; });")
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__inTab.id").toInt32() == 7)
+    }
+
     @Test func workerMessagingIsLeftAloneUntilAnExtensionUsesIt() {
         // A page: controller stays WebKit's, and only posts to the extension's own worker take the hidden port.
         let page = Self.workerWorld(worker: false)
