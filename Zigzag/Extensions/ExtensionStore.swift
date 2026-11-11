@@ -1207,9 +1207,12 @@ extension ExtensionStore {
     /// a lock request from one kills the extension's process, so a script that names navigator.locks brings the
     /// stand-in with it; on a page or background that already has it, it does nothing.
     static func filled(_ text: String) -> String? {
+        // Foundation's search: the standard library's `contains` walks a megabyte of script a character at a time,
+        // which held Zigzag up for most of a second as an extension was set up (#89).
+        func has(_ word: String) -> Bool { text.range(of: word, options: .literal) != nil }
         var fill = ""
-        if text.contains("Symbol.dispose") || text.contains("Symbol.asyncDispose"), !text.hasPrefix(languageFill) { fill += languageFill }
-        if text.contains("navigator.locks"), !text.contains(ExtensionBridgeScript.webLocksMark) { fill += "\n" + ExtensionBridgeScript.webLocks + "\n" }
+        if has("Symbol.dispose") || has("Symbol.asyncDispose"), !text.hasPrefix(languageFill) { fill += languageFill }
+        if has("navigator.locks"), !has(ExtensionBridgeScript.webLocksMark) { fill += "\n" + ExtensionBridgeScript.webLocks + "\n" }
         guard !fill.isEmpty else { return nil }
         for directive in ["\"use strict\";", "'use strict';"] where text.hasPrefix(directive) {
             return directive + fill + String(text.dropFirst(directive.count))
@@ -1222,7 +1225,7 @@ extension ExtensionStore {
         let source = package.appendingPathComponent(file), target = overlay.appendingPathComponent(file)
         guard var text = try? String(contentsOf: source, encoding: .utf8) else { return }
         for patch in patches {
-            guard text.contains(patch.find) else {
+            guard text.range(of: patch.find, options: .literal) != nil else {
                 ExtensionLog.write("patch for \(id) in \(file) skipped: this version changed")
                 continue
             }
