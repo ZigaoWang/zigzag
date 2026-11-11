@@ -355,6 +355,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         partnerTitle.stringValue = pinnedPartner?.title ?? partner?.displayTitle ?? ""
         partnerIcon.image = partner?.favicon ?? pinnedPartner?.icon
         partnerIcon.isLoading = (partner?.isLoading ?? false) && !(partner?.isSuspended ?? true)
+        partnerIcon.isAsleep = partner?.isAsleep == true
         // A symbol set again is drawn again: only when it changes.
         let partnerSound = partner?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
         if partnerAudioButton.symbol != partnerSound { partnerAudioButton.symbol = partnerSound }
@@ -447,6 +448,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         title.stringValue = fixedTitle ?? tab?.displayTitle ?? ""
         icon.image = tab?.favicon ?? (fixedTitle != nil ? bookmarkIcon : nil)
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
+        icon.isAsleep = tab?.isAsleep == true
+        toolTip = tab.flatMap(Self.asleepToolTip)
         let sound = tab?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
         if audioButton.symbol != sound { audioButton.symbol = sound }
         audioButton.toolTip = tab?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.") : String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
@@ -456,6 +459,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     var bookmarkIcon: NSImage?
+
+    /// Said when you point at a sleeping tab: why its page is gone, and that it comes back where you were.
+    static func asleepToolTip(_ tab: Tab) -> String? {
+        guard tab.isAsleep else { return nil }
+        return tab.sleptForEnergy
+            ? String(localized: "Asleep to save energy. Opens where you left off.", comment: "Tooltip of a sidebar tab that Zigzag put to sleep because it used a lot of energy in the background.")
+            : String(localized: "Asleep to save memory. Opens where you left off.", comment: "Tooltip of a sidebar tab that Zigzag put to sleep because it wasn't used for a while or the Mac was low on memory.")
+    }
 
     private func refreshTitleColor() {
         // A pinned tab that isn't loaded reads the same as one that is: faded means old elsewhere in Zigzag.

@@ -481,7 +481,7 @@ final class FavoriteTile: InteractiveView {
         guard tab !== self.tab else { return }
         self.tab = tab
         tabToken = tab?.changed.observe { [weak self] change in
-            if change == .loading || change == .favicon { self?.refreshLoading() }
+            if change == .loading || change == .favicon || change == .webView { self?.refreshLoading() }
             if change == .audio || change == .webView { self?.refreshAudio() }
         }
         refreshLoading()
@@ -490,6 +490,9 @@ final class FavoriteTile: InteractiveView {
 
     private func refreshLoading() {
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
+        icon.isAsleep = tab?.isAsleep == true
+        let name = Words.list([bookmark?.title, partner?.title].compactMap { $0 })
+        toolTip = tab.flatMap(TabRowView.asleepToolTip).map { name.isEmpty ? $0 : "\(name)\n\($0)" } ?? name
         if let favicon = tab?.favicon, !(tab?.isLoading ?? false) { icon.image = favicon; needsLayout = true }
     }
 

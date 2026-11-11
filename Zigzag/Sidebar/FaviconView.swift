@@ -19,6 +19,9 @@ final class FaviconView: NSView {
 
     var image: NSImage? { didSet { refreshImage() } }
     var isLoading = false { didSet { if oldValue != isLoading { refreshLoading() } } }
+    /// A tab put to sleep: a dotted ring round its icon, as Chrome marks a tab whose page it let go.
+    var isAsleep = false { didSet { if oldValue != isAsleep { asleepRing.isHidden = !isAsleep } } }
+    private let asleepRing = CAShapeLayer()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -28,6 +31,12 @@ final class FaviconView: NSView {
         imageLayer.cornerRadius = Tokens.Radius.small - 1
         imageLayer.masksToBounds = true
         layer?.addSublayer(imageLayer)
+        asleepRing.fillColor = nil
+        asleepRing.lineWidth = 1.25
+        asleepRing.lineCap = .round
+        asleepRing.lineDashPattern = [0.01, 2.6]
+        asleepRing.isHidden = true
+        layer?.addSublayer(asleepRing)
 
         spinner.weight = 0.3
         // A page that never says it's done (long polling, a hung load) would keep it flowing forever: after a
@@ -49,6 +58,10 @@ final class FaviconView: NSView {
         super.layout()
         Tokens.Motion.withoutAnimation {
             imageLayer.frame = bounds
+            // Just outside the icon, so the icon itself reads as it always does.
+            let ring = bounds.insetBy(dx: -2.5, dy: -2.5)
+            asleepRing.frame = bounds
+            asleepRing.path = CGPath(ellipseIn: ring.offsetBy(dx: -bounds.minX, dy: -bounds.minY), transform: nil)
             spinner.frame = bounds
             spinner.ribbonWidth = bounds.width * 0.62
             fallback.frame = bounds
@@ -70,6 +83,10 @@ final class FaviconView: NSView {
     private func refreshColors() {
         Tokens.Motion.withoutAnimation {
             spinner.color = Tokens.Color.icon
+            var ink = Tokens.Color.textSecondary.cgColor
+            effectiveAppearance.performAsCurrentDrawingAppearance { ink = Tokens.Color.textSecondary.cgColor }
+            asleepRing.strokeColor = ink
+            asleepRing.contentsScale = window?.backingScaleFactor ?? 2
             imageLayer.cornerRadius = isInk ? 0 : Tokens.Radius.small - 1
             let scale = window?.backingScaleFactor ?? 2
             // Drawn once at exactly the pixels it fills, with the best filtering, rather than scaled on the fly; again
