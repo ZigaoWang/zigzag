@@ -5,7 +5,7 @@ import IOKit.ps
 /// comes back when you plug in. `changed` fires when either changes.
 @MainActor
 enum PowerSaving {
-    static let changed = Notification.Name("PowerSavingChanged")
+    nonisolated static let changed = Notification.Name("PowerSavingChanged")
 
     static var isOn: Bool { ProcessInfo.processInfo.isLowPowerModeEnabled || onBattery }
 

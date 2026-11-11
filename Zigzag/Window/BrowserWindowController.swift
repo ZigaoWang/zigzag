@@ -731,7 +731,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                         case .success(let name):
                             report(.added(name))
                             // After the store bar has gone, when it's up, so the two never sit on each other.
-                            DispatchQueue.main.asyncAfter(deadline: .now() + (progress == nil ? 1.5 : 3.4)) { [weak self] in self?.offerSearchEngine(of: id) }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + (progress == nil ? 1.5 : 3.4)) { [weak controller = self] in controller?.offerSearchEngine(of: id) }
                         case .failure(let error): report(.failed(error.message))
                         }
                     }
@@ -1291,13 +1291,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Reader stands in for the page in place, so it only crossfades, quickly both ways: nothing rises or zooms.
     /// Moving or transforming a view that hosts web content stops WebKit drawing into it, and so does a fully
     /// transparent start (hence 0.01).
-    private static func readerTransition(_ view: NSView, entering: Bool, completion: (() -> Void)? = nil) {
+    private static func readerTransition(_ view: NSView, entering: Bool, completion: (@MainActor () -> Void)? = nil) {
         if entering { view.alphaValue = 0.01 }
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = Tokens.Motion.crossfade * Tokens.Motion.debugSlowdown
             ctx.timingFunction = Tokens.Motion.easeOut
             view.animator().alphaValue = entering ? 1 : 0.01
-        }, completionHandler: completion)
+        }, completionHandler: Tokens.Motion.completion(completion))
     }
 
     private func updateReaderButton() {

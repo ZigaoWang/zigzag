@@ -31,7 +31,7 @@ enum PageScreenshot {
         guard !isTaking, canTake(tab), let webView = tab.webView else { return }
         isTaking = true
         Toast.show(String(localized: "Taking a screenshot of the whole page…", comment: "Toast while Zigzag takes a screenshot of the whole page."), symbol: "camera.viewfinder", duration: 30, in: controller)
-        Task { @MainActor in
+        Task { @MainActor [controller] in
             defer { isTaking = false }
             let (data, onScreenOnly) = await capture(webView)
             guard let data else {

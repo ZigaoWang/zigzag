@@ -166,7 +166,7 @@ nonisolated final class Freezes: @unchecked Sendable {
     func start() {
         guard !started else { return }
         started = true
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [self] in
             let center = NotificationCenter.default
             self.tokens = [
                 center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in

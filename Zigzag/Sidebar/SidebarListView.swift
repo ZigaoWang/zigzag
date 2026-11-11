@@ -633,10 +633,10 @@ final class SidebarListView: NSView {
     // MARK: Folders
 
     /// Pinned pages shown inside an open folder, set in by this much.
-    static let folderIndent: CGFloat = 14
+    nonisolated static let folderIndent: CGFloat = 14
     /// Folders this deep set their rows in a full step each; deeper ones half a step, so a tree imported eight deep
     /// still leaves its names room in a narrow sidebar, each level a step in from the one it's in.
-    static let fullIndentLevels = 3
+    nonisolated static let fullIndentLevels = 3
 
     /// How far in a row sits, `depth` folders deep.
     nonisolated static func indent(depth: Int) -> CGFloat {

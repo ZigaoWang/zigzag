@@ -247,7 +247,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// The one way it leaves, closing or moving into Zigzag: a quick fade as it eases a touch smaller, quieter than
     /// it came.
-    private func fadeAway(then done: @escaping () -> Void) {
+    private func fadeAway(then done: @escaping @MainActor () -> Void) {
         guard let window else { done(); return }
         isLeaving = true
         if !Tokens.Motion.reduceMotion, let layer = root.layer {
@@ -264,7 +264,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             context.duration = Tokens.Motion.exit * Tokens.Motion.debugSlowdown
             context.timingFunction = Tokens.Motion.easeOut
             window.animator().alphaValue = 0
-        }, completionHandler: done)
+        }, completionHandler: Tokens.Motion.completion(done))
     }
 
     // MARK: The page

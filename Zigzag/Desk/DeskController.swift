@@ -593,7 +593,7 @@ final class DeskController {
         let card = target.flatMap { target in cards[manager?.split(for: target)?.left ?? target.id] ?? cards[target.id] }
         if let tab { controller.tabManager.select(tab) }
         if let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
-        let finish = { [weak self] in
+        let finish: @MainActor () -> Void = { [weak self] in
             // Opened again before this finished: it stays.
             guard let self, self.transition == id else { return }
             Tokens.Motion.withoutAnimation {

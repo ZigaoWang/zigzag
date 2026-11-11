@@ -1294,18 +1294,17 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     }
 
     nonisolated func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard let body = message.body as? [String: Any], let id = body["tap"] as? String, let pcm = body["pcm"] as? String,
-              let rate = body["rate"] as? Double else { return }
-        let at = body["at"] as? Double ?? 0
-        var level = body["level"] as? Double ?? 1
-        #if DEBUG
-        // Testing the switch on a page whose sound Web Audio can hear: as if it couldn't.
-        if UserDefaults.standard.bool(forKey: "DebugAssumeSilentCapture") { level = 0 }
-        #endif
-        let world = message.world
         MainActor.assumeIsolated {
+            guard let body = message.body as? [String: Any], let id = body["tap"] as? String, let pcm = body["pcm"] as? String,
+                  let rate = body["rate"] as? Double else { return }
+            let at = body["at"] as? Double ?? 0
+            var level = body["level"] as? Double ?? 1
+            #if DEBUG
+            // Testing the switch on a page whose sound Web Audio can hear: as if it couldn't.
+            if UserDefaults.standard.bool(forKey: "DebugAssumeSilentCapture") { level = 0 }
+            #endif
             // Only from the half that's listening, in the tab it's listening to.
-            guard var tap = taps[id], tap.shared == nil, !tap.switching, tap.webView === message.webView, tap.world == world else { return }
+            guard var tap = taps[id], tap.shared == nil, !tap.switching, tap.webView === message.webView, tap.world == message.world else { return }
             // The extension stopped listening (its popup closed): the tap goes too, and the tab's sound comes back.
             guard isListening(tap) else { stop(id, because: "it stopped listening"); return }
             if level > 0.0001, !tap.heard { tap.heard = true; taps[id]?.heard = true }

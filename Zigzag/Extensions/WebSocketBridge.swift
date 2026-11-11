@@ -8,7 +8,7 @@ import WebKit
 /// WebSocket (see `ExtensionShims.webSocketShim`) that talks to this over a native port; this opens the real
 /// connection with URLSession and passes frames both ways. Only hosts and close codes are logged, never frames.
 @available(macOS 15.4, *)
-final class WebSocketBridge: NSObject, URLSessionWebSocketDelegate {
+@MainActor final class WebSocketBridge: NSObject, URLSessionWebSocketDelegate {
     static let host = "zigzag.websocket"
 
     private let port: WKWebExtension.MessagePort

@@ -306,7 +306,7 @@ final class DownloadManager: NSObject {
         guard item.state == .paused, let webView = webView(for: item) else { return }
         item.state = .downloading
         changed.send(item)
-        let attach: (WKDownload) -> Void = { [weak self] download in
+        let attach: @MainActor (WKDownload) -> Void = { [weak self] download in
             MainActor.assumeIsolated {
                 download.delegate = self
                 self?.attach(download, to: item)
@@ -401,7 +401,7 @@ final class DownloadManager: NSObject {
     }
 
     /// The new attempt takes the old row's place, keeping the hidden page it runs on (if any) until it's done.
-    private func replace(_ item: DownloadItem, from webView: WKWebView) -> (WKDownload) -> Void {
+    private func replace(_ item: DownloadItem, from webView: WKWebView) -> @MainActor (WKDownload) -> Void {
         { [weak self] download in
             MainActor.assumeIsolated {
                 guard let self else { return }

@@ -1255,7 +1255,7 @@ enum DebugBridge {
             guard n.count == 4, let window = controller.window else { break }
             let height = window.frame.height
             let direct = name == "seldragdirect"
-            func send(_ type: NSEvent.EventType, _ y: Double) {
+            let send: @MainActor (NSEvent.EventType, Double) -> Void = { type, y in
                 if let event = NSEvent.mouseEvent(with: type, location: NSPoint(x: n[0], y: height - y), modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                                                   windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1) {
                     if direct, let webView = controller.selectedWebView {

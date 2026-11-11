@@ -31,7 +31,7 @@ final class DockProgress {
               let controller = Self.window(for: item) else { return }
         announced.insert(item.id)
         let failed = item.state == .failed
-        let announce = { [weak controller] in
+        let announce: @MainActor () -> Void = { [weak controller] in
             guard let controller, !DownloadsPanel.isOpen(in: controller.window) else { return }
             if failed {
                 Toast.show(String(localized: "Couldn’t download \(item.filename)", comment: "Toast when a download fails; the file's name."),

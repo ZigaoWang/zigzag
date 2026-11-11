@@ -739,13 +739,13 @@ enum Tokens {
         /// `evenFromKeyboard`: for changes to the window's layout (the sidebar, a split), where seeing where things
         /// went matters more than a few milliseconds. `moves`: the changes move or resize something, so with Reduce
         /// Motion they happen at once; fades and color changes still play with it on.
-        static func animate(_ curve: Curve = snappy, evenFromKeyboard: Bool = false, moves: Bool = false, _ changes: @escaping () -> Void, completion: (() -> Void)? = nil) {
+        static func animate(_ curve: Curve = snappy, evenFromKeyboard: Bool = false, moves: Bool = false, _ changes: @escaping () -> Void, completion: (@MainActor () -> Void)? = nil) {
             if isFromKey && !evenFromKeyboard {
                 NSAnimationContext.runAnimationGroup({ ctx in
                     ctx.duration = 0
                     ctx.allowsImplicitAnimation = false
                     changes()
-                }, completionHandler: completion)
+                }, completionHandler: Self.completion(completion))
                 return
             }
             if reduceMotion && moves {
@@ -754,7 +754,7 @@ enum Tokens {
                     ctx.duration = 0
                     ctx.allowsImplicitAnimation = false
                     changes()
-                }, completionHandler: completion)
+                }, completionHandler: Self.completion(completion))
                 return
             }
             NSAnimationContext.runAnimationGroup({ ctx in
@@ -762,7 +762,13 @@ enum Tokens {
                 ctx.timingFunction = curve.timing
                 ctx.allowsImplicitAnimation = true
                 changes()
-            }, completionHandler: completion)
+            }, completionHandler: Self.completion(completion))
+        }
+
+        /// An animation group's completion, which AppKit calls on the main thread, run as the main actor's.
+        static func completion(_ done: (@MainActor () -> Void)?) -> (@Sendable () -> Void)? {
+            guard let done else { return nil }
+            return { MainActor.assumeIsolated { done() } }
         }
 
         static var reduceMotion: Bool {

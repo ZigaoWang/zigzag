@@ -206,7 +206,7 @@ final class ExtensionHost: NSObject {
     /// A popup hidden or back in sight neither opens nor closes, but its button should show it.
     private func watchPopupVisibility() {
         popupOcclusionObserver = NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: nil, queue: .main) { [weak self] note in
-            nonisolated(unsafe) let window = note.object as? NSWindow
+            let window = note.object as? NSWindow
             MainActor.assumeIsolated {
                 guard let self, self.openPopups.values.contains(where: { $0.popover.contentViewController?.view.window === window }) else { return }
                 self.popupsChanged.send()
