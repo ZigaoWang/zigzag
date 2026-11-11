@@ -2,6 +2,7 @@ import AppKit
 import WebKit
 import AVFoundation
 import IOKit.pwr_mgt
+import Network
 import UserNotifications
 
 // The smaller Chrome namespaces the bridge answers (ExtensionBridge). Each is the Chrome API's shape over what
@@ -694,7 +695,9 @@ final class ExtensionFetchRequests {
             let request = try Self.writeRequest(options, url: url, extensionID: extensionID)
             // Only WebKit's cookie store stays on the main thread; the jar, the request and its body leave it.
             let task = Task {
-                try await ExtensionWrite.send(request, cookies: await store.httpCookieStore.allCookies(), authorize: authorize) { set, deleted in
+                // The profile's proxy, set by an extension through chrome.proxy, carries these as it carries its pages.
+                try await ExtensionWrite.send(request, cookies: await store.httpCookieStore.allCookies(), proxies: store.proxyConfigurations,
+                                              authorize: authorize) { set, deleted in
                     for cookie in deleted { await store.httpCookieStore.deleteCookie(cookie) }
                     for cookie in set { await store.httpCookieStore.setCookie(cookie) }
                 }
@@ -796,12 +799,14 @@ nonisolated enum ExtensionWrite {
     /// Cookies that go back to the profile: those the server set or changed, and those it deleted.
     typealias Apply = @MainActor @Sendable (_ set: [HTTPCookie], _ deleted: [HTTPCookie]) async -> Void
 
-    @concurrent static func send(_ input: Request, cookies: [HTTPCookie], authorize: @escaping @MainActor @Sendable () -> Bool,
+    @concurrent static func send(_ input: Request, cookies: [HTTPCookie], proxies: [ProxyConfiguration] = [],
+                                 authorize: @escaping @MainActor @Sendable () -> Bool,
                                  apply: @escaping Apply) async throws -> ExtensionWriteResponse {
         let url = input.url
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil
         configuration.timeoutIntervalForResource = 30
+        configuration.proxyConfigurations = proxies
         let jar = configuration.httpCookieStorage!
         jar.cookieAcceptPolicy = .onlyFromMainDocumentDomain
         // Never use HTTPCookieStorage.shared. The temporary jar starts with cookies for this target only.

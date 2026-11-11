@@ -337,6 +337,20 @@ extension ExtensionBridgeTests {
         #expect(!headers.contains { $0[0] == "set-cookie" })
     }
 
+    /// A proxy an extension set through chrome.proxy carries writes too, so they never leave by your own address.
+    @Test func writesGoThroughTheProfilesProxy() async throws {
+        let proxy = try SessionTestServer()
+        let proxyURL = try await proxy.start()
+        defer { proxy.listener.cancel() }
+        let store = WKWebsiteDataStore.nonPersistent()
+        let endpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: UInt16(proxyURL.port!))!)
+        store.proxyConfigurations = [ProxyConfiguration(httpCONNECTProxy: endpoint)]
+        // A made-up site that can't be reached directly: only the proxy can answer for it.
+        _ = try? await ExtensionFetchRequests().response(["method": "POST", "body": "{}"], url: URL(string: "https://proxied.example/write")!,
+                                                         extensionID: "test", store: store)
+        #expect(proxy.requests.withLock { $0 } == 1)
+    }
+
     @Test func writeCancellationAndRevokedAccessPreventDispatch() async throws {
         let server = try SessionTestServer()
         let url = try await server.start()
