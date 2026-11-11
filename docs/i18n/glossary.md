@@ -66,6 +66,12 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Getting Started (the guide) | 入门 | 新手指南 | Short, Apple-like. |
 | What's New | 新功能 | 更新内容 | Apple uses 新功能. |
 | Chrome Web Store | Chrome 网上应用店 | Chrome 应用商店 | Google's own Chinese name for it. |
+| Automation (the Settings section) | 自动化 | | macOS's Privacy & Security › Automation is 自动化. |
+| AI apps | AI 应用 | AI 程序, 人工智能应用 | Short, and what people say. MCP stays as it is. |
+| Key (for AI apps) | 密钥 | 令牌, 钥匙 | What apps send to connect; 密钥 is the plain word for a secret key. |
+| Setup (the JSON an app takes) | 配置 | 设置 | 设置 is Settings; 配置 is the setup you paste. |
+| Prompt (to paste into an AI app) | 提示词 | 提示, 指令 | What AI apps' Chinese users call it. |
+| Scripts (AppleScript, Shortcuts) | 脚本 | | macOS's Script Editor is 脚本编辑器. |
 
 ## Actions
 
