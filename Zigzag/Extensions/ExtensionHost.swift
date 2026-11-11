@@ -11,6 +11,15 @@ enum ExtensionPopups {
     }
 }
 
+/// Each extension's keep-awake port in a profile. A background that starts again opens a new one before WebKit
+/// says the old one closed: that late word never drops the new one.
+struct KeepAlivePorts<Port: AnyObject> {
+    private var ports: [String: Port] = [:]
+    mutating func opened(_ port: Port, for id: String) { ports[id] = port }
+    mutating func closed(_ port: Port, for id: String) { if ports[id] === port { ports[id] = nil } }
+    func port(for id: String) -> Port? { ports[id] }
+}
+
 /// Runs browser extensions with WebKit's extension engine: Chrome Web Store extensions, and 1Password
 /// set up for you, so they work the way they do in other browsers.
 @available(macOS 15.4, *)
@@ -29,6 +38,8 @@ final class ExtensionHost: NSObject {
     /// When each extension last started helpers for a connection, to slow down one that keeps reconnecting.
     fileprivate var helperStarts: [String: [Date]] = [:]
     private var socketBridges: [ObjectIdentifier: WebSocketBridge] = [:]
+    /// Each background's port for staying awake while its companion app is connected (ExtensionShims.nativeKeepAlive).
+    private var keepAlivePorts = KeepAlivePorts<WKWebExtension.MessagePort>()
 
     init(profile: Profile) {
         self.profile = profile
@@ -1073,6 +1084,12 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
 
     // MARK: Native messaging (the extension talking to the 1Password app)
 
+    /// Its companion app is still connected: its background answers on its keep-awake port, which WebKit counts as
+    /// the background being busy, so it isn't stopped for being quiet (Chrome never stops one with an app connected).
+    fileprivate func keepBackgroundAwake(_ id: String) {
+        keepAlivePorts.port(for: id)?.sendMessage(1, completionHandler: nil)
+    }
+
     func webExtensionController(_ controller: WKWebExtensionController, sendMessage message: Any, toApplicationWithIdentifier applicationIdentifier: String?,
                                 for extensionContext: WKWebExtensionContext, replyHandler: @escaping (Any?, (any Error)?) -> Void) {
         if applicationIdentifier == ExtensionShims.diagnosticsHost {
@@ -1108,6 +1125,15 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             let key = ObjectIdentifier(port)
             socketBridges[key] = WebSocketBridge(port: port, extensionID: extensionContext.uniqueIdentifier) { [weak self] in
                 self?.socketBridges[key] = nil
+            }
+            completionHandler(nil)
+            return
+        }
+        if port.applicationIdentifier == ExtensionShims.keepAliveHost {
+            let id = extensionContext.uniqueIdentifier
+            keepAlivePorts.opened(port, for: id)
+            port.disconnectHandler = { [weak self, weak port] _ in
+                if let self, let port { self.keepAlivePorts.closed(port, for: id) }
             }
             completionHandler(nil)
             return
@@ -1274,6 +1300,9 @@ final class NativeMessagingHost {
     private weak var owner: ExtensionHost?
     /// A one-off message gets this long for its answer; a locked app waiting on you can take a while.
     private static let replyTimeout: TimeInterval = 60
+    /// How often a connected app keeps its extension's background awake: well inside the two quiet minutes after
+    /// which WebKit stops one.
+    static let keepAwakeInterval: TimeInterval = 30
 
     static func terminateAll() {
         for host in Array(running.values) { host.finish() }
@@ -1489,6 +1518,7 @@ final class NativeMessagingHost {
             waiting.forEach { self.write($0) }
             waiting = []
             self.pointAtAppIfWaiting(received: { received }, sent: { sent })
+            self.keepBackgroundAwake()
         }
         let delay = delayBeforeStarting()
         if delay > 0 {
@@ -1498,6 +1528,15 @@ final class NativeMessagingHost {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { begin() }
         } else {
             begin()
+        }
+    }
+
+    /// While the helper runs, its extension's background stays awake, as in Chrome.
+    private func keepBackgroundAwake() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.keepAwakeInterval) { [weak self] in
+            guard let self, !self.finished, self.process != nil else { return }
+            self.owner?.keepBackgroundAwake(self.extensionID)
+            self.keepBackgroundAwake()
         }
     }
 

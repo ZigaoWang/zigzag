@@ -799,7 +799,7 @@ enum ExtensionShims {
         // Errors reported first (a background that stops as it starts says why), then the bridge (real answers from
         // Zigzag), then stand-ins for what's still missing. Every background gets the WebSocket stand-in: one opened
         // the WebKit way freezes the extension's pages along with it (MyBib's popup never came up).
-        shim.backgroundPrelude = diagnostics + ExtensionBridgeScript.source + "\n" + compatibility + "\n" + ExtensionBridgeScript.afterCompatibility + "\n" + webSocketShim + "\n" + (shim.backgroundPrelude ?? "")
+        shim.backgroundPrelude = diagnostics + ExtensionBridgeScript.source + "\n" + compatibility + "\n" + ExtensionBridgeScript.afterCompatibility + "\n" + webSocketShim + "\n" + nativeKeepAlive + "\n" + (shim.backgroundPrelude ?? "")
         #if DEBUG
         // Testing builds say each background got past Zigzag's own scripts, so a quiet log means quiet, not broken.
         let started = "try { (globalThis.chrome || globalThis.browser).runtime.sendNativeMessage('\(diagnosticsHost)', { where: 'background', kind: 'started', text: 'ok' }); } catch (e) {}\n"
@@ -1048,6 +1048,23 @@ enum ExtensionShims {
     static func usesWebSocketShim(manifest: [String: Any]?) -> Bool {
         (manifest?["background"] as? [String: Any])?["service_worker"] is String
     }
+
+    /// Chrome keeps a background running while it has a companion app connected (connectNative). WebKit stops one
+    /// whose ports have been quiet for two minutes, and with it the app's helper and whatever the two had set up:
+    /// iCloud Passwords' pairing, so a profile you'd left for a while asked for a new code. The background keeps a
+    /// port to Zigzag open and answers each beat on it; Zigzag beats while the extension's companion app is
+    /// connected (NativeMessagingHost), and the answer is the background being busy.
+    static let keepAliveHost = "zigzag.keepalive"
+    static let nativeKeepAlive = """
+    (() => {
+      const api = globalThis.browser || globalThis.chrome;
+      if (!api || !api.runtime || typeof api.runtime.connectNative !== 'function') return;
+      try {
+        const port = api.runtime.connectNative('\(keepAliveHost)');
+        port.onMessage.addListener(() => { try { port.postMessage(1); } catch (e) {} });
+      } catch (e) {}
+    })();
+    """
 
     /// WebKit's extension service workers freeze on `new WebSocket(…)`. This stands in for it, with the same
     /// events and methods, and Zigzag opens the real connection over a native port (WebSocketBridge). A background
