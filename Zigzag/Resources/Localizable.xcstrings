@@ -1539,6 +1539,17 @@
         }
       }
     },
+    "A link you open in a new tab sits under the page it came from, so tabs from one page stay together. Drag a tab out to make it a tab of its own." : {
+      "comment" : "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在新标签页中打开的链接会放在它来自的页面下面，同一页面打开的标签页就待在一起。把标签页拖出来，它就成为独立的标签页。"
+          }
+        }
+      }
+    },
     "A password can’t be empty." : {
       "comment" : "Toast when saving a login with its password cleared.",
       "localizations" : {
@@ -5836,6 +5847,17 @@
         }
       }
     },
+    "Hide Nested Tabs" : {
+      "comment" : "Tooltip of the chevron on a tab's row in the sidebar that has tabs nested under it: folds them away.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏嵌套的标签页"
+          }
+        }
+      }
+    },
     "Hide Others" : {
       "comment" : "Zigzag menu item.",
       "localizations" : {
@@ -8266,6 +8288,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在右侧打开"
+          }
+        }
+      }
+    },
+    "Open ⌘-clicked links under their tab" : {
+      "comment" : "A setting in Settings › Tabs: a link opened in a new tab goes in the sidebar nested under the tab it came from. ⌘ is the Command key.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌘ 点按的链接放在来源标签页下"
           }
         }
       }
@@ -10981,6 +11014,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "告诉我怎么做"
+          }
+        }
+      }
+    },
+    "Show Nested Tabs" : {
+      "comment" : "Tooltip of the chevron on a tab's row in the sidebar whose nested tabs are folded away: shows them.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示嵌套的标签页"
           }
         }
       }

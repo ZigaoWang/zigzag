@@ -563,6 +563,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let darkPages = DropdownButton()
     private let newTabPlace = DropdownButton()
     private let pinOfferToggle = Toggle()
+    private let nestToggle = Toggle()
     private let swipeToggle = Toggle()
     private let miniToggle = Toggle()
     private let energyToggle = Toggle()
@@ -749,6 +750,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         tabsGroup.add(FormRow(title: String(localized: "New tabs open", comment: "A setting in Settings › Tabs: where a new tab goes in the sidebar's list."),
                               detail: String(localized: "Where ⌘T and links put a new tab in the sidebar.", comment: "Explanation under “New tabs open” in Settings › Tabs."),
                               control: newTabPlace))
+        nestToggle.onChange = { on in TabManager.nestsOpenedLinks = on }
+        tabsGroup.add(FormRow(title: String(localized: "Open ⌘-clicked links under their tab", comment: "A setting in Settings › Tabs: a link opened in a new tab goes in the sidebar nested under the tab it came from. ⌘ is the Command key."),
+                              detail: String(localized: "A link you open in a new tab sits under the page it came from, so tabs from one page stay together. Drag a tab out to make it a tab of its own.", comment: "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs."),
+                              control: nestToggle))
         archiveAfter.options = TabArchive.After.allCases.map { DropdownButton.Option(title: $0.title) }
         archiveAfter.onSelect = { index in TabArchive.after = TabArchive.After.allCases[index] }
         tabsGroup.add(FormRow(title: String(localized: "Archive tabs you haven’t used", comment: "A setting in Settings › Tabs."),
@@ -1553,6 +1558,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         scriptJavaScriptToggle.isOn = Scripting.allowsJavaScript
         newTabPlace.selectedIndex = TabManager.NewTabPlace.allCases.firstIndex(of: TabManager.newTabPlace) ?? 0
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
+        nestToggle.isOn = TabManager.nestsOpenedLinks
         swipeToggle.isOn = SwipeNavigator.isOn
         miniToggle.isOn = MiniWindowController.opensExternalLinks
         miniKeys.keys = Shortcuts.allItems.first { $0.action == #selector(AppDelegate.newMiniWindow(_:)) }.map(Shortcuts.caps) ?? []
