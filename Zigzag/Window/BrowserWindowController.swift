@@ -862,6 +862,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let side = Tokens.Metric.floatingButton
         let inset = Tokens.Metric.sidebarPadding
         floatingDownloads.frame = NSRect(x: inset, y: root.overlay.bounds.height - side - inset, width: side, height: side)
+        // With its shortcut, as the sidebar's Downloads button says it.
+        (floatingDownloadsButton as? IconButton)?.toolTip = Shortcuts.tooltip(String(localized: "Downloads", comment: "Tooltip of the floating downloads button, shown while the sidebar is hidden."),
+                                                                             for: #selector(showDownloads(_:)))
         guard floatingDownloads.superview == nil else { return }
         root.overlay.addSubview(floatingDownloads)
         floatingDownloads.growsFrom = CGPoint(x: 0.5, y: 0.5)
