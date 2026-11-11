@@ -492,15 +492,20 @@ final class TabManager {
         guard !isPrivate, id != currentSpaceID, Library.shared.space(id) != nil else { return }
         // Making a space switches to it on its own; going somewhere after that is the guide's last step.
         if !isPrivate, Tutorial.done.contains("space") { Tutorial.complete("switch") }
-        selectedTab?.captureSnapshot()
-        selectedTab?.markActivated()
+        let left = selectedTab
+        left?.captureSnapshot()
+        left?.markActivated()
         currentSpaceID = id
         changed.send(.space)
         Brand.themeChanged.send(())
+        // Where you were on the page you left, as selecting another tab notes it, in case it has to load again while
+        // you're away (a favorite you left this way stays open behind the other space).
+        if left !== selectedTab { left?.readPageState() }
         if let tab = selectedTab {
             tab.markActivated()
             promote(tab)
             tab.ensureWebView()
+            if tab !== left { tab.shown() }
         }
         changed.send(.selection)
     }
