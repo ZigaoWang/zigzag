@@ -2126,13 +2126,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                  control: data))
 
         // The choices made one site at a time, which otherwise have nowhere to be seen.
-        let ads = ContentBlocker.allowedSites.count, extensions = ExtensionStore.extensionsOffSites.count
-        let media = SitePermissions.sites.count, zoom = ZoomLevels.count
-        let dark = DarkPages.sitesOn.count + DarkPages.sitesOff.count
-        func phrase(_ n: Int, _ text: String) -> String? { n > 0 ? "\(text) on \(n) \(n == 1 ? "site" : "sites")" : nil }
-        let parts = [phrase(ads, "Ads allowed"), phrase(extensions, "extensions off"), phrase(media, "permissions set"), phrase(zoom, "zoom set"), phrase(dark, "dark page set")].compactMap { $0 }
+        let nothingChosen = ContentBlocker.allowedSites.isEmpty && ExtensionStore.extensionsOffSites.isEmpty && SitePermissions.sites.isEmpty
+            && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty
         let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
-        sitesReset = parts.isEmpty ? nil : reset
+        sitesReset = nothingChosen ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: String(localized: "Reset choices made for single sites?", comment: "Title of the sheet that forgets the choices made for single sites."),
                           message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, and dark pages follow your setting again.",
@@ -2147,7 +2144,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 self?.layoutDocument()
             }
         }
-        if parts.isEmpty {
+        if nothingChosen {
             sitesGroup.add(FormRow(title: String(localized: "None yet", comment: "A setting in Settings › Privacy."),
                                    detail: String(localized: "Choices you make for one site, like allowing ads, a camera or notifications, show up here.", comment: "Explanation under “None yet” in Settings › Privacy."),
                                    control: NSView()))
