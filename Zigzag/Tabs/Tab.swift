@@ -71,6 +71,9 @@ final class Tab: NSObject {
         return webView.underPageBackgroundColor ?? themeColor
     }
     private(set) var isLoading = false
+    /// A new page is on its way in (a link followed, an address typed): the one showing is about to go. Until it
+    /// arrives (`didCommit`) or never does.
+    private(set) var isLeavingPage = false
     private(set) var progress: Double = 0
     private(set) var canGoBack = false
     private(set) var canGoForward = false
@@ -443,6 +446,7 @@ final class Tab: NSObject {
         webView.removeFromSuperview()
         self.webView = nil
         isLoading = false
+        isLeavingPage = false
         isPlayingAudio = false
     }
 
@@ -829,6 +833,8 @@ final class Tab: NSObject {
                 MainActor.assumeIsolated {
                     guard let self else { return }
                     self.isLoading = wv.isLoading
+                    // Nothing on its way any more (a download, a load that stopped without a word).
+                    if !wv.isLoading { self.isLeavingPage = false }
                     self.changed.send(.loading)
                     // Back and Forward can bring a PDF back from memory without a finished load: check here too.
                     if !wv.isLoading { self.checkForPDF(wv) }
@@ -1124,7 +1130,12 @@ extension Tab: WKNavigationDelegate {
         }
     }
 
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        isLeavingPage = true
+    }
+
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        isLeavingPage = false
         // The new page is here: its address shows.
         addressWaitsForCommit = false
         if webView.url != url { followAddress(of: webView) }
@@ -1213,6 +1224,7 @@ extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {}
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        isLeavingPage = false
         // It never came: the address goes back to the page still showing.
         addressWaitsForCommit = false
         if webView.url != url { followAddress(of: webView) }
