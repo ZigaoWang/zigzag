@@ -5,6 +5,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-11-11
+
 ### Fixed
 - Split view with the address bar above the page has one set of controls: each page's own bar moves into the top row, instead of repeating back, reload and the address. ([#97](https://github.com/ZigaoWang/zigzag/issues/97))
 - iCloud Passwords and other extensions that talk to an app on your Mac stay connected in every profile, instead of asking for a new code after a couple of minutes. ([#98](https://github.com/ZigaoWang/zigzag/issues/98))
