@@ -13,34 +13,53 @@ struct TabSleepTests {
 
     @Test func aTabUnseenForLessThanAnHourStaysAwake() {
         // Fifteen minutes put it to sleep before: a forum you went back to was loading again every time.
-        #expect(TabSleep.sleepers([tab(16 * minute), tab(59 * minute)], awake: 3, lowOnMemory: false).isEmpty)
+        #expect(TabSleep.sleepers([tab(16 * minute), tab(59 * minute)], awake: 3, memory: .normal).isEmpty)
     }
 
     @Test func aTabUnseenForAnHourSleeps() {
         let old = tab(61 * minute)
-        #expect(TabSleep.sleepers([old, tab(10 * minute)], awake: 3, lowOnMemory: false) == [old.id])
+        #expect(TabSleep.sleepers([old, tab(10 * minute)], awake: 3, memory: .normal) == [old.id])
     }
 
     @Test func manyAwakeSleepsTheLongestUnseenUntilBackToTheCrowd() {
         let tabs = (0..<24).map { tab(TimeInterval(16 + $0) * minute) }
-        let slept = TabSleep.sleepers(tabs, awake: 24, lowOnMemory: false)
+        let slept = TabSleep.sleepers(tabs, awake: 24, memory: .normal)
         // Down to 20 awake, oldest first.
         #expect(slept == tabs.sorted { $0.unseen > $1.unseen }.prefix(4).map(\.id))
     }
 
     @Test func manyAwakeStillLeavesOnesYouJustLeft() {
         let tabs = (0..<30).map { _ in tab(10 * minute) }
-        #expect(TabSleep.sleepers(tabs, awake: 30, lowOnMemory: false).isEmpty)
+        #expect(TabSleep.sleepers(tabs, awake: 30, memory: .normal).isEmpty)
     }
 
     @Test func lowOnMemorySleepsTabsUnseenForFiveMinutes() {
         let away = tab(6 * minute), recent = tab(2 * minute)
-        #expect(TabSleep.sleepers([away, recent], awake: 3, lowOnMemory: true) == [away.id])
+        #expect(TabSleep.sleepers([away, recent], awake: 3, memory: .low) == [away.id])
     }
 
     @Test func typedTextAndTabsInUseNeverSleep() {
         let tabs = [tab(5 * 60 * minute, typed: true), tab(5 * 60 * minute, mustStay: true)]
-        #expect(TabSleep.sleepers(tabs, awake: 40, lowOnMemory: true).isEmpty)
+        #expect(TabSleep.sleepers(tabs, awake: 40, memory: .low).isEmpty)
+    }
+
+    @Test func aFavoriteStaysAwakeHoweverLongUnseenOrManyAwake() {
+        let favorite = TabSleep.Candidate(id: UUID(), unseen: 5 * 60 * minute, mustStay: false, hasTypedText: false, isFavorite: true)
+        #expect(TabSleep.sleepers([favorite], awake: 40, memory: .normal).isEmpty)
+    }
+
+    @Test func aFavoriteStaysAwakeOnMacOSFirstMemoryWarning() {
+        // macOS warns often in everyday use: one warning put every favorite left five minutes ago to sleep at once.
+        let favorite = TabSleep.Candidate(id: UUID(), unseen: 30 * minute, mustStay: false, hasTypedText: false, isFavorite: true)
+        let other = tab(30 * minute)
+        #expect(TabSleep.sleepers([favorite, other], awake: 3, memory: .low) == [other.id])
+    }
+
+    @Test func aFavoriteSleepsOnlyWhenMemoryIsCritical() {
+        let away = TabSleep.Candidate(id: UUID(), unseen: 30 * minute, mustStay: false, hasTypedText: false, isFavorite: true)
+        let recent = TabSleep.Candidate(id: UUID(), unseen: 2 * minute, mustStay: false, hasTypedText: false, isFavorite: true)
+        let typed = TabSleep.Candidate(id: UUID(), unseen: 30 * minute, mustStay: false, hasTypedText: true, isFavorite: true)
+        #expect(TabSleep.sleepers([away, recent, typed], awake: 3, memory: .critical) == [away.id])
     }
 
     @Test func webKitReasonsAreToldApart() {

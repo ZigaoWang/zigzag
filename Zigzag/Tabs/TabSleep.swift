@@ -8,6 +8,10 @@ import Foundation
 /// So a tab out of sight sleeps after an hour, after a quarter of an hour once more than 20 are awake, and after
 /// five minutes only while macOS says it's short of memory (sooner Zigzag's choice of tab than macOS's choice of
 /// process). Never while something you typed is still in it.
+///
+/// A favorite never sleeps for being idle or one of many, as in Arc: it's the page you keep coming back to, so it
+/// stays as you left it. Only memory running critically short puts it to sleep; macOS's first warning, which a Mac
+/// in everyday use gives often, doesn't.
 nonisolated enum TabSleep {
     struct Candidate: Sendable {
         let id: UUID
@@ -16,6 +20,16 @@ nonisolated enum TabSleep {
         /// On screen, playing, in a call, or from a site that notifies.
         let mustStay: Bool
         let hasTypedText: Bool
+        var isFavorite = false
+    }
+
+    /// What macOS last said of memory, within `MemoryPressure.lasts`.
+    enum Memory: Sendable {
+        case normal
+        /// Its warning: memory is getting short.
+        case low
+        /// Its critical level: it's about to take memory back by ending processes.
+        case critical
     }
 
     static let idle: TimeInterval = 60 * 60
@@ -24,11 +38,16 @@ nonisolated enum TabSleep {
     static let lowOnMemoryIdle: TimeInterval = 5 * 60
 
     /// The tabs to sleep now, longest unseen first. `awake`: how many tabs have their page loaded, all told.
-    static func sleepers(_ tabs: [Candidate], awake: Int, lowOnMemory: Bool) -> [UUID] {
+    static func sleepers(_ tabs: [Candidate], awake: Int, memory: Memory) -> [UUID] {
         var awake = awake
         var out: [UUID] = []
+        let lowOnMemory = memory != .normal
         for tab in tabs.sorted(by: { $0.unseen > $1.unseen }) where !tab.mustStay && !tab.hasTypedText {
-            guard tab.unseen > idle || (lowOnMemory && tab.unseen > lowOnMemoryIdle) || (awake > crowd && tab.unseen > crowdedIdle) else { continue }
+            if tab.isFavorite {
+                guard memory == .critical, tab.unseen > lowOnMemoryIdle else { continue }
+            } else {
+                guard tab.unseen > idle || (lowOnMemory && tab.unseen > lowOnMemoryIdle) || (awake > crowd && tab.unseen > crowdedIdle) else { continue }
+            }
             out.append(tab.id)
             awake -= 1
         }
@@ -80,9 +99,13 @@ final class MemoryPressure {
     nonisolated static let lasts: TimeInterval = 2 * 60
 
     private(set) var lastWarning: Date?
+    /// The last time macOS said memory was critically short.
+    private(set) var lastCritical: Date?
     private var source: DispatchSourceMemoryPressure?
 
     var isLow: Bool { lastWarning.map { Date().timeIntervalSince($0) < Self.lasts } ?? false }
+    var isCritical: Bool { lastCritical.map { Date().timeIntervalSince($0) < Self.lasts } ?? false }
+    var level: TabSleep.Memory { isCritical ? .critical : isLow ? .low : .normal }
     var warningAgo: TimeInterval? { lastWarning.map { Date().timeIntervalSince($0) } }
 
     func start() {
@@ -98,9 +121,10 @@ final class MemoryPressure {
 
     func warned(critical: Bool) {
         let now = Date()
-        // Noted once in a while: macOS can say it again and again.
-        if !isLow { Diagnostics.note("Mac low on memory", critical ? "critical" : "warning") }
+        // Noted once in a while: macOS can say it again and again. Going from its warning to critical is noted too.
+        if !isLow || (critical && !isCritical) { Diagnostics.note("Mac low on memory", critical ? "critical" : "warning") }
         lastWarning = now
+        if critical { lastCritical = now }
         for controller in WindowManager.shared.controllers { controller.tabManager.sleepIdleTabs() }
     }
 }
