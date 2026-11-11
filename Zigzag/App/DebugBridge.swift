@@ -781,6 +781,15 @@ enum DebugBridge {
         case "tl":
             let n = arg.split(separator: " ").compactMap { Double($0) }
             if n.count == 2 { (controller.window as? BrowserWindow)?.trafficLightOrigin = NSPoint(x: n[0], y: n[1]) }
+        case "wheel":
+            // wheel x y dy: a scroll-wheel turn at a point (window points, top-left origin), handed to the window as one
+            // would arrive, inside the app only; dy in lines, negative scrolls down.
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            guard f.count >= 3, let window = controller.window,
+                  let cg = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: Int32(f[2]), wheel2: 0, wheel3: 0) else { break }
+            let screen = window.convertPoint(toScreen: NSPoint(x: f[0], y: window.frame.height - f[1]))
+            cg.location = CGPoint(x: screen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screen.y)
+            if let event = NSEvent(cgEvent: cg) { window.sendEvent(event) }
         case "mouse":
             // mouse <down|drag|up|move|click|rclick> x y [shift|cmd|opt]  (window points, top-left origin)
             let f = arg.split(separator: " ").map(String.init)
