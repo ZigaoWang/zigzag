@@ -109,7 +109,7 @@ final class EnergyWatch {
             let kept = [selected, selected.flatMap(owner.tabManager.partner(of:))].compactMap { $0 }
             for tab in owner.tabManager.allTabs where tab.webView.flatMap(Self.processID) == pid && !Self.isOnScreen(tab, in: owner)
                 && !kept.contains(where: { $0 === tab }) {
-                let mustStay = url.scheme == "webkit-extension" || tab.isPlayingAudio || tab.isInUse || tab.notifiesUser
+                let mustStay = url.scheme == "webkit-extension" || tab.isPlayingAudio || tab.isInUse || tab.notifiesUser || tab.isFavorite
                     || tab.pageState?.hasTypedText == true
                 if mustStay { awake.append(tab) } else if now.timeIntervalSince(tab.lastActivated) <= Self.recentlySeen { soon = true } else {
                     tab.suspend(because: "using a lot of energy")
