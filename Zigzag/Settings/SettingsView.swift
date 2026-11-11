@@ -790,6 +790,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             extensionsToken = ExtensionCenter.changed.observe { [weak self] in
                 guard let self, self.window != nil else { return }
                 self.reloadExtensions()
+                // An ad blocker turned on or off takes YouTube over from Zigzag, or hands it back.
+                self.reloadBlocking()
+                if self.pane == .privacy || self.isSearching { self.layoutDocument() }
                 // One turned on or off may give a search engine, or take yours with it.
                 self.refreshEngines()
                 self.refreshCustomSearch()
@@ -1007,11 +1010,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                               control: miniToggle))
 
         // Privacy
-        blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
-        // EasyList's licence asks for credit; this is where people look for what does the blocking.
-        blockingGroup.add(FormRow(title: String(localized: "Block ads and trackers", comment: "A setting in Settings › Privacy."),
-                                  detail: String(localized: "Uses EasyList and EasyPrivacy, by the EasyList authors.", comment: "Explanation under “Block ads and trackers” in Settings › Privacy."),
-                                  control: blockingToggle))
+        blockingToggle.onChange = { [weak self] on in
+            ContentBlocker.isEnabled = on
+            self?.reloadBlocking()
+        }
+        reloadBlocking()
 
         // Passwords
         saveToggle.onChange = { [weak self] on in
@@ -1236,6 +1239,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             reloadSpaces()
             reloadProfiles()
             reloadExtensions()
+            reloadBlocking()
             reloadPasswords()
             reloadTranslation()
             if showsWebsiteData { reloadPrivacy() }
@@ -1293,6 +1297,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         layingOutOnce {
             refreshProfilePicker()
             reloadExtensions()
+            reloadBlocking()
             if showsWebsiteData { reloadPrivacy() }
             reloadPasswords()
             layoutDocument()
@@ -1588,6 +1593,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     /// When a password-manager extension is on, Zigzag's own saving and filling start off, and say why.
+    /// Block ads, and, while an ad blocker extension in the profile shown handles YouTube in Zigzag's place, which.
+    private func reloadBlocking() {
+        blockingGroup.removeAllRows()
+        // EasyList's licence asks for credit; this is where people look for what does the blocking.
+        var detail = String(localized: "Uses EasyList and EasyPrivacy, by the EasyList authors.", comment: "Explanation under “Block ads and trackers” in Settings › Privacy.")
+        if ContentBlocker.isEnabled, let blocker = AdBlockers.active(in: profile) {
+            detail += " " + String(localized: "\(blocker) is blocking ads on YouTube.",
+                                   comment: "After the explanation under “Block ads and trackers” in Settings › Privacy, while an ad blocker extension (its name, like uBlock Origin Lite) handles YouTube instead of Zigzag.")
+        }
+        blockingGroup.add(FormRow(title: String(localized: "Block ads and trackers", comment: "A setting in Settings › Privacy."),
+                                  detail: detail, control: blockingToggle))
+    }
+
     private func reloadPasswords() {
         passwordsGroup.removeAllRows()
         cardGroup.removeAllRows()

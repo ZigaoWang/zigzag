@@ -208,6 +208,17 @@
         }
       }
     },
+    "%@ is blocking ads on YouTube." : {
+      "comment" : "After the explanation under “Block ads and trackers” in Settings › Privacy, while an ad blocker extension (its name, like uBlock Origin Lite) handles YouTube instead of Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 正在拦截 YouTube 上的广告。"
+          }
+        }
+      }
+    },
     "%@ is listening to this tab" : {
       "comment" : "Toast when an extension starts hearing a tab's sound. The placeholder is the extension's name.",
       "localizations" : {
