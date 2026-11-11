@@ -728,6 +728,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let archiveAfter = DropdownButton()
     private let favoritesPerRow = DropdownButton()
     private let darkPages = DropdownButton()
+    private let pureBlackToggle = Toggle()
+    private lazy var pureBlackRow: FormRow = {
+        let row = FormRow(title: String(localized: "Pure black backgrounds", comment: "A setting in Settings › Appearance, under Dark pages and shown while it's on: darkened websites are black instead of dark gray."),
+                          detail: String(localized: "Darkened websites are black instead of dark gray.", comment: "Explanation under “Pure black backgrounds” in Settings › Appearance."),
+                          control: pureBlackToggle)
+        row.keywords = String(localized: "black pure true black oled amoled dark mode", comment: "Words that find the Pure black backgrounds setting with Find a setting in Settings. Not shown.")
+        return row
+    }()
     private let newTabPlace = DropdownButton()
     private let pinOfferToggle = Toggle()
     private let nestToggle = Toggle()
@@ -902,13 +910,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             return DropdownButton.Option(title: title)
         }
-        darkPages.onSelect = { index in DarkPages.mode = DarkPages.Mode.allCases[index] }
+        darkPages.onSelect = { [weak self] index in
+            DarkPages.mode = DarkPages.Mode.allCases[index]
+            self?.refreshPureBlack()
+        }
         let darkRow = FormRow(title: String(localized: "Dark pages", comment: "A setting in Settings › Appearance: websites without a dark look of their own are drawn dark."),
                               detail: String(localized: "Websites without a dark look of their own are drawn dark. Pictures and video stay as they are.",
                                              comment: "Explanation under “Dark pages” in Settings › Appearance."),
                               control: darkPages)
         darkRow.keywords = String(localized: "dark mode light appearance night theme black invert", comment: "Words that find the Dark pages setting with Find a setting in Settings. Not shown.")
         appearanceGroup.add(darkRow)
+        pureBlackToggle.onChange = { on in DarkPages.pureBlack = on }
+        appearanceGroup.add(pureBlackRow)
+        refreshPureBlack()
         motionToggle.onChange = { on in Tokens.Motion.reducesMotionHere = on }
         appearanceGroup.add(FormRow(title: String(localized: "Reduce motion", comment: "A setting in Settings › Appearance."),
                                     detail: String(localized: "Things appear in place instead of sliding or growing. Fades stay.", comment: "Explanation under “Reduce motion” in Settings › Appearance."),
@@ -2043,6 +2057,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         engine.selectedIndex = chosen ?? builtIn.firstIndex(of: Library.shared.searchEngine) ?? 0
     }
 
+    /// Pure black backgrounds shows only while dark pages are on.
+    private func refreshPureBlack() {
+        let shown = DarkPages.mode != .off
+        guard pureBlackRow.isAvailable != shown else { return }
+        pureBlackRow.isAvailable = shown
+        laidOutWidth = -1
+        needsLayout = true
+    }
+
     /// The custom address row shows only with Custom chosen.
     private func refreshCustomSearch() {
         let shown = Library.shared.searchEngine == .custom
@@ -2092,6 +2115,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         favoritesPerRow.selectedIndex = FavoritesView.perRowChoices.firstIndex(of: FavoritesView.perRow) ?? 0
         darkPages.selectedIndex = DarkPages.Mode.allCases.firstIndex(of: DarkPages.mode) ?? 0
+        pureBlackToggle.isOn = DarkPages.pureBlack
+        refreshPureBlack()
         saveToggle.isOn = PasswordCapture.offersToSave(in: profile)
         fillToggle.isOn = Autofill.isOn(in: profile)
         translateOffer.isOn = PageTranslator.offers

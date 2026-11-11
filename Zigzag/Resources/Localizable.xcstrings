@@ -4645,6 +4645,17 @@
         }
       }
     },
+    "Darkened websites are black instead of dark gray." : {
+      "comment" : "Explanation under “Pure black backgrounds” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以深色显示的网站用纯黑代替深灰。"
+          }
+        }
+      }
+    },
     "Darkest" : {
       "comment" : "VoiceOver, the Shade slider's value at its deepest.",
       "localizations" : {
@@ -9861,6 +9872,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "代理脚本（PAC）"
+          }
+        }
+      }
+    },
+    "Pure black backgrounds" : {
+      "comment" : "A setting in Settings › Appearance, under Dark pages and shown while it's on: darkened websites are black instead of dark gray.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "纯黑背景"
           }
         }
       }
@@ -15696,6 +15718,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Beta 版 测试版 预览版 beta channel prerelease"
+          }
+        }
+      }
+    },
+    "black pure true black oled amoled dark mode" : {
+      "comment" : "Words that find the Pure black backgrounds setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "纯黑 黑色 深色模式 OLED AMOLED black pure"
           }
         }
       }
