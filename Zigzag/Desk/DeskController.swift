@@ -798,7 +798,7 @@ final class DeskController {
     }
 
     private func reload(animated: Bool = false) {
-        guard let manager else { return }
+        guard manager != nil else { return }
         let allTabs = Library.shared.spaces.flatMap { cardTabs(in: $0.id) }
         let ids = Set(allTabs.map(\.id))
         for (id, view) in cards where !ids.contains(id) {
@@ -1196,7 +1196,7 @@ final class DeskController {
     // MARK: Dragging cards
 
     private func beginDrag(_ tab: Tab, event: NSEvent) -> Bool {
-        guard let window = canvas.window, let card = cards[tab.id], let manager else { return false }
+        guard let window = canvas.window, let card = cards[tab.id], manager != nil else { return false }
         let start = canvas.convert(event.locationInWindow, from: nil)
         let offset = NSPoint(x: start.x - card.frame.minX, y: start.y - card.frame.minY)
         card.removeFromSuperview()

@@ -1488,7 +1488,7 @@ enum DebugBridge {
             report["openedTab"] = controller.tabManager.currentTabs.count > tabs
             extensions(in: controller).lastAction?.popupPopover?.close()
         }
-        debugLog("exttest " + ((try? String(data: JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]), encoding: .utf8)) ?? "?") ?? "?")
+        debugLog("exttest " + ((try? String(data: JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]), encoding: .utf8)) ?? "?"))
         while controller.tabManager.currentTabs.count > tabsBefore, let last = controller.tabManager.selectedTab { controller.tabManager.close(last) }
         if !had { ExtensionStore.uninstall(id, from: controller.tabManager.profile) }
     }

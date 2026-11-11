@@ -408,7 +408,7 @@ final class PopupTab: NSObject, WKWebExtensionTab {
     }
 
     func reload(fromOrigin: Bool, for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
-        fromOrigin ? popup?.webView.reloadFromOrigin() : popup?.webView.reload()
+        _ = fromOrigin ? popup?.webView.reloadFromOrigin() : popup?.webView.reload()
         completionHandler(nil)
     }
 }

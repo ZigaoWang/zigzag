@@ -159,7 +159,7 @@ enum AuthenticationPrompt {
         let method = challenge.protectionSpace.authenticationMethod
         // A certificate you chose to trust on the warning page: accepted for this session.
         if method == NSURLAuthenticationMethodServerTrust, let trust = challenge.protectionSpace.serverTrust,
-           await CertificateExceptions.allows(challenge.protectionSpace.host, trust: trust, in: store) {
+           CertificateExceptions.allows(challenge.protectionSpace.host, trust: trust, in: store) {
             return (.useCredential, URLCredential(trust: trust))
         }
         guard method == NSURLAuthenticationMethodHTTPBasic || method == NSURLAuthenticationMethodHTTPDigest || method == NSURLAuthenticationMethodNTLM else {

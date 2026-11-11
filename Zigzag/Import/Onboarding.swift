@@ -968,8 +968,7 @@ private final class BrowserRow: InteractiveView {
         let x = icon.frame.maxX + Tokens.Space.x3
         var right = bounds.width - pad
         // The fix sits on the browser's line, at the right; what went wrong reads underneath.
-        let buttonBelow = false
-        if !fixButton.isHidden, !buttonBelow {
+        if !fixButton.isHidden {
             let w = fixButton.fittingWidth
             right -= w
             fixButton.frame = NSRect(x: right, y: (top - Tokens.Space.x7Height) / 2, width: w, height: Tokens.Space.x7Height)
@@ -997,10 +996,6 @@ private final class BrowserRow: InteractiveView {
         problem.isHidden = problem.stringValue.isEmpty
         let ph = ceil(problem.sizeThatFits(NSSize(width: bounds.width - x - pad, height: 200)).height)
         problem.frame = NSRect(x: x, y: top - Tokens.Space.x2, width: bounds.width - x - pad, height: ph)
-        if buttonBelow {
-            let w = fixButton.fittingWidth
-            fixButton.frame = NSRect(x: x, y: problem.frame.maxY + Tokens.Space.x2, width: w, height: Tokens.Space.x7Height)
-        }
     }
 }
 

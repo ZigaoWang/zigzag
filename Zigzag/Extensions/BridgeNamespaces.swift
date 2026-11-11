@@ -250,7 +250,7 @@ final class BridgeFavicons: BridgeNamespace {
             return OpenTab(url: url.absoluteString, icon: tab.favicon, isPrivate: tab.isPrivate,
                            mayRead: readsAll || context.hasAccess(to: url, in: tab))
         }
-        return Self.icons(for: asked.map { $0 as? String }, among: open).map { $0.flatMap(dataURL) ?? NSNull() } as [Any]
+        return Self.icons(for: asked.map { $0 as? String }, among: open).map { $0.flatMap(dataURL).map { $0 as Any } ?? NSNull() }
     }
 
     struct OpenTab {

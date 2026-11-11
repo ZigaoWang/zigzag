@@ -757,7 +757,7 @@ final class SidebarListView: NSView {
         case .header:
             let header = SpaceHeaderView()
             header.onClick = { [weak self, weak header] event in
-                guard let self, let header else { return }
+                guard let self, header != nil else { return }
                 // The name folds the pinned tabs away, as the chevron does; the space itself is edited from its menu.
                 self.toggleCollapsed()
             }
@@ -1921,7 +1921,7 @@ final class SidebarListView: NSView {
         }
 
         // Somewhere that isn't any Zigzag window: the tabs become a new window there.
-        if let tab, Self.window(at: mouse) == nil, delegate?.listDropOutside(tabs, at: mouse) == true { return nil }
+        if tab != nil, Self.window(at: mouse) == nil, delegate?.listDropOutside(tabs, at: mouse) == true { return nil }
 
         // Onto a space's dot: into that space, whichever one is showing.
         if let space = drag.hoverSpace {
