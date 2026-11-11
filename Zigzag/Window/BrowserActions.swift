@@ -467,7 +467,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         // Spaces are kept for good; a private window keeps nothing.
         guard !tabManager.isPrivate else { return }
         var created: SpaceInfo?
-        libraryChange(String(localized: "New Space", comment: "Undo action name, shown in the Edit menu as Undo New Space.")) { created = Library.shared.addSpace() }
+        libraryChange(String(localized: "New Space", comment: "Undo action name, shown in the Edit menu as Undo New Space.")) { created = Library.shared.addSpace(profile: tabManager.profile.id) }
         guard let space = created else { return }
         let previous = tabManager.currentSpaceID
         // Into the new space first: that move isn't the guide's "go back" step, which only starts once this one counts.

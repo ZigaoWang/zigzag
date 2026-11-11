@@ -2039,8 +2039,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.refresh(); self?.layoutDocument() }
     }
 
+    /// On the profile of the space the window is on, as one made from the sidebar is.
     private func addSpace() {
-        BrowserWindowController.changeLibrary(String(localized: "New Space", comment: "What Edit › Undo undoes after a space is added.")) { Library.shared.addSpace() }
+        let profile = browser?.tabManager.profile.id ?? Profile.defaultID
+        BrowserWindowController.changeLibrary(String(localized: "New Space", comment: "What Edit › Undo undoes after a space is added.")) { Library.shared.addSpace(profile: profile) }
     }
 
     // MARK: Privacy

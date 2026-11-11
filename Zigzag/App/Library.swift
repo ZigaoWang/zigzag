@@ -486,12 +486,14 @@ final class Library {
 
     func index(of id: UUID) -> Int? { spaces.firstIndex { $0.id == id } }
 
+    /// A new space, on `profile`: where you made it from, so a space made among separate ones stays with them.
     @discardableResult
-    func addSpace(name: String? = nil, color: SpaceColor? = nil) -> SpaceInfo {
+    func addSpace(name: String? = nil, color: SpaceColor? = nil, profile: UUID = Profile.defaultID) -> SpaceInfo {
         let pick = color ?? SpaceColor.next(unused: spaces.map(\.color))
         let space = SpaceInfo(name: name ?? String(localized: "Space \(spaces.count + 1)", comment: "The name of a new space: its number. People can rename it."),
                               color: pick)
         spaces.append(space)
+        directory.assign(space: space.id, to: profile)
         commit()
         return space
     }
