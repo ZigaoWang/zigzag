@@ -1446,16 +1446,32 @@ final class TabManager {
                                hasTypedText: $0.pageState?.hasTypedText == true, isFavorite: $0.isFavorite,
                                keptAwake: KeepAwake.isOn(for: $0.url))
         }
+        let byID = Dictionary(live.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for id in TabSleep.sleepers(candidates, awake: live.count, memory: memory) {
-            guard let tab = live.first(where: { $0.id == id }) else { continue }
+            guard let tab = byID[id] else { continue }
             let unseen = now.timeIntervalSince(tab.lastActivated)
             // A favorite or a site kept awake sleeps only for memory, however long unseen.
             let shielded = tab.isFavorite || KeepAwake.isOn(for: tab.url)
-            tab.suspend(because: unseen > TabSleep.idle && !shielded ? "unseen for an hour"
-                        : memory != .normal ? "Mac low on memory" : "more than \(TabSleep.crowd) tabs awake")
+            let reason = unseen > TabSleep.idle && !shielded ? "unseen for an hour"
+                : memory != .normal ? "Mac low on memory" : "more than \(TabSleep.crowd) tabs awake"
+            // A few at a time; one you've gone back to meanwhile stays awake.
+            TabSleep.queue.add(tab.id) { [weak tab] in
+                guard let tab, Self.mayStillSleep(tab) else { return }
+                tab.suspend(because: reason)
+            }
         }
         // Each space keeps the page it shows out of the archive, as before.
         archiveStaleTabs(keeping: selectedIDs.union(selectedBySpace.values))
+    }
+
+    /// Whether a tab on its way to sleep (TabSleep.queue) still may: it's open and awake, and no window has come to
+    /// show it, alone or beside another in a split, since it was chosen.
+    static func mayStillSleep(_ tab: Tab) -> Bool {
+        guard !tab.isClosed, !tab.isSuspended else { return false }
+        return !WindowManager.shared.controllers.contains { controller in
+            guard let selected = controller.tabManager.selectedTab else { return false }
+            return selected === tab || controller.tabManager.partner(of: selected) === tab
+        }
     }
 
     /// Ordinary tabs unseen for longer than the setting move to the archive. Never pinned pages or favorites,

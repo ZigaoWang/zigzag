@@ -130,7 +130,16 @@ final class TabArchive {
         if entries.count > Self.limit { entries.removeLast(entries.count - Self.limit) }
     }
 
+    /// Written in order, off the main thread: tabs are archived as others go to sleep, and up to 500 entries took
+    /// their time to encode and write there.
+    private static let writer = DispatchQueue(label: "app.zigzag.archive", qos: .utility)
+
     private func save() {
-        JSONStore.save(entries, to: Paths.file("Archive.json"))
+        let entries = entries
+        let file = Paths.file("Archive.json")
+        Self.writer.async { JSONStore.save(entries, to: file) }
     }
+
+    /// Waits for what's being written, so quitting never cuts it short.
+    static func flush() { writer.sync {} }
 }

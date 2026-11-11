@@ -120,16 +120,18 @@ nonisolated enum Diagnostics {
     /// carries a token or an email.
     static func clean(_ text: String, limit: Int = 200) -> String {
         var out = text.replacingOccurrences(of: "\n", with: " ")
-        let links = try? NSRegularExpression(pattern: #"[a-zA-Z][a-zA-Z0-9+.-]*://([^/\s'"?#)]+)[^\s'")]*"#)
-        if let links {
+        if let links = linkPattern {
             out = links.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: "$1")
         }
-        let emails = try? NSRegularExpression(pattern: #"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"#)
-        if let emails {
+        if let emails = emailPattern {
             out = emails.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: "(email)")
         }
         return out.count > limit ? String(out.prefix(limit)) + "…" : out
     }
+
+    // Made once: every tab put to sleep or page that didn't load is noted, and making them is most of the cost.
+    private static let linkPattern = try? NSRegularExpression(pattern: #"[a-zA-Z][a-zA-Z0-9+.-]*://([^/\s'"?#)]+)[^\s'")]*"#)
+    private static let emailPattern = try? NSRegularExpression(pattern: #"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"#)
 
     /// An error in plain words with its code, so it can be looked up: "The site’s security certificate isn’t valid
     /// (NSURLErrorDomain -1202)".

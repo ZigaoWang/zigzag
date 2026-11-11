@@ -120,7 +120,11 @@ final class EnergyWatch {
                                                notifies: tab.notifiesUser, favorite: tab.isFavorite, keptAwake: KeepAwake.isOn(for: tab.url),
                                                typed: tab.pageState?.hasTypedText == true)
                 if mustStay { awake.append(tab) } else if now.timeIntervalSince(tab.lastActivated) <= Self.recentlySeen { soon = true } else {
-                    tab.suspend(because: "using a lot of energy")
+                    // A few at a time: a site's tabs share a process, and there can be dozens.
+                    TabSleep.queue.add(tab.id) { [weak tab] in
+                        guard let tab, TabManager.mayStillSleep(tab) else { return }
+                        tab.suspend(because: "using a lot of energy")
+                    }
                     slept.append(tab)
                 }
             }

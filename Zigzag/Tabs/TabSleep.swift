@@ -171,6 +171,92 @@ final class MemoryPressure {
         if !isLow || (critical && !isCritical) { Diagnostics.note("Mac low on memory", critical ? "critical" : "warning") }
         lastWarning = now
         if critical { lastCritical = now }
+        guard TabSleep.looksAgain(at: now, lastLook: lastLook, lastLevel: lastLookLevel, level: level) else { return }
+        lastLook = now
+        lastLookLevel = level
         for controller in WindowManager.shared.controllers { controller.tabManager.sleepIdleTabs() }
     }
+
+    /// When a warning last had every window look for tabs to sleep, and how short memory was then.
+    private var lastLook: Date?
+    private var lastLookLevel = TabSleep.Memory.normal
+}
+
+nonisolated extension TabSleep.Memory: Comparable {
+    private var rank: Int {
+        switch self {
+        case .normal: 0
+        case .low: 1
+        case .critical: 2
+        }
+    }
+    static func < (a: Self, b: Self) -> Bool { a.rank < b.rank }
+}
+
+nonisolated extension TabSleep {
+    /// How long after one look for tabs to sleep, for memory, another warning brings no new one: macOS repeats its
+    /// warning while memory stays short, and each look went through every tab again. Memory getting shorter (its
+    /// warning turning critical) is looked at at once.
+    static let warningRescan: TimeInterval = 30
+
+    static func looksAgain(at now: Date, lastLook: Date?, lastLevel: Memory, level: Memory) -> Bool {
+        guard let lastLook else { return true }
+        return level > lastLevel || now.timeIntervalSince(lastLook) >= warningRescan
+    }
+}
+
+/// Work that comes in a crowd, done a few at a time: macOS's memory warning, or a busy process shared by a site's
+/// tabs, put dozens of tabs to sleep in one turn of the run loop, each taking its picture and taking down its page,
+/// and Zigzag stopped answering for a second or more (#89). A key added again keeps its place and does the newer work.
+@MainActor
+final class StagedQueue<Key: Hashable> {
+    private var order: [Key] = []
+    private var work: [Key: () -> Void] = [:]
+    private let perStep: Int
+    private let interval: TimeInterval
+    private var scheduled = false
+
+    /// What's still waiting, first first.
+    var pending: [Key] { order }
+
+    init(perStep: Int = 2, interval: TimeInterval = 0.1) {
+        self.perStep = perStep
+        self.interval = interval
+    }
+
+    /// Done at the next turn of the run loop at the soonest, never inside the caller.
+    func add(_ key: Key, _ run: @escaping () -> Void) {
+        if work[key] == nil { order.append(key) }
+        work[key] = run
+        schedule(after: 0)
+    }
+
+    func remove(_ key: Key) {
+        guard work.removeValue(forKey: key) != nil else { return }
+        order.removeAll { $0 == key }
+    }
+
+    private func schedule(after delay: TimeInterval) {
+        guard !scheduled else { return }
+        scheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            MainActor.assumeIsolated {
+                self?.scheduled = false
+                self?.step()
+            }
+        }
+    }
+
+    private func step() {
+        for _ in 0..<perStep {
+            guard !order.isEmpty else { break }
+            work.removeValue(forKey: order.removeFirst())?()
+        }
+        if !order.isEmpty { schedule(after: interval) }
+    }
+}
+
+extension TabSleep {
+    /// Every tab on its way to sleep, whichever window or watcher sent it: two at a time, a tenth of a second apart.
+    @MainActor static let queue = StagedQueue<UUID>()
 }

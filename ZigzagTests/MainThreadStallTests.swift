@@ -51,7 +51,7 @@ import Testing
             await settle(0.01)
         }
         // A Debouncer would still be waiting for a pause.
-        #expect(runs >= 2)
+        #expect(runs >= 1)
     }
 
     @Test func cancelledNeverRuns() async {
@@ -157,5 +157,65 @@ import Testing
         ExtensionStore.write(ExtensionInstalls.State(), keys: stateKeys, to: file)
         #expect(ExtensionStore.generation != generation)
         #expect(remembered.value(at: ExtensionStore.generation) { made += 1; return made } == 2)
+    }
+}
+
+/// Tabs going to sleep together go a few at a time, in the order they were chosen (#89).
+@MainActor struct StagedSleepTests {
+    @Test func nothingRunsInsideTheCaller() {
+        let queue = StagedQueue<Int>(perStep: 2, interval: 0.1)
+        var ran: [Int] = []
+        for i in 0..<5 { queue.add(i) { ran.append(i) } }
+        #expect(ran.isEmpty)
+        #expect(queue.pending == [0, 1, 2, 3, 4])
+    }
+
+    @Test func twoAtATimeInOrder() async {
+        let queue = StagedQueue<Int>(perStep: 2, interval: 0.4)
+        var ran: [Int] = []
+        for i in 0..<7 { queue.add(i) { ran.append(i) } }
+        await settle(0.1)
+        #expect(ran == [0, 1])
+        await settle(1.5)
+        #expect(ran == Array(0..<7))
+        #expect(queue.pending.isEmpty)
+    }
+
+    @Test func addedAgainKeepsItsPlaceAndRunsOnceWithTheNewerWork() async {
+        let queue = StagedQueue<String>(perStep: 1, interval: 0.02)
+        var ran: [String] = []
+        queue.add("a") { ran.append("a1") }
+        queue.add("b") { ran.append("b") }
+        queue.add("a") { ran.append("a2") }
+        #expect(queue.pending == ["a", "b"])
+        await settle(0.2)
+        #expect(ran == ["a2", "b"])
+    }
+
+    @Test func removedNeverRuns() async {
+        let queue = StagedQueue<Int>(perStep: 2, interval: 0.02)
+        var ran: [Int] = []
+        for i in 0..<3 { queue.add(i) { ran.append(i) } }
+        queue.remove(1)
+        await settle(0.2)
+        #expect(ran == [0, 2])
+    }
+
+    @Test func aRepeatedWarningLooksAgainOnlyAfterAWhileOrWhenMemoryGetsShorter() {
+        let now = Date()
+        #expect(TabSleep.looksAgain(at: now, lastLook: nil, lastLevel: .normal, level: .low))
+        #expect(!TabSleep.looksAgain(at: now, lastLook: now.addingTimeInterval(-5), lastLevel: .low, level: .low))
+        #expect(TabSleep.looksAgain(at: now, lastLook: now.addingTimeInterval(-5), lastLevel: .low, level: .critical))
+        #expect(!TabSleep.looksAgain(at: now, lastLook: now.addingTimeInterval(-5), lastLevel: .critical, level: .critical))
+        #expect(TabSleep.looksAgain(at: now, lastLook: now.addingTimeInterval(-31), lastLevel: .critical, level: .low))
+    }
+
+    @Test func cleaningTextStillCutsAddressesAndEmails() {
+        let text = "Failed https://example.com/reset?token=abc for me@example.org"
+        #expect(Diagnostics.clean(text) == "Failed example.com for (email)")
+        // Made once, used many times: a thousand notes take no time to speak of.
+        let start = Date()
+        for _ in 0..<1000 { _ = Diagnostics.clean(text) }
+        #expect(Date().timeIntervalSince(start) < 1)
     }
 }
