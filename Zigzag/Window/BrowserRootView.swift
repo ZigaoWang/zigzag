@@ -652,7 +652,6 @@ final class BrowserRootView: SpaceFrameView {
         let left = cardViewFrame(panes.left)
         card.frame = left
         card.band = left.height - panes.left.height
-        card.bandColor = paintsTopBar ? pageColor : nil
         topBar.pageColor = paintsTopBar ? pageColor : nil
         let attached = sidebarVisible && Self.isBorderless
         card.squaresRightCorners = windowCorners(of: left, attached: attached)
@@ -730,12 +729,23 @@ final class BrowserRootView: SpaceFrameView {
         sidebarContainer.frame = sidebarFrame
         sidebarContainer.isFloating = !sidebarVisible && !leavesDocked
         // Docked beside the bar above the page, the sidebar's top row stays on the bar's middle line.
-        sidebarContainer.sidebar.topRowDrop = showsTopBar && !sidebarContainer.isFloating ? topBarFrame.minY : 0
+        sidebarContainer.sidebar.topRowDrop = sidebarTopRowDrop
         let handleWidth = Tokens.Metric.resizeHandleWidth
         resizeHandle.frame = NSRect(x: sidebarWidth - handleWidth / 2, y: 0, width: handleWidth, height: bounds.height)
         resizeHandle.isHidden = !sidebarVisible && !isDraggingSidebarEdge
         overlay.frame = bounds
         onLayoutChange?()
+    }
+
+    /// Full screen with the frame on: the page runs edge to edge while the sidebar is hidden, so the frame comes and
+    /// goes with the sidebar, and the bar above the page moves down and up by its inset as it does.
+    private var frameComesWithSidebar: Bool { !Self.isBorderless && window?.styleMask.contains(.fullScreen) == true }
+
+    /// How far down the docked sidebar's top row sits, to stay on the middle line of the bar above the page. Not
+    /// where the frame comes and goes with the sidebar: there the row would move as the sidebar is shown, and its
+    /// toggle, the one thing you reach for in that corner, stays where it is with the sidebar hidden.
+    var sidebarTopRowDrop: CGFloat {
+        showsTopBar && !sidebarContainer.isFloating && !frameComesWithSidebar ? topBarFrame.minY : 0
     }
 
     private func layoutTopBar() {
@@ -746,12 +756,17 @@ final class BrowserRootView: SpaceFrameView {
         if sidebarVisible { sidebarContainer.sidebar.contentTop = page.minY - sidebarFrame.minY }
     }
 
+    /// The address's end is over the page's card, the bar being its top: not beside an extension's side panel, where
+    /// it runs on over the panel.
+    private var addressEndsOnCard: Bool { paintsTopBar && !showsSidePanel }
+
     /// The bar's controls run from the page's left edge to its right: at the frame's inset, or just inside the
     /// window's edges when the page meets them.
     private func placeTopBar() {
         let bar = topBarSlideFrame ?? topBarFrame
         topBar.frame = bar
-        (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: pageAreaFrame, window: bounds)
+        topBar.rowTop = topBarFrame.minY - bar.minY
+        (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: pageAreaFrame, window: bounds, onCard: addressEndsOnCard)
         let panes = paneFrames
         let over = liftedCards.map { $0 === card ? panes.left : panes.right ?? panes.left }
         topBar.setStrips(liftedCards.map(\.header), panes: over.map { ($0.minX - bar.minX)...max($0.minX, $0.maxX) - bar.minX })
@@ -879,10 +894,7 @@ final class BrowserRootView: SpaceFrameView {
         }, completion: {
             self.leavesDocked = false
             // Not if another slide took over meanwhile: that one ends it.
-            if self.topBarSlideFrame != nil, self.topBarSlides == slide {
-                self.topBarSlideFrame = nil
-                self.topBar.endSlide()
-            }
+            if self.topBarSlideFrame != nil, self.topBarSlides == slide { self.topBarSlideFrame = nil }
             self.needsLayout = true
         })
     }
