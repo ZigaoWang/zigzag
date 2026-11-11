@@ -701,6 +701,8 @@ final class TabManager {
         tab.bookmarkID = bookmark.id
         tab.landingUntil = Date().addingTimeInterval(8)
         bookmarkTabs[bookmark.id] = tab
+        // Opened again after its folder was shut over it: it shows under the folder now, as a page opened there does.
+        Library.shared.untuck(bookmark.id)
         changed.send(.structure)
         return tab
     }

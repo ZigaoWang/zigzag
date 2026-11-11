@@ -17,6 +17,9 @@ struct BookmarkFolder: Codable, Identifiable, Equatable {
     var icon: String? = nil
     /// The folder this one is inside. Nil: it sits among the space's pinned pages.
     var parentID: UUID? = nil
+    /// The pages that were open when it was shut: shut on purpose, it hides them too (#154), though pages opened
+    /// after still show under it (#94). Nil while it's open.
+    var tucked: [UUID]? = nil
 }
 
 extension Array where Element == BookmarkFolder {
@@ -971,7 +974,7 @@ final class Library {
         if let inside, spaces[s].folders?.contains(where: { $0.id == inside }) == true {
             folder.parentID = inside
             // Open on the way in, so the new folder shows.
-            if let p = spaces[s].folders?.firstIndex(where: { $0.id == inside }) { spaces[s].folders?[p].isOpen = true }
+            if let p = spaces[s].folders?.firstIndex(where: { $0.id == inside }) { spaces[s].folders?[p].isOpen = true; spaces[s].folders?[p].tucked = nil }
         }
         spaces[s].folders = (spaces[s].folders ?? []) + [folder]
         tidyFolders(s)
@@ -992,10 +995,25 @@ final class Library {
         commit()
     }
 
-    func setFolderOpen(_ id: UUID, _ open: Bool) {
+    /// Opens or shuts a folder. Shut, it keeps `tucking` (its pages open now) hidden with the rest.
+    func setFolderOpen(_ id: UUID, _ open: Bool, tucking: Set<UUID> = []) {
         guard let s = spaceIndex(ofFolder: id), let f = spaces[s].folders?.firstIndex(where: { $0.id == id }) else { return }
         spaces[s].folders?[f].isOpen = open
+        spaces[s].folders?[f].tucked = open || tucking.isEmpty ? nil : tucking.sorted { $0.uuidString < $1.uuidString }
         commit()
+    }
+
+    /// A page opened again: it shows under its shut folder from now on, as any page opened there does.
+    func untuck(_ bookmarkID: UUID) {
+        var changed = false
+        for s in spaces.indices {
+            for f in (spaces[s].folders ?? []).indices where spaces[s].folders?[f].tucked?.contains(bookmarkID) == true {
+                spaces[s].folders?[f].tucked?.removeAll { $0 == bookmarkID }
+                if spaces[s].folders?[f].tucked?.isEmpty == true { spaces[s].folders?[f].tucked = nil }
+                changed = true
+            }
+        }
+        if changed { commit() }
     }
 
     /// The folder goes; what was in it (pages and folders) stays where it was, one level up.
@@ -1042,7 +1060,7 @@ final class Library {
         spaces[target].bookmarks.insert(contentsOf: moving, at: min(at, spaces[target].bookmarks.count))
         folder.parentID = into
         spaces[s].folders?[f] = folder
-        if let p = into, let pi = spaces[target].folders?.firstIndex(where: { $0.id == p }) { spaces[target].folders?[pi].isOpen = true }
+        if let p = into, let pi = spaces[target].folders?.firstIndex(where: { $0.id == p }) { spaces[target].folders?[pi].isOpen = true; spaces[target].folders?[pi].tucked = nil }
         if s != target {
             // Its subfolders go along.
             let travelling = Set([id] + inner)

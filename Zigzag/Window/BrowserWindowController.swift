@@ -1965,8 +1965,12 @@ extension BrowserWindowController: SidebarDelegate {
         pageChange(parent == nil ? String(localized: "Move Folder", comment: "Undo action name, shown in the Edit menu as Undo Move Folder.") : String(localized: "Move into Folder", comment: "Undo action name, shown in the Edit menu as Undo Move into Folder.")) { Library.shared.moveFolder(id, to: index, in: spaceID, parent: .some(parent)) }
     }
     func listSetFolderOpen(_ id: UUID, _ open: Bool) {
-        // Opening and closing isn't an edit to undo.
-        Library.shared.setFolderOpen(id, open)
+        // Opening and closing isn't an edit to undo. Shut on purpose, it hides its pages that are open now, in any
+        // window, as well as the rest (#154).
+        let folders = Library.shared.spaces.first { $0.folders?.contains { $0.id == id } == true }?.folders ?? []
+        let pages = open ? [] : folders.pages(in: id)
+        let tucking = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
+        Library.shared.setFolderOpen(id, open, tucking: tucking)
     }
     func listRenameFolder(_ id: UUID, to name: String) {
         libraryChange(String(localized: "Rename Folder", comment: "Undo action name, shown in the Edit menu as Undo Rename Folder.")) { Library.shared.renameFolder(id, to: name) }
