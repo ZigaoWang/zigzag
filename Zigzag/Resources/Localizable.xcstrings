@@ -12863,6 +12863,17 @@
         }
       }
     },
+    "The profile this was going to has been deleted. Nothing was added." : {
+      "comment" : "Toast when the profile chosen in the sheet that adds an extension was deleted before the extension went in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要添加到的描述文件已被删除，未添加任何内容。"
+          }
+        }
+      }
+    },
     "The result can’t be given as text. For a promise, put await before it and return its value." : {
       "comment" : "Error a script gets when its JavaScript ends on a value like a promise or a page element.",
       "localizations" : {

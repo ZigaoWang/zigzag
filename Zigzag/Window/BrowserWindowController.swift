@@ -715,10 +715,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 }
                 var sheet: ExtensionSheet?
                 sheet = ExtensionSheet.present(asked, in: self, onConfirm: {
-                    report(.adding)
                     let chosen = sheet.map { $0.destinationIndex }.flatMap { profiles.indices.contains($0) ? profiles[$0] : nil }
-                    let profile = profiles.count > 1 ? Profiles.shared.profile(chosen?.id ?? profile.id) : profile
+                    // The profile chosen, held while the extension goes into it so it isn't removed meanwhile. One
+                    // removed while the sheet was up gets nothing: never the first profile in its place.
+                    guard let profile = Profiles.shared.listed(profiles.count > 1 ? chosen?.id ?? profile.id : profile.id),
+                          Profiles.shared.hold(profile.id) else {
+                        ExtensionStore.discard(prepared)
+                        report(.failed(String(localized: "The profile this was going to has been deleted. Nothing was added.", comment: "Toast when the profile chosen in the sheet that adds an extension was deleted before the extension went in.")))
+                        return
+                    }
+                    report(.adding)
                     Task {
+                        defer { Profiles.shared.done(profile.id) }
                         switch await ExtensionStore.finishInstall(prepared, in: profile) {
                         case .success(let name):
                             report(.added(name))
