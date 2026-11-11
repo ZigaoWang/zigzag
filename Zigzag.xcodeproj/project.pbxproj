@@ -209,6 +209,7 @@
 		A93EFB5F858A1B33E7E03B79 /* SiteSignInTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D7D2BAAFBF678F6CF7BC040 /* SiteSignInTests.swift */; };
 		AC1B158FB5D979FA4552705A /* FormSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F889675E696C25E32096931 /* FormSheet.swift */; };
 		AD420686AFB0AEBB23F9ADF7 /* InlineCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B09FDD82E339C4D35FD657C /* InlineCompletionTests.swift */; };
+		AD66AB1C32F3990847A89971 /* CommandBarRankingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B89F5BC1A42191D2C02C66 /* CommandBarRankingTests.swift */; };
 		AF0091F08138B34E47C07295 /* TabSleepTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18A3CEE886C0270C9A5BE70C /* TabSleepTests.swift */; };
 		AFE7C6BEFFFF26CDDB8D783A /* ExtensionSidePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AC9B41E8717A89ACC4B6BD4 /* ExtensionSidePanel.swift */; };
 		B04713924CD34C38A4EC8FF5 /* ExtensionImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F75F27BD154DC2EB7A42D2DE /* ExtensionImportTests.swift */; };
@@ -467,6 +468,7 @@
 		95FCFEE43D95B1A09B1F883D /* chrome-api.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "chrome-api.json"; sourceTree = "<group>"; };
 		96D4CC131CEDF843998D604C /* DarkPages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPages.swift; sourceTree = "<group>"; };
 		979ECE3AE8285E787E972E3E /* PageCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageCardView.swift; sourceTree = "<group>"; };
+		97B89F5BC1A42191D2C02C66 /* CommandBarRankingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarRankingTests.swift; sourceTree = "<group>"; };
 		9875E3DF61E5A98363065101 /* PasswordCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordCapture.swift; sourceTree = "<group>"; };
 		98C36FF6B8E4B6DBFC1DF273 /* Zigzag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zigzag.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		98C4AD0F5E55B24044483033 /* MaterialsShowcase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialsShowcase.swift; sourceTree = "<group>"; };
@@ -988,6 +990,7 @@
 				7069B71082962459B24D179F /* ChromiumExtensionsTests.swift */,
 				F18C84CC63265389A43E642F /* CommandActionTests.swift */,
 				CE6475CD75E987F5A8B0D182 /* CommandBarHistoryTests.swift */,
+				97B89F5BC1A42191D2C02C66 /* CommandBarRankingTests.swift */,
 				5D3D982B142CB7CC9AA89B6A /* ContrastTokensTests.swift */,
 				8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */,
 				4295D4E75FDD1157FE955EBF /* DarkPagesTests.swift */,
@@ -1453,6 +1456,7 @@
 				95116D4DAA8CC50801C588B5 /* ChromiumExtensionsTests.swift in Sources */,
 				54665D76641D0469C5A31D12 /* CommandActionTests.swift in Sources */,
 				23B86800C5070366304E8423 /* CommandBarHistoryTests.swift in Sources */,
+				AD66AB1C32F3990847A89971 /* CommandBarRankingTests.swift in Sources */,
 				87F8E37BD3315332966A7421 /* ContrastTokensTests.swift in Sources */,
 				37417FBDF6F6A5A1633769C5 /* DarkPagesTests.swift in Sources */,
 				B5E6F1A8F313A228FEF5DE37 /* DeveloperToolsTests.swift in Sources */,
