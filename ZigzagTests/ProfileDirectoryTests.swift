@@ -272,3 +272,20 @@ struct PageProfileTests {
         #expect(!ProfileSheets.isRebuilt(isPrivate: true, isLoaded: true, in: work, movingTo: play))
     }
 }
+
+/// A profile you chose (to add an extension to, to import into) that's gone since is refused, never swapped for the
+/// first; a profile that isn't chosen falls back to the first as before.
+@MainActor
+struct ListedProfileTests {
+    @Test func aGoneProfileIsNotListedAndCantBeHeld() {
+        let gone = UUID()
+        #expect(Profiles.shared.listed(gone) == nil)
+        #expect(Profiles.shared.profile(gone) === Profiles.shared.default)
+        #expect(!Profiles.shared.hold(gone))
+        #expect(!Profiles.shared.inUse.contains(gone))
+    }
+
+    @Test func theFirstProfileIsAlwaysListed() {
+        #expect(Profiles.shared.listed(Profile.defaultID) === Profiles.shared.default)
+    }
+}

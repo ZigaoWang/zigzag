@@ -70,7 +70,14 @@ final class Profiles {
 
     /// The profile with this ID. One that's gone, or was never there, is the first profile.
     func profile(_ id: UUID) -> Profile {
-        guard id != Profile.defaultID, Library.shared.directory.profile(id) != nil else { return `default` }
+        listed(id) ?? `default`
+    }
+
+    /// The profile with this ID while it's listed; nil for one that's gone. For a profile you chose (where something
+    /// is added or imported): one removed meanwhile is refused, never swapped for the first.
+    func listed(_ id: UUID) -> Profile? {
+        if id == Profile.defaultID { return `default` }
+        guard Library.shared.directory.profile(id) != nil else { return nil }
         if let known = others[id] { return known }
         let made = Profile(id: id)
         others[id] = made
@@ -93,7 +100,8 @@ final class Profiles {
 
     // MARK: Profiles in use
 
-    /// The profiles something is writing into for a while (an import), each with how many are. One of these isn't
+    /// The profiles something is writing into for a while (an import, an extension being added), each with how
+    /// many are. One of these isn't
     /// removed until they're done (`remove`): what's being written would land in data that's being erased.
     private var writers: [UUID: Int] = [:]
     var inUse: Set<UUID> { Set(writers.keys) }
