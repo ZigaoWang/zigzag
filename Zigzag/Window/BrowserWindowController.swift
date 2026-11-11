@@ -842,9 +842,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// The bar above the page in the shown page's color: its background (a site's theme color can be its header's,
-    /// and stay light on a page that turned dark), else its theme color.
+    /// and stay light on a page that turned dark), else its theme color. None over what covers the page (a PDF,
+    /// Settings, Reader), which has a color of its own: the bar is the plain one then.
     private func paintTopBar() {
-        root.paintTopBar(shownTab?.webView?.underPageBackgroundColor ?? shownTab?.themeColor)
+        let covered = reader != nil && readerCard === root.card
+        root.paintTopBar(covered ? nil : Self.pageColor(of: shownTab))
+    }
+
+    static func pageColor(of tab: Tab?) -> NSColor? {
+        guard let tab, let webView = tab.webView, tab.pdfViewer == nil, tab.settingsView == nil else { return nil }
+        return webView.underPageBackgroundColor ?? tab.themeColor
     }
 
     /// Where popovers that belong to the address bar (extension popups) open from: the address bar while the sidebar
@@ -1021,6 +1028,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             updateWindowTitle()
         case .webView:
             showPages()
+            paintTopBar()
+        case .pdf, .settings:
+            paintTopBar()
         case .capture:
             sidebar.address.setCapture(camera: tab.isUsingCamera, microphone: tab.isUsingMicrophone)
         case .reader:
@@ -1214,6 +1224,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 return nil
             }
             self.updateReaderButton()
+            self.paintTopBar()
             // An open Find follows the article in, and back out to the page.
             self.findBar.pageChanged()
         }
@@ -1234,6 +1245,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         if let webView = tabManager.selectedTab?.webView { window?.makeFirstResponder(webView) }
         updateReaderButton()
+        paintTopBar()
         findBar.pageChanged()
     }
 
