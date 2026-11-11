@@ -261,6 +261,108 @@ struct MiniPlayerTests {
         #expect(dragged.minY >= 44)
     }
 
+    // MARK: Snapping to a corner
+
+    /// The page area beside a 240-point sidebar, inside the window above.
+    private let pageArea = CGRect(x: 240, y: 4, width: 1036, height: 797)
+
+    @Test func letGoItGlidesIntoThePagesNearestCorner() {
+        // Let go a little up and left of the bottom right: into that corner, a margin in.
+        let there = CGRect(x: 800, y: 500, width: 333, height: 187)
+        let (frame, place) = MiniPlayerLayout.rest(there, free: false, page: pageArea, in: window)
+        #expect(place == .corner(.bottomRight))
+        #expect(frame == CGRect(x: 1276 - 12 - 333, y: 801 - 12 - 187, width: 333, height: 187))
+        // Over the sidebar at the top: the page's top left, not the sidebar's.
+        let sidebar = MiniPlayerLayout.rest(CGRect(x: 10, y: 60, width: 333, height: 187), free: false, page: pageArea, in: window)
+        #expect(sidebar.place == .corner(.topLeft))
+        #expect(sidebar.frame.origin == CGPoint(x: 252, y: 16))
+    }
+
+    @Test func letGoWithCommandItStaysWhereItWas() {
+        let there = CGRect(x: 600, y: 300, width: 333, height: 187)
+        let (frame, place) = MiniPlayerLayout.rest(there, free: true, page: pageArea, in: window)
+        #expect(frame == there)
+        #expect(place == .free(MiniPlayerLayout.anchor(of: there, in: window)))
+    }
+
+    @Test func aCornerKeepsToThePageAsTheWindowChanges() {
+        let size = CGSize(width: 333, height: 187)
+        let frame = MiniPlayerLayout.frame(for: .corner(.bottomLeft), size: size, page: pageArea, in: window)
+        #expect(frame.origin == CGPoint(x: 252, y: 801 - 12 - 187))
+        // The sidebar hidden: the page is the whole window, and the card goes with its corner.
+        let whole = MiniPlayerLayout.frame(for: .corner(.bottomLeft), size: size, page: window, in: window)
+        #expect(whole.minX == 16)
+    }
+
+    @Test func itsRestingPlaceIsKeptAsText() {
+        #expect(MiniPlayerLayout.Place(stored: MiniPlayerLayout.Place.corner(.topRight).stored) == .corner(.topRight))
+        let anchor = MiniPlayerLayout.Anchor(corner: .bottomLeft, offset: CGSize(width: 51, height: 258))
+        #expect(MiniPlayerLayout.Place(stored: MiniPlayerLayout.Place.free(anchor).stored) == .free(anchor))
+        // A place saved before the card snapped stays where it was.
+        #expect(MiniPlayerLayout.Place(stored: "bottomRight 8 8") == .free(MiniPlayerLayout.Anchor(corner: .bottomRight, offset: CGSize(width: 8, height: 8))))
+        #expect(MiniPlayerLayout.Place(stored: "middle") == nil)
+    }
+
+    // MARK: Resizing
+
+    @Test func aSizeYouChoseKeepsForAnyShape() {
+        let area = window.size
+        #expect(MiniPlayerLayout.cardSize(aspect: 16 / 9, extent: 400, in: area) == CGSize(width: 400, height: 225))
+        // A tall video: the same longer side, standing up.
+        #expect(MiniPlayerLayout.cardSize(aspect: 9 / 16, extent: 400, in: area) == CGSize(width: 225, height: 400))
+        // Never smaller than its controls need, nor more than most of the window.
+        #expect(MiniPlayerLayout.cardSize(aspect: 16 / 9, extent: 50, in: area).width == MiniPlayerLayout.smallestCard.width)
+        let huge = MiniPlayerLayout.cardSize(aspect: 16 / 9, extent: 5000, in: area)
+        #expect(huge.width <= area.width * MiniPlayerLayout.largestShare)
+        #expect(huge.height <= area.height * MiniPlayerLayout.largestShare)
+    }
+
+    @Test func itsEdgesAndCornersTakeHold() {
+        let size = CGSize(width: 320, height: 180)
+        #expect(MiniPlayerLayout.edges(at: CGPoint(x: 2, y: 90), in: size) == .left)
+        #expect(MiniPlayerLayout.edges(at: CGPoint(x: 318, y: 90), in: size) == .right)
+        #expect(MiniPlayerLayout.edges(at: CGPoint(x: 160, y: 1), in: size) == .top)
+        #expect(MiniPlayerLayout.edges(at: CGPoint(x: 160, y: 178), in: size) == .bottom)
+        // A corner reaches a little further in than an edge.
+        #expect(MiniPlayerLayout.edges(at: CGPoint(x: 9, y: 9), in: size) == [.left, .top])
+        #expect(MiniPlayerLayout.edges(at: CGPoint(x: 312, y: 172), in: size) == [.right, .bottom])
+        #expect(MiniPlayerLayout.edges(at: CGPoint(x: 160, y: 90), in: size).isEmpty)
+        #expect(MiniPlayerLayout.edges(at: CGPoint(x: -3, y: 90), in: size).isEmpty)
+    }
+
+    @Test func draggingACornerKeepsTheShapeAndTheOppositeCorner() {
+        let card = CGRect(x: 931, y: 602, width: 320, height: 180)
+        let bigger = MiniPlayerLayout.resized(card, from: [.left, .top], by: CGSize(width: -160, height: -10), in: window)
+        #expect(bigger.maxX == card.maxX)
+        #expect(bigger.maxY == card.maxY)
+        #expect(bigger.width == 480)
+        #expect(bigger.height == 270)
+        // The other way: down to the smallest, no further.
+        let smaller = MiniPlayerLayout.resized(card, from: [.left, .top], by: CGSize(width: 400, height: 400), in: window)
+        #expect(smaller.width == MiniPlayerLayout.smallestCard.width)
+        #expect(smaller.maxX == card.maxX)
+    }
+
+    @Test func draggingAnEdgeKeepsTheCardInItsCorner() {
+        let card = CGRect(x: 931, y: 602, width: 320, height: 180)
+        // The left edge out: the right stays, and the bottom, the side nearer the window's edge.
+        let wider = MiniPlayerLayout.resized(card, from: .left, by: CGSize(width: -80, height: 0), in: window)
+        #expect(wider == CGRect(x: 851, y: 557, width: 400, height: 225))
+        // The top edge up: height leads.
+        let taller = MiniPlayerLayout.resized(card, from: .top, by: CGSize(width: 0, height: -45), in: window)
+        #expect(taller == CGRect(x: 851, y: 557, width: 400, height: 225))
+    }
+
+    @Test func itNeverGrowsOutOfTheWindow() {
+        let card = CGRect(x: 931, y: 602, width: 320, height: 180)
+        // The bottom right corner pulled far out: only as far as the window goes.
+        let pulled = MiniPlayerLayout.resized(card, from: [.right, .bottom], by: CGSize(width: 900, height: 900), in: window)
+        #expect(window.contains(pulled))
+        #expect(pulled.minX == card.minX)
+        #expect(pulled.minY == card.minY)
+        #expect(abs(pulled.width / pulled.height - 16 / 9) < 0.02)
+    }
+
     // MARK: Minimized
 
     @Test func minimizingHidesItAndTheVideoPlaysOn() {
