@@ -112,8 +112,8 @@ enum ProfileSheets {
         ConfirmSheet.show(in: host,
                           title: one ? String(localized: "Move this tab to \(space.name)?", comment: "Title of the sheet that asks before a tab moves to a space on another profile. The placeholder is the space's name.")
                                      : String(localized: "Move these tabs to \(space.name)?", comment: "Title of the sheet that asks before several tabs move to a space on another profile. The placeholder is the space's name."),
-                          message: one ? String(localized: "\(space.name) is on \(profile.displayName). The page reloads there, with that profile’s sign-ins and extensions, and keeps its back and forward history.", comment: "Message of the sheet that asks before a tab moves to a space on another profile. First the space's name, then the profile's.")
-                                       : String(localized: "\(space.name) is on \(profile.displayName). The pages reload there, with that profile’s sign-ins and extensions, and keep their back and forward history.", comment: "Message of the sheet that asks before several tabs move to a space on another profile. First the space's name, then the profile's."),
+                          message: one ? String(localized: "\(space.name) is on \(profile.displayName), a profile with its own sign-ins and extensions. The page reloads there and keeps its back and forward history.", comment: "Message of the sheet that asks before a tab moves to a space on another profile. First the space's name, then the profile's.")
+                                       : String(localized: "\(space.name) is on \(profile.displayName), a profile with its own sign-ins and extensions. The pages reload there and keep their back and forward history.", comment: "Message of the sheet that asks before several tabs move to a space on another profile. First the space's name, then the profile's."),
                           confirmTitle: String(localized: "Move and Reload", comment: "Button of the sheet that asks before tabs move to a space on another profile.")) { confirmed in
             if confirmed { move() } else { cancelled() }
         }
@@ -185,20 +185,24 @@ enum ProfileSheets {
         let library = Library.shared
         guard let profile = library.directory.profile(id), !profile.isDefault else { return }
         let name = profile.displayName
-        // Not while something is still being brought into it: that would be erased half written.
+        // Not while something is still being brought into it (an import, an extension): that would be erased half
+        // written.
         let tellInUse = { [weak host] in
             guard let host else { return }
-            ConfirmSheet.notice(in: host, title: String(localized: "\(name) can’t be deleted yet", comment: "Title of the sheet shown instead of the one that deletes a profile, while an import into that profile is still running. The placeholder is the profile's name."),
-                                message: String(localized: "Zigzag is still importing into it. Try again when the import is done.", comment: "Message of the sheet shown instead of the one that deletes a profile, while an import into that profile is still running."))
+            ConfirmSheet.notice(in: host, title: String(localized: "\(name) can’t be deleted yet", comment: "Title of the sheet shown instead of the one that deletes a profile, while an import or an extension is still going into that profile. The placeholder is the profile's name."),
+                                message: String(localized: "Something is still being added to it, such as an import or an extension. Try again when that’s done.", comment: "Message of the sheet shown instead of the one that deletes a profile, while an import or an extension is still going into that profile."))
         }
         if Profiles.shared.removalBlock(id) == .inUse { tellInUse(); return }
         let typed = FilledField(placeholder: name)
-        var message = String(localized: "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins, history and favorites. Make sure you have your recovery phrases. This can’t be undone.",
-                             comment: "Message of the sheet that deletes a profile.")
+        // What goes, what moves, what stays, and last that it's for good.
+        var message = String(localized: "Its sign-ins, history, favorites and extensions are deleted, with everything the extensions hold, wallets included.",
+                             comment: "Message of the sheet that deletes a profile. More sentences may follow.")
         if !library.spaces(in: id).isEmpty {
             let first = library.profiles[0].displayName
             message = Words.sentences(message, String(localized: "Its spaces move to \(first).", comment: "Added to the message of the sheet that deletes a profile, when the profile has spaces. The placeholder is the first profile's name."))
         }
+        message = Words.sentences(message, String(localized: "Saved passwords stay.", comment: "Added to the message of the sheet that deletes a profile: the passwords Zigzag saved, which every profile shares, aren't deleted with it."))
+        message = Words.sentences(message, String(localized: "Write down any recovery phrases first. This can’t be undone.", comment: "Ends the message of the sheet that deletes a profile: a wallet extension's recovery phrase is the only way back to it."))
         let rows = [
             FormSheet.Row.note(String(localized: "Type \(name) to confirm", comment: "Over the field in the sheet that deletes a profile. The placeholder is the profile's name.")),
             FormSheet.Row(label: nil, view: typed),

@@ -114,7 +114,7 @@
       }
     },
     "%@ can’t be deleted yet" : {
-      "comment" : "Title of the sheet shown instead of the one that deletes a profile, while an import into that profile is still running. The placeholder is the profile's name.",
+      "comment" : "Title of the sheet shown instead of the one that deletes a profile, while an import or an extension is still going into that profile. The placeholder is the profile's name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -219,7 +219,7 @@
         }
       }
     },
-    "%@ is on %@. The page reloads there, with that profile’s sign-ins and extensions, and keeps its back and forward history." : {
+    "%@ is on %@, a profile with its own sign-ins and extensions. The page reloads there and keeps its back and forward history." : {
       "comment" : "Message of the sheet that asks before a tab moves to a space on another profile. First the space's name, then the profile's.",
       "localizations" : {
         "en" : {
@@ -231,12 +231,12 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%1$@”位于描述文件“%2$@”。页面会在那里重新载入，使用该描述文件的登录状态和扩展，并保留前进和后退记录。"
+            "value" : "“%1$@”位于描述文件“%2$@”，它有自己的登录状态和扩展。页面会在那里重新载入，并保留前进和后退记录。"
           }
         }
       }
     },
-    "%@ is on %@. The pages reload there, with that profile’s sign-ins and extensions, and keep their back and forward history." : {
+    "%@ is on %@, a profile with its own sign-ins and extensions. The pages reload there and keep their back and forward history." : {
       "comment" : "Message of the sheet that asks before several tabs move to a space on another profile. First the space's name, then the profile's.",
       "localizations" : {
         "en" : {
@@ -248,7 +248,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%1$@”位于描述文件“%2$@”。这些页面会在那里重新载入，使用该描述文件的登录状态和扩展，并保留前进和后退记录。"
+            "value" : "“%1$@”位于描述文件“%2$@”，它有自己的登录状态和扩展。这些页面会在那里重新载入，并保留前进和后退记录。"
           }
         }
       }
@@ -6520,17 +6520,6 @@
         }
       }
     },
-    "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins, history and favorites. Make sure you have your recovery phrases. This can’t be undone." : {
-      "comment" : "Message of the sheet that deletes a profile.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "它的扩展及其保存的所有内容（包括钱包）都会被删除，登录状态、历史记录和收藏也会一并删除。请确认你已保存好恢复短语。此操作不可撤销。"
-          }
-        }
-      }
-    },
     "Its open tabs reload in %@, with that profile’s sign-ins and extensions. Pages you were filling in may lose what you typed." : {
       "comment" : "Message of the sheet that asks before a space with open tabs is put on another profile. The placeholder is the profile's name.",
       "localizations" : {
@@ -6593,6 +6582,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它在这台 Mac 上的设置和数据也会被删除。你可以从 Chrome 网上应用店重新添加它。"
+          }
+        }
+      }
+    },
+    "Its sign-ins, history, favorites and extensions are deleted, with everything the extensions hold, wallets included." : {
+      "comment" : "Message of the sheet that deletes a profile. More sentences may follow.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的登录状态、历史记录、收藏和扩展都会被删除，扩展保存的所有内容（包括钱包）也会一并删除。"
           }
         }
       }
@@ -10877,6 +10877,17 @@
         }
       }
     },
+    "Saved passwords stay." : {
+      "comment" : "Added to the message of the sheet that deletes a profile: the passwords Zigzag saved, which every profile shares, aren't deleted with it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储的密码会保留。"
+          }
+        }
+      }
+    },
     "Saved to your Keychain for %@" : {
       "comment" : "Under Use Strong Password in the fill-password menu. The placeholder is a site, like github.com.",
       "localizations" : {
@@ -12050,6 +12061,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "导入时遇到了问题"
+          }
+        }
+      }
+    },
+    "Something is still being added to it, such as an import or an extension. Try again when that’s done." : {
+      "comment" : "Message of the sheet shown instead of the one that deletes a profile, while an import or an extension is still going into that profile.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍有内容正在添加到其中，例如导入或扩展。请在完成后再试。"
           }
         }
       }
@@ -14727,6 +14749,17 @@
         }
       }
     },
+    "Write down any recovery phrases first. This can’t be undone." : {
+      "comment" : "Ends the message of the sheet that deletes a profile: a wallet extension's recovery phrase is the only way back to it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先记下所有恢复短语。此操作不可撤销。"
+          }
+        }
+      }
+    },
     "Writing report…" : {
       "comment" : "Toast while the problem report is written.",
       "localizations" : {
@@ -15224,17 +15257,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzag 由 Zigao Wang 制作，依据 Apache License, Version 2.0 开源。它建立在他人的成果之上，下面列出了这些作品及其许可证。谢谢你们。"
-          }
-        }
-      }
-    },
-    "Zigzag is still importing into it. Try again when the import is done." : {
-      "comment" : "Message of the sheet shown instead of the one that deletes a profile, while an import into that profile is still running.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zigzag 仍在向其中导入。请在导入完成后再试。"
           }
         }
       }
