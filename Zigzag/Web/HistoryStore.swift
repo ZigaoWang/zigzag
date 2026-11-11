@@ -22,6 +22,11 @@ struct HistoryRemoval {
 
 /// Every page visited in one profile, kept locally in SQLite. Used by the command bar. Each profile has its own
 /// (`Profile.history`): what you visit in one is never suggested in another.
+///
+/// Its connection lives on a queue of its own (`HistoryDatabase`): a visit or a title is written there without the
+/// main thread waiting, which it did for every page visited, up to the two seconds SQLite waits for a lock another
+/// Zigzag or an update backup holds (#89). Reads wait there for the writes before them, so what was just recorded is
+/// always found.
 final class HistoryStore {
     /// The profile it's the history of.
     let profile: UUID
@@ -33,79 +38,24 @@ final class HistoryStore {
         return { Library.shared.profileID(ofSpace: $0.spaceID) == profile }
     }
 
-    private var db: OpaquePointer?
-    private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    private let database: HistoryDatabase
     /// Where the History page's searches run; nil for a store in memory, which no second connection can see.
     private let reader: HistoryReader?
+
+    /// Every store opened since Zigzag started, to finish their writes as it quits.
+    private static let opened = NSHashTable<HistoryStore>.weakObjects()
 
     /// Profiles open theirs; tests open their own, ":memory:", so they never see your history.
     init(path: String, profile: UUID = Profile.defaultID) {
         self.profile = profile
         reader = path == ":memory:" ? nil : HistoryReader(path: path)
-        guard open(path) else {
-            // A damaged file (a disk error, a half-copied restore) would leave history off for good, silently: it's
-            // set aside, named for when, and history starts afresh.
-            sqlite3_close(db)
-            db = nil
-            let stamp = Int(Date().timeIntervalSince1970)
-            for suffix in ["", "-wal", "-shm"] {
-                try? FileManager.default.moveItem(atPath: path + suffix, toPath: "\(path).damaged-\(stamp)\(suffix)")
-            }
-            Diagnostics.note("History was damaged and started afresh")
-            if !open(path) { sqlite3_close(db); db = nil }
-            return
-        }
+        database = HistoryDatabase(path: path)
+        Self.opened.add(self)
     }
 
-    /// Runs a removal on the history in every update backup too, erasing it there as here.
-    private func scrubBackups(_ sql: String) {
-        for backup in UpdateBackup.all() {
-            let file = backup.appendingPathComponent(backupPath)
-            guard FileManager.default.fileExists(atPath: file.path) else { continue }
-            var copy: OpaquePointer?
-            guard sqlite3_open_v2(file.path, &copy, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else { sqlite3_close(copy); continue }
-            sqlite3_exec(copy, "PRAGMA secure_delete=ON", nil, nil, nil)
-            sqlite3_exec(copy, sql, nil, nil, nil)
-            sqlite3_exec(copy, "PRAGMA wal_checkpoint(TRUNCATE)", nil, nil, nil)
-            sqlite3_close(copy)
-        }
-    }
-
-    /// Opens the file and makes sure it holds History's table; false when it isn't a database SQLite can use.
-    private func open(_ path: String) -> Bool {
-        guard sqlite3_open(path, &db) == SQLITE_OK else { return false }
-        // Another Zigzag writing (an update relaunching) waits its turn instead of losing the visit.
-        sqlite3_busy_timeout(db, 2000)
-        exec("PRAGMA journal_mode=WAL")
-        // With WAL this is still safe across a crash, without a full disk sync on every page visited.
-        exec("PRAGMA synchronous=NORMAL")
-        // What's cleared is overwritten, not just unlinked, so a cleared page can't be read back out of the file.
-        exec("PRAGMA secure_delete=ON")
-        let created = sqlite3_exec(db, """
-        CREATE TABLE IF NOT EXISTS visits (
-            url TEXT PRIMARY KEY,
-            host TEXT NOT NULL,
-            title TEXT NOT NULL DEFAULT '',
-            visit_count INTEGER NOT NULL DEFAULT 1,
-            last_visit REAL NOT NULL
-        )
-        """, nil, nil, nil)
-        guard created == SQLITE_OK, sqlite3_exec(db, "SELECT 1 FROM visits LIMIT 1", nil, nil, nil) == SQLITE_OK else { return false }
-        exec("CREATE INDEX IF NOT EXISTS visits_last ON visits(last_visit DESC)")
-        exec("CREATE INDEX IF NOT EXISTS visits_host ON visits(host)")
-        // A year of history is plenty to search; older single visits go, so typing stays quick as it grows.
-        exec("DELETE FROM visits WHERE last_visit < strftime('%s','now') - 31536000 AND visit_count <= 1")
-        return true
-    }
-
-    private func exec(_ sql: String) {
-        sqlite3_exec(db, sql, nil, nil, nil)
-    }
-
-    private func prepare(_ sql: String) -> OpaquePointer? {
-        var statement: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { return nil }
-        return statement
+    /// Waits for what's still being written, in every store: for quitting, so nothing recorded or cleared is cut short.
+    static func finishWriting() {
+        for store in opened.allObjects { store.database.finishWriting() }
     }
 
     nonisolated static func shouldRecord(_ url: URL) -> Bool {
@@ -114,20 +64,27 @@ final class HistoryStore {
     }
 
     func recordVisit(url: URL, title: String?, at date: Date = Date(), count: Int = 1) {
-        guard Self.shouldRecord(url), let statement = prepare("""
-        INSERT INTO visits (url, host, title, visit_count, last_visit) VALUES (?1, ?2, ?3, ?4, ?5)
-        ON CONFLICT(url) DO UPDATE SET visit_count = visit_count + ?4,
-            last_visit = MAX(last_visit, ?5),
-            title = CASE WHEN ?3 = '' THEN title ELSE ?3 END
-        """) else { return }
-        defer { sqlite3_finalize(statement) }
-        sqlite3_bind_text(statement, 1, url.absoluteString, -1, transient)
-        sqlite3_bind_text(statement, 2, Self.normalizedHost(url), -1, transient)
-        sqlite3_bind_text(statement, 3, title ?? "", -1, transient)
-        sqlite3_bind_int(statement, 4, Int32(count))
-        sqlite3_bind_double(statement, 5, date.timeIntervalSince1970)
-        sqlite3_step(statement)
-        onVisit?(url)
+        guard Self.shouldRecord(url) else { return }
+        let address = url.absoluteString, host = Self.normalizedHost(url), title = title ?? "", count = Int32(count)
+        let when = date.timeIntervalSince1970
+        database.write { db in
+            HistoryDatabase.run(db, """
+            INSERT INTO visits (url, host, title, visit_count, last_visit) VALUES (?1, ?2, ?3, ?4, ?5)
+            ON CONFLICT(url) DO UPDATE SET visit_count = visit_count + ?4,
+                last_visit = MAX(last_visit, ?5),
+                title = CASE WHEN ?3 = '' THEN title ELSE ?3 END
+            """) { statement in
+                HistoryDatabase.bind(statement, 1, address)
+                HistoryDatabase.bind(statement, 2, host)
+                HistoryDatabase.bind(statement, 3, title)
+                sqlite3_bind_int(statement, 4, count)
+                sqlite3_bind_double(statement, 5, when)
+            }
+            // Once it's in: whoever hears of it can look it up.
+            DispatchQueue.main.async { [weak self] in
+                MainActor.assumeIsolated { self?.onVisit?(url) }
+            }
+        }
     }
 
     /// Told of each page recorded, for extensions listening to `history.onVisited` (ExtensionBridge).
@@ -136,11 +93,14 @@ final class HistoryStore {
     var onRemove: (([URL]?) -> Void)?
 
     func updateTitle(_ title: String, for url: URL) {
-        guard Self.shouldRecord(url), let statement = prepare("UPDATE visits SET title = ?1 WHERE url = ?2") else { return }
-        defer { sqlite3_finalize(statement) }
-        sqlite3_bind_text(statement, 1, title, -1, transient)
-        sqlite3_bind_text(statement, 2, url.absoluteString, -1, transient)
-        sqlite3_step(statement)
+        guard Self.shouldRecord(url) else { return }
+        let address = url.absoluteString
+        database.write { db in
+            HistoryDatabase.run(db, "UPDATE visits SET title = ?1 WHERE url = ?2") { statement in
+                HistoryDatabase.bind(statement, 1, title)
+                HistoryDatabase.bind(statement, 2, address)
+            }
+        }
     }
 
     /// Bulk import inside one transaction, with one statement. A page already here keeps the larger count, not
@@ -148,73 +108,61 @@ final class HistoryStore {
     /// so importing the same browser again says it brought nothing new rather than every page once more.
     @discardableResult
     func importVisits(_ entries: [(URL, String, Int, Date)]) -> Int {
-        guard let statement = prepare("""
-        INSERT INTO visits (url, host, title, visit_count, last_visit) VALUES (?1, ?2, ?3, ?4, ?5)
-        ON CONFLICT(url) DO UPDATE SET visit_count = MAX(visit_count, ?4),
-            last_visit = MAX(last_visit, ?5),
-            title = CASE WHEN ?3 = '' THEN title ELSE ?3 END
-        """) else { return 0 }
-        defer { sqlite3_finalize(statement) }
-        exec("BEGIN")
-        let before = pageCount()
-        for (url, title, count, date) in entries where Self.shouldRecord(url) {
-            sqlite3_reset(statement)
-            sqlite3_bind_text(statement, 1, url.absoluteString, -1, transient)
-            sqlite3_bind_text(statement, 2, Self.normalizedHost(url), -1, transient)
-            sqlite3_bind_text(statement, 3, title, -1, transient)
-            sqlite3_bind_int(statement, 4, Int32(clamping: max(1, count)))
-            sqlite3_bind_double(statement, 5, date.timeIntervalSince1970)
-            sqlite3_step(statement)
-        }
-        let added = pageCount() - before
-        exec("COMMIT")
-        return max(0, added)
-    }
-
-    private func pageCount() -> Int {
-        guard let statement = prepare("SELECT count(*) FROM visits") else { return 0 }
-        defer { sqlite3_finalize(statement) }
-        return sqlite3_step(statement) == SQLITE_ROW ? Int(sqlite3_column_int64(statement, 0)) : 0
+        let rows = entries.filter { Self.shouldRecord($0.0) }
+            .map { (url: $0.0.absoluteString, host: Self.normalizedHost($0.0), title: $0.1, count: Int32(clamping: max(1, $0.2)), when: $0.3.timeIntervalSince1970) }
+        return database.sync { db in HistoryDatabase.importRows(rows, into: db) }
     }
 
     /// Takes everything visited out of History, or everything since `date`. Archived tabs go with it (they're pages
     /// you visited, and the address bar suggests them), and so do where you were in PDFs and the icons saved for those
     /// sites. All of it comes back as `HistoryRemoval`, so ⌘Z can put it back.
     func remove(since date: Date? = nil) -> HistoryRemoval {
-        let visits = select(date.map { _ in "last_visit >= ?1" }) { statement in
-            if let date { sqlite3_bind_double(statement, 1, date.timeIntervalSince1970) }
+        let since = date?.timeIntervalSince1970
+        let visits = database.sync { db -> [HistoryEntry] in
+            let visits = HistoryDatabase.select(db, since.map { _ in "last_visit >= ?1" }) { statement in
+                if let since { sqlite3_bind_double(statement, 1, since) }
+            }
+            if let since {
+                HistoryDatabase.run(db, "DELETE FROM visits WHERE last_visit >= ?1") { sqlite3_bind_double($0, 1, since) }
+            } else {
+                HistoryDatabase.exec(db, "DELETE FROM visits")
+            }
+            return visits
         }
-        if let date, let statement = prepare("DELETE FROM visits WHERE last_visit >= ?1") {
-            defer { sqlite3_finalize(statement) }
-            sqlite3_bind_double(statement, 1, date.timeIntervalSince1970)
-            sqlite3_step(statement)
-        } else if date == nil {
-            exec("DELETE FROM visits")
+        // The log the deleted rows passed through goes too, and the copies kept from before each update: cleared
+        // means cleared there as well. Both after the rows are gone, on the history's own queue; quitting waits for them.
+        let backups = backupFiles
+        database.write { db in
+            HistoryDatabase.exec(db, "PRAGMA wal_checkpoint(TRUNCATE)")
+            HistoryDatabase.scrub(backups, since.map { "DELETE FROM visits WHERE last_visit >= \($0)" } ?? "DELETE FROM visits")
         }
-        // The log the deleted rows passed through goes too.
-        exec("PRAGMA wal_checkpoint(TRUNCATE)")
         // What went wrong lately names its sites too. That, where you were in PDFs and the sites' icons aren't
         // kept by profile, so with several profiles they go for all: cleared never leaves a trace behind.
         Diagnostics.forget(since: date)
-        // And the copies kept from before each update: cleared means cleared there as well.
-        scrubBackups(date.map { "DELETE FROM visits WHERE last_visit >= \($0.timeIntervalSince1970)" } ?? "DELETE FROM visits")
         onRemove?(date == nil ? nil : visits.map(\.url))
         return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(since: date, where: isOurs),
                               pdfPlaces: PDFViewerView.takePlaces(since: date), icons: FaviconStore.shared.setAsideVisited(since: date), profile: profile)
     }
 
+    /// The history files in every update backup.
+    private var backupFiles: [URL] { UpdateBackup.all().map { $0.appendingPathComponent(backupPath) } }
+
     /// Takes these pages out of History, and their archived tabs with them.
     func remove(_ urls: [URL]) -> HistoryRemoval {
-        var visits: [HistoryEntry] = []
-        for url in urls {
-            visits += select("url = ?1") { sqlite3_bind_text($0, 1, url.absoluteString, -1, self.transient) }
-            guard let statement = prepare("DELETE FROM visits WHERE url = ?1") else { continue }
-            sqlite3_bind_text(statement, 1, url.absoluteString, -1, transient)
-            sqlite3_step(statement)
-            sqlite3_finalize(statement)
+        let addresses = urls.map(\.absoluteString)
+        let visits = database.sync { db -> [HistoryEntry] in
+            var visits: [HistoryEntry] = []
+            for address in addresses {
+                visits += HistoryDatabase.select(db, "url = ?1") { HistoryDatabase.bind($0, 1, address) }
+                HistoryDatabase.run(db, "DELETE FROM visits WHERE url = ?1") { HistoryDatabase.bind($0, 1, address) }
+            }
+            return visits
         }
-        let quoted = urls.map { "'" + $0.absoluteString.replacingOccurrences(of: "'", with: "''") + "'" }.joined(separator: ",")
-        if !urls.isEmpty { scrubBackups("DELETE FROM visits WHERE url IN (\(quoted))") }
+        let quoted = addresses.map { "'" + $0.replacingOccurrences(of: "'", with: "''") + "'" }.joined(separator: ",")
+        if !urls.isEmpty {
+            let backups = backupFiles
+            database.write { _ in HistoryDatabase.scrub(backups, "DELETE FROM visits WHERE url IN (\(quoted))") }
+        }
         if !visits.isEmpty { onRemove?(visits.map(\.url)) }
         return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(urls, where: isOurs), pdfPlaces: [:], icons: nil, profile: profile)
     }
@@ -227,20 +175,14 @@ final class HistoryStore {
         if let icons = removal.icons { FaviconStore.shared.putBack(icons) }
     }
 
-    private func select(_ condition: String?, bind: (OpaquePointer) -> Void) -> [HistoryEntry] {
-        guard let statement = prepare("SELECT url, title, visit_count, last_visit FROM visits" + (condition.map { " WHERE " + $0 } ?? "")) else { return [] }
-        defer { sqlite3_finalize(statement) }
-        bind(statement)
-        return Self.collect(statement)
-    }
-
-
     /// Newest first, for the History window; `before` pages further back.
     func page(before date: Date? = nil, limit: Int = 300) -> [HistoryEntry] {
-        guard let statement = prepare("SELECT url, title, visit_count, last_visit FROM visits WHERE last_visit < ?1 ORDER BY last_visit DESC LIMIT \(limit)") else { return [] }
-        defer { sqlite3_finalize(statement) }
-        sqlite3_bind_double(statement, 1, (date ?? .distantFuture).timeIntervalSince1970)
-        return Self.collect(statement)
+        let before = (date ?? .distantFuture).timeIntervalSince1970
+        return database.sync { db in
+            HistoryDatabase.query(db, "SELECT url, title, visit_count, last_visit FROM visits WHERE last_visit < ?1 ORDER BY last_visit DESC LIMIT \(limit)") {
+                sqlite3_bind_double($0, 1, before)
+            }
+        }
     }
 
     nonisolated static func normalizedHost(_ url: URL) -> String {
@@ -254,7 +196,8 @@ final class HistoryStore {
 
     /// Ranked matches: every word must appear in the URL or title.
     func search(_ query: String, limit: Int = 12) -> [HistoryEntry] {
-        Self.runSearch(Self.words(query), limit: limit, in: db)
+        let words = Self.words(query)
+        return database.sync { Self.runSearch(words, limit: limit, in: $0) }
     }
 
     /// The same search, off the main thread, for the History page and the command bar: typing there never waits on
@@ -262,22 +205,18 @@ final class HistoryStore {
     /// from the same `asker` took over: it's stopped where it was, as its answer would only be dropped.
     func search<T: Sendable>(_ query: String, limit: Int, asker: Int, then: @escaping @Sendable ([HistoryEntry]) -> T) async -> T? {
         guard let reader else { return then(search(query, limit: limit)) }
+        // What was recorded just before is in by then.
+        await database.written()
         return await reader.search(Self.words(query), limit: limit, asker: asker, then: then)
     }
 
     nonisolated fileprivate static func runSearch(_ words: [String], limit: Int, in db: OpaquePointer?) -> [HistoryEntry] {
         guard !words.isEmpty else { return [] }
-        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
         let clause = words.indices.map { "(url LIKE ?\($0 + 1) ESCAPE '\\' OR title LIKE ?\($0 + 1) ESCAPE '\\')" }.joined(separator: " AND ")
         let sql = "SELECT url, title, visit_count, last_visit FROM visits WHERE \(clause) ORDER BY visit_count * 1.0 / (1 + (strftime('%s','now') - last_visit) / 604800.0) DESC LIMIT \(limit * 3)"
-        var statement: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else { return [] }
-        defer { sqlite3_finalize(statement) }
-        for (i, word) in words.enumerated() {
-            let escaped = word.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "%", with: "\\%").replacingOccurrences(of: "_", with: "\\_")
-            sqlite3_bind_text(statement, Int32(i + 1), "%\(escaped)%", -1, transient)
+        return HistoryDatabase.query(db, sql) { statement in
+            for (i, word) in words.enumerated() { HistoryDatabase.bind(statement, Int32(i + 1), "%\(HistoryDatabase.escapeLike(word))%") }
         }
-        return collect(statement)
     }
 
     /// Sites whose host starts with the typed text, for inline completion: the most used first, each with the page
@@ -285,7 +224,7 @@ final class HistoryStore {
     /// `afterSubdomain`, hosts where it starts a later label instead ("wiki" in en.wikipedia.org); that can't use the
     /// index, so it's only asked when no host starts with it.
     func completionSites(for prefix: String, afterSubdomain: Bool = false, limit: Int = 8) -> [(entry: HistoryEntry, score: Double)] {
-        Self.runCompletionSites(prefix, afterSubdomain: afterSubdomain, limit: limit, in: db)
+        database.sync { Self.runCompletionSites(prefix, afterSubdomain: afterSubdomain, limit: limit, in: $0) }
     }
 
     /// The command bar's inline completion, off the main thread: hosts starting with the text, or failing that hosts
@@ -295,13 +234,14 @@ final class HistoryStore {
             let found = Self.runCompletionSites(prefix, afterSubdomain: false, limit: 8, in: db)
             return found.isEmpty ? Self.runCompletionSites(prefix, afterSubdomain: true, limit: 8, in: db) : found
         }
-        guard let reader else { return lookup(db) }
+        guard let reader else { return database.sync { lookup($0) } }
+        await database.written()
         return await reader.read(asker: asker, lookup) { $0 }
     }
 
     nonisolated fileprivate static func runCompletionSites(_ prefix: String, afterSubdomain: Bool, limit: Int,
                                                            in db: OpaquePointer?) -> [(entry: HistoryEntry, score: Double)] {
-        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        let transient = HistoryDatabase.transient
         let lower = prefix.lowercased()
         let match = afterSubdomain ? "host LIKE ?3 ESCAPE '\\'" : "host >= ?1 AND host < ?2"
         var statement: OpaquePointer?
@@ -326,8 +266,7 @@ final class HistoryStore {
         // Hosts are stored lowercase, so a plain range finds the prefix through the index instead of a full scan.
         sqlite3_bind_text(statement, 1, lower, -1, transient)
         sqlite3_bind_text(statement, 2, lower + "\u{10FFFF}", -1, transient)
-        let escaped = lower.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "%", with: "\\%").replacingOccurrences(of: "_", with: "\\_")
-        sqlite3_bind_text(statement, 3, "%.\(escaped)%", -1, transient)
+        sqlite3_bind_text(statement, 3, "%.\(HistoryDatabase.escapeLike(lower))%", -1, transient)
         var results: [(HistoryEntry, Double)] = []
         while sqlite3_step(statement) == SQLITE_ROW {
             guard let cURL = sqlite3_column_text(statement, 0), let url = URL(string: String(cString: cURL)) else { continue }
@@ -346,56 +285,217 @@ final class HistoryStore {
         var clauses = ["last_visit >= ?1", "last_visit <= ?2"]
         clauses += words.indices.map { "(url LIKE ?\($0 + 3) ESCAPE '\\' OR title LIKE ?\($0 + 3) ESCAPE '\\')" }
         let sql = "SELECT rowid, url, title, visit_count, last_visit FROM visits WHERE \(clauses.joined(separator: " AND ")) ORDER BY last_visit DESC LIMIT \(max(1, min(limit, 10_000)))"
-        guard let statement = prepare(sql) else { return [] }
-        defer { sqlite3_finalize(statement) }
-        sqlite3_bind_double(statement, 1, (start ?? .distantPast).timeIntervalSince1970)
-        sqlite3_bind_double(statement, 2, (end ?? .distantFuture).timeIntervalSince1970)
-        for (i, word) in words.enumerated() {
-            let escaped = word.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "%", with: "\\%").replacingOccurrences(of: "_", with: "\\_")
-            sqlite3_bind_text(statement, Int32(i + 3), "%\(escaped)%", -1, transient)
+        let from = (start ?? .distantPast).timeIntervalSince1970, to = (end ?? .distantFuture).timeIntervalSince1970
+        return database.sync { db in
+            var statement: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else { return [] }
+            defer { sqlite3_finalize(statement) }
+            sqlite3_bind_double(statement, 1, from)
+            sqlite3_bind_double(statement, 2, to)
+            for (i, word) in words.enumerated() { HistoryDatabase.bind(statement, Int32(i + 3), "%\(HistoryDatabase.escapeLike(word))%") }
+            var results: [(Int64, HistoryEntry)] = []
+            while sqlite3_step(statement) == SQLITE_ROW {
+                guard let cURL = sqlite3_column_text(statement, 1), let url = URL(string: String(cString: cURL)) else { continue }
+                let title = sqlite3_column_text(statement, 2).map { String(cString: $0) } ?? ""
+                results.append((sqlite3_column_int64(statement, 0), HistoryEntry(url: url, title: title, visitCount: Int(sqlite3_column_int(statement, 3)),
+                                                                                   lastVisit: Date(timeIntervalSince1970: sqlite3_column_double(statement, 4)))))
+            }
+            return results
         }
-        var results: [(Int64, HistoryEntry)] = []
-        while sqlite3_step(statement) == SQLITE_ROW {
-            guard let cURL = sqlite3_column_text(statement, 1), let url = URL(string: String(cString: cURL)) else { continue }
-            let title = sqlite3_column_text(statement, 2).map { String(cString: $0) } ?? ""
-            results.append((sqlite3_column_int64(statement, 0), HistoryEntry(url: url, title: title, visitCount: Int(sqlite3_column_int(statement, 3)),
-                                                                               lastVisit: Date(timeIntervalSince1970: sqlite3_column_double(statement, 4)))))
-        }
-        return results
     }
 
     /// One page by its address, with its ID, for `history.getVisits` and `onVisited`.
     func item(for url: URL) -> (id: Int64, entry: HistoryEntry)? {
-        guard let statement = prepare("SELECT rowid, url, title, visit_count, last_visit FROM visits WHERE url = ?1") else { return nil }
-        defer { sqlite3_finalize(statement) }
-        sqlite3_bind_text(statement, 1, url.absoluteString, -1, transient)
-        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
-        let title = sqlite3_column_text(statement, 2).map { String(cString: $0) } ?? ""
-        return (sqlite3_column_int64(statement, 0), HistoryEntry(url: url, title: title, visitCount: Int(sqlite3_column_int(statement, 3)),
-                                                                lastVisit: Date(timeIntervalSince1970: sqlite3_column_double(statement, 4))))
+        let address = url.absoluteString
+        return database.sync { db in
+            var statement: OpaquePointer?
+            guard sqlite3_prepare_v2(db, "SELECT rowid, url, title, visit_count, last_visit FROM visits WHERE url = ?1", -1, &statement, nil) == SQLITE_OK,
+                  let statement else { return nil }
+            defer { sqlite3_finalize(statement) }
+            HistoryDatabase.bind(statement, 1, address)
+            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            let title = sqlite3_column_text(statement, 2).map { String(cString: $0) } ?? ""
+            return (sqlite3_column_int64(statement, 0), HistoryEntry(url: url, title: title, visitCount: Int(sqlite3_column_int(statement, 3)),
+                                                                    lastVisit: Date(timeIntervalSince1970: sqlite3_column_double(statement, 4))))
+        }
     }
 
     /// The pages visited most, weighed by how recent, for `topSites.get`.
     func mostVisited(limit: Int) -> [HistoryEntry] {
-        guard let statement = prepare("SELECT url, title, visit_count, last_visit FROM visits ORDER BY visit_count * 1.0 / (1 + (strftime('%s','now') - last_visit) / 604800.0) DESC LIMIT \(limit)") else { return [] }
-        defer { sqlite3_finalize(statement) }
-        return Self.collect(statement)
+        database.sync { HistoryDatabase.query($0, "SELECT url, title, visit_count, last_visit FROM visits ORDER BY visit_count * 1.0 / (1 + (strftime('%s','now') - last_visit) / 604800.0) DESC LIMIT \(limit)") { _ in } }
     }
 
     /// Takes out what was last visited between two times, for `history.deleteRange`.
     func remove(from start: Date, to end: Date) -> HistoryRemoval {
-        let bind: (OpaquePointer) -> Void = { sqlite3_bind_double($0, 1, start.timeIntervalSince1970); sqlite3_bind_double($0, 2, end.timeIntervalSince1970) }
-        let visits = select("last_visit >= ?1 AND last_visit <= ?2", bind: bind)
+        let from = start.timeIntervalSince1970, to = end.timeIntervalSince1970
+        let visits = database.sync { db in
+            HistoryDatabase.select(db, "last_visit >= ?1 AND last_visit <= ?2") { sqlite3_bind_double($0, 1, from); sqlite3_bind_double($0, 2, to) }
+        }
         return visits.isEmpty ? HistoryRemoval(visits: [], archive: [], pdfPlaces: [:], icons: nil) : remove(visits.map(\.url))
     }
 
     func recent(limit: Int = 8) -> [HistoryEntry] {
-        guard let statement = prepare("SELECT url, title, visit_count, last_visit FROM visits ORDER BY last_visit DESC LIMIT \(limit)") else { return [] }
-        defer { sqlite3_finalize(statement) }
-        return Self.collect(statement)
+        database.sync { HistoryDatabase.query($0, "SELECT url, title, visit_count, last_visit FROM visits ORDER BY last_visit DESC LIMIT \(limit)") { _ in } }
+    }
+}
+
+/// History's own connection, and the one queue it's used on, in order: writes are sent there and the main thread goes
+/// on; reads wait there for the writes before them. Opening the file (and taking out a year's old visits) happens
+/// there too, so a profile's history opening for the first time never holds anything up.
+nonisolated final class HistoryDatabase: @unchecked Sendable {
+    private let queue = DispatchQueue(label: "app.zigzag.history", qos: .utility)
+    // Only touched on `queue`.
+    private var db: OpaquePointer?
+
+    init(path: String) {
+        queue.async { self.open(path) }
     }
 
-    nonisolated private static func collect(_ statement: OpaquePointer) -> [HistoryEntry] {
+    deinit { sqlite3_close(db) }
+
+    /// Done on the queue, in order, without waiting for it.
+    func write(_ work: @escaping @Sendable (OpaquePointer?) -> Void) {
+        queue.async { work(self.db) }
+    }
+
+    /// Done on the queue, after what's already there, waiting for the answer.
+    func sync<T>(_ work: (OpaquePointer?) -> T) -> T {
+        queue.sync { work(db) }
+    }
+
+    /// Once everything sent before has been done.
+    func written() async {
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in queue.async { done.resume() } }
+    }
+
+    /// Waits for everything sent so far.
+    func finishWriting() { queue.sync {} }
+
+    /// Opens the file; a damaged one (a disk error, a half-copied restore) would leave history off for good,
+    /// silently: it's set aside, named for when, and history starts afresh.
+    private func open(_ path: String) {
+        guard !openFile(path) else { return }
+        sqlite3_close(db)
+        db = nil
+        let stamp = Int(Date().timeIntervalSince1970)
+        for suffix in ["", "-wal", "-shm"] {
+            try? FileManager.default.moveItem(atPath: path + suffix, toPath: "\(path).damaged-\(stamp)\(suffix)")
+        }
+        Diagnostics.note("History was damaged and started afresh")
+        if !openFile(path) { sqlite3_close(db); db = nil }
+    }
+
+    /// Opens the file and makes sure it holds History's table; false when it isn't a database SQLite can use.
+    private func openFile(_ path: String) -> Bool {
+        guard sqlite3_open(path, &db) == SQLITE_OK else { return false }
+        // Another Zigzag writing (an update relaunching) waits its turn instead of losing the visit.
+        sqlite3_busy_timeout(db, 2000)
+        Self.exec(db, "PRAGMA journal_mode=WAL")
+        // With WAL this is still safe across a crash, without a full disk sync on every page visited.
+        Self.exec(db, "PRAGMA synchronous=NORMAL")
+        // What's cleared is overwritten, not just unlinked, so a cleared page can't be read back out of the file.
+        Self.exec(db, "PRAGMA secure_delete=ON")
+        let created = sqlite3_exec(db, """
+        CREATE TABLE IF NOT EXISTS visits (
+            url TEXT PRIMARY KEY,
+            host TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT '',
+            visit_count INTEGER NOT NULL DEFAULT 1,
+            last_visit REAL NOT NULL
+        )
+        """, nil, nil, nil)
+        guard created == SQLITE_OK, sqlite3_exec(db, "SELECT 1 FROM visits LIMIT 1", nil, nil, nil) == SQLITE_OK else { return false }
+        Self.exec(db, "CREATE INDEX IF NOT EXISTS visits_last ON visits(last_visit DESC)")
+        Self.exec(db, "CREATE INDEX IF NOT EXISTS visits_host ON visits(host)")
+        // A year of history is plenty to search; older single visits go, so typing stays quick as it grows.
+        Self.exec(db, "DELETE FROM visits WHERE last_visit < strftime('%s','now') - 31536000 AND visit_count <= 1")
+        return true
+    }
+
+    // MARK: Statements, on the queue
+
+    static var transient: sqlite3_destructor_type { unsafeBitCast(-1, to: sqlite3_destructor_type.self) }
+
+    static func exec(_ db: OpaquePointer?, _ sql: String) {
+        sqlite3_exec(db, sql, nil, nil, nil)
+    }
+
+    static func bind(_ statement: OpaquePointer, _ index: Int32, _ text: String) {
+        sqlite3_bind_text(statement, index, text, -1, transient)
+    }
+
+    static func escapeLike(_ word: String) -> String {
+        word.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "%", with: "\\%").replacingOccurrences(of: "_", with: "\\_")
+    }
+
+    /// Runs a statement that returns no rows.
+    static func run(_ db: OpaquePointer?, _ sql: String, bind: (OpaquePointer) -> Void) {
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else { return }
+        defer { sqlite3_finalize(statement) }
+        bind(statement)
+        sqlite3_step(statement)
+    }
+
+    /// The visits a statement returns, as url, title, visit_count, last_visit.
+    static func query(_ db: OpaquePointer?, _ sql: String, bind: (OpaquePointer) -> Void) -> [HistoryEntry] {
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else { return [] }
+        defer { sqlite3_finalize(statement) }
+        bind(statement)
+        return collect(statement)
+    }
+
+    static func select(_ db: OpaquePointer?, _ condition: String?, bind: (OpaquePointer) -> Void) -> [HistoryEntry] {
+        query(db, "SELECT url, title, visit_count, last_visit FROM visits" + (condition.map { " WHERE " + $0 } ?? ""), bind: bind)
+    }
+
+    static func importRows(_ rows: [(url: String, host: String, title: String, count: Int32, when: Double)], into db: OpaquePointer?) -> Int {
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, """
+        INSERT INTO visits (url, host, title, visit_count, last_visit) VALUES (?1, ?2, ?3, ?4, ?5)
+        ON CONFLICT(url) DO UPDATE SET visit_count = MAX(visit_count, ?4),
+            last_visit = MAX(last_visit, ?5),
+            title = CASE WHEN ?3 = '' THEN title ELSE ?3 END
+        """, -1, &statement, nil) == SQLITE_OK, let statement else { return 0 }
+        defer { sqlite3_finalize(statement) }
+        exec(db, "BEGIN")
+        let before = pageCount(db)
+        for row in rows {
+            sqlite3_reset(statement)
+            bind(statement, 1, row.url)
+            bind(statement, 2, row.host)
+            bind(statement, 3, row.title)
+            sqlite3_bind_int(statement, 4, row.count)
+            sqlite3_bind_double(statement, 5, row.when)
+            sqlite3_step(statement)
+        }
+        let added = pageCount(db) - before
+        exec(db, "COMMIT")
+        return max(0, added)
+    }
+
+    private static func pageCount(_ db: OpaquePointer?) -> Int {
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT count(*) FROM visits", -1, &statement, nil) == SQLITE_OK, let statement else { return 0 }
+        defer { sqlite3_finalize(statement) }
+        return sqlite3_step(statement) == SQLITE_ROW ? Int(sqlite3_column_int64(statement, 0)) : 0
+    }
+
+    /// Runs a removal on the history in every update backup too, erasing it there as here.
+    static func scrub(_ files: [URL], _ sql: String) {
+        for file in files {
+            guard FileManager.default.fileExists(atPath: file.path) else { continue }
+            var copy: OpaquePointer?
+            guard sqlite3_open_v2(file.path, &copy, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else { sqlite3_close(copy); continue }
+            sqlite3_exec(copy, "PRAGMA secure_delete=ON", nil, nil, nil)
+            sqlite3_exec(copy, sql, nil, nil, nil)
+            sqlite3_exec(copy, "PRAGMA wal_checkpoint(TRUNCATE)", nil, nil, nil)
+            sqlite3_close(copy)
+        }
+    }
+
+    static func collect(_ statement: OpaquePointer) -> [HistoryEntry] {
         var results: [HistoryEntry] = []
         while sqlite3_step(statement) == SQLITE_ROW {
             guard let cURL = sqlite3_column_text(statement, 0), let url = URL(string: String(cString: cURL)) else { continue }
@@ -409,7 +509,7 @@ final class HistoryStore {
 }
 
 /// History's searches for the History page and the command bar, on a connection of their own and a queue of their own. The file is in WAL
-/// mode, so reading here never waits on a visit being written on the main thread, nor holds one up.
+/// mode, so reading here never waits on a visit being written (HistoryDatabase), nor holds one up.
 nonisolated final class HistoryReader: @unchecked Sendable {
     private let path: String
     private let queue = DispatchQueue(label: "app.zigzag.history.search", qos: .userInitiated)

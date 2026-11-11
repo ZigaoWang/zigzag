@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SQLite3
 import Testing
 @testable import Zigzag
 
@@ -284,5 +285,77 @@ struct DarkPagesReinstallTests {
         #expect(!DarkPages.siteChanged("dark.test", given: given, now: given))
         // A page with no site (a blank page) reads none of it.
         #expect(!DarkPages.siteChanged(nil, given: given, now: []))
+    }
+}
+
+/// History is written on a queue of its own, in order, and read after what was written before (#89).
+@MainActor struct HistoryQueueTests {
+    private func folder() throws -> URL {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-history-queue-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
+    @Test func whatWasJustRecordedIsFound() throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = HistoryStore(path: folder.appendingPathComponent("History.sqlite").path)
+        for i in 0..<50 { store.recordVisit(url: URL(string: "https://example.com/\(i)")!, title: "Page \(i)") }
+        store.updateTitle("Renamed", for: URL(string: "https://example.com/7")!)
+        #expect(store.search("example", limit: 100).count == 50)
+        #expect(store.item(for: URL(string: "https://example.com/7")!)?.entry.title == "Renamed")
+    }
+
+    @Test func clearingComesAfterTheVisitsBeforeIt() throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = HistoryStore(path: folder.appendingPathComponent("History.sqlite").path)
+        for i in 0..<20 { store.recordVisit(url: URL(string: "https://example.com/\(i)")!, title: nil) }
+        let removal = store.remove()
+        // Every visit recorded before it went with it: none lands after and stays.
+        #expect(removal.visits.count == 20)
+        #expect(store.recent(limit: 50).isEmpty)
+        store.recordVisit(url: URL(string: "https://example.com/after")!, title: nil)
+        #expect(store.recent(limit: 50).map(\.url.absoluteString) == ["https://example.com/after"])
+    }
+
+    @Test func aVisitDoesntWaitForAnotherConnectionsLock() throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let path = folder.appendingPathComponent("History.sqlite").path
+        let store = HistoryStore(path: path)
+        _ = store.recent()
+        // Another Zigzag (an update relaunching) holding the file: the main thread used to wait up to two seconds.
+        var other: OpaquePointer?
+        #expect(sqlite3_open(path, &other) == SQLITE_OK)
+        #expect(sqlite3_exec(other, "BEGIN IMMEDIATE", nil, nil, nil) == SQLITE_OK)
+        let started = Date()
+        for i in 0..<5 { store.recordVisit(url: URL(string: "https://example.com/\(i)")!, title: nil) }
+        let took = Date().timeIntervalSince(started)
+        #expect(took < 0.05, "recording took \(Int(took * 1000)) ms")
+        sqlite3_exec(other, "COMMIT", nil, nil, nil)
+        sqlite3_close(other)
+        #expect(store.recent(limit: 10).count == 5)
+    }
+
+    @Test func anExtensionHearsOfAVisitOnceItCanBeLookedUp() async throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = HistoryStore(path: folder.appendingPathComponent("History.sqlite").path)
+        var found: [String] = []
+        store.onVisit = { url in if store.item(for: url) != nil { found.append(url.absoluteString) } }
+        store.recordVisit(url: URL(string: "https://example.com/heard")!, title: "Heard")
+        #expect(found.isEmpty)
+        await settle(0.2)
+        #expect(found == ["https://example.com/heard"])
+        store.onVisit = nil
+    }
+
+    @Test func aSearchOffTheMainThreadFindsWhatWasJustRecorded() async throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = HistoryStore(path: folder.appendingPathComponent("History.sqlite").path)
+        for i in 0..<10 { store.recordVisit(url: URL(string: "https://example.com/\(i)")!, title: nil) }
+        #expect(await store.search("example", limit: 20, asker: 1) { $0.count } == 10)
     }
 }
