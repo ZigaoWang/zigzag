@@ -78,3 +78,15 @@ struct TabIconOnCommitTests {
         #expect(Tab.keepsIcon(from: nil, to: url("https://example.com/")))
     }
 }
+
+/// Icons are fetched for every profile from one place, so never with cookies: a jar shared by those fetches would let
+/// a site tie one profile's visit to another's.
+@MainActor
+struct FaviconSessionTests {
+    @Test func iconsAreFetchedWithoutCookies() {
+        let configuration = FaviconStore.makeSession().configuration
+        #expect(configuration.httpCookieStorage == nil)
+        #expect(!configuration.httpShouldSetCookies)
+        #expect(configuration.httpCookieAcceptPolicy == .never)
+    }
+}

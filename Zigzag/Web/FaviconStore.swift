@@ -16,12 +16,19 @@ final class FaviconStore {
     /// Sites with no icon file yet, so asking again (every sidebar refresh) doesn't read the disk each time.
     private var missing: Set<String> = []
     private var inFlight: Set<String> = []
-    private let session: URLSession = {
+    private let session: URLSession = FaviconStore.makeSession()
+
+    /// Icons are fetched without cookies: one jar for every fetch, whichever profile the page was in, would let a site
+    /// tell one profile's visit from another's as the same person's.
+    static func makeSession() -> URLSession {
         let config = URLSessionConfiguration.default
+        config.httpCookieStorage = nil
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
         config.timeoutIntervalForRequest = 10
         config.httpAdditionalHeaders = ["User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) \(WebKitSetup.applicationNameForUserAgent)"]
         return URLSession(configuration: config)
-    }()
+    }
 
     /// Fires with the host whose icon changed.
     let updated = Signal<String>()
