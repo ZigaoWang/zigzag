@@ -5316,17 +5316,6 @@
         }
       }
     },
-    "Expand" : {
-      "comment" : "Tooltip of the minimized mini player's button that makes it a full card again.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "展开"
-          }
-        }
-      }
-    },
     "Export" : {
       "comment" : "Button in the Passwords window that exports passwords to a file.\nButton in the sheet that confirms exporting passwords.",
       "localizations" : {
@@ -7095,7 +7084,7 @@
       }
     },
     "Minimize" : {
-      "comment" : "Tooltip of the mini player's button that shrinks it to a small pill; the video keeps playing.\nWindow menu item.",
+      "comment" : "Tooltip of the mini player's button that hides it; the video keeps playing in its tab.\nWindow menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
