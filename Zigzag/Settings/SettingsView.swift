@@ -800,9 +800,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                     detail: String(localized: "The page meets the window’s edges instead of floating inside it. Hold ⌥⌘ and drag anywhere on the page to move the window.", comment: "Explanation under “Borderless page” in Settings › Appearance. ⌥⌘ are the Option and Command keys."),
                                     control: borderlessToggle))
         addressAboveToggle.onChange = { on in BrowserRootView.addressAbovePage = on }
-        appearanceGroup.add(FormRow(title: String(localized: "Address bar above the page", comment: "A setting in Settings › Appearance."),
-                                    detail: String(localized: "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden.", comment: "Explanation under “Address bar above the page” in Settings › Appearance."),
-                                    control: addressAboveToggle))
+        let addressRow = FormRow(title: String(localized: "Address bar above the page", comment: "A setting in Settings › Appearance."),
+                                 detail: String(localized: "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden.", comment: "Explanation under “Address bar above the page” in Settings › Appearance."),
+                                 control: addressAboveToggle)
+        addressRow.keywords = String(localized: "toolbar top bar url location", comment: "Words that find the Address bar above the page setting with Find a setting in Settings. Not shown.")
+        appearanceGroup.add(addressRow)
         largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
         appearanceGroup.add(FormRow(title: String(localized: "Large space names", comment: "A setting in Settings › Appearance."),
                                     detail: String(localized: "Shows the space’s name large and light above its tabs. When off, it’s a plain heading.", comment: "Explanation under “Large space names” in Settings › Appearance."),
@@ -848,9 +850,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                               detail: String(localized: "Where ⌘T and links put a new tab in the sidebar.", comment: "Explanation under “New tabs open” in Settings › Tabs."),
                               control: newTabPlace))
         nestToggle.onChange = { on in TabManager.nestsOpenedLinks = on }
-        tabsGroup.add(FormRow(title: String(localized: "Open ⌘-clicked links under their tab", comment: "A setting in Settings › Tabs: a link opened in a new tab goes in the sidebar nested under the tab it came from. ⌘ is the Command key."),
+        let nestRow = FormRow(title: String(localized: "Open ⌘-clicked links under their tab", comment: "A setting in Settings › Tabs: a link opened in a new tab goes in the sidebar nested under the tab it came from. ⌘ is the Command key."),
                               detail: String(localized: "A link you open in a new tab sits under the page it came from, so tabs from one page stay together. Drag a tab out to make it a tab of its own.", comment: "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs."),
-                              control: nestToggle))
+                              control: nestToggle)
+        nestRow.keywords = String(localized: "nested tree child command click", comment: "Words that find the Open ⌘-clicked links under their tab setting with Find a setting in Settings. Not shown.")
+        tabsGroup.add(nestRow)
         archiveAfter.options = TabArchive.After.allCases.map { DropdownButton.Option(title: $0.title) }
         archiveAfter.onSelect = { index in TabArchive.after = TabArchive.After.allCases[index] }
         tabsGroup.add(FormRow(title: String(localized: "Archive tabs you haven’t used", comment: "A setting in Settings › Tabs."),
@@ -861,9 +865,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                               detail: String(localized: "A tab you’re not using that keeps working hard sleeps until you open it again.", comment: "Explanation under “Put busy background tabs to sleep” in Settings › Tabs."),
                               control: energyToggle))
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
-        tabsGroup.add(FormRow(title: String(localized: "Keep videos playing when you switch tabs", comment: "A setting in Settings › Tabs."),
-                              detail: String(localized: "A playing video follows you in a small player.", comment: "Explanation under “Keep videos playing when you switch tabs” in Settings › Tabs."),
-                              control: pipToggle))
+        let videoRow = FormRow(title: String(localized: "Keep videos playing when you switch tabs", comment: "A setting in Settings › Tabs."),
+                               detail: String(localized: "A playing video follows you in a small player.", comment: "Explanation under “Keep videos playing when you switch tabs” in Settings › Tabs."),
+                               control: pipToggle)
+        videoRow.keywords = String(localized: "mini player picture in picture pip floating", comment: "Words that find the Keep videos playing setting with Find a setting in Settings. Not shown.")
+        tabsGroup.add(videoRow)
         swipeToggle.onChange = { on in SwipeNavigator.isOn = on }
         tabsGroup.add(FormRow(title: String(localized: "Swipe to go back and forward", comment: "A setting in Settings › Tabs: two fingers sideways on the trackpad go back or forward."),
                               detail: String(localized: "Two fingers sideways on the trackpad. When off, websites get every swipe.", comment: "Explanation under “Swipe to go back and forward” in Settings › Tabs."),
