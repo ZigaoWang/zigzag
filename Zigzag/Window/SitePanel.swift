@@ -397,9 +397,10 @@ final class SitePanel: FloatingPanelView {
         }
         if let language = tab.foreignLanguage {
             let name = PageTranslator.name(of: language)
-            let always = String(localized: "Always translated", comment: "Under a language's name in the site panel's This Site group: pages in it are always translated.")
-            let asked = String(localized: "Translated when you ask", comment: "Under a language's name in the site panel's This Site group: pages in it are translated only when asked.")
-            rows.append(.toggle(name, status: { $0 ? always : asked }, on: PageTranslator.translatesAlways(language)) { [weak self] on in
+            let title = String(localized: "Always translate \(name)", comment: "Row in the site panel's This Site group: pages in this language are translated as they open, on every site. The name is a language's, like English.")
+            let always = String(localized: "As pages open, on every site", comment: "Under Always translate <language> in the site panel's This Site group, while it's on.")
+            let asked = String(localized: "Only when you ask", comment: "Under Always translate <language> in the site panel's This Site group, while it's off: pages are translated only when asked.")
+            rows.append(.toggle(title, status: { $0 ? always : asked }, on: PageTranslator.translatesAlways(language)) { [weak self] on in
                 PageTranslator.setTranslatesAlways(on, language)
                 if on, self?.tab.isTranslated == false { self?.controller?.translatePage() }
             })

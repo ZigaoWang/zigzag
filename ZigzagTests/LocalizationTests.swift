@@ -125,9 +125,9 @@ struct LocalizationTests {
             (#"\bSpaces?\b"#, "空间"), ("Favorite", "收藏"), (#"\bPeek\b"#, "速览"), ("[Cc]ommand bar", "命令栏"),
             ("[Ss]idebar", "边栏"), (#"\bShare"#, "共享"), (#"\bReload"#, "重新载入"), ("Private [Ww]indow", "无痕浏览窗口"),
             (#"\bReader\b"#, "阅读器"), ("Split View", "分屏浏览"), ("[Ss]ign-ins", "登录状态"), (#"\bArchive"#, "归档"),
-            (#"\b[Pp]rofiles?\b"#, "描述文件"),
+            (#"\b[Pp]rofiles?\b"#, "个人资料"),
         ]
-        let avoided = ["您", "侧边栏", "分享", "刷新", "工作区", "隐私浏览", "扩展程序"]
+        let avoided = ["您", "侧边栏", "分享", "刷新", "工作区", "隐私浏览", "扩展程序", "描述文件"]
         var off: [String] = []
         for (key, entry) in try Self.catalog() where key != "key.space-bar" {
             guard let zh = Self.forms(entry, "zh-Hans").first else { continue }

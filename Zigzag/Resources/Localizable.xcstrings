@@ -231,7 +231,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%1$@”位于描述文件“%2$@”，它有自己的登录状态和扩展。页面会在那里重新载入，并保留前进和后退记录。"
+            "value" : "“%1$@”位于个人资料“%2$@”，它有自己的登录状态和扩展。页面会在那里重新载入，并保留前进和后退记录。"
           }
         }
       }
@@ -248,7 +248,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%1$@”位于描述文件“%2$@”，它有自己的登录状态和扩展。这些页面会在那里重新载入，并保留前进和后退记录。"
+            "value" : "“%1$@”位于个人资料“%2$@”，它有自己的登录状态和扩展。这些页面会在那里重新载入，并保留前进和后退记录。"
           }
         }
       }
@@ -1640,7 +1640,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "描述文件有自己的扩展、登录状态、历史记录和收藏。同一描述文件中的空间共用这些内容。"
+            "value" : "个人资料有自己的扩展、登录状态、历史记录和收藏。同一份个人资料中的空间共用这些内容。"
           }
         }
       }
@@ -2311,13 +2311,13 @@
         }
       }
     },
-    "Always translated" : {
-      "comment" : "Under a language's name in the site panel's This Site group: pages in it are always translated.",
+    "Always translate %@" : {
+      "comment" : "Row in the site panel's This Site group: pages in this language are translated as they open, on every site. The name is a language's, like English.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "始终翻译"
+            "value" : "总是翻译%@"
           }
         }
       }
@@ -2395,6 +2395,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已从“%@”归档"
+          }
+        }
+      }
+    },
+    "As pages open, on every site" : {
+      "comment" : "Under Always translate <language> in the site panel's This Site group, while it's on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在所有网站上，页面打开时即翻译"
           }
         }
       }
@@ -4557,7 +4568,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "来自已不在列表中的描述文件的数据"
+            "value" : "来自已不在列表中的个人资料的数据"
           }
         }
       }
@@ -4634,7 +4645,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "删除描述文件"
+            "value" : "删除个人资料"
           }
         }
       }
@@ -4667,7 +4678,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要删除这个描述文件的数据吗？"
+            "value" : "要删除此个人资料的数据吗？"
           }
         }
       }
@@ -4997,7 +5008,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "每个描述文件都有自己的扩展、登录状态、历史记录和收藏。同一描述文件中的空间共用这些内容。"
+            "value" : "每份个人资料都有自己的扩展、登录状态、历史记录和收藏。同一份个人资料中的空间共用这些内容。"
           }
         }
       }
@@ -5019,7 +5030,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "编辑描述文件"
+            "value" : "编辑个人资料"
           }
         }
       }
@@ -5403,7 +5414,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "扩展会全新添加，它们在其他描述文件中存储的内容不会带过来。"
+            "value" : "扩展会全新添加，它们在其他个人资料中存储的内容不会带过来。"
           }
         }
       }
@@ -5634,7 +5645,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "当前描述文件"
+            "value" : "当前个人资料"
           }
         }
       }
@@ -6317,7 +6328,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "其他描述文件中的扩展"
+            "value" : "其他个人资料中的扩展"
           }
         }
       }
@@ -6493,7 +6504,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "它打开的标签页会在“%@”中重新载入，使用该描述文件的登录状态和扩展。你正在填写的页面可能会丢失已输入的内容。"
+            "value" : "它打开的标签页会在“%@”中重新载入，使用该个人资料的登录状态和扩展。你正在填写的页面可能会丢失已输入的内容。"
           }
         }
       }
@@ -7464,7 +7475,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "为此描述文件命名"
+            "value" : "为此个人资料命名"
           }
         }
       }
@@ -7607,7 +7618,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新建描述文件"
+            "value" : "新建个人资料"
           }
         }
       }
@@ -7618,7 +7629,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新建描述文件…"
+            "value" : "新建个人资料…"
           }
         }
       }
@@ -8399,7 +8410,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "只会清除“%@”的历史记录，其他描述文件的不受影响。"
+            "value" : "只会清除“%@”的历史记录，其他个人资料的不受影响。"
           }
         }
       }
@@ -8410,7 +8421,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "仅针对“%@”，其他描述文件不受影响。"
+            "value" : "仅针对“%@”，其他个人资料不受影响。"
           }
         }
       }
@@ -8433,6 +8444,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "只填好了密码，请输入用户名。"
+          }
+        }
+      }
+    },
+    "Only when you ask" : {
+      "comment" : "Under Always translate <language> in the site panel's This Site group, while it's off: pages are translated only when asked.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅在你要求时翻译"
           }
         }
       }
@@ -9656,7 +9678,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "描述文件"
+            "value" : "个人资料"
           }
         }
       }
@@ -9667,7 +9689,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "描述文件 %lld"
+            "value" : "个人资料 %lld"
           }
         }
       }
@@ -9678,7 +9700,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "描述文件"
+            "value" : "个人资料"
           }
         }
       }
@@ -10558,7 +10580,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已恢复的描述文件"
+            "value" : "已恢复的个人资料"
           }
         }
       }
@@ -11609,7 +11631,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "显示描述文件"
+            "value" : "显示个人资料"
           }
         }
       }
@@ -12170,7 +12192,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同一描述文件中的空间共用登录状态、扩展和历史记录。"
+            "value" : "同一份个人资料中的空间共用登录状态、扩展和历史记录。"
           }
         }
       }
@@ -12258,7 +12280,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在这里全新开始：它在其他描述文件中存储的内容不会带过来。"
+            "value" : "在这里全新开始：它在其他个人资料中存储的内容不会带过来。"
           }
         }
       }
@@ -12880,7 +12902,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要导入到的描述文件已被删除。请选取其他描述文件，然后重新导入。"
+            "value" : "要导入到的个人资料已被删除。请选取其他个人资料，然后重新导入。"
           }
         }
       }
@@ -12891,7 +12913,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要添加到的描述文件已被删除，未添加任何内容。"
+            "value" : "要添加到的个人资料已被删除，未添加任何内容。"
           }
         }
       }
@@ -13585,17 +13607,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已从%@翻译"
-          }
-        }
-      }
-    },
-    "Translated when you ask" : {
-      "comment" : "Under a language's name in the site panel's This Site group: pages in it are translated only when asked.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在你要求时翻译"
           }
         }
       }
@@ -14821,7 +14832,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你的描述文件"
+            "value" : "你的个人资料"
           }
         }
       }
@@ -15179,7 +15190,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zigzag 无法读取你的描述文件，所有空间暂时位于“默认”。该文件已保留。"
+            "value" : "Zigzag 无法读取你的个人资料，所有空间暂时位于“默认”。该文件已保留。"
           }
         }
       }

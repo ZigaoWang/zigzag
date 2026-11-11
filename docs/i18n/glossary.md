@@ -35,7 +35,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | English | 简体中文 | Not used | Why |
 |---|---|---|---|
 | Space | 空间 | 工作区 | Arc's Chinese users say 空间, and macOS calls Mission Control's Spaces 空间. 工作区 was clearer next to Mission Control but colder, and not what Arc users know. |
-| Profile | 描述文件 | 个人资料, 配置文件, 用户 | Safari's Profiles are 描述文件 (新建描述文件). Chrome's 个人资料 reads as a page about you; 配置文件 as a settings file; 用户 as an account. The first profile, until it's named, is 默认. The one Settings shows, as a heading, is 当前描述文件 (此描述文件 reads bare on its own). |
+| Profile | 个人资料 | 描述文件, 配置文件, 用户 | What Chrome and Edge call a browser profile, so it's the word people already know for one. 描述文件 is what macOS calls configuration profiles (System Settings › 描述文件), installed settings that manage a Mac, so it reads as that; 配置文件 as a settings file; 用户 as an account. Counted with 份 (每份个人资料, 同一份个人资料), and 此个人资料 for this one. The first profile, until it's named, is 默认. The one Settings shows, as a heading, is 当前个人资料. |
 | Tab | 标签页 | | Safari and Chrome. |
 | New Tab | 新建标签页 | | Safari's button and menu item. |
 | Pinned (the section) | 已固定 | 固定标签页 | Safari's Pin Tab is 固定标签页; as a heading 已固定 is shorter. |
