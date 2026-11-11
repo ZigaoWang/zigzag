@@ -695,6 +695,7 @@ final class ExtensionFetchRequests {
             // Over plain HTTP that session knows nothing of the sites WebKit keeps on HTTPS (HSTS) and would send
             // their cookies in the clear, so outside this Mac those stay with WebKit's own fetch.
             if url.scheme == "http", !Self.isLoopback(url) { return ["fallback": true] }
+            if ((options["body"] as? String)?.utf8.count ?? 0) > Self.responseLimit { return ["fallback": true] }
             let request = try Self.writeRequest(options, url: url, extensionID: extensionID)
             // Only WebKit's cookie store stays on the main thread; the jar, the request and its body leave it.
             let task = Task {
@@ -724,8 +725,13 @@ final class ExtensionFetchRequests {
         // Site access can change while the blank page is being prepared.
         guard authorize() else { throw BridgeError("The extension can no longer access this URL.") }
         guard pages[key] != nil else { throw BridgeError("Extension request cancelled.") }
-        return try await page.callAsyncJavaScript(Self.requestScript, arguments: ["options": options, "target": url.absoluteString], in: nil, contentWorld: .page)
+        return try await page.callAsyncJavaScript(Self.requestScript, arguments: ["options": options, "target": url.absoluteString, "limit": Self.responseLimit],
+                                                  in: nil, contentWorld: .page)
     }
+
+    /// The most one request hands over, as it's carried whole, in Base64, through three processes. Bigger reads go
+    /// to WebKit's own fetch, which streams; bigger writes, sent or answered, fail rather than fill memory.
+    nonisolated static let responseLimit = 32 << 20
 
     /// This Mac itself, where a developer's own server answers over plain HTTP.
     static func isLoopback(_ url: URL) -> Bool {
@@ -770,7 +776,19 @@ final class ExtensionFetchRequests {
             credentials: 'include', cache: options.cache || 'default', mode: 'same-origin',
             redirect: options.redirect || 'follow', referrerPolicy: 'no-referrer', signal: controller.signal
           });
-          const bytes = new Uint8Array(await response.arrayBuffer());
+          // Too big to hand over in one piece: WebKit's own fetch streams it instead.
+          if (Number(response.headers.get('content-length')) > limit) { controller.abort(); return { fallback: true }; }
+          const chunks = [];
+          let size = 0;
+          for (const reader = response.body && response.body.getReader(); reader;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            size += value.length;
+            if (size > limit) { controller.abort(); return { fallback: true }; }
+            chunks.push(value);
+          }
+          const bytes = new Uint8Array(size);
+          for (let at = 0, i = 0; i < chunks.length; at += chunks[i].length, i++) bytes.set(chunks[i], at);
           let binary = '';
           for (let start = 0; start < bytes.length; start += 32768) binary += String.fromCharCode(...bytes.subarray(start, start + 32768));
           return { status: response.status, statusText: response.statusText, headers: [...response.headers.entries()],
@@ -852,7 +870,7 @@ nonisolated enum ExtensionWrite {
         jar.setCookies(scoped, for: url, mainDocumentURL: url)
         try Task.checkCancellation()
         guard await authorize() else { throw BridgeError("The extension can no longer access this URL.") }
-        let transfer = ExtensionWriteTransfer()
+        let transfer = ExtensionWriteTransfer(limit: ExtensionFetchRequests.responseLimit)
         let session = URLSession(configuration: configuration, delegate: transfer, delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         var request = URLRequest(url: url)
@@ -928,6 +946,10 @@ nonisolated private final class ExtensionWriteTransfer: NSObject, URLSessionData
     private var data = Data()
     private var response: URLResponse?
     private var done: CheckedContinuation<(Data, URLResponse), any Error>?
+    private var tooLarge = false
+    private let limit: Int
+
+    init(limit: Int) { self.limit = limit }
 
     func run(_ request: URLRequest, in session: URLSession) async throws -> (Data, URLResponse) {
         let task = session.dataTask(with: request)
@@ -936,6 +958,7 @@ nonisolated private final class ExtensionWriteTransfer: NSObject, URLSessionData
                 lock.withLock {
                     data = Data()
                     response = nil
+                    tooLarge = false
                     done = continuation
                 }
                 task.resume()
@@ -950,20 +973,33 @@ nonisolated private final class ExtensionWriteTransfer: NSObject, URLSessionData
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
                     completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void) {
-        lock.withLock { self.response = response }
-        completionHandler(.allow)
+        let over = response.expectedContentLength > Int64(limit)
+        lock.withLock {
+            self.response = response
+            tooLarge = over
+        }
+        completionHandler(over ? .cancel : .allow)
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        lock.withLock { self.data.append(data) }
+        let over = lock.withLock {
+            self.data.append(data)
+            if self.data.count > limit {
+                tooLarge = true
+                self.data = Data()
+            }
+            return tooLarge
+        }
+        if over { dataTask.cancel() }
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
-        let (continuation, data, response) = lock.withLock {
+        let (continuation, data, response, tooLarge) = lock.withLock {
             defer { done = nil }
-            return (done, self.data, self.response)
+            return (done, self.data, self.response, self.tooLarge)
         }
-        if let error { continuation?.resume(throwing: error) }
+        if tooLarge { continuation?.resume(throwing: BridgeError("The response is too large for an extension request.")) }
+        else if let error { continuation?.resume(throwing: error) }
         else if let response { continuation?.resume(returning: (data, response)) }
         else { continuation?.resume(throwing: BridgeError("Invalid extension response.")) }
     }

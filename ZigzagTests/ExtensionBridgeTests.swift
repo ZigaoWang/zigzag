@@ -356,6 +356,24 @@ extension ExtensionBridgeTests {
         #expect(ExtensionWrite.mayBeSet("X-HTTP-Method-Override", "DELETE"))
     }
 
+    /// Nothing bigger than the bridge carries is held in memory: reads go to WebKit's streaming fetch, writes fail.
+    @Test func bigResponsesAreNeverBuffered() async throws {
+        let server = try SessionTestServer()
+        let url = try await server.start().appendingPathComponent("huge")
+        defer { server.listener.cancel() }
+        let read = try await ExtensionFetchRequests().response([:], url: url, extensionID: "test", store: .nonPersistent())
+        #expect((read as? [String: Any])?["fallback"] as? Bool == true)
+        await #expect(throws: BridgeError.self) {
+            try await ExtensionFetchRequests().response(["method": "POST", "body": "{}"], url: url, extensionID: "test", store: .nonPersistent())
+        }
+        // An upload that big isn't sent here at all.
+        let before = server.requests.withLock { $0 }
+        let upload = try await ExtensionFetchRequests().response(["method": "POST", "body": String(repeating: "x", count: ExtensionFetchRequests.responseLimit + 1)],
+                                                                  url: url, extensionID: "test", store: .nonPersistent())
+        #expect((upload as? [String: Any])?["fallback"] as? Bool == true)
+        #expect(server.requests.withLock { $0 } == before)
+    }
+
     /// A write says it's the browser, as WebKit's fetch would, unless the extension chose its own user agent.
     @Test func writesSendTheBrowsersUserAgent() async throws {
         let server = try SessionTestServer()
@@ -569,6 +587,12 @@ nonisolated private final class SessionTestServer: @unchecked Sendable {
             }
             requests.withLock { $0 += 1 }
             let path = text.components(separatedBy: " ").dropFirst().first ?? "/"
+            if path == "/huge" {
+                // Says it's far bigger than the bridge carries, then sends only a little of it.
+                let head = "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: 40000000\r\nConnection: close\r\n\r\n"
+                connection.send(content: Data(head.utf8) + Data(count: 1024), completion: .contentProcessed { _ in connection.cancel() })
+                return
+            }
             if path == "/pending" {
                 connection.receive(minimumIncompleteLength: 1, maximumLength: 1) { _, _, _, _ in connection.cancel() }
                 return

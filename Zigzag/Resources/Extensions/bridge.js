@@ -116,7 +116,8 @@
           headers: [...request.headers.entries()], body, cache: request.cache, redirect: request.redirect, userAgent: sentUserAgent }]), aborted]);
         signal.throwIfAborted();
         if (answer.fallback) return nativeFetch(input, init);
-        const bytes = Uint8Array.from(atob(answer.body), (byte) => byte.charCodeAt(0));
+        const binary = atob(answer.body), bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         return metadata(new Response(method === 'HEAD' || [204, 205, 304].includes(answer.status) ? null : bytes,
           { status: answer.status, statusText: answer.statusText, headers: answer.headers }), answer);
       } catch (error) {
