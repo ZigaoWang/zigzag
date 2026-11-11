@@ -204,6 +204,7 @@ enum MainMenu {
 
         let help = submenu(String(localized: "Help", comment: "A menu in the menu bar."), [
             item(String(localized: "Getting Started", comment: "Help menu item."), #selector(C.showGettingStarted(_:)), ""),
+            item(String(localized: "Keyboard Shortcuts", comment: "Help menu item: opens Settings › Shortcuts."), #selector(AppDelegate.showKeyboardShortcuts(_:)), ""),
             item(String(localized: "What’s New in Zigzag", comment: "Help menu item."), #selector(C.showWhatsNew(_:)), ""),
             item(String(localized: "Send Feedback…", comment: "Help menu item."), #selector(C.sendFeedback(_:)), ""),
             item(String(localized: "Report a Problem…", comment: "Help menu item."), #selector(C.reportProblem(_:)), ""),

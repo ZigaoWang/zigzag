@@ -354,6 +354,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Settings opens as a tab in the front window, as History does.
     @objc func showSettings(_ sender: Any?) { frontBrowserWindow().map { SettingsPage.open(in: $0) } }
+    /// Help › Keyboard Shortcuts: every shortcut, where you can change them.
+    @objc func showKeyboardShortcuts(_ sender: Any?) { frontBrowserWindow().map { SettingsPage.open(.shortcuts, in: $0) } }
 
     @objc func checkForUpdates(_ sender: Any?) { Updater.shared.checkForUpdates() }
 
