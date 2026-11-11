@@ -10,6 +10,10 @@ struct SessionState: Codable {
         var createdAt: Date
         /// A name you gave the tab; older sessions don't have one.
         var customTitle: String? = nil
+        /// The tab it's nested under, and whether the tabs under it are folded away; sessions from before nested tabs
+        /// have neither, and their tabs come back at the top level.
+        var parentID: UUID? = nil
+        var collapsed: Bool? = nil
     }
 
     struct SpaceTabs: Codable {
@@ -35,6 +39,14 @@ struct SessionState: Codable {
     }
 
     var windows: [WindowState]
+
+    /// The parent each kept tab is saved with: the tabs left out (no page yet) are taken out of the tree first, so
+    /// the tabs under them are saved a level up rather than under a tab that won't come back.
+    nonisolated static func savedParents(_ nodes: [TabTree.Node], keeping kept: Set<UUID>) -> [UUID: UUID] {
+        var tree = nodes
+        for node in nodes where !kept.contains(node.id) { tree = TabTree.removing(node.id, from: tree) }
+        return Dictionary(tree.compactMap { node in node.parent.map { (node.id, $0) } }, uniquingKeysWith: { a, _ in a })
+    }
 }
 
 /// Creates, tracks and restores browser windows.
@@ -264,13 +276,16 @@ final class WindowManager {
         let manager = controller.tabManager
         let fullScreen = controller.window?.styleMask.contains(.fullScreen) == true
         let frame = (fullScreen ? controller.windowedFrame : nil) ?? controller.window?.frame ?? .zero
-        func state(_ tab: Tab) -> SessionState.TabState {
+        func state(_ tab: Tab, parent: UUID? = nil) -> SessionState.TabState {
             SessionState.TabState(id: tab.id, url: tab.url, title: tab.title.isEmpty ? tab.displayTitle : tab.title, lastActivated: tab.lastActivated,
-                                  createdAt: tab.createdAt, customTitle: tab.customTitle)
+                                  createdAt: tab.createdAt, customTitle: tab.customTitle, parentID: parent, collapsed: tab.isCollapsed ? true : nil)
         }
         let spaces = Library.shared.spaces.map { space in
-            SessionState.SpaceTabs(spaceID: space.id, tabs: manager.tabs(in: space.id).filter { $0.url != nil }.map(state),
-                                   selectedTabID: manager.selectedTab(in: space.id)?.id)
+            let tabs = manager.tabs(in: space.id)
+            // New tabs with no page aren't kept: the tabs under one come back a level up, as if it had closed.
+            let parents = SessionState.savedParents(manager.treeNodes(in: space.id), keeping: Set(tabs.filter { $0.url != nil }.map(\.id)))
+            return SessionState.SpaceTabs(spaceID: space.id, tabs: tabs.filter { $0.url != nil }.map { state($0, parent: parents[$0.id]) },
+                                          selectedTabID: manager.selectedTab(in: space.id)?.id)
         }
         let bookmarkTabs = manager.bookmarkTabs.map { SessionState.BookmarkTabState(bookmarkID: $0.key, tab: state($0.value)) }
         return SessionState.WindowState(frame: [frame.origin.x, frame.origin.y, frame.width, frame.height],
@@ -368,6 +383,8 @@ final class WindowManager {
         let tab = Tab(id: state.id, url: state.url, title: state.title, spaceID: spaceID, interactionState: interaction,
                       lastActivated: state.lastActivated, createdAt: state.createdAt)
         tab.customTitle = state.customTitle
+        tab.parentID = state.parentID
+        tab.isCollapsed = state.collapsed ?? false
         return tab
     }
 
