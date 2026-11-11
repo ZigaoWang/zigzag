@@ -109,11 +109,13 @@ final class IconGrid: NSView, NSTextFieldDelegate {
         return CGFloat(rows) * cell + CGFloat(rows - 1) * gap + Tokens.Space.x3 + fieldHeight
     }
 
-    init(noneSymbol: String, selected: String?) {
+    /// `noneToolTip`: what the plain choice says it is, where that's more than no icon (a page's: its site's).
+    init(noneSymbol: String, noneToolTip: String? = nil, selected: String?) {
         self.noneSymbol = noneSymbol
         self.selected = selected
         super.init(frame: .zero)
-        let none = IconButton(symbol: noneSymbol, size: Self.cell, symbolSize: Tokens.Symbol.row, toolTip: String(localized: "No Icon", comment: "Tooltip of the choice that takes a space's or a folder's icon away."))
+        let none = IconButton(symbol: noneSymbol, size: Self.cell, symbolSize: Tokens.Symbol.row,
+                              toolTip: noneToolTip ?? String(localized: "No Icon", comment: "Tooltip of the choice that takes a space's or a folder's icon away."))
         none.onClick = { [weak self] _ in self?.pick(nil) }
         cells = [none] + IconChoice.symbols.map { name in
             let button = IconButton(symbol: name, size: Self.cell, symbolSize: Tokens.Symbol.row, toolTip: nil)
@@ -179,15 +181,15 @@ final class IconGrid: NSView, NSTextFieldDelegate {
     }
 }
 
-/// The grid in a small floating panel, for a folder in the sidebar.
+/// The grid in a small floating panel, for a folder, a tab, a pinned page or a favorite in the sidebar.
 final class IconPickerPanel: FloatingPanelView {
     private let grid: IconGrid
     private var monitor: Any?
     private let pad = Tokens.Space.x3
     static weak var current: IconPickerPanel?
 
-    init(noneSymbol: String, selected: String?, onPick: @escaping (String?) -> Void) {
-        grid = IconGrid(noneSymbol: noneSymbol, selected: selected)
+    init(noneSymbol: String, noneToolTip: String? = nil, selected: String?, onPick: @escaping (String?) -> Void) {
+        grid = IconGrid(noneSymbol: noneSymbol, noneToolTip: noneToolTip, selected: selected)
         super.init(frame: .zero)
         radius = Tokens.Radius.panel
         grid.onPick = onPick

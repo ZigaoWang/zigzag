@@ -123,6 +123,29 @@ extension BrowserWindowController {
         }
     }
 
+    // MARK: Icons
+
+    /// A tab's own icon (nil: its site's again). ⌘Z finds the tab by its id, so a tab closed since is left alone.
+    func setIconWithUndo(_ icon: String?, for tab: Tab) {
+        let before = tab.customIcon
+        guard before != icon else { return }
+        tab.customIcon = icon
+        let id = tab.id
+        sidebarUndo.registerUndo(withTarget: self) { controller in
+            guard let tab = controller.tabManager.tab(with: id) else { return }
+            controller.setIconWithUndo(before, for: tab)
+        }
+        sidebarUndo.setActionName(Self.changeIconName)
+    }
+
+    /// A pinned page's or favorite's icon (nil: its site's again).
+    func setIconWithUndo(_ icon: String?, forBookmark id: UUID) {
+        guard !tabManager.isPrivate, let bookmark = Library.shared.bookmark(id), bookmark.icon != icon else { return }
+        libraryChange(Self.changeIconName) { Library.shared.setIcon(icon, forBookmark: id) }
+    }
+
+    static var changeIconName: String { String(localized: "Change Icon", comment: "Undo action name, shown in the Edit menu as Undo Change Icon.") }
+
     // MARK: Favorites
 
     /// A tab (and a split's other half) into the favorites at a tile's place (nil: the end).

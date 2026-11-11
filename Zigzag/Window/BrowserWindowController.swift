@@ -2158,6 +2158,32 @@ extension BrowserWindowController: SidebarDelegate {
         panel.show(beside: row, in: root.overlay, x: root.sidebarContainer.frame.maxX + Tokens.Space.x2)
     }
 
+    /// The icon grid beside a tab's row, as for a folder; its plain choice is the site's own icon. A private window's
+    /// tabs take one too: it lasts as long as the tab.
+    func chooseIcon(for tab: Tab) {
+        guard let row = sidebar.list.tabRow(tab.id) else { return }
+        closeFloatingPanels()
+        let id = tab.id
+        let panel = IconPickerPanel(noneSymbol: "globe", noneToolTip: SidebarMenus.useSiteIconTitle, selected: tab.customIcon) { [weak self] icon in
+            guard let self, let tab = self.tabManager.tab(with: id) else { return }
+            self.setIconWithUndo(icon, for: tab)
+        }
+        panel.show(beside: row, in: root.overlay, x: root.sidebarContainer.frame.maxX + Tokens.Space.x2)
+    }
+
+    /// The icon grid beside a pinned page's row or a favorite's tile. Kept in the library, so never from a private
+    /// window.
+    func chooseIcon(forBookmark id: UUID) {
+        guard !tabManager.isPrivate, let bookmark = Library.shared.bookmark(id) else { return }
+        let anchor = Library.shared.isFavorite(id) ? sidebar.favorites.tile(for: id) : sidebar.list.bookmarkRow(id)
+        guard let anchor else { return }
+        closeFloatingPanels()
+        let panel = IconPickerPanel(noneSymbol: "globe", noneToolTip: SidebarMenus.useSiteIconTitle, selected: bookmark.icon) { [weak self] icon in
+            self?.setIconWithUndo(icon, forBookmark: id)
+        }
+        panel.show(beside: anchor, in: root.overlay, x: root.sidebarContainer.frame.maxX + Tokens.Space.x2)
+    }
+
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
 
     func listDragOverPage(at windowPoint: NSPoint?, item: SidebarItem) {
