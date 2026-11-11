@@ -8,7 +8,7 @@ final class WebStoreOffer: FloatingPanelView {
     private let icon = NSImageView()
     private let name = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let line = Label(String(localized: "Works in Zigzag", comment: "On the bar over a Chrome Web Store page for an extension that works in Zigzag."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let add = PillButton(title: String(localized: "Add to Zigzag", comment: "Button on the bar over a Chrome Web Store page: installs the extension."), style: .prominent)
+    private let add = PillButton(title: String(localized: "Add to Zigzag", comment: "The Chrome Web Store's own button, and the bar over its page: installs the extension."), style: .prominent)
     private let close = IconButton(symbol: "xmark", toolTip: String(localized: "Not Now", comment: "Tooltip of the close button on the bar over a Chrome Web Store page."))
     private let id: String
     private let spinner = Spinner()

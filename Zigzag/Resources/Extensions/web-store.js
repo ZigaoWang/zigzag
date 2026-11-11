@@ -1,12 +1,14 @@
 // The Chrome Web Store's own button, for Zigzag. The store enables "Add to Chrome" only where the page has
 // chrome.webstorePrivate and chrome.management (the install API Chrome gives that one site), so on that site alone
-// they're here: adding goes through Zigzag's own review sheet, removing through its own question, and the button reads
-// Zigzag where it reads Chrome. The user agent stays Safari's. Every other page, and every frame, is left as it was.
+// they're here: adding goes through Zigzag's own review sheet, removing through its own question, and the button says
+// Zigzag's own "Add to Zigzag" / "Remove from Zigzag". The user agent stays Safari's. Every other page, and every frame, is left as it was.
 (() => {
   if (location.protocol !== 'https:' || location.host !== 'chromewebstore.google.com' || window.top !== window) return;
   const handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.zigzagWebStore;
   if (!handler) return;
   const ask = (kind, id) => handler.postMessage(id ? { kind, id } : { kind });
+  // Filled in by Zigzag (WebStoreButton.source): the button's words in Zigzag's language, and its Chrome version.
+  const config = {};
 
   const chrome = window.chrome || (window.chrome = {});
   const runtime = chrome.runtime || (chrome.runtime = {});
@@ -86,6 +88,8 @@
       }, () => {});
     },
     isInIncognitoMode(callback) { answer(callback, false); },
+    // The store checks an extension's minimum Chrome version against this (and against the user agent only in Chrome).
+    getFullChromeVersion(callback) { answer(callback, { version_number: config.version || '' }); },
   });
 
   document.addEventListener('visibilitychange', () => {
@@ -95,15 +99,20 @@
   });
 
   // The store writes its button as "Add to Chrome" / "Remove from Chrome" in the page's language, and writes it
-  // again whenever it redraws: each time, Chrome becomes Zigzag in the button alone.
-  // So is the message it shows once one is removed ("JSON Formatter has been removed from Chrome."): only the one
-  // naming what was just removed, so nothing else the page says about Chrome changes.
+  // again whenever it redraws: each time, the button gets Zigzag's own words, in Zigzag's language. Which button it is
+  // comes from the store's own name for it (jsname): ajZLRd removes, wQO0od adds, and the one with neither is the
+  // greyed-out "Add" drawn before the store has looked.
+  // The message the store shows once one is removed ("JSON Formatter has been removed from Chrome.") has Chrome
+  // replaced, and only the one naming what was just removed, so nothing else the page says about Chrome changes.
   const rename = (root) => {
-    for (const label of root.querySelectorAll('[jscontroller="ri2s0b"] button span')) {
+    for (const button of root.querySelectorAll('[jscontroller="ri2s0b"] button')) {
+      const jsname = button.getAttribute('jsname');
+      const word = jsname === 'ajZLRd' ? config.remove : (jsname === 'wQO0od' || !jsname) ? config.add : null;
+      const label = button.querySelector('span[jsname="V67aGc"]');
+      if (!word || !label || label.textContent === word) continue;
+      // The store's own text node, changed in place: the store may write to it again when it redraws.
       const text = label.firstChild;
-      if (label.childNodes.length === 1 && text.nodeType === Node.TEXT_NODE && text.data.includes('Chrome')) {
-        text.data = text.data.replace(/Chrome/g, 'Zigzag');
-      }
+      if (label.childNodes.length === 1 && text.nodeType === Node.TEXT_NODE) text.data = word; else label.textContent = word;
     }
     if (removed && Date.now() < removed.until) {
       for (const region of root.querySelectorAll('[aria-live]')) {

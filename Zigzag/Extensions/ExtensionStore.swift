@@ -223,6 +223,10 @@ enum ExtensionStore {
 
     // MARK: The Chrome Web Store
 
+    /// The Chrome version Zigzag gives the store: packages are picked for it, and the store's own button checks an
+    /// extension's minimum version against it.
+    static let chromeVersion = "140.0"
+
     static let webStoreURL = URL(string: "https://chromewebstore.google.com/category/extensions")!
 
     /// The extension id in a Chrome Web Store page address, e.g. chromewebstore.google.com/detail/ublock-origin-lite/ddkjiahejlhfcafbddmgiahcphecmpfh.
@@ -474,7 +478,7 @@ enum ExtensionStore {
         var components = URLComponents(string: "https://clients2.google.com/service/update2/crx")!
         components.queryItems = [
             .init(name: "response", value: "redirect"),
-            .init(name: "prodversion", value: "140.0"),
+            .init(name: "prodversion", value: chromeVersion),
             .init(name: "acceptformat", value: "crx3"),
             .init(name: "x", value: "id=\(id)&uc"),
         ]
@@ -669,7 +673,7 @@ enum ExtensionStore {
         var components = URLComponents(string: "https://clients2.google.com/service/update2/crx")!
         components.queryItems = [
             .init(name: "response", value: "updatecheck"),
-            .init(name: "prodversion", value: "140.0"),
+            .init(name: "prodversion", value: chromeVersion),
             .init(name: "acceptformat", value: "crx3"),
             .init(name: "x", value: "id=\(id)&v=\(current)&uc"),
         ]
