@@ -157,7 +157,53 @@ final class BrowserWebView: WKWebView {
                 break
             }
         }
+        Self.addAutoFill(to: menu)
         Self.placeInspectElementLast(in: menu)
+        #if DEBUG
+        // What the page's menu holds, with submenus and actions (AutoFill › Passwords… in a field), for scripts.
+        debugLog("webmenu " + Self.debugDescribe(menu))
+        #endif
+    }
+
+    #if DEBUG
+    static func debugDescribe(_ menu: NSMenu) -> String {
+        menu.items.map { item in
+            if item.isSeparatorItem { return "-" }
+            let action = item.action.map { NSStringFromSelector($0) } ?? ""
+            let sub = item.submenu.map { " [" + debugDescribe($0) + "]" } ?? ""
+            return "\(item.title){\(action)}\(item.isHidden ? "(hidden)" : "")\(sub)"
+        }.joined(separator: " | ")
+    }
+    #endif
+
+    /// A field's menu (one with Paste) gets the Mac's AutoFill submenu, Contact…, Passwords… and Credit Card…, as in
+    /// Safari: the same items as Edit › AutoFill. Chosen with the cursor in the page's field, macOS opens its AutoFill
+    /// panel there, knowing the page's site, and fills what you pick into it. WebKit's own menu doesn't have it.
+    static func addAutoFill(to menu: NSMenu, from mainMenu: NSMenu? = NSApp.mainMenu) {
+        guard let paste = menu.items.firstIndex(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierPaste" }),
+              !hasItem(SystemAutoFillPanel.command, in: menu),
+              let source = mainMenu.flatMap({ autoFillItem(in: $0) }), let items = source.submenu?.items else { return }
+        // Copies: an item belongs to one menu only.
+        let autoFill = NSMenuItem(title: source.title, action: nil, keyEquivalent: "")
+        autoFill.submenu = NSMenu(title: source.title)
+        items.compactMap { $0.copy() as? NSMenuItem }.forEach { autoFill.submenu?.addItem($0) }
+        menu.insertItem(.separator(), at: paste + 1)
+        menu.insertItem(autoFill, at: paste + 2)
+        if paste + 3 < menu.items.count, !menu.items[paste + 3].isSeparatorItem { menu.insertItem(.separator(), at: paste + 3) }
+    }
+
+    /// The menu bar's AutoFill submenu (AppKit puts it in the Edit menu, in the Mac's language).
+    private static func autoFillItem(in menu: NSMenu) -> NSMenuItem? {
+        for item in menu.items {
+            guard let submenu = item.submenu else { continue }
+            if submenu.items.contains(where: { $0.action == SystemAutoFillPanel.command }) { return item }
+            if let found = autoFillItem(in: submenu) { return found }
+        }
+        return nil
+    }
+
+    private static func hasItem(_ action: Selector, in menu: NSMenu) -> Bool {
+        menu.items.contains { $0.action == action || $0.submenu.map { hasItem(action, in: $0) } == true }
     }
 
     /// WebKit's Inspect Element stays the menu's last item, below extensions' own, where Chrome keeps it.

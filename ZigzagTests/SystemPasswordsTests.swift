@@ -417,6 +417,42 @@ struct SystemPasswordsTests {
         #expect(try await webView.evaluateJavaScript("typeof window.__zigzagField") as? String == "undefined")
     }
 
+    @Test func aFieldsRightClickMenuHasAutoFill() {
+        let mainMenu = NSMenu(), edit = NSMenuItem(title: "Edit", action: nil, keyEquivalent: ""), autoFill = NSMenuItem(title: "AutoFill", action: nil, keyEquivalent: "")
+        edit.submenu = NSMenu(title: "Edit")
+        autoFill.submenu = NSMenu(title: "AutoFill")
+        for (title, command) in [("Contact…", "_handleInsertFromContactsCommand:"), ("Passwords…", "_handleInsertFromPasswordsCommand:"), ("Credit Card…", "_handleInsertFromCreditCardsCommand:")] {
+            autoFill.submenu?.addItem(NSMenuItem(title: title, action: NSSelectorFromString(command), keyEquivalent: ""))
+        }
+        edit.submenu?.addItem(autoFill)
+        mainMenu.addItem(edit)
+        func webMenu(_ identifiers: [String]) -> NSMenu {
+            let menu = NSMenu()
+            for identifier in identifiers {
+                if identifier == "-" { menu.addItem(.separator()); continue }
+                let item = NSMenuItem(title: identifier, action: nil, keyEquivalent: "")
+                item.identifier = NSUserInterfaceItemIdentifier(identifier)
+                menu.addItem(item)
+            }
+            return menu
+        }
+        func titles(_ menu: NSMenu) -> [String] { menu.items.map { $0.isSeparatorItem ? "-" : $0.title } }
+
+        let field = webMenu(["WKMenuItemIdentifierCut", "WKMenuItemIdentifierCopy", "WKMenuItemIdentifierPaste", "-", "WKMenuItemIdentifierInspectElement"])
+        BrowserWebView.addAutoFill(to: field, from: mainMenu)
+        #expect(titles(field) == ["WKMenuItemIdentifierCut", "WKMenuItemIdentifierCopy", "WKMenuItemIdentifierPaste", "-", "AutoFill", "-", "WKMenuItemIdentifierInspectElement"])
+        #expect(field.items[4].submenu?.items.map(\.title) == ["Contact…", "Passwords…", "Credit Card…"])
+        #expect(field.items[4].submenu?.items[1].action == SystemAutoFillPanel.command)
+        // The menu bar keeps its own.
+        #expect(autoFill.submenu?.items.count == 3)
+        // Once only.
+        BrowserWebView.addAutoFill(to: field, from: mainMenu)
+        #expect(titles(field).filter { $0 == "AutoFill" }.count == 1)
+        // Not on a page's menu away from a field.
+        let page = webMenu(["WKMenuItemIdentifierReload", "-", "WKMenuItemIdentifierInspectElement"])
+        BrowserWebView.addAutoFill(to: page, from: mainMenu)
+        #expect(titles(page) == ["WKMenuItemIdentifierReload", "-", "WKMenuItemIdentifierInspectElement"])
+    }
 
     @Test func onlyAClickJustMadeOpensThePanel() {
         #expect(Autofill.justClicked(99.6, now: 100))
