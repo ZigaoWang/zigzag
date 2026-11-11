@@ -746,12 +746,16 @@ final class BrowserRootView: SpaceFrameView {
         if sidebarVisible { sidebarContainer.sidebar.contentTop = page.minY - sidebarFrame.minY }
     }
 
+    /// The address's end is over the page's card, the bar being its top: not beside an extension's side panel, where
+    /// it runs on over the panel.
+    private var addressEndsOnCard: Bool { paintsTopBar && !showsSidePanel }
+
     /// The bar's controls run from the page's left edge to its right: at the frame's inset, or just inside the
     /// window's edges when the page meets them.
     private func placeTopBar() {
         let bar = topBarSlideFrame ?? topBarFrame
         topBar.frame = bar
-        (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: pageAreaFrame, window: bounds)
+        (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: pageAreaFrame, window: bounds, onCard: addressEndsOnCard)
         let panes = paneFrames
         let over = liftedCards.map { $0 === card ? panes.left : panes.right ?? panes.left }
         topBar.setStrips(liftedCards.map(\.header), panes: over.map { ($0.minX - bar.minX)...max($0.minX, $0.maxX) - bar.minX })

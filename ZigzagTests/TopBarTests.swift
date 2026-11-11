@@ -68,6 +68,11 @@ struct TopBarTests {
         var frames = TopBarView.frames(width: shown.width, buttons: 3, trafficLightsWidth: 0, leadingInset: ends.leading, trailingInset: ends.trailing)
         #expect(shown.minX + frames.buttons[0].minX == framed.minX)
         #expect(shown.minX + frames.address.maxX == framed.maxX)
+        // The bar as the top of the page's card: the address ends an inset before the card's right edge, never on it.
+        ends = TopBarView.insets(bar: shown, page: framed, window: window, onCard: true)
+        frames = TopBarView.frames(width: shown.width, buttons: 3, trafficLightsWidth: 0, leadingInset: ends.leading, trailingInset: ends.trailing)
+        #expect(shown.minX + frames.buttons[0].minX == framed.minX)
+        #expect(shown.minX + frames.address.maxX == framed.maxX - Tokens.Sidebar.edge)
         // Borderless, the page meets the window: the same inset in from both of its edges, clear of the window's.
         let borderless = BrowserRootView.pageArea(in: window, sidebarVisible: true, sidebarWidth: 240, edgeToEdge: false, borderless: true, topBar: true)
         ends = TopBarView.insets(bar: shown, page: borderless, window: window)
@@ -79,6 +84,10 @@ struct TopBarTests {
         let hidden = BrowserRootView.pageArea(in: window, sidebarVisible: false, sidebarWidth: 240, edgeToEdge: false, borderless: false, topBar: true)
         ends = TopBarView.insets(bar: hiddenBar, page: hidden, window: window)
         #expect(ends.leading == hidden.minX && hiddenBar.maxX - ends.trailing == hidden.maxX)
+        ends = TopBarView.insets(bar: hiddenBar, page: hidden, window: window, onCard: true)
+        #expect(hiddenBar.maxX - ends.trailing == hidden.maxX - Tokens.Sidebar.edge)
+        // Borderless, on the card or not, it's the same inset from the window's edge.
+        #expect(TopBarView.insets(bar: shown, page: borderless, window: window, onCard: true).trailing == Tokens.Sidebar.edge)
     }
 
     @Test func asTheSidebarGoesTheControlsStartWhereTheyWere() {

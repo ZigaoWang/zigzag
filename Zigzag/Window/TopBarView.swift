@@ -15,7 +15,8 @@ final class TopBarView: NSView {
     /// From the bar's leading edge to its first button while the traffic lights aren't there: the page's left edge,
     /// plus the inset the address keeps from the page's right edge, so both ends match.
     var leadingInset: CGFloat = Tokens.Sidebar.edge { didSet { if leadingInset != oldValue { needsLayout = true } } }
-    /// From the bar's trailing edge to the address's end, so the address ends where the page does.
+    /// From the bar's trailing edge to the address's end: where the page ends, or `Sidebar.edge` before it while the
+    /// bar is the top of the page's card (`insets`).
     var trailingInset: CGFloat = Tokens.Sidebar.edge { didSet { if trailingInset != oldValue { needsLayout = true } } }
 
     /// The sidebar's toggle, first after the traffic lights while the sidebar is hidden: the sidebar's own is out of
@@ -115,9 +116,13 @@ final class TopBarView: NSView {
     /// Where the bar's controls start and end, from its own edges: the page's edges, pulled in by one inset on both
     /// ends, enough that the address never comes closer than `Sidebar.edge` to the window's edge. Framed, that's the
     /// page's edges themselves; borderless, the page meets the window, so they sit `Sidebar.edge` inside it.
-    static func insets(bar: NSRect, page: NSRect, window: NSRect) -> (leading: CGFloat, trailing: CGFloat) {
+    /// `onCard`: the bar is the top of the page's card, in the page's color. The card's right edge is then an edge
+    /// the address has to keep clear of too, framed as well: it ends `Sidebar.edge` before it. (The first button
+    /// needs nothing more: its glyph sits that far inside its target.) On the plain bar, over Settings or a PDF,
+    /// there's no such edge beside the address, and the frame's own inset is all the room it needs.
+    static func insets(bar: NSRect, page: NSRect, window: NSRect, onCard: Bool = false) -> (leading: CGFloat, trailing: CGFloat) {
         let inset = edgeInset(page: page, window: window)
-        return (page.minX - bar.minX + inset, bar.maxX - page.maxX + inset)
+        return (page.minX - bar.minX + inset, bar.maxX - page.maxX + (onCard ? Tokens.Sidebar.edge : inset))
     }
 
     // MARK: Split view
