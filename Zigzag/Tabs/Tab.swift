@@ -1264,7 +1264,7 @@ extension Tab: WKUIDelegate {
 
     /// WebKit's own question for location (not public API, but how Safari asks): answered with Zigzag's prompt.
     @objc(_webView:requestGeolocationPermissionForOrigin:initiatedByFrame:decisionHandler:)
-    func webView(_ webView: WKWebView, requestGeolocationPermissionFor origin: WKSecurityOrigin, initiatedBy frame: WKFrameInfo,
+    private func webView(_ webView: WKWebView, requestGeolocationPermissionFor origin: WKSecurityOrigin, initiatedBy frame: WKFrameInfo,
                  decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
         Task { decisionHandler(await SitePermissions.requestLocation(origin: origin, window: host?.hostWindow, isPrivate: isPrivate, tab: self)) }
     }

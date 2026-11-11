@@ -261,7 +261,7 @@ struct BookmarkFolderTests {
         (\(SwipeAnswers.keeps))(room, \(deltaX), \(prevented))
         """)
         #expect(context.exception == nil)
-        return try #require(result?.toBool())
+        return try #require(result?.toBool() as Bool?)
     }
 
     private func grid(scrollLeft: Double, overscroll: String = "auto") -> String {
