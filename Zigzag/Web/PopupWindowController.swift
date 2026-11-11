@@ -106,7 +106,9 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         let content = ColorView(color: SpaceColor.graphite.background)
         window.contentView = content
         content.addSubview(header)
-        content.addSubview(webView)
+        // The page gets a holder of its own under the header, so a docked Web Inspector stays under it too.
+        let holder = PageHolder(holding: webView)
+        content.addSubview(holder)
         header.frame = NSRect(x: 0, y: 0, width: size.width, height: Self.headerHeight)
         header.autoresizingMask = [.width]
         let pin = Tokens.Pane.button
@@ -125,8 +127,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                 KeepOnTop.refresh(self.pinButton, for: self.window)
             }
         }
-        webView.frame = NSRect(x: 0, y: Self.headerHeight, width: size.width, height: size.height - Self.headerHeight)
-        webView.autoresizingMask = [.width, .height]
+        holder.frame = NSRect(x: 0, y: Self.headerHeight, width: size.width, height: size.height - Self.headerHeight)
+        holder.autoresizingMask = [.width, .height]
         webView.uiDelegate = self
         webView.navigationDelegate = self
         webView.isInspectable = true
