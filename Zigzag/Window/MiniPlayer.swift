@@ -229,6 +229,10 @@ final class MiniPlayer {
         } else {
             tab?.isInMiniPlayer = false
         }
+        // It had the keyboard: back to the page you're on.
+        if let card, let window = card.window, window.firstResponder === card {
+            window.makeFirstResponder(controller?.tabManager.selectedTab?.webView)
+        }
         if let card {
             if closing {
                 card.disappear(handOff: parking ? { [weak self] holder in
@@ -815,6 +819,23 @@ final class MiniPlayerView: NSView {
         setControls(false, animated: true)
     }
     override func scrollWheel(with event: NSEvent) {}
+
+    // MARK: Keyboard
+
+    /// Clicked, it takes the keyboard, as a player window does: Space plays or pauses, Esc and ⌘W close it. The
+    /// page you were on gets it back when you click there, or as the card goes.
+    override var acceptsFirstResponder: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        let plain = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function]).isEmpty
+        if plain, event.keyCode == 49 { onToggle?(); return }
+        super.keyDown(with: event)
+    }
+
+    override func cancelOperation(_ sender: Any?) { onClose?() }
+
+    /// ⌘W (File › Close Tab) closes the card while it has the keyboard, not the tab under it.
+    @objc func closeTab(_ sender: Any?) { onClose?() }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     private(set) var showsControls = false
@@ -944,6 +965,7 @@ final class MiniPlayerView: NSView {
             isDragging = false
             if resized { onResized?() } else { onMoved?(event.modifierFlags.contains(.command)) }
         } else {
+            window?.makeFirstResponder(self)
             keepControls()
         }
     }
