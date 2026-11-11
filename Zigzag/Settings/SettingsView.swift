@@ -1883,7 +1883,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                              font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
             hint.lineBreakMode = .byTruncatingTail
             hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y + (rh - hint.lineHeight) / 2,
-                                width: max(0, contentWidth - rw - Tokens.Space.x4 - Tokens.Page.groupPad * 2), height: hint.lineHeight)
+                                width: max(0, contentWidth - Tokens.Page.groupPad * 2 - (resetAll.isHidden ? 0 : rw + Tokens.Space.x4)), height: hint.lineHeight)
             documentView.addSubview(hint)
             y += rh + Tokens.Space.x2
             for (title, group) in shortcutGroups { section(title, group) }
