@@ -68,6 +68,62 @@
   // The icons of open tabs, by address, for the favIconUrl WebKit's tabs leave out (webkit-differences.js).
   Object.defineProperty(globalThis, '__zigzagFavicons', { value: (urls) => send('favicons', 'forPages', [urls]), configurable: true });
 
+  // WebKit omits SameSite cookies from credentialed extension fetches even with site access. For buffered
+  // reads, Zigzag can fetch in a blank page at the target origin. Writes use a temporary native session with
+  // the sender's Chrome extension Origin and this profile's cookies, syncing response cookie changes back.
+  // Native code checks current site access; without it, the original fetch runs. No vendor is singled out.
+  // Upload streams, event streams, explicit referrers, integrity and manual redirects stay with WebKit.
+  // Cross-origin redirects cannot use this buffered transport.
+  if (typeof globalThis.fetch === 'function') {
+    const nativeFetch = globalThis.fetch.bind(globalThis);
+    const metadata = (response, answer) => {
+      const clone = response.clone.bind(response);
+      Object.defineProperties(response, {
+        url: { value: answer.url }, redirected: { value: answer.redirected }, type: { value: 'basic' },
+        clone: { value: () => metadata(clone(), answer) }
+      });
+      return response;
+    };
+    globalThis.fetch = async (input, init) => {
+      const isRequest = input instanceof Request;
+      const option = (name, fallback) => init && init[name] !== undefined ? init[name] : isRequest ? input[name] : fallback;
+      const url = new URL(isRequest ? input.url : String(input), globalThis.location && location.href);
+      const method = String(option('method', 'GET')).toUpperCase();
+      const body = init && init.body != null ? init.body : isRequest ? input.body : null;
+      if (!['http:', 'https:'].includes(url.protocol) || option('credentials', 'same-origin') !== 'include'
+          || !['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].includes(method)
+          || option('mode', 'cors') !== 'cors' || option('integrity', '') || option('keepalive', false)
+          || !['', 'no-referrer'].includes(option('referrerPolicy', ''))
+          || !['', 'about:client'].includes(option('referrer', 'about:client'))
+          || option('redirect', 'follow') === 'manual' || option('cache', 'default') === 'only-if-cached'
+          || (isRequest && input.body !== null) || (body != null && typeof body !== 'string')) return nativeFetch(input, init);
+      const headers = new Headers(option('headers', undefined));
+      if (/text\/event-stream|application\/(?:x-ndjson|ndjson|stream\+json)/i.test(headers.get('accept') || '')) return nativeFetch(input, init);
+      const request = new Request(input, init);
+      const signal = request.signal;
+      signal.throwIfAborted();
+      const requestID = crypto.randomUUID();
+      let abort;
+      const aborted = new Promise((resolve, reject) => { abort = () => {
+        try { send('extensionFetch', 'cancel', [requestID]).catch(() => {}); } catch (e) {}
+        reject(signal.reason);
+      }; });
+      signal.addEventListener('abort', abort, { once: true });
+      try {
+        const answer = await Promise.race([send('extensionFetch', 'fetch', [{ requestID, url: request.url, method,
+          headers: [...request.headers.entries()], body, cache: request.cache, redirect: request.redirect }]), aborted]);
+        signal.throwIfAborted();
+        if (answer.fallback) return nativeFetch(input, init);
+        const bytes = Uint8Array.from(atob(answer.body), (byte) => byte.charCodeAt(0));
+        return metadata(new Response(method === 'HEAD' || [204, 205, 304].includes(answer.status) ? null : bytes,
+          { status: answer.status, statusText: answer.statusText, headers: answer.headers }), answer);
+      } catch (error) {
+        signal.throwIfAborted();
+        throw new TypeError(error.message);
+      } finally { signal.removeEventListener('abort', abort); }
+    };
+  }
+
   // A Chrome-style method: a promise, or the trailing callback Chrome extensions often pass instead.
   const method = (ns, fn, { before, after } = {}) => (...args) => {
     const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;

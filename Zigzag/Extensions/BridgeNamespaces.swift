@@ -624,6 +624,238 @@ private final class PageLoad: NSObject, WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { finish() }
 }
 
+// MARK: - extension fetch
+
+/// WebKit leaves SameSite cookies out of extension fetches even with host access. Reads use a blank page at
+/// the target origin; writes use a temporary native session to preserve the sender's Chrome extension Origin.
+/// Both use the owning profile's cookies. Live host permission authorizes requests, with no vendor allowlist.
+@available(macOS 15.4, *)
+@MainActor
+final class BridgeExtensionFetch: BridgeNamespace {
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
+    static let name = "extensionFetch"
+    // Fetching with cookies needs host access, not the cookies API's separate permission to inspect them.
+    static let permission = ""
+    private let requests = ExtensionFetchRequests()
+
+    static func allows(_ url: URL, context: WKWebExtensionContext) -> Bool {
+        ["http", "https"].contains(url.scheme ?? "") && url.host() != nil && url.user == nil && url.password == nil
+            && context.hasAccess(to: url)
+    }
+
+    func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
+        if fn == "cancel", let text = args.string(0), let id = UUID(uuidString: text) {
+            requests.cancel(id, extensionID: extensionID)
+            return nil
+        }
+        guard fn == "fetch" else { throw BridgeError.unsupported(Self.name, fn) }
+        let options = args.object(0)
+        guard let requestID = options.string("requestID").flatMap(UUID.init(uuidString:)),
+              let text = options.string("url"), let url = URL(string: text) else { throw BridgeError("Invalid extension request.") }
+        let host = host
+        guard let context = host.context(for: extensionID) else { throw BridgeError("The extension is no longer loaded.") }
+        // Without host access, ordinary WebKit fetch decides what is available through the site's CORS policy.
+        guard Self.allows(url, context: context) else { return ["fallback": true] }
+        return try await requests.response(options, url: url, extensionID: extensionID, store: host.profile.store, requestID: requestID) {
+            host.context(for: extensionID) === context && Self.allows(url, context: context)
+        }
+    }
+
+    func release(_ extensionID: String) { requests.release(extensionID) }
+}
+
+/// One profile's in-flight requests. Kept apart from the host so transport tests use temporary stores without
+/// creating persistent profiles; the bridge always supplies its own profile's store and live permission check.
+@MainActor
+final class ExtensionFetchRequests {
+    private struct RequestKey: Hashable {
+        let extensionID: String
+        let id: UUID
+    }
+    private var pages: [RequestKey: WKWebView] = [:]
+    private var writes: [RequestKey: Task<ExtensionWriteResponse, any Error>] = [:]
+    // A cancel can arrive before its fetch message has started. Keep that decision briefly, with a fixed bound.
+    private var cancelled: [RequestKey: Date] = [:]
+
+    func response(_ options: [String: Any], url: URL, extensionID: String, store: WKWebsiteDataStore,
+                  requestID id: UUID = UUID(), authorize: @escaping () -> Bool = { true }) async throws -> Any? {
+        let key = RequestKey(extensionID: extensionID, id: id)
+        if let when = cancelled.removeValue(forKey: key), when.timeIntervalSinceNow > -40 { throw BridgeError("Extension request cancelled.") }
+        guard pages[key] == nil, writes[key] == nil else { throw BridgeError("Extension request is already running.") }
+        let method = (options["method"] as? String ?? "GET").uppercased()
+        if !["GET", "HEAD"].contains(method) {
+            // A website-origin helper gives POST the wrong Origin. A short-lived native session preserves the
+            // Chrome extension origin and uses only this profile's cookies, including server-side deletions.
+            let task = Task { try await Self.write(options, url: url, extensionID: extensionID, store: store, authorize: authorize) }
+            writes[key] = task
+            defer { writes[key] = nil }
+            return try await task.value.value
+        }
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = store
+        configuration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
+        // No extension controller, injected scripts, or remote document: only our own blank page and fetch below.
+        let page = WKWebView(frame: .zero, configuration: configuration)
+        pages[key] = page
+        defer { pages[key] = nil; page.stopLoading() }
+        let loaded = PageLoad()
+        page.navigationDelegate = loaded
+        let origin = url.deletingLastPathComponent().absoluteURL
+        page.loadHTMLString("<!doctype html><title></title>", baseURL: origin)
+        await loaded.wait(seconds: 10)
+        // Site access can change while the blank page is being prepared.
+        guard authorize() else { throw BridgeError("The extension can no longer access this URL.") }
+        guard pages[key] != nil else { throw BridgeError("Extension request cancelled.") }
+        return try await page.callAsyncJavaScript(Self.requestScript, arguments: ["options": options, "target": url.absoluteString], in: nil, contentWorld: .page)
+    }
+
+    private static func write(_ options: [String: Any], url: URL, extensionID: String, store: WKWebsiteDataStore,
+                              authorize: () -> Bool) async throws -> ExtensionWriteResponse {
+        let method = (options["method"] as? String ?? "POST").uppercased()
+        guard ["POST", "PUT", "PATCH", "DELETE", "OPTIONS"].contains(method),
+              options["body"] == nil || options["body"] is NSNull || options["body"] is String else {
+            throw BridgeError("Unsupported extension request.")
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.timeoutIntervalForResource = 30
+        let jar = configuration.httpCookieStorage!
+        jar.cookieAcceptPolicy = .onlyFromMainDocumentDomain
+        // Never use HTTPCookieStorage.shared. The temporary jar starts with cookies for this target only.
+        let cookies = await store.httpCookieStore.allCookies()
+        let host = url.host()?.lowercased() ?? ""
+        let scoped = cookies.filter { cookie in
+            let domain = cookie.domain.lowercased()
+            return domain == host || (domain.hasPrefix(".") && (host == String(domain.dropFirst()) || host.hasSuffix(domain)))
+        }
+        jar.setCookies(scoped, for: url, mainDocumentURL: url)
+        try Task.checkCancellation()
+        guard authorize() else { throw BridgeError("The extension can no longer access this URL.") }
+        let session = URLSession(configuration: configuration, delegate: ExtensionWriteRedirects(), delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.httpBody = (options["body"] as? String).map { Data($0.utf8) }
+        switch options["cache"] as? String {
+        case "no-store", "reload": request.cachePolicy = .reloadIgnoringLocalCacheData
+        case "no-cache": request.cachePolicy = .reloadRevalidatingCacheData
+        case "force-cache": request.cachePolicy = .returnCacheDataElseLoad
+        default: break
+        }
+        for header in options["headers"] as? [[String]] ?? [] where header.count == 2 {
+            let name = header[0].lowercased()
+            if ["cookie", "cookie2", "origin", "referer", "host", "content-length", "connection", "transfer-encoding"].contains(name)
+                || name.hasPrefix("sec-") || name.hasPrefix("proxy-") { continue }
+            request.setValue(header[1], forHTTPHeaderField: header[0])
+        }
+        // Derived from the native-message sender, never a payload-supplied Origin or a website's origin.
+        request.setValue("chrome-extension://\(extensionID)", forHTTPHeaderField: "Origin")
+        var redirected = false
+        for _ in 0..<20 {
+            try Task.checkCancellation()
+            guard authorize() else { throw BridgeError("The extension can no longer access this URL.") }
+            let before = jar.cookies ?? []
+            let (data, raw) = try await session.data(for: request)
+            try Task.checkCancellation()
+            guard let response = raw as? HTTPURLResponse else { throw BridgeError("Invalid extension response.") }
+            // CFNetwork applies all Set-Cookie fields (including Max-Age=0) to the isolated jar. Apply only its
+            // delta back to WebKit, rather than replacing the profile's whole jar or restoring stale cookies.
+            let after = jar.cookies ?? []
+            func matches(_ a: HTTPCookie, _ b: HTTPCookie) -> Bool { a.name == b.name && a.domain == b.domain && a.path == b.path }
+            for old in before where !after.contains(where: { matches(old, $0) }) { await store.httpCookieStore.deleteCookie(old) }
+            for cookie in after {
+                let old = before.first { matches(cookie, $0) }
+                if old == nil || NSDictionary(dictionary: old!.properties ?? [:]) != NSDictionary(dictionary: cookie.properties ?? [:]) {
+                    await store.httpCookieStore.setCookie(cookie)
+                }
+            }
+            let status = response.statusCode
+            if [301, 302, 303, 307, 308].contains(status), let location = response.value(forHTTPHeaderField: "Location"),
+               let next = URL(string: location, relativeTo: request.url)?.absoluteURL {
+                guard options["redirect"] as? String != "error", SiteOrigin.of(next) == SiteOrigin.of(url),
+                      next.user == nil, next.password == nil else { throw BridgeError("Extension request redirect is not allowed.") }
+                if status == 303 || ([301, 302].contains(status) && request.httpMethod == "POST") {
+                    request.httpMethod = "GET"
+                    request.httpBody = nil
+                    for name in ["Content-Type", "Content-Encoding", "Content-Language", "Content-Location"] { request.setValue(nil, forHTTPHeaderField: name) }
+                }
+                request.url = next
+                redirected = true
+                continue
+            }
+            let headers = response.allHeaderFields.compactMap { key, value -> [String]? in
+                let name = String(describing: key).lowercased()
+                return ["set-cookie", "set-cookie2"].contains(name) ? nil : [name, String(describing: value)]
+            }
+            return ExtensionWriteResponse(status: status, headers: headers, body: data, url: response.url?.absoluteString ?? url.absoluteString, redirected: redirected)
+        }
+        throw BridgeError("Too many extension request redirects.")
+    }
+
+    static let requestScript = """
+        const url = new URL(target);
+        if (location.origin !== url.origin) throw new Error('Request page could not be loaded.');
+        const method = (options.method || 'GET').toUpperCase();
+        if (!['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].includes(method)
+            || (options.body != null && typeof options.body !== 'string')) throw new Error('Unsupported extension request.');
+        const headers = new Headers(options.headers || []);
+        for (const name of ['cookie', 'cookie2', 'origin', 'referer', 'host']) headers.delete(name);
+        const controller = new AbortController();
+        globalThis.__zigzagFetchAbort = controller;
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        try {
+          const response = await fetch(url.href, {
+            method, headers, body: options.body,
+            credentials: 'include', cache: options.cache || 'default', mode: 'same-origin',
+            redirect: options.redirect || 'follow', referrerPolicy: 'no-referrer', signal: controller.signal
+          });
+          const bytes = new Uint8Array(await response.arrayBuffer());
+          let binary = '';
+          for (let start = 0; start < bytes.length; start += 32768) binary += String.fromCharCode(...bytes.subarray(start, start + 32768));
+          return { status: response.status, statusText: response.statusText, headers: [...response.headers.entries()],
+                   body: btoa(binary), url: response.url, redirected: response.redirected };
+        } finally { clearTimeout(timeout); delete globalThis.__zigzagFetchAbort; }
+        """
+
+    func cancel(_ id: UUID, extensionID: String) {
+        let key = RequestKey(extensionID: extensionID, id: id)
+        if let write = writes.removeValue(forKey: key) { write.cancel(); return }
+        guard let page = pages.removeValue(forKey: key) else {
+            cancelled = cancelled.filter { $0.value.timeIntervalSinceNow > -40 }
+            if cancelled.count >= 256, let oldest = cancelled.min(by: { $0.value < $1.value })?.key { cancelled[oldest] = nil }
+            cancelled[key] = Date()
+            return
+        }
+        page.evaluateJavaScript("globalThis.__zigzagFetchAbort?.abort()", completionHandler: nil)
+        // Navigation also cancels fetches; stopLoading alone only stops a document load.
+        page.loadHTMLString("", baseURL: nil)
+    }
+
+    func release(_ extensionID: String) {
+        for key in Array(pages.keys) + Array(writes.keys) where key.extensionID == extensionID { cancel(key.id, extensionID: extensionID) }
+        cancelled = cancelled.filter { $0.key.extensionID != extensionID }
+    }
+}
+
+nonisolated private struct ExtensionWriteResponse: Sendable {
+    let status: Int
+    let headers: [[String]]
+    let body: Data
+    let url: String
+    let redirected: Bool
+
+    var value: [String: Any] {
+        ["status": status, "statusText": "", "headers": headers, "body": body.base64EncodedString(), "url": url, "redirected": redirected]
+    }
+}
+
+/// Redirects are handled explicitly above, after checking the destination and applying response cookies.
+nonisolated private final class ExtensionWriteRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
+}
+
 // MARK: - identity
 
 /// `chrome.identity.launchWebAuthFlow`: an extension's "Sign in with…" in a small window of its own, with your
