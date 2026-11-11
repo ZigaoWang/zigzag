@@ -709,6 +709,47 @@ final class Tab: NSObject {
         }
     }
 
+    /// A page that has only ever loaded out of sight (opened in the background) has no picture: WebKit draws it
+    /// only in a window. It's put in `host` for a moment, at `size`, under everything else, to be drawn and pictured,
+    /// then let go, unless something else took it meanwhile (you went to its tab).
+    func captureSnapshotOutOfSight(in host: NSView, size: NSSize, _ completion: @escaping () -> Void) {
+        guard let webView, webView.superview == nil, hasLoadedOnce, host.window != nil, size.width > 0, size.height > 0 else {
+            completion()
+            return
+        }
+        let resizing = webView.autoresizingMask
+        webView.autoresizingMask = []
+        webView.frame = NSRect(origin: .zero, size: size)
+        host.addSubview(webView)
+        let letGo = { [weak webView, weak host] in
+            guard let webView, let host, webView.superview === host else { return }
+            webView.removeFromSuperview()
+            webView.autoresizingMask = resizing
+        }
+        let config = WKSnapshotConfiguration()
+        config.afterScreenUpdates = true
+        config.snapshotWidth = NSNumber(value: Double(min(size.width, 1280)))
+        // A moment in the window first, for it to draw.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self, weak webView] in
+            guard let self, let webView, webView.window != nil else { letGo(); completion(); return }
+            webView.takeSnapshot(with: config) { [weak self] image, _ in
+                letGo()
+                if let self, let image, !TabThumbnailView.isBlank(image) {
+                    self.snapshot = image
+                    if !self.isPrivate { SnapshotStore.save(image, for: self.id) }
+                    self.changed.send(.snapshot)
+                }
+                completion()
+            }
+        }
+    }
+
+    /// Whether the overview should picture a page out of sight: it has a live page that's loaded, it isn't on
+    /// screen, and it has no picture yet.
+    nonisolated static func needsPictureOutOfSight(hasWebView: Bool, onScreen: Bool, loaded: Bool, hasPicture: Bool) -> Bool {
+        hasWebView && !onScreen && loaded && !hasPicture
+    }
+
     /// Saves the picture last taken in memory only, so it's there after a relaunch.
     func keepSnapshot() {
         if let snapshot, !isPrivate { SnapshotStore.save(snapshot, for: id) }

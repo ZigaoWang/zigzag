@@ -393,6 +393,7 @@ final class DeskController {
         searchField.stringValue = ""
         layoutSearch()
         reload()
+        pictureUnseenPages()
         // The window's own controls would sit on top of the desk; tuck them away.
         (controller.window as? BrowserWindow)?.trafficLightsHidden = false
         // Typing filters straight away, and the arrow keys move between cards from the field too.
@@ -425,6 +426,30 @@ final class DeskController {
         }
         capturePages(start)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { MainActor.assumeIsolated { start() } }
+    }
+
+    /// Pages loaded out of sight (opened in the background) with no picture yet get one now, so their cards show the
+    /// page, not just its icon. Each is drawn for a moment under the desk, then let go.
+    private func pictureUnseenPages() {
+        guard let controller, let manager else { return }
+        let root = controller.root
+        let size = root.cardFrame.size
+        let pages = Library.shared.spaces.flatMap { manager.tabs(in: $0.id) }.filter {
+            Tab.needsPictureOutOfSight(hasWebView: $0.webView != nil, onScreen: $0.webView?.superview != nil, loaded: $0.hasLoadedOnce,
+                                       hasPicture: !TabThumbnailView.isBlank($0.snapshot))
+        }
+        guard !pages.isEmpty, size.width > 0 else { return }
+        // Beneath everything in the window, where the page is: drawn, but never seen.
+        let host = NSView(frame: root.cardFrame)
+        root.addSubview(host, positioned: .below, relativeTo: nil)
+        var waiting = pages.count
+        for page in pages {
+            page.captureSnapshotOutOfSight(in: host, size: size) { [weak self, weak host] in
+                if let self, self.isVisible { self.cards.values.filter { $0.tab === page || $0.partner === page }.forEach { $0.refreshImage() } }
+                waiting -= 1
+                if waiting == 0 { host?.removeFromSuperview() }
+            }
+        }
     }
 
     /// Takes new pictures of the page on screen, both pages with a split, then calls `completion` once.
