@@ -123,6 +123,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DockProgress.shared.start()
         Tokens.Contrast.start()
         DebugBridge.start()
+        // Only if you turned it on in Settings: otherwise nothing listens.
+        MCPService.startIfOn()
     }
 
     func applicationWillBecomeActive(_ notification: Notification) { MiniLinkWake.appWillActivate() }
