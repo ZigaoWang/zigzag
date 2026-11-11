@@ -1185,6 +1185,11 @@ final class TabManager {
             other.setSpace(tab.spaceID)
             tabsBySpace[tab.spaceID, default: []].insert(other, at: 0)
         }
+        // A split is one row at the top level: tabs nested under either half move up a level, where they are, as
+        // they do when their page is pinned or leaves for another space.
+        liftChildren(of: tab)
+        liftChildren(of: other)
+        repairTree(in: tab.spaceID)
         splits.append(otherOnRight ? SplitPair(left: tab.id, right: other.id) : SplitPair(left: other.id, right: tab.id))
         Tutorial.complete("split")
         other.ensureWebView()
