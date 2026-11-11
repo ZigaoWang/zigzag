@@ -1365,13 +1365,24 @@ final class NativeMessagingHost {
             return try? JSONSerialization.jsonObject(with: bytes) as? [String: Any]
         }
         #endif
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let dirs = [
-            "Library/Application Support/Google/Chrome/NativeMessagingHosts",
-            "Library/Application Support/Chromium/NativeMessagingHosts",
-            "Library/Application Support/Microsoft Edge/NativeMessagingHosts",
-            "Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts",
-        ].map { home.appendingPathComponent($0) } + [URL(fileURLWithPath: "/Library/Google/Chrome/NativeMessagingHosts")]
+        return manifest(named: name, in: searchFolders(home: FileManager.default.homeDirectoryForCurrentUser))
+    }
+
+    /// Where Chromium browsers keep their hosts, in the order looked in. An app writes its manifest only for the
+    /// browsers it finds on the Mac (1Password: Chrome and its Beta, Dev and Canary, Edge and its channels, Vivaldi,
+    /// Arc), so someone without Chrome still has one in another browser's folder.
+    static func searchFolders(home: URL) -> [URL] {
+        [
+            "Google/Chrome", "Google/Chrome Beta", "Google/Chrome Dev", "Google/Chrome Canary", "Chromium",
+            "Microsoft Edge", "Microsoft Edge Beta", "Microsoft Edge Dev", "Microsoft Edge Canary",
+            "BraveSoftware/Brave-Browser", "Vivaldi", "Vivaldi Snapshot", "Arc/User Data",
+        ].map { home.appendingPathComponent("Library/Application Support/\($0)/NativeMessagingHosts", isDirectory: true) }
+            + [URL(fileURLWithPath: "/Library/Google/Chrome/NativeMessagingHosts", isDirectory: true)]
+    }
+
+    /// The first manifest for the host in these folders.
+    static func manifest(named name: String, in dirs: [URL]) -> [String: Any]? {
+        guard isValidName(name) else { return nil }
         for dir in dirs {
             let file = dir.appendingPathComponent("\(name).json")
             if let data = try? Data(contentsOf: file), let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
