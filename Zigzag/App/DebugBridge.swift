@@ -1502,6 +1502,10 @@ enum DebugBridge {
                 WindowManager.shared.windowBecameKey(all[n])
             }
         case "reducemotion": Tokens.Motion.debugReduceMotion = arg != "off"
+        // contrast on|off|system: Increase Contrast's colors for this app alone, or the Mac's setting again.
+        case "contrast":
+            Tokens.Contrast.debugOverride = arg == "system" ? nil : arg != "off"
+            Tokens.Contrast.redraw()
         case "dropdown":
             // dropdown <n>: opens the nth dropdown on the page (0 first), as a click would; "close" closes the open menu.
             if arg == "close" { MenuPanel.current?.close(); break }
