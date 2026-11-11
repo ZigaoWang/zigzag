@@ -78,4 +78,14 @@ struct HistoryClustersTests {
         #expect(title(date(18, 13)) == "Sunday afternoon, October 18")
         #expect(title(date(12, 1, month: 12, year: 2025)) == "Friday late night, December 12, 2025")
     }
+
+    /// A session's heading names the day and the part of it, never a time: each row under it shows its own.
+    @Test func headingsLeaveTimesToTheRows() throws {
+        let script = HistoryPage.template
+        let start = try #require(script.range(of: "function sessionElement"))
+        let body = script[start.lowerBound...].prefix(while: { $0 != "}" })
+        #expect(body.contains("session.title"))
+        #expect(!body.contains("span("))
+        #expect(!body.contains("timeOf("))
+    }
 }

@@ -345,7 +345,7 @@ enum HistoryPage {
             .replacingOccurrences(of: "\"", with: "&quot;")
     }
 
-    private static let template = #"""
+    static let template = #"""
 <!doctype html>
 <html lang="%LANG%">
 <head>
@@ -365,7 +365,6 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 .session-head { position: sticky; top: var(--header, 56px); z-index: 2; background: var(--bg); display: flex; align-items: baseline;
                 gap: var(--space-2); padding: var(--space-3) var(--row-inset) var(--space-1); color: var(--faint); font-size: var(--label); font-weight: 500; }
 .session-head h2 { font-size: inherit; font-weight: inherit; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.session-head .range { white-space: nowrap; }
 .session-head .count { margin-left: auto; color: var(--faint); font-size: var(--small); white-space: nowrap; }
 /* A row's own small button, as the sidebar's: a 20px target with a thin drawn ×, the app's one line weight. */
 .remove { flex: none; width: 20px; height: 20px; padding: 0; display: grid; place-items: center; border-radius: var(--radius-small); color: var(--muted); }
@@ -538,7 +537,8 @@ function sessionElement(session) {
   const section = el('section', 'session');
   const items = session.clusters.flatMap((c) => c.items);
   const head = el('div', 'session-head');
-  head.append(el('h2', null, session.title), el('span', 'range', span(items)),
+  // The heading names the day and part of it; the times are on the rows under it, so it doesn't repeat them.
+  head.append(el('h2', null, session.title),
               el('span', 'count', pages(items.length)),
               removeButton(words.removeSession, () => forget(items.map((i) => i.url), session)));
   const rows = el('div', 'rows');
