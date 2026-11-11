@@ -16,13 +16,27 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
       const main = window === window.top;
       const post = (m) => { try { window.webkit.messageHandlers.\(messageName).postMessage(m); } catch (e) {} };
       let list = [], last = '[]', timer = 0, ticking = 0, saved = null;
+      // The videos you started or changed the sound of yourself: one that plays or changes volume within a second of
+      // your own press or key on the page. A press on a link goes somewhere rather than plays, so it doesn't count:
+      // a card's preview playing under the pointer as you click through to its page isn't one you started.
+      const started = new WeakSet();
+      let pressed = -Infinity;
+      const press = (e) => {
+        if (!e.isTrusted) return;
+        const t = e.target;
+        if (t && t.closest && t.closest('a[href]')) return;
+        pressed = performance.now();
+      };
+      addEventListener('pointerdown', press, true);
+      addEventListener('keydown', press, true);
+      const engage = (e) => { if (e.target && e.target.tagName === 'VIDEO' && performance.now() - pressed < 1000) started.add(e.target); };
       const describe = () => {
         list = Array.from(document.querySelectorAll('video')).slice(0, 12);
         return list.map((v, i) => {
           const r = v.getBoundingClientRect();
           return { i, x: r.left, y: r.top, w: r.width, h: r.height, vw: v.videoWidth, vh: v.videoHeight,
                    playing: !v.paused && !v.ended && v.readyState >= 2, ended: v.ended, muted: v.muted || v.volume === 0,
-                   loop: v.loop, autoplay: v.autoplay, controls: v.controls, fit: getComputedStyle(v).objectFit || 'contain',
+                   loop: v.loop, autoplay: v.autoplay, controls: v.controls, user: started.has(v), link: !!v.closest('a[href]'), fit: getComputedStyle(v).objectFit || 'contain',
                    t: v.currentTime || 0, d: isFinite(v.duration) ? v.duration : -1 };
         });
       };
@@ -32,12 +46,14 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
         const fs = !!(document.fullscreenElement || document.webkitFullscreenElement);
         // Nothing to say on a page with no video, however it resizes.
         const key = videos.length === 0 && !pip && !fs ? '[]'
-          : JSON.stringify(videos.map((v) => [v.x | 0, v.y | 0, v.w | 0, v.h | 0, v.vw, v.vh, v.playing, v.ended, v.muted])) + pip + fs + innerWidth + 'x' + innerHeight;
+          : JSON.stringify(videos.map((v) => [v.x | 0, v.y | 0, v.w | 0, v.h | 0, v.vw, v.vh, v.playing, v.ended, v.muted, v.user])) + pip + fs + innerWidth + 'x' + innerHeight;
         if (!always && key === last) return;
         last = key;
         post({ id, main, vw: innerWidth, vh: innerHeight, videos, pip, fs });
       };
       const soon = () => { if (!timer) timer = setTimeout(() => { timer = 0; report(false); }, 150); };
+      document.addEventListener('play', engage, true);
+      document.addEventListener('volumechange', engage, true);
       for (const kind of ['play', 'playing', 'pause', 'ended', 'emptied', 'loadedmetadata', 'resize', 'volumechange',
                           'enterpictureinpicture', 'leavepictureinpicture', 'webkitpresentationmodechanged']) {
         document.addEventListener(kind, soon, true);

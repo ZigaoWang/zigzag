@@ -16,6 +16,10 @@ nonisolated struct PageVideo: Equatable, Sendable {
     var loops = false
     var autoplays = false
     var hasControls = false
+    /// You started it, or changed its sound, yourself: a press or a key on the page just before (not on a link).
+    var isStartedByUser = false
+    /// It sits in a link: a card's preview of a page it goes to.
+    var isInLink = false
     /// Its CSS object-fit.
     var fit = "contain"
     var time: Double = 0
@@ -23,7 +27,8 @@ nonisolated struct PageVideo: Equatable, Sendable {
     var duration: Double?
 
     init(index: Int, rect: CGRect, natural: CGSize, isPlaying: Bool, hasEnded: Bool = false, isMuted: Bool = false, loops: Bool = false,
-         autoplays: Bool = false, hasControls: Bool = false, fit: String = "contain", time: Double = 0, duration: Double? = nil) {
+         autoplays: Bool = false, hasControls: Bool = false, isStartedByUser: Bool = false, isInLink: Bool = false, fit: String = "contain",
+         time: Double = 0, duration: Double? = nil) {
         self.index = index
         self.rect = rect
         self.natural = natural
@@ -33,6 +38,8 @@ nonisolated struct PageVideo: Equatable, Sendable {
         self.loops = loops
         self.autoplays = autoplays
         self.hasControls = hasControls
+        self.isStartedByUser = isStartedByUser
+        self.isInLink = isInLink
         self.fit = fit
         self.time = time
         self.duration = duration
@@ -47,7 +54,7 @@ nonisolated struct PageVideo: Equatable, Sendable {
         self.init(index: index, rect: CGRect(x: number("x"), y: number("y"), width: number("w"), height: number("h")),
                   natural: CGSize(width: number("vw"), height: number("vh")), isPlaying: flag("playing"), hasEnded: flag("ended"),
                   isMuted: flag("muted"), loops: flag("loop"), autoplays: flag("autoplay"), hasControls: flag("controls"),
-                  fit: o["fit"] as? String ?? "contain", time: number("t"), duration: duration > 0 ? duration : nil)
+                  isStartedByUser: flag("user"), isInLink: flag("link"), fit: o["fit"] as? String ?? "contain", time: number("t"), duration: duration > 0 ? duration : nil)
     }
 
     /// A muted loop or a muted autoplaying picture with no controls: a page's moving background, not something you
