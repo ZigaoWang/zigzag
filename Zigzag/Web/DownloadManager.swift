@@ -333,19 +333,29 @@ final class DownloadManager: NSObject {
     /// A page to fetch it with on its own data store: an open tab of the same kind, else a hidden one, so a private
     /// download never uses another session's cookies.
     func webView(for item: DownloadItem) -> WKWebView? {
+        guard let store = Self.store(for: item.dataStore, isPrivate: item.isPrivate, profile: item.profile) else { return nil }
         if let open = WindowManager.shared.controllers.first(where: { $0.tabManager.isPrivate == item.isPrivate })?.selectedWebView,
-           item.dataStore == nil || open.configuration.websiteDataStore === item.dataStore {
+           open.configuration.websiteDataStore === store {
             return open
         }
         if let helper = helpers[item.id] { return helper }
         let configuration = WKWebViewConfiguration()
-        if let store = item.dataStore { configuration.websiteDataStore = store } else if item.isPrivate { return nil }
+        configuration.websiteDataStore = store
         let hidden = WKWebView(frame: .zero, configuration: configuration)
         helpers[item.id] = hidden
         return hidden
     }
 
     private var helpers: [UUID: WKWebView] = [:]
+
+    /// The store a download is fetched again in: the one it was made in while that's still here, else its profile's
+    /// (a download listed from before Zigzag started), never the store of whichever page is in front, which may be
+    /// another profile's sign-ins. None for a private window's that's gone, or a profile that's been removed.
+    static func store(for made: WKWebsiteDataStore?, isPrivate: Bool, profile: UUID) -> WKWebsiteDataStore? {
+        if let made { return made }
+        guard !isPrivate else { return nil }
+        return Profiles.shared.listed(profile)?.store
+    }
 
     func reveal(_ item: DownloadItem) {
         guard let url = item.destination else { return }

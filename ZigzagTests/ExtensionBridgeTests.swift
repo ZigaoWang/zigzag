@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WebKit
 @testable import Zigzag
 
 /// What the extension bridge reads from history for `chrome.history`, and how it shapes values for the extension.
@@ -75,6 +76,17 @@ extension ExtensionBridgeTests {
         #expect(!BridgeDownloads.sees(second, in: Profile.defaultID))
         #expect(!BridgeDownloads.sees(hidden, in: Profile.defaultID))
         #expect(!BridgeDownloads.sees(hidden, in: other))
+    }
+
+    /// A download fetched again (one listed from before Zigzag started has no store of its own) goes in its own
+    /// profile's store, never the one of whichever page is in front: that could be another profile's sign-ins.
+    @Test func aDownloadIsFetchedAgainInItsOwnProfile() {
+        let made = WKWebsiteDataStore.nonPersistent()
+        #expect(DownloadManager.store(for: made, isPrivate: true, profile: Profile.defaultID) === made)
+        #expect(DownloadManager.store(for: nil, isPrivate: false, profile: Profile.defaultID) === Profiles.shared.default.store)
+        // A private window that's gone, or a profile that's been removed: nowhere to fetch it.
+        #expect(DownloadManager.store(for: nil, isPrivate: true, profile: Profile.defaultID) == nil)
+        #expect(DownloadManager.store(for: nil, isPrivate: false, profile: UUID()) == nil)
     }
 }
 
