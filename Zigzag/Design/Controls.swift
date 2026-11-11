@@ -495,6 +495,9 @@ final class IconButton: InteractiveView {
     /// The window's own toolbar and bottom bar: a step crisper glyph (`Color.chromeIcon`); the usual quiet hover
     /// and press fills.
     var isChrome = false { didSet { if isChrome { tint = Tokens.Color.chromeIcon } } }
+    /// On a page's own color (the bar above the page), not the frame: the neutral hover and press fills, which show
+    /// on any color, rather than the frame's white washes.
+    var isOnPage = false { didSet { if isOnPage != oldValue { stateDidChange(animated: false) } } }
 
     override func stateDidChange(animated: Bool) {
         if selectsAsCard {
@@ -504,8 +507,8 @@ final class IconButton: InteractiveView {
             return
         }
         // On the window's frame, hover and press are washes of the space's own color, like the rows beside them.
-        let pressed = isChrome ? Tokens.Chrome.pressed : Tokens.Color.pressedFill
-        let hover = isChrome ? Tokens.Chrome.hover : Tokens.Color.hoverFill
+        let pressed = isChrome && !isOnPage ? Tokens.Chrome.pressed : Tokens.Color.pressedFill
+        let hover = isChrome && !isOnPage ? Tokens.Chrome.hover : Tokens.Color.hoverFill
         let fill: NSColor? = !isEnabled ? nil : isPressed ? pressed : (isHovered || isSelected) ? hover : showsFillAtRest ? Tokens.Color.fieldFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
         imageView.contentTintColor = image == nil ? tint : nil

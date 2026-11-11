@@ -10,6 +10,8 @@ protocol SidebarDelegate: SidebarListDelegate {
 
 /// The address at the top of the sidebar. Shows only the domain; clicking opens the command bar.
 final class AddressView: InteractiveView {
+    /// In the bar above the page, on the page's own color: a page's neutral field rather than the frame's wash.
+    var isOnPage = false { didSet { if isOnPage != oldValue { stateDidChange(animated: false) } } }
     private let label = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textSecondary)
     private let lock = NSImageView()
     /// Shows while the page uses the camera or microphone; click for options.
@@ -544,8 +546,10 @@ final class AddressView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // A soft field of the space's own color, a step lighter under the pointer and pressed.
-        let fill = isPressed ? Tokens.Chrome.fieldPressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
+        // A soft field of the space's own color, a step lighter under the pointer and pressed. On a page's own color
+        // (the bar above the page), a page's neutral field instead, which shows on white too.
+        let fill = isOnPage ? (isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.highlight : Tokens.Color.fieldFill)
+            : isPressed ? Tokens.Chrome.fieldPressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
         Tokens.Motion.withoutAnimation {
             layer?.borderWidth = 0

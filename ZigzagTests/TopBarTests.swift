@@ -136,6 +136,20 @@ struct TopBarTests {
         #expect(topBar.appearance == nil)
     }
 
+    @Test func thePagesColorTakesTheNeutralFills() {
+        let topBar = TopBarView()
+        let back = SidebarView.chromeButton("chevron.left", toolTip: "")
+        let address = AddressView()
+        topBar.hold(buttons: [back], address: address)
+        topBar.pageColor = .white
+        #expect(back.isOnPage && address.isOnPage && topBar.sidebarButton.isOnPage)
+        topBar.pageColor = nil
+        #expect(!back.isOnPage && !address.isOnPage)
+        // Light controls by the line text on a page's color goes light by.
+        #expect(TopBarView.isDark(.black) && !TopBarView.isDark(.white))
+        #expect(TopBarView.isDark(NSColor(srgbRed: 0.05, green: 0.07, blue: 0.09, alpha: 1)))
+    }
+
     @Test func underThePagesColorTheCardReachesUpUnderTheBar() {
         let sidebar = SidebarView()
         let root = BrowserRootView(sidebar: sidebar)
