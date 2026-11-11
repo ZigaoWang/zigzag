@@ -11,10 +11,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Profiles: give a space its own sign-ins, extensions, history and favorites, so two accounts on one site or two wallets live side by side. Spaces on the same profile share everything, and with one profile nothing changes. Choose a space's profile in its editor, where New Profile… makes one. Thanks to [vandenbulckjean](https://github.com/vandenbulckjean) for building it. ([#61](https://github.com/ZigaoWang/zigzag/issues/61))
 - Dark pages: Settings › Appearance can draw light websites dark, always or when your Mac is dark, with a switch for each site in Site Controls. Sites with their own dark theme are left as they are, and pictures and video keep their colors. ([#53](https://github.com/ZigaoWang/zigzag/issues/53))
 - Nested tabs: turn on Settings › Tabs › Open ⌘-clicked links under their tab, and links you open in a new tab sit under the page they came from, folded away when you like. Closing the page moves its tabs up instead of closing them. ([#58](https://github.com/ZigaoWang/zigzag/issues/58))
-- A playing video follows you in a mini player when you switch tabs. Drag it anywhere in the window, minimize it to keep listening, or click its site name to go back. ([#17](https://github.com/ZigaoWang/zigzag/issues/17), [#69](https://github.com/ZigaoWang/zigzag/issues/69))
+- A playing video follows you in a mini player when you switch tabs. It shows just the video, without the site's own controls. Drag it anywhere in the window, minimize it to keep listening, or click its site name to go back. ([#17](https://github.com/ZigaoWang/zigzag/issues/17), [#69](https://github.com/ZigaoWang/zigzag/issues/69), [#71](https://github.com/ZigaoWang/zigzag/issues/71))
 - With the address bar above the page, the bar takes the page's own color and reads as one card with it. Thanks to [philigrin](https://github.com/philigrin) for building it. ([#56](https://github.com/ZigaoWang/zigzag/issues/56))
 - Reader sets the article in one calm column, with its source, author and reading time on top, and Find searches the article. ([#47](https://github.com/ZigaoWang/zigzag/issues/47))
 - Each page in split view has its own close button, which leaves the other page. ([#70](https://github.com/ZigaoWang/zigzag/issues/70))
+- Keep on Top: pin a pop-up or Zigzag Mini, or choose Window › Keep on Top, and it stays above your other apps. ([#72](https://github.com/ZigaoWang/zigzag/issues/72))
 
 ### Fixed
 - Sound Booster, Shazam and other extensions hear streamed tabs like YouTube, and an extension asking for a tab another one is already listening to says which one has it. ([#45](https://github.com/ZigaoWang/zigzag/issues/45))
@@ -27,6 +28,10 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Text typed into pages keeps its dashes and quotes, and your own text replacements work again. ([#49](https://github.com/ZigaoWang/zigzag/issues/49), [#52](https://github.com/ZigaoWang/zigzag/issues/52))
 - Extensions that look for Chrome's named tab and window constants, like Coupert, work. ([#63](https://github.com/ZigaoWang/zigzag/issues/63))
 - A tab that goes from one site to another drops the last site's icon.
+- Profiles and private windows keep to themselves: Reader, site icons, search suggestions, dark pages, Download Again and extension options no longer carry anything across. ([#76](https://github.com/ZigaoWang/zigzag/issues/76), [#81](https://github.com/ZigaoWang/zigzag/issues/81), [#82](https://github.com/ZigaoWang/zigzag/issues/82), [#83](https://github.com/ZigaoWang/zigzag/issues/83), [#84](https://github.com/ZigaoWang/zigzag/issues/84), [#85](https://github.com/ZigaoWang/zigzag/issues/85))
+- Nested tabs keep their place when you reopen closed tabs or split one, and a link opened under a folded tab unfolds it. ([#77](https://github.com/ZigaoWang/zigzag/issues/77), [#78](https://github.com/ZigaoWang/zigzag/issues/78), [#79](https://github.com/ZigaoWang/zigzag/issues/79))
+- The bar above the page takes the right color after leaving a page drawn dark. ([#75](https://github.com/ZigaoWang/zigzag/issues/75))
+- Settings and the browser's menus, tooltips and previews are more consistent, and Find a Setting finds the new settings. ([#74](https://github.com/ZigaoWang/zigzag/issues/74), [#80](https://github.com/ZigaoWang/zigzag/issues/80))
 
 ## [0.7.9] - 2026-11-10
 
