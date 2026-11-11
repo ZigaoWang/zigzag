@@ -115,6 +115,7 @@
 		6442D472EF68990B9ED4855E /* OrionImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59BC11FC585D34A441C60694 /* OrionImportTests.swift */; };
 		6492B599ABBE44450D161D18 /* PDFViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02C322374F6FF1EF842FDB10 /* PDFViewer.swift */; };
 		654BFD1BB2CE1CC41CDFD065 /* Readability.js in Resources */ = {isa = PBXBuildFile; fileRef = 25F6D89709F01D7AD083FC85 /* Readability.js */; };
+		6598C85C3B959B5CB955185B /* Cookieless.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E69CFF8CE303F5DB6F0073 /* Cookieless.swift */; };
 		65BFE923B15D9B75D0349C50 /* DockProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3073C0E2D268EC8C3B767 /* DockProgress.swift */; };
 		666CC5A457A95E2BD07EA5FF /* PasswordCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9875E3DF61E5A98363065101 /* PasswordCapture.swift */; };
 		66E5020894B420AEB3943EAC /* Tokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 256245226DA14768B001589E /* Tokens.swift */; };
@@ -329,6 +330,7 @@
 		1F512EE34F01C45AF2FE2C52 /* FirefoxImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirefoxImporter.swift; sourceTree = "<group>"; };
 		1FB43BE39C48B06C807284C2 /* PeekController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeekController.swift; sourceTree = "<group>"; };
 		1FF592955291CE8F4D81FCBD /* NetworkChangesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkChangesTests.swift; sourceTree = "<group>"; };
+		21E69CFF8CE303F5DB6F0073 /* Cookieless.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cookieless.swift; sourceTree = "<group>"; };
 		2477477EEAA33212F1AA2281 /* SpaceFrameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFrameView.swift; sourceTree = "<group>"; };
 		253D16FCBE561D267ED6957C /* BrowserRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRootView.swift; sourceTree = "<group>"; };
 		256245226DA14768B001589E /* Tokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokens.swift; sourceTree = "<group>"; };
@@ -633,6 +635,7 @@
 		1A4CDB5B71DD2C4947122E55 /* Support */ = {
 			isa = PBXGroup;
 			children = (
+				21E69CFF8CE303F5DB6F0073 /* Cookieless.swift */,
 				8551A279CC24B357CC11755E /* CrashReports.swift */,
 				5B4B60FF2196B96D92F2D31D /* Diagnostics.swift */,
 				765C1F36BCEE463F8B5316BE /* Paths.swift */,
@@ -1238,6 +1241,7 @@
 				B49BE228769F046774C0D2C5 /* ContactCard.swift in Sources */,
 				A05782BC7540B79FF1021BF4 /* ContentBlocker.swift in Sources */,
 				10324776656E836D07CD1B27 /* Controls.swift in Sources */,
+				6598C85C3B959B5CB955185B /* Cookieless.swift in Sources */,
 				902CD60C9DC21A528D47701B /* CrashReports.swift in Sources */,
 				D8CF4BCBE8B4918517E852AD /* DarkPages.swift in Sources */,
 				2DAB6350F3AD369496F738CF /* DebugBridge.swift in Sources */,

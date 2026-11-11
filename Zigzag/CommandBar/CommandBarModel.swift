@@ -431,10 +431,10 @@ final class SuggestionFetcher {
     /// In a private window: suggestions go through a session of their own, so the search engine can't tie them to
     /// your other browsing.
     var isPrivate = false
-    private lazy var privateSession = URLSession(configuration: .ephemeral)
+    private lazy var privateSession = URLSession(configuration: .cookieless)
     /// Everyday windows' suggestions: no cookies and no cache either, so what you type can't be tied to you by a
     /// cookie the engine set, only your text and the address it came from.
-    private static let session = URLSession(configuration: .ephemeral)
+    private static let session = URLSession(configuration: .cookieless)
 
     /// On by default. Off, nothing you type in the command bar leaves the Mac for suggestions.
     static var isOn: Bool {

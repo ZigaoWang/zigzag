@@ -22,9 +22,7 @@ final class FaviconStore {
     /// tell one profile's visit from another's as the same person's.
     static func makeSession() -> URLSession {
         let config = URLSessionConfiguration.default
-        config.httpCookieStorage = nil
-        config.httpShouldSetCookies = false
-        config.httpCookieAcceptPolicy = .never
+        config.dropsCookies()
         config.timeoutIntervalForRequest = 10
         config.httpAdditionalHeaders = ["User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) \(WebKitSetup.applicationNameForUserAgent)"]
         return URLSession(configuration: config)

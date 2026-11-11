@@ -89,4 +89,14 @@ struct FaviconSessionTests {
         #expect(!configuration.httpShouldSetCookies)
         #expect(configuration.httpCookieAcceptPolicy == .never)
     }
+
+    /// Suggestions and notification icons go through `.cookieless`: `.ephemeral` alone keeps a site's cookies in
+    /// memory and sends them back for as long as Zigzag runs.
+    @Test func cookielessKeepsNoneEvenInMemory() {
+        let configuration = URLSessionConfiguration.cookieless
+        #expect(configuration.httpCookieStorage == nil)
+        #expect(!configuration.httpShouldSetCookies)
+        #expect(configuration.httpCookieAcceptPolicy == .never)
+        #expect(URLSessionConfiguration.ephemeral.httpCookieStorage != nil)
+    }
 }

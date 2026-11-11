@@ -210,7 +210,7 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
     }
 
     /// No cookies or cache: an icon is fetched like a stranger would.
-    private static let session = URLSession(configuration: .ephemeral)
+    private static let session = URLSession(configuration: .cookieless)
     private static let redirects = IconRedirects()
 
     private func remove(_ keys: [String]) {
