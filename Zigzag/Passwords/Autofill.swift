@@ -450,6 +450,24 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         }
     }
 
+    /// macOS 27's key icon in a sign-in field, clicked (WebKit tells the page's UI delegate): the Mac's AutoFill
+    /// panel on that field, in place of Zigzag's menu. Only for a click you just made in the page in front; where the
+    /// panel can't open, the click on the field has brought Zigzag's menu as it always has.
+    func keyIconClicked(in webView: BrowserWebView) {
+        debugLog("autofill key icon clicked")
+        guard SystemAutoFillPanel.isAvailable, Self.justClicked(webView.lastClickUp), Self.isInFront(webView),
+              Autofill.isOn(in: Profiles.shared.profile(ofPage: webView)), let origin = Origin(webView.url) else { return }
+        // Zigzag's menu for the same click, shown or on its way, makes room for the panel.
+        generation += 1
+        hide()
+        Task { _ = await SystemAutoFillPanel.open(in: webView, frame: nil, origin: origin, inFront: Self.isInFront) }
+    }
+
+    /// A click in the page ended (`clickUp`, system uptime) a moment ago.
+    static func justClicked(_ clickUp: TimeInterval, now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> Bool {
+        now - clickUp >= 0 && now - clickUp < 1
+    }
+
     /// Fills what the Mac's list gave into the page Passwords… was chosen on, then lets go of it.
     func fillFromSystem(username: SecretString, password: SecretString, into request: (webView: BrowserWebView, frame: WKFrameInfo, origin: Origin)) {
         let webView = request.webView

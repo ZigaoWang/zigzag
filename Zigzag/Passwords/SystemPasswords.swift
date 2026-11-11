@@ -280,8 +280,8 @@ enum SystemAutoFillPanel {
     }
 }
 
-/// macOS 27 and later: sign-in fields show Safari's key icon. A click on it is a click on the field, so it opens
-/// Zigzag's password menu there, with Passwords… in it, as a click anywhere in the field does.
+/// macOS 27 and later: sign-in fields show Safari's key icon. A click on it opens the Mac's AutoFill panel on the
+/// field (`Autofill.keyIconClicked`); a click anywhere else in the field opens Zigzag's password menu.
 @available(macOS 27, *)
 enum AutofillKeyIcon {
     static let messageName = "zigzagAutofillKey"

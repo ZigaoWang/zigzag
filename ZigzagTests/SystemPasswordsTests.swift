@@ -368,6 +368,39 @@ struct SystemPasswordsTests {
 
     // MARK: macOS 27: the Mac's AutoFill panel on the page's field
 
+    private final class KeyIconClicks: NSObject, WKUIDelegate {
+        var count = 0
+        @objc(_webView:didClickAutoFillButtonWithUserInfo:)
+        func webView(_ webView: WKWebView, didClickAutoFillButtonWithUserInfo userInfo: Any?) { count += 1 }
+    }
+
+    @Test func aClickOnTheKeyIconReachesTheDelegate() async throws {
+        guard #available(macOS 27, *) else { return }
+        let clicks = KeyIconClicks()
+        let (webView, window, _) = await page(form) { configuration in
+            configuration.userContentController.addUserScript(AutofillKeyIcon.script)
+            configuration.userContentController.addScriptMessageHandler(AutofillKeyIcon.Asker { _ in true }, contentWorld: AutofillKeyIcon.world, name: AutofillKeyIcon.messageName)
+        }
+        webView.uiDelegate = clicks
+        try await wait(0.3)
+        let rect = try #require(try await webView.callAsyncJavaScript("const r = document.getElementById('p').getBoundingClientRect(); return [r.left, r.top, r.width, r.height]",
+                                                                      arguments: [:], in: nil, contentWorld: .page) as? [Double])
+        window.makeFirstResponder(webView)
+        let point = webView.convert(NSPoint(x: rect[0] + rect[2] - 10, y: webView.isFlipped ? rect[1] + rect[3] / 2 : webView.bounds.height - rect[1] - rect[3] / 2), to: nil)
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                        windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+            if type == .leftMouseDown { webView.mouseDown(with: event) } else { webView.mouseUp(with: event) }
+        }
+        try await wait(0.3)
+        _ = try await webView.callAsyncJavaScript("return 1", arguments: [:], in: nil, contentWorld: .page)
+        #expect(clicks.count == 1)
+        // A page clicking its own field doesn't.
+        _ = try await webView.evaluateJavaScript("document.getElementById('p').click()")
+        try await wait(0.2)
+        #expect(clicks.count == 1)
+    }
+
     @Test func thePanelIsAskedForOnTheFieldTheMenuWasFor() async throws {
         let (webView, _, _) = await page(form) { configuration in
             configuration.userContentController.addUserScript(Autofill.script)
@@ -384,4 +417,11 @@ struct SystemPasswordsTests {
         #expect(try await webView.evaluateJavaScript("typeof window.__zigzagField") as? String == "undefined")
     }
 
+
+    @Test func onlyAClickJustMadeOpensThePanel() {
+        #expect(Autofill.justClicked(99.6, now: 100))
+        #expect(!Autofill.justClicked(95, now: 100))
+        #expect(!Autofill.justClicked(-.infinity, now: 100))
+        #expect(!Autofill.justClicked(101, now: 100))
+    }
 }

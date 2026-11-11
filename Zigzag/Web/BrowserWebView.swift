@@ -73,6 +73,15 @@ final class BrowserWebView: WKWebView {
         super.mouseDown(with: event)
     }
 
+    /// When the last click in the page ended (system uptime). WebKit reports a click on the key icon in a sign-in
+    /// field a moment after; a page can't make one of these.
+    private(set) var lastClickUp: TimeInterval = -.infinity
+
+    override func mouseUp(with event: NSEvent) {
+        lastClickUp = ProcessInfo.processInfo.systemUptime
+        super.mouseUp(with: event)
+    }
+
     /// Three-finger swipes, for Macs set to swipe between pages that way: these come as swipe events, not scrolls.
     override func swipe(with event: NSEvent) {
         if event.deltaX > 0, let owner, owner.canGoBackOrReturn { owner.goBack(); return }

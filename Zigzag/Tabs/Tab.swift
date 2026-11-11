@@ -1229,6 +1229,14 @@ extension Tab: WKUIDelegate {
         DownloadManager.shared.track(download, window: host?.hostWindow)
     }
 
+    /// The key icon macOS 27 shows in sign-in fields (AutofillKeyIcon), clicked. WebKit reports it through this
+    /// (WKUIDelegatePrivate, unpublished); without it the click is only a click on the field.
+    @objc(_webView:didClickAutoFillButtonWithUserInfo:)
+    func webView(_ webView: WKWebView, didClickAutoFillButtonWithUserInfo userInfo: Any?) {
+        guard let webView = webView as? BrowserWebView else { return }
+        Autofill.shared.keyIconClicked(in: webView)
+    }
+
     /// Reported by our hover script: the link under the pointer, or nil.
     func hoveredLinkChanged(_ url: URL?) {
         host?.tab(self, hoveringLink: url)
