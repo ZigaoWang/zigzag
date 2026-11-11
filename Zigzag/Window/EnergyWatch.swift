@@ -218,7 +218,8 @@ final class EnergyWatch {
                        action: (String(localized: "Close Tab", comment: "Button in the toast about a tab using a lot of energy: closes that tab."), { [weak controller, weak tab] in
                            guard let tab, !tab.isClosed else { return }
                            // The window it's in now: it may have been moved to another since.
-                           (Self.window(holding: tab) ?? controller)?.closeWithUndo(tab)
+                           // Only the page using the energy, not tabs folded under it.
+                           (Self.window(holding: tab) ?? controller)?.closeWithUndo(tab, alone: true)
                        }), duration: 15, in: controller)
             return
         }

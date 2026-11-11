@@ -1739,7 +1739,8 @@ extension BrowserWindowController: TabHost {
     func tabWantsToReturnToOpener(_ tab: Tab) {
         guard let opener = tab.opener else { return }
         tabManager.returnPane(of: tab, to: opener)
-        closeWithUndo(tab)
+        // The page closed itself: the tabs it opened stay.
+        closeWithUndo(tab, alone: true)
         if !opener.isClosed { tabManager.select(opener) }
     }
 
@@ -1799,8 +1800,13 @@ extension BrowserWindowController: SidebarDelegate {
         set { UserDefaults.standard.set(newValue, forKey: "OffersToPinWanderedPage") }
     }
 
-    /// Closes a tab; ⌘Z brings it back with its history, ⇧⌘Z closes it again.
-    func closeWithUndo(_ tab: Tab) {
+    /// Closes a tab; ⌘Z brings it back with its history, ⇧⌘Z closes it again. With the tabs under it folded away they
+    /// close with it, as one step, and a toast says how many (#155); `alone` closes just this one.
+    func closeWithUndo(_ tab: Tab, alone: Bool = false) {
+        if !alone {
+            let closing = tabManager.closing(tab)
+            if closing.count > 1 { closeManyWithUndoToast(closing); return }
+        }
         let wasBookmark = tab.bookmarkID != nil
         let id = tab.id
         // A pinned page you'd wandered away from: the pin keeps its own address, and the note offers to keep where

@@ -1440,6 +1440,15 @@ final class TabManager {
         return tabs(in: tab.spaceID).filter { ids.contains($0.id) }
     }
 
+    /// What closing this tab closes: with the tabs under it folded away, all of them too, in list order (#155); else
+    /// it alone, and they move up a level.
+    func closing(_ tab: Tab) -> [Tab] {
+        guard tab.bookmarkID == nil else { return [tab] }
+        let ids = TabTree.closing(tab.id, folded: tab.isCollapsed, in: treeNodes(in: tab.spaceID))
+        let byID = Dictionary(tabs(in: tab.spaceID).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        return ids.count > 1 ? ids.compactMap { byID[$0] } : [tab]
+    }
+
     /// Folds the tabs under this one away in the sidebar, or shows them again.
     func setNestedTabsCollapsed(_ tab: Tab, _ collapsed: Bool) {
         guard tab.isCollapsed != collapsed else { return }

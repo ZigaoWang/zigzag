@@ -62,6 +62,12 @@ nonisolated enum TabTree {
         return nodes[(index + 1)..<subtreeEnd(at: index, in: nodes)].map(\.id)
     }
 
+    /// What closing a tab closes: folded, the tab and every tab under it, in list order; open, the tab alone.
+    static func closing(_ id: UUID, folded: Bool, in nodes: [Node]) -> [UUID] {
+        guard nodes.contains(where: { $0.id == id }) else { return [] }
+        return [id] + (folded ? descendants(of: id, in: nodes) : [])
+    }
+
     static func hasChildren(_ id: UUID, in nodes: [Node]) -> Bool { nodes.contains { $0.parent == id } }
 
     /// Where a link opened from `parent` goes: after everything already under it, so a row of links stays in
