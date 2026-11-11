@@ -32,11 +32,12 @@ nonisolated enum Diagnostics {
 
     /// Notes something that went wrong (or a step in a flow that tends to: a pop-up, a sign-in). `site` is a host;
     /// pass `isPrivate` from a private window and the site is left out. Repeats in a row are counted, not added.
-    static func note(_ kind: String, site: String? = nil, _ detail: String? = nil, isPrivate: Bool = false) {
+    /// `limit`: how long the detail may be; a freeze's says what was running, which takes more room than an error.
+    static func note(_ kind: String, site: String? = nil, _ detail: String? = nil, isPrivate: Bool = false, limit: Int = 200) {
         let site = isPrivate ? nil : site.map { $0.withoutWWW }.flatMap { $0.isEmpty ? nil : $0 }
         // A private window's own words (an error quoting a host, a certificate naming its site) never land here:
         // only an error's code, which names nothing.
-        let detail = isPrivate ? detail.flatMap(errorCode) : detail.map(clean)
+        let detail = isPrivate ? detail.flatMap(errorCode) : detail.map { clean($0, limit: limit) }
         let (added, schedule) = state.withLock { s -> (Bool, Bool) in
             let now = Date()
             if var last = s.events.last, last.kind == kind, last.site == site, last.detail == detail, now.timeIntervalSince(last.date) < 60 {
@@ -117,7 +118,7 @@ nonisolated enum Diagnostics {
 
     /// A page's own words, kept short, with any address in them cut to its site: an error can quote a link that
     /// carries a token or an email.
-    static func clean(_ text: String) -> String {
+    static func clean(_ text: String, limit: Int = 200) -> String {
         var out = text.replacingOccurrences(of: "\n", with: " ")
         let links = try? NSRegularExpression(pattern: #"[a-zA-Z][a-zA-Z0-9+.-]*://([^/\s'"?#)]+)[^\s'")]*"#)
         if let links {
@@ -127,7 +128,7 @@ nonisolated enum Diagnostics {
         if let emails {
             out = emails.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: "(email)")
         }
-        return out.count > 200 ? String(out.prefix(200)) + "…" : out
+        return out.count > limit ? String(out.prefix(limit)) + "…" : out
     }
 
     /// An error in plain words with its code, so it can be looked up: "The site’s security certificate isn’t valid
@@ -151,80 +152,3 @@ nonisolated enum Diagnostics {
     }
 }
 
-/// Notices Zigzag freezing as it happens, rather than a day later from macOS: while Zigzag is in front, the main
-/// thread ticks four times a second and another thread watches the ticks. A gap of a second or more is a freeze,
-/// noted with how long it lasted once it's over. In the background both rest, so an idle Zigzag costs nothing.
-nonisolated final class Freezes: @unchecked Sendable {
-    static let shared = Freezes()
-    private let beat = OSAllocatedUnfairLock(initialState: (last: Date(), counts: false))
-    /// Wakes the watcher when Zigzag comes to the front.
-    private let wake = DispatchSemaphore(value: 0)
-    private var timer: Timer?
-    private var started = false
-    private var tokens: [NSObjectProtocol] = []
-
-    func start() {
-        guard !started else { return }
-        started = true
-        DispatchQueue.main.async { [self] in
-            let center = NotificationCenter.default
-            self.tokens = [
-                center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.resume() }
-                },
-                center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.rest() }
-                },
-            ]
-            if MainActor.assumeIsolated({ NSApp.isActive }) { self.resume() }
-        }
-        let watcher = Thread { [weak self] in self?.watch() }
-        watcher.name = "Zigzag freeze watch"
-        watcher.qualityOfService = .utility
-        watcher.start()
-    }
-
-    @MainActor private func resume() {
-        guard timer == nil else { return }
-        beat.withLock { $0 = (Date(), true) }
-        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
-            self?.beat.withLock { $0 = (Date(), true) }
-        }
-        timer.tolerance = 0.05
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
-        wake.signal()
-    }
-
-    @MainActor private func rest() {
-        timer?.invalidate()
-        timer = nil
-        beat.withLock { $0.counts = false }
-    }
-
-    private func watch() {
-        var frozenSince: Date?
-        while true {
-            let (last, counts) = beat.withLock { $0 }
-            guard counts || frozenSince != nil else {
-                // In the background: wait to be woken, not on a clock.
-                wake.wait()
-                continue
-            }
-            Thread.sleep(forTimeInterval: 0.25)
-            let gap = Date().timeIntervalSince(last)
-            if gap >= 1, counts, frozenSince == nil {
-                frozenSince = last
-            } else if gap < 0.5, let since = frozenSince {
-                frozenSince = nil
-                let length = last.timeIntervalSince(since)
-                // Longer than this is the Mac asleep, not Zigzag stuck.
-                if length >= 1, length < 120 {
-                    Diagnostics.note("Zigzag froze", String(format: "for %.1f s", length))
-                }
-            } else if !counts {
-                frozenSince = nil
-            }
-        }
-    }
-}

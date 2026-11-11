@@ -64,7 +64,7 @@ enum ProblemReport {
         let destination = file
         return await Task.detached(priority: .userInitiated) { () -> URL? in
             try? FileManager.default.createDirectory(at: CrashReports.folder, withIntermediateDirectories: true)
-            let text = summary + recent + crashes + extensionLog
+            let text = summary + recent + crashes + freezes + extensionLog
             return (try? Data(text.utf8).write(to: destination, options: .atomic)) == nil ? nil : destination
         }.value
     }
@@ -117,7 +117,13 @@ enum ProblemReport {
             ["error", "rejection", "failed", "couldn", "crash", "http 4", "http 5", "invalid"].contains { line.localizedCaseInsensitiveContains($0) }
         }
         guard !problems.isEmpty else { return "" }
-        return (["", "Extension errors, latest"] + problems.suffix(20).map(Diagnostics.clean)).joined(separator: "\n") + "\n"
+        return (["", "Extension errors, latest"] + problems.suffix(20).map { Diagnostics.clean($0) }).joined(separator: "\n") + "\n"
+    }
+
+    /// What the main thread was running in Zigzag's last few freezes, when there were any.
+    nonisolated static var freezes: String {
+        let text = Freezes.recentStacks.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? "" : "\nWhat was running when Zigzag froze, latest last\n" + text + "\n"
     }
 
     /// The crash and freeze reports kept on this Mac, read from disk.
