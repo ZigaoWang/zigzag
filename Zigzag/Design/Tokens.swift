@@ -128,10 +128,6 @@ enum Tokens {
         static let toastButtonHeight: CGFloat = Space.x7Height
         /// Where a hovered link goes: the small floating capsule in the page's bottom-left corner.
         static let linkStatusHeight: CGFloat = Space.x6
-        /// A site's chip in front of the command bar's field while you search inside it; `chipHeightSmall` in the
-        /// sidebar's address.
-        static let chipHeight: CGFloat = Space.x6 + 2
-        static let chipHeightSmall: CGFloat = Space.x5
         /// A keycap (`KeyCap`): Return on a chosen result, Tab beside "Search YouTube".
         static let keyCapHeight: CGFloat = Space.x5 - 2
         /// A small round button floating over a page edge on its own (swipe arrows, the stand-in Downloads button).
@@ -155,9 +151,8 @@ enum Tokens {
     enum Sidebar {
         /// From the sidebar's edges to its rows, favorites and address.
         static let edge: CGFloat = 6
-        /// The icon column (12) and the text column (36), from the sidebar's leading edge.
+        /// The icon column (12), from the sidebar's leading edge.
         static var iconColumn: CGFloat { edge + rowInset }
-        static var textColumn: CGFloat { iconColumn + favicon + iconGap }
         /// A row's title (tabs, pinned pages, folders, New Tab) and the address's host.
         static let rowText: CGFloat = TypeSize.body
         /// A section's label ("Personal", "Tabs", Clear): small, medium, muted.
@@ -185,7 +180,6 @@ enum Tokens {
         static let spaceNameBearing: CGFloat = 1
         /// A space key in the bottom bar: a small rounded key with its number, 4pt between keys.
         static let spaceKey: CGFloat = 18
-        static let spaceKeyRadius: CGFloat = 5
         /// Between the favorites and the list.
         static let sectionGap: CGFloat = Space.x3
 
@@ -356,8 +350,6 @@ enum Tokens {
         static let smallWordmarkHeight: CGFloat = 22
         /// The glass card a step's choice sits on.
         static let cardWidth: CGFloat = 560
-        /// Its padding.
-        static let cardPadding: CGFloat = Space.x5
         /// A step's big title, in display weight: the one place type is this large.
         static let titleSize: CGFloat = 30
         /// The count of what came over in an import: the one number set this large.
@@ -369,15 +361,11 @@ enum Tokens {
         static let aboutIcon: CGFloat = 96
         /// About › Acknowledgments: wide enough for a license's lines as written.
         static let acknowledgementsSize = NSSize(width: 640, height: 600)
-        /// The progress dots: the dot, and the long one for the step you're on.
+        /// The progress dots.
         static let dot: CGFloat = 6
-        static let currentDot: CGFloat = Space.x5 + 2
         /// The main pill on a step and the welcome's one button.
         static let buttonHeight: CGFloat = Space.x10
         static let buttonWidth: CGFloat = 168
-        /// A question's two answers.
-        static let answerWidth: CGFloat = 200
-        static let answerHeight: CGFloat = Space.x10 + Space.x1
         static let groupGap: CGFloat = Space.x6 + Space.x1
     }
 
@@ -798,18 +786,6 @@ enum Tokens {
 
         /// Slides a view horizontally into its current (final) position from `offset` points away, on the
         /// render server. Returns how long the slide takes, 0 if it was skipped.
-        /// Vertical companion to `slide`, always animated (used for feedback like toasts).
-        static func slideVertically(_ view: NSView, fromOffsetY offset: CGFloat, curve: Curve = snappy) {
-            guard let layer = view.layer, !reduceMotion else { return }
-            let animation = CABasicAnimation(keyPath: "transform.translation.y")
-            animation.fromValue = view.isFlipped ? offset : -offset
-            animation.toValue = 0
-            animation.duration = curve.duration
-            animation.timingFunction = curve.timing
-            animation.fillMode = .backwards
-            layer.add(animation, forKey: "slideY")
-        }
-
         /// `velocity`: how fast the view is already moving, in points per second (positive is rightward), so a slide
         /// that takes over from the fingers doesn't stall or lurch. Springs only.
         @discardableResult
@@ -1038,10 +1014,8 @@ enum Tokens {
         static let keyCapFill = dynamic(light: hex(0x000000, alpha: 0.04), dark: hex(0xFFFFFF, alpha: 0.07))
         static let keyCapEdge = dynamic(light: hex(0x000000, alpha: 0.1), dark: hex(0xFFFFFF, alpha: 0.1))
 
-        /// Settings: the window behind grouped rows, and the groups themselves (System Settings proportions).
+        /// Settings: the window behind grouped rows (System Settings proportions).
         static let formBackground = dynamic(light: hex(0xF2F2F4), dark: hex(0x1E1E20))
-        static let formGroup = dynamic(light: hex(0xFFFFFF), dark: hex(0x2A2A2D))
-        static let formGroupEdge = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0xFFFFFF, alpha: 0.06))
         static let progress = dynamic(light: hex(0x000000, alpha: 0.28), dark: hex(0xFFFFFF, alpha: 0.32))
         static let destructive = NSColor.systemRed
         /// Status: something to fix (a weak password, an import problem).
@@ -1066,11 +1040,6 @@ enum Tokens {
         }
         /// A status color's soft fill behind a note (a weak password's warning): the color at this opacity.
         static let statusFillAlpha: CGFloat = 0.12
-        /// Light ink and fills on the brand's blue frame (the welcome, onboarding): the ribbon's own color, and how
-        /// much of it a quiet line, a quiet fill and a lit fill take.
-        static let onFrameSecondaryAlpha: CGFloat = 0.72
-        static let onFrameFillAlpha: CGFloat = 0.1
-        static let onFrameChosenAlpha: CGFloat = 0.2
     }
 
     // MARK: - The slide switch

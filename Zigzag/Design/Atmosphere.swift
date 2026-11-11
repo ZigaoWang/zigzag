@@ -61,9 +61,6 @@ final class Atmosphere: NSView {
         applyColors(animated: animated)
     }
 
-    /// The ink for the wordmark on an atmosphere: the brand's blue on the pale one, its light ribbon on the deep one.
-    static let markInk = Tokens.Color.dynamic(light: Brand.Theme.brand.accent, dark: Brand.ribbon)
-
     // MARK: Colors
 
     /// A wash from top to bottom and the four fields' colors.

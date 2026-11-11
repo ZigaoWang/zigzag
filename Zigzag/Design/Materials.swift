@@ -682,7 +682,6 @@ final class TactileButton: InteractiveView {
     private let rim = GradientStroke(width: 1)
     private let outline = CAShapeLayer()
     private let text = CATextLayer()
-    private var hasAppeared = false
 
     init(title: String, style: Style = .secondary, size: Size = .regular) {
         self.title = title

@@ -280,12 +280,6 @@ enum Brand {
     }
 
     static func ease(_ t: CGFloat) -> CGFloat { t < 0.5 ? 4 * t * t * t : 1 - pow(-2 * t + 2, 3) / 2 }
-
-    /// First launch writes the wordmark in, letter by letter, once; after that only the ribbon writes itself in.
-    static var hasDrawnIn: Bool {
-        get { UserDefaults.standard.bool(forKey: "BrandDrawnIn") }
-        set { UserDefaults.standard.set(newValue, forKey: "BrandDrawnIn") }
-    }
 }
 
 /// The ribbon Z. At rest it's one stroke with round joins, exactly like the icon. Its motion is writing: it draws
