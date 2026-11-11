@@ -42,7 +42,7 @@ final class ExtensionBridge {
         webRequest = BridgeWebRequest(host: host)
         let others: [any BridgeNamespace.Type] = [BridgeHistory.self, BridgeTopSites.self, BridgeBookmarks.self, BridgeDownloads.self, BridgeNotifications.self, BridgeIdle.self,
                                                   BridgeDisplay.self, BridgeContexts.self, BridgeRuntime.self, BridgeSpeech.self, BridgePower.self, BridgeIdentity.self,
-                                                  BridgeUserScripts.self, BridgeFavicons.self]
+                                                  BridgeUserScripts.self, BridgeFavicons.self, BridgeExtensionFetch.self]
         let all: [any BridgeNamespace] = others.map { $0.init(host: host) } + [offscreen, sidePanel, tabCapture, proxy, webRequest]
         namespaces = Dictionary(uniqueKeysWithValues: all.map { (type(of: $0).name, $0) })
     }
@@ -62,8 +62,13 @@ final class ExtensionBridge {
             return
         }
         let args = body["args"] as? [Any] ?? []
+        let host = host
         Task { @MainActor in
             do {
+                // A queued fetch must not inherit a replacement context's grants after unload/reload.
+                if ns == BridgeExtensionFetch.name, host.context(for: id) !== context {
+                    throw BridgeError("The extension is no longer loaded.")
+                }
                 let value = try await namespace.call(fn, args: args, extensionID: id)
                 reply(["value": Self.plain(value) ?? NSNull()], nil)
             } catch {
