@@ -572,9 +572,9 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
 /// its name in the page's address (zigzag://settings/privacy), which a tab keeps with the session: a pane can be
 /// added anywhere in the column, but a name never changes.
 enum SettingsPane: String, CaseIterable {
-    case general, appearance, tabs, spaces, profiles, search, mini, passwords, privacy, translation, extensions
+    case general, appearance, tabs, spaces, profiles, search, mini, translation, passwords, privacy
     case websiteData = "website-data"
-    case shortcuts, automation
+    case extensions, shortcuts, automation
 
     var title: String {
         switch self {
@@ -629,11 +629,26 @@ enum SettingsPane: String, CaseIterable {
     /// sits among the others and what Website Data holds stays in Privacy, as before there were profiles.
     static let perProfile: [SettingsPane] = [.extensions, .websiteData]
 
+    /// The column's sections in groups, a small gap between each, as System Settings has them: the browser itself,
+    /// finding and reading, what's kept safe, and adding to Zigzag. With more than one profile, the sections about
+    /// the profile chosen there follow under their own heading.
+    static func columnGroups(manyProfiles: Bool) -> (shared: [[SettingsPane]], profile: [SettingsPane]) {
+        let groups: [[SettingsPane]] = [[.general, .appearance, .tabs, .spaces, .profiles], [.search, .mini, .translation],
+                                        [.passwords, .privacy], [.extensions, .shortcuts, .automation]]
+        guard manyProfiles else { return (groups, []) }
+        return (groups.map { $0.filter { !perProfile.contains($0) } }.filter { !$0.isEmpty }, perProfile)
+    }
+
     /// The column's sections: the ones every profile shares, then, with more than one profile, the ones about
     /// the profile chosen there.
     static func column(manyProfiles: Bool) -> (shared: [SettingsPane], profile: [SettingsPane]) {
-        guard manyProfiles else { return (allCases.filter { $0 != .websiteData }, []) }
-        return (allCases.filter { !perProfile.contains($0) }, perProfile)
+        let groups = columnGroups(manyProfiles: manyProfiles)
+        return (groups.shared.flatMap { $0 }, groups.profile)
+    }
+
+    /// The sections that start a group after the first, so the column leaves a gap before each.
+    static func groupStarts(manyProfiles: Bool) -> Set<SettingsPane> {
+        Set(columnGroups(manyProfiles: manyProfiles).shared.dropFirst().compactMap(\.first))
     }
 
     /// The section that's shown when this one is asked for: Website Data is part of Privacy until there's a
@@ -666,6 +681,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let profileHeading = Label.groupHeading(String(localized: "For This Profile", comment: "A heading in the column of Settings, with more than one profile, over the menu that chooses a profile and the sections that show that profile's things."))
     /// Whether the column was built for more than one profile.
     private var columnHasProfiles = false
+    /// The sections that start a group in the column, with a gap before each.
+    private var groupStarts: Set<SettingsPane> = []
     private let column = FlippedView()
     /// The chosen section's fill, gliding to the one you pick.
     private let sectionSelection = SelectionGlide()
@@ -1277,13 +1294,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         profileHeading.isHidden = !grouped
         // The heading and the menu take about two sections' room.
         let count = CGFloat(items.count + (grouped ? 2 : 0))
+        // A small gap before each group after the first, no label: how System Settings sets its groups apart.
+        let gaps = CGFloat(items.filter { groupStarts.contains($0.pane) }.count)
+        let gap = arrangement == .row ? Tokens.Space.x2 : Tokens.Space.x3
         // In the row they shrink to fit, rather than run off the page's edge.
-        let side = arrangement == .row ? min(Tokens.Space.x10, floor((column.bounds.width - Tokens.Space.x2 * 2) / count)) : Tokens.Space.x10
+        let side = arrangement == .row ? min(Tokens.Space.x10, floor((column.bounds.width - Tokens.Space.x2 * 2 - gaps * gap) / count)) : Tokens.Space.x10
         // Down the column, a short page (a small window) takes some height off each section, never below a control's,
         // so all of them fit under the title.
         let top = Tokens.Page.headerHeight + Tokens.Space.x1
         func height(_ tallest: CGFloat) -> CGFloat {
-            max(Tokens.Page.controlHeight, min(tallest, floor((column.bounds.height - top - Tokens.Space.x2) / count) - 2))
+            max(Tokens.Page.controlHeight, min(tallest, floor((column.bounds.height - top - Tokens.Space.x2 - gaps * gap) / count) - 2))
         }
         switch arrangement {
         case .column:
@@ -1300,6 +1320,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                     profilePicker.frame = NSRect(x: gutter - inset, y: y, width: column.bounds.width - (gutter - inset) * 2, height: Tokens.Page.controlHeight)
                     y = profilePicker.frame.maxY + Tokens.Space.x2
                 }
+                if groupStarts.contains(item.pane) { y += gap }
                 item.frame = NSRect(x: gutter - inset, y: y, width: column.bounds.width - (gutter - inset) * 2, height: rowHeight)
                 y += rowHeight + 2
             }
@@ -1307,17 +1328,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let rowHeight = height(side)
             var y = top
             for item in items {
+                if groupStarts.contains(item.pane) { y += gap }
                 item.frame = NSRect(x: (column.bounds.width - side) / 2, y: y, width: side, height: rowHeight)
                 y += rowHeight + 2
             }
         case .row:
             // Spread evenly across, but never further apart than the rail has them.
-            let gap = min(Tokens.Space.x2, max(0, (column.bounds.width - Tokens.Space.x4 * 2 - side * count) / (count - 1)))
-            let total = side * count + gap * (count - 1)
+            let spacing = min(Tokens.Space.x2, max(0, (column.bounds.width - Tokens.Space.x4 * 2 - side * count - gaps * gap) / (count - 1)))
+            let total = side * count + spacing * (count - 1) + gaps * gap
             var x = max(0, round((column.bounds.width - total) / 2))
             for item in items {
+                if groupStarts.contains(item.pane) { x += gap }
                 item.frame = NSRect(x: x, y: (column.bounds.height - side) / 2, width: side, height: side)
-                x += side + gap
+                x += side + spacing
             }
         }
         moveSectionSelection(animated: false)
@@ -1436,6 +1459,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let many = hasManyProfiles
         let sections = SettingsPane.column(manyProfiles: many)
         columnHasProfiles = many
+        groupStarts = SettingsPane.groupStarts(manyProfiles: many)
         items = (sections.shared + sections.profile).map { pane in
             let item = SectionItem(pane)
             item.drawsSelection = false
