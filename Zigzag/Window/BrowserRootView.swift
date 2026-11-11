@@ -729,12 +729,23 @@ final class BrowserRootView: SpaceFrameView {
         sidebarContainer.frame = sidebarFrame
         sidebarContainer.isFloating = !sidebarVisible && !leavesDocked
         // Docked beside the bar above the page, the sidebar's top row stays on the bar's middle line.
-        sidebarContainer.sidebar.topRowDrop = showsTopBar && !sidebarContainer.isFloating ? topBarFrame.minY : 0
+        sidebarContainer.sidebar.topRowDrop = sidebarTopRowDrop
         let handleWidth = Tokens.Metric.resizeHandleWidth
         resizeHandle.frame = NSRect(x: sidebarWidth - handleWidth / 2, y: 0, width: handleWidth, height: bounds.height)
         resizeHandle.isHidden = !sidebarVisible && !isDraggingSidebarEdge
         overlay.frame = bounds
         onLayoutChange?()
+    }
+
+    /// Full screen with the frame on: the page runs edge to edge while the sidebar is hidden, so the frame comes and
+    /// goes with the sidebar, and the bar above the page moves down and up by its inset as it does.
+    private var frameComesWithSidebar: Bool { !Self.isBorderless && window?.styleMask.contains(.fullScreen) == true }
+
+    /// How far down the docked sidebar's top row sits, to stay on the middle line of the bar above the page. Not
+    /// where the frame comes and goes with the sidebar: there the row would move as the sidebar is shown, and its
+    /// toggle, the one thing you reach for in that corner, stays where it is with the sidebar hidden.
+    var sidebarTopRowDrop: CGFloat {
+        showsTopBar && !sidebarContainer.isFloating && !frameComesWithSidebar ? topBarFrame.minY : 0
     }
 
     private func layoutTopBar() {

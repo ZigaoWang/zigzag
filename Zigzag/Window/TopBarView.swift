@@ -23,12 +23,12 @@ final class TopBarView: NSView {
     /// sight with it then. Shown, the sidebar keeps it in its own top row.
     let sidebarButton = SidebarView.chromeButton("sidebar.left", toolTip: String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."))
     var showsSidebarButton = false { didSet { if showsSidebarButton != oldValue { refreshSidebarButton() } } }
-    /// While the sidebar slides back in, its toggle stays here where the sidebar's own will land (this far from the
-    /// window's left edge), still as the traffic lights, until the sidebar arrives with its own. Takes no room.
-    var heldSidebarButtonX: CGFloat? { didSet { if heldSidebarButtonX != oldValue { refreshSidebarButton() } } }
+    /// While the sidebar slides back in, its toggle stays here where the sidebar's own will land (this place in the
+    /// window), still as the traffic lights, until the sidebar arrives with its own. Takes no room.
+    var heldSidebarButtonOrigin: NSPoint? { didSet { if heldSidebarButtonOrigin != oldValue { refreshSidebarButton() } } }
 
     private func refreshSidebarButton() {
-        sidebarButton.isHidden = !showsSidebarButton && heldSidebarButtonX == nil
+        sidebarButton.isHidden = !showsSidebarButton && heldSidebarButtonOrigin == nil
         needsLayout = true
     }
 
@@ -181,16 +181,17 @@ final class TopBarView: NSView {
         let frames = Self.frames(width: bounds.width, buttons: buttons.count, sidebarButton: showsSidebarButton,
                                  trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset, trailingInset: trailingInset)
         var places: [(view: NSView, frame: NSRect)] = []
-        if let toggle = frames.sidebarButton {
-            places.append((sidebarButton, toggle))
-        } else if let x = heldSidebarButtonX {
-            let b = Tokens.Sidebar.button
-            places.append((sidebarButton, NSRect(x: x - frame.minX, y: Self.height / 2 - b / 2, width: b, height: b)))
-        }
+        if let toggle = frames.sidebarButton { places.append((sidebarButton, toggle)) }
         for (button, rect) in zip(buttons, frames.buttons) where button.superview === self { places.append((button, rect)) }
         if let address, address.superview === self { places.append((address, frames.address)) }
         for (strip, place) in zip(strips, stripPlaces) where strip.superview === self { places.append((strip, place.frame)) }
-        return places.map { ($0.view, $0.frame.offsetBy(dx: 0, dy: rowTop)) }
+        places = places.map { ($0.view, $0.frame.offsetBy(dx: 0, dy: rowTop)) }
+        // Held for the sidebar's own: where that one lands in the window, whatever the bar's row is doing.
+        if frames.sidebarButton == nil, let origin = heldSidebarButtonOrigin {
+            let b = Tokens.Sidebar.button
+            places.append((sidebarButton, NSRect(x: origin.x - frame.minX, y: origin.y - frame.minY, width: b, height: b)))
+        }
+        return places
     }
 
     private var stripPlaces: [Strip] {

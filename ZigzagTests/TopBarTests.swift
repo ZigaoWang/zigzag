@@ -133,6 +133,23 @@ struct TopBarTests {
         #expect(topBar.frame.minY + buttons[0].frame.minY == held)
     }
 
+    @Test func theHeldToggleStaysWhereTheSidebarsLands() {
+        // Full screen, framed: the sidebar comes back and the bar's row moves down with the frame. The toggle held
+        // for the sidebar's own keeps to where that one lands in the window, not to the row.
+        let topBar = TopBarView(frame: NSRect(x: 0, y: 0, width: 1280, height: bar + inset))
+        topBar.rowTop = inset
+        topBar.heldSidebarButtonOrigin = NSPoint(x: 6, y: 9)
+        topBar.layoutSubtreeIfNeeded()
+        #expect(!topBar.sidebarButton.isHidden && topBar.sidebarButton.frame.origin == NSPoint(x: 6, y: 9))
+        // The bar in its own frame, the inset down: the same place in the window.
+        topBar.frame = NSRect(x: 240, y: inset, width: 1040, height: bar)
+        topBar.rowTop = 0
+        topBar.layoutSubtreeIfNeeded()
+        #expect(topBar.sidebarButton.frame.offsetBy(dx: 240, dy: inset).origin == NSPoint(x: 6, y: 9))
+        topBar.heldSidebarButtonOrigin = nil
+        #expect(topBar.sidebarButton.isHidden)
+    }
+
     @Test func asTheSidebarGoesTheControlsStartWhereTheyWere() {
         // The sidebar hides: the bar holds still over the whole width, and its controls start from where they were.
         let parent = NSView(frame: window)
