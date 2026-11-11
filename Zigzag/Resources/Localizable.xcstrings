@@ -7613,7 +7613,7 @@
       }
     },
     "New Space" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nButton beside Your Spaces in Settings › Spaces.\nItem in a space's context menu.\nTooltip of the button that adds a space, at the bottom of the sidebar.\nUndo action name, shown in the Edit menu as Undo New Space.\nView menu item.\nWhat Edit › Undo undoes after a space is added.",
+      "comment" : "A command in the command bar, named as in the menu bar.\nButton beside Your Spaces in Settings › Spaces.\nItem in a space's context menu.\nUndo action name, shown in the Edit menu as Undo New Space.\nView menu item.\nWhat Edit › Undo undoes after a space is added.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7623,24 +7623,35 @@
         }
       }
     },
-    "New Space or Folder" : {
-      "comment" : "Tooltip of the + button at the bottom of the sidebar: opens a menu to add a space or a folder.",
+    "New Space…" : {
+      "comment" : "Item in the menu of the sidebar's + and its empty space: adds a space and opens it to be named.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新建空间或文件夹"
+            "value" : "新建空间…"
           }
         }
       }
     },
     "New Tab" : {
-      "comment" : "A tab’s title before it has a page, in the sidebar.\nFile menu item.\nIn the tab overview (all spaces' tabs as cards), a button in a space with no tabs.\nItem in the menu of the sidebar's empty space.\nName the site panel shows for a new tab with no page.\nThe New Tab row in the sidebar, above the tabs.\nThe name of a tab with no page yet.",
+      "comment" : "A tab’s title before it has a page, in the sidebar.\nFile menu item.\nIn the tab overview (all spaces' tabs as cards), a button in a space with no tabs.\nItem in the menu of the sidebar's + and its empty space.\nName the site panel shows for a new tab with no page.\nThe New Tab row in the sidebar, above the tabs.\nThe name of a tab with no page yet.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "新建标签页"
+          }
+        }
+      }
+    },
+    "New Tab, Folder or Space" : {
+      "comment" : "Tooltip of the + button at the bottom of the sidebar: opens a menu to add a tab, a folder or a space.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建标签页、文件夹或空间"
           }
         }
       }

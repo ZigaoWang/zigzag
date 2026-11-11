@@ -1510,7 +1510,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.forwardButton.toolTip = Shortcuts.tooltip(String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."), for: #selector(goForward(_:)))
         sidebar.reloadButton.toolTip = SidebarView.reloadTip(loading: selectedTab?.isLoading ?? false)
         sidebar.downloadsButton.toolTip = Shortcuts.tooltip(String(localized: "Downloads", comment: "Tooltip of the sidebar's downloads button."), for: #selector(showDownloads(_:)))
-        sidebar.newSpaceButton.toolTip = Shortcuts.tooltip(String(localized: "New Space", comment: "Tooltip of the button that adds a space, at the bottom of the sidebar."), for: #selector(newSpace(_:)))
         sidebar.sidebarButton.isSelected = false
     }
 
@@ -2219,11 +2218,8 @@ extension BrowserWindowController: SidebarDelegate {
 
     func sidebarOpenCommandBar() { commandBar.show(mode: .editCurrent) }
     func sidebarSwitchSpace(_ id: UUID) { tabManager.switchToSpace(id) }
-    func sidebarAddMenu() -> NSMenu? {
-        let menu = SidebarMenus.addMenu(controller: self)
-        return menu.items.isEmpty ? nil : menu
-    }
-    func sidebarBlankMenu() -> NSMenu? { SidebarMenus.blankMenu(controller: self) }
+    func sidebarAddMenu() -> [MenuPanel.Entry] { SidebarMenus.addPanel(controller: self) }
+    func sidebarBlankMenu() -> [MenuPanel.Entry] { SidebarMenus.blankPanel(controller: self) }
     func sidebarShowDownloads(from view: NSView) { DownloadsPanel.show(from: view, in: self) }
     func sidebarSpaceMenu(for id: UUID) -> NSMenu? {
         let menu = SidebarMenus.spaceMenu(for: id, controller: self)

@@ -355,51 +355,76 @@ enum SidebarMenus {
         return menu
     }
 
-    /// What the sidebar's own menus hold, in order, before they're made into items: the right-click on its empty
-    /// space and the + at its bottom.
+    /// What the sidebar's own menus hold, in order, before they're made into items: the + at its bottom and the
+    /// right-click on its empty space. Both are Zigzag's own drawn menu (`MenuPanel`), so they look and work alike.
     enum Entry: Equatable { case newTab, newFolder, editSpace, newSpace, separator }
 
-    /// Right-click on the sidebar where there's no row or button: what you'd make here, then the space itself. A
-    /// private window keeps no pinned tabs or spaces, so only a tab.
+    /// The + at the bottom of the sidebar: what you can add, smallest first. A private window keeps no pinned tabs
+    /// or spaces, so only a tab.
+    static func addEntries(isPrivate: Bool) -> [Entry] {
+        isPrivate ? [.newTab] : [.newTab, .newFolder, .newSpace]
+    }
+
+    /// Right-click on the sidebar where there's no row or button: the same as the +, with the space itself beside
+    /// a new one.
     static func blankEntries(isPrivate: Bool) -> [Entry] {
         isPrivate ? [.newTab] : [.newTab, .newFolder, .separator, .editSpace, .newSpace]
     }
 
-    /// The + at the bottom of the sidebar: the bigger things to add, the space first, as the button stands among
-    /// the spaces.
-    static func addEntries(isPrivate: Bool) -> [Entry] {
-        isPrivate ? [] : [.newSpace, .newFolder]
-    }
-
-    static func blankMenu(controller: BrowserWindowController) -> NSMenu {
-        menu(blankEntries(isPrivate: controller.tabManager.isPrivate), controller: controller)
-    }
-
-    static func addMenu(controller: BrowserWindowController) -> NSMenu {
-        menu(addEntries(isPrivate: controller.tabManager.isPrivate), controller: controller)
-    }
-
-    private static func menu(_ entries: [Entry], controller: BrowserWindowController) -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        for entry in entries {
-            switch entry {
-            case .separator: menu.addItem(.separator())
-            case .newTab:
-                menu.addItem(Item(String(localized: "New Tab", comment: "Item in the menu of the sidebar's empty space.")) { [weak controller] in controller?.listNewTab() })
-            case .newFolder:
-                menu.addItem(Item(String(localized: "New Folder", comment: "Item in a space's context menu.")) { [weak controller] in controller?.newFolder() })
-            case .editSpace:
-                // Beside the space's name, as the View menu's Edit Space… opens it.
-                menu.addItem(Item(String(localized: "Edit Space…", comment: "Item in a space's context menu.")) { [weak controller] in
-                    guard let controller else { return }
-                    controller.openSpaceEditor(controller.tabManager.currentSpaceID, anchor: controller.sidebar.list.headerView)
-                })
-            case .newSpace:
-                menu.addItem(Item(String(localized: "New Space", comment: "Item in a space's context menu.")) { [weak controller] in controller?.newSpace(nil) })
-            }
+    /// What an entry is called, its symbol and the shortcut the menu bar gives it now (none for a folder).
+    static func title(of entry: Entry) -> String {
+        switch entry {
+        case .newTab: String(localized: "New Tab", comment: "Item in the menu of the sidebar's + and its empty space.")
+        case .newFolder: String(localized: "New Folder", comment: "Item in a space's context menu.")
+        case .editSpace: String(localized: "Edit Space…", comment: "Item in a space's context menu.")
+        case .newSpace: String(localized: "New Space…", comment: "Item in the menu of the sidebar's + and its empty space: adds a space and opens it to be named.")
+        case .separator: ""
         }
-        return menu
+    }
+
+    static func symbol(of entry: Entry) -> String? {
+        switch entry {
+        case .newTab: "plus"
+        case .newFolder: "folder.badge.plus"
+        case .editSpace: "pencil"
+        case .newSpace: "plus.square"
+        case .separator: nil
+        }
+    }
+
+    static func action(of entry: Entry) -> Selector? {
+        switch entry {
+        case .newTab: #selector(BrowserWindowController.newTab(_:))
+        case .newSpace: #selector(BrowserWindowController.newSpace(_:))
+        case .editSpace: #selector(BrowserWindowController.renameSpace(_:))
+        case .newFolder, .separator: nil
+        }
+    }
+
+    static func addPanel(controller: BrowserWindowController) -> [MenuPanel.Entry] {
+        panel(addEntries(isPrivate: controller.tabManager.isPrivate), controller: controller)
+    }
+
+    static func blankPanel(controller: BrowserWindowController) -> [MenuPanel.Entry] {
+        panel(blankEntries(isPrivate: controller.tabManager.isPrivate), controller: controller)
+    }
+
+    private static func panel(_ entries: [Entry], controller: BrowserWindowController) -> [MenuPanel.Entry] {
+        entries.map { entry in
+            guard entry != .separator else { return .separator }
+            let shortcut = action(of: entry).map(Shortcuts.keys(for:)) ?? ""
+            return .item(MenuPanel.Item(title: title(of: entry), symbol: symbol(of: entry), shortcut: shortcut) { [weak controller] in
+                guard let controller else { return }
+                switch entry {
+                case .newTab: controller.listNewTab()
+                case .newFolder: controller.newFolder()
+                // Beside the space's name, as the View menu's Edit Space… opens it.
+                case .editSpace: controller.openSpaceEditor(controller.tabManager.currentSpaceID, anchor: controller.sidebar.list.headerView)
+                case .newSpace: controller.newSpace(nil)
+                case .separator: break
+                }
+            })
+        }
     }
 
     private static func swatch(_ color: NSColor) -> NSImage {

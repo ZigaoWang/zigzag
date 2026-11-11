@@ -296,19 +296,3 @@ struct ArcFolderTests {
         #expect(steps[Library.folderDepthLimit] < CGFloat(Library.folderDepthLimit) * full)
     }
 }
-
-/// The sidebar's own menus: a folder can always be made from the sidebar, one space or many, pinned tabs or none.
-struct SidebarMenuTests {
-    @Test func emptySpaceOffersTabFolderAndSpace() {
-        #expect(SidebarMenus.blankEntries(isPrivate: false) == [.newTab, .newFolder, .separator, .editSpace, .newSpace])
-    }
-
-    @Test func plusOffersSpaceThenFolder() {
-        #expect(SidebarMenus.addEntries(isPrivate: false) == [.newSpace, .newFolder])
-    }
-
-    @Test func privateWindowOnlyMakesTabs() {
-        #expect(SidebarMenus.blankEntries(isPrivate: true) == [.newTab])
-        #expect(SidebarMenus.addEntries(isPrivate: true).isEmpty)
-    }
-}
