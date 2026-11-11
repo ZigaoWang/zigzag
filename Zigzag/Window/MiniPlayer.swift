@@ -84,12 +84,11 @@ final class MiniPlayer {
         apply(model.switched(shown: shown, playing: playing?.id))
     }
 
-    /// Whether this tab's video would follow you out of it: its page is on screen and plays a video, and isn't
-    /// floating or filling the screen with it itself.
+    /// Whether this tab's video would follow you out of it: its page is on screen, and plays a video you were
+    /// watching (`MiniPlayerLayout.followed`), not one it's leaving behind for a page on its way in.
     private func follows(_ tab: Tab) -> Bool {
-        guard !tab.isPeek, !tab.isClosed, let webView = tab.webView, webView.window != nil, tab.pageHolder?.superview?.superview is PageCardView,
-              !PageVideos.shared.isPresentingItself(webView) else { return false }
-        return PageVideos.shared.playing(in: webView) != nil
+        guard !tab.isPeek, !tab.isClosed, let webView = tab.webView, webView.window != nil, tab.pageHolder?.superview?.superview is PageCardView else { return false }
+        return PageVideos.shared.followed(in: webView, leavingPage: tab.isLeavingPage) != nil
     }
 
     /// Tabs came or went: one closed, or moved to another window, takes the player with it.
@@ -140,7 +139,8 @@ final class MiniPlayer {
     // MARK: Showing and going
 
     private func start(_ tab: Tab) {
-        guard let controller, let webView = tab.webView, let holder = tab.pageHolder, let (frame, video) = PageVideos.shared.playing(in: webView) else {
+        guard let controller, let webView = tab.webView, let holder = tab.pageHolder,
+              let (frame, video) = PageVideos.shared.followed(in: webView, leavingPage: tab.isLeavingPage) else {
             _ = model.lost(tab.id)
             return
         }
@@ -262,14 +262,14 @@ final class MiniPlayer {
     /// again, the page is let go of, as it would be with no mini player.
     private func parkedPageReported(_ webView: BrowserWebView) {
         guard let index = parked.firstIndex(where: { $0.webView === webView }) else { return }
-        if PageVideos.shared.playing(in: webView) != nil {
+        if PageVideos.shared.playing(in: webView, any: true) != nil {
             parked[index].stopped?.cancel()
             parked[index].stopped = nil
             return
         }
         guard parked[index].stopped == nil else { return }
         let wait = DispatchWorkItem { [weak self, weak webView] in
-            guard let self, let webView, PageVideos.shared.playing(in: webView) == nil else { return }
+            guard let self, let webView, PageVideos.shared.playing(in: webView, any: true) == nil else { return }
             self.unpark { $0.webView === webView }
         }
         parked[index].stopped = wait

@@ -181,12 +181,19 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
         return Array(entry.frames.values)
     }
 
-    /// The video that would follow you out of this page, and the frame it's in.
-    func playing(in webView: WKWebView) -> (frame: Frame, video: PageVideo)? {
-        let found = frames(in: webView).compactMap { frame in MiniPlayerLayout.choose(frame.videos, viewport: frame.viewport).map { (frame, $0) } }
-        // Across frames, by the same rule.
-        guard let best = MiniPlayerLayout.choose(found.map(\.1), viewport: .init(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude)) else { return nil }
-        return found.first { $0.1 == best }.map { (frame: $0.0, video: $0.1) }
+    /// The video that would follow you out of this page, and the frame it's in: one you were watching. `any`: any
+    /// video playing a picture, for a page the mini player already has.
+    func playing(in webView: WKWebView, any: Bool = false) -> (frame: Frame, video: PageVideo)? {
+        let all = frames(in: webView)
+        return MiniPlayerLayout.best(in: all.map { ($0.viewport, $0.videos) }, by: any ? MiniPlayerLayout.plays : MiniPlayerLayout.follows)
+            .map { (frame: all[$0.frame], video: $0.video) }
+    }
+
+    /// The video leaving this page takes along, by `MiniPlayerLayout.followed`.
+    func followed(in webView: WKWebView, leavingPage: Bool) -> (frame: Frame, video: PageVideo)? {
+        let all = frames(in: webView)
+        return MiniPlayerLayout.followed(in: all.map { ($0.viewport, $0.videos) }, leavingPage: leavingPage, presentingItself: isPresentingItself(webView))
+            .map { (frame: all[$0.frame], video: $0.video) }
     }
 
     /// The page floats a video in Picture in Picture, or shows one in full screen, itself.
