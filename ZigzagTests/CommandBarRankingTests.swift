@@ -21,4 +21,21 @@ struct CommandBarRankingTests {
         #expect(!CommandRanker.repeatsCommand(URL(string: "https://example.com/settings")!, offered: ["settings"]))
         #expect(!CommandRanker.repeatsCommand(nil, offered: ["settings"]))
     }
+
+    @Test func miniLeavesOutPagesThatFailedToLoad() {
+        let tabs = [FakeTab("on"), FakeTab("a"), FakeTab("bad", failed: true), FakeTab("b"), FakeTab("cert", failed: true)]
+        let mini = CommandRanker.recentChoices(tabs, selected: tabs[0], failed: \.failed, leavingOutFailed: true)
+        #expect(mini.map(\.name) == ["a", "b"])
+        // A browser window's ⌘T still lists them: switching back to retry one is a fair thing to want there.
+        let bar = CommandRanker.recentChoices(tabs, selected: tabs[0], failed: \.failed, leavingOutFailed: false)
+        #expect(bar.map(\.name) == ["a", "bad", "b", "cert"])
+    }
+
+    @Test func recentListStaysAtSix() {
+        let tabs = (0..<10).map { FakeTab("\($0)") }
+        #expect(CommandRanker.recentChoices(tabs, selected: nil, failed: \.failed, leavingOutFailed: true).count == 6)
+        // The one you're on is left out of the six, as before.
+        #expect(CommandRanker.recentChoices(tabs, selected: tabs[2], failed: \.failed, leavingOutFailed: false).map(\.name)
+                == ["0", "1", "3", "4", "5"])
+    }
 }
