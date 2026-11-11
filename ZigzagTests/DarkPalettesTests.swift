@@ -55,6 +55,12 @@ struct DarkPalettesTests {
     }
 
     /// Too big together: the latest page's palette alone.
+    @Test func aPaletteTooBigOnItsOwnIsTheFilter() {
+        let big = String(repeating: "x", count: DarkPalettes.maxBytes + 1)
+        let made = entry(rules: [big])
+        #expect(made.invert && made.rules.isEmpty)
+    }
+
     @Test func aPaletteTooBigTogetherIsTheLatestAlone() {
         let big = String(repeating: "x", count: DarkPalettes.maxBytes / 2 + 10)
         let first = entry(rules: [big + "1"])
@@ -161,6 +167,8 @@ struct DarkPalettesTests {
         DarkPages.pureBlack = black
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = store
+        // A web view in no window is a tab in the background, whose timers WebKit slows more and more: not here.
+        configuration.preferences.inactiveSchedulingPolicy = .none
         let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
         DarkPages.attach(to: webView)
         let loading = Loading()
@@ -283,6 +291,31 @@ struct DarkPalettesTests {
             #expect(filter?.contains("invert") == true)
             let marked = await until { DarkPalettes.entry(origin: origin, black: false, scope: "default")?.invert == true }
             #expect(marked)
+            DarkPalettes.forget(scope: "default", site: DarkPalettes.site(ofOrigin: origin))
+        }
+    }
+
+    /// A big site's style (8,000 rules, 48,000 colors) is read in idle slices inside the time it's allowed, and isn't
+    /// written into a sheet that big.
+    @Test func aBigSitesStyleIsReadQuickly() async throws {
+        try await withDefaults {
+            let origin = "https://big-\(UUID().uuidString.prefix(8).lowercased()).test"
+            let rules = (0..<8000).map { i in
+                ".c\(i) { color: #\(String(format: "%06x", (i * 2654435) & 0xffffff)); background-color: rgb(\(240 + i % 16), 245, 250); border: 1px solid #d0d7de; }"
+            }.joined(separator: "\n")
+            let html = "<html><head><style>:root { --bg: #fff; --fg: #222 } body { background: var(--bg); color: var(--fg) }\n\(rules)</style></head><body><p>Big</p></body></html>"
+            let webView = await page(html, at: origin)
+            let made = await until(30) { DarkPalettes.entry(origin: origin, black: false, scope: "default") != nil }
+            let seen = try await state(webView)
+            #expect(made, "\(seen)")
+            let stats = DarkPages.lastAnalysis
+            print("dark palette analysis, 8000 rules: \(stats)")
+            #expect(stats["finished"] as? Bool == true, "\(stats)")
+            #expect(stats["declarations"] as? Int == 48003, "\(stats)")
+            #expect((stats["ms"] as? Double ?? 999) < 400, "\(stats)")
+            #expect((stats["rules"] as? Int ?? 0) > 8000)
+            // Overrides for 48,000 colors would come to megabytes: too much to put in each page, so the site keeps the filter.
+            #expect(DarkPalettes.entry(origin: origin, black: false, scope: "default")?.invert == true)
             DarkPalettes.forget(scope: "default", site: DarkPalettes.site(ofOrigin: origin))
         }
     }
