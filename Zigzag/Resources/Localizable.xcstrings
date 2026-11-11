@@ -3266,7 +3266,7 @@
       }
     },
     "Change Icon…" : {
-      "comment" : "Item in a folder's context menu in the sidebar.",
+      "comment" : "Item in the context menu of a folder, a tab, a pinned tab or a favorite in the sidebar. Opens the icon choices.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14619,6 +14619,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用所选内容查找"
+          }
+        }
+      }
+    },
+    "Use Site Icon" : {
+      "comment" : "Item in the context menu of a tab, a pinned tab or a favorite that has an icon you chose: puts the site's own icon back. Also the tooltip of that choice among the icons.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用网站图标"
           }
         }
       }
