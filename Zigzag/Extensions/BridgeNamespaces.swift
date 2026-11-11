@@ -741,9 +741,14 @@ final class ExtensionFetchRequests {
               options["body"] == nil || options["body"] is NSNull || options["body"] is String else {
             throw BridgeError("Unsupported extension request.")
         }
+        var headers = (options["headers"] as? [[String]] ?? []).filter { $0.count == 2 }
+        // The browser's own, as WebKit's fetch would send, rather than the session's CFNetwork one.
+        if let agent = options["userAgent"] as? String, !agent.isEmpty, !headers.contains(where: { $0[0].lowercased() == "user-agent" }) {
+            headers.append(["User-Agent", agent])
+        }
         // Derived from the native-message sender, never a payload-supplied Origin or a website's origin.
         return ExtensionWrite.Request(url: url, method: method, body: (options["body"] as? String).map { Data($0.utf8) },
-                                      headers: (options["headers"] as? [[String]] ?? []).filter { $0.count == 2 },
+                                      headers: headers,
                                       cache: options["cache"] as? String, redirect: options["redirect"] as? String,
                                       origin: "chrome-extension://\(extensionID)")
     }

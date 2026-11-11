@@ -356,6 +356,24 @@ extension ExtensionBridgeTests {
         #expect(ExtensionWrite.mayBeSet("X-HTTP-Method-Override", "DELETE"))
     }
 
+    /// A write says it's the browser, as WebKit's fetch would, unless the extension chose its own user agent.
+    @Test func writesSendTheBrowsersUserAgent() async throws {
+        let server = try SessionTestServer()
+        let url = try await server.start().appendingPathComponent("headers")
+        defer { server.listener.cancel() }
+        let agent = "Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 (KHTML, like Gecko) Synthetic"
+        func sent(_ options: [String: Any]) async throws -> String {
+            let response = try #require(try await ExtensionFetchRequests().response(options, url: url, extensionID: "test", store: .nonPersistent()) as? [String: Any])
+            return String(decoding: Data(base64Encoded: try #require(response["body"] as? String)) ?? Data(), as: UTF8.self)
+        }
+        #expect(try await sent(["method": "POST", "body": "{}", "userAgent": agent]).contains("User-Agent: \(agent)\r\n"))
+        let own = try await sent(["method": "POST", "body": "{}", "userAgent": agent, "headers": [["user-agent", "Own/1.0"]]])
+        #expect(own.contains("Own/1.0") && !own.contains("Synthetic"))
+        // Headers fetch forbids never reach the server, even sent straight to the bridge.
+        let forced = try await sent(["method": "POST", "body": "{}", "headers": [["Upgrade", "websocket"], ["Via", "forged"], ["X-Ok", "fine"]]])
+        #expect(forced.contains("X-Ok: fine") && !forced.lowercased().contains("upgrade:") && !forced.lowercased().contains("via:"))
+    }
+
     /// A plain-HTTP write to another machine stays with WebKit, which knows the sites kept on HTTPS.
     @Test func plainHTTPWritesLeaveThisMacOnlyThroughWebKit() async throws {
         let response = try await ExtensionFetchRequests().response(["method": "POST", "body": "{}"], url: URL(string: "http://remote.example/write")!,
@@ -559,6 +577,7 @@ nonisolated private final class SessionTestServer: @unchecked Sendable {
             let signedIn = text.components(separatedBy: "\r\n").contains { $0.lowercased().hasPrefix("cookie:") && $0.contains("session=synthetic") }
             let body = path == "/binary" ? Data([0, 255, 128, 65])
                 : path == "/echo" ? Data(bytes[boundary.upperBound..<(boundary.upperBound + length)])
+                : path == "/headers" ? Data(text.utf8)
                 : Data("{\"signedIn\":\(signedIn)}".utf8)
             let logoutOK = text.components(separatedBy: "\r\n").contains { $0.lowercased() == "origin: chrome-extension://test" }
                 && text.components(separatedBy: "\r\n").contains { $0.lowercased().hasPrefix("cookie:") && $0.contains("logout_token=test-session") && !$0.contains("session=forged") }

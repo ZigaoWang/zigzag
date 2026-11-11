@@ -8,6 +8,8 @@
   // "Safari", they take a Safari branch that expects Safari's own plumbing and stops. So their code reads Chrome, while
   // what they send to servers stays Zigzag's own, as servers that compare it with the connection expect.
   const nav = typeof navigator !== 'undefined' ? navigator : null;
+  // What WebKit sends, for the requests Zigzag sends for the extension itself (extensionFetch below).
+  const sentUserAgent = nav ? String(nav.userAgent) : '';
   if (nav && !/Chrome\//.test(nav.userAgent)) {
     const asChrome = nav.userAgent.replace(/Version\/[\d.]+ Safari\/[\d.]+/, 'Chrome/140.0.0.0 Safari/537.36');
     const proto = Object.getPrototypeOf(nav);
@@ -111,7 +113,7 @@
       signal.addEventListener('abort', abort, { once: true });
       try {
         const answer = await Promise.race([send('extensionFetch', 'fetch', [{ requestID, url: request.url, method,
-          headers: [...request.headers.entries()], body, cache: request.cache, redirect: request.redirect }]), aborted]);
+          headers: [...request.headers.entries()], body, cache: request.cache, redirect: request.redirect, userAgent: sentUserAgent }]), aborted]);
         signal.throwIfAborted();
         if (answer.fallback) return nativeFetch(input, init);
         const bytes = Uint8Array.from(atob(answer.body), (byte) => byte.charCodeAt(0));
