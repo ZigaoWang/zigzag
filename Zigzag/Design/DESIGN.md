@@ -366,9 +366,9 @@ something came from, answers at once, and can be interrupted.
   - Quiet (`.quiet`): no fill until the pointer is over it.
   `PrimaryButton` and `TextButton` draw the same looks for the forms that still use them; new code uses `PillButton`.
 - **Switch** (`Toggle`): a slide switch, 34 by 20: a matte recessed track (shade under its upper lip, a hairline
-  around it) and a small round 14pt knob. Off, the knob is porcelain on the left; on, it slides right and takes the
-  space's accent. The track never lights up: what's on is the knob, so on and off differ by place
-  and by color. The knob settles in 200ms on a critically damped spring and stretches
+  around it) and a small round 14pt knob. Off, a porcelain knob on the left of a neutral track; on, the knob slides
+  right, turns white, and the track fills with the space's accent (`Switch.knobOn`, `edgeOn`), a step deeper under
+  the pointer, so on reads at a glance in every space and with Increase Contrast. The knob settles in 200ms on a critically damped spring and stretches
   4pt while held; the track's color fades over the same time. Reduce Motion: the knob jumps, the color fades.
 - **Field** (`FilledField`): soft fill, accent ring while typing; `.isPill` for a field on its own in a panel;
   `.isOutlined` for the page look, white with a hairline and a faint shadow like the buttons beside it, which a

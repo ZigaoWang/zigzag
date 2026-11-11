@@ -1169,6 +1169,11 @@ enum Tokens {
         static let recess = Color.dynamic(light: ink(0.07), dark: ink(0.25))
         static let recessDepth: CGFloat = 0.55
         static let knob = Color.dynamic(light: Color.hex(0xFBFAF8), dark: Color.hex(0xE9E7E4))
+        /// On: white on the accent-filled track, in both modes.
+        static let knobOn = Color.hex(0xFFFFFF)
+        /// On: the accent track's edge, a touch deeper than it, stronger with Increase Contrast.
+        static let edgeOn = Color.dynamic(light: ink(0.1), dark: ink(0.2),
+            highLight: ink(0.45), highDark: Color.hex(0xFFFFFF, alpha: 0.4))
         static let knobEdge = Color.dynamic(light: ink(0.11), dark: ink(0.3),
             highLight: ink(0.4), highDark: ink(0.5))
         static let knobShadow = Color.dynamic(light: ink(0.18), dark: ink(0.45))

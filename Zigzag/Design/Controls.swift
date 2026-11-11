@@ -930,10 +930,10 @@ final class ChoicePill: InteractiveView {
     }
 }
 
-/// A slide switch, as on a good piece of hardware: a small round knob in a recessed track. Off, the knob is matte
-/// porcelain on the left; on, it slides right and takes the space's own accent. The track never lights up:
-/// what's on is the knob. It stretches a little while held, so a press reads at once; with Reduce Motion it moves
-/// at once and only the color fades.
+/// A slide switch, as on a good piece of hardware: a small round knob in a recessed track. Off, a porcelain knob on
+/// the left of a neutral track; on, the knob slides right and the track fills with the space's own accent, so on
+/// reads at a glance. It stretches a little while held, so a press reads at once; with Reduce Motion it moves at
+/// once and only the color fades.
 final class Toggle: InteractiveView {
     private let knob = CALayer()
     /// The track's recess: shade under its upper lip.
@@ -1010,13 +1010,16 @@ final class Toggle: InteractiveView {
     }
 
     private func paint(fading: Bool) {
-        // The recess: a matte track a step darker than what it's set in, deeper under the pointer (`Switch`).
+        // Off, the recess: a matte track a step darker than what it's set in, deeper under the pointer (`Switch`).
+        // On, the track is the space's accent, a step deeper under the pointer and pressed.
         typealias S = Tokens.Switch
-        let track = isPressed ? S.trackPressed : isHovered ? S.trackHover : S.track
+        let accent = Brand.Theme.for(self).accent
+        let track = isOn ? (isPressed ? accent.withSystemEffect(.pressed) : isHovered ? accent.withSystemEffect(.rollover) : accent)
+            : (isPressed ? S.trackPressed : isHovered ? S.trackHover : S.track)
         layer?.set(backgroundColor: cgColor(track), animated: fading, duration: Tokens.Motion.standard)
-        knob.set(backgroundColor: cgColor(isOn ? Brand.Theme.for(self).accent : S.knob), animated: fading, duration: Tokens.Motion.standard)
+        knob.set(backgroundColor: cgColor(isOn ? S.knobOn : S.knob), animated: fading, duration: Tokens.Motion.standard)
         Tokens.Motion.withoutAnimation {
-            layer?.borderColor = cgColor(S.edge)
+            layer?.borderColor = cgColor(isOn ? S.edgeOn : S.edge)
             recess.colors = [cgColor(S.recess), cgColor(NSColor.clear)]
             recess.startPoint = CGPoint(x: 0.5, y: isFlipped ? 0 : 1)
             recess.endPoint = CGPoint(x: 0.5, y: isFlipped ? S.recessDepth : 1 - S.recessDepth)
