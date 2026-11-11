@@ -80,15 +80,54 @@ struct TutorialTests {
 
     @Test func ringStaysInsideTheWindow() {
         let window = NSRect(x: 0, y: 0, width: 800, height: 600)
-        // The + in the bottom corner: the ring's outset is cut back at the window's edges.
+        // The + in the bottom corner: a smaller ring, still round and centered on it, inside the window.
         let corner = Tutorial.ringRect(visible: NSRect(x: 770, y: 570, width: 28, height: 28), outset: 5, within: window, margin: 3)
-        #expect(corner == NSRect(x: 765, y: 565, width: 32, height: 32))
+        #expect(corner == NSRect(x: 771, y: 571, width: 26, height: 26))
         // Well inside: the full outset.
         let inside = Tutorial.ringRect(visible: NSRect(x: 100, y: 100, width: 200, height: 30), outset: 5, within: window, margin: 3)
         #expect(inside == NSRect(x: 95, y: 95, width: 210, height: 40))
-        // A row hanging past the left edge (a sidebar sliding in) is ringed only where it shows.
+        // A row hanging past the left edge (a sidebar sliding in) is ringed only where it shows, with no outset
+        // past the edge.
         let left = Tutorial.ringRect(visible: NSRect(x: -50, y: 200, width: 200, height: 30), outset: 5, within: window, margin: 3)
-        #expect(left == NSRect(x: 3, y: 195, width: 152, height: 40))
+        #expect(left == NSRect(x: 3, y: 200, width: 147, height: 30))
+        // Every ring it makes is whole inside the window, less the margin.
+        for rect in [corner, inside, left].compactMap({ $0 }) {
+            #expect(window.insetBy(dx: 3, dy: 3).contains(rect))
+        }
+    }
+
+    @Test func noKeysNoPressTheseKeys() {
+        // A step whose shortcut was taken away in Settings says how to do it without keys.
+        for task in Tutorial.tasks where task.keys.isEmpty {
+            #expect(!task.note.contains("these keys"), "\(task.id): \(task.note)")
+        }
+    }
+
+    @Test func lastStepFollowsWhereYouAre() {
+        // Made in the sidebar, the new space opens: the step is to go back.
+        #expect(Tutorial.switchGoesBack(currentSpaceIndex: 1))
+        // Made in Settings, you're still in the first: the step is to go to the new one.
+        #expect(!Tutorial.switchGoesBack(currentSpaceIndex: 0))
+    }
+
+    @Test func overviewPicturesOnlyUnseenLoadedPages() {
+        #expect(Tab.needsPictureOutOfSight(hasWebView: true, onScreen: false, loaded: true, hasPicture: false))
+        #expect(!Tab.needsPictureOutOfSight(hasWebView: true, onScreen: true, loaded: true, hasPicture: false))
+        #expect(!Tab.needsPictureOutOfSight(hasWebView: true, onScreen: false, loaded: false, hasPicture: false))
+        #expect(!Tab.needsPictureOutOfSight(hasWebView: true, onScreen: false, loaded: true, hasPicture: true))
+        #expect(!Tab.needsPictureOutOfSight(hasWebView: false, onScreen: false, loaded: true, hasPicture: false))
+    }
+
+    @Test func draggedTabStaysInTheWindow() {
+        let window = NSRect(x: 0, y: 0, width: 760, height: 560)
+        let size = NSSize(width: 228, height: 30)
+        let grab = CGPoint(x: 40, y: 15)
+        // A narrow window: the middle of the drop is too near the edge for the whole tab.
+        let narrow = TourDemo.dragEnd(drop: NSRect(x: 520, y: 0, width: 220, height: 560), grab: grab, size: size, within: window)
+        #expect(narrow.x + size.width <= window.maxX)
+        // A wide one: right over the middle of the drop.
+        let wide = TourDemo.dragEnd(drop: NSRect(x: 400, y: 0, width: 360, height: 560), grab: grab, size: size, within: NSRect(x: 0, y: 0, width: 1400, height: 560))
+        #expect(wide.x == CGFloat(540))
     }
 
     @Test func noRingForWhatYouCantSee() {
