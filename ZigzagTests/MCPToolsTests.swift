@@ -105,6 +105,30 @@ struct MCPToolsTests {
         #expect(AgentControl.line(for: String(repeating: "a", count: 200)).count < 120)
     }
 
+    /// Stop lets the tab go, keeps it out of reach and disconnects the app; turning the setting off forgets it all.
+    @Test func stopKeepsTheTabOutOfReach() {
+        let control = AgentControl()
+        var disconnected: [MCPClient] = []
+        control.onStop = { disconnected.append($0) }
+        let app = MCPClient(key: "s1", name: "Inspector"), other = MCPClient(key: "s2", name: "Other")
+        let first = Tab(url: URL(string: "https://example.com"), spaceID: UUID()), second = Tab(url: URL(string: "https://example.org"), spaceID: UUID())
+        let third = Tab(url: URL(string: "https://example.net"), spaceID: UUID())
+        control.touch(first, by: app)
+        control.touch(second, by: app)
+        control.touch(third, by: other)
+        control.stop(first.id)
+        #expect(disconnected == [app])
+        #expect(control.isStopped(first.id) && !control.isStopped(second.id))
+        #expect(control.inUse.keys.sorted { $0.uuidString < $1.uuidString } == [third.id])
+        control.release(other)
+        #expect(control.inUse.isEmpty)
+        control.touch(second, by: app, now: Date(timeIntervalSinceNow: -AgentControl.quietAfter - 1))
+        control.forgetQuiet()
+        #expect(control.inUse.isEmpty)
+        control.reset()
+        #expect(!control.isStopped(first.id))
+    }
+
     // MARK: The page script, in a real page
 
     private final class Loading: NSObject, WKNavigationDelegate {
