@@ -310,6 +310,8 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         onClick = { [weak self] _ in self?.openEditor() }
         onRightClick = { [weak self] _ in self?.actionsMenu() }
         editButton.onClick = { [weak self] _ in self?.openEditor() }
+        // Every row has an Edit: VoiceOver says which space it edits.
+        editButton.setAccessibilityLabel(String(localized: "Edit “\(space.name)”", comment: "VoiceOver label of the Edit button on a space's row in Settings › Spaces; the space's name."))
         deleteButton.onClick = { [weak self] _ in
             guard let self, let host = self.host else { return }
             SpaceSettingsRow.confirmDelete(self.spaceID, in: host)
@@ -1364,6 +1366,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         controls.append(remove)
         let installs = profile.installs
         let toggle = Toggle(isOn: installs.isEnabled(id))
+        toggle.setAccessibilityLabel(ext.displayName ?? id)
         toggle.onChange = { on in installs.setEnabled(id, on) }
         controls.append(toggle)
         let stack = NSStackView(views: controls)
@@ -1429,6 +1432,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             let edit = PillButton(title: String(localized: "Edit…", comment: "Button on a profile's row in Settings › Profiles: opens the sheet that renames it and changes its color."))
             edit.onClick = { [weak self] _ in if let self { ProfileSheets.edit(profile.id, in: self) } }
+            edit.setAccessibilityLabel(String(localized: "Edit “\(profile.displayName)”", comment: "VoiceOver label of the Edit button on a profile's row in Settings › Profiles; the profile's name."))
             controls.append(edit)
             let stack = NSStackView(views: controls)
             stack.spacing = Tokens.Space.x2
