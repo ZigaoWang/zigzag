@@ -219,8 +219,11 @@ struct TopBarTests {
         let back = sidebar.backButton.convert(sidebar.backButton.bounds, to: root)
         #expect(back.minX - root.cardFrame.minX == root.cardFrame.maxX - address.maxX)
         #expect(address.maxX == root.bounds.maxX - max(Tokens.Sidebar.edge, root.bounds.maxX - root.cardFrame.maxX))
-        // All of the top row on the traffic lights' line.
-        #expect(back.midY == Tokens.Sidebar.lightsCenter && address.midY == Tokens.Sidebar.lightsCenter)
+        // All of the top row on one line, the bar's middle: the sidebar's toggle (and the lights) too.
+        let line = root.topBar.frame.minY + Tokens.Sidebar.lightsCenter
+        let toggle = sidebar.sidebarButton.convert(sidebar.sidebarButton.bounds, to: root)
+        #expect(back.midY == line && address.midY == line && toggle.midY == line)
+        #expect(sidebar.trafficLightCenterY == line)
 
         sidebar.holdsAddress = true
         root.showsTopBar = false

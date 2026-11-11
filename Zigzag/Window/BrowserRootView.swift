@@ -725,6 +725,8 @@ final class BrowserRootView: SpaceFrameView {
         layoutTopBar()
         sidebarContainer.frame = sidebarFrame
         sidebarContainer.isFloating = !sidebarVisible && !leavesDocked
+        // Docked beside the bar above the page, the sidebar's top row stays on the bar's middle line.
+        sidebarContainer.sidebar.topRowDrop = showsTopBar && !sidebarContainer.isFloating ? topBarFrame.minY : 0
         let handleWidth = Tokens.Metric.resizeHandleWidth
         resizeHandle.frame = NSRect(x: sidebarWidth - handleWidth / 2, y: 0, width: handleWidth, height: bounds.height)
         resizeHandle.isHidden = !sidebarVisible && !isDraggingSidebarEdge

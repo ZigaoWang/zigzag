@@ -859,7 +859,10 @@ final class SidebarView: NSView {
     static let trafficLightsX = Tokens.Sidebar.lightsX
 
     /// The y position (from the top) where the traffic lights should be centered.
-    var trafficLightCenterY: CGFloat { Tokens.Sidebar.lightsCenter }
+    var trafficLightCenterY: CGFloat { Tokens.Sidebar.lightsCenter + topRowDrop }
+    /// How far the top row sits below its usual line: framed, the bar above the page starts the frame's inset down,
+    /// and the lights and the sidebar's toggle stay on its middle line with its buttons (set by the window).
+    var topRowDrop: CGFloat = 0 { didSet { if topRowDrop != oldValue { needsLayout = true } } }
 
     override func layout() {
         super.layout()
