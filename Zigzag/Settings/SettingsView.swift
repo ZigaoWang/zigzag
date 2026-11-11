@@ -1750,6 +1750,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private static var sitesHeading: String { String(localized: "Site Permissions", comment: "A heading in Settings › Privacy: camera, location, pop-ups and other choices made for single sites.") }
     private static var alwaysTranslateHeading: String { String(localized: "Always Translate", comment: "A heading in Settings › Translation.") }
     private static var fillingHeading: String { String(localized: "AutoFill", comment: "A heading in Settings › Passwords: when Zigzag offers to save and fill passwords and forms.") }
+    /// With more than one profile, over the one row every profile shares: what it fills, named plainly, so it doesn't
+    /// read as a second heading for what the one over saving and filling passwords already says.
+    private static var formsHeading: String { String(localized: "Forms", comment: "A heading in Settings › Passwords, with more than one profile, over “Fill forms from My Card”, which every profile shares.") }
     // Over what's one profile's, a heading names the profile once there's more than one: it's the one chosen in the
     // column's menu. A heading that names none is over what every profile shares.
     private var browsingDataHeading: String {
@@ -1804,7 +1807,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .mini: [(nil, miniGroup)]
         case .spaces: [(Self.spacesHeading, spacesGroup)]
         case .profiles: [(Self.profilesHeading, profilesGroup), (Self.unlistedHeading, unlistedGroup)]
-        case .passwords: [(nil, passwordsWindowGroup), (savingHeading, passwordsGroup)] + (hasManyProfiles ? [(Self.fillingHeading, cardGroup)] : [])
+        case .passwords: [(nil, passwordsWindowGroup), (savingHeading, passwordsGroup)] + (hasManyProfiles ? [(Self.formsHeading, cardGroup)] : [])
         case .privacy: [(nil, blockingGroup), (Self.sitesHeading, sitesGroup)] + (SettingsPane.websiteData(manyProfiles: hasManyProfiles) == .privacy ? websiteDataGroups : [])
         case .websiteData: SettingsPane.websiteData(manyProfiles: hasManyProfiles) == .websiteData ? websiteDataGroups : []
         case .translation: [(nil, translationGroup), (Self.alwaysTranslateHeading, alwaysGroup)]

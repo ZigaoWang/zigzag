@@ -5661,6 +5661,17 @@
         }
       }
     },
+    "Forms" : {
+      "comment" : "A heading in Settings › Passwords, with more than one profile, over “Fill forms from My Card”, which every profile shares.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表单"
+          }
+        }
+      }
+    },
     "Forward" : {
       "comment" : "Hidden View menu item, named in Settings › Shortcuts.\nTooltip of a button in the strip on top of each page of a split view: goes forward.\nTooltip of the sidebar's forward button.\nView menu item.",
       "localizations" : {
