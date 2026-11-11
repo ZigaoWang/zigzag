@@ -2984,6 +2984,17 @@
         }
       }
     },
+    "Cache" : {
+      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缓存"
+          }
+        }
+      }
+    },
     "Cache cleared" : {
       "comment" : "Toast after every site's cache is cleared.",
       "localizations" : {
@@ -3002,17 +3013,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已清除 %@ 的缓存"
-          }
-        }
-      }
-    },
-    "Cache." : {
-      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "缓存。"
           }
         }
       }
@@ -4056,24 +4056,35 @@
         }
       }
     },
-    "Cookies and cache." : {
-      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.",
+    "Cookies" : {
+      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cookie 和缓存。"
+            "value" : "Cookie"
           }
         }
       }
     },
-    "Cookies and saved data." : {
-      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.",
+    "Cookies and cache" : {
+      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cookie 和存储的数据。"
+            "value" : "Cookie 和缓存"
+          }
+        }
+      }
+    },
+    "Cookies and saved data" : {
+      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cookie 和存储的数据"
           }
         }
       }
@@ -4100,24 +4111,13 @@
         }
       }
     },
-    "Cookies, saved data and cache." : {
-      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.",
+    "Cookies, saved data and cache" : {
+      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cookie、存储的数据和缓存。"
-          }
-        }
-      }
-    },
-    "Cookies." : {
-      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cookie。"
+            "value" : "Cookie、存储的数据和缓存"
           }
         }
       }
@@ -4562,6 +4562,17 @@
         }
       }
     },
+    "Data" : {
+      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数据"
+          }
+        }
+      }
+    },
     "Data from a profile that’s no longer listed" : {
       "comment" : "Title of a row in Settings › Profiles, for data left on this Mac by a profile that's in no list.",
       "localizations" : {
@@ -4569,17 +4580,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "来自已不在列表中的个人资料的数据"
-          }
-        }
-      }
-    },
-    "Data." : {
-      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "数据。"
           }
         }
       }
@@ -6742,6 +6742,17 @@
         }
       }
     },
+    "Keyboard Shortcuts" : {
+      "comment" : "Help menu item: opens Settings › Shortcuts.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "键盘快捷键"
+          }
+        }
+      }
+    },
     "Knowing when you’re away" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
       "localizations" : {
@@ -7095,7 +7106,7 @@
       }
     },
     "More" : {
-      "comment" : "Tooltip of the … button in the downloads panel.\nTooltip of the … button in the site panel.",
+      "comment" : "Tooltip of a button in the strip on top of each page of a narrow split view: opens a menu with the split's buttons that don't fit.\nTooltip of the … button in the downloads panel.\nTooltip of the … button in the site panel.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10866,24 +10877,24 @@
         }
       }
     },
-    "Saved data and cache." : {
-      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.",
+    "Saved data" : {
+      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "存储的数据和缓存。"
+            "value" : "存储的数据"
           }
         }
       }
     },
-    "Saved data." : {
-      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.",
+    "Saved data and cache" : {
+      "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "存储的数据。"
+            "value" : "存储的数据和缓存"
           }
         }
       }

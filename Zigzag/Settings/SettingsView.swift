@@ -2386,22 +2386,22 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// What a site keeps, in a few plain words: "Cookies, saved data and cache."
+    /// What a site keeps, in a few plain words, as a label under its name: "Cookies, saved data and cache".
     private static func describe(_ types: Set<String>) -> String {
         let cache: Set<String> = [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeFetchCache, WKWebsiteDataTypeOfflineWebApplicationCache]
         let cookies = types.contains(WKWebsiteDataTypeCookies)
         let saved = !types.subtracting(cache).subtracting([WKWebsiteDataTypeCookies]).isEmpty
         let cached = !types.isDisjoint(with: cache)
-        // Each combination a whole sentence, so a language can say it its own way.
+        // Each combination whole, so a language can say it its own way.
         switch (cookies, saved, cached) {
-        case (true, true, true): return String(localized: "Cookies, saved data and cache.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
-        case (true, true, false): return String(localized: "Cookies and saved data.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
-        case (true, false, true): return String(localized: "Cookies and cache.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
-        case (true, false, false): return String(localized: "Cookies.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
-        case (false, true, true): return String(localized: "Saved data and cache.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
-        case (false, true, false): return String(localized: "Saved data.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
-        case (false, false, true): return String(localized: "Cache.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
-        case (false, false, false): return String(localized: "Data.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
+        case (true, true, true): return String(localized: "Cookies, saved data and cache", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
+        case (true, true, false): return String(localized: "Cookies and saved data", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
+        case (true, false, true): return String(localized: "Cookies and cache", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
+        case (true, false, false): return String(localized: "Cookies", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
+        case (false, true, true): return String(localized: "Saved data and cache", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
+        case (false, true, false): return String(localized: "Saved data", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
+        case (false, false, true): return String(localized: "Cache", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
+        case (false, false, false): return String(localized: "Data", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
         }
     }
 
