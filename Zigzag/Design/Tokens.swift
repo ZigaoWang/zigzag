@@ -1050,10 +1050,8 @@ enum Tokens {
         static func ink(on color: NSColor) -> NSColor {
             guard let c = color.usingColorSpace(.sRGB) else { return textPrimary }
             let luminance = 0.2126 * c.redComponent + 0.7152 * c.greenComponent + 0.0722 * c.blueComponent
-            return luminance < inkLine ? hex(0xFFFFFF, alpha: 0.94) : hex(0x000000, alpha: 0.84)
+            return luminance < 0.58 ? hex(0xFFFFFF, alpha: 0.94) : hex(0x000000, alpha: 0.84)
         }
-        /// The luminance under which a color we don't choose takes light ink rather than dark.
-        static let inkLine: CGFloat = 0.58
 
         /// How dark a color is, 0 to 1 by its luminance: for deciding whether a color we don't choose needs an edge.
         static func luminance(of color: NSColor) -> CGFloat {

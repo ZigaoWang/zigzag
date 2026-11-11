@@ -32,9 +32,8 @@ final class TopBarView: NSView {
     }
 
     /// The page's own color under the bar (the page's card reaches up under it, `PageCardView.band`), nil while the
-    /// window's frame shows through. Icons and text turn light or dark to match, as text on a page's color does
-    /// elsewhere (`Color.ink(on:)`), and the fills turn the neutral washes a page's own controls use: the frame's
-    /// white washes would vanish on a white page.
+    /// window's frame shows through. Icons and text turn light or dark, whichever reads more clearly on it, and the
+    /// fills turn the neutral washes a page's own controls use: the frame's white washes would vanish on a white page.
     var pageColor: NSColor? {
         didSet {
             guard pageColor != oldValue else { return }
@@ -49,8 +48,9 @@ final class TopBarView: NSView {
         (address as? AddressView)?.isOnPage = onPage
     }
 
-    /// Whether a page's color takes light controls: by the same line `Color.ink(on:)` draws.
-    static func isDark(_ color: NSColor) -> Bool { Tokens.Color.luminance(of: color) < Tokens.Color.inkLine }
+    /// Whether a page's color takes light controls: white contrasts with it more than black (WCAG), so a mid gray
+    /// keeps dark ones.
+    static func isDark(_ color: NSColor) -> Bool { Brand.contrast(color, .white) > Brand.contrast(color, .black) }
 
     private var buttons: [NSView] = []
     private weak var address: NSView?
