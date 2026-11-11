@@ -293,6 +293,8 @@ enum Tokens {
     /// one; and the last step, a note with the wordmark across its top.
     enum Tour {
         static let cardWidth: CGFloat = 440
+        /// As narrow as a step's card gets, in a narrow window.
+        static let minCardWidth: CGFloat = 280
         /// A step's row: one line, or the line and its why.
         static let rowHeight: CGFloat = Space.x16
         static let rowWithNoteHeight: CGFloat = Space.x16 + Space.x6

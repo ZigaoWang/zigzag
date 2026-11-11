@@ -29,13 +29,17 @@ enum Tutorial {
             Task(id: "newTab",
                  title: String(localized: "Open a new tab", comment: "A step's title in the getting-started guide, a card in the window."),
                  keys: newTabKeys,
-                 note: String(localized: "Press these keys, then search YouTube", comment: "Under a step's title in the getting-started guide, a card in the window."),
+                 note: newTabKeys.isEmpty
+                    ? String(localized: "Click New Tab in the sidebar, then search YouTube", comment: "Under the new tab step's title in the getting-started guide, a card in the window, when New Tab has no shortcut. New Tab is a row in the sidebar.")
+                    : String(localized: "Press these keys, then search YouTube", comment: "Under a step's title in the getting-started guide, a card in the window."),
                  done: String(localized: "You searched YouTube from here", comment: "Said once a step is done in the getting-started guide, a card in the window."),
                  doneNote: String(localized: "Type any site’s name, then Tab, to search it", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window. Tab is the key.")),
             Task(id: "pin",
                  title: String(localized: "Pin this page", comment: "A step's title in the getting-started guide, a card in the window."),
                  keys: pinKeys,
-                 note: String(localized: "Pinned tabs stay, even after you quit", comment: "Under a step's title in the getting-started guide, a card in the window."),
+                 note: pinKeys.isEmpty
+                    ? String(localized: "Right-click its tab, then Pin Tab", comment: "Under the pin step's title in the getting-started guide, a card in the window, when Pin Tab has no shortcut. Pin Tab is an item in a tab's menu in the sidebar.")
+                    : String(localized: "Pinned tabs stay, even after you quit", comment: "Under a step's title in the getting-started guide, a card in the window."),
                  done: String(localized: "Pinned", comment: "Said once a step is done in the getting-started guide, a card in the window."),
                  doneNote: String(localized: "It stays at the top of this space", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window.")),
             Task(id: "peek",
@@ -47,7 +51,9 @@ enum Tutorial {
             Task(id: "overview",
                  title: String(localized: "See all your tabs", comment: "A step's title in the getting-started guide, a card in the window."),
                  keys: overviewKeys,
-                 note: String(localized: "Press these keys to see every tab at once", comment: "Under the tab overview step's title in the getting-started guide, a card in the window."),
+                 note: overviewKeys.isEmpty
+                    ? String(localized: "Choose View › Show All Tabs", comment: "Under the tab overview step's title in the getting-started guide, a card in the window, when Show All Tabs has no shortcut. View is the menu, Show All Tabs its item.")
+                    : String(localized: "Press these keys to see every tab at once", comment: "Under the tab overview step's title in the getting-started guide, a card in the window."),
                  done: String(localized: "Every tab, at a glance", comment: "Said once a step is done in the getting-started guide, a card in the window."),
                  doneNote: overviewKeys.isEmpty
                     ? String(localized: "It’s Show All Tabs, in the View menu", comment: "Under what's said once the tab overview step is done, in the getting-started guide, a card in the window.")
@@ -165,11 +171,28 @@ enum Tutorial {
     /// Where the ring around what to click goes: the part of it you can see (`visible`, nil when it's off screen or
     /// scrolled away), grown by `outset`, and kept `margin` inside `bounds` (the window), so the ring never runs off
     /// an edge. Nil when too little of it shows to point at.
-    static func ringRect(visible: NSRect?, outset: CGFloat, within bounds: NSRect, margin: CGFloat) -> NSRect? {
+    static func ringRect(visible: NSRect?, outset: CGFloat, within bounds: NSRect, margin: CGFloat, roundBelow: CGFloat = 44) -> NSRect? {
         guard let visible, visible.width >= 4, visible.height >= 4 else { return nil }
         let area = bounds.insetBy(dx: margin, dy: margin)
-        let ring = visible.insetBy(dx: -outset, dy: -outset).intersection(area)
-        guard !ring.isNull, ring.width >= 4, ring.height >= 4 else { return nil }
-        return ring
+        // Something small at an edge (the + in the bottom corner): a smaller ring, still whole and centered on it,
+        // rather than one cut flat by the edge.
+        if max(visible.width, visible.height) < roundBelow {
+            let center = CGPoint(x: visible.midX, y: visible.midY)
+            guard area.contains(center) else { return nil }
+            let room = min(center.x - area.minX, area.maxX - center.x, center.y - area.minY, area.maxY - center.y)
+            let halfWidth = min(visible.width / 2 + outset, room), halfHeight = min(visible.height / 2 + outset, room)
+            guard halfWidth >= 2, halfHeight >= 2 else { return nil }
+            return NSRect(x: center.x - halfWidth, y: center.y - halfHeight, width: halfWidth * 2, height: halfHeight * 2)
+        }
+        // Anything bigger: only the part that shows, grown alike on every side as far as there's room.
+        let seen = visible.intersection(area)
+        guard !seen.isNull, seen.width >= 4, seen.height >= 4 else { return nil }
+        let room = min(seen.minX - area.minX, area.maxX - seen.maxX, seen.minY - area.minY, area.maxY - seen.maxY)
+        let grow = max(0, min(outset, room))
+        return seen.insetBy(dx: -grow, dy: -grow)
     }
+
+    /// The last step, said for where you are: in the space you started in (the new one was made in Settings, or
+    /// you've gone back already), it's to go to the new one; anywhere else, back to the first.
+    static func switchGoesBack(currentSpaceIndex: Int) -> Bool { currentSpaceIndex != 0 }
 }

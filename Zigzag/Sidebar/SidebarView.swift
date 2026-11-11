@@ -1246,6 +1246,8 @@ final class SidebarView: NSView {
     var dotsAnchor: NSView { bottomBar }
     /// The first space's dot, or the row when there's only one.
     var firstDotAnchor: NSView { dots.count > 1 ? dots[0] : bottomBar }
+    /// The newest space's dot, or the row when there's only one.
+    var lastDotAnchor: NSView { dots.count > 1 ? dots[dots.count - 1] : bottomBar }
     /// The + that makes a space.
     var newSpaceAnchor: NSView { newSpaceButton }
     var onEditSpace: ((UUID) -> Void)?

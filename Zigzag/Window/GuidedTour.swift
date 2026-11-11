@@ -87,6 +87,7 @@ final class GuidedTour: NSView {
         card.appearance = NSAppearance(named: .darkAqua)
         card.radius = Tokens.Radius.large
         [step, check, title, note, skip, close, finish, wordmark, letter, signature].forEach { card.addSubview($0) }
+        [title, note].forEach { $0.lineBreakMode = .byTruncatingTail }
         wordmark.color = .white
         letter.isSelectable = false
         letter.font = Tokens.Font.body()
@@ -313,6 +314,12 @@ final class GuidedTour: NSView {
             return Display(keys: [], title: title, note: String(localized: "It opens beside this one", comment: "Under the split view step's title in the getting-started guide, a card in the window."),
                            count: count, isDone: false, isFinal: false, target: "split")
         }
+        // A space made in Settings leaves you where you were: the last step is then to go to the new one.
+        if task.id == "switch", let index = Library.shared.spaces.firstIndex(where: { $0.id == controller.tabManager.currentSpaceID }),
+           !Tutorial.switchGoesBack(currentSpaceIndex: index) {
+            return Display(keys: [], title: String(localized: "Switch to your new space", comment: "The last step's title in the getting-started guide, a card in the window, when you're still in the space you started in."),
+                           note: task.note, count: count, isDone: false, isFinal: false, target: "switchNew")
+        }
         return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: task.id)
     }
 
@@ -332,6 +339,7 @@ final class GuidedTour: NSView {
         case "editor": return SpaceEditorPanel.current
         case "addmenu": return MenuPanel.current
         case "switch": return controller.sidebar.firstDotAnchor
+        case "switchNew": return controller.sidebar.lastDotAnchor
         case "done.space", "done.switch": return controller.sidebar.dotsAnchor
         default: return nil
         }
@@ -343,7 +351,10 @@ final class GuidedTour: NSView {
         if key != shown {
             shown = key
             if !now.isDone, !now.isFinal {
-                if Tutorial.current?.id == "peek", lastStepID != "peek" { openArticle() }
+                if Tutorial.current?.id == "peek", lastStepID != "peek" {
+                    openArticle()
+                    if !hasSplitPartner { openSplitPartner() }
+                }
                 if ["overview", "split"].contains(Tutorial.current?.id), lastStepID != Tutorial.current?.id { openSplitPartner() }
                 lastStepID = Tutorial.current?.id
             }
@@ -418,6 +429,13 @@ final class GuidedTour: NSView {
         return name.count > 28 ? String(name.prefix(27)).trimmingCharacters(in: .whitespaces) + "…" : name
     }
 
+    /// The guide's second page is open in this space already.
+    private var hasSplitPartner: Bool {
+        guard let controller else { return false }
+        let manager = controller.tabManager
+        return manager.tabs(in: manager.currentSpaceID).contains { $0.url?.host()?.hasSuffix("wikipedia.org") == true && $0.url?.path.hasPrefix("/wiki/Split_screen") == true }
+    }
+
     /// Split View needs a second ordinary tab: the guide opens its own, behind this one.
     private func openSplitPartner() {
         guard let controller, splitCandidate == nil else { return }
@@ -447,7 +465,8 @@ final class GuidedTour: NSView {
         // Mid-step hints (no count) are part of a step: nothing to skip there, and the pill stays small.
         skip.isHidden = d.isDone || d.isFinal || d.count.isEmpty
         close.isHidden = d.isFinal
-        step.isHidden = d.isDone || d.isFinal || d.count.isEmpty
+        countShown = !(d.isDone || d.isFinal || d.count.isEmpty)
+        step.isHidden = !countShown
         finish.isHidden = !d.isFinal
         note.isHidden = d.isFinal || d.note.isEmpty
         [wordmark, letter, signature].forEach { $0.isHidden = !d.isFinal }
@@ -465,6 +484,23 @@ final class GuidedTour: NSView {
     override func layout() {
         super.layout()
         layoutTour(display, animated: false)
+    }
+
+    /// Whether the card says which step this is, room allowing.
+    private var countShown = false
+
+    /// The card's size, no wider than `room` (the page, less its margins): in a narrow window the step count gives
+    /// way first, then the words end in "…", so the card stays over the page and off the sidebar.
+    private func pillSize(_ d: Display, room: CGFloat) -> NSSize {
+        guard !d.isFinal else { return pillSize(d) }
+        step.isHidden = !countShown
+        var size = pillSize(d)
+        if size.width > room, countShown {
+            step.isHidden = true
+            size = pillSize(d)
+        }
+        size.width = max(Tokens.Tour.minCardWidth, min(size.width, floor(room)))
+        return size
     }
 
     private func pillSize(_ d: Display) -> NSSize {
@@ -493,7 +529,8 @@ final class GuidedTour: NSView {
         if pointsIntoSidebar { controller?.root.reveal(true) }
         if let target, ["pin", "split"].contains(d.target) { scrollIntoSight(target) }
         let visible = target.flatMap { $0.window != nil ? shownRect(of: $0) : nil }
-        let hole = Tutorial.ringRect(visible: visible, outset: Tokens.Tour.ringOutset, within: bounds, margin: ring.lineWidth) ?? .zero
+        let hole = Tutorial.ringRect(visible: visible, outset: Tokens.Tour.ringOutset, within: bounds, margin: ring.lineWidth + Tokens.Space.x1,
+                                       roundBelow: Tokens.Tour.ringRoundBelow) ?? .zero
         // Dragging a tab onto the page uses the sidebar and the page at once: nothing dimmed, nothing ringed.
         // The tab to drag keeps its ring, so you know which one.
         // Nothing is dimmed: the window stays as it is, and a soft ring marks only small things to click.
@@ -529,7 +566,15 @@ final class GuidedTour: NSView {
             if ring.path.map({ $0 != ringPath }) ?? true { ring.path = ringPath }
         }
 
-        let size = pillSize(d)
+        // The card stays over the page, and off the sidebar where it's slid out over the page to point into it.
+        var cardArea = page
+        if let root = controller?.root, root.isSidebarFloatingVisible {
+            let sidebar = root.sidebarContainer.convert(root.sidebarContainer.bounds, to: self)
+            if sidebar.maxX > cardArea.minX, sidebar.maxX < cardArea.maxX {
+                cardArea = NSRect(x: sidebar.maxX, y: cardArea.minY, width: cardArea.maxX - sidebar.maxX, height: cardArea.height)
+            }
+        }
+        let size = pillSize(d, room: cardArea.width - Tokens.Space.x8 * 2)
         var frame: NSRect
         if !d.isFinal {
             // Right under the address bar while it's open (where your eyes are), otherwise a bar at the bottom middle of
@@ -537,7 +582,7 @@ final class GuidedTour: NSView {
             if d.target == "bar", hole != .zero {
                 frame = NSRect(x: hole.midX - size.width / 2, y: hole.maxY + Tokens.Space.x3, width: size.width, height: size.height)
             } else {
-                frame = NSRect(x: windowCentered(size.width, in: page), y: page.maxY - size.height - Tokens.Space.x8, width: size.width, height: size.height)
+                frame = NSRect(x: windowCentered(size.width, in: cardArea), y: page.maxY - size.height - Tokens.Space.x8, width: size.width, height: size.height)
                 // Never over the +'s menu: beside it instead.
                 if d.target == "addmenu", hole != .zero, frame.intersects(hole) { frame.origin.x = hole.maxX + Tokens.Space.x4 }
             }
@@ -626,11 +671,12 @@ final class GuidedTour: NSView {
             return .drag(row: target, from: CGPoint(x: hole.minX + Tokens.Tour.ringOutset, y: hole.minY + Tokens.Tour.ringOutset), drop: drop)
         case "space":
             return ringed ? .click(at: center, holding: nil) : nil
-        case "switch":
-            // Two fingers across the sidebar's list, toward the first space (it's to the left, so they go right).
+        case "switch", "switchNew":
+            // Two fingers across the sidebar's list, toward the space to go to: back to the first (to the left, so
+            // they go right), or on to the new one (to the right, so they go left).
             let list = controller.sidebar.list.convert(controller.sidebar.list.bounds, to: self)
             let band = NSRect(x: list.minX, y: list.minY + min(list.height, 240) / 2 - 20, width: list.width, height: 40)
-            return list.width > 0 ? .swipe(across: band, toRight: true) : nil
+            return list.width > 0 ? .swipe(across: band, toRight: d.target == "switch") : nil
         case "article":
             findPeekLink()
             return peekLink.map { .click(at: $0, holding: "⇧") }
@@ -704,14 +750,6 @@ final class GuidedTour: NSView {
             x += w + Tokens.Tour.keyGap
         }
         if !caps.isEmpty { x += Tokens.Space.x3 - Tokens.Tour.keyGap }
-        if note.isHidden {
-            title.frame = NSRect(x: x, y: top + (height - title.lineHeight) / 2, width: title.textWidth + 4, height: title.lineHeight)
-        } else {
-            // Title, and the why beneath it, as one block in the middle.
-            let block = title.lineHeight + 2 + note.lineHeight
-            title.frame = NSRect(x: x, y: top + (height - block) / 2, width: title.textWidth + 4, height: title.lineHeight)
-            note.frame = NSRect(x: x, y: title.frame.maxY + 2, width: note.textWidth + 4, height: note.lineHeight)
-        }
         let sw = skip.fittingWidth
         let cs = IconButton.Size.compact.side
         close.frame = NSRect(x: width - Tokens.Space.x3 - cs, y: top + (height - cs) / 2, width: cs, height: cs)
@@ -719,5 +757,16 @@ final class GuidedTour: NSView {
         skip.frame = NSRect(x: end - sw, y: top + (height - Tokens.Space.x8) / 2, width: sw, height: Tokens.Space.x8)
         let cw = step.textWidth + 2
         step.frame = NSRect(x: skip.frame.minX - Tokens.Space.x1 - cw, y: top + (height - step.lineHeight) / 2, width: cw, height: step.lineHeight)
+        // The words take what's left, ending in "…" when the card is as narrow as the page.
+        let right = !step.isHidden ? step.frame.minX : !skip.isHidden ? skip.frame.minX : !close.isHidden ? close.frame.minX : width
+        let room = max(0, right - x)
+        if note.isHidden {
+            title.frame = NSRect(x: x, y: top + (height - title.lineHeight) / 2, width: min(title.textWidth + 4, room), height: title.lineHeight)
+        } else {
+            // Title, and the why beneath it, as one block in the middle.
+            let block = title.lineHeight + 2 + note.lineHeight
+            title.frame = NSRect(x: x, y: top + (height - block) / 2, width: min(title.textWidth + 4, room), height: title.lineHeight)
+            note.frame = NSRect(x: x, y: title.frame.maxY + 2, width: min(note.textWidth + 4, room), height: note.lineHeight)
+        }
     }
 }

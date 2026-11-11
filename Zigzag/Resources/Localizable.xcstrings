@@ -3325,6 +3325,17 @@
         }
       }
     },
+    "Choose View › Show All Tabs" : {
+      "comment" : "Under the tab overview step's title in the getting-started guide, a card in the window, when Show All Tabs has no shortcut. View is the menu, Show All Tabs its item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选取“显示”>“显示所有标签页”"
+          }
+        }
+      }
+    },
     "Choose a password export (a .csv file) or Safari’s browsing data export (a .zip file)." : {
       "comment" : "Message of the open panel from the Import window's Choose File… button.",
       "localizations" : {
@@ -3679,6 +3690,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "点按“新建空间”"
+          }
+        }
+      }
+    },
+    "Click New Tab in the sidebar, then search YouTube" : {
+      "comment" : "Under the new tab step's title in the getting-started guide, a card in the window, when New Tab has no shortcut. New Tab is a row in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按边栏中的“新建标签页”，然后搜索 YouTube"
           }
         }
       }
@@ -10728,6 +10750,17 @@
         }
       }
     },
+    "Right-click its tab, then Pin Tab" : {
+      "comment" : "Under the pin step's title in the getting-started guide, a card in the window, when Pin Tab has no shortcut. Pin Tab is an item in a tab's menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "右键点按它的标签页，然后点按“固定标签页”"
+          }
+        }
+      }
+    },
     "Rose" : {
       "comment" : "Name of a curated space color, in the space editor.\nTooltip and accessibility label of a preset look in the space editor. A pale pink.",
       "localizations" : {
@@ -12557,6 +12590,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "切换到标签页"
+          }
+        }
+      }
+    },
+    "Switch to your new space" : {
+      "comment" : "The last step's title in the getting-started guide, a card in the window, when you're still in the space you started in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换到你的新空间"
           }
         }
       }

@@ -84,6 +84,17 @@ final class TourDemo {
     // MARK: Gestures
 
     /// Arrive and press, carry it across, let go, fade.
+    /// Where the lifted tab comes to rest: its grab point over the middle of where it drops, but the whole tab kept
+    /// inside the window, so in a narrow one it never runs past the edge.
+    static func dragEnd(drop: NSRect, grab: CGPoint, size: NSSize, within bounds: NSRect) -> CGPoint {
+        let inset = Tokens.Space.x2
+        var x = drop.midX - grab.x
+        x = min(max(x, bounds.minX + inset), bounds.maxX - inset - size.width)
+        var y = drop.minY + drop.height * 0.35
+        y = min(max(y, bounds.minY + inset), bounds.maxY - inset - size.height)
+        return CGPoint(x: x, y: y)
+    }
+
     private func drag(_ row: NSView, from start: CGPoint, drop: NSRect, in view: NSView) {
         let grab = CGPoint(x: Tokens.Sidebar.favicon * 2.5, y: row.bounds.height / 2)
         // The tab as it looks lifted to drag. The card is see-through over the sidebar's color, and would all but
@@ -129,7 +140,7 @@ final class TourDemo {
             target.borderWidth = Tokens.Metric.dropEdge
             target.borderColor = row.cgColor(accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
         }
-        let end = CGPoint(x: drop.midX - grab.x, y: drop.minY + drop.height * 0.35)
+        let end = Self.dragEnd(drop: drop, grab: grab, size: row.bounds.size, within: view.bounds)
         let times: [NSNumber] = [0, 0.12, 0.22, 0.62, 0.76, 0.86, 1]
         run([
             (group, keyframes("position", [start, start, start, end, end, end, end].map { NSValue(point: $0) }, times, eased: true)),
