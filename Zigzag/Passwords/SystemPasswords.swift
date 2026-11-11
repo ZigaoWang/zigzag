@@ -62,13 +62,15 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
     /// Bumped on every change to the fields; the last one reads them.
     private var changes = 0
     private var settling = false
+    private var clickMonitor: Any?
     /// The system's list took the front (Zigzag stopped being the active app), so coming back means it closed.
     private(set) var opened = false
     private let timeout: TimeInterval
     private let openCheck: TimeInterval?
 
-    /// `openCheck`: how soon the list must have taken the front, or the fields go away (nil never checks).
-    init(timeout: TimeInterval = SystemPasswordPicker.timeout, openCheck: TimeInterval? = 2) {
+    /// `openCheck`: how soon the list must have taken the front, or the fields go away (nil, the default, never
+    /// checks: the Mac can show its list inside Zigzag's own window, where Zigzag never stops being the active app).
+    init(timeout: TimeInterval = SystemPasswordPicker.timeout, openCheck: TimeInterval? = nil) {
         self.timeout = timeout
         self.openCheck = openCheck
         super.init()
@@ -114,6 +116,16 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
                 MainActor.assumeIsolated { self?.after(0.5) { $0.giveUpIfEmpty(.dismissed) } }
             },
         ]
+        // A click in the window anywhere but the fields: you've moved on, so the fields go (a fill already on its
+        // way still lands). Clicks in the Mac's own list are in its window, not this one.
+        clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            MainActor.assumeIsolated {
+                guard let self, self.isPresented, let window = self.anchor.window, event.window === window else { return }
+                let point = self.anchor.convert(event.locationInWindow, from: nil)
+                if !self.anchor.bounds.contains(point) { self.after(0.3) { $0.giveUpIfEmpty(.dismissed) } }
+            }
+            return event
+        }
         after(timeout) { $0.finish(.cancelled(.timedOut)) }
         guard ask(passwordField) else { finish(.cancelled(.unavailable)); return }
         if let openCheck { after(openCheck) { if !$0.opened { $0.giveUpIfEmpty(.unavailable) } } }
@@ -168,8 +180,8 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
     }
 
     func controlTextDidEndEditing(_ notification: Notification) {
-        // Focus moved on (a click on the page): give up, unless a fill is on its way.
-        after(0.3) { $0.giveUpIfEmpty(.dismissed) }
+        // The Mac's list taking the focus ends editing too, as it opens: that alone mustn't take the fields away.
+        // A click elsewhere in the window does (`clickMonitor`), and Escape, Tab, Return and the timeout.
     }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
@@ -189,6 +201,8 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
         settling = false
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         observers = []
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+        clickMonitor = nil
         let window = anchor.window
         let focused = window.map { Self.owns($0.firstResponder, [usernameField, passwordField]) } ?? false
         // Emptied before anything else, the field editor's copy too.

@@ -264,6 +264,21 @@ struct SystemPasswordsTests {
         #expect(quiet.anchor.superview == nil)
     }
 
+    @Test func theListTakingTheFocusDoesNotCloseIt() async throws {
+        // The Mac's list can open inside Zigzag's window and take the focus from the fields as it does: that ended
+        // the request at once, so the list flashed and went (reported after 0.8.1).
+        let (window, overlay, stand) = host()
+        let picker = SystemPasswordPicker()
+        var outcome: SystemPasswordPicker.Outcome?
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
+        window.makeFirstResponder(nil)
+        try await wait(0.6)
+        #expect(outcome == nil)
+        #expect(picker.isPresented)
+        picker.cancel()
+        #expect(picker.anchor.superview == nil)
+    }
+
     @Test func escapeOrTabCancels() async throws {
         let (window, overlay, stand) = host()
         for command in [#selector(NSResponder.cancelOperation(_:)), #selector(NSResponder.insertTab(_:))] {
