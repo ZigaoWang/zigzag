@@ -268,6 +268,20 @@ enum DebugBridge {
         switch name {
         case "open": if let url = URL(string: arg) { controller.open(url, disposition: .foregroundTab, allowSwitch: false) }
         case "bg": if let url = URL(string: arg) { controller.open(url, disposition: .backgroundTab, allowSwitch: false) }
+        // child <url>: a link opened in a background tab from the tab you're on, as ⌘-click does.
+        case "child": if let url = URL(string: arg), let tab = controller.tabManager.selectedTab { controller.tab(tab, openURL: url, disposition: .backgroundTab) }
+        // nest on|off: Settings › Tabs › Open ⌘-clicked links under their tab.
+        case "nest": TabManager.nestsOpenedLinks = arg == "on"
+        // foldtab <index>: folds or shows the tabs nested under the tab at that place in the space's list.
+        case "foldtab":
+            let tabs = controller.tabManager.currentTabs
+            if let i = Int(arg), tabs.indices.contains(i) { controller.tabManager.setNestedTabsCollapsed(tabs[i], !tabs[i].isCollapsed) }
+        // tree <path>: the current space's tabs, each with how deep it's nested and whether it's folded.
+        case "tree":
+            let m = controller.tabManager
+            let levels = TabTree.levels(m.treeNodes(in: m.currentSpaceID))
+            let out = m.currentTabs.map { "\(String(repeating: "  ", count: levels[$0.id] ?? 0))\($0.displayTitle)\($0.isCollapsed ? " (folded)" : "")" }
+            try? out.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "load": if let url = URL(string: arg) { controller.open(url, disposition: .currentTab) }
         case "sidebar": controller.toggleBrowserSidebar(nil)
         // topbar on|off: Settings › Appearance › Address bar above the page.
