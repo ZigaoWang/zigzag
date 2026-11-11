@@ -110,8 +110,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WindowManager.shared.newWindow()
         }
         Updater.shared.start()
-        // Just updated: what's new comes first, and the default browser offer waits for another launch.
-        if !WhatsNew.offerIfUpdated() { offerDefaultBrowserOnce() }
+        // Just updated: what's new comes first, and the default browser offer waits for another launch. Profiles
+        // that couldn't be read come before either: what's new waits a launch.
+        if Library.shared.profilesWereSetAside { tellProfilesSetAside() } else if !WhatsNew.offerIfUpdated() { offerDefaultBrowserOnce() }
         DockProgress.shared.start()
         DebugBridge.start()
     }
@@ -270,6 +271,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let defaults = UserDefaults.standard
         guard defaults.object(forKey: "LargeSpaceNames") == nil else { return }
         defaults.set(defaults.integer(forKey: "LaunchCount") > 0, forKey: "LargeSpaceNames")
+    }
+
+    /// Profiles.json couldn't be read and was set aside: said once, so spaces turning up on Default isn't a mystery.
+    /// Settings › Profiles lists the data the other profiles left, to keep or erase.
+    private func tellProfilesSetAside() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+            Toast.show(String(localized: "Zigzag couldn’t read your profiles, so every space is on Default for now. The file was kept.", comment: "Toast at launch when the file listing the profiles couldn't be read and was set aside. Default is the first profile's name."),
+                       symbol: "exclamationmark.triangle",
+                       action: (String(localized: "Show Profiles", comment: "Button in the toast saying the profiles couldn't be read: opens Settings › Profiles."),
+                                { [weak controller] in controller.map { SettingsPage.open(.profiles, in: $0) } }),
+                       duration: 12, closes: true, in: controller)
+        }
     }
 
     /// One quiet offer, on the second launch, never repeated: by then you know whether you like it here.

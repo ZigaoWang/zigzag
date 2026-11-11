@@ -416,6 +416,9 @@ final class Library {
     /// What Profiles.json held when it was last read or written, so it's only written when it has changed: someone
     /// who never makes a second profile never gets the file.
     private var savedDirectory: ProfileDirectory
+    /// Profiles.json was there but couldn't be read, so it was set aside (JSONStore) and every space is on the first
+    /// profile for now. Said once, at launch.
+    let profilesWereSetAside: Bool
 
     /// Fires whenever spaces or bookmarks change.
     let changed = Signal<Void>()
@@ -423,7 +426,10 @@ final class Library {
     private let wasRead: Bool
 
     private init() {
-        directory = FileManager.default.fileExists(atPath: Paths.profiles.path) ? JSONStore.load(ProfileDirectory.self, from: Paths.profiles) ?? ProfileDirectory() : ProfileDirectory()
+        let hadProfiles = FileManager.default.fileExists(atPath: Paths.profiles.path)
+        let readProfiles = hadProfiles ? JSONStore.load(ProfileDirectory.self, from: Paths.profiles) : nil
+        directory = readProfiles ?? ProfileDirectory()
+        profilesWereSetAside = hadProfiles && readProfiles == nil
         savedDirectory = directory
         if let stored = JSONStore.load(Stored.self, from: Paths.library), !stored.spaces.isEmpty {
             spaces = stored.spaces.map(\.upgraded)

@@ -11592,6 +11592,17 @@
         }
       }
     },
+    "Show Profiles" : {
+      "comment" : "Button in the toast saying the profiles couldn't be read: opens Settings › Profiles.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示描述文件"
+          }
+        }
+      }
+    },
     "Show Reader" : {
       "comment" : "Menu bar item: opens the page in Reader.\nTooltip of the Reader action in the site panel.\nTooltip of the address bar's Reader button.\nView menu item.",
       "localizations" : {
@@ -15147,6 +15158,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzag 未能读取它已有的密码，所以没有添加任何密码。请再试一次。"
+          }
+        }
+      }
+    },
+    "Zigzag couldn’t read your profiles, so every space is on Default for now. The file was kept." : {
+      "comment" : "Toast at launch when the file listing the profiles couldn't be read and was set aside. Default is the first profile's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 无法读取你的描述文件，所有空间暂时位于“默认”。该文件已保留。"
           }
         }
       }
