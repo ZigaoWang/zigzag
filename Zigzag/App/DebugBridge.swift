@@ -378,6 +378,21 @@ enum DebugBridge {
         if name.hasPrefix("mini") { runMini(name, arg); return }
         if name == "windowsdump" { dumpWindows(to: arg); return }
         if name == "keepontop" || name == "windowmenu" { runKeepOnTop(name, arg); return }
+        // mcp on|off|reset|state <path>: Settings › General › Let AI apps use Zigzag, Reset Key, and the server's state (JSON).
+        if name == "mcp" {
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            switch f.first ?? "" {
+            case "on": MCPService.setOn(true)
+            case "off": MCPService.setOn(false)
+            case "reset": MCPService.resetKey()
+            case "state":
+                if f.count == 2, let data = try? JSONSerialization.data(withJSONObject: MCPService.debugState, options: [.prettyPrinted, .sortedKeys]) {
+                    try? data.write(to: URL(fileURLWithPath: f[1]))
+                }
+            default: break
+            }
+            return
+        }
         if name == "relayout" {
             // relayout: every browser window lays its pages out again, as a resize would, without coming forward.
             WindowManager.shared.controllers.forEach { $0.root.needsLayout = true; $0.root.card.needsLayout = true; $0.root.secondCard.needsLayout = true }
