@@ -467,7 +467,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         tokens.removeAll()
         Autofill.shared.forget(windowOf: window)
         if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
-        tab.webView?.removeFromSuperview()
+        tab.pageHolder?.removeFromSuperview()
         tab.isPeek = false
         target.tabManager.switchToSpace(spaceID)
         target.tabManager.insertAsNewTab(tab)

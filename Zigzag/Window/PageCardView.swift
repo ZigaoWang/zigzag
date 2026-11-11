@@ -7,6 +7,8 @@ final class PageCardView: NSView {
     private let clip = NSView()
     private let edge = CALayer()
     private(set) weak var webView: WKWebView?
+    /// The shown page's holder (`Tab.pageHolder`), borrowed while the card shows it.
+    private weak var holder: PageHolder?
     /// In split view, the pane you're working in: its toolbar is at full strength, the other's dims. An outline
     /// would run along the window's own edges where a pane meets them.
     var isFocusedPane = false { didSet { refreshColors() } }
@@ -276,9 +278,9 @@ final class PageCardView: NSView {
                 header.frame = NSRect(x: 0, y: clip.bounds.height - band - PaneHeaderView.height, width: clip.bounds.width, height: PaneHeaderView.height)
             }
             let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
-            // A page in full screen (a video's) is in WebKit's own window, which sizes it: sized to the card from here, it
-            // would no longer fill the screen.
-            if let webView, webView.superview === clip { webView.frame = content }
+            // The holder is sized, not the page (it fills the holder beside a docked Web Inspector, and in full screen
+            // WebKit sizes it), and only while it's in this card: the mini player or another window may have borrowed it.
+            if let holder, holder.superview === clip { holder.frame = content }
             document?.frame = content
             placeholder.frame = content
             overlay?.frame = content
@@ -329,26 +331,34 @@ final class PageCardView: NSView {
         }
     }
 
-    /// Puts a web view in the card. The new view goes in before the old one leaves, so nothing flickers.
+    /// Puts a web view in the card, in its holder. The new one goes in before the old one leaves, so nothing flickers.
     func show(_ newWebView: WKWebView?, placeholderImage: NSImage? = nil) {
         guard newWebView !== webView else { return }
-        let old = webView
-        // A page whose video is in full screen stays in WebKit's window, which puts it back here when that ends: taken
-        // out now, the full screen would be left without it.
-        if let newWebView, newWebView.fullscreenState == .notInFullscreen {
+        let old = webView, oldHolder = holder
+        let owner = (newWebView as? BrowserWebView)?.owner
+        // A tab's page comes in the tab's own holder, with whatever is docked beside it.
+        let newHolder = owner?.pageHolder
+        if let newHolder {
             let top = contentTop
-            newWebView.frame = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
-            newWebView.autoresizingMask = [.width, .height]
-            clip.addSubview(newWebView, positioned: .below, relativeTo: placeholder)
+            newHolder.frame = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
+            newHolder.autoresizingMask = [.width, .height]
+            if newHolder.superview !== clip { clip.addSubview(newHolder, positioned: .below, relativeTo: placeholder) }
         }
         webView = newWebView
-        if let old, old.superview === clip { old.removeFromSuperview() } else if let old, old.fullscreenState != .notInFullscreen {
-            fullScreenWatch = old.observe(\.fullscreenState) { [weak self] page, _ in
-                // WebKit puts the page back as its full screen finishes: looked at once it has.
-                DispatchQueue.main.async { MainActor.assumeIsolated { self?.pageLeftFullScreen(page) } }
+        holder = newHolder
+        // The old page's holder goes, unless it's this one again (its tab has a new page) or another card has it by now.
+        // One whose video is in full screen stays until that ends: WebKit puts the page back in it then, and taken
+        // out now, the full screen would be left without it.
+        if let oldHolder, oldHolder !== newHolder, oldHolder.superview === clip {
+            if let old, old.fullscreenState != .notInFullscreen {
+                fullScreenWatch = old.observe(\.fullscreenState) { [weak self] page, _ in
+                    // WebKit puts the page back as its full screen finishes: looked at once it has.
+                    DispatchQueue.main.async { MainActor.assumeIsolated { self?.pageLeftFullScreen(page) } }
+                }
+            } else {
+                oldHolder.removeFromSuperview()
             }
         }
-        let owner = (newWebView as? BrowserWebView)?.owner
         documentToken = owner?.changed.observe { [weak self] change in if change == .pdf || change == .settings { self?.refreshDocument() } }
         refreshDocument()
         placeholder.image = placeholderImage
@@ -357,12 +367,12 @@ final class PageCardView: NSView {
         clip.layer?.addSublayer(edge)
     }
 
-    /// A page's full screen ended: put back here by WebKit while another page is shown, it goes, rather than staying
-    /// under that one, still on screen to itself; the one shown is sized to the card again.
+    /// A page's full screen ended: WebKit put it back in its holder. Left here behind the page now shown, that holder
+    /// goes, rather than staying under it with its page still on screen to itself.
     func pageLeftFullScreen(_ page: WKWebView) {
         guard page.fullscreenState == .notInFullscreen else { return }
         fullScreenWatch = nil
-        if page !== webView, page.superview === clip { page.removeFromSuperview() }
+        if let left = page.superview, left !== holder, left.superview === clip { left.removeFromSuperview() }
         needsLayout = true
     }
 
@@ -380,10 +390,10 @@ final class PageCardView: NSView {
             document.removeFromSuperview()
         }
         document = viewer
-        guard let viewer, let webView else { return }
-        viewer.frame = webView.frame
+        guard let viewer, let webView, let holder else { return }
+        viewer.frame = holder.frame
         viewer.autoresizingMask = [.width, .height]
-        clip.addSubview(viewer, positioned: .above, relativeTo: webView)
+        clip.addSubview(viewer, positioned: .above, relativeTo: holder)
         if let window, window.firstResponder === webView { window.makeFirstResponder((viewer as? PDFViewerView)?.pdfView ?? viewer) }
     }
 
