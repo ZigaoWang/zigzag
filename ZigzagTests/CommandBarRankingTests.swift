@@ -22,6 +22,14 @@ struct CommandBarRankingTests {
         #expect(!CommandRanker.repeatsCommand(nil, offered: ["settings"]))
     }
 
+    @Test func detailThatRepeatsTheTitleIsLeftOut() {
+        #expect(CommandRanker.detail("nosuchsite.example", under: "nosuchsite.example") == "")
+        #expect(CommandRanker.detail("example.com", under: "www.example.com") == "")
+        #expect(CommandRanker.detail("Example.com", under: "example.com") == "")
+        #expect(CommandRanker.detail("example.com/news", under: "Example News") == "example.com/news")
+        #expect(CommandRanker.detail("example.com/news", under: "example.com") == "example.com/news")
+    }
+
     @Test func miniLeavesOutPagesThatFailedToLoad() {
         let tabs = [FakeTab("on"), FakeTab("a"), FakeTab("bad", failed: true), FakeTab("b"), FakeTab("cert", failed: true)]
         let mini = CommandRanker.recentChoices(tabs, selected: tabs[0], failed: \.failed, leavingOutFailed: true)
