@@ -625,9 +625,12 @@ final class BrowserRootView: SpaceFrameView {
     /// The bar above the page in the page's color, nil for none: the page's card grows up under the bar, its top in
     /// that color, so the two read as one card and move as one. Not in split view, where two pages have two colors.
     func paintTopBar(_ color: NSColor?) {
+        let before = (color: pageColor, painted: paintsTopBar)
         pageColor = color
         topBar.pageColor = paintsTopBar ? color : nil
-        needsLayout = true
+        // The same color again (asked on every load, navigation and color report, mostly unchanged) leaves the
+        // window's layout alone: laying the whole window out each time kept the main thread busy (#89).
+        if before.color != color || before.painted != paintsTopBar { needsLayout = true }
         refreshGlassOcclusion()
     }
 
