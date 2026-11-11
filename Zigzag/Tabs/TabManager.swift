@@ -446,7 +446,7 @@ final class TabManager {
         tab.bookmarkID = id
         tab.isFavorite = true
         bookmarkTabs[id] = tab
-        Library.shared.addFavorite(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), at: index, id: id, in: profile.id)
+        Library.shared.addFavorite(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), icon: tab.customIcon, at: index, id: id, in: profile.id)
     }
 
     /// A pinned page into the favorites at a tile's place, open or not; open, a split it's in comes along.
@@ -471,7 +471,7 @@ final class TabManager {
             mark = pinned
         } else {
             removeFromList(tab)
-            mark = Bookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url))
+            mark = Bookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), icon: tab.customIcon)
             tab.bookmarkID = mark.id
             bookmarkTabs[mark.id] = tab
         }
@@ -504,7 +504,7 @@ final class TabManager {
                 marks.append(mark)
             } else {
                 removeFromList(half)
-                let mark = Bookmark(url: url, title: Self.bookmarkTitle(half.displayTitle, url: url))
+                let mark = Bookmark(url: url, title: Self.bookmarkTitle(half.displayTitle, url: url), icon: half.customIcon)
                 half.bookmarkID = mark.id
                 bookmarkTabs[mark.id] = half
                 marks.append(mark)
@@ -719,7 +719,7 @@ final class TabManager {
         if let pair = split(for: tab), let other = partner(of: tab), other.bookmarkID == nil, other.url != nil {
             let (left, right) = pair.left == tab.id ? (tab, other) : (other, tab)
             let marks = [left, right].map { half in
-                let mark = Bookmark(url: half.url ?? url, title: Self.bookmarkTitle(half.displayTitle, url: half.url ?? url))
+                let mark = Bookmark(url: half.url ?? url, title: Self.bookmarkTitle(half.displayTitle, url: half.url ?? url), icon: half.customIcon)
                 removeFromList(half)
                 half.bookmarkID = mark.id
                 half.setSpace(space)
@@ -735,7 +735,7 @@ final class TabManager {
         tab.bookmarkID = bookmarkID
         tab.setSpace(space)
         bookmarkTabs[bookmarkID] = tab
-        Library.shared.addBookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), to: space, at: index, id: bookmarkID)
+        Library.shared.addBookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), icon: tab.customIcon, to: space, at: index, id: bookmarkID)
     }
 
     /// A tab dropped on a pinned page: it's pinned beside it as a pinned split, where the page is and in its folder.
@@ -743,7 +743,7 @@ final class TabManager {
     func pinSplit(_ tab: Tab, with bookmarkID: UUID, tabOnRight: Bool) {
         guard let url = tab.url, let space = Library.shared.spaceID(ofBookmark: bookmarkID),
               Self.canSplit(splitSide(of: tab), onto: splitSide(ofBookmark: bookmarkID)) else { return }
-        let mark = Bookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url))
+        let mark = Bookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), icon: tab.customIcon)
         removeFromList(tab)
         tab.bookmarkID = mark.id
         tab.setSpace(space)
@@ -775,8 +775,11 @@ final class TabManager {
             bookmarkTabs[bookmarkID]?.isFavorite = false
         }
         var result: Tab?
+        // Back among the tabs, it keeps the icon it had pinned.
+        let icon = Library.shared.bookmark(bookmarkID)?.icon
         if let tab = bookmarkTabs[bookmarkID] {
             bookmarkTabs[bookmarkID] = nil
+            tab.customIcon = icon
             tab.bookmarkID = nil
             let at = min(index ?? 0, tabsBySpace[tab.spaceID]?.count ?? 0)
             tab.parentID = TabTree.parent(at: at, preferring: parent, in: treeNodes(in: tab.spaceID))
@@ -784,6 +787,7 @@ final class TabManager {
             result = tab
         } else if let bookmark = Library.shared.bookmark(bookmarkID), let index {
             let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: space)
+            tab.customIcon = icon
             tab.host = host
             watch(tab)
             let at = min(index, tabsBySpace[tab.spaceID]?.count ?? 0)
@@ -801,8 +805,10 @@ final class TabManager {
         let anyOpen = bookmarkTabs[pinned.left] != nil || bookmarkTabs[pinned.right] != nil
         var halves: [(id: UUID, tab: Tab)] = []
         for id in [pinned.left, pinned.right] {
+            let icon = Library.shared.bookmark(id)?.icon
             if let tab = bookmarkTabs[id] {
                 bookmarkTabs[id] = nil
+                tab.customIcon = icon
                 tab.bookmarkID = nil
                 // A split favorite comes back as tabs in the space you're in.
                 tab.isFavorite = false
@@ -810,6 +816,7 @@ final class TabManager {
                 halves.append((id, tab))
             } else if anyOpen || index != nil, let bookmark = Library.shared.bookmark(id) {
                 let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: space)
+                tab.customIcon = icon
                 tab.host = host
                 watch(tab)
                 halves.append((id, tab))

@@ -646,8 +646,8 @@ final class Library {
 
     /// `slot` counts the profile's tiles, as the grid shows them; nil: at the end.
     @discardableResult
-    func addFavorite(url: URL, title: String, at slot: Int? = nil, id: UUID = UUID(), in profile: UUID) -> Bookmark {
-        let favorite = Bookmark(id: id, url: url, title: title)
+    func addFavorite(url: URL, title: String, icon: String? = nil, at slot: Int? = nil, id: UUID = UUID(), in profile: UUID) -> Bookmark {
+        let favorite = Bookmark(id: id, url: url, title: title, icon: icon)
         arrangeFavorites(Self.placing([id], atSlot: slot, in: favorites(in: profile).map(\.id), splits: favoriteSplits), adding: [favorite], in: profile)
         commit()
         return favorite
@@ -810,9 +810,9 @@ final class Library {
     }
 
     @discardableResult
-    func addBookmark(url: URL, title: String, to spaceID: UUID, at index: Int? = nil, id: UUID = UUID()) -> Bookmark? {
+    func addBookmark(url: URL, title: String, icon: String? = nil, to spaceID: UUID, at index: Int? = nil, id: UUID = UUID()) -> Bookmark? {
         guard let s = self.index(of: spaceID) else { return nil }
-        let bookmark = Bookmark(id: id, url: url, title: title)
+        let bookmark = Bookmark(id: id, url: url, title: title, icon: icon)
         let at = min(index ?? spaces[s].bookmarks.count, spaces[s].bookmarks.count)
         spaces[s].bookmarks.insert(bookmark, at: at)
         // Landing between a folder's pages doesn't put it in the folder: it goes just after, where the sidebar shows it.
