@@ -69,6 +69,9 @@ nonisolated enum JSONStore {
     static func encode<T: Encodable>(_ value: T) -> Data? {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .secondsSince1970
+        // Keys in a fixed order, so the same value always encodes to the same bytes: the session save skips a write
+        // that would change nothing, and that only works if equal sessions compare equal (#89).
+        encoder.outputFormatting = [.sortedKeys]
         return try? encoder.encode(value)
     }
 
