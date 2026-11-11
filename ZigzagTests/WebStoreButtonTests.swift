@@ -3,6 +3,7 @@ import JavaScriptCore
 import Testing
 @testable import Zigzag
 
+@MainActor
 struct WebStoreButtonTests {
     private let id = "bcjindcccaagfpapjjmafapmmgkkhgoa"
 
@@ -60,9 +61,9 @@ struct WebStoreButtonTests {
     // MARK: The page script
 
     /// Runs web-store.js in a stand-in page at `href`, with a handler that answers as Zigzag would.
-    private func page(_ href: String, framed: Bool = false, installed: Bool = false) throws -> JSContext {
-        let url = try #require(Bundle.main.url(forResource: "web-store", withExtension: "js"))
-        let source = try String(contentsOf: url, encoding: .utf8)
+    /// `buttons` are the store's install buttons on the page, as their jsname (nil for none) and label.
+    private func page(_ href: String, framed: Bool = false, installed: Bool = false, buttons: [(jsname: String?, label: String)] = []) throws -> JSContext {
+        let source = WebStoreButton.source
         let location = try #require(URL(string: href))
         let context = try #require(JSContext())
         context.evaluateScript("""
@@ -71,7 +72,9 @@ struct WebStoreButtonTests {
         var location = { protocol: '\(location.scheme ?? ""):', host: '\(location.host ?? "")' };
         var Node = { TEXT_NODE: 3 }, NodeFilter = { SHOW_TEXT: 4 };
         var MutationObserver = function () { this.observe = () => {}; };
-        var document = { documentElement: {}, visibilityState: 'visible', adoptedStyleSheets: [], addEventListener: () => {}, querySelectorAll: () => [] };
+        var __buttons = \(try buttonsJS(buttons));
+        var document = { documentElement: {}, visibilityState: 'visible', adoptedStyleSheets: [], addEventListener: () => {},
+          querySelectorAll: (selector) => selector === '[jscontroller="ri2s0b"] button' ? __buttons : [] };
         var __posted = [], __installed = \(installed);
         window.webkit = { messageHandlers: { zigzagWebStore: { postMessage: (m) => {
           __posted.push(m.kind);
@@ -85,6 +88,17 @@ struct WebStoreButtonTests {
         context.evaluateScript(source)
         #expect(context.exception == nil)
         return context
+    }
+
+    /// Stand-ins for the store's buttons: a jsname, and the span that holds its words.
+    private func buttonsJS(_ buttons: [(jsname: String?, label: String)]) throws -> String {
+        let items = try buttons.map { button -> String in
+            let jsname = try String(data: JSONSerialization.data(withJSONObject: button.jsname as Any, options: .fragmentsAllowed), encoding: .utf8) ?? "null"
+            let label = try String(data: JSONSerialization.data(withJSONObject: button.label, options: .fragmentsAllowed), encoding: .utf8) ?? "''"
+            return "(() => { const text = { nodeType: 3, data: \(label) }; const span = { original: text, firstChild: text, childNodes: [text], get textContent() { return this.firstChild.data; }, set textContent(v) { this.firstChild = { nodeType: 3, data: v }; this.childNodes = [this.firstChild]; } }; return { getAttribute: (n) => n === 'jsname' ? \(jsname) : null, "
+                + "querySelector: (q) => q === 'span[jsname=\"V67aGc\"]' ? span : null, span }; })()"
+        }
+        return "[" + items.joined(separator: ", ") + "]"
     }
 
     @Test func otherSitesAndFramesGetNoChrome() throws {
@@ -131,5 +145,23 @@ struct WebStoreButtonTests {
         #expect(context.evaluateScript("__gone")?.toBool() == false)
         // Only while the callback runs, as in Chrome.
         #expect(context.evaluateScript("typeof chrome.runtime.lastError")?.toString() == "undefined")
+    }
+
+    @Test func theStoreHearsZigzagsChromeVersion() throws {
+        #expect(!WebStoreButton.source.contains("const config = {};"))
+        let context = try page("https://chromewebstore.google.com/detail/json-formatter/\(id)")
+        context.evaluateScript("var __version; chrome.webstorePrivate.getFullChromeVersion((v) => { __version = v.version_number; });")
+        #expect(context.evaluateScript("__version")?.toString() == ExtensionStore.chromeVersion + ".0.0")
+    }
+
+    @Test func theButtonSaysZigzagsOwnWordsByWhichButtonItIs() throws {
+        let add = try #require(WebStoreButton.config["add"]), remove = try #require(WebStoreButton.config["remove"])
+        // In another language the store's words don't say Chrome where they'd be swapped: the button's name decides.
+        let context = try page("https://chromewebstore.google.com/detail/json-formatter/\(id)", buttons: [
+            ("wQO0od", "Zu Chrome hinzufügen"), ("ajZLRd", "Aus Chrome entfernen"), (nil, "Add to Chrome"), ("somethingElse", "Adding…"),
+        ])
+        #expect(context.evaluateScript("__buttons.map((b) => b.span.textContent).join('|')")?.toString() == [add, remove, add, "Adding…"].joined(separator: "|"))
+        // Changed in place: the store keeps its own text node, and may write to it again when it redraws.
+        #expect(context.evaluateScript("__buttons.every((b) => b.span.firstChild === b.span.original)")?.toBool() == true)
     }
 }
