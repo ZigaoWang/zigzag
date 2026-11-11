@@ -630,6 +630,7 @@ final class MiniPlayerView: NSView {
         progress.onSeek = { [weak self] fraction in self?.onSeekTo?(fraction) }
         // Holding the bar keeps the controls up.
         progress.onScrub = { [weak self] _ in self?.keepControls() }
+        progress.onStep = { [weak self] by in self?.onSeek?(by) }
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
         refreshColors()
@@ -1140,6 +1141,8 @@ final class MiniPlayerProgress: NSView {
     private var fraction: Double = 0
     var onSeek: ((Double) -> Void)?
     var onScrub: ((Double) -> Void)?
+    /// VoiceOver's increment and decrement: 15 seconds on or back, as the card's buttons go.
+    var onStep: ((Double) -> Void)?
     private(set) var isScrubbing = false
 
     override init(frame: NSRect) {
@@ -1176,6 +1179,9 @@ final class MiniPlayerProgress: NSView {
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
+
+    override func accessibilityPerformIncrement() -> Bool { onStep?(15); return true }
+    override func accessibilityPerformDecrement() -> Bool { onStep?(-15); return true }
 
     private func scrub(_ event: NSEvent) {
         let x = convert(event.locationInWindow, from: nil).x
