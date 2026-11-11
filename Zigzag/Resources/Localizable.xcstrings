@@ -3116,6 +3116,17 @@
         }
       }
     },
+    "Can’t open this site" : {
+      "comment" : "Title of the page Zigzag shows when a page can't load through a proxy on this Mac (like Clash).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法打开此网站"
+          }
+        }
+      }
+    },
     "Can’t undo: spaces or pinned tabs have changed since then" : {
       "comment" : "Toast when ⌘Z can't take back a change because the sidebar changed since.",
       "localizations" : {
@@ -14960,6 +14971,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的 Mac 不允许 Zigzag 打开它。"
+          }
+        }
+      }
+    },
+    "Your Mac sends pages through a proxy (%@). The address may have a typo, or the proxy couldn’t reach the site. Check the address, or try again with the proxy off." : {
+      "comment" : "Message on the page Zigzag shows when a page can't load through a proxy on this Mac (like Clash). The placeholder is the proxy's address, like 127.0.0.1:7890.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的 Mac 通过代理（%@）打开网页。地址可能有误，或者代理连不上这个网站。请检查地址，或关掉代理再试一次。"
           }
         }
       }

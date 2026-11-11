@@ -32,6 +32,7 @@
 		0F7420EF801E473BA2A58F2A /* SpaceEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27025355902590144D7FABA3 /* SpaceEditor.swift */; };
 		0FFDB208CC831BB0246A6A7B /* SpaceFrameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2477477EEAA33212F1AA2281 /* SpaceFrameView.swift */; };
 		10324776656E836D07CD1B27 /* Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32289A47E7257A31AC82FCB0 /* Controls.swift */; };
+		10ED316D4DDDE144EAA77A5D /* ProxyCheckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 400EEF52096D1DE0A08306FF /* ProxyCheckTests.swift */; };
 		11436BB68F1FE91F774FF4A9 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7CC06A0253CAF1E0CAEA2F /* Profile.swift */; };
 		116CB32D6BD3C4918FCD3F1C /* ImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F50C552DADDAC51AC86787B /* ImportView.swift */; };
 		1482F4A584F73FF91CA61BE4 /* AddressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA72586980E3DDF9FDA59A8 /* AddressTests.swift */; };
@@ -207,6 +208,7 @@
 		A76473630DD07B1AC5E521EB /* RowDeleteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFB1B0DA956C3C2FEED46E90 /* RowDeleteTests.swift */; };
 		A7923325AE8D9FDB8CFECF2D /* PasswordStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804A63C8F2764EC4BE20451D /* PasswordStoreTests.swift */; };
 		A93EFB5F858A1B33E7E03B79 /* SiteSignInTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D7D2BAAFBF678F6CF7BC040 /* SiteSignInTests.swift */; };
+		ABDD5678965557704DDFAE6A /* ProxyCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A6BF2A2F19A6A6964727837 /* ProxyCheck.swift */; };
 		AC1B158FB5D979FA4552705A /* FormSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F889675E696C25E32096931 /* FormSheet.swift */; };
 		AD420686AFB0AEBB23F9ADF7 /* InlineCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B09FDD82E339C4D35FD657C /* InlineCompletionTests.swift */; };
 		AD66AB1C32F3990847A89971 /* CommandBarRankingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B89F5BC1A42191D2C02C66 /* CommandBarRankingTests.swift */; };
@@ -378,6 +380,7 @@
 		3D7D2BAAFBF678F6CF7BC040 /* SiteSignInTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteSignInTests.swift; sourceTree = "<group>"; };
 		3EA686DC56C7EA8E8C9FFD3D /* webkit-differences.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "webkit-differences.js"; sourceTree = "<group>"; };
 		3F889675E696C25E32096931 /* FormSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormSheet.swift; sourceTree = "<group>"; };
+		400EEF52096D1DE0A08306FF /* ProxyCheckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyCheckTests.swift; sourceTree = "<group>"; };
 		4295D4E75FDD1157FE955EBF /* DarkPagesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPagesTests.swift; sourceTree = "<group>"; };
 		4363A8C97194CFB82618511C /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		445BFF7EFE1744F510AC8334 /* BridgeWebRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeWebRequest.swift; sourceTree = "<group>"; };
@@ -473,6 +476,7 @@
 		98C36FF6B8E4B6DBFC1DF273 /* Zigzag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zigzag.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		98C4AD0F5E55B24044483033 /* MaterialsShowcase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialsShowcase.swift; sourceTree = "<group>"; };
 		98D9F429D6C84167482CCFC1 /* Tutorial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tutorial.swift; sourceTree = "<group>"; };
+		9A6BF2A2F19A6A6964727837 /* ProxyCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyCheck.swift; sourceTree = "<group>"; };
 		9AD01A7A43B5EDAF47909918 /* CRXPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRXPackage.swift; sourceTree = "<group>"; };
 		9B09FDD82E339C4D35FD657C /* InlineCompletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineCompletionTests.swift; sourceTree = "<group>"; };
 		9B14798B8A091AAE19C57100 /* SitePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePanel.swift; sourceTree = "<group>"; };
@@ -873,6 +877,7 @@
 				02C322374F6FF1EF842FDB10 /* PDFViewer.swift */,
 				9569CB3512DF9E729E1FDA49 /* PopupNotice.swift */,
 				1EE88C88464115895D3647DF /* PopupWindowController.swift */,
+				9A6BF2A2F19A6A6964727837 /* ProxyCheck.swift */,
 				18FC50557675B6C303B2E0AE /* Reader.swift */,
 				CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */,
 				5B92A13A0C322891D0B40426 /* SwipeNavigation.swift */,
@@ -1034,6 +1039,7 @@
 				D9EC4A25A23CB02B95200F47 /* PasswordMenuTests.swift */,
 				804A63C8F2764EC4BE20451D /* PasswordStoreTests.swift */,
 				8FB2C82F9690C9AFD44179D6 /* ProfileDirectoryTests.swift */,
+				400EEF52096D1DE0A08306FF /* ProxyCheckTests.swift */,
 				B1C94BBE34DB020CBB3EA2A2 /* ProxyRulesTests.swift */,
 				47104C74FDC45A440611D21F /* ReaderTests.swift */,
 				DFB1B0DA956C3C2FEED46E90 /* RowDeleteTests.swift */,
@@ -1390,6 +1396,7 @@
 				25480DD5B1E7AB6A8924478A /* ProfileDirectory.swift in Sources */,
 				4489417AC1F72B028FA0998A /* ProfileSheets.swift in Sources */,
 				C11913DEEFC7AD66CBC10F50 /* PromptHost.swift in Sources */,
+				ABDD5678965557704DDFAE6A /* ProxyCheck.swift in Sources */,
 				D2985616CED5916351C99C8F /* PublicSuffix.swift in Sources */,
 				E341CC4E85411227052D3A17 /* Reader.swift in Sources */,
 				BEC7556625226B96D886206F /* SafariImporter.swift in Sources */,
@@ -1499,6 +1506,7 @@
 				73BEB8BF61DB6AA3E32A3ACB /* PasswordMenuTests.swift in Sources */,
 				A7923325AE8D9FDB8CFECF2D /* PasswordStoreTests.swift in Sources */,
 				FA39475A30BCCFE05D55F4E3 /* ProfileDirectoryTests.swift in Sources */,
+				10ED316D4DDDE144EAA77A5D /* ProxyCheckTests.swift in Sources */,
 				38280721DA958FF00E10EB8A /* ProxyRulesTests.swift in Sources */,
 				95F74CDE51DB6895673489C5 /* ReaderTests.swift in Sources */,
 				A76473630DD07B1AC5E521EB /* RowDeleteTests.swift in Sources */,

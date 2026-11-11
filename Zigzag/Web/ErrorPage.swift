@@ -48,7 +48,8 @@ enum ErrorPage {
         // Over a page that was showing, Back goes to it; on the same address (Try Again, a page that stopped), to
         // whatever was before it.
         let canGoBack = webView.url == nil ? false : webView.url == url ? webView.canGoBack : true
-        let page = html(error: error, url: url, canGoBack: canGoBack, proceedLink: proceed,
+        let proxy = blamesProxy(kind, url: url) ? ProxyCheck.localProxy(for: url) : nil
+        let page = html(error: error, url: url, canGoBack: canGoBack, proceedLink: proceed, proxy: proxy,
                         style: PageStyle.css(theme: Brand.Theme.for(webView)), nonce: UUID().uuidString)
         if kind == .offline { OfflineRetry.wait(webView, for: url) } else { OfflineRetry.forget(webView) }
         // WebKit won't show anything at an address of an extension it doesn't have, so that page has none.
@@ -60,6 +61,13 @@ enum ErrorPage {
     }
 
     // MARK: - What it says
+
+    /// The kinds a proxy on this Mac would cause, for a site out on the web: the proxy answers for every address,
+    /// so one it can't reach fails as a cut-off, an unanswered or a broken connection.
+    static func blamesProxy(_ kind: Kind, url: URL) -> Bool {
+        guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), !isOnThisMac(url) else { return false }
+        return [.secureFailed, .refused, .timedOut, .broken].contains(kind)
+    }
 
     static func kind(of error: NSError, url: URL) -> Kind {
         // An extension's own page, from an extension that's been removed or turned off.
@@ -112,9 +120,15 @@ enum ErrorPage {
     }
 
     /// The title and message for an error, in plain words. Never the system's own text, which reads like a log, and
-    /// never the site's name, which the page shows whole on a line of its own.
-    static func describe(_ error: NSError, url: URL) -> (String, String) {
-        switch Self.kind(of: error, url: url) {
+    /// never the site's name, which the page shows whole on a line of its own. `proxy`: the proxy on this Mac pages
+    /// go through (host:port), which is then the likelier cause than the network or the site.
+    static func describe(_ error: NSError, url: URL, proxy: String? = nil) -> (String, String) {
+        let kind = Self.kind(of: error, url: url)
+        if let proxy, blamesProxy(kind, url: url) {
+            return (String(localized: "Can’t open this site", comment: "Title of the page Zigzag shows when a page can't load through a proxy on this Mac (like Clash)."),
+                    String(localized: "Your Mac sends pages through a proxy (\(proxy)). The address may have a typo, or the proxy couldn’t reach the site. Check the address, or try again with the proxy off.", comment: "Message on the page Zigzag shows when a page can't load through a proxy on this Mac (like Clash). The placeholder is the proxy's address, like 127.0.0.1:7890."))
+        }
+        switch kind {
         case .offline:
             return (String(localized: "You’re offline", comment: "Title of the page Zigzag shows when a page can't load."),
                     String(localized: "Check your Wi-Fi or network connection. Zigzag tries again by itself once you’re back online.", comment: "Message on the page Zigzag shows when a page can't load because the Mac is offline."))
@@ -234,9 +248,9 @@ enum ErrorPage {
     // MARK: - The page
 
     /// The whole page, everything on it escaped, its one script allowed by `nonce` and nothing loaded from anywhere.
-    static func html(error: NSError, url: URL, canGoBack: Bool, proceedLink: URL?, style: String, nonce: String) -> String {
+    static func html(error: NSError, url: URL, canGoBack: Bool, proceedLink: URL?, proxy: String? = nil, style: String, nonce: String) -> String {
         let kind = Self.kind(of: error, url: url)
-        let (title, message) = describe(error, url: url)
+        let (title, message) = describe(error, url: url, proxy: proxy)
         let site = siteName(for: url)
         let actions = Self.actions(for: kind, canGoBack: canGoBack)
         let buttons = actions.enumerated().map { i, action in
