@@ -264,6 +264,17 @@
         }
       }
     },
+    "%@ is using this tab" : {
+      "comment" : "On the bar over a tab an AI app is using through MCP. The placeholder is the app's name, as it gives it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 正在使用此标签页"
+          }
+        }
+      }
+    },
     "%@ isn’t a Safari export Zigzag can open. In Safari, choose File › Export Browsing Data, then choose the zip it makes." : {
       "comment" : "Problem in the Import window. The placeholder is the file's name; File › Export Browsing Data is Safari's own menu wording.",
       "localizations" : {
@@ -2350,6 +2361,17 @@
         }
       }
     },
+    "An AI app is using this tab" : {
+      "comment" : "On the bar over a tab an AI app is using through MCP, when the app gave no name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一个 AI 应用正在使用此标签页"
+          }
+        }
+      }
+    },
     "An extension’s page is using a lot of energy" : {
       "comment" : "Toast when the page of an extension with no name uses a lot of energy.",
       "localizations" : {
@@ -2390,6 +2412,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "外观"
+          }
+        }
+      }
+    },
+    "Apps send it in the Authorization header. A new key disconnects every app." : {
+      "comment" : "Explanation under “Key” in Settings › General › Automation.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用会在 Authorization 请求头中发送它。重设密钥后，所有已连接的应用都会断开。"
+          }
+        }
+      }
+    },
+    "Apps you connect over MCP, on this Mac only, can open, read and use your tabs. Never private windows, passwords or Zigzag’s own pages." : {
+      "comment" : "Explanation under “Let AI apps use Zigzag” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你通过 MCP 连接的应用（仅限这台 Mac）可以打开、读取和操作你的标签页。不包括无痕浏览窗口、密码和 Zigzag 自己的页面。"
           }
         }
       }
@@ -4217,7 +4261,7 @@
       }
     },
     "Copied" : {
-      "comment" : "The Copy button under Details on an error page, once it has copied the error.",
+      "comment" : "Shown on a Copy button for a moment after it copies.\nThe Copy button under Details on an error page, once it has copied the error.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4239,12 +4283,23 @@
       }
     },
     "Copy" : {
-      "comment" : "Button under Details on the page Zigzag shows when a page can't load: copies the error.\nEdit menu item.",
+      "comment" : "Button that copies something to the clipboard.\nButton under Details on the page Zigzag shows when a page can't load: copies the error.\nEdit menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "拷贝"
+          }
+        }
+      }
+    },
+    "Copy Header" : {
+      "comment" : "Button in Settings › General › Automation: copies the Authorization header, with the key, that an AI app sends.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝请求头"
           }
         }
       }
@@ -4520,6 +4575,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未能存储截图"
+          }
+        }
+      }
+    },
+    "Couldn’t start. Port %lld may be in use by another app." : {
+      "comment" : "Under “Server address” in Settings › General › Automation when Zigzag's MCP server couldn't start. The placeholder is a port number.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法启动。端口 %lld 可能已被其他应用占用。"
           }
         }
       }
@@ -6869,6 +6935,28 @@
         }
       }
     },
+    "Key" : {
+      "comment" : "A row in Settings › General › Automation, shown while AI apps may use Zigzag: the secret key an app sends.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥"
+          }
+        }
+      }
+    },
+    "Key Reset" : {
+      "comment" : "Shown on the Reset Key button for a moment after it makes a new key.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已重设"
+          }
+        }
+      }
+    },
     "Keyboard Shortcuts" : {
       "comment" : "Help menu item: opens Settings › Shortcuts.",
       "localizations" : {
@@ -6986,6 +7074,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "薰衣草紫"
+          }
+        }
+      }
+    },
+    "Let AI apps use Zigzag" : {
+      "comment" : "A setting in Settings › General, under Automation: turns on Zigzag's MCP server, for AI apps on this Mac.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许 AI 应用使用 Zigzag"
           }
         }
       }
@@ -10657,6 +10756,17 @@
         }
       }
     },
+    "Reset Key" : {
+      "comment" : "Button in Settings › General › Automation: makes a new key for AI apps, which disconnects every app using the old one.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重设密钥"
+          }
+        }
+      }
+    },
     "Reset all shortcuts?" : {
       "comment" : "Title of the sheet that puts every shortcut back.",
       "localizations" : {
@@ -11539,6 +11649,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "衬线"
+          }
+        }
+      }
+    },
+    "Server address" : {
+      "comment" : "A row in Settings › General › Automation, shown while AI apps may use Zigzag: the MCP server's address, to give an app.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器地址"
           }
         }
       }
@@ -12496,7 +12617,7 @@
       }
     },
     "Stop" : {
-      "comment" : "Tooltip of a button in the strip on top of each page of a split view: stops the page loading.\nTooltip of the sidebar's reload button while the page loads: stops loading.\nView menu item.",
+      "comment" : "Button on the bar over a tab an AI app is using: stops it and disconnects the app.\nTooltip of a button in the strip on top of each page of a split view: stops the page loading.\nTooltip of the sidebar's reload button while the page loads: stops loading.\nView menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -16327,6 +16448,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "macOS 需要你的许可才能读取它"
+          }
+        }
+      }
+    },
+    "mcp ai agent automation model context protocol server" : {
+      "comment" : "Words that find the Let AI apps use Zigzag setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mcp ai agent automation model context protocol server 自动化 智能体 人工智能 代理 模型上下文协议 服务器"
           }
         }
       }

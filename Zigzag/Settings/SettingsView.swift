@@ -150,6 +150,16 @@ final class FormRow: NSView, SettingsSearchable {
     var searchText: String { [title.stringValue, detail.stringValue, keywords].joined(separator: " ") }
     /// More words "Find a setting" knows the row by, like its button's.
     var keywords = ""
+    /// The line under its title, which can change while it shows (an address, what went wrong).
+    var detailText: String {
+        get { detail.stringValue }
+        set {
+            guard detail.stringValue != newValue else { return }
+            detail.stringValue = newValue
+            detail.isHidden = newValue.isEmpty
+            needsLayout = true
+        }
+    }
     #if DEBUG
     var debugTitle: String { title.stringValue }
     #endif
@@ -753,6 +763,40 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let largeNamesToggle = Toggle()
     private let quitToggle = Toggle()
     private let scriptJavaScriptToggle = Toggle()
+    private let aiAppsToggle = Toggle()
+    private var aiAppsToken: SignalToken?
+    /// The server's address and its key, there while AI apps may use Zigzag.
+    private lazy var aiAddressRow: FormRow = {
+        let copy = PillButton(title: String(localized: "Copy", comment: "Button that copies something to the clipboard."))
+        copy.onClick = { [weak copy] _ in
+            Self.copy(MCPService.address)
+            copy?.flash(String(localized: "Copied", comment: "Shown on a Copy button for a moment after it copies."))
+        }
+        let row = FormRow(title: String(localized: "Server address", comment: "A row in Settings › General › Automation, shown while AI apps may use Zigzag: the MCP server's address, to give an app."),
+                          detail: MCPService.address, control: copy)
+        row.keywords = Self.aiAppsKeywords
+        return row
+    }()
+    private lazy var aiKeyRow: FormRow = {
+        let copy = PillButton(title: String(localized: "Copy Header", comment: "Button in Settings › General › Automation: copies the Authorization header, with the key, that an AI app sends."))
+        copy.onClick = { [weak copy] _ in
+            Self.copy(MCPService.authorizationHeader)
+            copy?.flash(String(localized: "Copied", comment: "Shown on a Copy button for a moment after it copies."))
+        }
+        let reset = PillButton(title: String(localized: "Reset Key", comment: "Button in Settings › General › Automation: makes a new key for AI apps, which disconnects every app using the old one."))
+        reset.onClick = { [weak reset] _ in
+            MCPService.resetKey()
+            reset?.flash(String(localized: "Key Reset", comment: "Shown on the Reset Key button for a moment after it makes a new key."))
+        }
+        let buttons = NSStackView(views: [copy, reset])
+        buttons.spacing = Tokens.Space.x2
+        let row = FormRow(title: String(localized: "Key", comment: "A row in Settings › General › Automation, shown while AI apps may use Zigzag: the secret key an app sends."),
+                          detail: String(localized: "Apps send it in the Authorization header. A new key disconnects every app.",
+                                         comment: "Explanation under “Key” in Settings › General › Automation."),
+                          control: buttons)
+        row.keywords = Self.aiAppsKeywords
+        return row
+    }()
     private let motionToggle = Toggle()
     /// Where downloads go: Downloads, another folder, or ask each time.
     private let downloadPlace = DropdownButton()
@@ -879,6 +923,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                     detail: String(localized: "Scripts and apps you allow in Privacy & Security › Automation can then read and change any page you have open, signed in or not. Never in private windows.",
                                                    comment: "Explanation under “Allow JavaScript from Apple Events” in Settings › General."),
                                     control: scriptJavaScriptToggle))
+        aiAppsToggle.onChange = { [weak self] on in
+            MCPService.setOn(on)
+            self?.refreshAIApps()
+        }
+        let aiRow = FormRow(title: String(localized: "Let AI apps use Zigzag", comment: "A setting in Settings › General, under Automation: turns on Zigzag's MCP server, for AI apps on this Mac."),
+                            detail: String(localized: "Apps you connect over MCP, on this Mac only, can open, read and use your tabs. Never private windows, passwords or Zigzag’s own pages.",
+                                           comment: "Explanation under “Let AI apps use Zigzag” in Settings › General."),
+                            control: aiAppsToggle)
+        aiRow.keywords = Self.aiAppsKeywords
+        automationGroup.add(aiRow)
+        automationGroup.add(aiAddressRow)
+        automationGroup.add(aiKeyRow)
+        aiAppsToken = MCPService.changed.observe { [weak self] in self?.refreshAIApps() }
 
         // Appearance
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
@@ -2057,6 +2114,29 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         engine.selectedIndex = chosen ?? builtIn.firstIndex(of: Library.shared.searchEngine) ?? 0
     }
 
+    private static var aiAppsKeywords: String {
+        String(localized: "mcp ai agent automation model context protocol server", comment: "Words that find the Let AI apps use Zigzag setting with Find a setting in Settings. Not shown.")
+    }
+
+    private static func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    /// The address and key show only while AI apps may use Zigzag; the address says so if the server couldn't start.
+    private func refreshAIApps() {
+        let shown = MCPService.isOn
+        let detail = MCPService.problem == nil ? MCPService.address
+            : String(localized: "Couldn’t start. Port \(Int(MCPService.port)) may be in use by another app.",
+                     comment: "Under “Server address” in Settings › General › Automation when Zigzag's MCP server couldn't start. The placeholder is a port number.")
+        guard aiAddressRow.isAvailable != shown || aiKeyRow.isAvailable != shown || aiAddressRow.detailText != detail else { return }
+        aiAddressRow.detailText = detail
+        aiAddressRow.isAvailable = shown
+        aiKeyRow.isAvailable = shown
+        laidOutWidth = -1
+        needsLayout = true
+    }
+
     /// Pure black backgrounds shows only while dark pages are on.
     private func refreshPureBlack() {
         let shown = DarkPages.mode != .off
@@ -2103,6 +2183,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
         scriptJavaScriptToggle.isOn = Scripting.allowsJavaScript
+        aiAppsToggle.isOn = MCPService.isOn
+        refreshAIApps()
         newTabPlace.selectedIndex = TabManager.NewTabPlace.allCases.firstIndex(of: TabManager.newTabPlace) ?? 0
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
         nestToggle.isOn = TabManager.nestsOpenedLinks
