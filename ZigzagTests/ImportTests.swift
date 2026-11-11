@@ -206,7 +206,8 @@ struct SafariExportTests {
 
 /// Importing the same profile again: what its space already has stays once, and a space deleted since comes back.
 struct ImportAgainTests {
-    static let name = "From Chrome (A)"
+    /// "From Chrome (A)", in whichever language the Mac reads.
+    static var name: String { ImportCoordinator.placement(for: nil, source: "Chrome (A)", in: [], on: Profile.defaultID, profileOf: { _ in Profile.defaultID }).name }
     static let bookmarks = [ImportBatch.Bookmark(url: URL(string: "https://example.com/")!, title: "Example"),
                             ImportBatch.Bookmark(url: URL(string: "https://example.org/")!, title: "Example Org", folders: ["Work"])]
     static let personal = SpaceInfo(name: "Personal", color: .sky)
@@ -218,24 +219,32 @@ struct ImportAgainTests {
         return space
     }
 
+    /// Where "Chrome (A)"'s bookmarks go among `spaces`, all on the first profile.
+    static func place(_ spaces: [SpaceInfo]) -> SpaceInfo? {
+        let place = ImportCoordinator.placement(for: nil, source: "Chrome (A)", in: spaces, on: Profile.defaultID, profileOf: { _ in Profile.defaultID })
+        #expect(place.name.contains("Chrome (A)"))
+        return place.space
+    }
+
     @Test func aDeletedSpaceComesBackWithItsPages() {
-        let first = ImportCoordinator.merged(Self.bookmarks, into: [Self.personal], named: Self.name)
-        #expect(first.space == nil)
-        #expect(first.new.count == 2)
+        #expect(Self.place([Self.personal]) == nil)
+        let first = ImportCoordinator.merged(Self.bookmarks, into: nil)
+        #expect(first.count == 2)
         // Deleted: only Personal is left, so all of it is new again, its folder too.
-        let space = Self.imported(first.new)
-        let again = ImportCoordinator.merged(Self.bookmarks, into: [Self.personal, space].filter { $0.id != space.id }, named: Self.name)
-        #expect(again.space == nil)
-        #expect(again.new.map(\.title) == ["Example", "Example Org"])
-        #expect(again.new.last?.folders == ["Work"])
+        let space = Self.imported(first)
+        let left = [Self.personal, space].filter { $0.id != space.id }
+        #expect(Self.place(left) == nil)
+        let again = ImportCoordinator.merged(Self.bookmarks, into: Self.place(left))
+        #expect(again.map(\.title) == ["Example", "Example Org"])
+        #expect(again.last?.folders == ["Work"])
     }
 
     @Test func importingTwiceAddsNothingTwice() {
-        let space = Self.imported(ImportCoordinator.merged(Self.bookmarks, into: [Self.personal], named: Self.name).new)
+        let space = Self.imported(ImportCoordinator.merged(Self.bookmarks, into: nil))
         let same = ImportBatch.Bookmark(url: URL(string: "http://www.example.com")!, title: "Same page")
-        let again = ImportCoordinator.merged(Self.bookmarks + [same], into: [Self.personal, space], named: Self.name)
-        #expect(again.space?.id == space.id)
-        #expect(again.new.isEmpty)
+        let found = Self.place([Self.personal, space])
+        #expect(found?.id == space.id)
+        #expect(ImportCoordinator.merged(Self.bookmarks + [same], into: found).isEmpty)
     }
 
     /// History brought over again says nothing new came, not every page once more.

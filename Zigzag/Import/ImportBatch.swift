@@ -19,6 +19,21 @@ nonisolated struct ImportBatch: Sendable {
         let title: String
         /// The folders it was in, outermost first ("Work", "Docs"); empty at the top level.
         var folders: [String] = []
+        /// The browser profile it came from, when the browser has several: each gets a space of its own.
+        var from: BrowserProfile? = nil
+    }
+
+    /// One profile of a browser with several ("Work" in Chrome), which its bookmarks come over as a space of.
+    struct BrowserProfile: Sendable, Hashable {
+        /// Which profile, for good: the browser's folder and the profile's ("Google/Chrome/Profile 1"). Its space
+        /// keeps it, so importing the profile again finds that space even renamed, and never another of the same name.
+        let key: String
+        /// The browser's name ("Chrome").
+        let browser: String
+        /// The profile's name as the browser shows it, short ("Work").
+        let name: String
+        /// Its name in full ("Wang (a@example.com)"), which spaces made by earlier versions were named after.
+        var display: String? = nil
     }
 
     var logins: [Login] = []

@@ -92,12 +92,9 @@ enum ImportCoordinator {
         #endif
         for browser in ChromiumImporter.browsers where ChromiumImporter.isInstalled(browser) {
             // Several profiles: each is its own choice ("Chrome (Work)"), as other browsers' importers do.
-            let profiles = browser.name == "Arc" || plainNames ? [] : ChromiumImporter.profileNames(of: browser)
-            if profiles.count > 1 {
-                // "Wang (a@zigao.xyz)" reads as just "Wang"; the email only when two profiles share a name.
-                let short = profiles.map { Self.shortProfileName($0.1) }
-                for ((folder, display), name) in zip(profiles, short) {
-                    let label = short.filter { $0 == name }.count > 1 ? Self.profileEmail(display) ?? display : name
+            let profiles = browser.name == "Arc" || plainNames ? [] : ChromiumImporter.profileLabels(of: browser)
+            if !profiles.isEmpty {
+                for (folder, label, display) in profiles {
                     sources.append(Source(kind: .chromium(browser.only(folder, named: display)), name: "\(browser.name) (\(label))", bundleID: browser.bundleID))
                 }
             } else {
@@ -401,7 +398,11 @@ enum ImportCoordinator {
 
         summary.problems += batch.problems
         if choice.contains(.passwords) { await savePasswords(batch.logins, into: &summary) }
-        if choice.contains(.bookmarks), !batch.bookmarks.isEmpty { summary.bookmarks += addBookmarks(batch.bookmarks, from: source.name, into: profile.id) }
+        if choice.contains(.bookmarks), !batch.bookmarks.isEmpty {
+            let added = addBookmarks(batch.bookmarks, from: source.name, into: profile.id)
+            summary.bookmarks += added.bookmarks
+            summary.spaces += added.spaces
+        }
         if choice.contains(.history), !batch.history.isEmpty {
             // Only pages new here count: the same browser again brings nothing new, and says so.
             summary.history += profile.history.importVisits(batch.history)
@@ -490,32 +491,82 @@ enum ImportCoordinator {
         }
     }
 
-    /// Bookmarks go into a space of their own ("From Chrome"), so nothing already here gets crowded. A space made
-    /// for them is on the profile the import goes into; one already there stays where it is.
-    private static func addBookmarks(_ bookmarks: [ImportBatch.Bookmark], from name: String, into profile: UUID) -> Int {
-        let spaceName = String(localized: "From \(name)", comment: "Name of the space imported bookmarks go into. The placeholder is a browser's name: From Chrome.")
-        let merge = merged(bookmarks, into: Library.shared.spaces, named: spaceName)
-        guard !merge.new.isEmpty else { return 0 }
-        let space: SpaceInfo
-        if let existing = merge.space {
-            space = existing
-        } else {
-            space = Library.shared.addSpace(name: spaceName)
-            Library.shared.setProfile(profile, forSpace: space.id)
+    /// Bookmarks go into a space of their own, so nothing already here gets crowded: "From Chrome", or with a browser
+    /// of several profiles one space for each, named after it ("Work"). Spaces made for them are on the profile the
+    /// import goes into. How many bookmarks came over, and how many spaces were made for them.
+    private static func addBookmarks(_ bookmarks: [ImportBatch.Bookmark], from name: String, into profile: UUID) -> (bookmarks: Int, spaces: Int) {
+        let library = Library.shared
+        var count = 0, made = 0
+        for part in plan(bookmarks, source: name, in: library.spaces, on: profile, profileOf: library.profileID(ofSpace:)) {
+            let space: SpaceInfo
+            if let existing = part.space {
+                space = existing
+            } else {
+                guard !part.new.isEmpty else { continue }
+                space = library.addSpace(name: part.name, profile: profile)
+                made += 1
+            }
+            // Its profile noted on it, also on a space an earlier version made: the next import finds it by that.
+            if let from = part.from { library.setImportedFrom(from.key, forSpace: space.id) }
+            guard !part.new.isEmpty else { continue }
+            // All in one change: thousands of bookmarks one at a time would redraw every window thousands of times.
+            // Their folders come over as folders.
+            let added = library.appendBookmarks(part.new.map { ($0.url, $0.title) }, to: space.id, folders: part.new.map(\.folders))
+            // Icons for the first ones now; the sidebar fetches the rest for the rows it shows.
+            for bookmark in added.prefix(40) { FaviconStore.shared.prefetch(for: bookmark.url) }
+            count += added.count
         }
-        // All in one change: thousands of bookmarks one at a time would redraw every window thousands of times. Their
-        // folders come over as folders.
-        let added = Library.shared.appendBookmarks(merge.new.map { ($0.url, $0.title) }, to: space.id, folders: merge.new.map(\.folders))
-        // Icons for the first ones now; the sidebar fetches the rest for the rows it shows.
-        for bookmark in added.prefix(40) { FaviconStore.shared.prefetch(for: bookmark.url) }
-        return added.count
+        return (count, made)
+    }
+
+    /// Where an import's bookmarks go, one part for each browser profile they came from, in the order the browser
+    /// lists them: the space (nil: one to make, with `name`) and the pages it doesn't have yet.
+    static func plan(_ bookmarks: [ImportBatch.Bookmark], source: String, in spaces: [SpaceInfo], on target: UUID,
+                     profileOf: (UUID) -> UUID) -> [(from: ImportBatch.BrowserProfile?, space: SpaceInfo?, name: String, new: [ImportBatch.Bookmark])] {
+        var order: [ImportBatch.BrowserProfile?] = []
+        var groups: [ImportBatch.BrowserProfile?: [ImportBatch.Bookmark]] = [:]
+        for bookmark in bookmarks {
+            if groups[bookmark.from] == nil { order.append(bookmark.from) }
+            groups[bookmark.from, default: []].append(bookmark)
+        }
+        var names = spaces
+        return order.map { from in
+            let place = placement(for: from, source: source, in: names, on: target, profileOf: profileOf)
+            // A name given to one profile's new space isn't given to the next ("Wang" twice).
+            if place.space == nil { names.append(SpaceInfo(name: place.name, color: .sky)) }
+            return (from, place.space, place.name, merged(groups[from] ?? [], into: place.space))
+        }
+    }
+
+    /// The space one browser profile's bookmarks go into, on `target`, and the name to make it with when there's
+    /// none yet. Only ever a space an import made: one of yours with the same name is left alone.
+    ///
+    /// - The space made for that profile before, found by the profile it keeps (renamed or not).
+    /// - Else one an earlier version made for it, known by its name then ("From Chrome (Work)").
+    /// - Else none: a new one, named after the profile ("Work"), or "From Chrome (Work)" when a space has that name.
+    ///
+    /// Bookmarks from a browser of one profile (`from` nil) go into "From Chrome", as they always have.
+    static func placement(for from: ImportBatch.BrowserProfile?, source: String, in spaces: [SpaceInfo], on target: UUID,
+                          profileOf: (UUID) -> UUID) -> (space: SpaceInfo?, name: String) {
+        func fromName(_ name: String) -> String {
+            String(localized: "From \(name)", comment: "Name of the space imported bookmarks go into. The placeholder is a browser's name: From Chrome.")
+        }
+        let here = spaces.filter { profileOf($0.id) == target }
+        guard let from else {
+            let name = fromName(source)
+            return (here.first { $0.name == name && $0.importedFrom == nil }, name)
+        }
+        if let space = here.first(where: { $0.importedFrom == from.key }) { return (space, space.name) }
+        let earlier = fromName("\(from.browser) (\(from.name))")
+        let older = Set([earlier] + (from.display.map { [fromName("\(from.browser) (\($0))")] } ?? []))
+        if let space = here.first(where: { $0.importedFrom == nil && older.contains($0.name) }) { return (space, space.name) }
+        return (nil, spaces.contains { $0.name == from.name } ? earlier : from.name)
     }
 
     /// What importing bookmarks again adds: only the pages its space doesn't have yet, once each. With that space
     /// deleted, `space` is nil and everything is new, so the space comes back whole.
-    static func merged(_ bookmarks: [ImportBatch.Bookmark], into spaces: [SpaceInfo], named spaceName: String) -> (space: SpaceInfo?, new: [ImportBatch.Bookmark]) {
-        let space = spaces.first { $0.name == spaceName }
+    static func merged(_ bookmarks: [ImportBatch.Bookmark], into space: SpaceInfo?) -> [ImportBatch.Bookmark] {
         var known = Set((space?.bookmarks ?? []).map { TabManager.normalize($0.url) })
-        return (space, bookmarks.filter { known.insert(TabManager.normalize($0.url)).inserted })
+        return bookmarks.filter { known.insert(TabManager.normalize($0.url)).inserted }
     }
 }

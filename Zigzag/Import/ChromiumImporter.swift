@@ -82,9 +82,10 @@ nonisolated enum ChromiumImporter {
         BrowserFolders.applicationSupport.appendingPathComponent(browser.root, isDirectory: true)
     }
 
-    /// Profile folders, from `Local State` (falling back to "Default").
-    static func profiles(of browser: Browser) -> [URL] {
-        let root = rootURL(of: browser)
+    /// Profile folders, from `Local State` (falling back to "Default"). `root`: the browser's folder, when not its own
+    /// (a test's made-up one).
+    static func profiles(of browser: Browser, in root: URL? = nil) -> [URL] {
+        let root = root ?? rootURL(of: browser)
         var names: [String] = []
         if let data = try? Data(contentsOf: root.appendingPathComponent("Local State")),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -100,8 +101,8 @@ nonisolated enum ChromiumImporter {
     static func isInstalled(_ browser: Browser) -> Bool { !profiles(of: browser).isEmpty }
 
     /// Each profile's folder and the name the browser shows for it, in the order the browser lists them.
-    static func profileNames(of browser: Browser) -> [(folder: String, name: String)] {
-        let root = rootURL(of: browser)
+    static func profileNames(of browser: Browser, in root: URL? = nil) -> [(folder: String, name: String)] {
+        let root = root ?? rootURL(of: browser)
         guard let data = try? Data(contentsOf: root.appendingPathComponent("Local State")),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let profile = json["profile"] as? [String: Any],
@@ -122,6 +123,18 @@ nonisolated enum ChromiumImporter {
         }
     }
 
+    /// Each profile's name, short, as the Import window lists it: "Wang (a@zigao.xyz)" reads as just "Wang", with
+    /// the email only when two profiles share a name. Empty with one profile or none.
+    static func profileLabels(of browser: Browser, in root: URL? = nil) -> [(folder: String, label: String, display: String)] {
+        let profiles = profileNames(of: browser, in: root)
+        guard profiles.count > 1 else { return [] }
+        let short = profiles.map { ImportCoordinator.shortProfileName($0.name) }
+        return zip(profiles, short).map { profile, name in
+            let label = short.filter { $0 == name }.count > 1 ? ImportCoordinator.profileEmail(profile.name) ?? profile.name : name
+            return (profile.folder, label, profile.name)
+        }
+    }
+
     // MARK: Reading
 
     struct Choice: OptionSet, Sendable {
@@ -134,15 +147,16 @@ nonisolated enum ChromiumImporter {
         static let cookies = Choice(rawValue: 16)
     }
 
-    static func read(_ browser: Browser, _ choice: Choice) -> ImportBatch {
+    static func read(_ browser: Browser, _ choice: Choice, in root: URL? = nil) -> ImportBatch {
         var batch = ImportBatch()
-        let profiles = profiles(of: browser)
+        let root = root ?? rootURL(of: browser)
+        let profiles = profiles(of: browser, in: root)
         // macOS protects some browsers' data (Chrome, Edge, Brave) from other apps, with no prompt; say so.
         let files = profiles.flatMap { profile in
             ["Login Data", "Bookmarks", "History"].map { profile.appendingPathComponent($0) } + [SignInImporter.chromiumFile(in: profile)]
         }
         if files.contains(where: { FileManager.default.fileExists(atPath: $0.path) && !FileManager.default.isReadableFile(atPath: $0.path) })
-            || (profiles.isEmpty && FileManager.default.fileExists(atPath: rootURL(of: browser).path)) {
+            || (profiles.isEmpty && FileManager.default.fileExists(atPath: root.path)) {
             batch.problems.append(ImportProblem(message: String(localized: "macOS keeps \(browser.name)’s data private until you allow it. In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on \(browser.name), then try again.",
                                                                 comment: "Problem in the Import window. The placeholder is a browser's name, like Chrome; System Settings › Privacy & Security › Files & Folders is macOS's own wording."),
                                                 fix: .fullDiskAccess))
@@ -197,7 +211,16 @@ nonisolated enum ChromiumImporter {
             }
         }
         if choice.contains(.bookmarks) {
-            for profile in profiles { batch.bookmarks += bookmarks(at: profile.appendingPathComponent("Bookmarks")) }
+            // A browser with several profiles: each one's bookmarks are marked with it, so each comes over as a space
+            // of its own, even when the browser was listed as one row (its profiles unread until macOS allowed it).
+            let labels = profileLabels(of: browser, in: root)
+            for profile in profiles {
+                let folder = profile.lastPathComponent
+                let from = labels.first { $0.folder == folder }.map {
+                    ImportBatch.BrowserProfile(key: "\(browser.root)/\(folder)", browser: browser.name, name: $0.label, display: $0.display)
+                }
+                batch.bookmarks += bookmarks(at: profile.appendingPathComponent("Bookmarks")).map { var b = $0; b.from = from; return b }
+            }
         }
         if choice.contains(.history) {
             for profile in profiles { batch.history += history(at: profile.appendingPathComponent("History")) }

@@ -126,6 +126,9 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var usesClearGlass: Bool { Self.hasClearGlass && clearGlass != false && !PowerSaving.isOn }
     /// Shown beside its name and in the space switcher: an SF Symbol's name, or an emoji. Nil: a dot.
     var icon: String? = nil
+    /// The browser profile this space was made for by an import (`ImportBatch.BrowserProfile.key`), so importing that
+    /// profile again adds to it instead of making another. Nil: made here.
+    var importedFrom: String? = nil
 
     /// No hue of its own: white, a gray, or black.
     var isNeutral: Bool { (hue == nil && color.isNeutral) || (tint ?? 1) < 0.005 }
@@ -496,6 +499,13 @@ final class Library {
         directory.assign(space: space.id, to: profile)
         commit()
         return space
+    }
+
+    /// Notes which browser profile an import made this space for, so the next import of it lands here again.
+    func setImportedFrom(_ key: String, forSpace id: UUID) {
+        guard let i = index(of: id), spaces[i].importedFrom != key else { return }
+        spaces[i].importedFrom = key
+        commit()
     }
 
     func renameSpace(_ id: UUID, to name: String) {
