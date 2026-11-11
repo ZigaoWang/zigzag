@@ -199,6 +199,11 @@ One look for each state, everywhere:
 - Pointer: the arrow on every control, as on the Mac; the I-beam in text; the pointing hand only for links in a
   page's text. Hover feedback is the fill, not the cursor.
 - Disabled: `Opacity.disabled`.
+- Increase Contrast (the Mac's, `Tokens.Contrast`): hairlines, edges, separators, quiet text, icons, the chrome's
+  fills and the controls' borders take their stronger versions (`Color.dynamic(light:dark:highLight:highDark:)`),
+  quiet and tertiary text at AA or better on every surface and frame; every window draws again when it changes.
+  With it or Reduce Transparency, floating panels are opaque. Debug builds force it with ZIGZAG_HIGH_CONTRAST=1 or
+  `contrast on|off|system`.
 - Drop target: the accent at 14% with a 1.5pt accent edge; an insertion is a 2pt accent line with round ends. A
   carried item stays faint in place (`CarriedCopy.faint`) while a see-through copy follows the pointer.
 
