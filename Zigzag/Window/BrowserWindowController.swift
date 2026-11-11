@@ -851,6 +851,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     static func pageColor(of tab: Tab?) -> NSColor? {
         guard let tab, let webView = tab.webView, tab.pdfViewer == nil, tab.settingsView == nil else { return nil }
+        // Drawn dark by Zigzag: the page's own colors are still light underneath, so the bar takes the color as drawn.
+        if let dark = tab.darkPage, dark.darkened, let color = dark.color { return color }
         return webView.underPageBackgroundColor ?? tab.themeColor
     }
 
@@ -1037,7 +1039,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             updateReaderButton()
         case .language:
             offerTranslation()
-        case .themeColor:
+        case .themeColor, .darkPage:
             paintTopBar()
         default:
             break
