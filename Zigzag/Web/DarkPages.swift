@@ -149,23 +149,42 @@ enum DarkPages {
         (try? JSONSerialization.data(withJSONObject: config(for: store), options: [.sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     }
 
+    /// The first line of the page script, so it can be told from a web view's other scripts at a glance.
+    static let scriptMark = "/* zigzag dark pages */\n"
+
     static func script(for store: WKWebsiteDataStore?) -> WKUserScript {
-        WKUserScript(source: source.replacingOccurrences(of: "__CONFIG__", with: configJSON(for: store)),
+        WKUserScript(source: scriptMark + source.replacingOccurrences(of: "__CONFIG__", with: configJSON(for: store)),
                      injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world)
     }
 
-    private static func isOurs(_ script: WKUserScript) -> Bool { script.source.contains("window.__zigzagDark") }
+    /// By its first line only. A web view's scripts come to hundreds of kilobytes (autofill, Reader, an extension's
+    /// bridge); searching all of them for a word, as this once did, held up every new tab for a quarter of a second
+    /// and every open tab at once when a page taught it a site (#89).
+    static func isOurs(_ script: WKUserScript) -> Bool { (script.source as NSString).hasPrefix(scriptMark) }
 
     /// Puts the page script, with the choices as they are now, into a web view's set of scripts, in place of the
     /// one it had. Pages already open hear of a change from `refresh`; this is for the pages loaded after it.
     private static func install(in webView: WKWebView) {
         let controller = webView.configuration.userContentController
-        let others = controller.userScripts.filter { !isOurs($0) }
-        if others.count != controller.userScripts.count {
+        let scripts = controller.userScripts
+        let others = scripts.filter { !isOurs($0) }
+        if others.count != scripts.count {
             controller.removeAllUserScripts()
             others.forEach(controller.addUserScript)
         }
         controller.addUserScript(script(for: webView.configuration.websiteDataStore))
+        installed[ObjectIdentifier(controller)] = generation
+    }
+
+    /// Counts up each time what a page script is given changes without anyone asking (a site learned dark): a web
+    /// view whose script is older gets the new one as it next goes to a page, not all of them at once.
+    private static var generation = 0
+    /// Which generation each web view's scripts (by their set, shared by a page and the pop-ups it opened) have.
+    private static var installed: [ObjectIdentifier: Int] = [:]
+
+    private static func installIfStale(in webView: WKWebView) {
+        let key = ObjectIdentifier(webView.configuration.userContentController)
+        if installed[key] != generation { install(in: webView) }
     }
 
     private final class Entry {
@@ -187,6 +206,8 @@ enum DarkPages {
         // Going to another site, its own choice applies before its page starts.
         entry.observation = webView.observe(\.url, options: [.new]) { webView, _ in
             MainActor.assumeIsolated {
+                // Sites learned since its script was put in: the page it's going to starts with them.
+                installIfStale(in: webView)
                 applyLook(to: webView)
                 // A single-page app's new view, which loads nothing: looked at again once it's drawn.
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak webView] in
@@ -195,6 +216,8 @@ enum DarkPages {
             }
         }
         entries = entries.filter { $0.value.webView != nil }
+        let live = Set(entries.values.compactMap { $0.webView.map { ObjectIdentifier($0.configuration.userContentController) } })
+        installed = installed.filter { live.contains($0.key) || $0.key == ObjectIdentifier(controller) }
         entries[ObjectIdentifier(webView)] = entry
         applyLook(to: webView)
         if appearanceObservation == nil {
@@ -251,8 +274,6 @@ enum DarkPages {
         var site: String
     }
 
-    private static var pendingInstall: DispatchWorkItem?
-
     /// What a page in this store found: a site it saw dark, or saw light, joins or leaves its profile's list.
     /// True when the list changed.
     @discardableResult
@@ -267,21 +288,9 @@ enum DarkPages {
 
     fileprivate static func received(_ state: State, from webView: WKWebView) {
         // Learned sites go into the scripts of pages loaded later in the same profile; not from a private window.
-        if learn(state, in: nativeScope(of: webView.configuration.websiteDataStore)) {
-            pendingInstall?.cancel()
-            let work = DispatchWorkItem {
-                MainActor.assumeIsolated {
-                    var done = Set<ObjectIdentifier>()
-                    for entry in entries.values {
-                        guard let webView = entry.webView,
-                              done.insert(ObjectIdentifier(webView.configuration.userContentController)).inserted else { continue }
-                        install(in: webView)
-                    }
-                }
-            }
-            pendingInstall = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
-        }
+        // Each web view takes them as it next goes to a page (`installIfStale`): putting them into every open tab's
+        // scripts at once held Zigzag up for seconds with many tabs open (#89).
+        if learn(state, in: nativeScope(of: webView.configuration.websiteDataStore)) { generation += 1 }
         if let tab = (webView as? BrowserWebView)?.owner { tab.darkPageChanged(state) }
         applyLook(to: webView)
     }

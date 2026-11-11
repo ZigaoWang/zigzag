@@ -251,4 +251,31 @@ struct DarkPagesTests {
         #expect(DarkPages.learn(DarkPages.State(darkened: true, native: false, color: nil, site: dark.site), in: one))
         #expect(!DarkPages.nativeSites(in: one).contains(dark.site))
     }
+
+    // MARK: Its script among the others (#89)
+
+    /// The page script is known by its first line; a big script that merely talks about it isn't taken for it.
+    @Test func thePageScriptIsKnownByItsFirstLine() {
+        #expect(DarkPages.isOurs(DarkPages.script(for: nil)))
+        let mentions = WKUserScript(source: "// reads window.__zigzagDark\n" + String(repeating: "x", count: 1000),
+                                    injectionTime: .atDocumentStart, forMainFrameOnly: true)
+        #expect(!DarkPages.isOurs(mentions))
+    }
+
+    /// A new tab next to a megabyte of other scripts gets its page script at once, and only one, however often it's
+    /// put in: telling the scripts apart once searched every one of them and held each new tab up.
+    @Test func puttingTheScriptInIsQuickAndLeavesOne() {
+        let configuration = WKWebViewConfiguration()
+        let big = WKUserScript(source: "/* other */" + String(repeating: "let a = 1; // window.__zigzag\n", count: 40_000),
+                               injectionTime: .atDocumentStart, forMainFrameOnly: false)
+        for _ in 0..<4 { configuration.userContentController.addUserScript(big) }
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let started = Date()
+        for _ in 0..<5 { DarkPages.attach(to: webView) }
+        let each = Date().timeIntervalSince(started) / 5
+        let scripts = configuration.userContentController.userScripts
+        #expect(scripts.filter(DarkPages.isOurs).count == 1)
+        #expect(scripts.count == 5)
+        #expect(each < 0.05, "attaching took \(Int(each * 1000)) ms")
+    }
 }
