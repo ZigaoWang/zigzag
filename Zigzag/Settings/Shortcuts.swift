@@ -157,7 +157,12 @@ enum Shortcuts {
 
     /// "⌘O": the menu item's shortcut as it is now, or empty if it has none.
     static func keys(for action: Selector) -> String {
-        allItems.first { $0.action == action }.map { caps($0).joined() } ?? ""
+        caps(for: action).joined()
+    }
+
+    /// The menu item's shortcut as it is now, one key per cap, or none.
+    static func caps(for action: Selector) -> [String] {
+        allItems.first { $0.action == action }.map { caps($0) } ?? []
     }
 
     private static func name(of key: String) -> String {

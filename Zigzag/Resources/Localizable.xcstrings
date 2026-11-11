@@ -3633,13 +3633,13 @@
         }
       }
     },
-    "Click + at the bottom of the sidebar" : {
-      "comment" : "Under a step's title in the getting-started guide, a card in the window.",
+    "Click + in the sidebar, then New Space" : {
+      "comment" : "Under the new space step's title in the getting-started guide, a card in the window. New Space is an item in the menu of the sidebar's +.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "点按边栏底部的 +"
+            "value" : "点按边栏中的 +，然后点按“新建空间”"
           }
         }
       }
@@ -3672,6 +3672,17 @@
         }
       }
     },
+    "Click New Space" : {
+      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while the menu of the sidebar's + is open. New Space is an item in that menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按“新建空间”"
+          }
+        }
+      }
+    },
     "Click a shortcut to change or remove it. To find one, type its name or keys in Find a setting." : {
       "comment" : "Hint at the top of Settings › Shortcuts. “Find a setting” is the search field's placeholder.",
       "localizations" : {
@@ -3683,13 +3694,13 @@
         }
       }
     },
-    "Click one to go to it, or press Esc to go back" : {
-      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window.",
+    "Click a tab to go to it" : {
+      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while the tab overview (every tab as a card) is open.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "点按一个即可前往，或按 Esc 键返回"
+            "value" : "点按一个标签页即可前往"
           }
         }
       }
@@ -6619,6 +6630,17 @@
         }
       }
     },
+    "It’s Show All Tabs, in the View menu" : {
+      "comment" : "Under what's said once the tab overview step is done, in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "就是“显示”菜单中的“显示所有标签页”"
+          }
+        }
+      }
+    },
     "JavaScript Console" : {
       "comment" : "View › Developer menu item: opens the Web Inspector's console.",
       "localizations" : {
@@ -8811,6 +8833,17 @@
         }
       }
     },
+    "Or click + in the sidebar, then New Space" : {
+      "comment" : "Under the new space step's title in the getting-started guide, a card in the window, after the keys that make a space. New Space is an item in the menu of the sidebar's +.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "或者点按边栏中的 +，然后点按“新建空间”"
+          }
+        }
+      }
+    },
     "Or click outside it" : {
       "comment" : "Under the hint to close a Peek, in the getting-started guide, a card in the window.",
       "localizations" : {
@@ -8829,6 +8862,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "也可以让 Zigzag 每次询问存储位置。"
+          }
+        }
+      }
+    },
+    "Or press Esc to go back" : {
+      "comment" : "Under a hint in the getting-started guide, a card in the window, while the tab overview is open. Esc is the key.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "或按 Esc 键返回"
           }
         }
       }
@@ -9540,6 +9584,17 @@
         }
       }
     },
+    "Press %@ anytime to find a tab" : {
+      "comment" : "Under what's said once the tab overview step is done, in the getting-started guide, a card in the window. The keys are a shortcut, like ⇧⌘\\.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "随时按 %@ 查找标签页"
+          }
+        }
+      }
+    },
     "Press Tab" : {
       "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, when the command bar offers to search YouTube. Tab is the key.",
       "localizations" : {
@@ -9551,6 +9606,17 @@
         }
       }
     },
+    "Press these keys to see every tab at once" : {
+      "comment" : "Under the tab overview step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按下这些键，一次看到所有标签页"
+          }
+        }
+      }
+    },
     "Press these keys, then search YouTube" : {
       "comment" : "Under a step's title in the getting-started guide, a card in the window.",
       "localizations" : {
@@ -9558,17 +9624,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "按下这些键，然后在 YouTube 上搜索"
-          }
-        }
-      }
-    },
-    "Press these keys, then type to find a tab" : {
-      "comment" : "Under a step's title in the getting-started guide, a card in the window.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "按下这些键，然后输入文字查找标签页"
           }
         }
       }
@@ -12423,13 +12478,30 @@
         }
       }
     },
-    "Swipe or click a dot anytime, or press ⌥⌘← and ⌥⌘→" : {
-      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window.",
+    "Swipe or click a dot anytime" : {
+      "comment" : "Under what's said once the switching spaces step is done, in the getting-started guide, a card in the window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "随时轻扫或点按圆点，也可以按 ⌥⌘← 和 ⌥⌘→"
+            "value" : "随时轻扫或点按圆点"
+          }
+        }
+      }
+    },
+    "Swipe or click a dot anytime, or press %@ and %@" : {
+      "comment" : "Under what's said once the switching spaces step is done, in the getting-started guide, a card in the window. The keys are shortcuts, like ⌥⌘← and ⌥⌘→.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Swipe or click a dot anytime, or press %1$@ and %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "随时轻扫或点按圆点，也可以按 %1$@ 和 %2$@"
           }
         }
       }
@@ -13501,13 +13573,24 @@
         }
       }
     },
-    "To separate them, click the split button at the top right of either page" : {
-      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window.",
+    "To separate them, press %@" : {
+      "comment" : "Under what's said once the split view step is done, in the getting-started guide, a card in the window. The keys are a shortcut, like ⌥⌘\\.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要分开它们，请点按任一页面右上角的分屏按钮"
+            "value" : "要分开它们，请按 %@"
+          }
+        }
+      }
+    },
+    "To separate them, use the buttons above either page" : {
+      "comment" : "Under what's said once the split view step is done, in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要分开它们，请使用任一页面上方的按钮"
           }
         }
       }

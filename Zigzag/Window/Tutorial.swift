@@ -15,72 +15,93 @@ enum Tutorial {
         let doneNote: String
     }
 
-    /// Each step is the keys, a few words, and one short line on why: a glance, nothing to read.
-    static let tasks: [Task] = [
-        Task(id: "newTab",
-             title: String(localized: "Open a new tab", comment: "A step's title in the getting-started guide, a card in the window."),
-             keys: ["⌘", "T"],
-             note: String(localized: "Press these keys, then search YouTube", comment: "Under a step's title in the getting-started guide, a card in the window."),
-             done: String(localized: "You searched YouTube from here", comment: "Said once a step is done in the getting-started guide, a card in the window."),
-             doneNote: String(localized: "Type any site’s name, then Tab, to search it", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window. Tab is the key.")),
-        Task(id: "pin",
-             title: String(localized: "Pin this page", comment: "A step's title in the getting-started guide, a card in the window."),
-             keys: ["⌘", "D"],
-             note: String(localized: "Pinned tabs stay, even after you quit", comment: "Under a step's title in the getting-started guide, a card in the window."),
-             done: String(localized: "Pinned", comment: "Said once a step is done in the getting-started guide, a card in the window."),
-             doneNote: String(localized: "It stays at the top of this space", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window.")),
-        Task(id: "peek",
-             title: String(localized: "Shift-click a blue link", comment: "A step's title in the getting-started guide, a card in the window."),
-             keys: ["⇧", String(localized: "Click", comment: "A key in the getting-started guide, after ⇧: click with the mouse or trackpad.")],
-             note: String(localized: "Here’s an article to try it on", comment: "Under a step's title in the getting-started guide, a card in the window."),
-             done: String(localized: "That’s Peek", comment: "Said once a step is done in the getting-started guide, a card in the window."),
-             doneNote: String(localized: "A quick look, without losing your place", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window. Peek is a Zigzag feature's name.")),
-        Task(id: "split",
-             title: String(localized: "Drag a tab onto the page", comment: "A step's title in the getting-started guide, a card in the window."),
-             keys: [],
-             note: String(localized: "Two pages, side by side", comment: "Under a step's title in the getting-started guide, a card in the window."),
-             done: String(localized: "That’s Split View", comment: "Said once a step is done in the getting-started guide, a card in the window."),
-             doneNote: String(localized: "To separate them, click the split button at the top right of either page", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window.")),
-        Task(id: "overview",
-             title: String(localized: "See all your tabs", comment: "A step's title in the getting-started guide, a card in the window."),
-             keys: ["⇧", "⌘", "\\"],
-             note: String(localized: "Press these keys, then type to find a tab", comment: "Under a step's title in the getting-started guide, a card in the window."),
-             done: String(localized: "Every tab, at a glance", comment: "Said once a step is done in the getting-started guide, a card in the window."),
-             doneNote: String(localized: "Click one to go to it, or press Esc to go back", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window.")),
-        Task(id: "space",
-             title: String(localized: "Make a space", comment: "A step's title in the getting-started guide, a card in the window."),
-             keys: [],
-             note: String(localized: "Click + at the bottom of the sidebar", comment: "Under a step's title in the getting-started guide, a card in the window."),
-             done: String(localized: "Your new space", comment: "Said once a step is done in the getting-started guide, a card in the window."),
-             doneNote: String(localized: "Its own tabs and pinned tabs, in its own color", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window.")),
-        Task(id: "switch",
-             title: String(localized: "Go back to your first space", comment: "A step's title in the getting-started guide, a card in the window."),
-             keys: [],
-             note: String(localized: "Swipe two fingers across the sidebar, or click its dot", comment: "Under a step's title in the getting-started guide, a card in the window."),
-             done: String(localized: "That’s switching spaces", comment: "Said once a step is done in the getting-started guide, a card in the window."),
-             doneNote: String(localized: "Swipe or click a dot anytime, or press ⌥⌘← and ⌥⌘→", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window.")),
-    ]
+    /// Each step is the keys, a few words, and one short line on why: a glance, nothing to read. Made fresh each time,
+    /// so the keys are the ones set in Settings › Shortcuts now.
+    static var tasks: [Task] {
+        let newTabKeys = Shortcuts.caps(for: #selector(BrowserWindowController.newTab(_:)))
+        let pinKeys = Shortcuts.caps(for: #selector(BrowserWindowController.toggleBookmark(_:)))
+        let overviewKeys = Shortcuts.caps(for: #selector(BrowserWindowController.toggleDeskView(_:)))
+        let separateKeys = Shortcuts.keys(for: #selector(BrowserWindowController.closeSplitView(_:)))
+        let newSpaceKeys = Shortcuts.caps(for: #selector(BrowserWindowController.newSpace(_:)))
+        let previousSpaceKeys = Shortcuts.keys(for: #selector(BrowserWindowController.previousSpace(_:)))
+        let nextSpaceKeys = Shortcuts.keys(for: #selector(BrowserWindowController.nextSpace(_:)))
+        return [
+            Task(id: "newTab",
+                 title: String(localized: "Open a new tab", comment: "A step's title in the getting-started guide, a card in the window."),
+                 keys: newTabKeys,
+                 note: String(localized: "Press these keys, then search YouTube", comment: "Under a step's title in the getting-started guide, a card in the window."),
+                 done: String(localized: "You searched YouTube from here", comment: "Said once a step is done in the getting-started guide, a card in the window."),
+                 doneNote: String(localized: "Type any site’s name, then Tab, to search it", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window. Tab is the key.")),
+            Task(id: "pin",
+                 title: String(localized: "Pin this page", comment: "A step's title in the getting-started guide, a card in the window."),
+                 keys: pinKeys,
+                 note: String(localized: "Pinned tabs stay, even after you quit", comment: "Under a step's title in the getting-started guide, a card in the window."),
+                 done: String(localized: "Pinned", comment: "Said once a step is done in the getting-started guide, a card in the window."),
+                 doneNote: String(localized: "It stays at the top of this space", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window.")),
+            Task(id: "peek",
+                 title: String(localized: "Shift-click a blue link", comment: "A step's title in the getting-started guide, a card in the window."),
+                 keys: ["⇧", String(localized: "Click", comment: "A key in the getting-started guide, after ⇧: click with the mouse or trackpad.")],
+                 note: String(localized: "Here’s an article to try it on", comment: "Under a step's title in the getting-started guide, a card in the window."),
+                 done: String(localized: "That’s Peek", comment: "Said once a step is done in the getting-started guide, a card in the window."),
+                 doneNote: String(localized: "A quick look, without losing your place", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window. Peek is a Zigzag feature's name.")),
+            Task(id: "overview",
+                 title: String(localized: "See all your tabs", comment: "A step's title in the getting-started guide, a card in the window."),
+                 keys: overviewKeys,
+                 note: String(localized: "Press these keys to see every tab at once", comment: "Under the tab overview step's title in the getting-started guide, a card in the window."),
+                 done: String(localized: "Every tab, at a glance", comment: "Said once a step is done in the getting-started guide, a card in the window."),
+                 doneNote: overviewKeys.isEmpty
+                    ? String(localized: "It’s Show All Tabs, in the View menu", comment: "Under what's said once the tab overview step is done, in the getting-started guide, a card in the window.")
+                    : String(localized: "Press \(overviewKeys.joined()) anytime to find a tab", comment: "Under what's said once the tab overview step is done, in the getting-started guide, a card in the window. The keys are a shortcut, like ⇧⌘\\.")),
+            Task(id: "split",
+                 title: String(localized: "Drag a tab onto the page", comment: "A step's title in the getting-started guide, a card in the window."),
+                 keys: [],
+                 note: String(localized: "Two pages, side by side", comment: "Under a step's title in the getting-started guide, a card in the window."),
+                 done: String(localized: "That’s Split View", comment: "Said once a step is done in the getting-started guide, a card in the window."),
+                 doneNote: separateKeys.isEmpty
+                    ? String(localized: "To separate them, use the buttons above either page", comment: "Under what's said once the split view step is done, in the getting-started guide, a card in the window.")
+                    : String(localized: "To separate them, press \(separateKeys)", comment: "Under what's said once the split view step is done, in the getting-started guide, a card in the window. The keys are a shortcut, like ⌥⌘\\.")),
+            Task(id: "space",
+                 title: String(localized: "Make a space", comment: "A step's title in the getting-started guide, a card in the window."),
+                 keys: newSpaceKeys,
+                 note: newSpaceKeys.isEmpty
+                    ? String(localized: "Click + in the sidebar, then New Space", comment: "Under the new space step's title in the getting-started guide, a card in the window. New Space is an item in the menu of the sidebar's +.")
+                    : String(localized: "Or click + in the sidebar, then New Space", comment: "Under the new space step's title in the getting-started guide, a card in the window, after the keys that make a space. New Space is an item in the menu of the sidebar's +."),
+                 done: String(localized: "Your new space", comment: "Said once a step is done in the getting-started guide, a card in the window."),
+                 doneNote: String(localized: "Its own tabs and pinned tabs, in its own color", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window.")),
+            Task(id: "switch",
+                 title: String(localized: "Go back to your first space", comment: "A step's title in the getting-started guide, a card in the window."),
+                 keys: [],
+                 note: String(localized: "Swipe two fingers across the sidebar, or click its dot", comment: "Under a step's title in the getting-started guide, a card in the window."),
+                 done: String(localized: "That’s switching spaces", comment: "Said once a step is done in the getting-started guide, a card in the window."),
+                 doneNote: previousSpaceKeys.isEmpty || nextSpaceKeys.isEmpty
+                    ? String(localized: "Swipe or click a dot anytime", comment: "Under what's said once the switching spaces step is done, in the getting-started guide, a card in the window.")
+                    : String(localized: "Swipe or click a dot anytime, or press \(previousSpaceKeys) and \(nextSpaceKeys)", comment: "Under what's said once the switching spaces step is done, in the getting-started guide, a card in the window. The keys are shortcuts, like ⌥⌘← and ⌥⌘→.")),
+        ]
+    }
 
     /// The step that was just skipped, so the guide moves on without saying it was done.
     @MainActor static var skipped: String?
 
+    /// Where it's kept: the app's defaults, or a scratch suite in tests.
+    static var store: UserDefaults = .standard
+
     private static let key = "TutorialDone"
     static var done: Set<String> {
         get {
-            var done = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+            var done = Set(store.stringArray(forKey: key) ?? [])
             // Finished before Split View or the overview were steps: it doesn't come back to teach just those.
             if done.contains("space") { done.formUnion(["split", "overview"]) }
             return done
         }
-        set { UserDefaults.standard.set(Array(newValue), forKey: key) }
+        set { store.set(Array(newValue), forKey: key) }
     }
 
     /// Finished the guide before "go back to your first space" was a step: once, on the first launch of the version
     /// that added it, that step counts as done too, so the guide doesn't come back to teach just that.
     static func migrate() {
         let flag = "TutorialSwitchStepAdded"
-        guard !UserDefaults.standard.bool(forKey: flag) else { return }
-        UserDefaults.standard.set(true, forKey: flag)
+        guard !store.bool(forKey: flag) else { return }
+        store.set(true, forKey: flag)
         if done.contains("space") { done.insert("switch") }
     }
 
@@ -89,8 +110,8 @@ enum Tutorial {
 
     /// Ended with the guide's ×; Help › Getting Started starts it again.
     static var isHidden: Bool {
-        get { UserDefaults.standard.bool(forKey: "TutorialHidden") }
-        set { UserDefaults.standard.set(newValue, forKey: "TutorialHidden") }
+        get { store.bool(forKey: "TutorialHidden") }
+        set { store.set(newValue, forKey: "TutorialHidden") }
     }
 
     /// Sent when a step is done or skipped.
@@ -113,6 +134,20 @@ enum Tutorial {
         changed.send(())
     }
 
+    /// The overview opened while it's the step. It counts once you leave it again, by a card, Esc or the keys, so
+    /// the step is seeing it and getting back, not just opening it.
+    @MainActor private(set) static var inOverview = false
+
+    @MainActor static func overviewOpened() {
+        inOverview = current?.id == "overview"
+    }
+
+    @MainActor static func overviewClosed() {
+        guard inOverview else { return }
+        inOverview = false
+        complete("overview")
+    }
+
     @MainActor static func skip() {
         guard let current else { return }
         skipped = current.id
@@ -124,5 +159,17 @@ enum Tutorial {
     @MainActor static func restart() {
         done = []
         isHidden = false
+        inOverview = false
+    }
+
+    /// Where the ring around what to click goes: the part of it you can see (`visible`, nil when it's off screen or
+    /// scrolled away), grown by `outset`, and kept `margin` inside `bounds` (the window), so the ring never runs off
+    /// an edge. Nil when too little of it shows to point at.
+    static func ringRect(visible: NSRect?, outset: CGFloat, within bounds: NSRect, margin: CGFloat) -> NSRect? {
+        guard let visible, visible.width >= 4, visible.height >= 4 else { return nil }
+        let area = bounds.insetBy(dx: margin, dy: margin)
+        let ring = visible.insetBy(dx: -outset, dy: -outset).intersection(area)
+        guard !ring.isNull, ring.width >= 4, ring.height >= 4 else { return nil }
+        return ring
     }
 }

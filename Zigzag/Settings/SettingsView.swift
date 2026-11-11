@@ -2182,6 +2182,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func addSpace() {
         let profile = browser?.tabManager.profile.id ?? Profile.defaultID
         BrowserWindowController.changeLibrary(String(localized: "New Space", comment: "What Edit › Undo undoes after a space is added.")) { Library.shared.addSpace(profile: profile) }
+        // Made here rather than from the sidebar, it's still the guide's "make a space" step.
+        Tutorial.complete("space")
     }
 
     // MARK: Privacy

@@ -293,6 +293,16 @@ final class GuidedTour: NSView {
                            note: String(localized: "Or click outside it", comment: "Under the hint to close a Peek, in the getting-started guide, a card in the window."), count: "", isDone: false, isFinal: false, target: "peek")
         }
         if task.id == "peek" { return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: "article") }
+        // In the overview: what it's for is in front of you, so the hint is how to get back to a page.
+        if task.id == "overview", controller.desk.isVisible {
+            return Display(keys: [], title: String(localized: "Click a tab to go to it", comment: "A hint in the middle of a step in the getting-started guide, a card in the window, while the tab overview (every tab as a card) is open."),
+                           note: String(localized: "Or press Esc to go back", comment: "Under a hint in the getting-started guide, a card in the window, while the tab overview is open. Esc is the key."), count: "", isDone: false, isFinal: false, target: "desk")
+        }
+        // The + opens a menu: the space is its last item.
+        if task.id == "space", let menu = MenuPanel.current, menu.anchor === controller.sidebar.newSpaceAnchor {
+            return Display(keys: [], title: String(localized: "Click New Space", comment: "A hint in the middle of a step in the getting-started guide, a card in the window, while the menu of the sidebar's + is open. New Space is an item in that menu."),
+                           note: "", count: "", isDone: false, isFinal: false, target: "addmenu")
+        }
         // Names the very tab to drag, and a cursor in the window shows the drag on it: a ring alone reads as the tab
         // you're on.
         if task.id == "split" {
@@ -320,6 +330,7 @@ final class GuidedTour: NSView {
         case "done.split", "overview", "done.overview": return controller.root.card
         case "space": return controller.sidebar.newSpaceAnchor
         case "editor": return SpaceEditorPanel.current
+        case "addmenu": return MenuPanel.current
         case "switch": return controller.sidebar.firstDotAnchor
         case "done.space", "done.switch": return controller.sidebar.dotsAnchor
         default: return nil
@@ -333,7 +344,7 @@ final class GuidedTour: NSView {
             shown = key
             if !now.isDone, !now.isFinal {
                 if Tutorial.current?.id == "peek", lastStepID != "peek" { openArticle() }
-                if Tutorial.current?.id == "split", lastStepID != "split" { openSplitPartner() }
+                if ["overview", "split"].contains(Tutorial.current?.id), lastStepID != Tutorial.current?.id { openSplitPartner() }
                 lastStepID = Tutorial.current?.id
             }
             // A different card (another step, done or finished): the old one leaves first, the new one arrives in its
@@ -375,13 +386,19 @@ final class GuidedTour: NSView {
     /// Wikipedia sends it on to "Split screen (computing)", so any of its Split screen pages counts.
     private static let splitPartnerURL = URL(string: "https://en.wikipedia.org/wiki/Split_screen_(computer_graphics)")!
 
-    /// The guide's own page, once open, if it can go beside the one you're on.
+    /// The guide's own pages: Peek's article and the one opened to go beside it.
+    private static func isGuidePage(_ url: URL?) -> Bool {
+        guard let url, url.host()?.hasSuffix("wikipedia.org") == true else { return false }
+        return url.path.hasPrefix("/wiki/Split_screen") || url.path.hasPrefix("/wiki/Web_browser")
+    }
+
+    /// The guide's other page, once open, if it can go beside the one you're on. Either one: the overview step
+    /// may have left you on the second.
     private var splitCandidate: Tab? {
         guard let controller, let current = controller.tabManager.selectedTab else { return nil }
         let manager = controller.tabManager
         return manager.tabs(in: manager.currentSpaceID).first {
-            $0 !== current && $0.url?.host()?.hasSuffix("wikipedia.org") == true && $0.url?.path.hasPrefix("/wiki/Split_screen") == true
-                && manager.split(for: $0) == nil && manager.canSplit(current, with: $0)
+            $0 !== current && Self.isGuidePage($0.url) && manager.split(for: $0) == nil && manager.canSplit(current, with: $0)
         }
     }
 
@@ -474,13 +491,15 @@ final class GuidedTour: NSView {
         // Out first, so the ring goes where the sidebar is, not where it hides.
         pointsIntoSidebar = !d.isFinal && controller.map { target?.isDescendant(of: $0.sidebar) == true } ?? false
         if pointsIntoSidebar { controller?.root.reveal(true) }
-        let hole: NSRect = target.flatMap { $0.window != nil ? $0.convert($0.bounds, to: self).insetBy(dx: -Tokens.Tour.ringOutset, dy: -Tokens.Tour.ringOutset) : nil } ?? .zero
+        if let target, ["pin", "split"].contains(d.target) { scrollIntoSight(target) }
+        let visible = target.flatMap { $0.window != nil ? shownRect(of: $0) : nil }
+        let hole = Tutorial.ringRect(visible: visible, outset: Tokens.Tour.ringOutset, within: bounds, margin: ring.lineWidth) ?? .zero
         // Dragging a tab onto the page uses the sidebar and the page at once: nothing dimmed, nothing ringed.
         // The tab to drag keeps its ring, so you know which one.
         // Nothing is dimmed: the window stays as it is, and a soft ring marks only small things to click.
         let cut = CGMutablePath()
         let page = controller?.root.cardFrame ?? bounds
-        let ringed = hole != .zero && !d.isDone && !d.isFinal && hole.width < page.width * 0.6 && !["bar", "editor", "peek"].contains(d.target)
+        let ringed = hole != .zero && !d.isDone && !d.isFinal && hole.width < page.width * 0.6 && !["bar", "editor", "peek", "addmenu"].contains(d.target)
         // Something as small as a space's dot gets a round ring; anything bigger, a rounded rectangle.
         let radius = max(hole.width, hole.height) < Tokens.Tour.ringRoundBelow ? min(hole.width, hole.height) / 2 : Tokens.Radius.tile
         let ringPath: CGPath = ringed ? CGPath(roundedRect: hole, cornerWidth: radius, cornerHeight: radius, transform: nil) : CGMutablePath()
@@ -519,6 +538,8 @@ final class GuidedTour: NSView {
                 frame = NSRect(x: hole.midX - size.width / 2, y: hole.maxY + Tokens.Space.x3, width: size.width, height: size.height)
             } else {
                 frame = NSRect(x: windowCentered(size.width, in: page), y: page.maxY - size.height - Tokens.Space.x8, width: size.width, height: size.height)
+                // Never over the +'s menu: beside it instead.
+                if d.target == "addmenu", hole != .zero, frame.intersects(hole) { frame.origin.x = hole.maxX + Tokens.Space.x4 }
             }
         } else if hole == .zero {
             // Where ⌘T's bar opens: centered on the whole window, a little above the middle of the page.
@@ -546,6 +567,26 @@ final class GuidedTour: NSView {
             card.frame = frame
         }
         layoutPill(d, in: frame.size)
+    }
+
+    /// Where a view is, here, cut to what the scroll views around it show: a row scrolled half away is ringed only
+    /// where you can see it.
+    private func shownRect(of view: NSView) -> NSRect {
+        var rect = view.convert(view.bounds, to: self)
+        var ancestor = view.superview
+        while let current = ancestor {
+            if current is NSClipView { rect = rect.intersection(current.convert(current.bounds, to: self)) }
+            ancestor = current.superview
+        }
+        return rect.isNull ? .zero : rect
+    }
+
+    /// The row to ring, scrolled into sight once if the list has it out of view.
+    private weak var scrolledTo: NSView?
+    private func scrollIntoSight(_ target: NSView) {
+        guard target !== scrolledTo, target.window != nil else { return }
+        scrolledTo = target
+        if shownRect(of: target).height < target.bounds.height { target.scrollToVisible(target.bounds) }
     }
 
     static let cardWidth = Tokens.Tour.cardWidth

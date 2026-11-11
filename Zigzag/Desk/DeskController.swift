@@ -363,7 +363,7 @@ final class DeskController {
         guard !isVisible, let controller else { return }
         isVisible = true
         transition += 1
-        Tutorial.complete("overview")
+        Tutorial.overviewOpened()
         selection = []
         controller.previews.hide()
         // A peek would sit under the cards and come back after: it's put away first.
@@ -593,6 +593,8 @@ final class DeskController {
         let card = target.flatMap { target in cards[manager?.split(for: target)?.left ?? target.id] ?? cards[target.id] }
         if let tab { controller.tabManager.select(tab) }
         if let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
+        // Back on a tab: the guide's overview step is done.
+        Tutorial.overviewClosed()
         let finish: @MainActor () -> Void = { [weak self] in
             // Opened again before this finished: it stays.
             guard let self, self.transition == id else { return }
