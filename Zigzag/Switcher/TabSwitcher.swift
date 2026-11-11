@@ -345,9 +345,25 @@ final class TabSwitcher {
         let tall = CGFloat(rows) * (width * aspect + chrome) + CGFloat(rows - 1) * gap
         if tall > room.height {
             let pictures = (room.height - CGFloat(rows - 1) * gap - CGFloat(rows) * chrome) / (CGFloat(rows) * aspect)
-            width = max(least * 0.6, floor(pictures))
+            width = min(width, max(least * 0.6, floor(pictures)))
         }
         return (columns, width)
+    }
+
+    /// Where the panel goes: centered on the page beside the sidebar (the whole window with it hidden; a split's
+    /// two halves together), sized by `grid` to the page so it never spreads over the sidebar. A page too small for
+    /// even the smallest cards lends it some of the window, but it stays a step inside the window's edges.
+    static func panelFrame(size: NSSize, page: NSRect, window: NSRect) -> NSRect {
+        let edge = Tokens.Space.x2
+        let x = min(max(window.minX + edge, round(page.midX - size.width / 2)), window.maxX - edge - size.width)
+        let y = min(max(window.minY + edge, round(page.midY - size.height / 2)), window.maxY - edge - size.height)
+        return NSRect(x: max(window.minX, x), y: max(window.minY, y), width: size.width, height: size.height)
+    }
+
+    /// The room the cards have on a page: the page less a margin all round, as Command+Tab keeps off the screen's edges.
+    static func room(on page: NSRect, pad: CGFloat) -> NSSize {
+        let margin = Tokens.Space.x8
+        return NSSize(width: max(0, page.width - margin * 2 - pad * 2), height: max(0, page.height - margin * 2 - pad * 2))
     }
     private var shown = false
     private var showWork: DispatchWorkItem?
@@ -420,9 +436,8 @@ final class TabSwitcher {
         let inset = Tokens.Space.x1
         // A little air between cards, so a grid of busy pages still reads as separate pages.
         let gap = Tokens.Space.x2
-        // Centered on the whole window, as Command+Tab is on the screen, with or without the sidebar.
-        let area = controller.root.overlay.bounds
-        let grid = Self.grid(count: tabs.count, room: NSSize(width: area.width - Tokens.Space.x16 - pad * 2, height: area.height - Tokens.Space.x16 - pad * 2),
+        // On the page beside the sidebar: more tabs go into rows, and smaller cards, before reaching over it.
+        let grid = Self.grid(count: tabs.count, room: Self.room(on: card, pad: pad),
                              aspect: aspect, chrome: TabThumbnailView.titleHeight + inset * 2, gap: gap)
         columns = grid.columns
         let thumbWidth = grid.width
@@ -451,7 +466,7 @@ final class TabSwitcher {
             return thumb
         }
         let height = pad * 2 + CGFloat(rows) * thumbHeight + CGFloat(rows - 1) * gap
-        panel.frame = NSRect(x: round(area.midX - width / 2), y: round(area.midY - height / 2), width: width, height: height)
+        panel.frame = Self.panelFrame(size: NSSize(width: width, height: height), page: card, window: controller.root.overlay.bounds)
         controller.root.overlay.addSubview(panel)
         // Flicked through with ⌃Tab many times an hour: simply there.
         panel.present(arrival: .instant)
