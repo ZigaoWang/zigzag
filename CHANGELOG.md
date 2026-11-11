@@ -7,9 +7,16 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [0.8.1] - 2026-11-11
 
+### New
+- Keep tabs awake: a switch in Site Controls keeps a site's tabs from sleeping in the background. Sites you keep awake are listed in Settings › Privacy › Sites. ([#91](https://github.com/ZigaoWang/zigzag/issues/91))
+- Passwords… in the password menu opens the Passwords app and password manager apps like Dashlane and 1Password, and fills the login you pick. On macOS 27, sign-in fields show the key icon. ([#57](https://github.com/ZigaoWang/zigzag/issues/57))
+- Right-click empty space in the sidebar for New Tab, New Folder and New Space, and the + button offers New Space or New Folder, even with a single space. ([#87](https://github.com/ZigaoWang/zigzag/issues/87))
+
 ### Fixed
-- Favorites keep their page when you leave them. An everyday memory warning from macOS no longer puts them to sleep, only a critical one does, and a favorite busy in the background is pointed out instead. ([#65](https://github.com/ZigaoWang/zigzag/issues/65), [#88](https://github.com/ZigaoWang/zigzag/issues/88))
-- A page that does come back, after a crash or a real memory shortage, returns to where you were, forums like Discourse included, and switching spaces remembers your place too. ([#88](https://github.com/ZigaoWang/zigzag/issues/88))
+- Zigzag no longer stalls with many tabs open. Dark pages, extension badges, memory warnings, saving, history and site icons stopped holding it up, and a freeze note in Help › Report a Problem now says what was running. ([#89](https://github.com/ZigaoWang/zigzag/issues/89))
+- Favorites keep their page when you leave them: an everyday memory warning from macOS no longer puts them to sleep, and a busy favorite is pointed out instead. A page that does come back returns to where you were, forums like Discourse included. ([#65](https://github.com/ZigaoWang/zigzag/issues/65), [#88](https://github.com/ZigaoWang/zigzag/issues/88))
+- Extensions stay signed in after you sign in on their website, and can sign out. Thanks to [sheauhuu](https://github.com/sheauhuu) for the fix. ([#93](https://github.com/ZigaoWang/zigzag/issues/93))
+- A private window no longer saves a site's ad blocking or dark page choice. ([#92](https://github.com/ZigaoWang/zigzag/issues/92))
 
 ## [0.8.0] - 2026-11-11
 
