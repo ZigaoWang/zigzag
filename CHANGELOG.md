@@ -14,6 +14,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - ⌘Q in an installed app quits that app, not all of Zigzag. While its window is in front the menus are the app's own: Hide and Quit name it, and the browser's New Tab and the rest aren't there. ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
 - Peek's top strip is as slim as a split view's, and the frame around its page thinner, so the page gets more room.
 - Pages in Peek keep their own scrollbars, as in Safari: thin ones that show while you scroll, unless your Mac is set to always show them, dark on a dark page. Peek put a scrollbar of its own on every page, always showing.
+- With the sidebar hidden, moving the pointer across the window's edge on its way somewhere else, to a display on that side in full screen for one, no longer pulls the sidebar out and leaves it there. It opens when the pointer rests at the edge or just past it, and goes once the pointer is well away on either side.
+- The sidebar that slides out no longer comes in under the address while you're editing it, or under Site Controls or Downloads opened from the bar above the page. Opening the command bar puts it away, as it does every other panel.
 
 ## [0.8.7] - 2026-11-12
 
