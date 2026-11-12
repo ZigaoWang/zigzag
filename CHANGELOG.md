@@ -5,16 +5,14 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- On macOS 27, sign-in fields show the key icon and open the Mac's AutoFill panel even when a password manager like Dashlane or 1Password does the filling instead of Zigzag, so its logins can be picked there. ([#57](https://github.com/ZigaoWang/zigzag/issues/57))
-- ⌘Z and ⇧⌘Z reach the page first, so web apps like Google Sheets undo their own changes. Zigzag's own undo for the sidebar still works when the page lets the key pass. Thanks to [Lakeland97](https://github.com/Lakeland97).
-
 ## [0.8.6] - 2026-11-12
 
 ### New
 - Settings' sections sit under headings: Browser, Tools, Privacy & Security and Advanced.
 
 ### Fixed
+- On macOS 27, sign-in fields show the key icon and open the Mac's AutoFill panel even when a password manager like Dashlane or 1Password does the filling instead of Zigzag, so its logins can be picked there. ([#57](https://github.com/ZigaoWang/zigzag/issues/57))
+- ⌘Z and ⇧⌘Z reach the page first, so web apps like Google Sheets undo their own changes. Zigzag's own undo for the sidebar still works when the page lets the key pass. Thanks to [Lakeland97](https://github.com/Lakeland97).
 - Google Sheets stays sharp instead of turning blurry a moment after it opens: pages now know the size of the window they're in. ([#161](https://github.com/ZigaoWang/zigzag/issues/161))
 - With dark pages on, new tabs and tabs waking from sleep no longer flash white, and a site's saved dark colors are checked on the first frame. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - The loading line is back along the top of the page; 0.8.5 drew it at the bottom.
