@@ -798,7 +798,7 @@ final class SitePanel: FloatingPanelView {
     /// The site's name at its size, a little smaller when it's long, and past that cut so its domain stays whole
     /// (`HostText`): the subdomains quiet, the domain that says whose site it is in the text's own ink.
     static func fitted(_ name: String, in width: CGFloat) -> NSAttributedString {
-        let fit = HostText.fit(name, width: width, size: 20, shrink: 2, smallest: 15) { text, size in
+        let fit = HostText.fit(name, width: width, size: 20, shrink: 5, smallest: 13) { text, size in
             ceil(Tokens.Font.voiceText(text, size: size).size().width)
         }
         return HostText.styled(fit, font: { Tokens.Font.voice($0) }, kern: { Tokens.Font.voiceKern($0) })
