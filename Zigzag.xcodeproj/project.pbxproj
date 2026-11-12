@@ -307,6 +307,7 @@
 		C97B9B37DFA7FAA30CFCA860 /* PageDialogSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88B983CBE21557E05E6C3E28 /* PageDialogSheet.swift */; };
 		C98C23949C56DEB824D49CA7 /* Materials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C67092285DC153FB7BBDFCE /* Materials.swift */; };
 		CA3459F40D8BD64FDC4DD972 /* PageWindowFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 520390EE6EE00D66943EA4D3 /* PageWindowFrame.swift */; };
+		CC339E887DEC10B4B03A62F6 /* SettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ED37168840DD1514429F6DA /* SettingsLayoutTests.swift */; };
 		CC863940E1D9104CAF03EB77 /* DeveloperState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCA190F9EEBCEE2543FE55EB /* DeveloperState.swift */; };
 		CCC088113C422B3314562B78 /* TabTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFF4F53349180E96D4253BD3 /* TabTree.swift */; };
 		CCE61B476DAB6D934A4808C5 /* bridge.js in Resources */ = {isa = PBXBuildFile; fileRef = 71C449E3F3ECA4A28D2BCAA7 /* bridge.js */; };
@@ -496,6 +497,7 @@
 		2C1EF45053176602E3D8A4C1 /* UserScriptsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserScriptsTests.swift; sourceTree = "<group>"; };
 		2D8E0E7DB1C952078DABEE2B /* MiniLinkWake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniLinkWake.swift; sourceTree = "<group>"; };
 		2E2214E6363E199754548C38 /* PageState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageState.swift; sourceTree = "<group>"; };
+		2ED37168840DD1514429F6DA /* SettingsLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsLayoutTests.swift; sourceTree = "<group>"; };
 		2FC330CEE0425B72CE83C21D /* PageHolder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageHolder.swift; sourceTree = "<group>"; };
 		2FD8BEABF4B3488FB915B002 /* autoconsent-compact-rules.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "autoconsent-compact-rules.json"; sourceTree = "<group>"; };
 		3014AEB17D7BEE4384710CD9 /* DeveloperToolsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperToolsTests.swift; sourceTree = "<group>"; };
@@ -1357,6 +1359,7 @@
 				14F71A00B5EA5EDD64C993B3 /* SaveFailureTests.swift */,
 				633F57F860ED6EC0B7E99FC3 /* ScriptingTests.swift */,
 				7890881D589D032D70E5DC20 /* SecurityFixesTests.swift */,
+				2ED37168840DD1514429F6DA /* SettingsLayoutTests.swift */,
 				FB5152360ED2798576497043 /* SettingsPageTests.swift */,
 				104B0C82EED3690FF32A2B00 /* SharedSoundGateTests.swift */,
 				014C509EA75D15344BB68028 /* ShipFixesTests.swift */,
@@ -1976,6 +1979,7 @@
 				4A1BC30C9B5ABF6AAA3B3D90 /* SaveFailureTests.swift in Sources */,
 				5F21C65FD6DBBC3F333DFD27 /* ScriptingTests.swift in Sources */,
 				91501632F628CC18660775E6 /* SecurityFixesTests.swift in Sources */,
+				CC339E887DEC10B4B03A62F6 /* SettingsLayoutTests.swift in Sources */,
 				4A65CC145A4105C2BA63B742 /* SettingsPageTests.swift in Sources */,
 				5F8FD5529E5D633E06EE0A83 /* SharedSoundGateTests.swift in Sources */,
 				80ADEAD45C5C339358B88DFB /* ShipFixesTests.swift in Sources */,
