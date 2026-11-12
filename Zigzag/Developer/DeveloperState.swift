@@ -70,10 +70,18 @@ extension Tab {
     /// The choices in effect on a page at `url`. What puts them on the page asks by the address its web view is
     /// going to, which is ahead of the page the tab shows while another is on its way: a page off the list never
     /// starts with them, and one on it starts with them from its first frame.
-    func developerInEffect(at url: URL?) -> DeveloperState { DeveloperTools.applies(to: url) ? developer : DeveloperState() }
+    /// A tab with nothing chosen (nearly every tab) answers at once, without reading the list: dark pages ask this
+    /// of every open page each time they look at one.
+    func developerInEffect(at url: URL?) -> DeveloperState {
+        guard !developer.isUnchanged, DeveloperTools.applies(to: url) else { return DeveloperState() }
+        return developer
+    }
 
     /// The look chosen for a page at `url` in this tab, light or dark whatever the Mac's is; none to follow it.
-    func chosenLook(at url: URL?) -> NSAppearance.Name? { developerInEffect(at: url).appearance.name }
+    func chosenLook(at url: URL?) -> NSAppearance.Name? {
+        guard developer.appearance != .followsMac else { return nil }
+        return developerInEffect(at: url).appearance.name
+    }
 
     /// Puts the choices in effect on the page: when one changes, when the web view's address does, when the tab
     /// becomes or stops being a development tab, and for a new web view. One path for all of them, so the page is
