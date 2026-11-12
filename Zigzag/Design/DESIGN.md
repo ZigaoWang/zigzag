@@ -311,15 +311,17 @@ something came from, answers at once, and can be interrupted.
   page, not a readout: nothing shows at zero.
   A button that holds a choice wears the choice's symbol (Page Appearance: the half-filled circle following the
   Mac, the sun, the moon, a printer for print styles), and its menu checks the one in effect.
-  Page Size's button is a phone, a tablet or a laptop by the size chosen, with the size after it at the label size
+  Page Size's button is a phone, a tablet or a laptop by the size chosen (a tablet: short side 500 or more, squarer
+  than 1.55 and under 1400 long), with the size after it at the label size
   ("393 × 852", tabular as numbers that mark something), there only while the page has a size of its own and
   there's room for it.
   ⋯ is filled (`ellipsis.circle.fill`) while something chosen under it is in effect (JavaScript off, another user
   agent, outlines), so no choice is one nothing shows. Its menu: what gave way, what's on or off, User Agent under
   its heading with Open In after it, then View Source, Developer Settings and removing the site.
 - **A page at a size of its own** (`PageCardView.pageSize`, the developer tools'): in the middle of its room on
-  the card, both ways, the card's plain ground around it rather than the page's color, so its edges show; the
-  bar above the page turns plain with it. The Web Inspector docks beside it, in room of its own
+  the card, both ways, on the PDF viewer's backdrop (`Color.pdfBackdrop`) rather than the page's color, with a
+  hairline in `Color.cardEdge` round it, so its edges show on a light page or a dark one; the bar above the page
+  turns plain with it. The Web Inspector docks beside it, in room of its own
   (`PageHolder.dockedRoom`): the page keeps its size. A size larger than the room is cut to the room. What covers
   the page (a PDF, Settings, Reader) fills the room as ever.
 - **Pane header** (split view): on the page card, 30 tall: back, forward and reload, the address centered in a small
