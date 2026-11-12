@@ -90,7 +90,7 @@ struct FreezeReportTests {
 }
 
 /// Hands the look's frames back from the thread that took it.
-private final class FramesBox: @unchecked Sendable {
+nonisolated private final class FramesBox: @unchecked Sendable {
     private let lock = NSLock()
     private var frames: [MainThreadStack.Frame] = []
     func set(_ value: [MainThreadStack.Frame]) { lock.lock(); frames = value; lock.unlock() }

@@ -91,7 +91,7 @@ struct MiniPlayerPageTests {
             webView.loadHTMLString(html, baseURL: URL(string: "https://videos.test/"))
         }
         // The page plays and turns up its own videos: no one pressed anything.
-        try await webView.callAsyncJavaScript("document.querySelectorAll('video').forEach((v) => { v.volume = 0.5; v.dispatchEvent(new Event('play')); }); return true",
+        _ = try await webView.callAsyncJavaScript("document.querySelectorAll('video').forEach((v) => { v.volume = 0.5; v.dispatchEvent(new Event('play')); }); return true",
                                               arguments: [:], in: nil, contentWorld: .page)
         try await script("return window.__zigzagVideos.report()", in: webView)
         var videos: [PageVideo] = []

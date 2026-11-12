@@ -124,7 +124,7 @@ struct SidebarSideTests {
         }
         UserDefaults.standard.removeObject(forKey: key)
         #expect(!BrowserRootView.sidebarOnRight)
-        final class Count: @unchecked Sendable { var heard = 0 }
+        nonisolated final class Count: @unchecked Sendable { var heard = 0 }
         let count = Count()
         let token = NotificationCenter.default.addObserver(forName: BrowserRootView.sidebarSideChanged, object: nil, queue: nil) { _ in count.heard += 1 }
         defer { NotificationCenter.default.removeObserver(token) }

@@ -30,7 +30,7 @@ struct KeepOnTopTests {
 
     @Test func turningItOffGivesTheWindowBackAsItWas() {
         let window = window([.fullScreenNone])
-        final class Count: @unchecked Sendable { var value = 0 }
+        nonisolated final class Count: @unchecked Sendable { var value = 0 }
         let count = Count()
         let token = NotificationCenter.default.addObserver(forName: KeepOnTop.changed, object: window, queue: nil) { _ in count.value += 1 }
         defer { NotificationCenter.default.removeObserver(token) }
