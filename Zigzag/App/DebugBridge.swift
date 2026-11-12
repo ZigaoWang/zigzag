@@ -1014,6 +1014,17 @@ enum DebugBridge {
             if let data = try? JSONSerialization.data(withJSONObject: ["tabs": rows, "fill": PageFullScreen.fill.rawValue, "windowFullScreen": controller.window?.styleMask.contains(.fullScreen) == true], options: [.prettyPrinted]) {
                 try? data.write(to: URL(fileURLWithPath: arg))
             }
+        // developer on|off: Settings › Developer › Developer tools. devsite add|remove <site>: its list.
+        // devstate: the switch, the list and which open tabs are development tabs, in the debug log.
+        case "developer": DeveloperTools.isOn = arg == "on"
+        case "devsite":
+            let parts = arg.split(separator: " ").map(String.init)
+            if parts.count == 2, let site = DevelopmentSites.entry(from: parts[1]) {
+                if parts[0] == "add" { DevelopmentSites.add(site) } else if parts[0] == "remove" { DevelopmentSites.remove(site) }
+            }
+        case "devstate":
+            let tabs = controller.tabManager.allTabs.map { "\($0.url?.host() ?? "-"):\($0.url?.port ?? 0)=\($0.isDevelopment)" }.sorted()
+            debugLog("devstate => on=\(DeveloperTools.isOn) sites=\(DevelopmentSites.sites) tabs=\(tabs)")
         case "darkstate":
             controller.selectedWebView?.callAsyncJavaScript("return window.__zigzagDark ? JSON.stringify(window.__zigzagDark.state()) : 'none'",
                                                             arguments: [:], in: nil, in: DarkPages.world) { result in
