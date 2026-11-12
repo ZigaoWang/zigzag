@@ -1352,6 +1352,13 @@ extension Tab: WKUIDelegate {
         DownloadManager.shared.track(download, window: host?.hostWindow)
     }
 
+    /// The window the page is told it's in (`window.outerWidth` and the rest): the page's own place on screen
+    /// (PageWindowFrame). WKUIDelegatePrivate, unpublished; without it a page sees a window of no size at all.
+    @objc(_webView:getWindowFrameWithCompletionHandler:)
+    func webView(_ webView: WKWebView, getWindowFrameWithCompletionHandler completion: @escaping (CGRect) -> Void) {
+        completion(PageWindowFrame.frame(of: webView, hostWindow: host?.hostWindow))
+    }
+
     /// The key icon macOS 27 shows in sign-in fields (AutofillKeyIcon), clicked. WebKit reports it through this
     /// (WKUIDelegatePrivate, unpublished); without it the click is only a click on the field.
     @objc(_webView:didClickAutoFillButtonWithUserInfo:)

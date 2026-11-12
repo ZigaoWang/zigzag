@@ -302,6 +302,12 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         DownloadManager.shared.track(download, window: window)
     }
 
+    /// The window the page is told it's in, as a tab's page is (PageWindowFrame).
+    @objc(_webView:getWindowFrameWithCompletionHandler:)
+    func webView(_ webView: WKWebView, getWindowFrameWithCompletionHandler completion: @escaping (CGRect) -> Void) {
+        completion(PageWindowFrame.frame(of: webView, hostWindow: window))
+    }
+
     func webView(_ webView: WKWebView, respondTo challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         await AuthenticationPrompt.respond(to: challenge, window: window, store: webView.configuration.websiteDataStore, page: webView, tab: isPrivate ? nil : tab)
     }
