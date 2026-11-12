@@ -46,8 +46,29 @@ enum SiteOrigin {
     }
 }
 
+/// Answers given to a site's question, kept for the page that asked only: its tab, until it loads another page or
+/// reloads. That's what Ask means, as in Safari: asked again on every visit, never "asked once, then allowed for good".
+/// Allow and Block are what's kept for the site, chosen in Site Controls or Settings › Privacy.
+struct PagePermissionAnswers {
+    private var answers: [String: Bool] = [:]
+
+    /// `key` is what the answer is for (`SitePermissions.answerKey`), `kind` what was asked ("camera", "location"…).
+    mutating func note(_ allowed: Bool, key: String, kind: String) { answers["\(key)|\(kind)"] = allowed }
+
+    /// A camera-only or microphone-only question takes an answer given to both at once.
+    func answer(key: String, kind: String) -> Bool? {
+        answers["\(key)|\(kind)"] ?? (kind == "camera" || kind == "microphone" ? answers["\(key)|cameraAndMicrophone"] : nil)
+    }
+
+    mutating func forget() { answers = [:] }
+
+    var isEmpty: Bool { answers.isEmpty }
+}
+
 /// Camera, microphone, location, notification, pop-up and open-an-app decisions, remembered per origin (see
-/// `SiteOrigin`), stored as "origin|kind". Asked once, in a sheet, never as a surprise popup.
+/// `SiteOrigin`), stored as "origin|kind". Only Allow and Block are kept, chosen in Site Controls or Settings; a
+/// question's answer holds for the page that asked (`PagePermissionAnswers`). Asked in a sheet, never as a surprise
+/// popup.
 enum SitePermissions {
     private static let key = "SitePermissions"
     /// Where the answers are kept; tests use their own.
@@ -58,7 +79,7 @@ enum SitePermissions {
         set { defaults.set(newValue, forKey: key) }
     }
 
-    private static func kind(_ type: WKMediaCaptureType) -> String {
+    static func kind(_ type: WKMediaCaptureType) -> String {
         switch type {
         case .camera: "camera"
         case .microphone: "microphone"
@@ -273,37 +294,53 @@ enum SitePermissions {
         origin.map(SiteOrigin.label) ?? String(localized: "This page", comment: "Stands for the site in a question when the page has no host.")
     }
 
-    /// Asked like the camera. A private window never remembers the answer, and never shows notifications anyway.
+    /// The site's notification answer on `tab`'s page: Allow or Block kept for the site, else the answer given on
+    /// this page.
+    static func notifications(origin: String, tab: Tab?) -> Bool? {
+        notifications(origin: origin) ?? tab?.permissionAnswers.answer(key: origin, kind: "notifications")
+    }
+
+    /// Asked like the camera, the answer kept for the page that asked. A private window never shows them anyway.
     static func requestNotifications(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool? {
-        if let known = notifications(origin: origin) { return known }
+        if let known = notifications(origin: origin, tab: tab) { return known }
         guard let controller = WindowManager.shared.promptHost(for: window) else { return nil }
         let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
                                                 title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
-                                                answered: { notifications(origin: origin).map { $0 ? .allow : .deny } })
+                                                answered: { notifications(origin: origin, tab: tab).map { $0 ? .allow : .deny } })
         switch answer {
         case .allow, .deny:
-            if !isPrivate { setNotifications(answer == .allow, origin: origin) }
+            tab?.permissionAnswers.note(answer == .allow, key: origin, kind: "notifications")
             return answer == .allow
         case .notNow:
             return nil
         }
     }
 
-    /// Location, asked and remembered the same way as the camera. A page with no origin to keep it under (file:)
-    /// is asked every time.
+    /// The location answer for `key` on `tab`'s page: Allow or Block kept, else the answer given on this page.
+    private static func location(key: String, tab: Tab?) -> Bool? {
+        location(origin: key) ?? tab?.permissionAnswers.answer(key: key, kind: "location")
+    }
+
+    /// The camera or microphone answer for `key` on `tab`'s page: Allow or Block kept, else the answer given on
+    /// this page.
+    private static func decision(key: String, type: WKMediaCaptureType, tab: Tab?) -> Bool? {
+        decision(origin: key, type: type) ?? tab?.permissionAnswers.answer(key: key, kind: kind(type))
+    }
+
+    /// Location, asked the same way as the camera. A page with no origin to keep it under (file:) is asked every time.
     static func requestLocation(origin securityOrigin: WKSecurityOrigin, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> WKPermissionDecision {
         let frame = SiteOrigin.of(securityOrigin), page = page(of: tab, frame: frame)
         let key = answerKey(frame: frame, page: page)
-        if let key, let known = location(origin: key) { return known ? .grant : .deny }
+        if let key, let known = location(key: key, tab: tab) { return known ? .grant : .deny }
         noteAsked(.location, origin: page, isPrivate: isPrivate)
         guard let controller = WindowManager.shared.promptHost(for: window) else { return .deny }
         let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: "your location",
                                                 symbol: "location.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
-                                                answered: { key.flatMap { location(origin: $0) }.map { $0 ? .allow : .deny } })
+                                                answered: { key.flatMap { location(key: $0, tab: tab) }.map { $0 ? .allow : .deny } })
         switch answer {
         case .allow, .deny:
-            if !isPrivate, let key { all["\(key)|location"] = answer == .allow }
+            if let key { tab?.permissionAnswers.note(answer == .allow, key: key, kind: "location") }
             return answer == .allow ? .grant : .deny
         case .notNow:
             return .deny
@@ -314,7 +351,7 @@ enum SitePermissions {
                         tab: Tab? = nil) async -> WKPermissionDecision {
         let frame = SiteOrigin.of(securityOrigin), page = page(of: tab, frame: frame)
         let key = answerKey(frame: frame, page: page)
-        if let key, let known = decision(origin: key, type: type) { return known ? .grant : .deny }
+        if let key, let known = decision(key: key, type: type, tab: tab) { return known ? .grant : .deny }
         noteAsked(.cameraAndMicrophone, origin: page, isPrivate: isPrivate)
         let what: String, title: String
         switch type {
@@ -329,15 +366,12 @@ enum SitePermissions {
         // The question goes once the tab leaves the page it was asked on.
         let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: what,
                                                 symbol: type == .microphone ? "mic.fill" : "video.fill", in: controller, tab: tab, title: title,
-                                                answered: { key.flatMap { decision(origin: $0, type: type) }.map { $0 ? .allow : .deny } })
-        // Only a clicked answer is remembered; Esc, or the window closing, is "not now".
+                                                answered: { key.flatMap { decision(key: $0, type: type, tab: tab) }.map { $0 ? .allow : .deny } })
+        // Only a clicked answer holds for the page; Esc, or the window closing, is "not now".
         switch answer {
-        case .allow:
-            if !isPrivate, let key { remember(true, origin: key, type: type) }
-            return .grant
-        case .deny:
-            if !isPrivate, let key { remember(false, origin: key, type: type) }
-            return .deny
+        case .allow, .deny:
+            if let key { tab?.permissionAnswers.note(answer == .allow, key: key, kind: kind(type)) }
+            return answer == .allow ? .grant : .deny
         case .notNow:
             return .deny
         }
@@ -426,8 +460,8 @@ enum PermissionChoice: CaseIterable {
 }
 
 /// "Use your location?", at the top of the page that asked, sliding down from its top edge: the question, the site
-/// under it, and two answers, Allow last and filled. The answer is kept for that site (never in a private window), and
-/// can be changed in the site panel. Not answering is easy: the close button, Esc, or a click anywhere else puts
+/// under it, and two answers, Allow last and filled. The answer holds for the page that asked; Allow or Block for good
+/// is chosen in the site panel or Settings › Privacy. Not answering is easy: the close button, Esc, or a click anywhere else puts
 /// it off ("not now"), and so does the tab going to another site. One question at a time per window. It belongs
 /// to the tab that asked: it steps aside while another tab is in front and comes back with that tab.
 final class PermissionPrompt: FloatingPanelView {

@@ -1125,7 +1125,7 @@ final class SpaceHeaderView: InteractiveView {
     static let profileRoom: CGFloat = 28
 
     /// The icon before a space's name: about the name's x-height and a little more, so the two read as one.
-    static let iconSide: CGFloat = 20
+    static var iconSide: CGFloat { Tokens.Sidebar.scaledEven(20) }
 
     override func stateDidChange(animated: Bool) {
         // The name in light type and the space's own ink, quietly fuller under the pointer; its icon a step back.

@@ -81,6 +81,11 @@ final class PaneHeaderView: NSView {
             guard let self, let tab = self.tab else { return }
             self.onEditAddress?(tab)
         }
+        address.drop.onDrop = { [weak self] url in
+            guard let tab = self?.tab else { return false }
+            tab.load(url)
+            return true
+        }
         address.siteControls.onClick = { [weak self] _ in self?.openSiteControls() }
         address.siteControls.onRightClick = { [weak self] _ in self?.openSiteControls(); return nil }
     }
@@ -297,6 +302,14 @@ final class TitleBandGuard: NSControl {
 
 /// A pane's address: the page's address in a small field, a faint fill and a 1px edge. A click edits it.
 final class PaneAddressView: InteractiveView {
+
+    // MARK: Dropping a link or words (#182)
+
+    /// Where a link, an address or words dropped on the field go (`AddressDrop`).
+    private(set) lazy var drop = AddressDrop(self)
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { drop.entered(sender) }
+    override func draggingExited(_ sender: NSDraggingInfo?) { drop.exited() }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool { drop.perform(sender) }
     private let label = Label("", font: .systemFont(ofSize: Tokens.Pane.addressText), color: Tokens.Color.textSecondary)
     static let padding = Tokens.Space.x2 + 2
     /// Site Controls for this pane's page, at the field's end as in the sidebar's address (#160).
@@ -343,6 +356,7 @@ final class PaneAddressView: InteractiveView {
         siteControls.radius = Tokens.Radius.control - Self.buttonInset
         siteControls.pressOutset = NSEdgeInsets(top: Self.buttonInset, left: 1, bottom: Self.buttonInset, right: Self.buttonInset)
         addSubview(siteControls)
+        _ = drop
         setAccessibilityRole(.button)
         setAccessibilityHelp(String(localized: "Edit this page’s address", comment: "VoiceOver hint of the address in a split view page's strip."))
     }

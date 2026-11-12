@@ -132,6 +132,16 @@ final class SidebarListView: NSView {
             self.needsLayout = true
         }
     }
+    /// Settings › Appearance › Sidebar size: every row is made again at the new size, its type and buttons with it.
+    private lazy var sizeObserver: NSObjectProtocol = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
+        MainActor.assumeIsolated {
+            guard let self, self.drag == nil else { return }
+            for view in self.rows.values { view.removeFromSuperview() }
+            self.rows = [:]
+            self.reload(animated: false)
+            self.needsLayout = true
+        }
+    }
     weak var delegate: SidebarListDelegate?
     /// Shows this space instead of the current one (the neighbor that slides in during a swipe).
     var spaceOverride: UUID?
@@ -1284,6 +1294,7 @@ final class SidebarListView: NSView {
 
     override func viewDidMoveToWindow() {
         _ = nameStyleObserver
+        _ = sizeObserver
         super.viewDidMoveToWindow()
         _ = iconToken
     }

@@ -251,8 +251,12 @@ final class FormRow: NSView, SettingsSearchable {
         return size.width > 0 ? size : control.intrinsicContentSize
     }
 
+    /// A row about the row above it (a site's permission, under the site): its text starts where that row's does,
+    /// past the picture it doesn't have.
+    var isIndented = false { didSet { needsLayout = true } }
+
     /// Where the row's text starts.
-    var textInset: CGFloat { icon.isHidden ? pad : pad + Self.iconSide + Tokens.Space.x3 }
+    var textInset: CGFloat { icon.isHidden && !isIndented ? pad : pad + Self.iconSide + Tokens.Space.x3 }
 
     /// Narrow (half of a split, a small window), the control goes under the text instead of squeezing it.
     private func isStacked(_ width: CGFloat) -> Bool {
@@ -772,6 +776,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var siteDataShowsAll = false
     /// Every site with a choice made for it, not only the first 30.
     private var sitesShowAll = false
+    /// Permissions changed here while Settings is open ("origin|permission"): set back to Ask, a row stays, so the
+    /// choice you just made doesn't vanish under the pointer.
+    private var permissionsChangedHere: Set<String> = []
     private var siteDataTask: Task<Void, Never>?
     /// Reset All beside the Sites heading, there only when something was chosen for a site.
     private var sitesReset: PillButton?
@@ -813,6 +820,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                                control: customSearch)
     private let archiveAfter = DropdownButton()
     private let favoritesPerRow = DropdownButton()
+    private let sidebarSize = DropdownButton()
     private let darkPages = DropdownButton()
     private let pureBlackToggle = Toggle()
     private lazy var pureBlackRow: FormRow = {
@@ -823,6 +831,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         return row
     }()
     private let newTabPlace = DropdownButton()
+    private var newTabRow: FormRow!
     private let pinOfferToggle = Toggle()
     private let nestToggle = Toggle()
     private let swipeToggle = Toggle()
@@ -1135,6 +1144,23 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         sideToken = NotificationCenter.default.addObserver(forName: BrowserRootView.sidebarSideChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.sidebarRightToggle.isOn = BrowserRootView.sidebarOnRight }
         }
+        // As macOS's System Settings › Appearance › Sidebar icon size: three sizes, Medium as Zigzag has always been.
+        sidebarSize.options = Tokens.Sidebar.Size.allCases.map { size in
+            let title = switch size {
+            case .small: String(localized: "Small", comment: "A choice for “Sidebar size” in Settings › Appearance.")
+            case .medium: String(localized: "Medium", comment: "A choice for “Sidebar size” in Settings › Appearance: the usual size.")
+            case .large: String(localized: "Large", comment: "A choice for “Sidebar size” in Settings › Appearance.")
+            }
+            return DropdownButton.Option(title: title)
+        }
+        sidebarSize.onSelect = { index in Tokens.Sidebar.size = Tokens.Sidebar.Size.allCases[index] }
+        let sizeRow = FormRow(title: String(localized: "Sidebar size", comment: "A setting in Settings › Appearance: how large the sidebar's tabs, folders, space names, favorites and address are, as macOS's Sidebar icon size."),
+                              detail: String(localized: "The size of the tabs, folders, favorites and address. To make everything on your Mac larger, use Larger Text in System Settings › Displays.",
+                                             comment: "Explanation under “Sidebar size” in Settings › Appearance. Larger Text and System Settings › Displays are macOS's own names."),
+                              control: sidebarSize)
+        // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossary.md): found by it, never shown.
+        sizeRow.keywords = String(localized: "text size font bigger larger smaller scale zoom interface ui", comment: "Words that find the Sidebar size setting with Find a setting in Settings. Not shown.") + " 侧边栏"
+        appearanceGroup.add(sizeRow)
         largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
         appearanceGroup.add(FormRow(title: String(localized: "Large space names", comment: "A setting in Settings › Appearance."),
                                     detail: String(localized: "Shows the space’s name large and light above its tabs. When off, it’s a plain heading.", comment: "Explanation under “Large space names” in Settings › Appearance."),
@@ -1181,16 +1207,20 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             case .next: String(localized: "Next to the Current Tab", comment: "A choice for “New tabs open” in Settings › Tabs: just below the tab you're on, or the page a link came from.")
             case .top: String(localized: "At the Top", comment: "A choice for “New tabs open” in Settings › Tabs: above the other tabs.")
             case .bottom: String(localized: "At the Bottom", comment: "A choice for “New tabs open” in Settings › Tabs: below the other tabs.")
+            case .sameSite: String(localized: "Next to Tabs from the Same Site", comment: "A choice for “New tabs open” in Settings › Tabs: a page goes right after the tabs already open from its website, like other github.com pages.")
             }
             return DropdownButton.Option(title: title)
         }
-        newTabPlace.onSelect = { index in TabManager.newTabPlace = TabManager.NewTabPlace.allCases[index] }
-        let newTabRow = FormRow(title: String(localized: "New tabs open", comment: "A setting in Settings › Tabs: where a new tab goes in the sidebar's list."),
-                                detail: String(localized: "Where ⌘T and links put a new tab in the sidebar.", comment: "Explanation under “New tabs open” in Settings › Tabs."),
-                                control: newTabPlace)
+        newTabPlace.onSelect = { [weak self] index in
+            TabManager.newTabPlace = TabManager.NewTabPlace.allCases[index]
+            self?.refreshNewTabPlace()
+        }
+        newTabRow = FormRow(title: String(localized: "New tabs open", comment: "A setting in Settings › Tabs: where a new tab goes in the sidebar's list."),
+                            detail: nil, control: newTabPlace)
         // There's no homepage: a new tab opens the address bar. This is the setting nearest to one.
-        newTabRow.keywords = String(localized: "new tab homepage home page start page position order", comment: "Words that find the New tabs open setting with Find a setting in Settings. Zigzag has no homepage, so words about one find this row. Not shown.")
+        newTabRow.keywords = String(localized: "new tab homepage home page start page position order same site domain group organize", comment: "Words that find the New tabs open setting with Find a setting in Settings. Zigzag has no homepage, so words about one find this row. Not shown.")
         tabsGroup.add(newTabRow)
+        refreshNewTabPlace()
         nestToggle.onChange = { on in TabManager.nestsOpenedLinks = on }
         let nestRow = FormRow(title: String(localized: "Open ⌘-clicked links under their tab", comment: "A setting in Settings › Tabs: a link opened in a new tab goes in the sidebar nested under the tab it came from. ⌘ is the Command key."),
                               detail: String(localized: "A link you open in a new tab sits under the page it came from. Drag a tab out to make it a tab of its own.", comment: "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs."),
@@ -2165,25 +2195,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// What a button says for a moment once it has cleared something.
     private static var cleared: String { String(localized: "Cleared", comment: "Shown on a Clear button in Settings › Privacy for a moment after it clears.") }
 
-    /// A permission chosen for a site, as Settings › Privacy › Sites lists it: "camera allowed".
-    private static func siteChoice(_ kind: String, allowed: Bool) -> String? {
-        switch (kind, allowed) {
-        case ("camera", true): String(localized: "camera allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("camera", false): String(localized: "camera blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("microphone", true): String(localized: "microphone allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("microphone", false): String(localized: "microphone blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("cameraAndMicrophone", true): String(localized: "camera and microphone allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("cameraAndMicrophone", false): String(localized: "camera and microphone blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("location", true): String(localized: "location allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("location", false): String(localized: "location blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("notifications", true): String(localized: "notifications allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("notifications", false): String(localized: "notifications blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("popups", true): String(localized: "pop-ups allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("popups", false): String(localized: "pop-ups blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        default: nil
-        }
-    }
-
     /// Each section's groups and their headings, as a search goes through them.
     private func groups(of pane: SettingsPane) -> [(title: String?, group: FormGroup)] {
         switch pane {
@@ -2468,6 +2479,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     /// Pure black backgrounds shows only while dark pages are on.
+    /// Under “New tabs open”: with Next to Tabs from the Same Site, where a page from a site with no tabs open goes.
+    private func refreshNewTabPlace() {
+        guard let newTabRow else { return }
+        let general = String(localized: "Where ⌘T and links put a new tab in the sidebar.", comment: "Explanation under “New tabs open” in Settings › Tabs.")
+        guard TabManager.newTabPlace == .sameSite else { newTabRow.detailText = general; return }
+        newTabRow.detailText = switch TabManager.otherNewTabPlace {
+        case .top: String(localized: "A page from a site with no tabs open goes at the top.", comment: "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.")
+        case .bottom: String(localized: "A page from a site with no tabs open goes at the bottom.", comment: "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.")
+        case .next, .sameSite: String(localized: "A page from a site with no tabs open goes next to the current tab.", comment: "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.")
+        }
+    }
+
     private func refreshPureBlack() {
         let shown = DarkPages.mode != .off
         guard pureBlackRow.isAvailable != shown else { return }
@@ -2522,6 +2545,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         developerTrustToggle.isOn = DeveloperTools.trustsLocalServers
         refreshAIApps()
         newTabPlace.selectedIndex = TabManager.NewTabPlace.allCases.firstIndex(of: TabManager.newTabPlace) ?? 0
+        refreshNewTabPlace()
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
         nestToggle.isOn = TabManager.nestsOpenedLinks
         swipeToggle.isOn = SwipeNavigator.isOn
@@ -2532,6 +2556,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshDownloadPlace()
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         favoritesPerRow.selectedIndex = FavoritesView.perRowChoices.firstIndex(of: FavoritesView.perRow) ?? 0
+        sidebarSize.selectedIndex = Tokens.Sidebar.Size.allCases.firstIndex(of: Tokens.Sidebar.size) ?? 1
         darkPages.selectedIndex = DarkPages.Mode.allCases.firstIndex(of: DarkPages.mode) ?? 0
         pureBlackToggle.isOn = DarkPages.pureBlack
         refreshPureBlack()
@@ -2732,11 +2757,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             var said: [String] = []
             let origin = origins[site]
             let choices = origin.map { SitePermissions.choices(origin: $0) } ?? [:]
-            for kind in ["camera", "microphone", "cameraAndMicrophone", "location", "notifications", "popups"] {
-                // A frame from elsewhere answered on the site's page: shown on the site's row when it has none of its own.
-                let allowed = choices[kind] ?? choices.first { $0.key.hasPrefix("embed:") && $0.key.hasSuffix("|" + kind) }?.value
-                if let allowed, let choice = Self.siteChoice(kind, allowed: allowed) { said.append(choice) }
-            }
+            // Its permissions get a row each under it, with Ask, Allow and Block, as in its Site Controls.
+            let permissions = origin.map { origin in
+                SitePermission.allCases.filter { SitePermissions.hasDecision($0, origin: origin) || permissionsChangedHere.contains("\(origin)|\($0.rawValue)") }
+            } ?? []
             for (kind, allowed) in choices.sorted(by: { $0.key < $1.key }) where allowed && kind.hasPrefix("app:") {
                 let app = ExternalLinks.appName(forScheme: String(kind.dropFirst(4)))
                 said.append(String(localized: "opens \(app)", comment: "A choice made for a site in Settings › Privacy: its links of this kind open in an app, by name."))
@@ -2771,7 +2795,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             } else if CookieBanners.sitesLeft.contains(site) {
                 said.append(String(localized: "cookie banners left alone", comment: "A choice made for a site in Settings › Privacy, in a list of them: its cookie consent pop-ups are left for you to answer."))
             }
-            guard !said.isEmpty else { continue }
+            guard !said.isEmpty || !permissions.isEmpty else { continue }
             // The first 30 by name, as with site data, then the rest on request.
             guard sitesShowAll || listed < 30 else { more += 1; continue }
             listed += 1
@@ -2801,9 +2825,24 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let favicon = siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
             let sentence = line.prefix(1).localizedUppercase + line.dropFirst()
             sitesGroup.add(FormRow(title: site,
-                                   detail: String(localized: "site-choices.sentence", defaultValue: "\(sentence).",
-                                                  comment: "Under a site in Settings › Privacy › Sites: the choices made for it, as one sentence."),
+                                   detail: said.isEmpty ? nil : String(localized: "site-choices.sentence", defaultValue: "\(sentence).",
+                                                                        comment: "Under a site in Settings › Privacy › Sites: the choices made for it, as one sentence."),
                                    icon: favicon, control: forget))
+            guard let origin else { continue }
+            let options = PermissionChoice.allCases
+            for permission in permissions {
+                let dropdown = DropdownButton()
+                dropdown.options = options.map { DropdownButton.Option(title: $0.title) }
+                dropdown.selectedIndex = options.firstIndex(of: SitePermissions.choice(permission, origin: origin)) ?? 0
+                dropdown.onSelect = { [weak self] index in
+                    SitePermissions.setChoice(options[index], for: permission, origin: origin)
+                    self?.permissionsChangedHere.insert("\(origin)|\(permission.rawValue)")
+                }
+                let row = FormRow(title: permission.title, control: dropdown)
+                row.isIndented = true
+                row.keywords = site
+                sitesGroup.add(row)
+            }
         }
         if more > 0 {
             let all = PillButton(title: String(localized: "Show All", comment: "Button under the first 30 sites in Settings › Privacy."))
@@ -2947,7 +2986,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let toolbar = Toggle(isOn: app.showsToolbar)
             toolbar.setAccessibilityLabel(String(localized: "Show toolbar in “\(app.name)”", comment: "VoiceOver label of the switch on an installed app's row in Settings › General; the app's name."))
             toolbar.onChange = { on in WebAppStore.shared.setShowsToolbar(on, for: app.id) }
-            let controls = NSStackView(views: [toolbarLabel, toolbar, remove])
+            // Where it is, without knowing the folder: the app selected in Finder.
+            let finder = PillButton(title: String(localized: "Show in Finder", comment: "Button on an installed app's row in Settings › General: shows the app itself, selected in its folder in Finder."))
+            finder.setAccessibilityLabel(String(localized: "Show “\(app.name)” in Finder", comment: "VoiceOver label of the Show in Finder button on an installed app's row in Settings › General; the app's name."))
+            finder.onClick = { _ in WebAppStore.shared.revealInFinder(app) }
+            let controls = NSStackView(views: [toolbarLabel, toolbar, finder, remove])
             controls.spacing = Tokens.Space.x2
             controls.setCustomSpacing(Tokens.Space.x4, after: toolbar)
             let icon = store.bundle(of: app).map { NSWorkspace.shared.icon(forFile: $0.path) } ?? SettingsIcon.symbol("app")

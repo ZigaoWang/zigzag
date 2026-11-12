@@ -16,11 +16,12 @@ final class AddressView: InteractiveView {
     /// In the bar above the page, on the page's own color: a page's neutral field rather than the frame's wash.
     var isOnPage = false { didSet { if isOnPage != oldValue { stateDidChange(animated: false) } } }
     private let label = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textSecondary)
+    private var sizeObserver: NSObjectProtocol?
     private let lock = NSImageView()
     /// Shows while the page uses the camera or microphone; click for options.
     /// Buttons inside the field: the same size, the same gap all round, corners that follow the field's.
-    static let buttonSide: CGFloat = Tokens.Sidebar.addressButton
-    static let buttonInset: CGFloat = (Tokens.Sidebar.addressHeight - buttonSide) / 2
+    static var buttonSide: CGFloat { Tokens.Sidebar.addressButton }
+    static var buttonInset: CGFloat { (Tokens.Sidebar.addressHeight - buttonSide) / 2 }
     static func button(_ symbol: String, toolTip: String) -> IconButton {
         IconButton(symbol: symbol, size: buttonSide, symbolSize: Tokens.Sidebar.addressGlyph, toolTip: toolTip)
     }
@@ -349,6 +350,14 @@ final class AddressView: InteractiveView {
         super.init(frame: frame)
         layer?.cornerRadius = Tokens.Sidebar.addressRadius
         layer?.cornerCurve = .continuous
+        // Settings › Appearance › Sidebar size: the host at the new size, the field the new height (its holder lays it).
+        sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.label.font = Tokens.Font.sidebarRow()
+                self.needsLayout = true
+            }
+        }
         // Keyboard focus: the accent ring, as a field's.
         lock.imageScaling = .scaleNone
         lock.contentTintColor = Tokens.Color.textTertiary
@@ -361,11 +370,21 @@ final class AddressView: InteractiveView {
         readerButton.isHidden = true
         addSubview(readerButton)
         addSubview(siteControlsButton)
+        _ = drop
         setAccessibilityRole(.button)
         setAccessibilityHelp(String(localized: "Opens the command bar", comment: "Accessibility help of the address in the sidebar."))
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+
+    // MARK: Dropping a link or words (#182)
+
+    /// Where a link, an address or words dropped on the field go (`AddressDrop`).
+    private(set) lazy var drop = AddressDrop(self)
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { drop.entered(sender) }
+    override func draggingExited(_ sender: NSDraggingInfo?) { drop.exited() }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool { drop.perform(sender) }
 
     func setReader(available: Bool, active: Bool) {
         wantsReader = available || active
@@ -794,7 +813,16 @@ final class SidebarView: NSView {
     var holdsAddress = true {
         didSet {
             guard holdsAddress != oldValue else { return }
-            if holdsAddress { addressViews.forEach(addSubview) }
+            if holdsAddress { (holdsButtons ? addressViews : [address]).forEach(addSubview) }
+            needsLayout = true
+        }
+    }
+    /// Back, forward and reload are in its top row; false while the strip above the page beside a sidebar on the
+    /// right holds them, after the traffic lights (`BrowserRootView.lightsStrip`, #181).
+    var holdsButtons = true {
+        didSet {
+            guard holdsButtons != oldValue else { return }
+            if holdsButtons, holdsAddress { addressButtons.forEach(addSubview) }
             needsLayout = true
         }
     }
@@ -804,6 +832,7 @@ final class SidebarView: NSView {
     /// What moves to the bar above the page: the three buttons in order, then the address.
     var addressButtons: [IconButton] { [backButton, forwardButton, reloadButton] }
     private var addressViews: [NSView] { addressButtons + [address] }
+    private var sizeObserver: NSObjectProtocol?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -817,6 +846,10 @@ final class SidebarView: NSView {
         addSubview(address)
         addSubview(favorites)
         favorites.onHeightChange = { [weak self] in self?.needsLayout = true }
+        // Settings › Appearance › Sidebar size: the address and favorites take their new heights, the list moves.
+        sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.needsLayout = true }
+        }
 
         scrollView.drawsBackground = false
         scrollView.hasHorizontalScroller = false
@@ -954,7 +987,7 @@ final class SidebarView: NSView {
         let button = Self.toolbarButton
         let row = Self.topRowFrames(width: width, trafficLightsWidth: trafficLightsWidth, onRight: isOnRight)
         func onLine(_ rect: NSRect) -> NSRect { NSRect(x: rect.minX, y: rowCenter - button / 2, width: button, height: button) }
-        for (b, rect) in zip([backButton, forwardButton, reloadButton], row.buttons) where holdsAddress { b.frame = onLine(rect) }
+        for (b, rect) in zip([backButton, forwardButton, reloadButton], row.buttons) where holdsAddress && holdsButtons { b.frame = onLine(rect) }
         sidebarButton.frame = onLine(row.toggle)
         if holdsAddress {
             address.frame = NSRect(x: pad, y: Tokens.Sidebar.addressTop, width: width - pad * 2, height: Tokens.Sidebar.addressHeight)

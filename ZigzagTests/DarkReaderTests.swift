@@ -195,6 +195,26 @@ struct DarkReaderTests {
         #expect(Tab.pageColor(dark: nil, under: nil, theme: Self.white) == Self.white)
         let unknown = DarkPages.State(darkened: false, native: true, color: nil, site: "example.com")
         #expect(Tab.pageColor(dark: unknown, under: nil, theme: Self.white) == Self.white)
+        // Dark on its own but light at the top, with no dark found to give: no white from it.
+        let lightTop = DarkPages.State(darkened: false, native: true, color: Self.white, site: "example.com")
+        #expect(Tab.pageColor(dark: lightTop, under: Self.dark, theme: Self.white) == Self.dark)
+    }
+
+    /// With dark pages off, a page dark on its own still says so, and its dark, for the bar above it (#134), from the
+    /// plain script with no Dark Reader in it; turned on, Dark Reader's script takes over from it.
+    @Test func aDarkPageSaysItsDarkWithDarkPagesOff() async throws {
+        try await withDefaults { () async throws in
+            DarkPages.mode = .off
+            let html = "<html style='background:#fff'><head><style>body { background: #111; color: #eee; margin: 0; min-height: 600px }</style></head><body><p>Dark.</p></body></html>"
+            let webView = await page(html)
+            let seen = await until { (try? await state(webView))?["native"] as? Bool == true }
+            #expect(seen)
+            let found = try await state(webView)
+            #expect(found["plain"] as? Bool == true && found["darkened"] as? Bool == false && found["color"] as? String == "#111111")
+            DarkPages.mode = .always
+            let tookOver = await until { (try? await state(webView))?["plain"] as? Bool == false }
+            #expect(tookOver)
+        }
     }
 
     /// Past a dark page's edges, its own dark; past any other where dark pages are wanted, the ground.

@@ -223,11 +223,18 @@ enum DarkPages {
     }
 
     /// The page script with Dark Reader in it, cut where the choices go: what's before them, and what's after.
-    private static let source: (head: String, tail: String) = {
-        let page = resource("dark-pages").replacingOccurrences(of: "__DARKREADER__", with: resource("darkreader"))
+    private static let source = cut(resource("dark-pages").replacingOccurrences(of: "__DARKREADER__", with: resource("darkreader")))
+
+    /// The page script without Dark Reader, for a page where dark pages aren't wanted: it only says whether the page
+    /// is dark on its own, and its color, for the bar above it (#134). Dark Reader's few hundred kilobytes aren't read
+    /// for it, and nothing in it would start Dark Reader.
+    static let plainDarkReader = "module.exports = { plain: true, enable() {}, disable() {}, setFetchMethod() {} };"
+    private static let plainSource = cut(resource("dark-pages").replacingOccurrences(of: "__DARKREADER__", with: plainDarkReader))
+
+    private static func cut(_ page: String) -> (head: String, tail: String) {
         let parts = page.components(separatedBy: "__CONFIG__")
         return parts.count == 2 ? (parts[0], parts[1]) : (page, "")
-    }()
+    }
 
     /// The choices as the page script reads them, for pages in this store, going to `url`.
     /// `standsBack`: the page's look was chosen for it (`standsBack(for:)`), so the page is told what one is told
@@ -256,6 +263,12 @@ enum DarkPages {
                      injectionTime: .atDocumentStart, forMainFrameOnly: false, in: world)
     }
 
+    /// The plain page script (`plainSource`), in the top page only: a frame's look is the page's business.
+    static func plainScript(for store: WKWebsiteDataStore?, url: URL? = nil) -> WKUserScript {
+        WKUserScript(source: scriptMark + plainSource.head + configJSON(for: store, url: url) + plainSource.tail,
+                     injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world)
+    }
+
     /// Dark Reader's proxy, in the page's own world: it tells Dark Reader of style the page changes through the CSSOM
     /// (adopted sheets, inserted rules, custom elements), which it can't see from Zigzag's world. Dark Reader asks for it
     /// with an event (scripts/update-darkreader.sh), rather than as an inline script a page's Content-Security-Policy
@@ -279,8 +292,8 @@ enum DarkPages {
     static func isOurs(_ script: WKUserScript) -> Bool { (script.source as NSString).hasPrefix(scriptMark) }
 
     /// Puts the page scripts, with the choices as they are now, into a web view's set of scripts, in place of the
-    /// ones it had: only where dark pages are wanted for the page it's going to, since Dark Reader is a few hundred
-    /// kilobytes for every frame to read. Pages already open hear of a change from `refresh`; this is for the pages
+    /// ones it had: Dark Reader only where dark pages are wanted for the page it's going to, since it's a few hundred
+    /// kilobytes for every frame to read; elsewhere the plain script, which only says how the page looks. Pages already open hear of a change from `refresh`; this is for the pages
     /// loaded after it.
     private static func install(in webView: WKWebView) {
         let controller = webView.configuration.userContentController
@@ -290,6 +303,8 @@ enum DarkPages {
         if wanted {
             controller.addUserScript(proxyScript)
             controller.addUserScript(script(for: store, url: webView.url))
+        } else {
+            controller.addUserScript(plainScript(for: store, url: webView.url))
         }
         installed[ObjectIdentifier(controller)] = Installed(generation: generation, wanted: wanted, native: nativeSites(in: nativeScope(of: store)),
                                                             seen: seenKey(seen(for: store, url: webView.url)), fix: fixKey(webView.url))
@@ -408,9 +423,9 @@ enum DarkPages {
         let appearance = (chosenLook(of: webView) ?? (wanted ? (isForced(url) ? .aqua : .darkAqua) : nil)).flatMap(NSAppearance.init(named:))
         if webView.appearance?.name != appearance?.name { webView.appearance = appearance }
         let tab = (webView as? BrowserWebView)?.owner
-        // Not wanted here, the page has no script to say so: what was heard of the page before doesn't hold, and the
-        // bar above it shouldn't keep that page's dark.
-        if !wanted, let tab, let state = tab.darkPage, state.darkened || state.native {
+        // Not wanted here, the page isn't darkened any more: until its script says how it looks on its own, the bar
+        // above it doesn't keep Zigzag's dark. What it said of its own dark stays (#134).
+        if !wanted, let tab, let state = tab.darkPage, state.darkened {
             tab.darkPageChanged(State(darkened: false, native: false, color: nil, site: site(of: url) ?? ""))
         }
         let store = webView.configuration.websiteDataStore
@@ -502,8 +517,13 @@ enum DarkPages {
         let config = config(for: store, url: webView.url, standsBack: standsBack(for: webView))
         let frames: [WKFrameInfo?] = [nil] + PageFrames.shared.frames(in: webView)
         for frame in frames {
-            webView.callAsyncJavaScript("if (window.__zigzagDark) { window.__zigzagDark.set(config); return true; } return false;",
-                                        arguments: ["config": config], in: frame, in: world) { result in
+            // The plain script steps aside for Dark Reader's where dark pages are now wanted.
+            webView.callAsyncJavaScript("""
+                const d = window.__zigzagDark;
+                if (d && d.plain && wanted) { d.retire(); return false; }
+                if (d) { d.set(config); return true; }
+                return false;
+                """, arguments: ["config": config, "wanted": wanted], in: frame, in: world) { result in
                 guard wanted, case .success(let had) = result, (had as? Bool) == false else { return }
                 MainActor.assumeIsolated {
                     webView.evaluateJavaScript(proxyScript.source, in: frame, in: .page) { _ in }
@@ -557,7 +577,8 @@ enum DarkPages {
         return (before == nil) != (after == nil)
     }
 
-    fileprivate static func received(_ state: State, from webView: WKWebView) {
+    /// `wanted`: dark pages are at work on the page (not the plain script): only then is its site learned dark or light.
+    fileprivate static func received(_ state: State, wanted: Bool = true, from webView: WKWebView) {
         // Learned sites go into the scripts of pages loaded later in the same profile; not from a private window.
         // Each web view takes them as it next goes to a page (`installIfStale`): putting them into every open tab's
         // scripts at once held Zigzag up for seconds with many tabs open (#89).
@@ -565,7 +586,7 @@ enum DarkPages {
         // start darkened again, Dark Reader at work on a site that's dark on its own.
         // Not from a page whose look was chosen for it, or that the developer tools changed some other way: what it
         // shows then says nothing of the site as you'd find it.
-        if !standsBack(for: webView), isUntouched(webView), learn(state, in: nativeScope(of: webView.configuration.websiteDataStore)) {
+        if wanted, !standsBack(for: webView), isUntouched(webView), learn(state, in: nativeScope(of: webView.configuration.websiteDataStore)) {
             generation += 1
             install(in: webView)
         }
@@ -582,7 +603,7 @@ enum DarkPages {
             let state = State(darkened: body["darkened"] as? Bool ?? false, native: body["native"] as? Bool ?? false,
                               color: (body["color"] as? String).flatMap(DarkPages.color(hex:)), site: body["site"] as? String ?? "",
                               marker: (body["marker"] as? String).flatMap(DarkPages.marker(_:)))
-            DarkPages.received(state, from: webView)
+            DarkPages.received(state, wanted: body["wanted"] as? Bool ?? true, from: webView)
         }
     }
 

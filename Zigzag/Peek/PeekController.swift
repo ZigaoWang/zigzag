@@ -47,7 +47,7 @@ final class PeekHeaderView: NSView {
         closeButton.frame = NSRect(x: bounds.width - edge - b, y: edge, width: b, height: b)
         expandButton.frame = NSRect(x: closeButton.frame.minX - b, y: edge, width: b, height: b)
         [expandButton, closeButton].forEach { $0.radius = max(Tokens.Radius.control, Tokens.Radius.large - edge) }
-        let iconSize = Tokens.Sidebar.favicon
+        let iconSize = Tokens.Pane.favicon
         icon.frame = NSRect(x: edge + (b - iconSize) / 2, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
         let x = icon.frame.maxX + Tokens.Space.x2 - Label.inset
         let h = host.lineHeight

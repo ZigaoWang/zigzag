@@ -11,6 +11,53 @@ enum ExtensionPopups {
     }
 }
 
+/// Extensions' items in a page's right-click menu. WebKit adds them to the page's menu by itself, for the extensions
+/// that may act on the page, with what was clicked (a link, a selection, an image); Zigzag asks each extension for its
+/// items too, for the others and to know whose item you chose. Each item goes in once: one WebKit put in is kept, and
+/// the extension's own copy of it left out.
+enum ExtensionMenuItems {
+    struct Plan {
+        /// Items to add, with whose they are.
+        var added: [(id: String, item: NSMenuItem)] = []
+        /// Items WebKit already put in the menu, with whose they are.
+        var adopted: [(id: String, item: NSMenuItem)] = []
+        /// Items WebKit put in that go (a private tab shows none).
+        var removed: [NSMenuItem] = []
+    }
+
+    /// Whether WebKit put this item in for an extension: the page's own items all carry WebKit's identifiers.
+    static func isExtensionItem(_ item: NSMenuItem) -> Bool {
+        !item.isSeparatorItem && !(item.identifier?.rawValue.hasPrefix("WKMenuItemIdentifier") ?? false)
+    }
+
+    /// The same item: the same title, with the same items under it.
+    static func isSame(_ a: NSMenuItem, _ b: NSMenuItem) -> Bool {
+        guard a.title == b.title, a.isSeparatorItem == b.isSeparatorItem else { return false }
+        let left = a.submenu?.items ?? [], right = b.submenu?.items ?? []
+        return left.count == right.count && zip(left, right).allSatisfy(isSame)
+    }
+
+    /// What to do with each extension's items, given what's in the menu already.
+    static func plan(existing: [NSMenuItem], extensions: [(id: String, items: [NSMenuItem])], isPrivate: Bool) -> Plan {
+        var plan = Plan()
+        var candidates = existing.filter(isExtensionItem)
+        if isPrivate {
+            plan.removed = candidates
+            return plan
+        }
+        for (id, items) in extensions {
+            for item in items {
+                if let index = candidates.firstIndex(where: { isSame($0, item) }) {
+                    plan.adopted.append((id, candidates.remove(at: index)))
+                } else if !plan.added.contains(where: { $0.id == id && isSame($0.item, item) }) {
+                    plan.added.append((id, item))
+                }
+            }
+        }
+        return plan
+    }
+}
+
 /// Each extension's keep-awake port in a profile. A background that starts again opens a new one before WebKit
 /// says the old one closed: that late word never drops the new one.
 struct KeepAlivePorts<Port: AnyObject> {
@@ -487,21 +534,24 @@ final class ExtensionHost: NSObject {
                           badge: action.badgeText, attention: attention[context.uniqueIdentifier])
     }
 
-    /// Extension items for a page's right-click menu; none in a private tab.
-    func menuItems(for tab: Tab) -> [NSMenuItem] {
-        guard !tab.isPrivate else { return [] }
-        var all: [NSMenuItem] = []
-        for context in contexts {
-            let items = context.menuItems(for: tab)
-            let owner = MenuOwner(id: context.uniqueIdentifier, tab: tab)
-            var queue = items
+    /// Extensions' items in a page's right-click menu, once each; none in a private tab. WebKit puts them in the
+    /// page's menu itself, so an item already there is kept (and noted as the extension's) rather than added again:
+    /// adding every extension's items a second time showed Bitwarden's twice (#186).
+    func addMenuItems(for tab: Tab, to menu: NSMenu) {
+        let ours = tab.isPrivate ? [] : contexts.map { (id: $0.uniqueIdentifier, items: $0.menuItems(for: tab)) }
+        let plan = ExtensionMenuItems.plan(existing: menu.items, extensions: ours, isPrivate: tab.isPrivate)
+        plan.removed.forEach(menu.removeItem)
+        for (id, item) in plan.adopted + plan.added {
+            let owner = MenuOwner(id: id, tab: tab)
+            var queue = [item]
             while let item = queue.popLast() {
                 menuOwners.setObject(owner, forKey: item)
                 queue += item.submenu?.items ?? []
             }
-            all += items
         }
-        return all
+        guard !plan.added.isEmpty else { return }
+        menu.addItem(.separator())
+        plan.added.forEach { menu.addItem($0.item) }
     }
 
     /// A click waiting for WebKit to ask for the popup: which window it belongs to, and whether a pinned button

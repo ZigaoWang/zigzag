@@ -1086,6 +1086,21 @@ enum DebugBridge {
             let tabs = controller.tabManager.allTabs.map { "\($0.url?.host() ?? "-"):\($0.url?.port ?? 0)=\($0.isDevelopment)" }.sorted()
             let front = controller.tabManager.selectedTab
             debugLog("devstate => on=\(DeveloperTools.isOn) sites=\(DevelopmentSites.sites) tabs=\(tabs) front=\(front?.displayTitle ?? "-") failed=\(front?.showsErrorPage ?? false)")
+        // addressdrop <sidebar|pane1..4|mini> <hold|release|text>: the drop ring on that address field, or text (a link,
+        // an address, words) let go on it, through the same steps a drop takes (#182).
+        case "addressdrop":
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            guard f.count == 2 else { break }
+            let drop: AddressDrop?
+            if f[0] == "sidebar" { drop = controller.sidebar.address.drop }
+            else if f[0] == "mini" { drop = MiniWindowController.all.last?.debugAddressDrop }
+            else if f[0].hasPrefix("pane"), let n = Int(f[0].dropFirst(4)), controller.root.paneCards.indices.contains(n - 1) { drop = controller.root.paneCards[n - 1].header.address.drop }
+            else { drop = nil }
+            switch f[1] {
+            case "hold": drop?.debugHold(true)
+            case "release": drop?.debugHold(false)
+            default: debugLog("addressdrop \(f[0]) handled=\(drop?.debugDrop(f[1]) ?? false)")
+            }
         case "darkstate":
             controller.selectedWebView?.callAsyncJavaScript("return window.__zigzagDark ? JSON.stringify(window.__zigzagDark.state()) : 'none'",
                                                             arguments: [:], in: nil, in: DarkPages.world) { result in
@@ -1488,6 +1503,11 @@ enum DebugBridge {
             let factor = max(1, Float(arg) ?? 1)
             controller.window?.contentView?.layer?.speed = 1 / factor
         case "quit": NSApp.terminate(nil)
+        case "updaterelaunch":
+            // updaterelaunch: quits as Sparkle does to restart for an update (its willRelaunch first); launching the
+            // copy again is the restart.
+            UpdateRelaunch.prepare()
+            NSApp.terminate(nil)
         case "materials": MaterialsShowcase.debug(arg)
         case "history": HistoryPage.open(in: controller)
         case "clearhistory":
@@ -1754,6 +1774,8 @@ enum DebugBridge {
             let engine = Library.shared.searchEngine
             debugLog("engine \(engine.rawValue) \(engine.name) \(engine.searchURL("zigzag test").absoluteString) home=\(engine.homeURL.absoluteString) offered=\(ExtensionSearchProvider.available.map(\.name)) before=\(ExtensionSearchProvider.previousEngine.rawValue)")
         case "largenames": SpaceHeaderView.isLarge = arg != "off"
+        case "sidebarsize": if let size = Tokens.Sidebar.Size(rawValue: arg) { Tokens.Sidebar.size = size }
+        case "newtabplace": if let place = TabManager.NewTabPlace(rawValue: arg) { TabManager.newTabPlace = place }
         case "sitepanel": SitePanel.toggle(in: controller, from: controller.sidebar.address)
         case "panesite", "panemore":
             // panesite <pane>: that split pane's Site Controls button, as a click on it (#160). panemore <pane>: its ⋯.

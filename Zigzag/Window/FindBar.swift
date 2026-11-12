@@ -280,15 +280,74 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
             return
         }
         guard let webView = window?.findableWebView, !query.isEmpty else { return }
-        searched = webView
-        let config = WKFindConfiguration()
-        config.backwards = backwards
-        config.caseSensitive = false
-        config.wraps = true
+        watch(webView)
         if fromStart { webView.evaluateJavaScript("window.getSelection().removeAllRanges()") }
-        webView.find(query, configuration: config) { [weak self] result in
-            self?.updateCount(found: result.matchFound)
+        // WebKit's own find, which counts the same matches it goes through (`PageFind`).
+        guard PageFind.isAvailable else {
+            let config = WKFindConfiguration()
+            config.backwards = backwards
+            config.caseSensitive = false
+            config.wraps = true
+            webView.find(query, configuration: config) { [weak self] result in
+                self?.show(result.matchFound ? nil : PageFind.Result(count: 0))
+            }
+            return
         }
+        let asked = query
+        Task { @MainActor [weak self, weak webView] in
+            guard let webView, let result = await PageFind.find(asked, in: webView, backwards: backwards) else { return }
+            // Typed on since: the newer search says it.
+            guard let self, self.query == asked, self.searched === webView else { return }
+            self.show(result)
+        }
+    }
+
+    /// The match you're on, from 0, so a recount can keep saying where you are.
+    private var place: Int?
+
+    /// The page being searched: once it finishes loading something new, its count is read again, so it never
+    /// says what an earlier page had.
+    private func watch(_ webView: WKWebView) {
+        guard searched !== webView || loadingWatch == nil else { return }
+        searched = webView
+        place = nil
+        loadingWatch = webView.observe(\.isLoading, options: [.new]) { [weak self] webView, change in
+            guard change.newValue == false else { return }
+            MainActor.assumeIsolated { self?.recount(in: webView) }
+        }
+    }
+    private var loadingWatch: NSKeyValueObservation?
+
+    private func recount(in webView: WKWebView) {
+        guard isVisible, searched === webView, !query.isEmpty, PageFind.isAvailable else { return }
+        let asked = query
+        Task { @MainActor [weak self, weak webView] in
+            guard let webView, let count = await PageFind.count(asked, in: webView) else { return }
+            guard let self, self.query == asked, self.searched === webView else { return }
+            let place = self.place.flatMap { $0 < count ? $0 : nil }
+            self.show(PageFind.Result(count: count, index: place))
+        }
+    }
+
+    /// The count for what was found: "3 of 12", "1 match", "No matches". Nil: found, how many unknown.
+    private func show(_ result: PageFind.Result?) {
+        place = result?.index
+        let text: String
+        switch result {
+        case nil: text = ""
+        case let result? where result.count == 0: text = Self.noMatches
+        case let result? where result.isOverMax: text = Self.moreThanMax
+        case let result? where result.count == 1: text = Self.matches(1)
+        case let result?: text = result.index.map { Self.place($0 + 1, of: result.count) } ?? Self.matches(result.count)
+        }
+        showCount(text)
+        countLabel.textColor = result?.count == 0 ? Tokens.Color.textTertiary : Tokens.Color.textSecondary
+        layoutPanel()
+    }
+
+    /// Past what's counted: "More than 1,000 matches".
+    private static var moreThanMax: String {
+        String(localized: "More than \(PageFind.maxCount) matches", comment: "Find bar count when the page has more matches than are counted. The number is 1,000.")
     }
 
     private static var noMatches: String { String(localized: "No matches", comment: "Find bar count when the page has nothing that matches.") }
@@ -299,35 +358,6 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     /// "3 of 12": the match you're on, and how many there are.
     private static func place(_ place: Int, of count: Int) -> String {
         String(localized: "\(place) of \(count)", comment: "Find bar count: the match you're on, and how many there are, like 3 of 12.")
-    }
-
-    private func updateCount(found: Bool) {
-        guard let webView = window?.findableWebView else { return }
-        // WebKit's public find API doesn't count; a quick text scan does. It runs in Zigzag's own script world with
-        // the query passed in, so the page can't see what you search for or change how it's counted.
-        // Counted over the same text twice, the whole page and the part before the match WebKit just selected, so
-        // "3 of 12" is where you are in the page.
-        let script = """
-        const q = String(query).toLowerCase(); if (!q || !document.body) return [0, 0];
-        const count = (t) => { t = t.toLowerCase(); let n = 0, i = 0; while ((i = t.indexOf(q, i)) !== -1) { n++; i += q.length; } return n; };
-        const all = document.createRange(); all.selectNodeContents(document.body);
-        const total = count(all.toString());
-        const sel = window.getSelection(); if (!sel.rangeCount) return [0, total];
-        const before = document.createRange(); before.setStart(document.body, 0);
-        const r = sel.getRangeAt(0); before.setEnd(r.startContainer, r.startOffset);
-        return [count(before.toString()) + 1, total];
-        """
-        webView.callAsyncJavaScript(script, arguments: ["query": query], in: nil, in: .defaultClient) { [weak self] result in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                let pair = ((try? result.get()) as? [Int]) ?? [0, 0]
-                let count = max(pair.count > 1 ? pair[1] : 0, 1), place = pair.first ?? 0
-                self.showCount(!found ? Self.noMatches : count == 1 ? Self.matches(count)
-                    : (1...count).contains(place) ? Self.place(place, of: count) : Self.matches(count))
-                self.countLabel.textColor = found ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
-                self.layoutPanel()
-            }
-        }
     }
 
     /// Shows the match count, and has VoiceOver say it when it changes.

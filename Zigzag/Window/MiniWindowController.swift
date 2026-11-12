@@ -5,7 +5,8 @@ import WebKit
 /// quick look-up. A slim strip on top in the page's own color (`PageBar`), the page under it edge to edge: the space
 /// it goes to, the page's site, Keep on Top, Copy Link and Open in. Its page is a real tab, so
 /// history, blocking, autofill and extensions work as they do anywhere; Open in moves that same live page into a
-/// browser window, in the space chosen on the strip. It's never saved: quitting lets it go, as Arc did.
+/// browser window, in the space chosen on the strip. Quitting lets it go, as Arc did; an update's restart brings it
+/// back (`UpdateRelaunch`).
 final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// The last to be asked about a key: one nothing took goes by quietly (`QuietKeys`).
     override func noResponder(for eventSelector: Selector) {
@@ -149,6 +150,11 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
         strip.openButton.onClick = { [weak self] _ in self?.openInZigzag() }
         strip.title.onClick = { [weak self] _ in self?.openLocation(nil) }
+        strip.title.drop.onDrop = { [weak self] url in
+            guard let self else { return false }
+            self.tab.load(url)
+            return true
+        }
         strip.copyButton.onClick = { [weak self] _ in self?.copyPageURL(nil) }
         strip.pinButton.onClick = { [weak self] _ in
             guard let window = self?.window else { return }
@@ -458,6 +464,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
 
     #if DEBUG
+    var debugAddressDrop: AddressDrop { strip.title.drop }
+
     func debugEnter(_ text: String) {
         if !commandBar.isVisible { commandBar.show(mode: .editCurrent) }
         commandBar.debugType(text)
@@ -628,6 +636,38 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
 }
 
+// MARK: - Through an update's restart
+
+extension MiniWindowController {
+    /// This window as an update's restart brings it back: its page, back/forward list, space, place and Keep on Top.
+    var savedForRelaunch: UpdateRelaunch.Mini? {
+        guard !isLeaving, let window, let url = tab.url else { return nil }
+        let frame = window.frame
+        return UpdateRelaunch.Mini(url: url, title: tab.title, spaceID: tab.spaceID,
+                                   frame: [frame.origin.x, frame.origin.y, frame.width, frame.height],
+                                   keepOnTop: KeepOnTop.isOn(window), interactionState: tab.interactionStateForSaving)
+    }
+
+    /// Opens one again as it was before an update's restart. A space that's gone gives way to the one Zigzag Mini
+    /// uses now; a place on a screen no longer there, to the middle of the screen.
+    @discardableResult
+    static func reopen(_ saved: UpdateRelaunch.Mini) -> MiniWindowController {
+        let space = Library.shared.space(saved.spaceID) != nil ? saved.spaceID : MiniQuickOpen.space.id
+        let tab = Tab(url: saved.url, title: saved.title, spaceID: space, interactionState: saved.interactionState)
+        let f = saved.frame
+        let area = NSScreen.main?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
+        var frame = f.count == 4 ? NSRect(x: f[0], y: f[1], width: f[2], height: f[3]) : nil
+        if let rect = frame, !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(rect) }) { frame = nil }
+        let controller = MiniWindowController(tab: tab, frame: frame ?? Self.frame(size: Tokens.Metric.miniWindowSize, in: area, taken: all.compactMap { $0.window?.frame }),
+                                              overFullScreen: false)
+        all.append(controller)
+        controller.appear(from: nil)
+        if #available(macOS 15.4, *) { ExtensionCenter.miniOpened(controller) }
+        if saved.keepOnTop, let window = controller.window { KeepOnTop.set(true, for: window) }
+        return controller
+    }
+}
+
 // MARK: - Its menu items
 
 extension MiniWindowController: NSMenuItemValidation {
@@ -726,7 +766,7 @@ extension MiniWindowController: TabHost {
         // and the menu's own items leave you here, a plain click takes you there.
         let background = pending != nil || (action.modifierFlags.contains(.command) && !action.modifierFlags.contains(.shift))
         let target = Self.browserWindow()
-        let newTab = target.tabManager.newTab(url: nil, select: !background, configuration: configuration)
+        let newTab = target.tabManager.newTab(url: nil, select: !background, configuration: configuration, site: action.request.url)
         if !background { target.window?.makeKeyAndOrderFront(nil) }
         return newTab.ensureWebView()
     }
@@ -924,6 +964,14 @@ final class MiniSpaceChip: InteractiveView {
 /// the pointer it shows the address field's soft fill, and a click opens the command bar over it, as the sidebar's
 /// address does.
 final class MiniTitleView: InteractiveView {
+
+    // MARK: Dropping a link or words (#182)
+
+    /// Where a link, an address or words dropped on the field go (`AddressDrop`).
+    private(set) lazy var drop = AddressDrop(self)
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { drop.entered(sender) }
+    override func draggingExited(_ sender: NSDraggingInfo?) { drop.exited() }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool { drop.perform(sender) }
     private let mark = NSImageView()
     private let label = Label("", font: .systemFont(ofSize: Tokens.Pane.addressText), color: Tokens.Color.textSecondary)
     private var themeToken: SignalToken?
@@ -940,6 +988,7 @@ final class MiniTitleView: InteractiveView {
         mark.isHidden = true
         label.lineBreakMode = .byTruncatingMiddle
         [mark, label].forEach(addSubview)
+        _ = drop
         setAccessibilityRole(.button)
         setAccessibilityHelp(String(localized: "Opens the command bar", comment: "Accessibility help of the address in the sidebar."))
         themeToken = Brand.themeChanged.observe { [weak self] in self?.stateDidChange(animated: false) }

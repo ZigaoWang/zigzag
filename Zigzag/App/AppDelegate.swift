@@ -120,8 +120,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Opened by a site installed as an app: only its window comes up, as Chrome's apps do; the browser windows
         // wait until you ask for them.
         let webAppOnly = pendingURLs.isEmpty && !pendingWebApps.isEmpty && !WindowManager.needsOnboarding
-        WindowManager.shared.sessionWaiting = miniOnly || webAppOnly
-        let restored = WindowManager.needsOnboarding || miniOnly || webAppOnly ? false : WindowManager.shared.restoreSession()
+        // Restarted for an update: exactly what was open comes back, Zigzag Mini windows too.
+        let relaunch = UpdateRelaunch.take()
+        let plan = UpdateRelaunch.plan(relaunch: relaunch, now: Date(), needsOnboarding: WindowManager.needsOnboarding,
+                                       miniOnly: miniOnly, webAppOnly: webAppOnly)
+        WindowManager.shared.sessionWaiting = plan.sessionWaiting
+        let restored = plan.restoresSession ? WindowManager.shared.restoreSession() : false
+        if plan.restoresMinis { relaunch?.minis.forEach { MiniWindowController.reopen($0) } }
         // Opened from the disk image or a download macOS keeps apart: offered a move to Applications, so it can update.
         MoveToApplications.offerWhenReady()
         launched = true
@@ -132,7 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             pendingURLs.forEach { WindowManager.shared.openExternal($0) }
             pendingURLs = []
-        } else if !restored, !webAppOnly {
+        } else if !restored, !plan.sessionWaiting {
             WindowManager.shared.newWindow()
         }
         pendingWebApps.forEach { WebAppStore.handle($0) }

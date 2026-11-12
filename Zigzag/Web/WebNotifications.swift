@@ -83,7 +83,7 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
 
     private func permission(origin: String, tab: Tab) -> String {
         if tab.isPrivate { return "denied" }
-        return SitePermissions.notifications(origin: origin).map { $0 ? "granted" : "denied" } ?? "default"
+        return SitePermissions.notifications(origin: origin, tab: tab).map { $0 ? "granted" : "denied" } ?? "default"
     }
 
     /// The frame's origin when it may use notifications: https (or http on this Mac), the page itself or a frame

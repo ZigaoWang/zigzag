@@ -67,6 +67,44 @@ struct SiteControlsPermissionTests {
         }
     }
 
+    /// Ask means ask every time (#174): an answer given to the question holds for that page only, nothing is kept
+    /// for the site, and the next page asks again.
+    @Test func aQuestionsAnswerHoldsForThePageOnly() throws {
+        try withDefaults {
+            let tab = Tab(url: URL(string: site), title: "Meet", spaceID: UUID())
+            tab.permissionAnswers.note(true, key: site, kind: "notifications")
+            tab.permissionAnswers.note(true, key: site, kind: "cameraAndMicrophone")
+            tab.permissionAnswers.note(false, key: site, kind: "location")
+            #expect(SitePermissions.notifications(origin: site, tab: tab) == true)
+            // A camera-only question takes the answer given to a call's camera and microphone.
+            #expect(tab.permissionAnswers.answer(key: site, kind: "camera") == true)
+            #expect(tab.permissionAnswers.answer(key: site, kind: "location") == false)
+            // Nothing kept for the site: it's still Ask, and another tab on it asks.
+            #expect(SitePermissions.choices(origin: site).isEmpty)
+            for permission in SitePermission.allCases { #expect(SitePermissions.choice(permission, origin: site) == .ask) }
+            let other = Tab(url: URL(string: site), title: "Meet", spaceID: UUID())
+            #expect(SitePermissions.notifications(origin: site, tab: other) == nil)
+            // Another origin's question on the same page has its own answer.
+            #expect(tab.permissionAnswers.answer(key: "http://meet.example.com", kind: "camera") == nil)
+            // The next page load forgets them.
+            tab.permissionAnswers.forget()
+            #expect(tab.permissionAnswers.isEmpty)
+            #expect(SitePermissions.notifications(origin: site, tab: tab) == nil)
+        }
+    }
+
+    /// Allow or Block kept for the site wins over an answer given on the page.
+    @Test func aKeptChoiceComesBeforeThePagesAnswer() throws {
+        try withDefaults {
+            let tab = Tab(url: URL(string: site), title: "Meet", spaceID: UUID())
+            tab.permissionAnswers.note(true, key: site, kind: "notifications")
+            SitePermissions.setChoice(.block, for: .notifications, origin: site)
+            #expect(SitePermissions.notifications(origin: site, tab: tab) == false)
+            SitePermissions.setChoice(.ask, for: .notifications, origin: site)
+            #expect(SitePermissions.notifications(origin: site, tab: tab) == true)
+        }
+    }
+
     @Test func allowAndBlockAreKeptAndAskForgets() throws {
         try withDefaults {
             for permission in SitePermission.allCases {

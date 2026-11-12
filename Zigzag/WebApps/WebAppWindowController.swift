@@ -224,6 +224,11 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         NSApp.activate()
     }
 
+    /// File › Show in Finder: the app itself, selected in its folder.
+    @objc func showAppInFinder(_ sender: Any?) {
+        WebAppStore.shared.revealInFinder(app)
+    }
+
     @objc func zoomIn(_ sender: Any?) {
         guard let webView = tab.webView else { return }
         setZoom(ZoomLevels.step(webView.pageZoom, by: 1))
@@ -334,7 +339,7 @@ extension WebAppWindowController: TabHost {
         }
         let background = pending != nil || (action.modifierFlags.contains(.command) && !action.modifierFlags.contains(.shift))
         let target = MiniWindowController.browserWindow()
-        let newTab = target.tabManager.newTab(url: nil, select: !background, configuration: configuration)
+        let newTab = target.tabManager.newTab(url: nil, select: !background, configuration: configuration, site: action.request.url)
         if !background {
             target.window?.makeKeyAndOrderFront(nil)
             NSApp.activate()

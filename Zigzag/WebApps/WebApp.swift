@@ -183,6 +183,14 @@ final class WebAppStore {
         return nil
     }
 
+    /// Show in Finder: the app's bundle selected in a Finder window, wherever it is now. False when it's gone.
+    @discardableResult
+    func revealInFinder(_ app: WebApp) -> Bool {
+        guard let bundle = bundle(of: app) else { return false }
+        NSWorkspace.shared.activateFileViewerSelecting([bundle])
+        return true
+    }
+
     /// Apps that were thrown away in Finder leave the list.
     func pruneMissing() {
         let gone = apps.filter { bundle(of: $0) == nil }.map(\.id)

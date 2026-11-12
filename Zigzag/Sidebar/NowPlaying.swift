@@ -8,6 +8,7 @@ final class NowPlayingView: InteractiveView {
     let playButton = TabRowView.rowButton("pause", toolTip: String(localized: "Pause", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."))
     let muteButton = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."))
     private(set) weak var tab: Tab?
+    private var sizeObserver: NSObjectProtocol?
     var isPaused = false { didSet { refresh() } }
 
     override init(frame: NSRect) {
@@ -15,6 +16,13 @@ final class NowPlayingView: InteractiveView {
         layer?.cornerRadius = Tokens.Sidebar.rowRadius
         layer?.cornerCurve = .continuous
         [icon, title, playButton, muteButton].forEach { addSubview($0) }
+        // Settings › Appearance › Sidebar size: the site's name at the rows' size.
+        sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.title.font = Tokens.Font.sidebarRow()
+                self?.needsLayout = true
+            }
+        }
         setAccessibilityRole(.group)
         setAccessibilityLabel(String(localized: "Now playing", comment: "Accessibility label of the sidebar's control for a tab playing sound in the background."))
         // VoiceOver goes to the playing tab as a click on the title does; the buttons speak for themselves.
