@@ -9142,6 +9142,17 @@
         }
       }
     },
+    "Open in Zigzag Mini" : {
+      "comment" : "Item in a tab's context menu in the sidebar: moves the tab's page into a Zigzag Mini window (the small window for one page, without the sidebar). Zigzag Mini is a name, kept in Latin letters.\nUndo action name, shown in the Edit menu as Undo Open in Zigzag Mini.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Zigzag Mini 中打开"
+          }
+        }
+      }
+    },
     "Open links from other apps in Zigzag Mini" : {
       "comment" : "A setting in Settings › Zigzag Mini.",
       "localizations" : {
