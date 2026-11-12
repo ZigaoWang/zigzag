@@ -5,14 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- With the address above the page, a zoomed pane in split view keeps its strip, with its address and buttons, on top of it, instead of leaving it behind in the bar. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
-- Site Controls opened from a pane in split view closes when the panes move, as when the split ends, a pane is zoomed or two swap, instead of staying where the pane's strip was. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
-- With Site Controls or Downloads left open in one window, the button in another window opens them there on the first click, instead of only closing the other window's. Link previews and Esc in Reader no longer wait on a panel open in another window.
-- An installed app opened again right after its window closed, from the Dock or Finder, opens its window, instead of leaving its Dock icon with no window. ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
-- Dragging a pinned page's pane out of the window in split view no longer opens an empty window and unloads the pinned page. Pinned pages belong to every window, so it stays where it is. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
-- In Show All Tabs, a split of a pinned page and a tab shows both pages on its card, each on its own side, and the card is the one picked when you're on the pinned page. It showed only the tab.
-
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
@@ -46,6 +38,12 @@ Split view with up to four pages, sites installed as apps of their own, the side
 - In Change Icon, the first choice shows the site's own icon, so it's clear that it puts the site's icon back.
 
 ### Fixed
+- With the address above the page, a zoomed pane in split view keeps its strip, with its address and buttons, on top of it, instead of leaving it behind in the bar. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+- Site Controls opened from a pane in split view closes when the panes move, as when the split ends, a pane is zoomed or two swap, instead of staying where the pane's strip was. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+- With Site Controls or Downloads left open in one window, the button in another window opens them there on the first click, instead of only closing the other window's. Link previews and Esc in Reader no longer wait on a panel open in another window.
+- An installed app opened again right after its window closed, from the Dock or Finder, opens its window, instead of leaving its Dock icon with no window. ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
+- Dragging a pinned page's pane out of the window in split view no longer opens an empty window and unloads the pinned page. Pinned pages belong to every window, so it stays where it is. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+- In Show All Tabs, a split of a pinned page and a tab shows both pages on its card, each on its own side, and the card is the one picked when you're on the pinned page. It showed only the tab.
 - Zigzag no longer crashes going back, forward or to a link after a while of browsing with an extension on. Each change of site could give the extension's scripts one more copy, until there were too many to hand a new page. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#178](https://github.com/ZigaoWang/zigzag/issues/178))
 - With dark pages on, a site with a dark look of its own, like GitHub or YouTube Music, is left exactly as it is, even with little on the page, instead of being painted partly light. It no longer flashes white before its dark theme shows, on the first visit or after a restart, and the bar above it is dark too. Zigzag remembers which sites are dark for each profile, and forgets them when you clear the site's data or History. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - In split view, a mouse's back and forward buttons and a swipe go back or forward in the page under the pointer, which becomes the page you're in, instead of in whichever page you were last in. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#170](https://github.com/ZigaoWang/zigzag/issues/170))
