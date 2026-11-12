@@ -215,15 +215,19 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         return [choices, rest].filter { !$0.isEmpty }
     }
 
+    /// The device a size is nearest, either way up: a phone by its short side; then a tablet, squarer than a
+    /// laptop's screen (an iPad is 4:3 to 3:2, a laptop 16:10 or wider) and no larger than the largest iPad.
+    static func symbol(forSize size: CGSize) -> String {
+        let short = min(size.width, size.height), long = max(size.width, size.height)
+        if short < 500 { return "iphone" }
+        return long / short < 1.55 && long < 1400 ? "ipad" : "laptopcomputer"
+    }
+
     /// The symbol of a button that holds a choice says which is in effect: the sun, the moon, a printer.
     static func symbol(of part: Part, in state: DeveloperState) -> String {
         if part.tools.contains(.sizeFill) {
-            // The device the size is nearest, either way up: a phone by its short side; then a tablet, squarer than a
-            // laptop's screen (an iPad is 4:3 to 3:2, a laptop 16:10 or wider) and no larger than the largest iPad.
             guard let size = state.size else { return part.symbol }
-            let short = min(size.width, size.height), long = max(size.width, size.height)
-            if short < 500 { return "iphone" }
-            return long / short < 1.55 && long < 1400 ? "ipad" : "laptopcomputer"
+            return symbol(forSize: size)
         }
         guard part.tools.contains(where: { $0.appearance != nil }) else { return part.symbol }
         if state.printStyles { return DeveloperTool.printStyles.symbol }

@@ -183,6 +183,8 @@ enum CommandRanker {
         var developerTools: [DeveloperTool] = []
         /// The site you're on is on the list of development sites.
         var isDevelopmentSite = false
+        /// The listed page sizes (Settings › Developer), offered by name where Page Size is.
+        var pageSizes: [PageSizes.Size] = []
     }
 
     /// The commands about the page and window you're in, each named as in the menu bar, and only those that apply.
@@ -220,6 +222,14 @@ enum CommandRanker {
         }
         list += c.developerTools.map {
             Action(id: $0.commandID, title: $0 == .site ? DeveloperTool.siteTitle(listed: c.isDevelopmentSite) : $0.title, keywords: $0.keywords, symbol: $0.symbol)
+        }
+        // Each listed size by its name, as the Page Size menu above the page has them: "iphone" finds iPhone 16.
+        if c.developerTools.contains(.sizeCustom) {
+            list += c.pageSizes.enumerated().map { i, size in
+                Action(id: PageSizes.commandID(i), title: PageSizes.commandTitle(size),
+                       keywords: ["page", "size", "device", "responsive", "developer"] + size.name.lowercased().split(separator: " ").map(String.init),
+                       symbol: DeveloperBarTools.symbol(forSize: size.size))
+            }
         }
         // Spaces are kept for good; a private window keeps nothing and has one space.
         guard !c.isPrivate else { return list }
@@ -296,6 +306,7 @@ enum CommandRanker {
         c.hasPage = tab.url != nil
         c.developerTools = DeveloperTool.allCases.filter { $0.isOffered(for: tab, isPrivate: manager.isPrivate, inSplit: manager.split(for: tab) != nil) }
         c.isDevelopmentSite = DevelopmentSites.covers(tab.url)
+        c.pageSizes = PageSizes.all
         c.isFavorite = tab.isFavorite
         c.isPinned = tab.bookmarkID != nil && !tab.isFavorite
         c.inSplit = manager.split(for: tab) != nil

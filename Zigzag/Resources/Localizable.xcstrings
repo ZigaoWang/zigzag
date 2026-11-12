@@ -10261,6 +10261,17 @@
         }
       }
     },
+    "Page Size: %@, %@" : {
+      "comment" : "A command in the command bar, on a development site: gives the page a listed size. The size's name, then its width and height, like “Page Size: iPhone 16, 393 × 852”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页尺寸：%1$@，%2$@"
+          }
+        }
+      }
+    },
     "Page Size: Fill the Window" : {
       "comment" : "View › Developer menu item and command, on a development site, checked while so: the page takes all its room in the window, as any page.",
       "localizations" : {

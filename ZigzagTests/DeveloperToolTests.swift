@@ -92,6 +92,22 @@ struct DeveloperToolTests {
         #expect(CommandRanker.contextActions(context).map(\.id).contains("developer:clear-cache"))
     }
 
+    /// The listed sizes are commands by name, where Page Size is offered, and each id leads back to its size.
+    @Test func theCommandBarOffersEachListedSizeByName() {
+        withDefaults {
+            var context = CommandRanker.Context()
+            context.pageSizes = PageSizes.all
+            #expect(!CommandRanker.contextActions(context).contains { $0.id.hasPrefix("developer-size:") })
+            context.developerTools = [.sizeFill, .sizeCustom]
+            let sizes = CommandRanker.contextActions(context).filter { $0.id.hasPrefix("developer-size:") }
+            #expect(sizes.count == PageSizes.all.count)
+            let phone = sizes.first { $0.keywords.contains("iphone") && $0.keywords.contains("16") }
+            #expect(phone?.symbol == "iphone")
+            #expect(phone.flatMap { PageSizes.size(commandID: $0.id) }?.size == CGSize(width: 393, height: 852))
+            #expect(PageSizes.size(commandID: "developer-size:999") == nil && PageSizes.size(commandID: "developer:size-fill") == nil)
+        }
+    }
+
     private func items(_ menu: NSMenu) -> [NSMenuItem] { menu.items.flatMap { $0.submenu.map(items) ?? [$0] } }
     private func actions(_ menu: NSMenu) -> [Selector] { items(menu).compactMap(\.action) }
 

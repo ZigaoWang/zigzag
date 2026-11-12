@@ -75,4 +75,17 @@ enum PageSizes {
         guard let size else { return nil }
         return all.first { $0.size == size || $0.size == CGSize(width: size.height, height: size.width) }
     }
+
+    /// A listed size's id among the command bar's commands, by its place in the list.
+    static func commandID(_ index: Int) -> String { "developer-size:\(index)" }
+    static func size(commandID: String) -> Size? {
+        guard commandID.hasPrefix("developer-size:"), let index = Int(commandID.dropFirst("developer-size:".count)) else { return nil }
+        let sizes = all
+        return sizes.indices.contains(index) ? sizes[index] : nil
+    }
+
+    /// A listed size as a command: named as Page Size names it, with its width and height.
+    static func commandTitle(_ size: Size) -> String {
+        String(localized: "Page Size: \(size.name), \(size.dimensions)", comment: "A command in the command bar, on a development site: gives the page a listed size. The size's name, then its width and height, like “Page Size: iPhone 16, 393 × 852”.")
+    }
 }
