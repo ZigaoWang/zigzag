@@ -5,7 +5,13 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Dark pages fill in the light parts of a site that's dark on its own, like a white suggestion list under a dark search box, and leave the rest of its colors alone. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
+- Force dark, in a site's controls, draws a site dark even when it looks dark already, for one that leaves parts of itself light. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
+
 ### Fixed
+- The bar above a page that's dark on its own is dark too, instead of white. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
+- With dark pages on, a dark page with little on it is no longer turned light. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - Extensions know about pinned tabs and favorites as soon as they open, so 1Password's passkeys and other extension features work on them instead of failing with "Tab not found".
 - The "Zigzag updated" note goes away by itself after 15 seconds, like a notification, and stays while your pointer is on it. What's New is still in the Help menu.
 
