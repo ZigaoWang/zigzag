@@ -277,13 +277,22 @@ something came from, answers at once, and can be interrupted.
   over its pinned tabs. The tab you're on: the light card of the color, which slides when you pick another. A split row shows both pages, each half with its icon, its title and, while that page
   plays or is muted, its own speaker; a pinned page split beside a tab carries the pair in its own row, so each page
   shows once and one row is lit. A tile group of three or four tabs is one row too, a part for each page in reading
-  order with a hairline between, each part's title only while every part has room for one (`TabRowView.segments`).
+  order with a hairline between, each part's title only while every part has room for a few words
+  (`TabRowView.segments`), else each icon in the middle of its part; pointing at a part names its page, and a
+  double-click renames that page (over its title, or the row for the moment when the part shows no title). A row of
+  several pages keeps the close button's room while it's hidden, so nothing in it moves under the pointer.
   A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +.
 - **Pane header** (split view): on the page card, 30 tall: back, forward and reload, the address centered in a small
   field, and the split's own buttons. Everything in it is its own pane's page: its buttons act on it, its loading
   line and reload state follow it, and clicking its address focuses that pane and opens the address bar over it.
-  A tile group's panes (#160) have no swap or layout buttons: their places are where they were dropped.
+  A tile group's panes (#160) have no swap or layout buttons: their places are where they were dropped. Its ink is
+  light or dark by contrast with its page's color, as the bar above the page's is (`PaneHeaderView.ground`).
+  Pressed and moved 4pt, the strip picks its pane up (`PaneDrag`), as every drag goes: the pane stays faint, a small
+  rounded picture of its page follows the pointer, and the drop hint shows where it lands ("Swap Places", "Move Top
+  Left"): another pane's middle swaps, the page's edges and corners take a half or quarter as for a tab, the sidebar's
+  list (its line) makes it a tab of its own there, outside every window a new window (⌥: Zigzag Mini). Esc, or its own
+  place, changes nothing; one ⌘Z puts it back. Up in the bar above the page the strip moves the window instead.
 - **Tiling** (`TileLayout.swift`): two to four panes on a 2×2 grid, halves and quarters, with a line between the
   columns and one between the rows, each dragged on its own and run only where it divides panes. A tab dragged over
   the page: its edges are halves, its corners quarters, anywhere else the half of the pane under the pointer (beside a

@@ -5,8 +5,14 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- In split view, drag a page by its strip to move it: onto another page and the two swap places, onto the page's edges or corners and it takes that half or quarter, onto the sidebar's tabs and it leaves the split as a tab of its own, out of the window and it opens in a new one (hold Option for Zigzag Mini). The same preview as for a dragged tab shows where it lands, Esc calls it off, and ⌘Z puts it back. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+- Double-clicking a split's row in the sidebar renames the page you clicked. A group of three or four shows its icons evenly in the row, and pointing at one names its page. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+
 ### Fixed
 - In a short window, the list of sections in Settings scrolls instead of running off the bottom ([#169](https://github.com/ZigaoWang/zigzag/issues/169)).
+- The strip over each page in split view reads clearly on dark pages: its address and buttons turn light, as the bar above the page does. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+- A split's row in the sidebar no longer shifts its pages as the pointer comes and goes. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - Notes at the top of the page slide back up when they go, the way they came down, instead of vanishing. Notes with a button (Undo, Pin This Page) have a close button, and the note after closing a pinned tab is shorter.
 - A tab Zigzag put to sleep has a thin, even dashed ring round its icon instead of chunky dots, and its preview says why it sleeps and about how much memory that freed, like "Asleep to save memory. Freed about 180 MB." ([#140](https://github.com/ZigaoWang/zigzag/issues/140))
 
