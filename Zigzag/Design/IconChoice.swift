@@ -88,7 +88,8 @@ enum IconChoice {
     }
 }
 
-/// The choices in a grid, with the plain look first and a field for an emoji under them.
+/// The choices in a grid, with the plain look first and a field under them that takes an emoji, or finds one by
+/// name (#163): while there's a search, the grid shows the emoji that match in the symbols' place.
 final class IconGrid: NSView, NSTextFieldDelegate {
     /// What "none" looks like here: a folder, or a space's dot.
     private let noneSymbol: String
@@ -96,18 +97,32 @@ final class IconGrid: NSView, NSTextFieldDelegate {
     var onPick: ((String?) -> Void)?
 
     private var cells: [IconButton] = []
-    private let emojiField = FilledField(placeholder: String(localized: "Or type an emoji", comment: "Placeholder of the field under the icon choices, for a space's or a folder's icon."))
+    private let emojiField = FilledField(placeholder: String(localized: "Search or type an emoji", comment: "Placeholder of the field under the icon choices (a space's, a folder's or a page's icon): type an emoji's name to find it, or the emoji itself."))
+    /// The emoji the field shows as the icon, if it's one: letters typed beside it start a search.
+    private var shownEmoji: String?
+    /// What's being searched for, as typed; nil when the field is empty or shows the icon.
+    private(set) var query: String?
+    /// The emoji found, best first, in the grid's place.
+    private(set) var results: [EmojiSearch.Entry] = []
+    private let resultsScroll = NSScrollView()
+    private let resultsList = FlippedView()
+    private var resultCells: [IconButton] = []
+    private let noResults = Label(String(localized: "No emoji found", comment: "In the icon choices, when no emoji's name matches what's typed in the field under them."),
+                                  font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
 
     static let columns = 8
     static let cell: CGFloat = 30
     static let gap: CGFloat = Tokens.Space.x1
     static let fieldHeight: CGFloat = 30
+    /// How big an emoji found by name is drawn in its cell.
+    static let resultSide: CGFloat = 20
 
     static var width: CGFloat { CGFloat(columns) * cell + CGFloat(columns - 1) * gap }
-    static var height: CGFloat {
+    static var gridHeight: CGFloat {
         let rows = (IconChoice.symbols.count + 1 + columns - 1) / columns
-        return CGFloat(rows) * cell + CGFloat(rows - 1) * gap + Tokens.Space.x3 + fieldHeight
+        return CGFloat(rows) * cell + CGFloat(rows - 1) * gap
     }
+    static var height: CGFloat { gridHeight + Tokens.Space.x3 + fieldHeight }
 
     /// `noneToolTip`: what the plain choice says it is, where that's more than no icon (a page's: its site's).
     /// `noneImage`: what the plain choice shows when it's a picture of its own (a page's: its site's icon, so it reads
@@ -128,10 +143,20 @@ final class IconGrid: NSView, NSTextFieldDelegate {
         }
         // The chosen icon is the soft card, as the chosen row is anywhere.
         cells.forEach { $0.selectsAsCard = true; addSubview($0) }
+        resultsScroll.drawsBackground = false
+        resultsScroll.documentView = resultsList
+        resultsScroll.useSlimScroller()
+        resultsScroll.isHidden = true
+        addSubview(resultsScroll)
+        noResults.alignment = .center
+        noResults.isHidden = true
+        addSubview(noResults)
         emojiField.field.delegate = self
-        if let selected, !IconChoice.isSymbol(selected) { emojiField.stringValue = selected }
+        if let selected, !IconChoice.isSymbol(selected) { emojiField.stringValue = selected; shownEmoji = selected }
         addSubview(emojiField)
         refresh()
+        // Made now, while the grid is looked at, so it's there by the time a name is typed.
+        EmojiSearch.index { _ in }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -139,7 +164,14 @@ final class IconGrid: NSView, NSTextFieldDelegate {
 
     private func pick(_ icon: String?) {
         selected = icon
-        if icon.map(IconChoice.isSymbol) != false { emojiField.stringValue = "" }
+        if let icon, !IconChoice.isSymbol(icon) {
+            emojiField.stringValue = icon
+            shownEmoji = icon
+        } else {
+            emojiField.stringValue = ""
+            shownEmoji = nil
+        }
+        search(nil)
         onPick?(icon)
     }
 
@@ -148,34 +180,159 @@ final class IconGrid: NSView, NSTextFieldDelegate {
             let name: String? = i == 0 ? nil : IconChoice.symbols[i - 1]
             cell.isSelected = name == selected || (i == 0 && selected == nil)
         }
+        for (i, cell) in resultCells.enumerated() where i < results.count { cell.isSelected = results[i].emoji == selected }
     }
 
     override func layout() {
         super.layout()
-        for (i, cell) in cells.enumerated() {
-            let row = i / Self.columns, column = i % Self.columns
-            cell.frame = NSRect(x: CGFloat(column) * (Self.cell + Self.gap), y: CGFloat(row) * (Self.cell + Self.gap),
-                                width: Self.cell, height: Self.cell)
-        }
-        let y = (cells.last?.frame.maxY ?? 0) + Tokens.Space.x3
-        emojiField.frame = NSRect(x: 0, y: y, width: bounds.width, height: Self.fieldHeight)
+        for (i, cell) in cells.enumerated() { cell.frame = Self.cellFrame(i) }
+        resultsScroll.frame = NSRect(x: 0, y: 0, width: bounds.width, height: Self.gridHeight)
+        layoutResults()
+        let h = noResults.lineHeight
+        noResults.frame = NSRect(x: 0, y: round((Self.gridHeight - h) / 2), width: bounds.width, height: h)
+        emojiField.frame = NSRect(x: 0, y: Self.gridHeight + Tokens.Space.x3, width: bounds.width, height: Self.fieldHeight)
     }
 
-    /// The last emoji typed is the icon; anything that isn't one is left out.
-    func controlTextDidChange(_ obj: Notification) {
-        let composing = (emojiField.field.currentEditor() as? NSTextView)?.hasMarkedText() == true
-        guard let emoji = Self.lastEmoji(in: emojiField.stringValue) else {
-            // Letters, or a digit or a symbol on its own, don't stay in the field as if they were the icon.
-            // (Not while an input method is still composing: that text isn't settled.)
-            guard !composing else { return }
-            emojiField.stringValue = ""
-            // The emoji deleted: back to no icon (a page's own site icon), as the plain choice does.
-            if Self.clearsEmoji(text: emojiField.stringValue, selected: selected) { pick(nil) }
+    private static func cellFrame(_ i: Int) -> NSRect {
+        let row = i / columns, column = i % columns
+        return NSRect(x: CGFloat(column) * (cell + gap), y: CGFloat(row) * (cell + gap), width: cell, height: cell)
+    }
+
+    private func layoutResults() {
+        for (i, cell) in resultCells.enumerated() { cell.frame = Self.cellFrame(i) }
+        let rows = (results.count + Self.columns - 1) / Self.columns
+        resultsList.frame = NSRect(x: 0, y: 0, width: Self.width, height: max(CGFloat(rows) * (Self.cell + Self.gap) - Self.gap, 0))
+    }
+
+    // MARK: Search
+
+    /// Shows what matches `text` in the grid's place, or the symbols again for nil or nothing but spaces.
+    private func search(_ text: String?) {
+        query = text
+        let searching = text.map { !EmojiSearch.normalized($0).isEmpty } == true
+        cells.forEach { $0.isHidden = searching }
+        resultsScroll.isHidden = !searching
+        guard searching, let text else {
+            results = []
+            noResults.isHidden = true
             return
         }
-        emojiField.stringValue = emoji
-        selected = emoji
-        onPick?(emoji)
+        guard let index = EmojiSearch.madeIndex else {
+            // Still being made (only just after the grid opened): the matches come when it is.
+            results = []
+            showResults()
+            noResults.isHidden = true
+            EmojiSearch.index { [weak self] _ in
+                guard let self, self.query == text else { return }
+                self.search(text)
+            }
+            return
+        }
+        results = EmojiSearch.search(text, in: index)
+        showResults()
+        noResults.isHidden = !results.isEmpty
+    }
+
+    private func showResults() {
+        while resultCells.count < results.count {
+            let i = resultCells.count
+            let button = IconButton(symbol: "", size: Self.cell, symbolSize: Tokens.Symbol.row, toolTip: nil)
+            button.selectsAsCard = true
+            button.imageSide = Self.resultSide
+            button.onClick = { [weak self] _ in
+                guard let self, self.results.indices.contains(i) else { return }
+                self.pick(self.results[i].emoji)
+            }
+            resultCells.append(button)
+            resultsList.addSubview(button)
+        }
+        for (i, cell) in resultCells.enumerated() {
+            cell.isHidden = i >= results.count
+            guard i < results.count else { continue }
+            let entry = results[i]
+            if cell.toolTip != entry.name {
+                cell.image = IconChoice.image(entry.emoji, size: Self.resultSide)
+                cell.toolTip = entry.name
+            }
+        }
+        refresh()
+        layoutResults()
+        resultsList.scroll(.zero)
+    }
+
+    /// Esc while searching: the search goes, and the field shows the icon again if it's an emoji. False when there's
+    /// no search, so Esc closes what the grid is in, as before.
+    @discardableResult func endSearch() -> Bool {
+        guard query != nil else { return false }
+        if let selected, !IconChoice.isSymbol(selected) {
+            emojiField.stringValue = selected
+            shownEmoji = selected
+        } else {
+            emojiField.stringValue = ""
+        }
+        search(nil)
+        return true
+    }
+
+    /// Return while searching picks the best match.
+    @discardableResult func pickFirstResult() -> Bool {
+        guard query != nil, let first = results.first else { return false }
+        pick(first.emoji)
+        return true
+    }
+
+    /// Puts `text` in the field as if it were typed (the debug bridge's `iconsearch`).
+    func type(_ text: String) {
+        emojiField.stringValue = text
+        controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: emojiField.field))
+    }
+
+    func controlTextDidChange(_ obj: Notification) {
+        // Mid-word in an input method (pinyin, kana), the text isn't settled: it's left as it is.
+        guard (emojiField.field.currentEditor() as? NSTextView)?.hasMarkedText() != true else { return }
+        switch Self.fieldState(emojiField.stringValue, shown: shownEmoji) {
+        case .empty:
+            let wasEmoji = shownEmoji != nil
+            shownEmoji = nil
+            search(nil)
+            // The emoji deleted: back to no icon (a page's own site icon), as the plain choice does.
+            if wasEmoji, Self.clearsEmoji(text: "", selected: selected) { pick(nil) }
+        case .emoji(let emoji):
+            emojiField.stringValue = emoji
+            shownEmoji = emoji
+            search(nil)
+            selected = emoji
+            onPick?(emoji)
+        case .search(let text):
+            if emojiField.stringValue != text { emojiField.stringValue = text }
+            shownEmoji = nil
+            search(text)
+        }
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        if selector == #selector(NSResponder.insertNewline(_:)) { return pickFirstResult() }
+        if selector == #selector(NSResponder.cancelOperation(_:)) { return endSearch() }
+        return false
+    }
+
+    /// What the field holds: nothing, an emoji to make the icon, or a name to find one by.
+    enum FieldState: Equatable {
+        case empty
+        case emoji(String)
+        /// The text to keep in the field and search for.
+        case search(String)
+    }
+
+    /// The field's text read as one of those. `shown`: the emoji it showed as the icon before this edit, so letters
+    /// typed beside it are a search (and it steps aside for them), where a new emoji typed or pasted, even among
+    /// words, is the icon, as it always was.
+    static func fieldState(_ text: String, shown: String?) -> FieldState {
+        if text.isEmpty { return .empty }
+        let typed = shown.map { text.replacingOccurrences(of: $0, with: "") } ?? text
+        if let emoji = lastEmoji(in: typed) { return .emoji(emoji) }
+        if typed.isEmpty, let shown { return .emoji(shown) }
+        return .search(typed)
     }
 
     /// What a click on a symbol picks: that symbol, or nothing when it's the one already chosen.
@@ -202,7 +359,7 @@ final class IconGrid: NSView, NSTextFieldDelegate {
 
 /// The grid in a small floating panel, for a folder, a tab, a pinned page or a favorite in the sidebar.
 final class IconPickerPanel: FloatingPanelView {
-    private let grid: IconGrid
+    let grid: IconGrid
     private var monitor: Any?
     private let pad = Tokens.Space.x3
     static weak var current: IconPickerPanel?
@@ -236,8 +393,12 @@ final class IconPickerPanel: FloatingPanelView {
             guard let self else { return event }
             if event.type == .keyDown {
                 // Mid-word in an input method (the emoji field takes any text), Esc belongs to it.
+                // Esc ends a search first, then closes the panel.
                 if event.keyCode == 53, event.window === self.window,
-                   (self.window?.firstResponder as? NSTextView)?.hasMarkedText() != true { self.close(); return nil }
+                   (self.window?.firstResponder as? NSTextView)?.hasMarkedText() != true {
+                    if !self.grid.endSearch() { self.close() }
+                    return nil
+                }
                 return event
             }
             if event.window === self.window, !self.bounds.contains(self.convert(event.locationInWindow, from: nil)) { self.close() }

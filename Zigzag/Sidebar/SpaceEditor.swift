@@ -1675,7 +1675,11 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
                 // Esc in another window (Settings, a second browser window) is that window's; mid-word in a
                 // Chinese or Japanese input method, it belongs to the input method.
                 if event.keyCode == 53, event.window === self.window,
-                   (self.window?.firstResponder as? NSTextView)?.hasMarkedText() != true { self.cancel(); return nil }
+                   (self.window?.firstResponder as? NSTextView)?.hasMarkedText() != true {
+                    // A search for an emoji goes first (#163).
+                    if self.iconGrid?.endSearch() != true { self.cancel() }
+                    return nil
+                }
                 return event
             }
             if event.window === self.window, !self.bounds.contains(self.convert(event.locationInWindow, from: nil)) { self.close() }

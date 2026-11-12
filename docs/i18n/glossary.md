@@ -74,6 +74,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Setup (the JSON an app takes) | 配置 | 设置 | 设置 is Settings; 配置 is the setup you paste. |
 | Prompt (to paste into an AI app) | 提示词 | 提示, 指令 | What AI apps' Chinese users call it. |
 | Scripts (AppleScript, Shortcuts) | 脚本 | | macOS's Script Editor is 脚本编辑器. |
+| Emoji (an icon you type or search for) | 表情符号 | 表情, emoji | macOS's Edit menu says 表情与符号; 表情 alone reads as a face's expression. |
 
 ## Actions
 

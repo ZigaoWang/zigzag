@@ -8130,6 +8130,17 @@
         }
       }
     },
+    "No emoji found" : {
+      "comment" : "In the icon choices, when no emoji's name matches what's typed in the field under them.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到表情符号"
+          }
+        }
+      }
+    },
     "No extensions yet" : {
       "comment" : "A setting in Settings › Extensions.",
       "localizations" : {
@@ -9259,17 +9270,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "或按 Esc 键返回"
-          }
-        }
-      }
-    },
-    "Or type an emoji" : {
-      "comment" : "Placeholder of the field under the icon choices, for a space's or a folder's icon.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "或键入一个表情符号"
           }
         }
       }
@@ -11611,6 +11611,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "搜索或输入地址"
+          }
+        }
+      }
+    },
+    "Search or type an emoji" : {
+      "comment" : "Placeholder of the field under the icon choices (a space's, a folder's or a page's icon): type an emoji's name to find it, or the emoji itself.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索或键入表情符号"
           }
         }
       }
