@@ -131,6 +131,7 @@
 		58E9C13EC966E01059CFEF0A /* ChromiumExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EA6931C96DF7709CF8A2B6 /* ChromiumExtensions.swift */; };
 		5923DDCCED279AFD335C2C83 /* MCPEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4783D256F64B717D5311DE1 /* MCPEndpoint.swift */; };
 		59457E9E257B31175B33588C /* chrome-bookmarks-personal.json in Resources */ = {isa = PBXBuildFile; fileRef = DCF6BF1C148060F0A2977094 /* chrome-bookmarks-personal.json */; };
+		5C2BC30E87CD508B261F76AE /* ReadyPictures.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF6CDE5FE89667C45F373D /* ReadyPictures.swift */; };
 		5C65A6AF892576313C6E9F2B /* Feedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61765B735BE30C84A0D55AA /* Feedback.swift */; };
 		5DEA33BF35DB8A21FE90DDC9 /* WhatsNewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0210E259AE4B1296648499E /* WhatsNewTests.swift */; };
 		5E2555180F5809CC3A7C971A /* GuidedTour.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62342912C2566D4F242E9B14 /* GuidedTour.swift */; };
@@ -308,6 +309,7 @@
 		DDFF8EFE3CB4DBF463105561 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9088949B9C029636E9E355 /* Updater.swift */; };
 		DE92B9DF7B20A11C2231C638 /* PageFullScreenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 573B23C96ABDD485D18B07F6 /* PageFullScreenTests.swift */; };
 		DFB7FFE90CE40670E90BB664 /* SiteSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9272B1C4212C3BF6B875E0DB /* SiteSearch.swift */; };
+		E08BEB9DD0B1E0785AE72037 /* ReadyPicturesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20694AE0469471EFE8837828 /* ReadyPicturesTests.swift */; };
 		E12D59946BA4DF7046EFE6F7 /* ImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58DD59DED7B66593D3CED57A /* ImportCoordinator.swift */; };
 		E137A0DE21BBDB974852712E /* EmojiSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F945D7E0BF21B2E2FD7A4C7 /* EmojiSearchTests.swift */; };
 		E1A05EC81079773031DC8766 /* MCPTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60AE774C9F1A97F60F3E627 /* MCPTools.swift */; };
@@ -439,6 +441,7 @@
 		1FB43BE39C48B06C807284C2 /* PeekController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeekController.swift; sourceTree = "<group>"; };
 		1FD7A9E859CDBE0C0FD1B2C5 /* dark-palette.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "dark-palette.js"; sourceTree = "<group>"; };
 		1FF592955291CE8F4D81FCBD /* NetworkChangesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkChangesTests.swift; sourceTree = "<group>"; };
+		20694AE0469471EFE8837828 /* ReadyPicturesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadyPicturesTests.swift; sourceTree = "<group>"; };
 		21702A8A7329B5CA2639717B /* PageHolderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageHolderTests.swift; sourceTree = "<group>"; };
 		21E69CFF8CE303F5DB6F0073 /* Cookieless.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cookieless.swift; sourceTree = "<group>"; };
 		2477477EEAA33212F1AA2281 /* SpaceFrameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFrameView.swift; sourceTree = "<group>"; };
@@ -722,6 +725,7 @@
 		F18C84CC63265389A43E642F /* CommandActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandActionTests.swift; sourceTree = "<group>"; };
 		F1B83A1FED706DC751940773 /* MiniPlayerLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerLayout.swift; sourceTree = "<group>"; };
 		F2773876C78493A8043AE850 /* NumberHintsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumberHintsTests.swift; sourceTree = "<group>"; };
+		F2FF6CDE5FE89667C45F373D /* ReadyPictures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadyPictures.swift; sourceTree = "<group>"; };
 		F32FB26AFED6DCCFDB468E39 /* public_suffix_list.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = public_suffix_list.txt; sourceTree = "<group>"; };
 		F3B051247D50C308EF2FDA69 /* blocklist.info.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = blocklist.info.json; sourceTree = "<group>"; };
 		F4DC55DF34ED9099624A7CA8 /* DarkPagesSeenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPagesSeenTests.swift; sourceTree = "<group>"; };
@@ -780,6 +784,7 @@
 		0DA4CA999A3CAEBA6DD1E436 /* Switcher */ = {
 			isa = PBXGroup;
 			children = (
+				F2FF6CDE5FE89667C45F373D /* ReadyPictures.swift */,
 				4B636331176C086C6157403B /* SpaceSwitcher.swift */,
 				175D363890A811683DC2D9E7 /* TabSwitcher.swift */,
 			);
@@ -1261,6 +1266,7 @@
 				400EEF52096D1DE0A08306FF /* ProxyCheckTests.swift */,
 				B1C94BBE34DB020CBB3EA2A2 /* ProxyRulesTests.swift */,
 				47104C74FDC45A440611D21F /* ReaderTests.swift */,
+				20694AE0469471EFE8837828 /* ReadyPicturesTests.swift */,
 				DFB1B0DA956C3C2FEED46E90 /* RowDeleteTests.swift */,
 				14F71A00B5EA5EDD64C993B3 /* SaveFailureTests.swift */,
 				633F57F860ED6EC0B7E99FC3 /* ScriptingTests.swift */,
@@ -1673,6 +1679,7 @@
 				ABDD5678965557704DDFAE6A /* ProxyCheck.swift in Sources */,
 				D2985616CED5916351C99C8F /* PublicSuffix.swift in Sources */,
 				E341CC4E85411227052D3A17 /* Reader.swift in Sources */,
+				5C2BC30E87CD508B261F76AE /* ReadyPictures.swift in Sources */,
 				BEC7556625226B96D886206F /* SafariImporter.swift in Sources */,
 				6A33BB5CABADE7C1D292DE54 /* SaveFailure.swift in Sources */,
 				995DC7DEF8E08A8C2ADFFE2D /* SavePasswordPrompt.swift in Sources */,
@@ -1819,6 +1826,7 @@
 				10ED316D4DDDE144EAA77A5D /* ProxyCheckTests.swift in Sources */,
 				38280721DA958FF00E10EB8A /* ProxyRulesTests.swift in Sources */,
 				95F74CDE51DB6895673489C5 /* ReaderTests.swift in Sources */,
+				E08BEB9DD0B1E0785AE72037 /* ReadyPicturesTests.swift in Sources */,
 				A76473630DD07B1AC5E521EB /* RowDeleteTests.swift in Sources */,
 				4A1BC30C9B5ABF6AAA3B3D90 /* SaveFailureTests.swift in Sources */,
 				5F21C65FD6DBBC3F333DFD27 /* ScriptingTests.swift in Sources */,

@@ -355,6 +355,7 @@ final class DeskController {
 
     private var manager: TabManager? { controller?.tabManager }
 
+
     // MARK: Showing
 
     func toggle() { isVisible ? hide(openingTab: nil) : show() }
@@ -392,6 +393,12 @@ final class DeskController {
         query = ""
         searchField.stringValue = ""
         layoutSearch()
+        // Zooming out, the cards wait for their pictures to be made ready off the main thread, out of sight until
+        // they settle in, so nothing is decoded on the main thread as the desk first draws.
+        let zooms = !Tokens.Motion.reduceMotion && !reopening
+        picturesWait = zooms
+        cards.values.forEach { $0.waitsForReadyPictures = zooms }
+        Tokens.Motion.withoutAnimation { scrollView.alphaValue = zooms ? 0 : 1 }
         reload()
         pictureUnseenPages()
         // The window's own controls would sit on top of the desk; tuck them away.
@@ -414,18 +421,47 @@ final class DeskController {
         }
         // The desk fades in at once, before the page's picture is ready, so the first thing you see is the answer.
         fade(backdrop, to: 1, duration: Tokens.Motion.standard)
-        // The page's picture is taken fresh, so what shrinks is exactly what was on screen. That's quick; if it
-        // isn't, the last picture will do.
+        // The page's picture is taken fresh, so what shrinks is exactly what was on screen, and the pictures of the
+        // cards in sight are made ready meanwhile. That's quick; if it isn't, the pictures as they are will do.
         let id = transition
         var started = false
+        var waiting = 2
         let start = { [weak self] in
             guard let self, !started, self.isVisible, self.transition == id else { return }
             started = true
-            self.cards.values.forEach { $0.refreshImage() }
+            self.picturesWait = false
+            let inSight = self.cards.values.filter { $0.frame.intersects(self.canvas.visibleRect) }
+            inSight.forEach { $0.waitsForReadyPictures = false; $0.refreshImage() }
+            Tokens.Motion.withoutAnimation { self.scrollView.alphaValue = 1 }
             self.zoomOut(settle: true)
         }
-        capturePages(start)
+        let ready = { waiting -= 1; if waiting == 0 { start() } }
+        let inSight = cards.values.filter { $0.frame.intersects(canvas.visibleRect) }
+        preparePictures(of: inSight, then: ready)
+        capturePages { [weak self] in
+            guard let self, let manager = self.manager, let tab = manager.selectedTab else { ready(); return }
+            ReadyPictures.prepare(manager.panes(of: tab).compactMap(\.snapshot), for: .full, in: self.controller?.window, completion: ready)
+        }
+        // The rest, out of sight, after: they show when they're ready, never decoded on the main thread.
+        let rest = cards.values.filter { !$0.frame.intersects(canvas.visibleRect) }
+        if !rest.isEmpty { preparePictures(of: rest) { [weak self] in self?.showPictures(of: rest) } }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { MainActor.assumeIsolated { start() } }
+    }
+
+    /// Whether cards made now wait for their pictures to be made ready, while the desk is opening.
+    private var picturesWait = false
+
+    /// Makes the pictures of `cards` ready for the screen, off the main thread, then calls `completion`.
+    private func preparePictures(of cards: [TabThumbnailView], then completion: @escaping () -> Void) {
+        ReadyPictures.prepare(cards.flatMap(\.pages).compactMap(\.snapshot), for: .card, in: controller?.window, completion: completion)
+    }
+
+    /// Cards whose pictures are ready show them.
+    private func showPictures(of cards: [TabThumbnailView]) {
+        for card in cards where card.waitsForReadyPictures {
+            card.waitsForReadyPictures = false
+            card.refreshImage()
+        }
     }
 
     /// Pages loaded out of sight (opened in the background) with no picture yet get one now, so their cards show the
@@ -436,7 +472,7 @@ final class DeskController {
         let size = root.cardFrame.size
         let pages = Library.shared.spaces.flatMap { manager.tabs(in: $0.id) }.filter {
             Tab.needsPictureOutOfSight(hasWebView: $0.webView != nil, onScreen: $0.webView?.window != nil, loaded: $0.hasLoadedOnce,
-                                       hasPicture: !TabThumbnailView.isBlank($0.snapshot))
+                                       hasPicture: $0.snapshot != nil && TabThumbnailView.knownBlank($0.snapshot) != true)
         }
         guard !pages.isEmpty, size.width > 0 else { return }
         // Beneath everything in the window, where the page is: drawn, but never seen.
@@ -445,7 +481,13 @@ final class DeskController {
         var waiting = pages.count
         for page in pages {
             page.captureSnapshotOutOfSight(in: host, size: size) { [weak self, weak host] in
-                if let self, self.isVisible { self.cards.values.filter { $0.pages.contains { $0 === page } }.forEach { $0.refreshImage() } }
+                if let self, self.isVisible {
+                    let shown = self.cards.values.filter { $0.pages.contains { $0 === page } }
+                    self.preparePictures(of: shown) { [weak self] in
+                        guard let self, self.isVisible else { return }
+                        shown.forEach { $0.waitsForReadyPictures = false; $0.refreshImage() }
+                    }
+                }
                 waiting -= 1
                 if waiting == 0 { host?.removeFromSuperview() }
             }
@@ -496,6 +538,7 @@ final class DeskController {
     /// they're ready the moment it lands.
     private func makeFlight(at frame: NSRect, radius: CGFloat) -> PagePicture {
         let picture = PagePicture()
+        picture.readyCopies = .full
         let layer = picture.layer
         let page = controller?.root.cardFrame.size ?? frame.size
         let scale = (x: frame.width / max(page.width, 1), y: frame.height / max(page.height, 1))
@@ -626,6 +669,7 @@ final class DeskController {
             Tokens.Motion.withoutAnimation {
                 self.backdrop.removeFromSuperview()
                 self.backdrop.alphaValue = 1
+                self.scrollView.alphaValue = 1
                 self.cards.values.forEach { $0.imageClip.alphaValue = 1 }
             }
         }
@@ -641,7 +685,16 @@ final class DeskController {
         let flight = self.flight ?? makeFlight(at: card.imageClip.convert(card.imageClip.bounds, to: flightView), radius: Tokens.Radius.thumbnail)
         root.pagesHidden = true
         Tokens.Motion.withoutAnimation { card.imageClip.alphaValue = 0 }
-        flight.show([Self.picture(of: page)] + card.partners.map(\.snapshot), shape: card.shape)
+        let pictures = [Self.picture(of: page)] + card.partners.map(\.snapshot)
+        flight.show(pictures, shape: card.shape)
+        // It starts from the card's copy of the picture; the whole picture takes over as it grows, once it's ready.
+        let whole = pictures.compactMap { $0 }.filter { !ReadyPictures.isReady($0, for: .full) }
+        if !whole.isEmpty {
+            ReadyPictures.prepare(whole, for: .full, in: controller.window) { [weak self, weak flight] in
+                guard let self, let flight, self.flight === flight else { return }
+                flight.show(pictures, shape: card.shape)
+            }
+        }
         // The desk is gone, and out of the way of clicks, a moment before the page lands.
         fade(backdrop, to: 0, duration: Tokens.Motion.standard, completion: finish)
         fly(flight, to: flightView.convert(root.cardFrame, from: root), radius: pageRadius) { [weak self] in
@@ -841,6 +894,8 @@ final class DeskController {
             let card = TabThumbnailView()
             card.inset = cardInset
             card.showsRing = true
+            card.picture.readyCopies = .card
+            card.waitsForReadyPictures = picturesWait
             card.configure(tab, partners: partners(of: tab), shape: shape(of: tab))
             card.onClick = { [weak self, weak tab, weak card] event in
                 guard let self, let tab else { return }

@@ -12,6 +12,13 @@ final class PagePicture {
     /// The hairlines between the pages: between the columns, and between the rows.
     private let dividers = [CALayer(), CALayer()]
     private var shape: TileShape?
+    /// Each page's picture's size, in points.
+    private var sizes: [CGSize?] = Array(repeating: nil, count: TileShape.maxPanes)
+    /// Shows the copies `ReadyPictures` made of the pictures for this size, where there are any, rather than the
+    /// pictures themselves, which Core Animation would decode on the main thread as it first draws them.
+    var readyCopies: ReadyPictures.Size?
+    /// A picture with no ready copy yet is left out for now rather than shown as it is, until this is turned off.
+    var waitsForReadyCopies = false
 
     init() {
         for (pane, image) in zip(panes, images) {
@@ -38,7 +45,15 @@ final class PagePicture {
         self.shape = shape
         let count = shape?.regions.count ?? 1
         Tokens.Motion.withoutAnimation {
-            for (i, image) in images.enumerated() { image.contents = i < count && i < pictures.count ? pictures[i] : nil }
+            for (i, image) in images.enumerated() {
+                let picture = i < count && i < pictures.count ? pictures[i] : nil
+                sizes[i] = picture?.size
+                // Flying, a card's copy will do until the whole picture is ready: it starts out card-sized.
+                let ready = picture.flatMap { picture in
+                    readyCopies.flatMap { ReadyPictures.copy(of: picture, for: $0) ?? ReadyPictures.copy(of: picture, for: .card) }
+                }
+                image.contents = ready ?? (waitsForReadyCopies ? nil : picture)
+            }
         }
         layout(size: layer.bounds.size)
     }
@@ -65,7 +80,7 @@ final class PagePicture {
 
     private func fill(_ index: Int, in rect: CGRect) {
         panes[index].frame = rect
-        guard let size = (images[index].contents as? NSImage)?.size, size.width > 0, size.height > 0 else { return }
+        guard images[index].contents != nil, let size = sizes[index], size.width > 0, size.height > 0 else { return }
         let scale = max(rect.width / size.width, rect.height / size.height)
         let w = size.width * scale, h = size.height * scale
         images[index].frame = CGRect(x: 0, y: rect.height - h, width: w, height: h)
@@ -200,10 +215,17 @@ final class TabThumbnailView: InteractiveView {
         needsLayout = true
     }
 
+    /// Desk view, as it opens: pictures wait for their ready copies (`ReadyPictures`), and whether one is blank is
+    /// only what's known already, so nothing is decoded on the main thread. Off again once they're made.
+    var waitsForReadyPictures = false {
+        didSet { picture.waitsForReadyCopies = waitsForReadyPictures }
+    }
+
     func refreshImage() {
         guard let tab else { return }
-        picture.show([Self.isBlank(tab.snapshot) ? nil : tab.snapshot] + partners.map(\.snapshot), shape: shape)
-        let showsPage = !Self.isBlank(tab.snapshot) || shape != nil
+        let blank = waitsForReadyPictures ? tab.snapshot == nil || Self.knownBlank(tab.snapshot) == true : Self.isBlank(tab.snapshot)
+        picture.show([blank ? nil : tab.snapshot] + partners.map(\.snapshot), shape: shape)
+        let showsPage = !blank || shape != nil
         placeholder.isHidden = showsPage
         siteName.isHidden = showsPage
         refreshColors()
@@ -224,6 +246,12 @@ final class TabThumbnailView: InteractiveView {
         let blank = isBlank(cg)
         blankness.setObject(NSNumber(value: blank), forKey: image)
         return blank
+    }
+
+    /// Whether a picture is blank, if that's been worked out already; nil if not.
+    static func knownBlank(_ image: NSImage?) -> Bool? {
+        guard let image else { return true }
+        return blankness.object(forKey: image)?.boolValue
     }
 
     /// Notes what a picture read from disk shows, worked out from a small thumbnail of its file, so the switcher
@@ -270,6 +298,10 @@ final class TabThumbnailView: InteractiveView {
     override func layout() {
         super.layout()
         layer?.cornerRadius = Tokens.Radius.thumbnail + inset
+        // The lifted card's shadow is its own shape, given rather than worked out from what it shows every frame
+        // it fades or moves.
+        let radius = Tokens.Radius.thumbnail + inset
+        layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
         let titleArea = showsTitle ? Self.titleHeight : 0
         imageClip.frame = NSRect(x: inset, y: inset, width: bounds.width - inset * 2, height: bounds.height - titleArea - inset * (showsTitle ? 1 : 2))
         picture.layout(size: imageClip.bounds.size)
