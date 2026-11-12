@@ -304,7 +304,8 @@ enum CookieBanners {
 
     /// Autoconsent's rules in their compact form (`autoconsent-compact-rules.json`), and the ones each frame gets, as
     /// Autoconsent's own `filterCompactRules` chooses them: in the page itself, the rules for any site and those for
-    /// this one; in a frame, the rules that run in frames. Each rule is kept as its JSON, so a frame's are only joined.
+    /// this one; in a frame, the rules that run in frames, with the strings no chosen rule uses left empty. Each rule
+    /// is kept as its JSON, so a frame's are only joined.
     nonisolated final class Rules: @unchecked Sendable {
         static let shared: Rules? = {
             guard let url = Bundle.main.url(forResource: "autoconsent-compact-rules", withExtension: "json"),
@@ -324,37 +325,57 @@ enum CookieBanners {
         let generic: Range<Int>
         let frames: Range<Int>
         let specific: Range<Int>
-        /// The strings every rule refers to by number, as JSON: all of them, and those up to the frames' last one.
-        let allStrings: String
-        let frameStrings: String
+        /// The strings the rules refer to by number, and which of them each rule uses.
+        let strings: [String]
+        let uses: [[Int]]
         /// What the page itself gets on a site with no rules of its own: most sites.
         let genericJSON: String
+
+        /// A frame's rules come out the same for nearly every frame: worked out once for each set of rules.
+        private var framesJSON: [[Int]: String] = [:]
+        private let lock = NSLock()
+
+        /// The step keys that name a string by its number (`CompactRuleStep`), and the ones that hold more steps.
+        static let stringKeys = ["e", "v", "c", "k", "w", "wv", "h", "cc"]
+
+        /// The strings a rule's steps use, by number, as Autoconsent's `clearUnusedStrings` finds them: its steps to
+        /// detect, find the pop-up, say no and test (fields 6 to 9), and its pre-hide selectors (field 5).
+        static func stringsUsed(by rule: [Any]) -> [Int] {
+            var used = Set<Int>()
+            func visit(_ value: Any?) {
+                if let steps = value as? [Any] { steps.forEach(visit); return }
+                guard let step = value as? [String: Any] else { return }
+                for key in stringKeys { if let i = step[key] as? Int { used.insert(i) } }
+                for key in ["if", "then", "else", "any"] { visit(step[key]) }
+            }
+            for field in 6...9 where field < rule.count { visit(rule[field]) }
+            if rule.count > 5, let prehide = rule[5] as? [Int] { used.formUnion(prehide) }
+            return used.sorted()
+        }
 
         init?(data: Data) {
             guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let v = root["v"] as? Int, v == 1, let s = root["s"] as? [String], let r = root["r"] as? [[Any]],
                   let index = root["index"] as? [String: Any],
                   let g = index["genericRuleRange"] as? [Int], let f = index["frameRuleRange"] as? [Int], let sp = index["specificRuleRange"] as? [Int],
-                  g.count == 2, f.count == 2, sp.count == 2, let frameStringEnd = index["frameStringEnd"] as? Int,
-                  let genericStringEnd = index["genericStringEnd"] as? Int else { return nil }
+                  g.count == 2, f.count == 2, sp.count == 2, let genericStringEnd = index["genericStringEnd"] as? Int else { return nil }
             func range(_ pair: [Int]) -> Range<Int>? {
                 pair[0] <= pair[1] && pair[0] >= 0 && pair[1] <= r.count ? pair[0]..<pair[1] : nil
             }
-            guard let generic = range(g), let frames = range(f), let specific = range(sp),
-                  frameStringEnd <= s.count, genericStringEnd <= s.count else { return nil }
-            func json(_ value: Any) -> String? {
-                (try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed])).flatMap { String(data: $0, encoding: .utf8) }
-            }
-            var rules: [String] = [], patterns: [NSRegularExpression?] = [], has: [Bool] = [], contexts: [Int] = []
+            guard let generic = range(g), let frames = range(f), let specific = range(sp), genericStringEnd <= s.count else { return nil }
+            var rules: [String] = [], patterns: [NSRegularExpression?] = [], has: [Bool] = [], contexts: [Int] = [], uses: [[Int]] = []
             for rule in r {
-                guard rule.count >= 5, let encoded = json(rule) else { return nil }
+                guard rule.count >= 10, let encoded = Self.json(rule) else { return nil }
                 rules.append(encoded)
                 let pattern = rule[3] as? String ?? ""
                 has.append(!pattern.isEmpty)
                 patterns.append(pattern.isEmpty ? nil : try? NSRegularExpression(pattern: pattern))
                 contexts.append(rule[4] as? Int ?? 22)
+                let used = Self.stringsUsed(by: rule)
+                guard used.allSatisfy({ $0 >= 0 && $0 < s.count }) else { return nil }
+                uses.append(used)
             }
-            guard let all = json(s), let framed = json(Array(s[..<frameStringEnd])), let genericStrings = json(Array(s[..<genericStringEnd])) else { return nil }
+            guard let genericStrings = Self.json(Array(s[..<genericStringEnd])) else { return nil }
             version = v
             self.rules = rules
             self.patterns = patterns
@@ -363,13 +384,24 @@ enum CookieBanners {
             self.generic = generic
             self.frames = frames
             self.specific = specific
-            allStrings = all
-            frameStrings = framed
-            genericJSON = Self.ruleset(v, genericStrings, rules[generic])
+            strings = s
+            self.uses = uses
+            genericJSON = Self.ruleset(v, genericStrings, generic.map { rules[$0] })
         }
 
-        private static func ruleset(_ v: Int, _ strings: String, _ rules: ArraySlice<String>) -> String {
+        private static func json(_ value: Any) -> String? {
+            (try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed])).flatMap { String(data: $0, encoding: .utf8) }
+        }
+
+        private static func ruleset(_ v: Int, _ strings: String, _ rules: [String]) -> String {
             #"{"v":"# + String(v) + #","s":"# + strings + #","r":["# + rules.joined(separator: ",") + "]}"
+        }
+
+        /// These rules, with only the strings they use: the rest left empty, up to the last one used.
+        private func ruleset(_ chosen: [Int]) -> String {
+            let used = Set(chosen.flatMap { uses[$0] })
+            let kept = (0..<((used.max() ?? -1) + 1)).map { used.contains($0) ? strings[$0] : "" }
+            return Self.ruleset(version, Self.json(kept) ?? "[]", chosen.map { rules[$0] })
         }
 
         /// Whether a rule runs in this frame, at this address (Autoconsent's `shouldRunRuleInContext`): the page or a
@@ -387,11 +419,17 @@ enum CookieBanners {
         /// The rules a frame at `url` gets, as Autoconsent's compact ruleset in JSON.
         func json(url: String, mainFrame: Bool) -> String {
             if !mainFrame {
-                return Self.ruleset(version, frameStrings, ArraySlice(frames.filter { runs($0, url: url, mainFrame: false) }.map { rules[$0] }))
+                let chosen = frames.filter { runs($0, url: url, mainFrame: false) }
+                lock.lock()
+                defer { lock.unlock() }
+                if let known = framesJSON[chosen] { return known }
+                let json = ruleset(chosen)
+                if framesJSON.count < 64 { framesJSON[chosen] = json }
+                return json
             }
             let mine = specific.filter { runs($0, url: url, mainFrame: true) }
             if mine.isEmpty { return genericJSON }
-            return Self.ruleset(version, allStrings, ArraySlice(generic.map { rules[$0] } + mine.map { rules[$0] }))
+            return ruleset(Array(generic) + mine)
         }
     }
 }
