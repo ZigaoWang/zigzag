@@ -63,6 +63,18 @@ enum Shortcuts {
         }
     }
 
+    /// Your shortcuts on another menu bar's items that do the same (an installed app's, `MainMenu.buildWebApp`), so
+    /// a key you changed is the same there.
+    static func applySaved(to menu: NSMenu) {
+        let saved = overrides
+        func walk(_ menu: NSMenu) {
+            for item in menu.items {
+                if let sub = item.submenu { walk(sub) } else if let id = id(item), let combo = saved[id] { write(combo, to: item) }
+            }
+        }
+        walk(menu)
+    }
+
     /// Changed by you, going by what's saved rather than the item's keys: macOS adjusts some of its own items
     /// (Enter Full Screen) after launch, which isn't a change of yours.
     static func isCustom(_ item: NSMenuItem) -> Bool {

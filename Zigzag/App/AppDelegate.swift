@@ -49,6 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NSApp.mainMenu = MainMenu.build()
         Shortcuts.apply()
+        // An installed app's window in front gets the app's own menus.
+        WebAppMenuBar.start()
         NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleGetURL(_:withReply:)),
                                                      forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL))
     }

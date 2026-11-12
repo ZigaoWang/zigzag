@@ -74,53 +74,7 @@ enum MainMenu {
             item(String(localized: "Print…", comment: "File menu item."), #selector(C.printPage(_:)), "p"),
         ]))
 
-        main.addItem(submenu(String(localized: "Edit", comment: "A menu in the menu bar."), [
-            item(String(localized: "Undo", comment: "Edit menu item."), Selector(("undo:")), "z"),
-            item(String(localized: "Redo", comment: "Edit menu item."), Selector(("redo:")), "z", [.command, .shift]),
-            .separator(),
-            item(String(localized: "Cut", comment: "Edit menu item."), #selector(NSText.cut(_:)), "x"),
-            item(String(localized: "Copy", comment: "Edit menu item."), #selector(NSText.copy(_:)), "c"),
-            item(String(localized: "Paste", comment: "Edit menu item."), #selector(NSText.paste(_:)), "v"),
-            item(String(localized: "Paste and Match Style", comment: "Edit menu item."), #selector(NSTextView.pasteAsPlainText(_:)), "v", [.command, .option, .shift]),
-            item(String(localized: "Select All", comment: "Edit menu item."), #selector(NSText.selectAll(_:)), "a"),
-            .separator(),
-            item(String(localized: "Copy Link", comment: "Edit menu item."), #selector(C.copyPageURL(_:)), "c", [.command, .shift]),
-            item(String(localized: "Copy Link as Markdown", comment: "Edit menu item."), #selector(C.copyPageURLAsMarkdown(_:)), "c", [.command, .shift, .option]),
-            .separator(),
-            submenu(String(localized: "Find", comment: "Submenu of the Edit menu."), [
-                item(String(localized: "Find…", comment: "Edit › Find menu item."), #selector(C.showFindBar(_:)), "f"),
-                item(String(localized: "Find Next", comment: "Edit › Find menu item."), #selector(C.findNextMatch(_:)), "g"),
-                item(String(localized: "Find Previous", comment: "Edit › Find menu item."), #selector(C.findPreviousMatch(_:)), "g", [.command, .shift]),
-                item(String(localized: "Use Selection for Find", comment: "Edit › Find menu item."), #selector(C.useSelectionForFind(_:)), "e"),
-                item(String(localized: "Jump to Selection", comment: "Edit › Find menu item."), #selector(C.jumpToSelection(_:)), "j"),
-            ]),
-            submenu(String(localized: "Spelling and Grammar", comment: "Submenu of the Edit menu."), [
-                item(String(localized: "Show Spelling and Grammar", comment: "Edit › Spelling and Grammar menu item."), #selector(NSText.showGuessPanel(_:)), ":"),
-                item(String(localized: "Check Document Now", comment: "Edit › Spelling and Grammar menu item."), #selector(NSText.checkSpelling(_:)), ";"),
-                .separator(),
-                item(String(localized: "Check Spelling While Typing", comment: "Edit › Spelling and Grammar menu item."), #selector(NSTextView.toggleContinuousSpellChecking(_:)), ""),
-                item(String(localized: "Check Grammar With Spelling", comment: "Edit › Spelling and Grammar menu item."), #selector(NSTextView.toggleGrammarChecking(_:)), ""),
-                item(String(localized: "Correct Spelling Automatically", comment: "Edit › Spelling and Grammar menu item."), #selector(NSTextView.toggleAutomaticSpellingCorrection(_:)), ""),
-            ]),
-            submenu(String(localized: "Substitutions", comment: "Submenu of the Edit menu."), [
-                item(String(localized: "Show Substitutions", comment: "Edit › Substitutions menu item."), #selector(NSTextView.orderFrontSubstitutionsPanel(_:)), ""),
-                .separator(),
-                item(String(localized: "Smart Copy/Paste", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleSmartInsertDelete(_:)), ""),
-                item(String(localized: "Smart Quotes", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleAutomaticQuoteSubstitution(_:)), ""),
-                item(String(localized: "Smart Dashes", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleAutomaticDashSubstitution(_:)), ""),
-                item(String(localized: "Smart Links", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleAutomaticLinkDetection(_:)), ""),
-                item(String(localized: "Text Replacement", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleAutomaticTextReplacement(_:)), ""),
-            ]),
-            submenu(String(localized: "Transformations", comment: "Submenu of the Edit menu."), [
-                item(String(localized: "Make Upper Case", comment: "Edit › Transformations menu item."), #selector(NSResponder.uppercaseWord(_:)), ""),
-                item(String(localized: "Make Lower Case", comment: "Edit › Transformations menu item."), #selector(NSResponder.lowercaseWord(_:)), ""),
-                item(String(localized: "Capitalize", comment: "Edit › Transformations menu item."), #selector(NSResponder.capitalizeWord(_:)), ""),
-            ]),
-            submenu(String(localized: "Speech", comment: "Submenu of the Edit menu."), [
-                item(String(localized: "Start Speaking", comment: "Edit › Speech menu item."), #selector(NSTextView.startSpeaking(_:)), ""),
-                item(String(localized: "Stop Speaking", comment: "Edit › Speech menu item."), #selector(NSTextView.stopSpeaking(_:)), ""),
-            ]),
-        ]))
+        main.addItem(submenu(String(localized: "Edit", comment: "A menu in the menu bar."), editItems(browser: true)))
 
         var viewItems: [NSMenuItem] = [
             item(String(localized: "Hide Sidebar", comment: "View menu item."), #selector(C.toggleBrowserSidebar(_:)), "s", [.control]),
@@ -217,6 +171,118 @@ enum MainMenu {
         main.addItem(help)
         NSApp.helpMenu = help.submenu
         return main
+    }
+
+    /// The menu bar while an installed app's window is in front (#165): the app's own, as in any Mac app, so ⌘Q quits
+    /// that app and not Zigzag, ⌘H hides it, and nothing in it opens a tab or a browser window by surprise. Its menus
+    /// for the Window menu and Services are the returned ones, for `NSApp` to use while it shows.
+    static func buildWebApp(name: String) -> (menu: NSMenu, windows: NSMenu, services: NSMenu) {
+        typealias W = WebAppWindowController
+        let main = NSMenu()
+        let services = NSMenu(title: String(localized: "Services", comment: "Submenu of the Zigzag menu, filled by macOS."))
+        let servicesItem = NSMenuItem(title: services.title, action: nil, keyEquivalent: "")
+        servicesItem.submenu = services
+        main.addItem(submenu(name, [
+            item(String(localized: "Settings…", comment: "Zigzag menu item."), #selector(AppDelegate.showSettings(_:)), ","),
+            .separator(),
+            servicesItem,
+            .separator(),
+            item(String(localized: "Hide \(name)", comment: "First menu of an installed app's window: hides the app. The placeholder is the app's name, like Wikipedia."), #selector(W.hideWebApp(_:)), "h"),
+            item(String(localized: "Hide Others", comment: "Zigzag menu item."), #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option]),
+            item(String(localized: "Show All", comment: "Zigzag menu item."), #selector(NSApplication.unhideAllApplications(_:)), ""),
+            .separator(),
+            item(String(localized: "Quit \(name)", comment: "First menu of an installed app's window: quits the app, and only it. The placeholder is the app's name, like Wikipedia."), #selector(W.quitWebApp(_:)), "q"),
+        ]))
+        main.addItem(submenu(String(localized: "File", comment: "A menu in the menu bar."), [
+            item(String(localized: "Open in Zigzag", comment: "File menu item of an installed app's window: opens the page it shows in a tab of a Zigzag window."), #selector(W.openInBrowser(_:)), ""),
+            .separator(),
+            item(String(localized: "Close Window", comment: "File menu item."), #selector(NSWindow.performClose(_:)), "w"),
+        ]))
+        main.addItem(submenu(String(localized: "Edit", comment: "A menu in the menu bar."), editItems(browser: false)))
+        main.addItem(submenu(String(localized: "View", comment: "A menu in the menu bar."), [
+            item(W.toolbarTitle(showing: true), #selector(W.toggleToolbar(_:)), ""),
+            .separator(),
+            item(String(localized: "Back", comment: "View menu item."), #selector(W.goBack(_:)), "["),
+            item(String(localized: "Forward", comment: "View menu item."), #selector(W.goForward(_:)), "]"),
+            item(String(localized: "Reload Page", comment: "View menu item."), #selector(W.reloadPage(_:)), "r"),
+            item(String(localized: "Reload Ignoring Cache", comment: "View menu item."), #selector(W.reloadPageFromOrigin(_:)), "r", [.command, .option]),
+            item(String(localized: "Stop", comment: "View menu item."), #selector(W.stopLoading(_:)), "."),
+            .separator(),
+            item(String(localized: "Actual Size", comment: "View menu item."), #selector(W.actualSize(_:)), "0"),
+            item(String(localized: "Zoom In", comment: "View menu item."), #selector(W.zoomIn(_:)), "+"),
+            item(String(localized: "Zoom Out", comment: "View menu item."), #selector(W.zoomOut(_:)), "-"),
+            .separator(),
+            item(String(localized: "Enter Full Screen", comment: "View menu item."), #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]),
+            alternate(item(String(localized: "Zoom In", comment: "Hidden View menu item, named in Settings › Shortcuts."), #selector(W.zoomIn(_:)), "=")),
+            alternate(item(String(localized: "Back", comment: "Hidden View menu item, named in Settings › Shortcuts."), #selector(W.goBack(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!))),
+            alternate(item(String(localized: "Forward", comment: "Hidden View menu item, named in Settings › Shortcuts."), #selector(W.goForward(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!))),
+        ]))
+        let window = submenu(String(localized: "Window", comment: "A menu in the menu bar."), [
+            item(String(localized: "Minimize", comment: "Window menu item."), #selector(NSWindow.performMiniaturize(_:)), "m"),
+            item(String(localized: "Zoom", comment: "Window menu item."), #selector(NSWindow.performZoom(_:)), ""),
+            item(KeepOnTop.title, #selector(AppDelegate.toggleKeepOnTop(_:)), ""),
+            .separator(),
+            item(String(localized: "Bring All to Front", comment: "Window menu item."), #selector(NSApplication.arrangeInFront(_:)), ""),
+        ])
+        main.addItem(window)
+        return (main, window.submenu!, services)
+    }
+
+    /// The Edit menu: a browser window's, or an installed app's, which has no find bar or Markdown link.
+    private static func editItems(browser: Bool) -> [NSMenuItem] {
+        typealias C = BrowserWindowController
+        var items: [NSMenuItem] = [
+            item(String(localized: "Undo", comment: "Edit menu item."), Selector(("undo:")), "z"),
+            item(String(localized: "Redo", comment: "Edit menu item."), Selector(("redo:")), "z", [.command, .shift]),
+            .separator(),
+            item(String(localized: "Cut", comment: "Edit menu item."), #selector(NSText.cut(_:)), "x"),
+            item(String(localized: "Copy", comment: "Edit menu item."), #selector(NSText.copy(_:)), "c"),
+            item(String(localized: "Paste", comment: "Edit menu item."), #selector(NSText.paste(_:)), "v"),
+            item(String(localized: "Paste and Match Style", comment: "Edit menu item."), #selector(NSTextView.pasteAsPlainText(_:)), "v", [.command, .option, .shift]),
+            item(String(localized: "Select All", comment: "Edit menu item."), #selector(NSText.selectAll(_:)), "a"),
+            .separator(),
+            item(String(localized: "Copy Link", comment: "Edit menu item."), #selector(C.copyPageURL(_:)), "c", [.command, .shift]),
+            item(String(localized: "Copy Link as Markdown", comment: "Edit menu item."), #selector(C.copyPageURLAsMarkdown(_:)), "c", [.command, .shift, .option]),
+            .separator(),
+            submenu(String(localized: "Find", comment: "Submenu of the Edit menu."), [
+                item(String(localized: "Find…", comment: "Edit › Find menu item."), #selector(C.showFindBar(_:)), "f"),
+                item(String(localized: "Find Next", comment: "Edit › Find menu item."), #selector(C.findNextMatch(_:)), "g"),
+                item(String(localized: "Find Previous", comment: "Edit › Find menu item."), #selector(C.findPreviousMatch(_:)), "g", [.command, .shift]),
+                item(String(localized: "Use Selection for Find", comment: "Edit › Find menu item."), #selector(C.useSelectionForFind(_:)), "e"),
+                item(String(localized: "Jump to Selection", comment: "Edit › Find menu item."), #selector(C.jumpToSelection(_:)), "j"),
+            ]),
+            submenu(String(localized: "Spelling and Grammar", comment: "Submenu of the Edit menu."), [
+                item(String(localized: "Show Spelling and Grammar", comment: "Edit › Spelling and Grammar menu item."), #selector(NSText.showGuessPanel(_:)), ":"),
+                item(String(localized: "Check Document Now", comment: "Edit › Spelling and Grammar menu item."), #selector(NSText.checkSpelling(_:)), ";"),
+                .separator(),
+                item(String(localized: "Check Spelling While Typing", comment: "Edit › Spelling and Grammar menu item."), #selector(NSTextView.toggleContinuousSpellChecking(_:)), ""),
+                item(String(localized: "Check Grammar With Spelling", comment: "Edit › Spelling and Grammar menu item."), #selector(NSTextView.toggleGrammarChecking(_:)), ""),
+                item(String(localized: "Correct Spelling Automatically", comment: "Edit › Spelling and Grammar menu item."), #selector(NSTextView.toggleAutomaticSpellingCorrection(_:)), ""),
+            ]),
+            submenu(String(localized: "Substitutions", comment: "Submenu of the Edit menu."), [
+                item(String(localized: "Show Substitutions", comment: "Edit › Substitutions menu item."), #selector(NSTextView.orderFrontSubstitutionsPanel(_:)), ""),
+                .separator(),
+                item(String(localized: "Smart Copy/Paste", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleSmartInsertDelete(_:)), ""),
+                item(String(localized: "Smart Quotes", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleAutomaticQuoteSubstitution(_:)), ""),
+                item(String(localized: "Smart Dashes", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleAutomaticDashSubstitution(_:)), ""),
+                item(String(localized: "Smart Links", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleAutomaticLinkDetection(_:)), ""),
+                item(String(localized: "Text Replacement", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleAutomaticTextReplacement(_:)), ""),
+            ]),
+            submenu(String(localized: "Transformations", comment: "Submenu of the Edit menu."), [
+                item(String(localized: "Make Upper Case", comment: "Edit › Transformations menu item."), #selector(NSResponder.uppercaseWord(_:)), ""),
+                item(String(localized: "Make Lower Case", comment: "Edit › Transformations menu item."), #selector(NSResponder.lowercaseWord(_:)), ""),
+                item(String(localized: "Capitalize", comment: "Edit › Transformations menu item."), #selector(NSResponder.capitalizeWord(_:)), ""),
+            ]),
+            submenu(String(localized: "Speech", comment: "Submenu of the Edit menu."), [
+                item(String(localized: "Start Speaking", comment: "Edit › Speech menu item."), #selector(NSTextView.startSpeaking(_:)), ""),
+                item(String(localized: "Stop Speaking", comment: "Edit › Speech menu item."), #selector(NSTextView.stopSpeaking(_:)), ""),
+            ]),
+        ]
+        if !browser {
+            let browserOnly: Set<Selector> = [#selector(C.copyPageURLAsMarkdown(_:))]
+            items.removeAll { $0.action.map(browserOnly.contains) ?? false || $0.submenu?.items.contains { $0.action == #selector(C.showFindBar(_:)) } == true }
+        }
+        return items
     }
 
     private static func servicesItem() -> NSMenuItem {

@@ -191,6 +191,29 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", over: overlay, area: overlay.bounds)
     }
 
+    /// The app menu's Quit: the app quits, as any Mac app does, and Zigzag with its other windows stays.
+    @objc func quitWebApp(_ sender: Any?) { window?.performClose(sender) }
+
+    /// The app menu's Hide: this window goes away until the app is chosen again (its Dock icon, ⌘Tab), and Zigzag's
+    /// other windows stay where they are. With no other window of Zigzag's showing, Zigzag steps back so the app
+    /// you were in before comes forward, as hiding an app does.
+    @objc func hideWebApp(_ sender: Any?) {
+        guard let window else { return }
+        window.orderOut(sender)
+        let others = NSApp.windows.contains { $0 !== window && $0.isVisible && $0.level == .normal && !($0 is NSPanel) }
+        if !others { NSApp.hide(sender) }
+        WebAppMenuBar.shared?.follow(NSApp.keyWindow === window ? nil : NSApp.keyWindow)
+    }
+
+    /// File › Open in Zigzag: the page as it is now, in a tab of a browser window.
+    @objc func openInBrowser(_ sender: Any?) {
+        guard let url = tab.url else { return }
+        let target = MiniWindowController.browserWindow()
+        target.open(url, disposition: .foregroundTab, allowSwitch: false)
+        target.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+    }
+
     private static let zoomSteps: [CGFloat] = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
 
     @objc func zoomIn(_ sender: Any?) {
@@ -245,7 +268,7 @@ extension WebAppWindowController: NSMenuItemValidation {
         case #selector(goBack(_:)): return tab.canGoBack
         case #selector(goForward(_:)): return tab.canGoForward
         case #selector(stopLoading(_:)): return tab.isLoading
-        case #selector(copyPageURL(_:)): return tab.url != nil
+        case #selector(copyPageURL(_:)), #selector(openInBrowser(_:)): return tab.url != nil
         case #selector(toggleToolbar(_:)):
             item.title = Self.toolbarTitle(showing: current.showsToolbar)
             return true

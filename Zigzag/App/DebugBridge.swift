@@ -100,7 +100,9 @@ enum DebugBridge {
 
     /// webapp install (the Install as App sheet over the front tab), webapp confirm|cancel (its answer),
     /// webapp open|close <id> (as the app's small app asks), webapp remove <id>, webapp closeall, webapp removeall, webapp state <path> (JSON: the list,
-    /// the open windows), webapp settings (Settings › General).
+    /// the open windows), webapp settings (Settings › General), webapp toolbar on|off (the first app's), webapp front |
+    /// browserfront (the menu bar for that window in front), webapp menukey <char> (⌘<char>'s item, run), webapp menu
+    /// <path> (the menu bar's items).
     private static func runWebApp(_ arg: String) {
         let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
         let rest = f.count > 1 ? f[1] : ""
@@ -114,6 +116,40 @@ enum DebugBridge {
         case "remove": WebAppStore.shared.remove(rest)
         case "closeall": WebAppWindowController.all.forEach { $0.window?.close() }
         case "removeall": WebAppStore.shared.apps.forEach { WebAppStore.shared.remove($0.id) }
+        case "toolbar":
+            // toolbar on|off: the first app's toolbar, as Settings' switch sets it.
+            if let app = WebAppStore.shared.apps.first { WebAppStore.shared.setShowsToolbar(rest == "on", for: app.id) }
+        case "front":
+            // front: the menu bar as it is with the first app's window in front (a copy behind other apps never
+            // becomes key on its own).
+            WebAppMenuBar.shared?.follow(WebAppWindowController.all.first?.window)
+        case "browserfront":
+            WebAppMenuBar.shared?.follow(WindowManager.shared.controllers.first?.window)
+        case "menukey":
+            // menukey <char>: what ⌘<char> does in the menu bar now: its item's action, sent as the menu would, to the
+            // key window or, with none (behind other apps), the first app's window.
+            func find(_ menu: NSMenu) -> NSMenuItem? {
+                for item in menu.items {
+                    if let sub = item.submenu, let found = find(sub) { return found }
+                    if item.keyEquivalent == rest, item.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask) == .command { return item }
+                }
+                return nil
+            }
+            guard let item = NSApp.mainMenu.flatMap(find), let action = item.action else { debugLog("webapp menukey \(rest): no item"); break }
+            let target: Any? = item.target ?? (NSApp.keyWindow == nil && !NSApp.responds(to: action) ? WebAppWindowController.all.first : nil)
+            debugLog("webapp menukey \(rest): \(item.title) \(action) -> \(NSApp.sendAction(action, to: target, from: item))")
+        case "menu":
+            // menu <path>: the menu bar's titles, each item with its action, indented under its menu.
+            var lines: [String] = []
+            func list(_ menu: NSMenu, _ depth: Int) {
+                for item in menu.items where !item.isSeparatorItem {
+                    let keys = item.keyEquivalent.isEmpty ? "" : " [\(item.keyEquivalentModifierMask.contains(.option) ? "⌥" : "")\(item.keyEquivalentModifierMask.contains(.shift) ? "⇧" : "")⌘\(item.keyEquivalent)]"
+                    lines.append(String(repeating: "  ", count: depth) + item.title + keys + (item.action.map { " <\(NSStringFromSelector($0))>" } ?? "") + (item.isHidden ? " (hidden)" : ""))
+                    if let sub = item.submenu { list(sub, depth + 1) }
+                }
+            }
+            if let main = NSApp.mainMenu { list(main, 0) }
+            try? lines.joined(separator: "\n").write(toFile: rest, atomically: true, encoding: .utf8)
         case "settings":
             if let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first { SettingsPage.open(.general, in: controller) }
         case "state":
