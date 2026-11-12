@@ -433,33 +433,40 @@ extension TabManager.SplitPair {
 }
 
 /// One pane of a split or tile group enlarged over the others for a moment (#160), as a terminal or an editor zooms a
-/// pane: nothing in the layout changes, and the zoom ends as soon as the group isn't the one it was zoomed in.
+/// pane: nothing in the layout changes, and the zoom ends as soon as the group isn't laid out as it was zoomed in.
 nonisolated struct PaneZoom: Equatable, Sendable {
     /// The page enlarged; nil while none is.
     private(set) var tabID: UUID?
-    /// The pages of the group it was zoomed in.
-    private var group: Set<UUID> = []
+    /// The pages of the group it was zoomed in, in order.
+    private var group: [UUID] = []
+    /// Where each of them sat.
+    private var places: [TileRegion]?
 
     var isZoomed: Bool { tabID != nil }
 
-    /// Zooms page `id` of the group `ids`; zoomed already, it goes back. Not a page of a group of two or more: nothing.
-    mutating func toggle(_ id: UUID, in ids: [UUID]) {
+    /// Zooms page `id` of the group `ids` (sitting at `places`); zoomed already, it goes back. Not a page of a group
+    /// of two or more: nothing.
+    mutating func toggle(_ id: UUID, in ids: [UUID], places: [TileRegion]? = nil) {
         if tabID == id { self = PaneZoom(); return }
         guard ids.count > 1, ids.contains(id) else { return }
         tabID = id
-        group = Set(ids)
+        group = ids
+        self.places = places
     }
 
     mutating func clear() { self = PaneZoom() }
 
-    /// The enlarged page's place in the group now on screen (`ids`, nil with no split). A page that came or went, the
-    /// group ending or leaving the window: the zoom is over. Places swapped keep it, on the same page.
-    mutating func index(in ids: [UUID]?) -> Int? {
+    /// The enlarged page's place in the group now on screen (`ids` at `places`, nil with no split). Any rearrangement
+    /// ends the zoom, as DESIGN.md has it: a page that came or went, places swapped, a pane moved or the layout
+    /// changed, the group ending or leaving the window. Only the lines between the panes may move.
+    mutating func index(in ids: [UUID]?, places: [TileRegion]? = nil) -> Int? {
         guard let tabID else { return nil }
-        guard let ids, Set(ids) == group, let index = ids.firstIndex(of: tabID) else {
+        guard let ids, ids == group, places == self.places,
+              let index = ids.firstIndex(of: tabID) else {
             self = PaneZoom()
             return nil
         }
+        return index
         return index
     }
 }

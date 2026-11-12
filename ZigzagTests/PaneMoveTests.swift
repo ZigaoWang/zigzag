@@ -176,13 +176,25 @@ struct PaneMoveTests {
         #expect(!zoom.isZoomed)
     }
 
-    @Test func theZoomFollowsItsPageAcrossASwap() {
+    @Test func anyRearrangementEndsTheZoom() {
         let a = UUID(), b = UUID(), c = UUID(), d = UUID()
+        let quarters: [TileRegion] = [.topLeft, .topRight, .bottomLeft, .bottomRight]
         var zoom = PaneZoom()
-        zoom.toggle(a, in: [a, b, c, d])
-        // Places traded: the same page, now third.
-        #expect(zoom.index(in: [c, b, a, d]) == 2)
-        #expect(zoom.isZoomed)
+        zoom.toggle(a, in: [a, b, c, d], places: quarters)
+        // Nothing moved: still zoomed, in its place.
+        #expect(zoom.index(in: [a, b, c, d], places: quarters) == 0)
+        // Places traded: back in its place.
+        #expect(zoom.index(in: [c, b, a, d], places: quarters) == nil && !zoom.isZoomed)
+        // A pane moved to another place.
+        zoom.toggle(a, in: [a, b, c, d], places: quarters)
+        #expect(zoom.index(in: [a, b, c, d], places: [.topLeft, .bottomLeft, .topRight, .bottomRight]) == nil)
+        #expect(!zoom.isZoomed)
+        // A split of two turned from side by side to stacked.
+        zoom.toggle(b, in: [a, b], places: [.left, .right])
+        #expect(zoom.index(in: [a, b], places: [.top, .bottom]) == nil && !zoom.isZoomed)
+        // A split of two swapped.
+        zoom.toggle(b, in: [a, b], places: [.left, .right])
+        #expect(zoom.index(in: [b, a], places: [.left, .right]) == nil && !zoom.isZoomed)
     }
 
     @Test func theZoomEndsWhenTheGroupChanges() {

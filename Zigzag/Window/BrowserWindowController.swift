@@ -844,7 +844,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// the pane you're in.
     func toggleZoom(_ tab: Tab) {
         guard let pair = tabManager.split(for: tab) else { return }
-        paneZoom.toggle(tab.id, in: pair.ids)
+        paneZoom.toggle(tab.id, in: pair.ids, places: pair.shape.regions)
         if paneZoom.isZoomed, tabManager.selectedTab !== tab { tabManager.select(tab) } else { showPages() }
         if paneZoom.isZoomed, let webView = tab.webView { window?.makeFirstResponder(webView) }
     }
@@ -880,10 +880,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let pair = tab.flatMap { tabManager.split(for: $0) }
         let pages = pair.map { $0.ids.compactMap { tabManager.tab(with: $0) } } ?? []
         let cards = root.paneCards
-        // The zoom lasts while its group is on screen as it was; anything else puts the pane back.
+        // The zoom lasts while its group is on screen as it was; anything else (a swap, a move, another layout) puts
+        // the pane back.
         // Going to another pane of it (a click on its part of the row) puts the zoomed one back too.
         if paneZoom.isZoomed, paneZoom.tabID != tab?.id { paneZoom.clear() }
-        let zoomed = paneZoom.index(in: pages.count == pair?.count ? pair?.ids : nil)
+        let zoomed = paneZoom.index(in: pages.count == pair?.count ? pair?.ids : nil, places: pair?.shape.regions)
         // Site Controls opened from a pane's strip sits under it: when the panes move (the split parts, a pane goes,
         // swaps or zooms), it would be left over nothing.
         let layout = pages.count == pair?.count ? "\(pair?.ids ?? []) \(String(describing: pair?.shape)) \(zoomed ?? -1)" : ""
