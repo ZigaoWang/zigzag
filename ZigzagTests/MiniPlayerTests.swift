@@ -201,8 +201,8 @@ struct MiniPlayerTests {
 
     // MARK: Moving it anywhere
 
-    /// A 1280 by 805 window, its edges `edgeInset` in.
-    private let window = MiniPlayerLayout.movableArea(in: CGRect(x: 0, y: 0, width: 1280, height: 805), below: nil)
+    /// A 1280 by 805 screen's usable part, its edges `edgeInset` in: the card floats anywhere on it (#172).
+    private let window = MiniPlayerLayout.movableArea(onScreen: CGRect(x: 0, y: 0, width: 1280, height: 805))
     private let card = CGSize(width: 333, height: 187)
 
     @Test func itGoesAnywhereInTheWindowOverTheSidebarToo() {
@@ -237,12 +237,12 @@ struct MiniPlayerTests {
         #expect(anchor.corner == .bottomRight)
         #expect(MiniPlayerLayout.frame(for: anchor, size: card, in: window) == dropped)
         // A smaller window: the same distance from the bottom right.
-        let smaller = MiniPlayerLayout.movableArea(in: CGRect(x: 0, y: 0, width: 1000, height: 700), below: nil)
+        let smaller = MiniPlayerLayout.movableArea(onScreen: CGRect(x: 0, y: 0, width: 1000, height: 700))
         let moved = MiniPlayerLayout.frame(for: anchor, size: card, in: smaller)
         #expect(1000 - moved.maxX == 1280 - dropped.maxX)
         #expect(700 - moved.maxY == 805 - dropped.maxY)
         // Too small for that distance: still wholly inside.
-        let tiny = MiniPlayerLayout.movableArea(in: CGRect(x: 0, y: 0, width: 400, height: 260), below: nil)
+        let tiny = MiniPlayerLayout.movableArea(onScreen: CGRect(x: 0, y: 0, width: 400, height: 260))
         #expect(tiny.contains(MiniPlayerLayout.frame(for: MiniPlayerLayout.Anchor(corner: .topLeft, offset: CGSize(width: 300, height: 300)), size: card, in: tiny)))
     }
 
@@ -253,34 +253,51 @@ struct MiniPlayerTests {
         #expect(MiniPlayerLayout.Anchor(stored: "topLeft x 2") == nil)
     }
 
-    @Test func itStaysUnderTheBarAboveThePage() {
-        let area = MiniPlayerLayout.movableArea(in: CGRect(x: 0, y: 0, width: 1280, height: 805), below: 44)
-        #expect(area.minY == 48)
-        #expect(area.maxY == 801)
-        let dragged = MiniPlayerLayout.dropped(CGRect(x: 400, y: -100, width: 333, height: 187), in: area)
-        #expect(dragged.minY >= 44)
+    @Test func screenCoordinatesTurnOverAndBack() {
+        // The Mac's screen coordinates run up from the main screen's bottom; the card's arithmetic runs down from its top.
+        let cocoa = CGRect(x: 100, y: 50, width: 320, height: 180)
+        let down = MiniPlayerLayout.flipped(cocoa, mainScreenHeight: 900)
+        #expect(down == CGRect(x: 100, y: 900 - 50 - 180, width: 320, height: 180))
+        #expect(MiniPlayerLayout.flipped(down, mainScreenHeight: 900) == cocoa)
+        // A screen above the main one is above its top: negative.
+        #expect(MiniPlayerLayout.flipped(CGRect(x: 0, y: 900, width: 1440, height: 900), mainScreenHeight: 900).minY == -900)
     }
 
     // MARK: Snapping to a corner
 
-    /// The page area beside a 240-point sidebar, inside the window above.
+    /// A browser window on that screen, and its page area beside a 240-point sidebar.
+    private let browser = CGRect(x: 0, y: 0, width: 1280, height: 805)
     private let pageArea = CGRect(x: 240, y: 4, width: 1036, height: 797)
 
     @Test func letGoItGlidesIntoThePagesNearestCorner() {
         // Let go a little up and left of the bottom right: into that corner, a margin in.
         let there = CGRect(x: 800, y: 500, width: 333, height: 187)
-        let (frame, place) = MiniPlayerLayout.rest(there, free: false, page: pageArea, in: window)
+        let (frame, place) = MiniPlayerLayout.rest(there, free: false, page: pageArea, window: browser, in: window)
         #expect(place == .corner(.bottomRight))
         #expect(frame == CGRect(x: 1276 - 12 - 333, y: 801 - 12 - 187, width: 333, height: 187))
         // Over the sidebar at the top: the page's top left, not the sidebar's.
-        let sidebar = MiniPlayerLayout.rest(CGRect(x: 10, y: 60, width: 333, height: 187), free: false, page: pageArea, in: window)
+        let sidebar = MiniPlayerLayout.rest(CGRect(x: 10, y: 60, width: 333, height: 187), free: false, page: pageArea, window: browser, in: window)
         #expect(sidebar.place == .corner(.topLeft))
         #expect(sidebar.frame.origin == CGPoint(x: 252, y: 16))
     }
 
+    @Test func letGoOutsideTheWindowItGlidesIntoTheScreensCorner() {
+        // A 2560 by 1415 screen's usable part, the window in its top left: let go off the window, toward the bottom right.
+        let screen = MiniPlayerLayout.movableArea(onScreen: CGRect(x: 0, y: 25, width: 2560, height: 1415))
+        let there = CGRect(x: 1900, y: 1000, width: 333, height: 187)
+        let (frame, place) = MiniPlayerLayout.rest(there, free: false, page: pageArea, window: browser, in: screen)
+        #expect(place == .screen(.bottomRight))
+        // A margin in from the screen's usable edges, as the Mac's Picture in Picture rests.
+        #expect(frame == CGRect(x: 2560 - 12 - 333, y: 25 + 1415 - 12 - 187, width: 333, height: 187))
+        // With no window on screen (put away in the Dock), anywhere is the screen's.
+        #expect(MiniPlayerLayout.rest(CGRect(x: 800, y: 500, width: 333, height: 187), free: false, page: pageArea, window: nil, in: screen).place == .screen(.topLeft))
+        // The screen's corner stays the screen's whatever the window does.
+        #expect(MiniPlayerLayout.frame(for: .screen(.topLeft), size: card, page: pageArea, in: screen).origin == CGPoint(x: 12, y: 37))
+    }
+
     @Test func letGoWithCommandItStaysWhereItWas() {
         let there = CGRect(x: 600, y: 300, width: 333, height: 187)
-        let (frame, place) = MiniPlayerLayout.rest(there, free: true, page: pageArea, in: window)
+        let (frame, place) = MiniPlayerLayout.rest(there, free: true, page: pageArea, window: browser, in: window)
         #expect(frame == there)
         #expect(place == .free(MiniPlayerLayout.anchor(of: there, in: window)))
     }
@@ -296,6 +313,9 @@ struct MiniPlayerTests {
 
     @Test func itsRestingPlaceIsKeptAsText() {
         #expect(MiniPlayerLayout.Place(stored: MiniPlayerLayout.Place.corner(.topRight).stored) == .corner(.topRight))
+        #expect(MiniPlayerLayout.Place.screen(.bottomLeft).stored == "screen bottomLeft")
+        #expect(MiniPlayerLayout.Place(stored: "screen bottomLeft") == .screen(.bottomLeft))
+        #expect(MiniPlayerLayout.Place(stored: "screen middle") == nil)
         let anchor = MiniPlayerLayout.Anchor(corner: .bottomLeft, offset: CGSize(width: 51, height: 258))
         #expect(MiniPlayerLayout.Place(stored: MiniPlayerLayout.Place.free(anchor).stored) == .free(anchor))
         // A place saved before the card snapped stays where it was.
