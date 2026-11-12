@@ -147,7 +147,7 @@ nonisolated enum WebAppIcon {
     }
 
     /// The icon at 1024 by 1024: `picture` filling the rounded square when it's a full square, else on a white one
-    /// with room around it; a small picture, or none, makes a letter on the site's color instead (`monogram`).
+    /// with room around it; a small picture, or none, makes a letter on the site's color instead (`drawMonogram`).
     static func render(_ picture: CGImage?, name: String, tint: NSColor? = nil) -> CGImage? {
         let side = Int(canvas)
         guard let context = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
