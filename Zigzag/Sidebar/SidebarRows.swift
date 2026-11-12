@@ -164,6 +164,19 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     let audioButton = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
     let partnerAudioButton = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
 
+    /// A development tab's mark (#141): a small hammer beside the close button's place, so the site you're building
+    /// is told from the one that's live. Only something to see: it takes no clicks. Its row keeps the close button's
+    /// room while that's hidden, as a row of several pages does, so the mark never moves under the pointer. Not on a
+    /// row of several pages.
+    private let developerMark: NSImageView = {
+        let view = NSImageView(image: Tokens.Symbol.image("hammer", size: Tokens.Sidebar.rowGlyph))
+        view.imageScaling = .scaleNone
+        view.isHidden = true
+        view.setAccessibilityElement(false)
+        return view
+    }()
+    var showsDeveloperMark: Bool { tab?.isDevelopment == true && !isSplit }
+
     static func rowButton(_ symbol: String, toolTip: String) -> IconButton {
         let button = IconButton(symbol: symbol, size: Tokens.Sidebar.rowButton, symbolSize: Tokens.Sidebar.rowGlyph, toolTip: toolTip)
         button.radius = Tokens.Radius.small + 1
@@ -409,6 +422,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         partnerTitle.isHidden = true
         divider.isHidden = true
         [partnerIcon, partnerTitle, divider].forEach { addSubview($0) }
+        addSubview(developerMark)
         addSubview(audioButton)
         addSubview(partnerAudioButton)
         addSubview(closeButton)
@@ -497,7 +511,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
                 ?? String(localized: "playing audio", comment: "Spoken by VoiceOver after a tab row's name: the tab plays sound.")
         }
         let split = partner != nil
-        let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
+        let development = showsDeveloperMark ? String(localized: "development site", comment: "Spoken by VoiceOver after a tab row's name: the tab is on a site listed in Settings › Developer, and has a hammer on its row.") : nil
+        let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, development, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
             + extraPartners.map { sound($0, $0.displayTitle) })
             .compactMap { $0 }.joined(separator: String(localized: "accessibility.state-separator", defaultValue: ", ", comment: "Separates the states VoiceOver reads after a tab row's name, like “current tab, playing audio”."))
         setAccessibilityValue(state.isEmpty ? nil : state)
@@ -579,7 +594,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     private func tabChanged(_ change: Tab.Change) {
         switch change {
-        case .title, .url, .favicon, .loading, .audio, .themeColor, .webView, .activity: refresh()
+        case .title, .url, .favicon, .loading, .audio, .themeColor, .webView, .activity, .developer: refresh()
         default: break
         }
     }
@@ -613,11 +628,12 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private var endSlot: CGFloat { showsClose ? closeButton.frame.width : showsNumber ? numberHint?.width ?? 0 : 0 }
 
     override var trailingAccessoryWidth: CGFloat {
-        let close = endSlot
-        let nested = showsNested ? Tokens.Sidebar.rowButton + (close > 0 ? Self.buttonGap : 0) : 0
+        let close = showsDeveloperMark ? max(endSlot, closeButton.frame.width) : endSlot
+        let mark = showsDeveloperMark ? Tokens.Sidebar.rowButton + Self.buttonGap : 0
+        let nested = showsNested ? Tokens.Sidebar.rowButton + (close + mark > 0 ? Self.buttonGap : 0) : 0
         // In a split each half's speaker sits at that half's end (laid out with the halves).
-        let audio = isSplit ? 0 : showsAudio ? audioButton.frame.width + (close + nested > 0 ? Self.buttonGap : 0) : 0
-        return close + nested + audio
+        let audio = isSplit ? 0 : showsAudio ? audioButton.frame.width + (close + mark + nested > 0 ? Self.buttonGap : 0) : 0
+        return close + mark + nested + audio
     }
 
     func refresh() {
@@ -642,6 +658,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         title.textColor = ink
         // One weight always: selection shows in the fill, never by text getting wider and shifting.
         partnerTitle.textColor = ink
+        // Quiet, as a folded group's button is at rest.
+        developerMark.contentTintColor = ink
+        developerMark.alphaValue = 0.6
         extraViews?.forEach { $0.title.textColor = ink }
         dropHalf.color = Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha)
         dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
@@ -655,6 +674,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         closeButton.toolTip = isAway ? String(localized: "Back to Pinned Page", comment: "Tooltip of a button on a tab's row in the sidebar. The pinned tab wandered off; this goes back to its page.")
             : isBookmark ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.") : String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         audioButton.isHidden = !showsAudio || renameField != nil
+        developerMark.isHidden = !showsDeveloperMark || renameField != nil
         partnerAudioButton.isHidden = !isSplit || !partnerShowsAudio || renameField != nil
         for (i, views) in (extraViews ?? []).enumerated() {
             let page = extraPartners.indices.contains(i) ? extraPartners[i] : nil
@@ -751,8 +771,13 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         }
         // A row of several pages keeps the close button's room whether or not it shows, so its parts never move as
         // the pointer comes and goes.
-        let slot = isSplit ? max(endSlot, size.width) : endSlot
+        let slot = isSplit || showsDeveloperMark ? max(endSlot, size.width) : endSlot
         var end = slot > 0 ? bounds.width - edge - slot - Self.buttonGap : bounds.width - edge
+        // The development mark stays beside the close button's place; the row's other buttons come before it.
+        if showsDeveloperMark {
+            developerMark.frame = NSRect(x: end - size.width, y: y, width: size.width, height: size.height)
+            end = developerMark.frame.minX - Self.buttonGap
+        }
         if showsNested {
             nestedButton.frame = NSRect(x: end - size.width, y: y, width: size.width, height: size.height)
             end = nestedButton.frame.minX - Self.buttonGap
