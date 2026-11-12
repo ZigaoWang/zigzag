@@ -224,6 +224,11 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         NSApp.activate()
     }
 
+    /// File › Show in Finder: the app itself, selected in its folder.
+    @objc func showAppInFinder(_ sender: Any?) {
+        WebAppStore.shared.revealInFinder(app)
+    }
+
     @objc func zoomIn(_ sender: Any?) {
         guard let webView = tab.webView else { return }
         setZoom(ZoomLevels.step(webView.pageZoom, by: 1))

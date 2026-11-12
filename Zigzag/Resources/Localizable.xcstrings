@@ -12893,7 +12893,7 @@
       }
     },
     "Show in Finder" : {
-      "comment" : "Button in the Import window: show the exported passwords file in Finder.\nButton in the toast after Install as App: shows the new app in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
+      "comment" : "Button in the Import window: show the exported passwords file in Finder.\nButton in the toast after Install as App: shows the new app in Finder.\nButton on an installed app's row in Settings › General: shows the app itself, selected in its folder in Finder.\nFile menu item of an installed app's window: shows the app itself, selected in its folder in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12943,6 +12943,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在“%@”中显示工具栏"
+          }
+        }
+      }
+    },
+    "Show “%@” in Finder" : {
+      "comment" : "VoiceOver label of the Show in Finder button on an installed app's row in Settings › General; the app's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在“访达”中显示“%@”"
           }
         }
       }

@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - Settings › Privacy › Sites lists each site's permissions under it, with Ask, Allow and Block as in its Site Controls, so you can change or take one back without opening the site. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#174](https://github.com/ZigaoWang/zigzag/issues/174))
+- Show in Finder, on each installed app's row in Settings › General and in the app's own File menu, shows the app selected in its folder. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
 
 ### Fixed
 - A permission set to Ask asks every time, as in Safari: answering a site's question for the camera, microphone, location or notifications holds for that page only, and the site asks again on its next visit. Allow and Block are kept, chosen in Site Controls, Settings › Privacy, or the address bar's camera button with Always Allow on This Site. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#174](https://github.com/ZigaoWang/zigzag/issues/174))

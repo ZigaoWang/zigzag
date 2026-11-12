@@ -2803,7 +2803,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let toolbar = Toggle(isOn: app.showsToolbar)
             toolbar.setAccessibilityLabel(String(localized: "Show toolbar in “\(app.name)”", comment: "VoiceOver label of the switch on an installed app's row in Settings › General; the app's name."))
             toolbar.onChange = { on in WebAppStore.shared.setShowsToolbar(on, for: app.id) }
-            let controls = NSStackView(views: [toolbarLabel, toolbar, remove])
+            // Where it is, without knowing the folder: the app selected in Finder.
+            let finder = PillButton(title: String(localized: "Show in Finder", comment: "Button on an installed app's row in Settings › General: shows the app itself, selected in its folder in Finder."))
+            finder.setAccessibilityLabel(String(localized: "Show “\(app.name)” in Finder", comment: "VoiceOver label of the Show in Finder button on an installed app's row in Settings › General; the app's name."))
+            finder.onClick = { _ in WebAppStore.shared.revealInFinder(app) }
+            let controls = NSStackView(views: [toolbarLabel, toolbar, finder, remove])
             controls.spacing = Tokens.Space.x2
             controls.setCustomSpacing(Tokens.Space.x4, after: toolbar)
             let icon = store.bundle(of: app).map { NSWorkspace.shared.icon(forFile: $0.path) } ?? SettingsIcon.symbol("app")
