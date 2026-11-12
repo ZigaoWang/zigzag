@@ -508,6 +508,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         menu.addItem(SidebarMenus.Item(String(localized: "Edit Space…", comment: "Item in the menu of a space's row in Settings › Spaces.")) { [weak self] in
             self?.openEditor()
         })
+        menu.addItem(SidebarMenus.useDefaultColorsItem(for: spaceID) { BrowserWindowController.changeLibrary($0, $1) })
         if Library.shared.spaces.count > 1 {
             menu.addItem(SidebarMenus.Item(String(localized: "Delete Space…", comment: "Item in the menu of a space's row in Settings › Spaces.")) { [weak self] in
                 guard let self, let host = self.host else { return }

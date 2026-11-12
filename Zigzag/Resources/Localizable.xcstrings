@@ -15592,6 +15592,17 @@
         }
       }
     },
+    "Use Default Colors" : {
+      "comment" : "Button in the space editor, and item in a space's context menu: puts back the colors the space had when it was made.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用默认颜色"
+          }
+        }
+      }
+    },
     "Use Selection for Find" : {
       "comment" : "Edit › Find menu item.",
       "localizations" : {
