@@ -339,7 +339,7 @@ extension WebAppWindowController: TabHost {
         }
         let background = pending != nil || (action.modifierFlags.contains(.command) && !action.modifierFlags.contains(.shift))
         let target = MiniWindowController.browserWindow()
-        let newTab = target.tabManager.newTab(url: nil, select: !background, configuration: configuration)
+        let newTab = target.tabManager.newTab(url: nil, select: !background, configuration: configuration, site: action.request.url)
         if !background {
             target.window?.makeKeyAndOrderFront(nil)
             NSApp.activate()

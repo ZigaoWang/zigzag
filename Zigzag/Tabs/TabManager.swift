@@ -157,11 +157,33 @@ final class TabManager {
     // MARK: Creating
 
     /// Where a new tab goes in the list (Settings › Tabs). Next to the current tab is what Chrome and Safari do, so
-    /// a tab shows up where you were looking; Arc's way, on top, and the bottom are choices.
-    enum NewTabPlace: String, CaseIterable { case next, top, bottom }
+    /// a tab shows up where you were looking; Arc's way, on top, and the bottom are choices. Next to tabs from the
+    /// same site (#188) puts a page with the tabs already open from its site, and one from a site with none open
+    /// where the choice before it put tabs (`otherNewTabPlace`).
+    enum NewTabPlace: String, CaseIterable { case next, top, bottom, sameSite }
     static var newTabPlace: NewTabPlace {
         get { UserDefaults.standard.string(forKey: "NewTabPlace").flatMap(NewTabPlace.init(rawValue:)) ?? .next }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: "NewTabPlace") }
+        set {
+            let was = newTabPlace
+            if newValue == .sameSite, was != .sameSite { UserDefaults.standard.set(was.rawValue, forKey: "NewTabPlaceOtherwise") }
+            UserDefaults.standard.set(newValue.rawValue, forKey: "NewTabPlace")
+        }
+    }
+
+    /// Where a new tab goes that has no tab from its site to go beside: the choice made before Next to Tabs from the
+    /// Same Site, or the one itself when that isn't on.
+    static var otherNewTabPlace: NewTabPlace {
+        let place = newTabPlace
+        guard place == .sameSite else { return place }
+        let before = UserDefaults.standard.string(forKey: "NewTabPlaceOtherwise").flatMap(NewTabPlace.init(rawValue:)) ?? .next
+        return before == .sameSite ? .next : before
+    }
+
+    /// What counts as one site for placing tabs: the registrable domain (mail.google.com and docs.google.com are
+    /// google.com), or the whole host where there isn't one (an IP address, localhost).
+    nonisolated static func site(of url: URL?) -> String? {
+        guard let url, url.scheme == "http" || url.scheme == "https", let host = url.host()?.lowercased(), !host.isEmpty else { return nil }
+        return PublicSuffix.registrableDomain(host) ?? host
     }
 
     /// Where a new tab lands in a space's list: next to the tab it came from (after the others it already opened, so a
@@ -170,8 +192,8 @@ final class TabManager {
     private func newTabIndex(in space: UUID, opener: Tab?, select: Bool) -> Int {
         let list = tabsBySpace[space] ?? []
         let nodes = treeNodes(in: space)
-        switch Self.newTabPlace {
-        case .top: return 0
+        switch Self.otherNewTabPlace {
+        case .top, .sameSite: return 0
         case .bottom: return list.count
         case .next:
             if let opener, let at = list.firstIndex(where: { $0 === opener }) {
@@ -200,15 +222,27 @@ final class TabManager {
     /// Where a new tab goes and the tab it goes under. With nested tabs on, a link goes under the tab it came from,
     /// after what that tab already opened; otherwise it stands beside the tab it came from (or the one you're on),
     /// at that tab's level, and never breaks into another tab's group.
-    private func newTabPlacement(in space: UUID, opener: Tab?, select: Bool) -> (index: Int, parent: UUID?) {
+    /// With Next to Tabs from the Same Site, a page goes with its site's tabs in the space (never a pinned page or
+    /// favorite: those keep their places), in the group the last of them is in.
+    private func newTabPlacement(in space: UUID, opener: Tab?, select: Bool, site page: URL?) -> (index: Int, parent: UUID?) {
         let nodes = treeNodes(in: space)
         if Self.nestsOpenedLinks, let opener, opener.bookmarkID == nil, !opener.isPeek, opener.spaceID == space,
            let at = TabTree.childIndex(of: opener.id, in: nodes) {
             return (at, opener.id)
         }
+        if let place = sameSitePlacement(in: space, opener: opener, site: page) { return place }
         let index = newTabIndex(in: space, opener: opener, select: select)
         let anchor = opener ?? (space == currentSpaceID ? selectedTab : nil)
         return (index, TabTree.parent(at: index, preferring: anchor?.bookmarkID == nil ? anchor?.parentID : nil, in: nodes))
+    }
+
+    /// Next to Tabs from the Same Site: where a page from `page`'s site goes among the space's tabs from it. Nil when
+    /// that isn't the choice, or no tab is from that site.
+    private func sameSitePlacement(in space: UUID, opener: Tab?, site page: URL?) -> (index: Int, parent: UUID?)? {
+        guard Self.newTabPlace == .sameSite, let site = Self.site(of: page) else { return nil }
+        var sites: [UUID: String] = [:]
+        for tab in tabs(in: space) { if let other = Self.site(of: tab.url) { sites[tab.id] = other } }
+        return TabTree.besideSameSite(site, sites: sites, opener: opener?.id, in: treeNodes(in: space))
     }
 
     /// The last tab put beside the current one with nothing that opened it, so the next lands after it.
@@ -217,7 +251,7 @@ final class TabManager {
 
     @discardableResult
     func newTab(url: URL?, spaceID: UUID? = nil, select: Bool = true, configuration: WKWebViewConfiguration? = nil,
-                opener: Tab? = nil, title: String? = nil) -> Tab {
+                opener: Tab? = nil, title: String? = nil, site: URL? = nil) -> Tab {
         // A page another page opened stays with it: WebKit made it in that page's profile.
         // One WebKit made for a page with no tab of its own here (a Zigzag Mini's, a sign-in window's) goes to a
         // space on that page's profile, not to whichever space this window happens to show.
@@ -228,11 +262,12 @@ final class TabManager {
         watch(tab)
         tab.opener = opener
         // Placed once, as Settings says; the list never reorders itself after that.
-        let place = newTabPlacement(in: space, opener: opener, select: select)
+        // `site`: the page a tab made empty is about to load, for Next to Tabs from the Same Site.
+        let place = newTabPlacement(in: space, opener: opener, select: select, site: url ?? site)
         tab.parentID = place.parent
         tabsBySpace[space, default: []].insert(tab, at: place.index)
         unfold(place.parent)
-        if opener == nil, !select, Self.newTabPlace == .next, space == currentSpaceID { placedBeside = PlacedBeside(anchor: selectedTab, last: tab) } else { placedBeside = nil }
+        if opener == nil, !select, Self.otherNewTabPlace == .next, space == currentSpaceID { placedBeside = PlacedBeside(anchor: selectedTab, last: tab) } else { placedBeside = nil }
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
         // Opened in front from a page in split view: it takes that page's pane, so the split stays on screen and
         // the page it came from waits in the list. A pinned split keeps its pages; the new tab shows on its own.
@@ -330,14 +365,14 @@ final class TabManager {
     }
 
     /// Adds a tab that already has a page (a promoted peek) to the top of the list and shows it.
-    func insert(_ tab: Tab, at index: Int = 0) {
+    func insert(_ tab: Tab, at index: Int = 0, under parent: UUID?? = nil) {
         tab.host = host
         tab.setSpace(currentSpaceID)
         watch(tab)
         var list = tabsBySpace[currentSpaceID] ?? []
         let at = min(max(index, 0), list.count)
         // It joins the group it lands in, if any, so the group stays whole.
-        tab.parentID = TabTree.parentForInsertion(at: at, in: treeNodes(in: currentSpaceID))
+        tab.parentID = parent ?? TabTree.parentForInsertion(at: at, in: treeNodes(in: currentSpaceID))
         list.insert(tab, at: at)
         tabsBySpace[currentSpaceID] = list
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
@@ -366,6 +401,7 @@ final class TabManager {
 
     /// A page that comes in from outside the list (Zigzag Mini's), placed where a new tab would go, and shown.
     func insertAsNewTab(_ tab: Tab) {
+        if let place = sameSitePlacement(in: currentSpaceID, opener: nil, site: tab.url) { return insert(tab, at: place.index, under: place.parent) }
         insert(tab, at: newTabIndex(in: currentSpaceID, opener: nil, select: true))
     }
 

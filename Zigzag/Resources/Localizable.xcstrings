@@ -1701,6 +1701,39 @@
         }
       }
     },
+    "A page from a site with no tabs open goes at the bottom." : {
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有打开标签页的网站，新页面放在底部。"
+          }
+        }
+      }
+    },
+    "A page from a site with no tabs open goes at the top." : {
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有打开标签页的网站，新页面放在顶部。"
+          }
+        }
+      }
+    },
+    "A page from a site with no tabs open goes next to the current tab." : {
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有打开标签页的网站，新页面放在当前标签页旁边。"
+          }
+        }
+      }
+    },
     "A password can’t be empty." : {
       "comment" : "Toast when saving a login with its password cleared.",
       "localizations" : {
@@ -8578,6 +8611,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下一个色相"
+          }
+        }
+      }
+    },
+    "Next to Tabs from the Same Site" : {
+      "comment" : "A choice for “New tabs open” in Settings › Tabs: a page goes right after the tabs already open from its website, like other github.com pages.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在同一网站的标签页旁边"
           }
         }
       }
@@ -17647,13 +17691,13 @@
         }
       }
     },
-    "new tab homepage home page start page position order" : {
+    "new tab homepage home page start page position order same site domain group organize" : {
       "comment" : "Words that find the New tabs open setting with Find a setting in Settings. Zigzag has no homepage, so words about one find this row. Not shown.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新标签页 主页 首页 起始页 位置 顺序 homepage new tab"
+            "value" : "新标签页 主页 首页 起始页 位置 顺序 同一网站 域名 分组 整理 homepage new tab"
           }
         }
       }

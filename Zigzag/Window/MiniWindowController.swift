@@ -766,7 +766,7 @@ extension MiniWindowController: TabHost {
         // and the menu's own items leave you here, a plain click takes you there.
         let background = pending != nil || (action.modifierFlags.contains(.command) && !action.modifierFlags.contains(.shift))
         let target = Self.browserWindow()
-        let newTab = target.tabManager.newTab(url: nil, select: !background, configuration: configuration)
+        let newTab = target.tabManager.newTab(url: nil, select: !background, configuration: configuration, site: action.request.url)
         if !background { target.window?.makeKeyAndOrderFront(nil) }
         return newTab.ensureWebView()
     }

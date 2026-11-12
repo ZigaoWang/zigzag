@@ -1861,7 +1861,7 @@ extension BrowserWindowController: TabHost {
         // A result opened from a search page keeps the search one Back away.
         if disposition == .backgroundTab || disposition == .foregroundTab, let current = tab.url, SearchFolding.isSearchResultsPage(current),
            let history = tab.interactionStateForSaving {
-            let newTab = tabManager.newTab(url: nil, select: disposition == .foregroundTab, opener: tab, title: url.host())
+            let newTab = tabManager.newTab(url: nil, select: disposition == .foregroundTab, opener: tab, title: url.host(), site: url)
             newTab.restoreHistory(history, thenLoad: url)
             return
         }
@@ -1877,7 +1877,7 @@ extension BrowserWindowController: TabHost {
                 WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: tabManager.isPrivate || pending == .privateWindow)
                 return nil
             }
-            let newTab = tabManager.newTab(url: nil, select: false, configuration: configuration, opener: tab)
+            let newTab = tabManager.newTab(url: nil, select: false, configuration: configuration, opener: tab, site: action.request.url)
             return newTab.ensureWebView()
         }
         // Peeked pages open their links in the card itself.
@@ -1898,7 +1898,7 @@ extension BrowserWindowController: TabHost {
         }
         let flags = action.modifierFlags
         let background = flags.contains(.command) && !flags.contains(.shift)
-        let newTab = tabManager.newTab(url: nil, select: !background, configuration: configuration, opener: tab)
+        let newTab = tabManager.newTab(url: nil, select: !background, configuration: configuration, opener: tab, site: action.request.url)
         return newTab.ensureWebView()
     }
 

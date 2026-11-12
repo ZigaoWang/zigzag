@@ -336,6 +336,7 @@
 		E1A05EC81079773031DC8766 /* MCPTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60AE774C9F1A97F60F3E627 /* MCPTools.swift */; };
 		E31FC3B636082D37DDFB6A0D /* HistoryClusters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05040A784BBF98D3612C0A6A /* HistoryClusters.swift */; };
 		E341CC4E85411227052D3A17 /* Reader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18FC50557675B6C303B2E0AE /* Reader.swift */; };
+		E35DE3455DA23C45B296D4C4 /* SameSiteTabsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D17D0EB87AD6124B7E4334FF /* SameSiteTabsTests.swift */; };
 		E38366D663CE427B640F71A5 /* PeekController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FB43BE39C48B06C807284C2 /* PeekController.swift */; };
 		E3CB22F1889EA1CC95A8B978 /* TopBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81FB8E290856C58E182C447B /* TopBarView.swift */; };
 		E3DB108E2FCB680F0EF592AC /* FindCountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FCB792604C01E2E8F11B27E /* FindCountTests.swift */; };
@@ -712,6 +713,7 @@
 		D0B754CF4F921CAA567C219B /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		D0FDA440FDF6324DAFBA1C61 /* PasswordsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordsWindow.swift; sourceTree = "<group>"; };
 		D1368F679CEF702DA00EC3E6 /* Atmosphere.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Atmosphere.swift; sourceTree = "<group>"; };
+		D17D0EB87AD6124B7E4334FF /* SameSiteTabsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SameSiteTabsTests.swift; sourceTree = "<group>"; };
 		D2EA6931C96DF7709CF8A2B6 /* ChromiumExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromiumExtensions.swift; sourceTree = "<group>"; };
 		D302D7F28821481E9ABC2148 /* ghostery-adblocker-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "ghostery-adblocker-LICENSE.txt"; sourceTree = "<group>"; };
 		D31A2391B831DAAD2A652FCA /* Onboarding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Onboarding.swift; sourceTree = "<group>"; };
@@ -1335,6 +1337,7 @@
 				47104C74FDC45A440611D21F /* ReaderTests.swift */,
 				20694AE0469471EFE8837828 /* ReadyPicturesTests.swift */,
 				DFB1B0DA956C3C2FEED46E90 /* RowDeleteTests.swift */,
+				D17D0EB87AD6124B7E4334FF /* SameSiteTabsTests.swift */,
 				14F71A00B5EA5EDD64C993B3 /* SaveFailureTests.swift */,
 				633F57F860ED6EC0B7E99FC3 /* ScriptingTests.swift */,
 				7890881D589D032D70E5DC20 /* SecurityFixesTests.swift */,
@@ -1932,6 +1935,7 @@
 				95F74CDE51DB6895673489C5 /* ReaderTests.swift in Sources */,
 				E08BEB9DD0B1E0785AE72037 /* ReadyPicturesTests.swift in Sources */,
 				A76473630DD07B1AC5E521EB /* RowDeleteTests.swift in Sources */,
+				E35DE3455DA23C45B296D4C4 /* SameSiteTabsTests.swift in Sources */,
 				4A1BC30C9B5ABF6AAA3B3D90 /* SaveFailureTests.swift in Sources */,
 				5F21C65FD6DBBC3F333DFD27 /* ScriptingTests.swift in Sources */,
 				91501632F628CC18660775E6 /* SecurityFixesTests.swift in Sources */,
