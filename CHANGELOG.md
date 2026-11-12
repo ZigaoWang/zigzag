@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- Switching Borderless page with Settings open no longer leaves Settings laid out for the size it had: a scroll bar's strip beside the list of sections, a white band under it, and the switches out of line with the search field. Settings now moves with its page as the page takes or gives up its margin, and the page's corners and shadow follow the move instead of jumping to where they end. ([#184](https://github.com/ZigaoWang/zigzag/issues/184))
 - A zoomed page of a split goes back in its place when the pages swap, move or change layout, as it does when one comes or goes. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - With the address bar above the page and a split stacked, zooming the top page no longer brings back the bar's own buttons and address beside it. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - The mini player goes to the screen's corner while its window is on another space, instead of the corner of a window you can't see, and letting it go where that window would be no longer snaps it there. Closing the window while the player has the keyboard no longer brings that window forward for a moment. ([#172](https://github.com/ZigaoWang/zigzag/issues/172))
