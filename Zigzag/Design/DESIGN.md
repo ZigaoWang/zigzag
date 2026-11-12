@@ -366,10 +366,22 @@ something came from, answers at once, and can be interrupted.
   or a site's own Full screen fills the page row in its controls, a page's full screen (a player's button, its key)
   fills the page card, or its pane in a split, in black, the window's chrome as it was. No bar, no note: the player's
   own controls say it's in full screen, and Esc, in the page or anywhere in the window, leaves it.
-- **A site installed as an app** (`WebAppWindowController`, #165): Zigzag Mini's window, its frame in the color of
-  the space it was installed from, with a strip as slim as a pane header's: the traffic lights, back, forward and
-  reload in `Tokens.Pane` sizes, and the app's name in the middle in the row ink (the host instead, on another site
-  it went to for a sign-in). No sidebar, no address. It opens at `Metric.webAppWindowSize` and keeps its own frame.
+- **The bar of a one-page window** (`PageBar`, Zigzag Mini and installed apps): the page's own color, as a web app's
+  title bar is in Chrome and Safari, the page under it edge to edge so the two read as one surface. The color is the
+  site's theme color (WebKit picks its light or dark one), an installed app's manifest `theme_color` after it, each
+  only on the page's side of light and dark, else the page's own background; the plain card ground until the page
+  says. No space color or grain on it. Its ink is light or dark by contrast (`PaneHeaderView.inkAppearance`), its
+  controls take the neutral fills (`isOnPage`), and a 1px hairline marks its foot only when the page under it is
+  within `PageBar.hairlineContrast` of it. Zigzag Mini keeps its space as the chip that says where Open in goes.
+- **A site installed as an app** (`WebAppWindowController`, #165): that bar, `Metric.miniStripHeight` tall: the
+  traffic lights, back, forward and reload in `Tokens.Pane` sizes on the lights' center line, and the app's name in
+  the middle in the window title's font (`titleBarFont`), dimmed while the window isn't key (the host instead, on
+  another site it went to for a sign-in). No sidebar, no address. Show Toolbar off (its View menu, the bar's
+  right-click, Settings › General › Installed Apps), the page fills the window with the traffic lights over it in a
+  title bar's place (`Metric.webAppTitleBarHeight`), which still moves the window around them and in an 8pt band
+  across the top (`Metric.webAppDragBand`), leaving the page's own controls under it alone. While its window is
+  key the menu bar is the app's own (`WebAppMenuBar`): Hide and Quit name it and act on it alone, and there's no
+  New Tab or other browser item. It opens at `Metric.webAppWindowSize` and keeps its own frame.
   The install sheet is a `FormSheet`: the icon at 72pt over the name field, Install as its one prominent button. The
   icon is the site's own picture filling the Mac's rounded square (824 of 1024, with the system's soft shadow), a
   shape of its own on white with room around it, or the name's first letter on the site's color.

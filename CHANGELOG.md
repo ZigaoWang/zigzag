@@ -5,8 +5,15 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- An installed app's toolbar takes the site's own color, as web apps do in Chrome and Safari, with its name in the middle in a window title's type, and no grain. Turn it off for just the page with the window's buttons over it: View › Hide Toolbar in the app, a right-click on the toolbar, or the Toolbar switch for the app in Settings › General. The top of the window still moves it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
+- Zigzag Mini's bar takes the page's color too, so a dark site isn't topped by a light, grainy bar, and the page meets it edge to edge.
+
 ### Fixed
 - Dark pages are drawn by [Dark Reader](https://darkreader.org)'s engine, with its fixes for thousands of sites: a site's own colors are made dark one by one, instead of the page being turned over with a filter and patched up afterward. Sites written with newer kinds of colors, like Cloudflare's dashboard, no longer stay mostly light. A site with a dark look of its own, like GitHub or YouTube Music, is left exactly as it is, no longer painted partly light. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
+- ⌘Q in an installed app quits that app, not all of Zigzag. While its window is in front the menus are the app's own: Hide and Quit name it, and the browser's New Tab and the rest aren't there. ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
+- Peek's top strip is as slim as a split view's, and the frame around its page thinner, so the page gets more room.
+- Pages in Peek keep their own scrollbars, as in Safari: thin ones that show while you scroll, unless your Mac is set to always show them, dark on a dark page. Peek put a scrollbar of its own on every page, always showing.
 
 ## [0.8.7] - 2026-11-12
 
