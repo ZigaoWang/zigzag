@@ -1002,11 +1002,11 @@ final class BrowserRootView: SpaceFrameView {
     /// Under the bar above the page, a split's strips are the bar: each pane's moves up into the bar's row, over its
     /// pane, and the bar's own back, forward, reload and address, which would belong to neither page, step aside.
     /// Stacked, the top pane's goes up; the bottom one keeps its own on its card. In a tile group, the panes along
-    /// the top, left to right.
+    /// the top, left to right. A pane enlarged over the rest takes its strip with it, on its card.
     private var cardsForBar: [PageCardView] {
         guard showsTopBar, tiles != nil else { return [] }
         let frames = tileFrames, top = cardFrame.minY
-        return frames.indices.filter { frames[$0].minY <= top + 0.5 }.sorted { frames[$0].minX < frames[$1].minX }.map { paneCards[$0] }
+        return frames.indices.filter { frames[$0].minY <= top + 0.5 && $0 != zoomedPane }.sorted { frames[$0].minX < frames[$1].minX }.map { paneCards[$0] }
     }
 
     /// Whether the panes' strips are in the bar's row.

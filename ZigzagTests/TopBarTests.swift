@@ -388,6 +388,22 @@ struct TopBarTests {
         #expect(root.paneTargets.left.minY == root.topBar.frame.minY && root.paneTargets.right?.minY == root.topBar.frame.minY)
     }
 
+    @Test func aZoomedPaneTakesItsStripWithIt() {
+        let (root, _) = splitRoot()
+        root.setZoomedPane(0, animated: false)
+        root.layoutSubtreeIfNeeded()
+        // Enlarged over the rest, its strip is on its card, at its top, not left behind in the bar.
+        let strip = root.card.header
+        #expect(strip.isDescendant(of: root.card) && !strip.isHidden && !strip.isInBar)
+        #expect(root.card.frame == root.zoomFrame)
+        // The other pane's strip stays up in the bar.
+        #expect(root.secondCard.header.superview === root.topBar && root.stripsInBar)
+        // Back in its place, its strip goes up again.
+        root.setZoomedPane(nil, animated: false)
+        root.layoutSubtreeIfNeeded()
+        #expect(root.card.header.superview === root.topBar && root.card.header.isInBar)
+    }
+
     @Test func stackedOnlyTheTopPanesStripGoesUp() {
         let (root, sidebar) = splitRoot(vertical: true)
         #expect(root.card.header.superview === root.topBar)

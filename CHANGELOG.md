@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- With the address above the page, a zoomed pane in split view keeps its strip, with its address and buttons, on top of it, instead of leaving it behind in the bar. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
