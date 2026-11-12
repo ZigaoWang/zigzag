@@ -235,6 +235,7 @@
 		A1B187BBCB414BDCB56CB3D0 /* SharedSoundGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82E0C32893C3D5F6AEF17C46 /* SharedSoundGate.swift */; };
 		A1B642C243114E42A13CF1D0 /* api-surface.js in Resources */ = {isa = PBXBuildFile; fileRef = 0A6D4409217ACDE22F8A28EA /* api-surface.js */; };
 		A25128EAA13B9A069E8A0598 /* BridgeBookmarks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D77B180834B8F01E59D50DF /* BridgeBookmarks.swift */; };
+		A25CD0F7F3F6516C2D48EA8D /* SidebarEdgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A53B7FA15165C41D80113E1 /* SidebarEdgeTests.swift */; };
 		A297D44BA6B37496BC5287EC /* DownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */; };
 		A2ACCFEF365397393F528C75 /* Onboarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31A2391B831DAAD2A652FCA /* Onboarding.swift */; };
 		A49DFBB9C68513D2B9431F6A /* FaviconStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9FAF507728E18C4FC4266C5 /* FaviconStore.swift */; };
@@ -596,6 +597,7 @@
 		98C36FF6B8E4B6DBFC1DF273 /* Zigzag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zigzag.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		98C4AD0F5E55B24044483033 /* MaterialsShowcase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialsShowcase.swift; sourceTree = "<group>"; };
 		98D9F429D6C84167482CCFC1 /* Tutorial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tutorial.swift; sourceTree = "<group>"; };
+		9A53B7FA15165C41D80113E1 /* SidebarEdgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarEdgeTests.swift; sourceTree = "<group>"; };
 		9A5F13F7F71BE34AE017E82A /* EmojiSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiSearch.swift; sourceTree = "<group>"; };
 		9A6BF2A2F19A6A6964727837 /* ProxyCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyCheck.swift; sourceTree = "<group>"; };
 		9AD01A7A43B5EDAF47909918 /* CRXPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRXPackage.swift; sourceTree = "<group>"; };
@@ -1286,6 +1288,7 @@
 				FB5152360ED2798576497043 /* SettingsPageTests.swift */,
 				104B0C82EED3690FF32A2B00 /* SharedSoundGateTests.swift */,
 				014C509EA75D15344BB68028 /* ShipFixesTests.swift */,
+				9A53B7FA15165C41D80113E1 /* SidebarEdgeTests.swift */,
 				6567506B7F99FD1755289D6C /* SidebarMenuTests.swift */,
 				BBCDEF7114B3ECBE3F211615 /* SidebarSideTests.swift */,
 				DD95FCA35585195612C38204 /* SignInImportTests.swift */,
@@ -1849,6 +1852,7 @@
 				4A65CC145A4105C2BA63B742 /* SettingsPageTests.swift in Sources */,
 				5F8FD5529E5D633E06EE0A83 /* SharedSoundGateTests.swift in Sources */,
 				80ADEAD45C5C339358B88DFB /* ShipFixesTests.swift in Sources */,
+				A25CD0F7F3F6516C2D48EA8D /* SidebarEdgeTests.swift in Sources */,
 				4026E10B64D404C941974769 /* SidebarMenuTests.swift in Sources */,
 				9DFE67FDE820756905A9DEB7 /* SidebarSideTests.swift in Sources */,
 				FA190095693F186FC9FC635C /* SignInImportTests.swift in Sources */,

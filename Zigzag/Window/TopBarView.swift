@@ -20,8 +20,17 @@ final class TopBarView: NSView {
     var trailingInset: CGFloat = Tokens.Sidebar.edge { didSet { if trailingInset != oldValue { needsLayout = true } } }
 
     /// The sidebar's toggle, first after the traffic lights while the sidebar is hidden: the sidebar's own is out of
-    /// sight with it then. Shown, the sidebar keeps it in its own top row.
-    let sidebarButton = SidebarView.chromeButton("sidebar.left", toolTip: String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."))
+    /// sight with it then. Shown, the sidebar keeps it in its own top row. For a sidebar on the right it's last, at
+    /// the bar's trailing end, the side the sidebar comes out of.
+    let sidebarButton = SidebarView.chromeButton(SidebarView.toggleSymbol(onRight: false), toolTip: String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."))
+    /// Whether the sidebar is on the window's right: the toggle sits at the bar's trailing end and its glyph mirrors.
+    var sidebarOnRight = false {
+        didSet {
+            guard sidebarOnRight != oldValue else { return }
+            sidebarButton.symbol = SidebarView.toggleSymbol(onRight: sidebarOnRight)
+            needsLayout = true
+        }
+    }
     var showsSidebarButton = false { didSet { if showsSidebarButton != oldValue { refreshSidebarButton() } } }
     /// While the sidebar slides back in, its toggle stays here where the sidebar's own will land (this place in the
     /// window), still as the traffic lights, until the sidebar arrives with its own. Takes no room.
@@ -87,25 +96,38 @@ final class TopBarView: NSView {
     /// The sidebar's toggle when it's here, then the buttons, a button apart, then the address to the trailing inset,
     /// all centered on the lights' line. After the traffic lights the first glyph sits `Sidebar.lightsGap` after them,
     /// as the toggle's does in the sidebar's own top row; without them the first button starts `leadingInset` in.
-    static func frames(width: CGFloat, buttons: Int, sidebarButton: Bool = false, trafficLightsWidth: CGFloat,
+    /// `onRight`: the sidebar is on the right, so its toggle is at the bar's trailing end, where the sidebar's own
+    /// lands (`trailingToggle`), with the address ending as far before it as it starts after the buttons.
+    static func frames(width: CGFloat, buttons: Int, sidebarButton: Bool = false, onRight: Bool = false, trafficLightsWidth: CGFloat,
                        leadingInset: CGFloat = Tokens.Sidebar.edge, trailingInset: CGFloat) -> Frames {
         let mid = height / 2, b = Tokens.Sidebar.button
-        var x = leadX(sidebarButton: sidebarButton, trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset)
+        let leads = sidebarButton && !onRight
+        var x = leadX(sidebarButton: leads, trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset)
         func next() -> NSRect {
             defer { x += b }
             return NSRect(x: x, y: mid - b / 2, width: b, height: b)
         }
-        let toggle = sidebarButton ? next() : nil
+        let first = leads ? next() : nil
         let rects = (0..<buttons).map { _ in next() }
+        let last = sidebarButton && onRight ? trailingToggle(width: width) : nil
         let start = x + Tokens.Space.x2, h = Tokens.Sidebar.addressHeight
-        return Frames(sidebarButton: toggle, buttons: rects,
-                      address: NSRect(x: start, y: round(mid - h / 2), width: max(0, width - trailingInset - start), height: h))
+        let end = min(width - trailingInset, last.map { $0.minX - Tokens.Space.x2 } ?? .infinity)
+        return Frames(sidebarButton: first ?? last, buttons: rects,
+                      address: NSRect(x: start, y: round(mid - h / 2), width: max(0, end - start), height: h))
+    }
+
+    /// The toggle at the bar's trailing end, for a sidebar on the right: `Sidebar.edge` in from the window's edge
+    /// (the bar reaches it while the sidebar is hidden), where the sidebar's own sits in its top row
+    /// (`SidebarView.topRowFrames`), so it stays put as the sidebar comes and goes, framed or not.
+    private static func trailingToggle(width: CGFloat) -> NSRect {
+        let b = Tokens.Sidebar.button
+        return NSRect(x: width - Tokens.Sidebar.edge - b, y: height / 2 - b / 2, width: b, height: b)
     }
 
     /// Where the first control goes: its glyph `Sidebar.lightsGap` after the traffic lights, or `leadingInset` in.
     private static func leadX(sidebarButton: Bool, trafficLightsWidth: CGFloat, leadingInset: CGFloat) -> CGFloat {
         let b = Tokens.Sidebar.button
-        let glyph = Tokens.Symbol.inkSize(sidebarButton ? "sidebar.left" : "chevron.left", size: Tokens.Sidebar.glyph).width
+        let glyph = Tokens.Symbol.inkSize(sidebarButton ? SidebarView.toggleSymbol(onRight: false) : "chevron.left", size: Tokens.Sidebar.glyph).width
         return trafficLightsWidth > 0 ? round(Tokens.Sidebar.lightsX + trafficLightsWidth + Tokens.Sidebar.lightsGap - (b - glyph) / 2) : leadingInset
     }
 
@@ -162,13 +184,16 @@ final class TopBarView: NSView {
 
     /// Each pane's strip: the bar's height, over its pane, `inset` in from the pane's edges, and clear of the traffic
     /// lights and the sidebar's toggle at the row's leading end, so the first pane's back button is where the bar's
-    /// own would be.
-    static func stripFrames(panes: [ClosedRange<CGFloat>], sidebarButton: Bool = false, trafficLightsWidth: CGFloat,
-                            leadingInset: CGFloat, inset: CGFloat) -> [Strip] {
-        let start = leadX(sidebarButton: sidebarButton, trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset)
-            + (sidebarButton ? Tokens.Sidebar.button : 0)
+    /// own would be. For a sidebar on the right the toggle is at the row's trailing end instead (`frames`), and the
+    /// last strip ends where it starts.
+    static func stripFrames(panes: [ClosedRange<CGFloat>], sidebarButton: Bool = false, onRight: Bool = false, width: CGFloat = 0,
+                            trafficLightsWidth: CGFloat, leadingInset: CGFloat, inset: CGFloat) -> [Strip] {
+        let leads = sidebarButton && !onRight
+        let start = leadX(sidebarButton: leads, trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset)
+            + (leads ? Tokens.Sidebar.button : 0)
+        let end = sidebarButton && onRight ? trailingToggle(width: width).minX : .infinity
         return panes.map { pane in
-            let minX = max(pane.lowerBound + inset, start), maxX = max(minX, pane.upperBound - inset)
+            let minX = max(pane.lowerBound + inset, start), maxX = max(minX, min(pane.upperBound - inset, end))
             return Strip(frame: NSRect(x: minX, y: 0, width: maxX - minX, height: height),
                          addressCenter: (pane.lowerBound + pane.upperBound) / 2 - minX)
         }
@@ -181,7 +206,7 @@ final class TopBarView: NSView {
 
     /// Each control showing here and where it goes.
     private var places: [(view: NSView, frame: NSRect)] {
-        let frames = Self.frames(width: bounds.width, buttons: buttons.count, sidebarButton: showsSidebarButton,
+        let frames = Self.frames(width: bounds.width, buttons: buttons.count, sidebarButton: showsSidebarButton, onRight: sidebarOnRight,
                                  trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset, trailingInset: trailingInset)
         var places: [(view: NSView, frame: NSRect)] = []
         if let toggle = frames.sidebarButton { places.append((sidebarButton, toggle)) }
@@ -198,8 +223,8 @@ final class TopBarView: NSView {
     }
 
     private var stripPlaces: [Strip] {
-        Self.stripFrames(panes: stripPanes, sidebarButton: showsSidebarButton, trafficLightsWidth: trafficLightsWidth,
-                         leadingInset: leadingInset, inset: stripInset)
+        Self.stripFrames(panes: stripPanes, sidebarButton: showsSidebarButton, onRight: sidebarOnRight, width: bounds.width,
+                         trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset, inset: stripInset)
     }
 
     private func centerStripAddresses() {

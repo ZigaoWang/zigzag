@@ -290,7 +290,9 @@ something came from, answers at once, and can be interrupted.
   the sidebar (previews, the space editor, icons) opening left of it, the mini player first in the page's bottom
   left. The traffic lights stay at the window's top left, as on every Mac window: docked, the page leaves them a
   strip of the frame (`lightsStripHeight`, the sidebar's `addressTop`, so the page's top meets the address's line)
-  and the sidebar's top row keeps its toggle, back, forward and reload; with the bar above the page they're at the
+  and the sidebar's top row is the left one's mirror image, back, forward and reload toward the page and the toggle
+  at the outer end, where the bar above the page keeps it while the sidebar is hidden (`SidebarView.topRowFrames`,
+  its glyph `sidebar.right`), so it stays put as the sidebar comes and goes; with the bar above the page they're at the
   bar's leading end, as with the sidebar hidden; slid out without the bar, the floating sidebar carries them, the one piece of
   chrome then in view. The command bar stays centered on the window. Changing sides, the sidebar slides across
   while the pages glide the other way (`gentle`).
