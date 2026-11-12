@@ -323,6 +323,7 @@
 		F5D219451BC618FC595D20BA /* MCPService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62205A849DC72ED60ABA5EB7 /* MCPService.swift */; };
 		F642AD8EB346945EEB6E2E67 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4363A8C97194CFB82618511C /* main.swift */; };
 		F68205100699AE990735AFB7 /* ImportBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F8D15DA6B83F9C7DF8A4CB0 /* ImportBatch.swift */; };
+		F6E20DC18DFECE821A1E1AED /* OwnWindowTabsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8056AFCD49228FC19D70CCBD /* OwnWindowTabsTests.swift */; };
 		F7D93036C3CDCBF8FC71B036 /* MiniLinkWakeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8679BD8FFD9BC3825E36199 /* MiniLinkWakeTests.swift */; };
 		F972A38781338935BAF22135 /* WebsiteData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B5A4CDA29A214770AB79A6 /* WebsiteData.swift */; };
 		F9A91C05B07D863474CC6DEB /* MCPBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2904F433A0EC465A91389CF8 /* MCPBrowser.swift */; };
@@ -497,6 +498,7 @@
 		7E0B6E4ACCE3366126E94F4A /* DarkPalettesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPalettesTests.swift; sourceTree = "<group>"; };
 		7F945D7E0BF21B2E2FD7A4C7 /* EmojiSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiSearchTests.swift; sourceTree = "<group>"; };
 		804A63C8F2764EC4BE20451D /* PasswordStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordStoreTests.swift; sourceTree = "<group>"; };
+		8056AFCD49228FC19D70CCBD /* OwnWindowTabsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnWindowTabsTests.swift; sourceTree = "<group>"; };
 		81370CCCA627CE0FAFB02E03 /* ExtensionImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionImport.swift; sourceTree = "<group>"; };
 		818D2FEE410E6D64CD17AADD /* logins.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = logins.json; sourceTree = "<group>"; };
 		81C684CBB391686C907F7D7C /* MCPHTTP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPHTTP.swift; sourceTree = "<group>"; };
@@ -1150,6 +1152,7 @@
 				1FF592955291CE8F4D81FCBD /* NetworkChangesTests.swift */,
 				F2773876C78493A8043AE850 /* NumberHintsTests.swift */,
 				59BC11FC585D34A441C60694 /* OrionImportTests.swift */,
+				8056AFCD49228FC19D70CCBD /* OwnWindowTabsTests.swift */,
 				21702A8A7329B5CA2639717B /* PageHolderTests.swift */,
 				54C6B331BCC370A4B830EDE3 /* PageIconTests.swift */,
 				46D2E0F2330CC776A71AC19D /* PageStatePrivacyTests.swift */,
@@ -1656,6 +1659,7 @@
 				A0A0EF24BC36F7C73F38E37A /* NetworkChangesTests.swift in Sources */,
 				0C2258B7291E37CBE925C8D0 /* NumberHintsTests.swift in Sources */,
 				6442D472EF68990B9ED4855E /* OrionImportTests.swift in Sources */,
+				F6E20DC18DFECE821A1E1AED /* OwnWindowTabsTests.swift in Sources */,
 				99F89444C80043DB635C413D /* PageHolderTests.swift in Sources */,
 				9859101E7770D18A338184C0 /* PageIconTests.swift in Sources */,
 				47481B98A075C26B774A694A /* PageStatePrivacyTests.swift in Sources */,
