@@ -7508,6 +7508,28 @@
         }
       }
     },
+    "Move Bottom Left" : {
+      "comment" : "Shown over the bottom left quarter of the page while a page of a split view is dragged there by its strip.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到左下方"
+          }
+        }
+      }
+    },
+    "Move Bottom Right" : {
+      "comment" : "Shown over the bottom right quarter of the page while a page of a split view is dragged there by its strip.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到右下方"
+          }
+        }
+      }
+    },
     "Move Favorite" : {
       "comment" : "Undo action name, shown in the Edit menu as Undo Move Favorite.",
       "localizations" : {
@@ -7629,6 +7651,28 @@
         }
       }
     },
+    "Move Top Left" : {
+      "comment" : "Shown over the top left quarter of the page while a page of a split view is dragged there by its strip.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到左上方"
+          }
+        }
+      }
+    },
+    "Move Top Right" : {
+      "comment" : "Shown over the top right quarter of the page while a page of a split view is dragged there by its strip.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到右上方"
+          }
+        }
+      }
+    },
     "Move and Reload" : {
       "comment" : "Button of the sheet that asks before tabs move to a space on another profile.",
       "localizations" : {
@@ -7724,6 +7768,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "移到窗口"
+          }
+        }
+      }
+    },
+    "Move to the Bottom" : {
+      "comment" : "Shown over the bottom half of the page while a page of a split view is dragged there by its strip.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到下方"
+          }
+        }
+      }
+    },
+    "Move to the Left" : {
+      "comment" : "Shown over the left half of the page while a page of a split view is dragged there by its strip.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到左侧"
+          }
+        }
+      }
+    },
+    "Move to the Right" : {
+      "comment" : "Shown over the right half of the page while a page of a split view is dragged there by its strip.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到右侧"
+          }
+        }
+      }
+    },
+    "Move to the Top" : {
+      "comment" : "Shown over the top half of the page while a page of a split view is dragged there by its strip.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到上方"
           }
         }
       }
@@ -12981,6 +13069,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "替换"
+          }
+        }
+      }
+    },
+    "Swap Places" : {
+      "comment" : "Shown over a page of a split view while another page of it is dragged there by its strip: the two trade places.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "交换位置"
           }
         }
       }
