@@ -119,7 +119,7 @@ final class FavoritesView: NSView {
     /// A favorite dropped on another's middle: the two become one, side by side (`onRight`: the carried one right).
     var onJoin: ((Bookmark, UUID, Bool) -> Void)?
 
-    static let tileHeight = Tokens.Sidebar.favoriteHeight
+    static var tileHeight: CGFloat { Tokens.Sidebar.favoriteHeight }
 
     /// How many favorites to a row, a setting: 0 for as many as fit (`Sidebar.favoriteMinWidth`), or 2, 3 or 4.
     static var perRow: Int {
@@ -167,7 +167,17 @@ final class FavoritesView: NSView {
                 self.relayout(gliding: true)
             }
         }
+        // Settings › Appearance › Sidebar size: the tiles take their new height and icons at once.
+        sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.onHeightChange?()
+                self.relayout(gliding: false)
+                self.tiles.forEach { $0.needsLayout = true }
+            }
+        }
     }
+    private var sizeObserver: NSObjectProtocol?
 
     required init?(coder: NSCoder) { fatalError() }
 
@@ -582,7 +592,7 @@ final class FavoriteTile: InteractiveView {
         setCardRim(isSelected)
     }
 
-    private static let iconSide = Tokens.Sidebar.favoriteIcon
+    private static var iconSide: CGFloat { Tokens.Sidebar.favoriteIcon }
 }
 
 /// The row a carried favorite turns into over the tab list: its page, or a split's two pages side by side with a

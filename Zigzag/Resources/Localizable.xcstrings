@@ -7470,6 +7470,17 @@
         }
       }
     },
+    "Large" : {
+      "comment" : "A choice for “Sidebar size” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大"
+          }
+        }
+      }
+    },
     "Large Space Names" : {
       "comment" : "Item in a space's context menu. A checkmark item: shows every space's name large at the top of the sidebar.",
       "localizations" : {
@@ -7812,7 +7823,7 @@
       }
     },
     "Medium" : {
-      "comment" : "Choice of column width in Reader's text and color choices.",
+      "comment" : "A choice for “Sidebar size” in Settings › Appearance: the usual size.\nChoice of column width in Reader's text and color choices.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13057,6 +13068,17 @@
         }
       }
     },
+    "Sidebar size" : {
+      "comment" : "A setting in Settings › Appearance: how large the sidebar's tabs, folders, space names, favorites and address are, as macOS's Sidebar icon size.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏大小"
+          }
+        }
+      }
+    },
     "Sign In" : {
       "comment" : "Button in a site's HTTP sign-in sheet.",
       "localizations" : {
@@ -13229,6 +13251,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "石板灰"
+          }
+        }
+      }
+    },
+    "Small" : {
+      "comment" : "A choice for “Sidebar size” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小"
           }
         }
       }
@@ -14385,6 +14418,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "该网站的证书不是由你的 Mac 信任的机构颁发的。你自己网络上的网站（比如路由器）常常是这样。"
+          }
+        }
+      }
+    },
+    "The size of the tabs, folders, favorites and address. To make everything on your Mac larger, use Larger Text in System Settings › Displays." : {
+      "comment" : "Explanation under “Sidebar size” in Settings › Appearance. Larger Text and System Settings › Displays are macOS's own names.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签页、文件夹、收藏和地址栏的大小。若要放大 Mac 上的所有内容，请使用“系统设置 › 显示器”中的“更大字体”。"
           }
         }
       }
@@ -17888,6 +17932,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "标签页保持唤醒"
+          }
+        }
+      }
+    },
+    "text size font bigger larger smaller scale zoom interface ui" : {
+      "comment" : "Words that find the Sidebar size setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字大小 字体 字号 放大 缩小 更大 缩放 界面 text size font bigger scale"
           }
         }
       }

@@ -29,7 +29,7 @@ enum IconChoice {
     /// draws it gives it the ink around it; an emoji in its own colors.
     static func pageIcon(_ icon: String) -> NSImage {
         if let made = pageIcons[icon] { return made }
-        let side = Tokens.Sidebar.favicon
+        let side: CGFloat = 16
         let image: NSImage
         if isSymbol(icon) {
             let symbol = Tokens.Symbol.image(icon, size: Tokens.Symbol.row)

@@ -66,7 +66,12 @@ final class TopBarView: NSView {
         setAccessibilityRole(.toolbar)
         sidebarButton.isHidden = true
         addSubview(sidebarButton)
+        // Settings › Appearance › Sidebar size: the address held here takes its new height.
+        sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.needsLayout = true }
+        }
     }
+    private var sizeObserver: NSObjectProtocol?
 
     required init?(coder: NSCoder) { fatalError() }
 
