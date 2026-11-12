@@ -2,8 +2,8 @@ import AppKit
 import WebKit
 
 /// Zigzag Mini: one page in a small, quiet window of its own, with no sidebar, for a link from another app or a
-/// quick look-up. It wears its space as a browser window does (the same color, the same page card in a thin frame of
-/// it), with a slim strip on top: the space, the page's site, Copy Link and Open in. Its page is a real tab, so
+/// quick look-up. A slim strip on top in the page's own color (`PageBar`), the page under it edge to edge: the space
+/// it goes to, the page's site, Keep on Top, Copy Link and Open in. Its page is a real tab, so
 /// history, blocking, autofill and extensions work as they do anywhere; Open in moves that same live page into a
 /// browser window, in the space chosen on the strip. It's never saved: quitting lets it go, as Arc did.
 final class MiniWindowController: NSWindowController, NSWindowDelegate {
@@ -169,6 +169,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         paint(animated: false)
         showPage()
         refreshStrip()
+        refreshBar(animated: false)
         window.trafficLightOrigin = NSPoint(x: Tokens.Sidebar.lightsX, y: round((Tokens.Metric.miniStripHeight - window.trafficLightHeight) / 2))
         strip.trafficLightsWidth = window.trafficLightsWidth
     }
@@ -316,8 +317,18 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             window?.title = tab.displayTitle
             // A new web view (the page crashed and came back, or crossed into an extension's page) takes the old one's place.
             if change == .webView, tab.webView != nil, !movedOut { showPage() }
+            if change == .webView || change == .loading { refreshBar(animated: false) }
+        case .themeColor, .darkPage:
+            refreshBar(animated: true)
         default: break
         }
+    }
+
+    /// The strip in the page's own color (`PageBar`), its ink light or dark to read on it.
+    private func refreshBar(animated: Bool) {
+        root.bar.show(bar: PageBar.color(for: tab), page: tab.pageColor, animated: animated)
+        strip.appearance = root.bar.inkAppearance
+        strip.refreshColors()
     }
 
     /// "Open in Work": what the button and ⌘O's menu item say, with the space the page goes to.
@@ -732,61 +743,38 @@ extension MiniWindowController: TabHost {
 
 // MARK: - The window's content
 
-/// Zigzag Mini's content: the space's frame, the slim strip on top of it, and the page as a card in a thin, even
-/// frame of the space's color, so it reads as a small Zigzag window. Borderless (Settings › Appearance), the page fills
-/// the window under the strip and meets it in a straight line, as a page meets the toolbar in a compact window; the
-/// window rounds its own corners.
+/// Zigzag Mini's content: the slim strip on top in the page's own color (`PageBar`), and the page under it edge to
+/// edge, meeting the strip as one surface, as a web app's window is in Chrome or Safari; the window rounds its own
+/// corners. The space it goes to is the strip's chip, and the window's light or dark (`SpaceFrameView`) its own.
 final class MiniRootView: SpaceFrameView {
+    let bar = PageBarView()
     let strip = MiniStripView()
     let card = PageCardView()
     /// Over the page: the link under the pointer, a site's question, a toast.
     let overlay = PassthroughView()
     /// Over the whole window: the command bar.
     let barLayer = PassthroughView()
-    private var borderlessToken: NSObjectProtocol?
 
     init() {
         super.init(color: SpaceColor.sky.background)
-        [strip, card, overlay, barLayer].forEach(addSubview)
-        // The setting changed: the page grows to the edges (or back into its frame) as a browser window's does.
-        borderlessToken = NotificationCenter.default.addObserver(forName: BrowserRootView.borderlessChanged, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                Tokens.Motion.animate(Tokens.Motion.gentle, moves: true) {
-                    self.needsLayout = true
-                    self.layoutSubtreeIfNeeded()
-                }
-            }
-        }
+        [bar, strip, card, overlay, barLayer].forEach(addSubview)
+        card.isEdgeToEdge = true
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    isolated deinit {
-        if let borderlessToken { NotificationCenter.default.removeObserver(borderlessToken) }
-    }
-
     var cardFrame: NSRect {
         let top = Tokens.Metric.miniStripHeight
-        if BrowserRootView.isBorderless { return NSRect(x: 0, y: top, width: bounds.width, height: max(0, bounds.height - top)) }
-        let inset = Tokens.Metric.miniFrame
-        return NSRect(x: inset, y: top, width: max(0, bounds.width - inset * 2), height: max(0, bounds.height - top - inset))
+        return NSRect(x: 0, y: top, width: bounds.width, height: max(0, bounds.height - top))
     }
 
-    /// Borderless, the page covers all but the strip: the glass goes only under that.
-    override var glassFrame: NSRect {
-        guard BrowserRootView.isBorderless else { return bounds }
-        return NSRect(x: 0, y: 0, width: bounds.width, height: min(bounds.height, Tokens.Metric.miniStripHeight))
-    }
+    /// The bar and the page cover it all: a see-through space's glass has nothing to show through.
+    override var glassFrame: NSRect { .zero }
 
     override func layout() {
         super.layout()
-        let borderless = BrowserRootView.isBorderless
         strip.frame = NSRect(x: 0, y: 0, width: bounds.width, height: Tokens.Metric.miniStripHeight)
-        // Borderless, every corner is square: the top meets the strip in a line, the bottom ones are the window's own.
-        card.isAttached = borderless
-        card.squaresLeftCorners = (borderless, borderless)
-        card.squaresRightCorners = (borderless, borderless)
+        bar.frame = strip.frame
         card.frame = cardFrame
         overlay.frame = card.frame
         barLayer.frame = bounds
@@ -805,13 +793,15 @@ final class MiniStripView: NSView {
         let button = IconButton(symbol: "link", size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph,
                                 toolTip: Shortcuts.tooltip(String(localized: "Copy Link", comment: "Edit menu item."),
                                                            for: #selector(MiniWindowController.copyPageURL(_:))))
-        button.isChrome = true
+        // On the page's color: the neutral fills, which show on any color.
+        button.isOnPage = true
         return button
     }()
     /// Window › Keep on Top for this window: a pin, filled while it's on.
     let pinButton: IconButton = {
         let button = IconButton(symbol: "pin", size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph, toolTip: KeepOnTop.title)
-        button.isChrome = true
+        // On the page's color: the neutral fills, which show on any color.
+        button.isOnPage = true
         return button
     }()
     let openButton = MiniOpenButton()
@@ -913,11 +903,11 @@ final class MiniSpaceChip: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // Plain on the frame at rest; under the pointer and while its menu is open, the toolbar buttons' wash.
-        let fill: NSColor? = isPressed ? Tokens.Chrome.pressed : isHovered || isSelected ? Tokens.Chrome.hover : nil
+        // Plain on the strip at rest; under the pointer and while its menu is open, the buttons' neutral wash, which
+        // shows on the page's color whatever it is. Its ink is the strip's, light or dark for that color.
+        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered || isSelected ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
-        let theme = Brand.Theme.for(self)
-        let ink = isHovered || isSelected ? theme.rowInk : theme.quietInk
+        let ink = isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         label.textColor = ink
         picture.contentTintColor = ink
     }
@@ -983,12 +973,11 @@ final class MiniTitleView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // Plain on the frame at rest; under the pointer, the sidebar address's soft field, a step back when pressed.
-        let fill: NSColor? = isPressed ? Tokens.Chrome.fieldPressed : isHovered ? Tokens.Chrome.field : nil
+        // Plain on the strip at rest; under the pointer, a page's neutral field, a step deeper when pressed.
+        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.fieldFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
-        let theme = Brand.Theme.for(self)
-        label.textColor = isHovered ? theme.rowInk : theme.quietInk
-        mark.contentTintColor = theme.quietInk
+        label.textColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        mark.contentTintColor = Tokens.Color.textSecondary
     }
 
     override func viewDidMoveToWindow() {
@@ -1045,17 +1034,16 @@ final class MiniOpenButton: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // The sidebar address's soft field, a step brighter under the pointer, a step back when pressed; the space
-        // key's hairline around it, so it still reads as a button on a white or pale space.
-        let fill = isPressed ? Tokens.Chrome.fieldPressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
+        // A page's neutral field, which shows on the page's color whatever it is, a step on under the pointer and
+        // when pressed, with a hairline so it still reads as a button on a white page.
+        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.highlight : Tokens.Color.fieldFill
         layer?.set(backgroundColor: cgColor(fill), animated: false)
         Tokens.Motion.withoutAnimation {
             layer?.borderWidth = Tokens.Metric.hairline
-            layer?.borderColor = cgColor(Tokens.Chrome.keyEdge)
+            layer?.borderColor = cgColor(Tokens.Color.separator)
         }
-        let theme = Brand.Theme.for(self)
-        label.textColor = theme.rowInk
-        keys.textColor = theme.quietInk
+        label.textColor = Tokens.Color.textPrimary
+        keys.textColor = Tokens.Color.textSecondary
         alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
     }
 
