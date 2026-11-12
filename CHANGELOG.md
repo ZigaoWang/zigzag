@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Cloudflare's "verify you are human" check (Turnstile) no longer logs an error each time it renews, as on linux.do.
 
 ### New
+- Open in Zigzag Mini, in a tab's right-click menu, moves the page into a Zigzag Mini window as it is, history and all; ⌘Z puts the tab back. Hold Option as you drag a tab out of the window to do the same. ([#164](https://github.com/ZigaoWang/zigzag/issues/164))
 - In Change Icon, the first choice shows the site's own icon, so it's clear that it puts the site's icon back.
 - A new window shows the same spaces and tabs as your other windows, as in Arc: open, close, move or nest a tab in one and every window shows it. Each window keeps its own space and its own tab in each space. A page is on screen in one window at a time; another window on that tab says so, with Show Here to bring it over. Closing a window closes none of its tabs, and Move Tab to New Window opens a window on that tab. Private windows keep their tabs to themselves. ([#162](https://github.com/ZigaoWang/zigzag/issues/162))
 - Split view takes up to four tabs. Drag a tab over the page: the edges place it in a half, the corners in a quarter, and a preview shows where it lands. Three tabs are a half and two quarters, four a grid; the lines between them drag, and the group is one row in the sidebar that comes back after a restart. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
