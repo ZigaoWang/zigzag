@@ -64,7 +64,9 @@ final class FormGroup: NSView {
         background.layer?.borderColor = background.cgColor(Tokens.Color.surfaceGroupEdge)
         var y: CGFloat = 0
         let shown = rows.filter { !$0.isHidden }
-        lines.forEach { $0.isHidden = true }
+        // A line between each two rows shown, the rest hidden. Each is only told when that changes: hidden and shown
+        // again, it would fade out and in when the page changes size inside an animation.
+        for (i, line) in lines.enumerated() where line.isHidden != (i >= shown.count - 1) { line.isHidden.toggle() }
         for (i, row) in shown.enumerated() {
             let h = rowHeight(row, bounds.width)
             row.frame = NSRect(x: 0, y: y, width: bounds.width, height: h)
@@ -72,7 +74,6 @@ final class FormGroup: NSView {
             if i < shown.count - 1 {
                 // The hairline starts where the text does, past any picture, and runs to the group's edge.
                 let x = (row as? FormRow)?.textInset ?? (row as? SpaceSettingsRow)?.textInset ?? Tokens.Page.groupPad
-                lines[i].isHidden = false
                 lines[i].frame = NSRect(x: x, y: y, width: bounds.width - x - Tokens.Page.groupPad, height: Tokens.Metric.hairline)
             }
         }
@@ -705,7 +706,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var groupHeadings: [SettingsPane: Label] = [:]
     private let column = FlippedView()
     /// Scrolls the column when a short window can't fit every section in it.
-    private let columnScroll = NSScrollView()
+    private let columnScroll = OverlayScrollView()
+    /// The column's tint, behind the sections. Its own view, placed by the page's layout: on the sections' document
+    /// it was only as large as that, and the document doesn't follow the page while it changes size.
+    private let columnWash = ColorView()
     /// The chosen section's fill, gliding to the one you pick.
     private let sectionSelection = SelectionGlide()
     /// The wordmark and "Settings" at the top of the column, where History has its own.
@@ -714,7 +718,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let header = PageHeader()
     private let paneTitle = PageTitleView("")
     private let columnEdge = ColorView(color: Tokens.Color.separator)
-    private let scroll = NSScrollView()
+    private let scroll = OverlayScrollView()
     private let documentView = FlippedView()
     private(set) var pane = SettingsPane.general
     /// Finds a setting in any section, at the top right of the page.
@@ -949,7 +953,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     override var wantsUpdateLayer: Bool { true }
     override func updateLayer() {
         layer?.backgroundColor = cgColor(Tokens.Color.surface)
-        column.layer?.backgroundColor = cgColor(Brand.Theme.for(self).wash)
+        columnWash.color = Brand.Theme.for(self).wash
     }
 
     private var themeToken: SignalToken?
@@ -962,7 +966,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         column.addSubview(sectionSelection)
         buildColumn()
         // The column of sections takes a light tint of the window's space, so Settings belongs to it.
-        column.wantsLayer = true
+        addSubview(columnWash)
         columnScroll.drawsBackground = false
         // The column starts at the window's top, under the traffic lights, as it did before it scrolled.
         columnScroll.automaticallyAdjustsContentInsets = false
@@ -1304,7 +1308,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// symbols across the top when it's too narrow for even that (half of a split in a small window).
     private enum Arrangement { case column, rail, row }
     private var arrangement: Arrangement { bounds.width >= 720 ? .column : bounds.width >= 520 ? .rail : .row }
-    private var laidOutWidth: CGFloat = -1
 
     /// The page's edge to its content: the same as History's, and tighter on a narrow page.
     private var gutter: CGFloat { bounds.width < Tokens.Page.narrowWidth ? Tokens.Page.narrowGutter : Tokens.Page.gutter }
@@ -1316,49 +1319,55 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         return (round((width - inner) / 2), inner)
     }
 
+    /// Everything here is placed from the page's own bounds, and nothing is read back from a view just placed. The
+    /// page changes size inside animations (the sidebar hidden, Borderless page turned on or off): there, a view
+    /// still answers with the frame it had, and a layout built on such answers is the last size's, not this one's.
     override func layout() {
         super.layout()
         let arrangement = arrangement
         let line = Tokens.Metric.hairline
         let headerHeight = Tokens.Page.headerHeight
-        var area = bounds
+        // Where the sections go, and where the chosen one's pane goes.
+        let columnFrame: NSRect, area: NSRect
         switch arrangement {
         case .column, .rail:
             let width = arrangement == .column ? Tokens.Page.columnWidth : Tokens.Space.x16
-            columnScroll.frame = NSRect(x: 0, y: 0, width: width, height: bounds.height)
+            columnFrame = NSRect(x: 0, y: 0, width: width, height: bounds.height)
             columnEdge.frame = NSRect(x: width, y: 0, width: line, height: bounds.height)
             area = NSRect(x: width + line, y: 0, width: max(0, bounds.width - width - line), height: bounds.height)
-            header.frame = NSRect(x: area.minX, y: 0, width: area.width, height: headerHeight)
         case .row:
             // The header across the top, then the sections as a row of symbols under it.
-            let height = Tokens.Space.x10 + Tokens.Space.x2
-            header.frame = NSRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
-            columnScroll.frame = NSRect(x: 0, y: headerHeight, width: bounds.width, height: height)
-            columnEdge.frame = NSRect(x: 0, y: columnScroll.frame.maxY, width: bounds.width, height: line)
-            area = NSRect(x: 0, y: columnScroll.frame.maxY + line, width: bounds.width, height: max(0, bounds.height - columnScroll.frame.maxY - line))
+            columnFrame = NSRect(x: 0, y: headerHeight, width: bounds.width, height: Tokens.Space.x10 + Tokens.Space.x2)
+            columnEdge.frame = NSRect(x: 0, y: columnFrame.maxY, width: bounds.width, height: line)
+            area = NSRect(x: 0, y: columnFrame.maxY + line, width: bounds.width, height: max(0, bounds.height - columnFrame.maxY - line))
         }
+        columnWash.frame = columnFrame
+        columnScroll.frame = columnFrame
+        header.frame = NSRect(x: area.minX, y: 0, width: area.width, height: headerHeight)
         // The page scrolls under the header; in a row, under the sections too.
         let top = arrangement == .row ? area.minY : headerHeight
         scroll.frame = NSRect(x: area.minX, y: top, width: area.width, height: max(0, bounds.height - top))
-        let span = contentSpan(in: header.frame.width)
+        let span = contentSpan(in: area.width)
         // Rows have no card now, so their text sits a group's padding in: the title and search line up with it.
         header.contentFrame = (span.x + Tokens.Page.groupPad, span.x + span.width - Tokens.Page.groupPad)
         // With no column to carry it, the wordmark heads the pane's own title.
         refreshTitle()
         placeProfilePicker(arrangement)
         settingSearch.tint = Brand.Theme.for(self).accent
-        // The sections are laid out for the height in view; what still doesn't fit scrolls.
-        column.frame = NSRect(origin: .zero, size: columnScroll.contentSize)
-        let columnBottom = layoutColumn(arrangement)
-        column.frame.size.height = max(columnScroll.contentSize.height, ceil(columnBottom))
-        // The pane's rows depend only on the width, so a change of height just stretches the page under them,
-        // instead of rebuilding every row (Shortcuts has about a hundred).
-        if scroll.frame.width != laidOutWidth {
-            layoutDocument()
-        } else {
-            documentView.frame.size.height = max(contentHeight, scroll.contentSize.height)
-        }
+        // The sections are laid out for the height in view; what still doesn't fit scrolls. Their document is as
+        // tall as they are and no taller, so it only ever scrolls when they don't fit.
+        let sectionsBottom = layoutColumn(arrangement, in: columnFrame.size)
+        column.frame = NSRect(x: 0, y: 0, width: columnFrame.width, height: arrangement == .row ? columnFrame.height : ceil(sectionsBottom))
+        // The pane's rows depend only on the width, so a change of height leaves them be, instead of rebuilding
+        // every row (Shortcuts has about a hundred).
+        paneWidth = area.width
+        if paneWidth != laidOutWidth { layoutDocument() }
     }
+
+    /// The width the pane has for its rows: the scroll view's, as the last layout placed it.
+    private var paneWidth: CGFloat = 0
+    /// The width the rows were last laid out for; -1 has the next layout do them again.
+    private var laidOutWidth: CGFloat = -1
 
     /// The header's title: the chosen section, or "results" while a search goes through all of them (the column
     /// already says "settings").
@@ -1373,7 +1382,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// Lays the sections out down `column` and returns where the last one ends.
     @discardableResult
-    private func layoutColumn(_ arrangement: Arrangement) -> CGFloat {
+    private func layoutColumn(_ arrangement: Arrangement, in room: NSSize) -> CGFloat {
         columnTitle.isHidden = arrangement != .column
         items.forEach { $0.isCompact = arrangement != .column }
         // With names beside them, the sections about one profile stand under a heading and the menu that chooses it;
@@ -1390,36 +1399,36 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let gaps = CGFloat(items.filter { groupStarts.contains($0.pane) }.count)
         let gap = arrangement == .row ? Tokens.Space.x2 : Tokens.Space.x3
         // In the row they shrink to fit, rather than run off the page's edge.
-        let side = arrangement == .row ? min(Tokens.Space.x10, floor((column.bounds.width - Tokens.Space.x2 * 2 - gaps * gap) / count)) : Tokens.Space.x10
+        let side = arrangement == .row ? min(Tokens.Space.x10, floor((room.width - Tokens.Space.x2 * 2 - gaps * gap) / count)) : Tokens.Space.x10
         // Down the column, a short page (a small window) takes some height off each section, never below a control's,
         // so all of them fit under the title.
         let top = Tokens.Page.headerHeight + Tokens.Space.x1
         func height(_ tallest: CGFloat) -> CGFloat {
             let headings = CGFloat(groupHeadings.count) * headingRoom
-            return max(Tokens.Page.controlHeight, min(tallest, floor((column.bounds.height - top - Tokens.Space.x2 - gaps * gap - headings) / count) - 2))
+            return max(Tokens.Page.controlHeight, min(tallest, floor((room.height - top - Tokens.Space.x2 - gaps * gap - headings) / count) - 2))
         }
         var bottom: CGFloat = 0
         switch arrangement {
         case .column:
             // The title sits where History's does; the sections' text lines up under it, their fills reaching past.
             let gutter = Tokens.Page.gutter, inset = Tokens.Page.rowInset
-            columnTitle.frame = NSRect(x: gutter, y: Tokens.Page.headerTop, width: column.bounds.width - gutter * 2, height: Tokens.Page.controlHeight)
+            columnTitle.frame = NSRect(x: gutter, y: Tokens.Page.headerTop, width: room.width - gutter * 2, height: Tokens.Page.controlHeight)
             let rowHeight = height(Tokens.Page.rowHeight)
             var y = top
             for item in items {
                 if grouped, item.pane == SettingsPane.perProfile.first {
                     y += Tokens.Space.x3
-                    profileHeading.frame = NSRect(x: gutter - Label.inset, y: y, width: column.bounds.width - gutter * 2, height: profileHeading.lineHeight)
+                    profileHeading.frame = NSRect(x: gutter - Label.inset, y: y, width: room.width - gutter * 2, height: profileHeading.lineHeight)
                     y = profileHeading.frame.maxY + Tokens.Space.x2
-                    profilePicker.frame = NSRect(x: gutter - inset, y: y, width: column.bounds.width - (gutter - inset) * 2, height: Tokens.Page.controlHeight)
+                    profilePicker.frame = NSRect(x: gutter - inset, y: y, width: room.width - (gutter - inset) * 2, height: Tokens.Page.controlHeight)
                     y = profilePicker.frame.maxY + Tokens.Space.x2
                 }
                 if groupStarts.contains(item.pane) { y += gap }
                 if let heading = groupHeadings[item.pane] {
-                    heading.frame = NSRect(x: gutter - Label.inset, y: y, width: column.bounds.width - gutter * 2, height: heading.lineHeight)
+                    heading.frame = NSRect(x: gutter - Label.inset, y: y, width: room.width - gutter * 2, height: heading.lineHeight)
                     y = heading.frame.maxY + Tokens.Space.x1
                 }
-                item.frame = NSRect(x: gutter - inset, y: y, width: column.bounds.width - (gutter - inset) * 2, height: rowHeight)
+                item.frame = NSRect(x: gutter - inset, y: y, width: room.width - (gutter - inset) * 2, height: rowHeight)
                 y += rowHeight + 2
             }
             bottom = y + Tokens.Space.x2
@@ -1428,18 +1437,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             var y = top
             for item in items {
                 if groupStarts.contains(item.pane) { y += gap }
-                item.frame = NSRect(x: (column.bounds.width - side) / 2, y: y, width: side, height: rowHeight)
+                item.frame = NSRect(x: (room.width - side) / 2, y: y, width: side, height: rowHeight)
                 y += rowHeight + 2
             }
             bottom = y + Tokens.Space.x2
         case .row:
             // Spread evenly across, but never further apart than the rail has them.
-            let spacing = min(Tokens.Space.x2, max(0, (column.bounds.width - Tokens.Space.x4 * 2 - side * count - gaps * gap) / (count - 1)))
+            let spacing = min(Tokens.Space.x2, max(0, (room.width - Tokens.Space.x4 * 2 - side * count - gaps * gap) / (count - 1)))
             let total = side * count + spacing * (count - 1) + gaps * gap
-            var x = max(0, round((column.bounds.width - total) / 2))
+            var x = max(0, round((room.width - total) / 2))
             for item in items {
                 if groupStarts.contains(item.pane) { x += gap }
-                item.frame = NSRect(x: x, y: (column.bounds.height - side) / 2, width: side, height: side)
+                item.frame = NSRect(x: x, y: (room.height - side) / 2, width: side, height: side)
                 x += side + spacing
             }
         }
@@ -2151,9 +2160,32 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         #if DEBUG
         debugLayouts += 1
         #endif
-        documentView.subviews.forEach { $0.removeFromSuperview() }
-        let width = scroll.contentSize.width
-        laidOutWidth = scroll.frame.width
+        // What's on the page stays on it and is only moved: taken off and put back, everything would fade out and in
+        // when the page changes size inside an animation, instead of gliding to its place.
+        var placed = Set<ObjectIdentifier>()
+        func place(_ view: NSView) {
+            if view.superview !== documentView { documentView.addSubview(view) }
+            placed.insert(ObjectIdentifier(view))
+        }
+        var part = 0
+        // A label or button made for this layout: the one made last time for the same place, if it says the same.
+        func made<Part: NSView>(_ says: String, _ make: () -> Part) -> Part {
+            part += 1
+            let key = "\(part) \(says)"
+            if let part = madeParts[key] as? Part { return part }
+            let new = make()
+            madeParts[key] = new
+            return new
+        }
+        let width = paneWidth
+        laidOutWidth = width
+        // Whatever the last layout placed and this one didn't comes off. The page is as tall as its rows and no
+        // taller, so it scrolls only when they don't fit, whatever the height in view.
+        func finish(_ y: CGFloat) {
+            for view in documentView.subviews where !placed.contains(ObjectIdentifier(view)) { view.removeFromSuperview() }
+            madeParts = madeParts.filter { placed.contains(ObjectIdentifier($0.value)) }
+            documentView.frame = NSRect(x: 0, y: 0, width: width, height: y)
+        }
         // The pane lines up with the header over it: the shared margins and maximum width, centered past it.
         let span = contentSpan(in: width)
         let pad = span.x, contentWidth = span.width
@@ -2165,34 +2197,41 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             if title != nil || accessory != nil {
                 let size = accessory.map { $0.fittingSize } ?? .zero
                 let slot = max(Tokens.Metric.sectionLabelHeight, size.height + Tokens.Space.x2)
-                let label = Label.groupHeading(title ?? "")
+                let label = made(title ?? "") { Label.groupHeading(title ?? "") }
                 let labelY = y + slot - Tokens.Space.x2 - label.lineHeight
                 label.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: labelY,
                                      width: max(0, contentWidth - size.width - Tokens.Space.x4 - Tokens.Page.groupPad), height: label.lineHeight)
-                documentView.addSubview(label)
+                place(label)
                 if let accessory {
                     accessory.frame = NSRect(x: pad + contentWidth - Tokens.Page.groupPad - size.width, y: round(label.frame.midY - size.height / 2),
                                              width: size.width, height: size.height)
-                    documentView.addSubview(accessory)
+                    place(accessory)
                 }
                 y += slot
             }
             group.frame = NSRect(x: pad, y: y, width: contentWidth, height: group.fittingHeight(for: contentWidth))
             group.needsLayout = true
-            documentView.addSubview(group)
+            place(group)
             y = group.frame.maxY + Tokens.Page.groupGap
         }
 
-        // A line said once under a group, in the rows' own explanation style, wrapping on a narrow page.
+        // A line in the rows' own explanation style, wrapping on a narrow page.
+        func explanation(_ text: String) -> NSTextField {
+            made(text) {
+                let label = NSTextField(wrappingLabelWithString: text)
+                label.font = Tokens.Font.detail()
+                label.textColor = Tokens.Color.textSecondary
+                label.isSelectable = false
+                return label
+            }
+        }
+        // One said once under a group.
         func note(_ text: String) {
-            let label = NSTextField(wrappingLabelWithString: text)
-            label.font = Tokens.Font.detail()
-            label.textColor = Tokens.Color.textSecondary
-            label.isSelectable = false
+            let label = explanation(text)
             let textWidth = max(0, contentWidth - Tokens.Page.groupPad * 2) + Label.inset * 2
             let height = ceil(label.sizeThatFits(NSSize(width: textWidth, height: 400)).height)
             label.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y - Tokens.Page.groupGap + Tokens.Space.x2, width: textWidth, height: height)
-            documentView.addSubview(label)
+            place(label)
             y = label.frame.maxY + Tokens.Page.groupGap
         }
 
@@ -2207,22 +2246,24 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 let shown = groups(of: pane).filter { $0.group.rows.contains { !$0.isHidden } }
                 guard !shown.isEmpty else { continue }
                 found = true
-                let heading = Label(pane.title, font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
+                let heading = made(pane.title) { Label(pane.title, font: Tokens.Font.heading(), color: Tokens.Color.textPrimary) }
                 heading.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y, width: contentWidth - Tokens.Page.groupPad, height: heading.lineHeight)
-                documentView.addSubview(heading)
+                place(heading)
                 y = heading.frame.maxY + Tokens.Space.x3
                 for (title, group) in shown { section(title, group) }
                 y += Tokens.Space.x2
             }
             if !found {
                 let words = settingSearch.stringValue.trimmingCharacters(in: .whitespaces)
-                let none = Label(String(localized: "No settings match “\(words)”.", comment: "In Settings when Find a setting finds nothing; what was typed."),
-                                 font: Tokens.Font.row(), color: Tokens.Color.textSecondary)
+                let none = made(words) {
+                    Label(String(localized: "No settings match “\(words)”.", comment: "In Settings when Find a setting finds nothing; what was typed."),
+                          font: Tokens.Font.row(), color: Tokens.Color.textSecondary)
+                }
                 none.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y, width: contentWidth - Tokens.Page.groupPad, height: none.lineHeight)
-                documentView.addSubview(none)
+                place(none)
                 y = none.frame.maxY + Tokens.Space.x6
             }
-            finishDocument(y, width: width)
+            finish(y)
             return
         }
 
@@ -2251,52 +2292,50 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .extensions:
             // With nothing installed, the empty row already offers Get Extensions; once said is enough.
             getExtensionsButton.isHidden = !hasExtensions
-            let buttons = NSStackView(views: [loadUnpackedButton, getExtensionsButton])
-            buttons.spacing = Tokens.Space.x2
+            let buttons: NSStackView = made("buttons") {
+                let buttons = NSStackView(views: [loadUnpackedButton, getExtensionsButton])
+                buttons.spacing = Tokens.Space.x2
+                return buttons
+            }
             section(installedHeading, extensionsGroup, accessory: buttons)
             if !otherProfilesGroup.rows.isEmpty { section(Self.otherProfilesHeading, otherProfilesGroup) }
             section(nil, developerGroup)
         case .shortcuts:
-            let resetAll = PillButton(title: String(localized: "Reset All…", comment: "Button in Settings › Shortcuts that puts every shortcut back."))
-            resetAll.isHidden = !Shortcuts.hasChanges
-            // Every shortcut you set, back to how Zigzag comes: asked first, as Sites' Reset All is.
-            resetAll.onClick = { [weak self] _ in
-                self?.confirm(title: String(localized: "Reset all shortcuts?", comment: "Title of the sheet that puts every shortcut back."),
-                              message: String(localized: "Every shortcut you changed goes back to its default.", comment: "Message of the sheet that puts every shortcut back."),
-                              action: String(localized: "Reset All", comment: "Button of the sheet that puts every shortcut back.")) {
-                    Shortcuts.resetAll()
-                    ShortcutRow.lastTaken = nil
-                    self?.reloadShortcuts()
-                    self?.layoutDocument()
+            let resetAll: PillButton = made("reset") {
+                let resetAll = PillButton(title: String(localized: "Reset All…", comment: "Button in Settings › Shortcuts that puts every shortcut back."))
+                // Every shortcut you set, back to how Zigzag comes: asked first, as Sites' Reset All is.
+                resetAll.onClick = { [weak self] _ in
+                    self?.confirm(title: String(localized: "Reset all shortcuts?", comment: "Title of the sheet that puts every shortcut back."),
+                                  message: String(localized: "Every shortcut you changed goes back to its default.", comment: "Message of the sheet that puts every shortcut back."),
+                                  action: String(localized: "Reset All", comment: "Button of the sheet that puts every shortcut back.")) {
+                        Shortcuts.resetAll()
+                        ShortcutRow.lastTaken = nil
+                        self?.reloadShortcuts()
+                        self?.layoutDocument()
+                    }
                 }
+                return resetAll
             }
+            resetAll.isHidden = !Shortcuts.hasChanges
             let rw = resetAll.fittingWidth, rh = Tokens.Page.controlHeight
             resetAll.frame = NSRect(x: pad + contentWidth - Tokens.Page.groupPad - rw, y: y, width: rw, height: rh)
-            documentView.addSubview(resetAll)
+            place(resetAll)
             // Wraps on a narrow page rather than losing its end, its first line beside Reset All.
-            let hint = NSTextField(wrappingLabelWithString: String(localized: "Click a shortcut to change or remove it. To find one, type its name or keys in Find a setting.",
-                                                                   comment: "Hint at the top of Settings › Shortcuts. “Find a setting” is the search field's placeholder."))
-            hint.font = Tokens.Font.detail()
-            hint.textColor = Tokens.Color.textSecondary
-            hint.isSelectable = false
+            let hint = explanation(String(localized: "Click a shortcut to change or remove it. To find one, type its name or keys in Find a setting.",
+                                           comment: "Hint at the top of Settings › Shortcuts. “Find a setting” is the search field's placeholder."))
             let hintWidth = max(0, contentWidth - Tokens.Page.groupPad * 2 - (resetAll.isHidden ? 0 : rw + Tokens.Space.x4)) + Label.inset * 2
             let hintHeight = ceil(hint.sizeThatFits(NSSize(width: hintWidth, height: 400)).height)
             let lineHeight = ceil(hint.font.map { NSLayoutManager().defaultLineHeight(for: $0) } ?? hintHeight)
             hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y + round((rh - lineHeight) / 2), width: hintWidth, height: hintHeight)
-            documentView.addSubview(hint)
+            place(hint)
             y = max(y + rh, hint.frame.maxY) + Tokens.Space.x2
             for (title, group) in shortcutGroups { section(title, group) }
         }
-        finishDocument(y, width: width)
+        finish(y)
     }
 
-    private func finishDocument(_ y: CGFloat, width: CGFloat) {
-        contentHeight = y
-        let height = max(y, scroll.contentSize.height)
-        documentView.frame = NSRect(x: 0, y: 0, width: width, height: height)
-    }
-
-    private var contentHeight: CGFloat = 0
+    /// The labels and buttons the last layout made for the page, by where they go and what they say.
+    private var madeParts: [String: NSView] = [:]
 
     private var hasExtensions: Bool {
         if #available(macOS 15.4, *) { return !profile.extensions.installed.isEmpty }
