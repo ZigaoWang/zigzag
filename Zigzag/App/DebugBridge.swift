@@ -623,6 +623,10 @@ enum DebugBridge {
         case "iconpicker":
             let list = controller.tabManager.navigableTabs
             if let n = Int(arg), list.indices.contains(n) { controller.chooseIcon(for: list[n]) }
+        // iconsearch [text]: puts text in the open icon grid's field, as if typed (#163). iconreturn, iconesc: those keys.
+        case "iconsearch": IconPickerPanel.current?.grid.type(arg)
+        case "iconreturn": IconPickerPanel.current?.grid.pickFirstResult()
+        case "iconesc": IconPickerPanel.current?.grid.endSearch()
         // pageicon <index> <icon|none>: gives the tab at that sidebar position an icon of its own, as Change Icon… does.
         case "pageicon":
             let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
