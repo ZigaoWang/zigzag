@@ -920,6 +920,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                     guard let self, let card else { return }
                     self.editAddress(of: tab, from: card.header.address)
                 }
+                card.header.onSiteControls = { [weak self] tab, anchor in self?.showSiteControls(for: tab, from: anchor) }
             }
         } else {
             root.setZoomedPane(nil, animated: false)
@@ -1043,6 +1044,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func editAddress(of tab: Tab, from anchor: NSView) {
         if tabManager.selectedTab !== tab { tabManager.select(tab) }
         commandBar.show(mode: .editCurrent, anchor: anchor)
+    }
+
+    /// Site Controls from a split pane's strip: that pane becomes the one you're in, and the panel is about its page,
+    /// under its address (#160).
+    func showSiteControls(for tab: Tab, from anchor: NSView) {
+        if SitePanel.isOpen(in: window), SitePanel.shown?.describes(tab) == false { SitePanel.closeCurrent() }
+        guard let page = tabManager.siteControlsTab(from: tab), page === tab else { return }
+        SitePanel.toggle(in: self, from: anchor, tab: page)
     }
 
     /// In split view, clicking a pane makes its tab the one you're working in.

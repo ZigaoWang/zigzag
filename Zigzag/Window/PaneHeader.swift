@@ -41,8 +41,11 @@ final class PaneHeaderView: NSView {
     private(set) weak var tab: Tab?
     private var token: SignalToken?
     static let height = Tokens.Pane.height
+    static let siteControlsTitle = String(localized: "Site Controls", comment: "Name of the button by the address that opens the site panel: its tooltip and VoiceOver name.")
     /// Clicked the address: edit this pane's page's address (the window focuses the pane first).
     var onEditAddress: ((Tab) -> Void)?
+    /// Site Controls asked for, from the button at the address's end or ⋯: for this pane's page, under this view (#160).
+    var onSiteControls: ((Tab, NSView) -> Void)?
     /// A split of two has swap and the layout; a tile group's pages keep the places they were dropped in (#160).
     var arrangesSplit = true { didSet { if arrangesSplit != oldValue { needsLayout = true } } }
     /// Up in the bar above the page (`TopBarView.strips`) instead of on the pane's card: the bar's height, on the
@@ -78,9 +81,17 @@ final class PaneHeaderView: NSView {
             guard let self, let tab = self.tab else { return }
             self.onEditAddress?(tab)
         }
+        address.siteControls.onClick = { [weak self] _ in self?.openSiteControls() }
+        address.siteControls.onRightClick = { [weak self] _ in self?.openSiteControls(); return nil }
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Site Controls for this pane's page: under the address, or under ⋯ while the address has no room for its button.
+    private func openSiteControls() {
+        guard let tab else { return }
+        onSiteControls?(tab, address.isHidden ? more : address)
+    }
 
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { isInBar }
@@ -129,7 +140,7 @@ final class PaneHeaderView: NSView {
         // Up in the bar, the bar's own appearance is the strip's.
         appearance = isInBar ? nil : Self.inkAppearance(on: ground).flatMap(NSAppearance.init(named:))
         let onPage = !isInBar && ground != nil
-        [back, forward, reload, zoom, swap, orientation, close, more, closeTab].forEach { $0.isOnPage = onPage }
+        [back, forward, reload, zoom, swap, orientation, close, more, closeTab, address.siteControls].forEach { $0.isOnPage = onPage }
     }
 
     func setVertical(_ vertical: Bool) {
@@ -210,6 +221,11 @@ final class PaneHeaderView: NSView {
             })
         }
         var entries: [MenuPanel.Entry] = []
+        // The address too narrow for its own button: Site Controls comes here, first, as it's about the page.
+        if !address.showsSiteControls, tab != nil {
+            entries.append(.item(.init(title: Self.siteControlsTitle, symbol: address.siteControls.symbol) { [weak self] in self?.openSiteControls() }))
+            entries.append(.separator)
+        }
         if !currentFit.showsForward { entries.append(item(forward)) }
         if !currentFit.showsReload { entries.append(item(reload)) }
         if !entries.isEmpty { entries.append(.separator) }
@@ -288,6 +304,22 @@ final class TitleBandGuard: NSControl {
 final class PaneAddressView: InteractiveView {
     private let label = Label("", font: .systemFont(ofSize: Tokens.Pane.addressText), color: Tokens.Color.textSecondary)
     static let padding = Tokens.Space.x2 + 2
+    /// Site Controls for this pane's page, at the field's end as in the sidebar's address (#160).
+    let siteControls = IconButton(symbol: "slider.horizontal.3", size: PaneAddressView.buttonSide, symbolSize: Tokens.Pane.glyph - 1,
+                                  toolTip: PaneHeaderView.siteControlsTitle)
+    static let buttonSide = Tokens.Pane.addressHeight - buttonInset * 2
+    static let buttonInset: CGFloat = 2
+    /// What the field keeps for its button: the button, its inset from the end, less the padding it stands in.
+    static var buttonRoom: CGFloat { buttonSide + buttonInset * 2 - padding + Tokens.Space.x1 }
+    /// The least of a cut address the field shows beside its button; any narrower and the button goes into the
+    /// strip's ⋯, leaving the address its room.
+    static let minTextWithButton: CGFloat = 56
+
+    /// Whether the button shows at a width: beside the whole address, or beside enough of a cut one to read.
+    static func showsButton(width: CGFloat, fitting: CGFloat, hasText: Bool) -> Bool {
+        hasText && (width >= fitting - 0.5 || width >= padding * 2 + buttonRoom + minTextWithButton)
+    }
+    var showsSiteControls: Bool { !isHidden && !siteControls.isHidden }
 
     var text: String {
         get { label.stringValue }
@@ -302,7 +334,7 @@ final class PaneAddressView: InteractiveView {
     /// before it cuts (centered, so they never show).
     var fittingWidth: CGFloat {
         let cell = label.cell.map { ceil($0.cellSize.width) - Label.inset * 2 } ?? 0
-        return max(cell, label.inkWidth) + Self.padding * 2 + Self.slack
+        return max(cell, label.inkWidth) + Self.padding * 2 + Self.slack + Self.buttonRoom
     }
     private static let slack: CGFloat = Tokens.Space.x2
 
@@ -313,6 +345,9 @@ final class PaneAddressView: InteractiveView {
         layer?.cornerRadius = Tokens.Radius.control
         layer?.cornerCurve = .continuous
         addSubview(label)
+        siteControls.radius = Tokens.Radius.control - Self.buttonInset
+        siteControls.pressOutset = NSEdgeInsets(top: Self.buttonInset, left: 1, bottom: Self.buttonInset, right: Self.buttonInset)
+        addSubview(siteControls)
         setAccessibilityRole(.button)
         setAccessibilityHelp(String(localized: "Edit this page’s address", comment: "VoiceOver hint of the address in a split view page's strip."))
     }
@@ -327,8 +362,12 @@ final class PaneAddressView: InteractiveView {
     override func layout() {
         super.layout()
         let h = label.lineHeight
+        let button = Self.showsButton(width: bounds.width, fitting: fittingWidth, hasText: !text.isEmpty)
+        siteControls.isHidden = !button
+        let side = Self.buttonSide
+        siteControls.frame = NSRect(x: bounds.width - Self.buttonInset - side, y: (bounds.height - side) / 2, width: side, height: side)
         label.frame = NSRect(x: Self.padding - Label.inset, y: (bounds.height - h) / 2,
-                             width: max(0, bounds.width - Self.padding * 2 + Label.inset * 2), height: h)
+                             width: max(0, bounds.width - Self.padding * 2 - (button ? Self.buttonRoom : 0) + Label.inset * 2), height: h)
     }
 
     override func stateDidChange(animated: Bool) {

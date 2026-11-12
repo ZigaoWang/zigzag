@@ -17,6 +17,8 @@ final class SitePanel: FloatingPanelView {
 
     private weak var controller: BrowserWindowController?
     private weak var anchor: NSView?
+    /// The button it opened from, shown pressed while it's open: the sidebar's, or a split pane's (#160).
+    private weak var opener: IconButton?
     private var monitor: Any?
     private let tab: Tab
     /// A private window's, even on a new tab with no page yet: no extensions there.
@@ -90,9 +92,9 @@ final class SitePanel: FloatingPanelView {
     private var width: CGFloat = SitePanel.width
     private var pad: CGFloat { width < Self.width ? Tokens.Space.x3 : Tokens.Space.x4 }
 
-    private init?(controller: BrowserWindowController) {
+    private init?(controller: BrowserWindowController, tab asked: Tab?) {
         // With no page (a new tab), it still opens: your extensions are always one click away.
-        let tab = controller.tabManager.selectedTab ?? Tab(url: nil, spaceID: controller.tabManager.currentSpaceID)
+        let tab = asked ?? controller.tabManager.selectedTab ?? Tab(url: nil, spaceID: controller.tabManager.currentSpaceID)
         let url = tab.url.flatMap { ["http", "https", "webkit-extension"].contains($0.scheme ?? "") ? $0 : nil }
         isBlank = url == nil
         self.controller = controller
@@ -170,39 +172,53 @@ final class SitePanel: FloatingPanelView {
 
     // MARK: Showing
 
-    static func toggle(in controller: BrowserWindowController, from anchor: NSView) {
+    /// Opens the panel under `anchor`, or closes the one open. `tab` is the page it's about: a split pane's, from
+    /// its strip (#160); nil is the tab you're in, which in a split is the pane you're in.
+    static func toggle(in controller: BrowserWindowController, from anchor: NSView, tab: Tab? = nil) {
         if let current, current.superview != nil { current.close(); return }
-        guard let panel = SitePanel(controller: controller) else { return }
+        guard let panel = SitePanel(controller: controller, tab: tab) else { return }
         controller.closeFloatingPanels()
         panel.anchor = anchor
-        let anchorFrame = anchor.convert(anchor.bounds, to: controller.root.overlay)
+        let overlay = controller.root.overlay
+        let anchorFrame = anchor.convert(anchor.bounds, to: overlay)
         // From the address bar in the sidebar: its width and left edge, just below it. With the sidebar slid out or
         // hidden it's the same width (the address keeps its width off screen), so it never grows past the sidebar.
         // From the address above the page, the sidebar's width, under the address's end where its button is.
+        // From a split pane's strip (on its card or up in the bar), its own width, under that pane's address's end,
+        // where its button is, and kept in the window.
+        let pane = Self.paneStrip(of: anchor) != nil
         let aboveThePage = anchor.isDescendant(of: controller.root.topBar)
         let sidebarLane = controller.root.sidebarWidth - Tokens.Metric.sidebarPadding * 2
-        panel.width = anchorFrame.width > 0 && !aboveThePage ? anchorFrame.width : sidebarLane
-        if controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible, !aboveThePage {
+        let inset = Tokens.Metric.cardInset
+        if pane {
+            panel.width = max(Self.minimumWidth, min(Self.width, overlay.bounds.width - inset * 2))
+        } else {
+            panel.width = anchorFrame.width > 0 && !aboveThePage ? anchorFrame.width : sidebarLane
+        }
+        if controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible, !aboveThePage, !pane {
             // The same glass panel as Downloads over the sidebar's lane, with the tabs under it faded back.
             panel.recedes = [controller.sidebar.list]
         }
-        let x = aboveThePage ? anchorFrame.maxX - panel.width : anchorFrame.minX
-        panel.frame.origin = NSPoint(x: max(Tokens.Metric.cardInset, x), y: anchorFrame.maxY + 4)
+        var x = aboveThePage || pane ? anchorFrame.maxX - panel.width : anchorFrame.minX
+        if pane { x = min(x, overlay.bounds.width - inset - panel.width) }
+        panel.frame.origin = NSPoint(x: max(inset, x), y: anchorFrame.maxY + 4)
         // Never past the window's bottom: what doesn't fit scrolls.
         panel.maxHeight = max(PanelLinkRow.height * 4, controller.root.overlay.bounds.height - panel.frame.minY - Tokens.Metric.cardInset)
         panel.frame.size = NSSize(width: panel.width, height: panel.fittedHeight)
         controller.root.overlay.addSubview(panel)
         panel.needsLayout = true
-        // Out of the button that opened it (the site controls, at the address's right end), not a corner.
+        // Out of the button that opened it (the site controls, at the address's right end), not a corner. From a
+        // pane's ⋯, out of ⋯.
+        let opener = (anchor as? PaneAddressView)?.siteControls ?? (anchor as? IconButton) ?? controller.sidebar.address.siteControlsButton
+        panel.opener = opener
         if panel.frame.width > 0 {
-            let button = controller.sidebar.address.siteControlsButton
-            let b = button.convert(button.bounds, to: controller.root.overlay)
+            let b = opener.convert(opener.bounds, to: controller.root.overlay)
             panel.growsFrom = CGPoint(x: min(max((b.midX - panel.frame.minX) / panel.frame.width, 0), 1), y: 0)
         } else {
             panel.growsFrom = CGPoint(x: 0.5, y: 0)
         }
         panel.present(arrival: .pop)
-        controller.sidebar.address.siteControlsButton.isSelected = true
+        opener.isSelected = true
         current = panel
         panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
             // Only its own window: keys and clicks in Settings or another window are theirs. A menu open over it
@@ -223,10 +239,20 @@ final class SitePanel: FloatingPanelView {
         }
     }
 
+    /// The split pane's strip a view is in, if any.
+    private static func paneStrip(of view: NSView) -> PaneHeaderView? {
+        var next: NSView? = view
+        while let v = next {
+            if let strip = v as? PaneHeaderView { return strip }
+            next = v.superview
+        }
+        return nil
+    }
+
     func close() {
         pageToken = nil
         extensionsToken = nil
-        controller?.sidebar.address.siteControlsButton.isSelected = false
+        opener?.isSelected = false
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         if Self.current === self { Self.current = nil }
@@ -1502,5 +1528,15 @@ enum SitePanelRows {
         if c.hasPermissions { links.append(.permissions) }
         if c.extensionHost { links.append(.extensions) }
         return links
+    }
+}
+
+extension TabManager {
+    /// The page Site Controls opens for. From a split pane's strip, that pane's page, made the one you're in first as
+    /// a click in it does, so everything the panel does (Reader, translating, a reload) lands on it; otherwise the tab
+    /// you're in, which in a split is the pane you're in, never the group's first (#160).
+    @discardableResult func siteControlsTab(from pane: Tab? = nil) -> Tab? {
+        if let pane, !pane.isClosed, pane !== selectedTab { select(pane) }
+        return selectedTab
     }
 }

@@ -1683,6 +1683,13 @@ enum DebugBridge {
             debugLog("engine \(engine.rawValue) \(engine.name) \(engine.searchURL("zigzag test").absoluteString) home=\(engine.homeURL.absoluteString) offered=\(ExtensionSearchProvider.available.map(\.name)) before=\(ExtensionSearchProvider.previousEngine.rawValue)")
         case "largenames": SpaceHeaderView.isLarge = arg != "off"
         case "sitepanel": SitePanel.toggle(in: controller, from: controller.sidebar.address)
+        case "panesite", "panemore":
+            // panesite <pane>: that split pane's Site Controls button, as a click on it (#160). panemore <pane>: its ⋯.
+            let cards = controller.root.paneCards
+            guard let n = Int(arg), cards.indices.contains(n), let click = NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0) else { break }
+            let header = cards[n].header
+            (name == "panemore" ? header.more : header.address.siteControls).onClick?(click)
+            debugLog("\(name) \(n): site controls \(header.address.showsSiteControls ? "in the address" : "in ⋯"), panel for \(SitePanel.shown.map { $0.describes(header.tab) } == true ? "this pane" : "another page")")
         // sitepage <main|connection|permissions|extensions>: the open site panel's page, as its rows and back button go.
         // sitezoom in|out|reset: its Zoom row. sitepermrow <row> <ask|allow|block> | reset: a permission row's
         // dropdown, or Reset Permissions. sitepanelstate <path>: what it shows (JSON).

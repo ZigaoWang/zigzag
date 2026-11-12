@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- Each page in split view has its own Site Controls: the button at the end of the address in its strip, or in its ⋯ when the strip is narrow, opens them for that page, under its address, with the address bar above the page too. The Site Controls button by the sidebar's address is for the page you're in. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+
 ## [0.8.7] - 2026-11-12
 
 ### New
