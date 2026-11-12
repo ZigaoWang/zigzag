@@ -6411,6 +6411,17 @@
         }
       }
     },
+    "Hide %@" : {
+      "comment" : "First menu of an installed app's window: hides the app. The placeholder is the app's name, like Wikipedia.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏 %@"
+          }
+        }
+      }
+    },
     "Hide Nested Tabs" : {
       "comment" : "Tooltip of the chevron on a tab's row in the sidebar that has tabs nested under it: folds them away.",
       "localizations" : {
@@ -6473,6 +6484,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "隐藏边栏"
+          }
+        }
+      }
+    },
+    "Hide Toolbar" : {
+      "comment" : "Menu item in an installed app's window (View menu, and its toolbar's right-click menu): leaves just the page with the traffic lights over it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏工具栏"
           }
         }
       }
@@ -9412,6 +9434,17 @@
         }
       }
     },
+    "Open in Zigzag" : {
+      "comment" : "File menu item of an installed app's window: opens the page it shows in a tab of a Zigzag window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Zigzag 中打开"
+          }
+        }
+      }
+    },
     "Open in Zigzag Mini" : {
       "comment" : "Item in a tab's context menu in the sidebar: moves the tab's page into a Zigzag Mini window (the small window for one page, without the sidebar). Zigzag Mini is a name, kept in Latin letters.\nUndo action name, shown in the Edit menu as Undo Open in Zigzag Mini.",
       "localizations" : {
@@ -10533,6 +10566,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "退出"
+          }
+        }
+      }
+    },
+    "Quit %@" : {
+      "comment" : "First menu of an installed app's window: quits the app, and only it. The placeholder is the app's name, like Wikipedia.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出 %@"
           }
         }
       }
@@ -12567,6 +12611,17 @@
         }
       }
     },
+    "Show Toolbar" : {
+      "comment" : "Menu item in an installed app's window (View menu, and the right-click menu of the strip at its top): brings back back, forward, reload and the app's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示工具栏"
+          }
+        }
+      }
+    },
     "Show in Finder" : {
       "comment" : "Button in the Import window: show the exported passwords file in Finder.\nButton in the toast after Install as App: shows the new app in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
       "localizations" : {
@@ -12607,6 +12662,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示已固定标签页"
+          }
+        }
+      }
+    },
+    "Show toolbar in “%@”" : {
+      "comment" : "VoiceOver label of the switch on an installed app's row in Settings › General; the app's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在“%@”中显示工具栏"
           }
         }
       }
@@ -14533,6 +14599,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今天夜里"
+          }
+        }
+      }
+    },
+    "Toolbar" : {
+      "comment" : "Beside the switch on an installed app's row in Settings › General: whether its window shows back, forward, reload and its name on top.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工具栏"
           }
         }
       }
