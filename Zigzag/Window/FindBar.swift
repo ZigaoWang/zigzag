@@ -795,7 +795,8 @@ enum Toast {
                 toast?.dismiss()
             }
         }
-        toast.closeButton.isHidden = !closes
+        // A toast with something to do (Undo, Pin This Page) can be put away at once, as a notification can.
+        toast.closeButton.isHidden = !(closes || action != nil)
         toast.closeButton.onClick = { [weak toast] _ in
             state.hideWork?.cancel()
             toast?.dismiss()

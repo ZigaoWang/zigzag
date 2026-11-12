@@ -14,7 +14,7 @@ struct MotionTests {
     }
 
     @Test func exitsAreQuickerThanEntrances() {
-        for origin: Motion.Origin in [.point(.zero), .edge(.minY), .offstage(.minY, 80), .inPlace] {
+        for origin: Motion.Origin in [.point(.zero), .offstage(.minY, 80), .inPlace] {
             let enter = Motion.presenceDuration(origin, entering: true, reduceMotion: false)
             let exit = Motion.presenceDuration(origin, entering: false, reduceMotion: false)
             #expect(exit < enter)
@@ -23,6 +23,8 @@ struct MotionTests {
             #expect(enter <= 0.25)
         }
         #expect(Motion.presenceDuration(.point(.zero), entering: true, reduceMotion: false) == Motion.enter)
+        // What hangs from an edge (a toast, the find bar) lifts back at the pace it dropped in.
+        #expect(Motion.presenceDuration(.edge(.minY), entering: false, reduceMotion: false) == Motion.presenceDuration(.edge(.minY), entering: true, reduceMotion: false))
         #expect(Motion.presenceDuration(.offstage(.minY, 80), entering: true, reduceMotion: false) == Motion.noticeIn)
     }
 
@@ -60,9 +62,9 @@ struct MotionTests {
         #expect(unflipped.m42 == Motion.edgeOffset)
         let bottom = Motion.hiddenTransform(.edge(.maxY), entering: true, size: size, anchor: .zero, flipped: true)
         #expect(bottom.m42 == Motion.edgeOffset)
-        // It leaves half as far as it came, quieter.
+        // It leaves back the way it came, as far as it dropped.
         let leaving = Motion.hiddenTransform(.edge(.minY), entering: false, size: size, anchor: .zero, flipped: true)
-        #expect(leaving.m42 == -Motion.edgeOffset / 2)
+        #expect(leaving.m42 == -Motion.edgeOffset)
         #expect(Motion.edgeOffset >= 4 && Motion.edgeOffset <= 8)
         // A notice goes all the way back out past the window's edge.
         let notice = Motion.hiddenTransform(.offstage(.minY, 90), entering: false, size: size, anchor: .zero, flipped: true)

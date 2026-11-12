@@ -588,11 +588,14 @@ enum Tokens {
         static func presenceDuration(_ origin: Origin, entering: Bool, reduceMotion: Bool) -> TimeInterval {
             if reduceMotion { return crossfade }
             if case .offstage = origin { return entering ? noticeIn : noticeOut }
+            // Hung from an edge (a toast, the find bar): it lifts back the way it dropped in, at the same pace, so its
+            // going reads as the same movement rather than a vanishing.
+            if case .edge = origin { return enter }
             return entering ? enter : exit
         }
 
         /// The pose it's hidden in, in its superview's coordinates (`flipped`: y runs down): a little smaller around its
-        /// origin, or a little way toward its edge. Leaving is subtler than arriving, except back offstage.
+        /// origin, or a little way toward its edge. Leaving a point is subtler than arriving; an edge's or offstage's is the same way back.
         static func hiddenTransform(_ origin: Origin, entering: Bool, size: CGSize, anchor: CGPoint, flipped: Bool) -> CATransform3D {
             func toward(_ edge: NSRectEdge, _ d: CGFloat) -> CATransform3D {
                 switch edge {
@@ -607,7 +610,7 @@ enum Tokens {
             case .point(let point):
                 return scale(entering ? enterScale : exitScale, size: size, anchor: anchor, around: point, flipped: flipped)
             case .edge(let edge):
-                return toward(screenEdge(edge, flipped: flipped), entering ? edgeOffset : edgeOffset / 2)
+                return toward(screenEdge(edge, flipped: flipped), edgeOffset)
             case .offstage(let edge, let distance):
                 return toward(screenEdge(edge, flipped: flipped), distance)
             case .inPlace:
