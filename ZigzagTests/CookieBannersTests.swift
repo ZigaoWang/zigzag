@@ -223,6 +223,31 @@ struct CookieBannersTests {
         }
     }
 
+    @Test func aFrameGetsOnlyTheStringsItsRulesUse() throws {
+        let rules = try #require(CookieBanners.Rules.shared)
+        let json = rules.json(url: "https://cdn.privacy-mgmt.com/index.html", mainFrame: false)
+        let set = try #require(try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        let strings = try #require(set["s"] as? [String])
+        let chosen = try #require(set["r"] as? [[Any]])
+        // Every string a chosen rule names is there, as it was.
+        for rule in chosen {
+            for i in CookieBanners.Rules.stringsUsed(by: rule) {
+                #expect(i < strings.count && strings[i] == rules.strings[i])
+            }
+        }
+        // And the others are left empty: a frame isn't sent the page's thousands.
+        #expect(strings.filter { !$0.isEmpty }.count < rules.strings.count / 4)
+        // The same frame again: the same answer.
+        #expect(rules.json(url: "https://cdn.privacy-mgmt.com/index.html", mainFrame: false) == json)
+    }
+
+    @Test func stepsNameTheirStringsAtAnyDepth() {
+        let rule: [Any] = [1, "x", 2, "", 22, [7],
+                           [["e": 1]], [["if": ["v": 2], "then": [["c": 3]], "else": [["any": [["k": 4], ["wv": 5]]]]]],
+                           [["h": 6, "cc": 8, "w": 9]], [], [:]]
+        #expect(CookieBanners.Rules.stringsUsed(by: rule) == [1, 2, 3, 4, 5, 6, 7, 8, 9])
+    }
+
     @Test func aRuleOnlyForFramesSkipsThePage() throws {
         let rules = try #require(CookieBanners.Rules.shared)
         if let i = rules.runContexts.firstIndex(of: 1) {
