@@ -355,6 +355,10 @@ final class DeskController {
 
     private var manager: TabManager? { controller?.tabManager }
 
+    #if DEBUG
+    /// Times an open or close: each step's moment, and every frame's interval while it animates, to debug.log.
+    private let meter = DeskMeter()
+    #endif
 
     // MARK: Showing
 
@@ -362,6 +366,9 @@ final class DeskController {
 
     func show() {
         guard !isVisible, let controller else { return }
+        #if DEBUG
+        meter.begin("open", in: controller.root)
+        #endif
         isVisible = true
         transition += 1
         Tutorial.overviewOpened()
@@ -400,6 +407,9 @@ final class DeskController {
         cards.values.forEach { $0.waitsForReadyPictures = zooms }
         Tokens.Motion.withoutAnimation { scrollView.alphaValue = zooms ? 0 : 1 }
         reload()
+        #if DEBUG
+        meter.mark("cards")
+        #endif
         pictureUnseenPages()
         // The window's own controls would sit on top of the desk; tuck them away.
         (controller.window as? BrowserWindow)?.trafficLightsHidden = false
@@ -408,6 +418,9 @@ final class DeskController {
         backdrop.layoutSubtreeIfNeeded()
         setFocus(currentCardID, scroll: false)
         if !reopening, let card = currentCard { canvas.scrollToVisible(card.frame.insetBy(dx: 0, dy: -margin)) }
+        #if DEBUG
+        meter.mark("laid out")
+        #endif
 
         guard !Tokens.Motion.reduceMotion else {
             Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 1 }) {
@@ -429,11 +442,17 @@ final class DeskController {
         let start = { [weak self] in
             guard let self, !started, self.isVisible, self.transition == id else { return }
             started = true
+            #if DEBUG
+            self.meter.mark("ready")
+            #endif
             self.picturesWait = false
             let inSight = self.cards.values.filter { $0.frame.intersects(self.canvas.visibleRect) }
             inSight.forEach { $0.waitsForReadyPictures = false; $0.refreshImage() }
             Tokens.Motion.withoutAnimation { self.scrollView.alphaValue = 1 }
             self.zoomOut(settle: true)
+            #if DEBUG
+            self.meter.mark("zoom started")
+            #endif
         }
         let ready = { waiting -= 1; if waiting == 0 { start() } }
         let inSight = cards.values.filter { $0.frame.intersects(canvas.visibleRect) }
@@ -646,6 +665,9 @@ final class DeskController {
 
     func hide(openingTab tab: Tab?) {
         guard isVisible, let controller else { return }
+        #if DEBUG
+        meter.begin("close", in: controller.root)
+        #endif
         isVisible = false
         // A toast from the desk goes back over the page.
         Toast.reposition(in: controller)
@@ -701,6 +723,9 @@ final class DeskController {
             guard let self, self.transition == id else { return }
             self.handOff(flight)
         }
+        #if DEBUG
+        meter.mark("zoom started")
+        #endif
     }
 
     /// The picture has grown into the page area: the live pages show under it, and it fades off them quickly. When
@@ -1397,3 +1422,78 @@ private final class DeskSearchDelegate: NSObject, NSTextFieldDelegate {
         command?(selector) ?? false
     }
 }
+
+#if DEBUG
+/// Debug timing for the desk's open and close: when each step happened, how evenly the frames came while it
+/// animated, and how long the main thread was busy at a stretch (a stretch past a frame is a frame missed), written
+/// to debug.log.
+final class DeskMeter: NSObject {
+    private var name = ""
+    private var start: CFTimeInterval = 0
+    private var last: CFTimeInterval = 0
+    private var marks: [String] = []
+    private var frames: [Double] = []
+    private var busy: [Double] = []
+    private var awake: CFTimeInterval?
+    private var link: CADisplayLink?
+    private var observer: CFRunLoopObserver?
+    private var count = 0
+
+    func begin(_ name: String, in view: NSView) {
+        if link != nil { finish() }
+        count += 1
+        self.name = "\(name) #\(count)"
+        start = CACurrentMediaTime()
+        last = start
+        awake = start
+        marks = []
+        frames = []
+        busy = []
+        let link = view.displayLink(target: self, selector: #selector(tick(_:)))
+        link.add(to: .main, forMode: .common)
+        self.link = link
+        // Last of everything before the run loop sleeps, so a stretch counts Core Animation's commit too.
+        let activities = CFRunLoopActivity.afterWaiting.rawValue | CFRunLoopActivity.beforeWaiting.rawValue
+        let observer = CFRunLoopObserverCreateWithHandler(nil, activities, true, CFIndex.max) { [weak self] _, activity in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let now = CACurrentMediaTime()
+                if activity == .afterWaiting {
+                    self.awake = now
+                } else if let awake = self.awake {
+                    self.busy.append((now - awake) * 1000)
+                    self.awake = nil
+                }
+            }
+        }
+        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
+        self.observer = observer
+    }
+
+    func mark(_ step: String) {
+        guard link != nil else { return }
+        marks.append(String(format: "%@ %.1f", step, (CACurrentMediaTime() - start) * 1000))
+    }
+
+    @objc private func tick(_ link: CADisplayLink) {
+        let now = CACurrentMediaTime()
+        frames.append((now - last) * 1000)
+        last = now
+        if now - start > 0.6 { finish() }
+    }
+
+    private func finish() {
+        link?.invalidate()
+        link = nil
+        if let observer { CFRunLoopRemoveObserver(CFRunLoopGetMain(), observer, .commonModes) }
+        observer = nil
+        let sorted = frames.dropFirst().sorted()
+        let typical = sorted.isEmpty ? 0 : sorted[sorted.count / 2]
+        let long = sorted.filter { $0 > typical * 1.5 }.count
+        let stretches = busy.filter { $0 >= 4 }.map { String(format: "%.0f", $0) }.joined(separator: " ")
+        debugLog(String(format: "desk %@: %@; main busy %.0f ms, longest %.1f ms [%@]; first frame %.1f ms, %d frames, median %.1f ms, max %.1f ms, %d long [%@]",
+                        name, marks.joined(separator: ", "), busy.reduce(0, +), busy.max() ?? 0, stretches, frames.first ?? 0, frames.count,
+                        typical, sorted.last ?? 0, long, frames.map { String(format: "%.0f", $0) }.joined(separator: " ")))
+    }
+}
+#endif
