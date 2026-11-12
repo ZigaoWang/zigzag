@@ -124,6 +124,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
+        // The address stands for the tab you're on: a middle-click closes it, as on the tab's own row.
+        sidebar.address.onMiddleClick = { [weak self] in self?.closeTab(nil) }
         sidebar.address.onPinsMoved = { [weak self] in
             if #available(macOS 15.4, *), let self { ExtensionCenter.repositionPinPopups(of: self) }
         }

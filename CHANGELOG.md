@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Middle-click the address to close the tab you're on, as a middle-click on its row in the sidebar does. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#171](https://github.com/ZigaoWang/zigzag/issues/171))
+
 ## [0.8.7] - 2026-11-12
 
 ### New
