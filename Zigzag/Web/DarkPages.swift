@@ -136,6 +136,25 @@ enum DarkPages {
 
     static var underPageColor: NSColor { underPageColor(black: pureBlack) }
 
+    /// The dark a site's palette draws the page's own white as (the bottom of its ramp in dark-palette.js): #121212, or
+    /// black for Pure black.
+    static func paletteGround(black: Bool) -> NSColor {
+        let gray: CGFloat = black ? 0 : 18 / 255
+        return NSColor(srgbRed: gray, green: gray, blue: gray, alpha: 1)
+    }
+
+    /// Behind a page that's about to be darkened, before it has drawn anything (#134): the dark its own white will be,
+    /// the palette's where the site has one that's used, the filter's otherwise.
+    static func ground(black: Bool, palette: Bool) -> NSColor {
+        palette ? paletteGround(black: black) : underPageColor(black: black)
+    }
+
+    /// Whether a palette is what a page starts with, rather than the filter.
+    static func drawsWithPalette(_ entry: DarkPalettes.Entry?) -> Bool {
+        guard let entry else { return false }
+        return !entry.invert && !entry.css.isEmpty
+    }
+
     // MARK: The style
 
     /// On a picture's own element (a background photo), and on one whose ::before or ::after shows a picture.
@@ -382,8 +401,18 @@ enum DarkPages {
         let tab = (webView as? BrowserWebView)?.owner
         // A page that's dark on its own shows its own color past its edges, as without dark pages.
         let own = tab?.darkPage?.native == true && tab?.darkPage?.site == site(of: url)
-        webView.underPageBackgroundColor = wanted && !own ? underPageColor : nil
+        let ground = ground(black: pureBlack, palette: drawsWithPalette(palette(for: webView.configuration.websiteDataStore, url: url)))
+        webView.underPageBackgroundColor = wanted && !own ? ground : nil
+        // No white of WebKit's own under the page (#134): a new web view's first frame, or one bringing back a tab that
+        // slept, was drawn on it before the page came, and stayed on screen until the page had drawn itself, since
+        // WebKit holds what's shown while a page is on its way. Clear instead, the dark of the card shows there.
+        let draws = !wanted
+        if !webView.responds(to: drawsGround) || webView.value(forKey: "drawsBackground") as? Bool != draws {
+            webView.setValue(draws, forKey: "drawsBackground")
+        }
     }
+
+    private static let drawsGround = NSSelectorFromString("_drawsBackground")
 
     /// The setting, a site's choice or the Mac's appearance changed: every open page follows at once, without
     /// reloading, and pages loaded later start the right way.
