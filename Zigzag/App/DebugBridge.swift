@@ -1819,9 +1819,6 @@ enum DebugBridge {
                let document = scroll.documentView {
                 document.scroll(NSPoint(x: 0, y: document.bounds.height - scroll.contentSize.height))
             }
-        case "settingspane":
-            // settingspane <general|appearance|tabs|spaces|search|mini|passwords|privacy|translation|extensions|shortcuts>
-            SettingsPage.open(SettingsPane(rawValue: arg), in: controller)
         case "allowads": ContentBlocker.setAllowed(arg != "off", on: controller.tabManager.selectedTab?.url); controller.tabManager.selectedTab?.reload()
         case "adfilters":
             // adfilters update (downloads the lists now, whether or not they've expired), adfilters <path> (JSON: the
