@@ -492,7 +492,8 @@ final class FavoriteTile: InteractiveView {
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
         icon.isAsleep = tab?.isAsleep == true
         let name = Words.list([bookmark?.title, partner?.title].compactMap { $0 })
-        toolTip = tab.flatMap(TabRowView.asleepToolTip).map { name.isEmpty ? $0 : "\(name)\n\($0)" } ?? name
+        // A favorite has no hover card, so a sleeping one says why, and what that freed, in its tooltip.
+        toolTip = tab?.asleepNote.map { name.isEmpty ? $0 : "\(name)\n\($0)" } ?? name
         if let image = tab?.displayIcon, !(tab?.isLoading ?? false) { icon.image = image; needsLayout = true }
     }
 

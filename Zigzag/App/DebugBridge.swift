@@ -621,7 +621,11 @@ enum DebugBridge {
                     }
                 }
             }
-        case "suspendtab": controller.tabManager.allTabs.first { $0.url?.absoluteString.hasPrefix(arg) == true }?.suspend(because: "debug")
+        // suspendtab [energy] <url prefix>: puts that tab to sleep, with "energy" as EnergyWatch does.
+        case "suspendtab":
+            let energy = arg.hasPrefix("energy ")
+            let prefix = energy ? String(arg.dropFirst(7)) : arg
+            controller.tabManager.allTabs.first { $0.url?.absoluteString.hasPrefix(prefix) == true }?.suspend(because: energy ? EnergyWatch.sleepReason : "debug")
         // iconpicker <index>: the Change Icon… grid beside the tab at that sidebar position, as its menu item opens it.
         case "iconpicker":
             let list = controller.tabManager.navigableTabs

@@ -11,10 +11,32 @@ final class TabPreviewView: FloatingPanelView {
     private let detail = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
     private let title2 = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let detail2 = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
+    /// A sleeping page's line under its address: why it sleeps, and about how much memory that freed.
+    private let note = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    private let note2 = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let imageClip = NSView()
     /// How a split's or tile group's pages share the picture; nil for one page.
     private var shape: TileShape?
     static let footerHeight = Tokens.Metric.previewCaptionHeight
+    /// The caption's height: a line taller while a page in it sleeps, for what it says of that.
+    /// The caption's height in a card this wide: taller while a page in it sleeps, by what it says of that (two lines
+    /// at most, when it's half of a split).
+    func footerHeight(width: CGFloat) -> CGFloat {
+        let textX = Self.textX, first = firstCaptionWidth(width)
+        func height(_ label: Label, _ room: CGFloat) -> CGFloat {
+            guard !label.isHidden, let cell = label.cell else { return 0 }
+            return ceil(cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: max(0, room), height: 200)).height)
+        }
+        return Self.footerHeight + max(height(note, first - textX * 2), height(note2, width - first - textX * 2))
+    }
+
+    private static let textX = Tokens.Space.x3 - Label.inset
+
+    /// How far across a card this wide the first page's caption runs: all of it, or its side of a split.
+    private func firstCaptionWidth(_ width: CGFloat) -> CGFloat {
+        guard !title2.isHidden, let shape else { return width }
+        return round(Self.inset + (width - Self.inset * 2) * (shape.isStacked ? 0.5 : shape.column))
+    }
     /// From the panel's edge to the picture; the picture's corners are the panel's less this, so the two run together.
     private static let inset = Tokens.Space.x1
 
@@ -27,7 +49,12 @@ final class TabPreviewView: FloatingPanelView {
         imageClip.layer?.addSublayer(picture.layer)
         addSubview(imageClip)
         addSubview(placeholder)
-        [title, detail, title2, detail2].forEach { addSubview($0) }
+        [title, detail, note, title2, detail2, note2].forEach { addSubview($0) }
+        for label in [note, note2] {
+            label.usesSingleLineMode = false
+            label.maximumNumberOfLines = 2
+            label.lineBreakMode = .byWordWrapping
+        }
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
@@ -45,6 +72,10 @@ final class TabPreviewView: FloatingPanelView {
         detail2.stringValue = partner?.url.map(CommandRanker.displayURL) ?? ""
         title2.isHidden = partner == nil
         detail2.isHidden = partner == nil
+        note.stringValue = tab?.asleepNote ?? ""
+        note.isHidden = tab?.asleepNote == nil
+        note2.stringValue = partner?.asleepNote ?? ""
+        note2.isHidden = partner?.asleepNote == nil
         placeholder.image = tab?.displayIcon ?? bookmark?.displayIcon
         setImages([tab?.snapshot] + partners.map(\.snapshot))
         needsLayout = true
@@ -82,24 +113,25 @@ final class TabPreviewView: FloatingPanelView {
 
     private func layoutContent() {
         let pad = Self.inset
-        let footer = Self.footerHeight
+        let footer = footerHeight(width: bounds.width)
         imageClip.frame = NSRect(x: pad, y: pad, width: bounds.width - pad * 2, height: bounds.height - footer - pad)
         picture.layout(size: imageClip.bounds.size)
         Tokens.Motion.withoutAnimation { picture.layer.position = CGPoint(x: imageClip.bounds.midX, y: imageClip.bounds.midY) }
         let icon = Tokens.Space.x8
         placeholder.frame = NSRect(x: imageClip.frame.midX - icon / 2, y: imageClip.frame.midY - icon / 2, width: icon, height: icon)
-        let textX = Tokens.Space.x3 - Label.inset
+        let textX = Self.textX
         let titleH = title.lineHeight, detailH = detail.lineHeight
-        let top = imageClip.frame.maxY + (footer - titleH - detailH) / 2
+        let noteH = footer - Self.footerHeight
+        let top = imageClip.frame.maxY + (Self.footerHeight - titleH - detailH) / 2
         // One title, or with a split, each page's under its own side; stacked pages share the row half and half.
-        let pair = title2.isHidden ? nil : shape
-        let share = pair.map { $0.isStacked ? 0.5 : $0.column } ?? 1
-        let firstWidth = pair == nil ? bounds.width : round(imageClip.frame.minX + imageClip.frame.width * share)
+        let firstWidth = firstCaptionWidth(bounds.width)
         title.frame = NSRect(x: textX, y: top, width: firstWidth - textX * 2, height: titleH)
         detail.frame = NSRect(x: textX, y: title.frame.maxY, width: firstWidth - textX * 2, height: detailH)
+        note.frame = NSRect(x: textX, y: detail.frame.maxY, width: firstWidth - textX * 2, height: noteH)
         let secondX = firstWidth + textX, secondWidth = max(0, bounds.width - firstWidth - textX * 2)
         title2.frame = NSRect(x: secondX, y: top, width: secondWidth, height: titleH)
         detail2.frame = NSRect(x: secondX, y: title2.frame.maxY, width: secondWidth, height: detailH)
+        note2.frame = NSRect(x: secondX, y: detail2.frame.maxY, width: secondWidth, height: noteH)
     }
 }
 
@@ -190,7 +222,7 @@ final class TabPreviewController {
         let card = controller.root.cardFrame
         let width = Tokens.Metric.previewWidth
         let aspect = card.height > 0 ? min(card.height / max(card.width, 1), 0.9) : 0.62
-        let height = round(width * aspect) + TabPreviewView.footerHeight
+        let height = round(width * aspect) + panel.footerHeight(width: width)
         let rowFrame = row.convert(row.bounds, to: overlay)
         let x = controller.root.sidebarContainer.frame.maxX + Tokens.Space.x2
         var y = rowFrame.midY - height / 2

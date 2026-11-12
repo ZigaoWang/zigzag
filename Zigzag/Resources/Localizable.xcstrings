@@ -2537,24 +2537,46 @@
         }
       }
     },
-    "Asleep to save energy. Opens where you left off." : {
-      "comment" : "Tooltip of a sidebar tab that Zigzag put to sleep because it used a lot of energy in the background.",
+    "Asleep to save energy." : {
+      "comment" : "Under a sleeping tab's title in its hover card, or its tooltip: Zigzag put it to sleep because it used a lot of energy in the background.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "为省电已休眠，打开后回到你离开的位置。"
+            "value" : "为省电已休眠。"
           }
         }
       }
     },
-    "Asleep to save memory. Opens where you left off." : {
-      "comment" : "Tooltip of a sidebar tab that Zigzag put to sleep because it wasn't used for a while or the Mac was low on memory.",
+    "Asleep to save energy. Freed about %@." : {
+      "comment" : "Under a sleeping tab's title in its hover card, or its tooltip: Zigzag put it to sleep because it used a lot of energy in the background. The size is how much memory that gave back, like 180 MB.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "为省内存已休眠，打开后回到你离开的位置。"
+            "value" : "为省电已休眠，释放了约 %@。"
+          }
+        }
+      }
+    },
+    "Asleep to save memory." : {
+      "comment" : "Under a sleeping tab's title in its hover card, or its tooltip: Zigzag put it to sleep because it wasn't used for a while or the Mac was low on memory.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为省内存已休眠。"
+          }
+        }
+      }
+    },
+    "Asleep to save memory. Freed about %@." : {
+      "comment" : "Under a sleeping tab's title in its hover card, or its tooltip: Zigzag put it to sleep because it wasn't used for a while or the Mac was low on memory. The size is how much memory that gave back, like 180 MB.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为省内存已休眠，释放了约 %@。"
           }
         }
       }

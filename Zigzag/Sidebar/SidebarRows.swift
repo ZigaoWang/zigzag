@@ -367,7 +367,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         guard partner !== self.partner else { return }
         self.partner = partner
         partnerToken = partner?.changed.observe { [weak self] change in
-            if change == .title || change == .favicon || change == .loading || change == .url || change == .audio { self?.refreshPartner() }
+            // `.webView`: it went to sleep or woke, which its icon shows.
+            if change == .title || change == .favicon || change == .loading || change == .url || change == .audio || change == .webView { self?.refreshPartner() }
         }
         [partnerIcon, partnerTitle, divider].forEach { $0.isHidden = !isSplit }
         refreshPartner()
@@ -381,7 +382,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         extraPartners = more
         extraTokens = more.map { page in
             page.changed.observe { [weak self] change in
-                if change == .title || change == .favicon || change == .loading || change == .url || change == .audio { self?.refreshExtras() }
+                if change == .title || change == .favicon || change == .loading || change == .url || change == .audio || change == .webView { self?.refreshExtras() }
             }
         }
         refreshExtras()
@@ -538,8 +539,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         title.stringValue = fixedTitle ?? tab?.displayTitle ?? ""
         icon.image = tab?.displayIcon ?? (fixedTitle != nil ? bookmarkIcon : nil)
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
+        // Why it sleeps, and what that freed, is in its hover card (`TabPreviewView`), not a tooltip on top of it.
         icon.isAsleep = tab?.isAsleep == true
-        toolTip = tab.flatMap(Self.asleepToolTip)
         let sound = tab?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
         if audioButton.symbol != sound { audioButton.symbol = sound }
         audioButton.toolTip = tab?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.") : String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
@@ -549,14 +550,6 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     var bookmarkIcon: NSImage?
-
-    /// Said when you point at a sleeping tab: why its page is gone, and that it comes back where you were.
-    static func asleepToolTip(_ tab: Tab) -> String? {
-        guard tab.isAsleep else { return nil }
-        return tab.sleptForEnergy
-            ? String(localized: "Asleep to save energy. Opens where you left off.", comment: "Tooltip of a sidebar tab that Zigzag put to sleep because it used a lot of energy in the background.")
-            : String(localized: "Asleep to save memory. Opens where you left off.", comment: "Tooltip of a sidebar tab that Zigzag put to sleep because it wasn't used for a while or the Mac was low on memory.")
-    }
 
     private func refreshTitleColor() {
         // A pinned tab that isn't loaded reads the same as one that is: faded means old elsewhere in Zigzag.
