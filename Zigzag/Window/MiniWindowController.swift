@@ -150,6 +150,11 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
         strip.openButton.onClick = { [weak self] _ in self?.openInZigzag() }
         strip.title.onClick = { [weak self] _ in self?.openLocation(nil) }
+        strip.title.drop.onDrop = { [weak self] url in
+            guard let self else { return false }
+            self.tab.load(url)
+            return true
+        }
         strip.copyButton.onClick = { [weak self] _ in self?.copyPageURL(nil) }
         strip.pinButton.onClick = { [weak self] _ in
             guard let window = self?.window else { return }
@@ -459,6 +464,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
 
     #if DEBUG
+    var debugAddressDrop: AddressDrop { strip.title.drop }
+
     func debugEnter(_ text: String) {
         if !commandBar.isVisible { commandBar.show(mode: .editCurrent) }
         commandBar.debugType(text)
@@ -957,6 +964,14 @@ final class MiniSpaceChip: InteractiveView {
 /// the pointer it shows the address field's soft fill, and a click opens the command bar over it, as the sidebar's
 /// address does.
 final class MiniTitleView: InteractiveView {
+
+    // MARK: Dropping a link or words (#182)
+
+    /// Where a link, an address or words dropped on the field go (`AddressDrop`).
+    private(set) lazy var drop = AddressDrop(self)
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { drop.entered(sender) }
+    override func draggingExited(_ sender: NSDraggingInfo?) { drop.exited() }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool { drop.perform(sender) }
     private let mark = NSImageView()
     private let label = Label("", font: .systemFont(ofSize: Tokens.Pane.addressText), color: Tokens.Color.textSecondary)
     private var themeToken: SignalToken?
@@ -973,6 +988,7 @@ final class MiniTitleView: InteractiveView {
         mark.isHidden = true
         label.lineBreakMode = .byTruncatingMiddle
         [mark, label].forEach(addSubview)
+        _ = drop
         setAccessibilityRole(.button)
         setAccessibilityHelp(String(localized: "Opens the command bar", comment: "Accessibility help of the address in the sidebar."))
         themeToken = Brand.themeChanged.observe { [weak self] in self?.stateDidChange(animated: false) }

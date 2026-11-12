@@ -130,6 +130,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
+        // A link or words dropped on the address: the page you're on goes there (#182).
+        sidebar.address.drop.onDrop = { [weak self] url in
+            self?.open(url, disposition: .currentTab)
+            return self != nil
+        }
         // The address stands for the tab you're on: a middle-click closes it, as on the tab's own row.
         sidebar.address.onMiddleClick = { [weak self] in self?.closeTab(nil) }
         sidebar.address.onPinsMoved = { [weak self] in

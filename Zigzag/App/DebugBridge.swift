@@ -1014,6 +1014,21 @@ enum DebugBridge {
             if let data = try? JSONSerialization.data(withJSONObject: ["tabs": rows, "fill": PageFullScreen.fill.rawValue, "windowFullScreen": controller.window?.styleMask.contains(.fullScreen) == true], options: [.prettyPrinted]) {
                 try? data.write(to: URL(fileURLWithPath: arg))
             }
+        // addressdrop <sidebar|pane1..4|mini> <hold|release|text>: the drop ring on that address field, or text (a link,
+        // an address, words) let go on it, through the same steps a drop takes (#182).
+        case "addressdrop":
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            guard f.count == 2 else { break }
+            let drop: AddressDrop?
+            if f[0] == "sidebar" { drop = controller.sidebar.address.drop }
+            else if f[0] == "mini" { drop = MiniWindowController.all.last?.debugAddressDrop }
+            else if f[0].hasPrefix("pane"), let n = Int(f[0].dropFirst(4)), controller.root.paneCards.indices.contains(n - 1) { drop = controller.root.paneCards[n - 1].header.address.drop }
+            else { drop = nil }
+            switch f[1] {
+            case "hold": drop?.debugHold(true)
+            case "release": drop?.debugHold(false)
+            default: debugLog("addressdrop \(f[0]) handled=\(drop?.debugDrop(f[1]) ?? false)")
+            }
         case "darkstate":
             controller.selectedWebView?.callAsyncJavaScript("return window.__zigzagDark ? JSON.stringify(window.__zigzagDark.state()) : 'none'",
                                                             arguments: [:], in: nil, in: DarkPages.world) { result in

@@ -361,11 +361,21 @@ final class AddressView: InteractiveView {
         readerButton.isHidden = true
         addSubview(readerButton)
         addSubview(siteControlsButton)
+        _ = drop
         setAccessibilityRole(.button)
         setAccessibilityHelp(String(localized: "Opens the command bar", comment: "Accessibility help of the address in the sidebar."))
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+
+    // MARK: Dropping a link or words (#182)
+
+    /// Where a link, an address or words dropped on the field go (`AddressDrop`).
+    private(set) lazy var drop = AddressDrop(self)
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { drop.entered(sender) }
+    override func draggingExited(_ sender: NSDraggingInfo?) { drop.exited() }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool { drop.perform(sender) }
 
     func setReader(available: Bool, active: Bool) {
         wantsReader = available || active

@@ -52,6 +52,7 @@
 		200DCC325CAD013BD582FBF6 /* UpdateRelaunch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 795D70D21D90CC7FB8A2295D /* UpdateRelaunch.swift */; };
 		202F156ED958778A3916C4D1 /* SpaceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B636331176C086C6157403B /* SpaceSwitcher.swift */; };
 		20C8469FA3D89C3469C3AFA5 /* WebAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B47E6DBF13FBD56C4DF65E8 /* WebAppTests.swift */; };
+		21251A414831FB29A32D3804 /* AddressDrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 886026308794DE28C83F6493 /* AddressDrop.swift */; };
 		21DA496E027D0DB086F085DD /* WebAppIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C0617D63CB7D0886FC367E5 /* WebAppIcon.swift */; };
 		23B478D43B7412702A5848F6 /* WebAppWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45729EC68E69DC16773C6CA /* WebAppWindowController.swift */; };
 		23B86800C5070366304E8423 /* CommandBarHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE6475CD75E987F5A8B0D182 /* CommandBarHistoryTests.swift */; };
@@ -358,6 +359,7 @@
 		F33B0673811E66F305F2EC55 /* favourites.plist in Resources */ = {isa = PBXBuildFile; fileRef = FA1F3192157697E1DC3F2FA2 /* favourites.plist */; };
 		F428675EDF7E08FC94B923B0 /* PaneMoveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC0CE69695B808069A887E8D /* PaneMoveTests.swift */; };
 		F44995777C048CCAB085C8AA /* MCPSetupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F62FA2BF2A457B8137CE704 /* MCPSetupTests.swift */; };
+		F561CDCA7B229704A348D99E /* AddressDropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD7578DF496E9D885F5A6548 /* AddressDropTests.swift */; };
 		F5D219451BC618FC595D20BA /* MCPService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62205A849DC72ED60ABA5EB7 /* MCPService.swift */; };
 		F642AD8EB346945EEB6E2E67 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4363A8C97194CFB82618511C /* main.swift */; };
 		F68205100699AE990735AFB7 /* ImportBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F8D15DA6B83F9C7DF8A4CB0 /* ImportBatch.swift */; };
@@ -593,6 +595,7 @@
 		8551A279CC24B357CC11755E /* CrashReports.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashReports.swift; sourceTree = "<group>"; };
 		87D85B5B031BEAE510CBFC57 /* SpaceSwitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceSwitcherTests.swift; sourceTree = "<group>"; };
 		8830C7ACBFDB8BD7C5DCCEB4 /* KeepOnTop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepOnTop.swift; sourceTree = "<group>"; };
+		886026308794DE28C83F6493 /* AddressDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressDrop.swift; sourceTree = "<group>"; };
 		888D287756137DE5F88678F5 /* FaviconRankTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaviconRankTests.swift; sourceTree = "<group>"; };
 		88A5C020C85AEC572EC2BA4A /* ZigzagApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZigzagApplication.swift; sourceTree = "<group>"; };
 		88B983CBE21557E05E6C3E28 /* PageDialogSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageDialogSheet.swift; sourceTree = "<group>"; };
@@ -729,6 +732,7 @@
 		DB9026CE3C5C707675A9BEEC /* ProblemReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProblemReport.swift; sourceTree = "<group>"; };
 		DCC3873C4E224EBB5A75591B /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		DCF6BF1C148060F0A2977094 /* chrome-bookmarks-personal.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "chrome-bookmarks-personal.json"; sourceTree = "<group>"; };
+		DD7578DF496E9D885F5A6548 /* AddressDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressDropTests.swift; sourceTree = "<group>"; };
 		DD95FCA35585195612C38204 /* SignInImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInImportTests.swift; sourceTree = "<group>"; };
 		DDA8091D12FF865D4C6F3952 /* chrome-local-state.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "chrome-local-state.json"; sourceTree = "<group>"; };
 		DE66F1100EDA4A2A65A5DA39 /* CarriedCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarriedCopy.swift; sourceTree = "<group>"; };
@@ -1253,6 +1257,7 @@
 		DF27ED16EF9BB28D19F995E5 /* ZigzagTests */ = {
 			isa = PBXGroup;
 			children = (
+				DD7578DF496E9D885F5A6548 /* AddressDropTests.swift */,
 				AFA72586980E3DDF9FDA59A8 /* AddressTests.swift */,
 				8D4C44C0E24339E50B51709A /* AdFiltersTests.swift */,
 				0E012EDE5594146129BF106F /* AsleepMarkTests.swift */,
@@ -1383,6 +1388,7 @@
 		F5DB143908BDB3FB1FB3440B /* Window */ = {
 			isa = PBXGroup;
 			children = (
+				886026308794DE28C83F6493 /* AddressDrop.swift */,
 				106F8B8ED9266890F76DEBB5 /* BrowserActions.swift */,
 				253D16FCBE561D267ED6957C /* BrowserRootView.swift */,
 				06AE52E198CC8E7B86B467BA /* BrowserWindow.swift */,
@@ -1629,6 +1635,7 @@
 				7A6644E5F8E6F88E4D4B80E1 /* AboutWindow.swift in Sources */,
 				B0B613E852FA44892B755F04 /* AcknowledgementsWindow.swift in Sources */,
 				548A302B2614C99406A1F549 /* AdFilters.swift in Sources */,
+				21251A414831FB29A32D3804 /* AddressDrop.swift in Sources */,
 				9723CC6AF985D1823D36E801 /* AgentControl.swift in Sources */,
 				3690704E0C2C6021A3E511D7 /* AppDelegate.swift in Sources */,
 				691243202E89456F9FB1A3C5 /* ArcImporter.swift in Sources */,
@@ -1848,6 +1855,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				DC8FE3DC9CACD4BE5F67F667 /* AdFiltersTests.swift in Sources */,
+				F561CDCA7B229704A348D99E /* AddressDropTests.swift in Sources */,
 				1482F4A584F73FF91CA61BE4 /* AddressTests.swift in Sources */,
 				51C6E5A688AD4C767333719C /* AsleepMarkTests.swift in Sources */,
 				2E6B0BE7362F9BFA6D652A71 /* BrandContrastTests.swift in Sources */,
