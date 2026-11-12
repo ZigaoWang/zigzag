@@ -115,7 +115,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Websites you visit can ask to use your microphone.</string>
 	<key>NSPrincipalClass</key>
-	<string>NSApplication</string>
+	<string>$(PRODUCT_MODULE_NAME).ZigzagApplication</string>
 	<key>NSSupportsAutomaticTermination</key>
 	<false/>
 	<key>NSSupportsSuddenTermination</key>
