@@ -115,6 +115,7 @@
 		4A65CC145A4105C2BA63B742 /* SettingsPageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB5152360ED2798576497043 /* SettingsPageTests.swift */; };
 		4ACC19B6A01DF157CE2C9A94 /* orion-history.sql in Resources */ = {isa = PBXBuildFile; fileRef = 5CBAF8A95BA2B524BCF4458E /* orion-history.sql */; };
 		4AD56EAFBF0AFF722B1CBEC0 /* PasswordStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A8DEA66B0550FB3754D7255 /* PasswordStore.swift */; };
+		4B66F75E2453142382DFEFA4 /* CookieBanners.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77ECA64FC76B1FB111087527 /* CookieBanners.swift */; };
 		4D9511C5D1A46A84D045245D /* public_suffix_list.txt in Resources */ = {isa = PBXBuildFile; fileRef = F32FB26AFED6DCCFDB468E39 /* public_suffix_list.txt */; };
 		4DAED34F3D46EDCBC3322752 /* MainThreadStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53C94D36AD5FE1082E53DA5 /* MainThreadStack.swift */; };
 		4E5CF0E3E770AEFADC046339 /* DiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14B44E3C60BDACED82D8B858 /* DiagnosticsTests.swift */; };
@@ -558,6 +559,7 @@
 		765C1F36BCEE463F8B5316BE /* Paths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Paths.swift; sourceTree = "<group>"; };
 		76DB536661E9E732536910C2 /* Readability-LICENSE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Readability-LICENSE.md"; sourceTree = "<group>"; };
 		77478845778FB285ADD29C14 /* Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library.swift; sourceTree = "<group>"; };
+		77ECA64FC76B1FB111087527 /* CookieBanners.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookieBanners.swift; sourceTree = "<group>"; };
 		7890881D589D032D70E5DC20 /* SecurityFixesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityFixesTests.swift; sourceTree = "<group>"; };
 		79F70CA73E1EF5C8460E9286 /* TabManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabManager.swift; sourceTree = "<group>"; };
 		7A6A928496FC897893B22DF7 /* BrowserWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWebView.swift; sourceTree = "<group>"; };
@@ -1091,6 +1093,7 @@
 				7A6A928496FC897893B22DF7 /* BrowserWebView.swift */,
 				0C054793F49E04AC36C79015 /* CertificateDetails.swift */,
 				91506D36CD561CBD7E11897D /* ContentBlocker.swift */,
+				77ECA64FC76B1FB111087527 /* CookieBanners.swift */,
 				96D4CC131CEDF843998D604C /* DarkPages.swift */,
 				6E41E2FFAB5C045AC7D0D6C2 /* DarkReaderFixes.swift */,
 				A69950C3F8014CFB7FAB861A /* DarkSeen.swift */,
@@ -1632,6 +1635,7 @@
 				B49BE228769F046774C0D2C5 /* ContactCard.swift in Sources */,
 				A05782BC7540B79FF1021BF4 /* ContentBlocker.swift in Sources */,
 				10324776656E836D07CD1B27 /* Controls.swift in Sources */,
+				4B66F75E2453142382DFEFA4 /* CookieBanners.swift in Sources */,
 				6598C85C3B959B5CB955185B /* Cookieless.swift in Sources */,
 				902CD60C9DC21A528D47701B /* CrashReports.swift in Sources */,
 				D8CF4BCBE8B4918517E852AD /* DarkPages.swift in Sources */,
