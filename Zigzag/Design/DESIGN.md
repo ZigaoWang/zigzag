@@ -276,11 +276,19 @@ something came from, answers at once, and can be interrupted.
   the accent ring from the keyboard). Favorites: small soft tiles four to a row in the same look. The space's name
   over its pinned tabs. The tab you're on: the light card of the color, which slides when you pick another. A split row shows both pages, each half with its icon, its title and, while that page
   plays or is muted, its own speaker; a pinned page split beside a tab carries the pair in its own row, so each page
-  shows once and one row is lit. A pinned page that has wandered reads "<its name> / <the page it's on>". Then
+  shows once and one row is lit. A tile group of three or four tabs is one row too, a part for each page in reading
+  order with a hairline between, each part's title only while every part has room for one (`TabRowView.segments`).
+  A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +.
 - **Pane header** (split view): on the page card, 30 tall: back, forward and reload, the address centered in a small
   field, and the split's own buttons. Everything in it is its own pane's page: its buttons act on it, its loading
   line and reload state follow it, and clicking its address focuses that pane and opens the address bar over it.
+  A tile group's panes (#160) have no swap or layout buttons: their places are where they were dropped.
+- **Tiling** (`TileLayout.swift`): two to four panes on a 2×2 grid, halves and quarters, with a line between the
+  columns and one between the rows, each dragged on its own and run only where it divides panes. A tab dragged over
+  the page: its edges are halves, its corners quarters, anywhere else the half of the pane under the pointer (beside a
+  page alone, the left or right half, as always), and a quarter that can't split takes the tab in its place. The drop
+  hint shows where it lands, in the split's one style, named for the place ("Open Top Left").
 - **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window. Beside the sidebar and
   meeting the window's edges it meets the frame cleanly: all four corners at the window's radius
   (`Radius.attached`), no outline, no shadow.

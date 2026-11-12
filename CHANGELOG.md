@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### New
+- Split view takes up to four tabs. Drag a tab over the page: the edges place it in a half, the corners in a quarter, and a preview shows where it lands. Three tabs are a half and two quarters, four a grid; the lines between them drag, and the group is one row in the sidebar that comes back after a restart. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - Dark pages fill in the light parts of a site that's dark on its own, like a white suggestion list under a dark search box, and leave the rest of its colors alone. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - Force dark, in a site's controls, draws a site dark even when it looks dark already, for one that leaves parts of itself light. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 
