@@ -300,6 +300,24 @@ struct SitePanelRowsTests {
         #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .forceDark, .keepAwake, .fullScreenFills, .alwaysTranslate])
     }
 
+    /// Cookie banners (#175): there once a pop-up was found or a choice kept, under Ad blocking; never in a private
+    /// window, nor on an extension's own page.
+    @Test func cookieBannersOnceFoundOrChosen() {
+        var c = Context()
+        #expect(!SitePanelRows.rows(c).contains(.cookieBanners))
+        c.cookieBanners = true
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .cookieBanners, .darkPage, .keepAwake])
+        // Apart from ad blocking: there with ad blocking off too.
+        c.adBlocking = false
+        #expect(SitePanelRows.rows(c) == [.zoom, .cookieBanners, .darkPage, .keepAwake])
+        var privately = c
+        privately.isPrivate = true
+        #expect(!SitePanelRows.rows(privately).contains(.cookieBanners))
+        var extensionPage = c
+        extensionPage.isWeb = false
+        #expect(!SitePanelRows.rows(extensionPage).contains(.cookieBanners))
+    }
+
     @Test func noZoomOverReaderOrAPDF() {
         var c = Context()
         c.coveredPage = true
