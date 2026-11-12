@@ -340,6 +340,20 @@ extension BrowserWindowController: NSMenuItemValidation {
         change(&tab.developer)
     }
 
+    /// View › Developer › Open on Your Phone…: the page's address for a phone on the same network, as a QR code. A
+    /// page on this Mac is given at the Mac's network address; with none, a toast says so.
+    @objc func openOnPhone(_ sender: Any?) {
+        guard let tab = selectedTab, DeveloperTool.phone.isOffered(for: tab, isPrivate: tabManager.isPrivate), let page = tab.url else { return }
+        guard let url = PhoneLink.url(for: page, lanAddress: PhoneLink.lanAddress()) else {
+            Toast.show(String(localized: "This Mac isn’t on a network a phone can reach", comment: "Toast after Open on Your Phone in the developer tools, when this Mac has no address on a local network."), symbol: "wifi.slash", in: self)
+            return
+        }
+        PhoneLinkSheet.show(in: root.overlay, url: url) { [weak self] in
+            guard let self else { return }
+            Toast.show(String(localized: "Address copied", comment: "Toast after Copy Address in the Open on Your Phone sheet of the developer tools."), symbol: "doc.on.doc", in: self)
+        }
+    }
+
     @objc func showDeveloperSettings(_ sender: Any?) { SettingsPage.open(.developer, in: self) }
 
     @objc func clearSiteCache(_ sender: Any?) { clearSite(.cache, as: .clearCache) }
@@ -631,6 +645,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             let state = tab?.developerInEffect ?? DeveloperState()
             item.state = tab != nil && tab?.isDevelopment == true && tool.isChecked(in: state) ? .on : .off
             return tool.isOffered(for: tab, isPrivate: tabManager.isPrivate, inSplit: selectedIsInSplit) && tool.applies(in: state)
+        case #selector(openOnPhone(_:)): return DeveloperTool.phone.isOffered(for: tab, isPrivate: tabManager.isPrivate)
         case #selector(clearSiteCache(_:)): return DeveloperTool.clearCache.isOffered(for: tab, isPrivate: tabManager.isPrivate)
         case #selector(clearSiteCookies(_:)): return DeveloperTool.clearCookies.isOffered(for: tab, isPrivate: tabManager.isPrivate)
         case #selector(installAsApp(_:)): return WebAppInstallSheet.canInstall(tab, isPrivate: tabManager.isPrivate)

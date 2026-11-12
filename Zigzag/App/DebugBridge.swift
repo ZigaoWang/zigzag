@@ -1082,6 +1082,10 @@ enum DebugBridge {
             let tools = controller.root.topBar.accessory as? DeveloperBarTools
             let on = controller.tabManager.selectedTab
             debugLog("devbar => tab=\(on?.url?.host() ?? "-") development=\(on?.isDevelopment ?? false) errors=\(on?.pageErrorCount ?? 0) shows=\(tools != nil) frame=\(tools.map { NSStringFromRect($0.frame) } ?? "-") buttons=\(tools?.shown ?? 0) page=\(card.webView?.superview.map { NSStringFromRect($0.frame) } ?? "-")")
+        // devphone: View › Developer › Open on Your Phone… for the tab in front, and the address it gives, in the debug log.
+        case "devphone":
+            controller.openOnPhone(nil)
+            debugLog("devphone => lan=\(PhoneLink.lanAddress() ?? "-") url=\(controller.tabManager.selectedTab?.url.flatMap { PhoneLink.url(for: $0, lanAddress: PhoneLink.lanAddress()) }?.absoluteString ?? "-")")
         case "devstate":
             let tabs = controller.tabManager.allTabs.map { "\($0.url?.host() ?? "-"):\($0.url?.port ?? 0)=\($0.isDevelopment)" }.sorted()
             let front = controller.tabManager.selectedTab

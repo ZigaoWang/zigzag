@@ -2335,6 +2335,17 @@
         }
       }
     },
+    "Address copied" : {
+      "comment" : "Toast after Copy Address in the Open on Your Phone sheet of the developer tools.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地址已拷贝"
+          }
+        }
+      }
+    },
     "Ads and trackers blocked" : {
       "comment" : "Badge on a sample page in the welcome window’s picture of Zigzag.",
       "localizations" : {
@@ -4720,6 +4731,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拷贝"
+          }
+        }
+      }
+    },
+    "Copy Address" : {
+      "comment" : "Button in the Open on Your Phone sheet of the developer tools: copies the page's address for a phone.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝地址"
           }
         }
       }
@@ -10090,6 +10112,28 @@
         }
       }
     },
+    "Open on Your Phone" : {
+      "comment" : "Title of the developer tools' sheet with a QR code of the page's address for a phone on the same network.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在手机上打开"
+          }
+        }
+      }
+    },
+    "Open on Your Phone…" : {
+      "comment" : "View › Developer menu item, command and item in the ⋯ menu of the developer tools above the page, on a development site: shows a QR code of the page's address for a phone on the same network.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在手机上打开…"
+          }
+        }
+      }
+    },
     "Open on the Left" : {
       "comment" : "Shown over the left half of the page while a link or tab is dragged there, to open it in a split view.",
       "localizations" : {
@@ -10995,6 +11039,17 @@
         }
       }
     },
+    "Point your phone's camera at the code to open this page there." : {
+      "comment" : "Under the title of the Open on Your Phone sheet of the developer tools.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用手机相机扫描这个二维码，就能在手机上打开这个页面。"
+          }
+        }
+      }
+    },
     "Pop-up blocked" : {
       "comment" : "Toast when Zigzag blocks a page's pop-up window.",
       "localizations" : {
@@ -11299,6 +11354,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "让耗电的后台标签页休眠"
+          }
+        }
+      }
+    },
+    "QR code of the address" : {
+      "comment" : "VoiceOver name of the QR code in the Open on Your Phone sheet of the developer tools.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地址的二维码"
           }
         }
       }
@@ -15078,6 +15144,17 @@
         }
       }
     },
+    "This Mac isn’t on a network a phone can reach" : {
+      "comment" : "Toast after Open on Your Phone in the developer tools, when this Mac has no address on a local network.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 不在手机能访问的网络上"
+          }
+        }
+      }
+    },
     "This Site" : {
       "comment" : "Section label over the site's settings in the site panel.",
       "localizations" : {
@@ -17169,6 +17246,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的密码存储在 Zigzag 中，保存在你 Mac 的钥匙串里，并通过 iCloud 钥匙串同步。可以在“Zigzag › 密码”中找到它们。"
+          }
+        }
+      }
+    },
+    "Your phone needs to be on the same network as this Mac, and your development server needs to listen on it too, not only on localhost (for most, a host of 0.0.0.0)." : {
+      "comment" : "Under the address in the Open on Your Phone sheet of the developer tools. 0.0.0.0 is a server setting, kept as is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手机需要和这台 Mac 连接同一个网络，你的开发服务器也需要在这个网络上监听，而不只是 localhost（多数情况下把主机设为 0.0.0.0）。"
           }
         }
       }

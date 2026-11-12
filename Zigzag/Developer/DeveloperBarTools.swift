@@ -32,7 +32,7 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
     /// in, and the rest. Each list is set apart by a line.
     static let moreGroups: [[DeveloperTool]] = [[.javaScript, .outlines],
                                                 [.userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox],
-                                                [.viewSource, .settings, .site]]
+                                                [.phone, .viewSource, .settings, .site]]
     static var moreTools: [DeveloperTool] { moreGroups.flatMap { $0 } }
 
     /// Whether something chosen under ⋯ is in effect, so its button can say so: a choice nothing shows is one

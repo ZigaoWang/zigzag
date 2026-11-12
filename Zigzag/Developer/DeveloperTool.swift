@@ -27,6 +27,8 @@ enum DeveloperTool: String, CaseIterable {
     case userAgentTablet = "user-agent-ipad"
     case userAgentChrome = "user-agent-chrome"
     case userAgentFirefox = "user-agent-firefox"
+    /// The page's address for a phone on the same network, as a QR code (`PhoneLink`).
+    case phone = "open-on-phone"
 
     var title: String {
         switch self {
@@ -53,6 +55,7 @@ enum DeveloperTool: String, CaseIterable {
         case .userAgentTablet: String(localized: "User Agent: Safari on iPad", comment: "View › Developer menu item and command, on a development site: the page is told it's in Safari on an iPad.")
         case .userAgentChrome: String(localized: "User Agent: Chrome", comment: "View › Developer menu item and command, on a development site: the page is told it's in Chrome on a Mac.")
         case .userAgentFirefox: String(localized: "User Agent: Firefox", comment: "View › Developer menu item and command, on a development site: the page is told it's in Firefox on a Mac.")
+        case .phone: String(localized: "Open on Your Phone…", comment: "View › Developer menu item, command and item in the ⋯ menu of the developer tools above the page, on a development site: shows a QR code of the page's address for a phone on the same network.")
         }
     }
 
@@ -176,6 +179,7 @@ enum DeveloperTool: String, CaseIterable {
         case .userAgentPhone: "iphone"
         case .userAgentTablet: "ipad"
         case .userAgentChrome, .userAgentFirefox: "macwindow"
+        case .phone: "qrcode"
         }
     }
 
@@ -203,6 +207,7 @@ enum DeveloperTool: String, CaseIterable {
         case .userAgentTablet: #selector(BrowserWindowController.userAgentTablet(_:))
         case .userAgentChrome: #selector(BrowserWindowController.userAgentChrome(_:))
         case .userAgentFirefox: #selector(BrowserWindowController.userAgentFirefox(_:))
+        case .phone: #selector(BrowserWindowController.openOnPhone(_:))
         }
     }
 
@@ -240,6 +245,7 @@ enum DeveloperTool: String, CaseIterable {
         case .userAgentTablet: ["user", "agent", "safari", "ipad", "tablet", "developer"]
         case .userAgentChrome: ["user", "agent", "chrome", "developer"]
         case .userAgentFirefox: ["user", "agent", "firefox", "developer"]
+        case .phone: ["open", "phone", "mobile", "qr", "code", "device", "network", "lan", "wifi", "developer"]
         }
     }
 
@@ -263,7 +269,7 @@ enum DeveloperTool: String, CaseIterable {
     static let menuItems: [DeveloperTool] = [.site, .clearCache, .clearCookies, .appearanceFollowsMac, .appearanceLight, .appearanceDark, .printStyles,
                                            .sizeFill, .sizeCustom, .rotate,
                                            .userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox,
-                                           .javaScript, .outlines]
+                                           .javaScript, .outlines, .phone]
 
     /// Its id among the command bar's commands.
     var commandID: String { Self.commandPrefix + rawValue }
@@ -284,7 +290,7 @@ enum DeveloperTool: String, CaseIterable {
         case .sizeFill, .sizeCustom, .rotate: isDevelopment && !inSplit
         case .console, .inspect, .reloadIgnoringCache, .viewSource, .settings,
              .appearanceFollowsMac, .appearanceLight, .appearanceDark, .printStyles, .javaScript, .outlines,
-             .userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox: isDevelopment
+             .userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox, .phone: isDevelopment
         }
     }
 
