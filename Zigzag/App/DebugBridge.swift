@@ -1180,6 +1180,33 @@ enum DebugBridge {
             controller.historyChange(HistoryPage.clearHistory) { [tabManager = controller.tabManager] in tabManager.profile.history.remove() }
         case "seedhistory": seedHistory(Int(arg) ?? 50_000)
         case "newwindow": WindowManager.shared.newWindow(url: URL(string: arg), showCommandBar: false)
+        // newwindowkey: a new window as ⌘N opens it (the command bar up), and the next commands go to it.
+        case "newwindowkey": WindowManager.shared.debugTarget = WindowManager.shared.newWindow()
+        // usewindow <n>: the next commands go to the nth browser window (in the order they opened), which comes forward.
+        case "usewindow":
+            let all = WindowManager.shared.controllers
+            if let n = Int(arg), all.indices.contains(n - 1) {
+                WindowManager.shared.debugTarget = all[n - 1]
+                all[n - 1].window?.makeKeyAndOrderFront(nil)
+            }
+        case "movetonewwindow":
+            if let tab = controller.tabManager.selectedTab { controller.moveToNewWindow(tab) }
+            WindowManager.shared.debugTarget = WindowManager.shared.controllers.last
+        // selecttitle <text>: the tab here whose title starts so, chosen as a click on its row chooses it.
+        case "selecttitle":
+            if let tab = controller.tabManager.allTabs.first(where: { $0.displayTitle.hasPrefix(arg) }) { controller.listSelect(tab) }
+        case "showhere": if let tab = controller.tabManager.selectedTab { controller.showHere(tab) }
+        case "windows":
+            // windows <path>: each browser window's space, chosen tab, whether another window has its page, and its list.
+            let rows: [[String: Any]] = WindowManager.shared.controllers.enumerated().map { i, c in
+                let m = c.tabManager
+                return ["window": i + 1, "private": m.isPrivate, "space": m.currentSpace.name,
+                        "selected": m.selectedTab?.displayTitle ?? "", "elsewhere": m.selectedTab.map(m.isShownElsewhere) ?? false,
+                        "card": c.root.card.shownElsewhere?.displayTitle ?? "", "tabs": m.currentTabs.map(\.displayTitle),
+                        "host": m.currentTabs.map { WindowManager.shared.window(of: $0).map { w in (WindowManager.shared.controllers.firstIndex { $0 === w } ?? -1) + 1 } ?? 0 },
+                        "frame": c.window.map { NSStringFromRect($0.frame) } ?? "", "number": c.window?.windowNumber ?? 0]
+            }
+            if let data = try? JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "closekey": WindowManager.shared.keyController?.window?.performClose(nil)
         case "reopenwindow": WindowManager.shared.reopenClosedWindow()
         case "whatsnew": WhatsNew.show(in: controller)
