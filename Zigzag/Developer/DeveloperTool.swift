@@ -252,7 +252,9 @@ enum DeveloperTool: String, CaseIterable {
     }
 
     /// Its shortcut as Zigzag ships it; none for most.
-    var key: (String, NSEvent.ModifierFlags)? { self == .site ? ("d", [.control]) : nil }
+    /// ⌥⇧⌘D for listing the site: never a key a text field uses (⌃D deletes forward in every one of them, the
+    /// address and a page's own fields included), and free in the menu bar and in macOS.
+    var key: (String, NSEvent.ModifierFlags)? { self == .site ? ("d", [.command, .option, .shift]) : nil }
 
     /// The tools with a tile of their own in Site Controls, where a development page doesn't have them above it.
     static let tiles: [DeveloperTool] = [.console, .inspect, .reloadIgnoringCache]

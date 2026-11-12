@@ -106,7 +106,7 @@ struct DeveloperToolTests {
             #expect(!MainMenu.setDeveloperTools(true, in: menu))
             for tool in DeveloperTool.menuItems { #expect(actions(menu).filter { $0 == tool.action }.count == 1) }
             let site = items(menu).first { $0.action == DeveloperTool.site.action }
-            #expect(site?.keyEquivalent == "d" && site?.keyEquivalentModifierMask == [.control])
+            #expect(site?.keyEquivalent == "d" && site?.keyEquivalentModifierMask == [.command, .option, .shift])
             // After the ones always there, under a line of their own.
             let developer = site?.menu?.items ?? []
             #expect(developer.first?.action == #selector(BrowserWindowController.showWebInspector(_:)))

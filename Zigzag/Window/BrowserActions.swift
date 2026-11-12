@@ -291,7 +291,7 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     /// View › Developer › Add This Site to Development Sites, or Remove: the list in Settings › Developer. It says
     /// what it did, by the name on the list: taking a site off takes off what covered it, which may be its parent
-    /// domain, and its key (⌃D) is one a slip of the hand finds.
+    /// domain.
     @objc func toggleDevelopmentSite(_ sender: Any?) {
         guard let tab = selectedTab, DeveloperTool.site.isOffered(for: tab, isPrivate: tabManager.isPrivate) else { return }
         if let listed = DevelopmentSites.entry(covering: tab.url) {
