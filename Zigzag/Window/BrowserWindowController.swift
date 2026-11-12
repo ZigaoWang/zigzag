@@ -390,7 +390,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// instead), it lands among the pinned tabs or the tabs right where it was dropped, and this window comes forward.
     func takePinned(_ bookmarkID: UUID, from source: BrowserWindowController, at screenPoint: NSPoint) -> NSView? {
         let ids = Library.shared.pinnedSplit(containing: bookmarkID).map { [$0.left, $0.right] } ?? [bookmarkID]
-        for id in ids {
+        // Windows showing the same tabs have the same open pages (#162): nothing to bring over.
+        for id in ids where source.tabManager.store !== tabManager.store {
             if tabManager.bookmarkTab(for: id) != nil {
                 if let live = source.tabManager.bookmarkTab(for: id) { source.tabManager.close(live) }
             } else if let live = source.tabManager.detachBookmarkTab(id) {
@@ -417,7 +418,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// stays instead), it lands as it would from this window's own, and this window comes forward.
     func takeFavorite(_ favorite: Bookmark, from source: BrowserWindowController, at screenPoint: NSPoint) -> NSView? {
         let ids = Library.shared.favoriteSplits.first { $0.contains(favorite.id) }.map { [$0.left, $0.right] } ?? [favorite.id]
-        for id in ids {
+        for id in ids where source.tabManager.store !== tabManager.store {
             if tabManager.bookmarkTab(for: id) != nil {
                 if let live = source.tabManager.bookmarkTab(for: id) { source.tabManager.close(live) }
             } else if let live = source.tabManager.detachBookmarkTab(id) {
@@ -542,7 +543,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             miniPlayer.switched(from: before, to: tab.map { tabManager.panes(of: $0) } ?? [])
             shownTab = tab
             selectedTabToken = tab?.changed.observe { [weak self] change in self?.selectedTabChanged(change) }
-            if let webView = tab?.ensureWebView(), window?.isKeyWindow == true, !commandBar.isVisible {
+            if let tab, !tabManager.isShownElsewhere(tab), case let webView = tab.ensureWebView(), window?.isKeyWindow == true, !commandBar.isVisible {
                 DispatchQueue.main.async { [weak self] in self?.window?.makeFirstResponder(webView) }
             }
         }
@@ -816,7 +817,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 card.header.setVertical(pair.vertical)
                 card.header.orientation.onClick = { [weak self] _ in self?.tabManager.toggleSplitOrientation(for: first) }
                 card.header.swap.onClick = { [weak self] _ in self?.tabManager.swapSplit(for: first) }
-                card.show(page.ensureWebView())
+                // A page another window has on screen stays there; the card says so (#162).
+                if tabManager.mayShow(page) {
+                    card.show(page.ensureWebView())
+                } else {
+                    card.showElsewhere(page) { [weak self] in self?.showHere(page) }
+                }
                 // Any page may have crashed while out of sight (a space switch brings it back, not only selecting it).
                 page.reloadIfItStopped()
                 card.isFocusedPane = page === tab
@@ -837,7 +843,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         } else {
             root.setTiles(nil, animated: true)
             root.isEmpty = tab == nil
-            root.card.show(tab?.ensureWebView())
+            if let tab, !tabManager.mayShow(tab) {
+                root.card.showElsewhere(tab) { [weak self] in self?.showHere(tab) }
+            } else {
+                root.card.showElsewhere(nil)
+                root.card.show(tab?.ensureWebView())
+            }
             tab?.reloadIfItStopped()
             root.card.showLoading(of: tab)
             root.card.isFocusedPane = false
@@ -846,6 +857,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             cards.dropFirst().forEach(clear)
         }
         func clear(_ card: PageCardView) {
+            card.showElsewhere(nil)
             card.show(nil)
             card.showLoading(of: nil)
             card.header.show(nil)
@@ -853,6 +865,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             card.isUnfocusedPane = false
             card.showsHeader = false
         }
+    }
+
+    /// Show Here, over a page another window has on screen (#162): it comes to this window, still loaded, and the other
+    /// shows it's here now.
+    func showHere(_ tab: Tab) {
+        guard !tab.isClosed, tabManager.tab(with: tab.id) === tab else { return }
+        tabManager.select(tab)
+        if let webView = tab.webView, window?.isKeyWindow == true { window?.makeFirstResponder(webView) }
     }
 
     // MARK: Downloads with the sidebar hidden
@@ -2025,63 +2045,31 @@ extension BrowserWindowController: SidebarDelegate {
             }
         }
     }
-    /// A tab in a window of its own, a little down and to the right of this one, so both stay in view.
+    /// A tab in a window of its own, a little down and to the right of this one, so both stay in view. Every window
+    /// shows the same tabs (#162): the new one shows this tab (and the pages beside it), and this one goes on to the
+    /// tab you were on before.
     func moveToNewWindow(_ tab: Tab) {
         guard !tabManager.isPrivate, let frame = window?.frame else { return }
         let target = WindowManager.shared.newWindow(spaceID: tab.spaceID, showCommandBar: false)
         target.window?.setFrame(frame.offsetBy(dx: 30, dy: -30), display: true)
-        let undo = transferUndo([tab], to: target, closesTarget: true)
-        transfer(tab, to: target, at: 0)
-        undo()
+        hand(tab, to: target)
+    }
+
+    /// `tab`'s page goes on screen in `target`, which comes forward; this window moves on from it if it was showing it.
+    private func hand(_ tab: Tab, to target: BrowserWindowController) {
+        guard target !== self, target.tabManager.store === tabManager.store, !tab.isClosed else { return }
+        target.tabManager.select(tab)
+        tabManager.moveOn(from: tab)
         target.window?.makeKeyAndOrderFront(nil)
-    }
-
-    /// Ready to register ⌘Z in the window tabs are about to go to (where you'll be): it sends them back here, where they
-    /// were, and closes a window that was made just for them once it's empty. Call it before the move, then call
-    /// what it returns after.
-    private func transferUndo(_ tabs: [Tab], to target: BrowserWindowController, closesTarget: Bool) -> () -> Void {
-        let places = tabs.map { tab in (tab, tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0) }
-        return { [weak self, weak target] in
-            guard let target else { return }
-            target.sidebarUndo.registerUndo(withTarget: target) { target in
-                guard let self, WindowManager.shared.controllers.contains(where: { $0 === self }) else { return }
-                // Lowest first, so each goes back in at the place it left.
-                for (tab, index) in places.sorted(by: { $0.1 < $1.1 }) where target.tabManager.allTabs.contains(where: { $0 === tab }) {
-                    target.transfer(tab, to: self, at: index)
-                }
-                if closesTarget, target.tabManager.allTabs.isEmpty { target.window?.performClose(nil) }
-                self.window?.makeKeyAndOrderFront(nil)
-            }
-            target.sidebarUndo.setActionName(String(localized: "Move to Window", comment: "Undo action name, shown in the Edit menu as Undo Move to Window."))
-        }
-    }
-
-    /// A tab into another window's list. Half of a split of two tabs brings the other half, and a page of a tile group
-    /// the rest of it: they arrive as one, still side by side.
-    private func transfer(_ tab: Tab, to target: BrowserWindowController, at index: Int) {
-        let pair = tabManager.split(for: tab)
-        let panes = tabManager.panes(of: tab)
-        let together = pair != nil && panes.count == pair?.count && panes.allSatisfy { $0.bookmarkID == nil }
-        guard let pair, together else {
-            tabManager.detach(tab)
-            target.tabManager.insert(tab, at: index)
-            return
-        }
-        panes.forEach { tabManager.detach($0) }
-        // Each in at the same place, last first, so they keep their order.
-        for page in panes.reversed() { target.tabManager.insert(page, at: index) }
-        target.tabManager.restoreSplit(pair)
     }
 
     func listDropOutside(_ tabs: [Tab], at screenPoint: NSPoint) -> Bool {
         guard !tabManager.isPrivate, let tab = tabs.first else { return false }
         let others = WindowManager.shared.controllers.filter { $0 !== self && !$0.tabManager.isPrivate }
         let target: BrowserWindowController
-        var isNew = false
         if let existing = others.first(where: { $0.window?.frame.contains(screenPoint) == true }) {
             target = existing
         } else {
-            isNew = true
             // A new window, roughly where the tab was let go.
             target = WindowManager.shared.newWindow(spaceID: tab.spaceID, showCommandBar: false)
             if let window = target.window {
@@ -2090,11 +2078,8 @@ extension BrowserWindowController: SidebarDelegate {
                 window.setFrame(frame, display: true)
             }
         }
-        let undo = transferUndo(tabs, to: target, closesTarget: isNew)
-        // Each in at the top, last first, so they keep their order.
-        for tab in tabs.reversed() { transfer(tab, to: target, at: 0) }
-        undo()
-        target.window?.makeKeyAndOrderFront(nil)
+        // The tabs are already in every window's list: the window it was let go over shows the first of them.
+        hand(tab, to: target)
         return true
     }
 
@@ -2245,12 +2230,25 @@ extension BrowserWindowController: SidebarDelegate {
         }
     }
 
+    /// Tabs let go among another window's tabs: they move to that place in the list every window shows, in the space
+    /// that window is in, and it shows the first of them.
     func listMoveToWindow(_ tabs: [Tab], controller: BrowserWindowController, index: Int) -> Bool {
-        guard !tabManager.isPrivate, !controller.tabManager.isPrivate else { return false }
-        let undo = transferUndo(tabs, to: controller, closesTarget: false)
-        for tab in tabs.reversed() { transfer(tab, to: controller, at: index) }
-        undo()
+        guard !tabManager.isPrivate, !controller.tabManager.isPrivate, controller.tabManager.store === tabManager.store,
+              let first = tabs.first else { return false }
+        let space = controller.tabManager.currentSpaceID
         controller.window?.makeKeyAndOrderFront(nil)
+        controller.confirmProfileCrossing(tabs.flatMap { controller.tabManager.panes(of: $0) }, to: space) { [weak self, weak controller] in
+            guard let self, let controller else { return }
+            controller.pageChange(String(localized: "Move to Window", comment: "Undo action name, shown in the Edit menu as Undo Move to Window.")) {
+                // Each in at the same place, last first, so they keep their order.
+                for tab in tabs.reversed() where !tab.isClosed && tab.bookmarkID == nil {
+                    // A place counted with the tab still in the list, as the other window draws it; a move counts without.
+                    let at = controller.tabManager.tabs(in: space).firstIndex { $0 === tab } ?? Int.max
+                    if tab.spaceID == space { controller.tabManager.move(tab, to: at < index ? index - 1 : index) } else { controller.tabManager.move(tab, to: index, in: space) }
+                }
+            }
+            self.hand(first, to: controller)
+        }
         return true
     }
 
