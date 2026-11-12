@@ -210,19 +210,31 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     var onRename: ((String) -> Void)?
     private var renameField: PlainTextField?
 
-    /// Double-click: the title becomes a field, the whole name selected. Return keeps it, Escape doesn't.
-    func beginRename() {
+    /// The page being renamed: in a row of several pages, the one whose part was double-clicked.
+    private(set) var renamingPage: Tab?
+    /// Which part's name is being edited (`half(at:)`'s numbering).
+    private var renamingPart = 0
+
+    /// Double-click: the title becomes a field, the whole name selected. Return keeps it, Escape doesn't. In a row of
+    /// several pages, the part at `point` (or `page`'s part): the field takes that part's title, its icon staying; a
+    /// part too narrow for a title gives the field the whole row for the moment, beside its own icon.
+    func beginRename(at point: NSPoint? = nil, page: Tab? = nil) {
         guard renameField == nil, let window else { return }
-        let field = PlainTextField(font: title.font ?? Tokens.Font.body(), placeholder: String(localized: "Name", comment: "Placeholder of the field that renames a tab, in its sidebar row."))
-        field.stringValue = title.stringValue
+        let index = point.map(half(at:)) ?? page.flatMap { page in pages.firstIndex { $0 === page } } ?? 0
+        renamingPart = partTitles.indices.contains(index) && (index == 0 || isSplit) ? index : 0
+        let label = partTitles[renamingPart]
+        renamingPage = renamingPart == 0 ? tab : pages.indices.contains(renamingPart) ? pages[renamingPart] : nil
+        let field = PlainTextField(font: label.font ?? Tokens.Font.body(), placeholder: String(localized: "Name", comment: "Placeholder of the field that renames a tab, in its sidebar row."))
+        field.stringValue = label.stringValue
         field.delegate = self
         field.onCancel = { [weak self] in self?.endRename(commit: false) }
-        title.isHidden = true
+        label.isHidden = true
         addSubview(field)
         renameField = field
         // The whole row is the name while you edit it: no close or audio button in the way.
         refreshAccessories()
-        layoutRenameField()
+        needsLayout = true
+        layoutSubtreeIfNeeded()
         window.makeFirstResponder(field)
         field.currentEditor()?.selectAll(nil)
     }
@@ -232,10 +244,20 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         renameField = nil
         let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         field.removeFromSuperview()
-        title.isHidden = false
+        partTitles[renamingPart].isHidden = false
+        // A group's other parts, set aside while one of them had the whole row.
+        partViews.flatMap { $0 }.forEach { $0.alphaValue = 1 }
+        ([divider] + (extraViews ?? []).map(\.divider)).forEach { $0.alphaValue = 1 }
         refreshAccessories()
         if commit { onRename?(name) }
+        renamingPage = nil
+        renamingPart = 0
         window?.makeFirstResponder(window?.contentView)
+    }
+
+    /// Each part's icon and title, in `half(at:)`'s order.
+    private var partViews: [[NSView]] {
+        [[icon, title], [partnerIcon, partnerTitle]] + (extraViews ?? []).map { [$0.icon, $0.title] }
     }
 
     /// The pinned page's own name, shown before the mark while it's away: "Apple / MacBook Pro".
@@ -400,6 +422,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             if views.audio.symbol != sound { views.audio.symbol = sound }
             views.audio.toolTip = page?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.") : String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
             [views.icon, views.title, views.divider].forEach { $0.isHidden = page == nil }
+            if renameField != nil, renamingPart == i + 2 { views.title.isHidden = true }
         }
         refreshAccessories()
         refreshAccessibilityLabel()
@@ -616,9 +639,31 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     private func layoutRenameField() {
         guard let field = renameField else { return }
-        let x = title.frame.minX
         let height = ceil(field.intrinsicContentSize.height)
-        field.frame = NSRect(x: x, y: (bounds.height - height) / 2, width: max(0, bounds.width - x - Self.inset), height: height)
+        let y = (bounds.height - height) / 2
+        guard isSplit else {
+            let x = title.frame.minX
+            field.frame = NSRect(x: x, y: y, width: max(0, bounds.width - x - Self.inset), height: height)
+            return
+        }
+        let views = partViews
+        guard views.indices.contains(renamingPart) else { return }
+        let icon = views[renamingPart][0], label = views[renamingPart][1]
+        // The part as laid out: from where its title starts to the end of its span, short of the next part.
+        let spans = partSpans
+        let span = spans.first { $0.start <= icon.frame.midX && icon.frame.midX < $0.end } ?? (0, bounds.width)
+        let roomy = label.frame.width > 0 && span.end - label.frame.minX >= 48
+        if roomy {
+            let end = span.end >= bounds.width - 1 ? bounds.width - Self.inset : span.end - Self.buttonEdge / 2
+            field.frame = NSRect(x: label.frame.minX, y: y, width: max(0, end - label.frame.minX), height: height)
+            return
+        }
+        // Too narrow for a name: for now the row is this page's alone, its icon where a tab's is, the field after it.
+        for (i, part) in views.enumerated() where i != renamingPart { part.forEach { $0.alphaValue = 0 } }
+        ([divider] + (extraViews ?? []).map(\.divider)).forEach { $0.alphaValue = 0 }
+        icon.frame.origin.x = Self.inset
+        let x = icon.frame.maxX + Self.titleOffset
+        field.frame = NSRect(x: x, y: y, width: max(0, bounds.width - x - Self.inset), height: height)
     }
 
     func controlTextDidEndEditing(_ obj: Notification) { endRename(commit: true) }

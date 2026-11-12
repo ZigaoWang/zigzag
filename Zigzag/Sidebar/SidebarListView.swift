@@ -855,8 +855,9 @@ final class SidebarListView: NSView {
                 self.delegate?.listSelect(row.page(at: row.convert(event.locationInWindow, from: nil)) ?? tab)
                 _ = id
             }
-            row.onDoubleClick = { [weak row] in row?.beginRename() }
-            row.onRename = { [weak row] name in row?.tab?.customTitle = name.isEmpty ? nil : name }
+            // In a row of several pages, the part double-clicked is the page renamed.
+            row.onDoubleClick = { [weak row] in row?.beginRename(at: Self.pointer(in: row)) }
+            row.onRename = { [weak row] name in (row?.renamingPage ?? row?.tab)?.customTitle = name.isEmpty ? nil : name }
             row.onClose = { [weak self, weak row] in
                 guard let tab = row?.tab else { return }
                 // A split row closes both its pages, as the desk's card does.
@@ -879,8 +880,13 @@ final class SidebarListView: NSView {
             let row = TabRowView()
             row.isBookmark = true
             // Not a pinned split's row: it carries two pages, and a new name would only reach the left one.
-            row.onDoubleClick = { [weak row] in if Library.shared.pinnedSplit(containing: id) == nil { row?.beginRename() } }
-            row.onRename = { [weak self] name in
+            row.onDoubleClick = { [weak row] in if Library.shared.pinnedSplit(containing: id) == nil { row?.beginRename(at: Self.pointer(in: row)) } }
+            row.onRename = { [weak self, weak row] name in
+                // The tab split beside the pinned page, riding in its row, keeps a name of its own.
+                if let page = row?.renamingPage, page.bookmarkID == nil {
+                    page.customTitle = name.isEmpty ? nil : name
+                    return
+                }
                 guard !name.isEmpty else { return }
                 self?.delegate?.listRenameBookmark(id, to: name)
             }
@@ -1315,7 +1321,17 @@ final class SidebarListView: NSView {
 
     /// A tab's row turns into a field for its name, as a double-click does.
     func beginRenaming(tab id: UUID) {
-        (shownRow(.tab(id)) as? TabRowView)?.beginRename()
+        if let row = shownRow(.tab(id)) as? TabRowView { row.beginRename(); return }
+        // A page of a split or tile group: its part of the group's row.
+        guard let (item, view) = rows.first(where: { ($0.value as? TabRowView)?.pages.contains { $0.id == id } == true }),
+              shownRow(item) != nil, let row = view as? TabRowView else { return }
+        row.beginRename(page: row.pages.first { $0.id == id })
+    }
+
+    /// Where the pointer is in a row, for what the event in hand did there.
+    private static func pointer(in row: NSView?) -> NSPoint? {
+        guard let row, let event = NSApp.currentEvent, event.window === row.window else { return nil }
+        return row.convert(event.locationInWindow, from: nil)
     }
 
 
