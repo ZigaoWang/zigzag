@@ -1729,6 +1729,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
         if DownloadsPanel.isOpen(in: window) { DownloadsPanel.closeCurrent() }
         if let editor = SpaceEditorPanel.current, editor.window === window { editor.close() }
+        // Nor the zoomed pane's Esc.
+        if let monitor = zoomEscMonitor { NSEvent.removeMonitor(monitor) }
+        zoomEscMonitor = nil
         // Its page is no longer on offer to your other devices.
         handoff?.invalidate()
         onClose?(self)
