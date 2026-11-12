@@ -11246,6 +11246,17 @@
         }
       }
     },
+    "Return Pane" : {
+      "comment" : "Tooltip and menu item: puts the enlarged page of a split view back in its place among the others.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还原窗格"
+          }
+        }
+      }
+    },
     "Return keeps it, Esc cancels" : {
       "comment" : "Under a hint in the getting-started guide, a card in the window, while the new space's editor is open. Return and Esc are keys.",
       "localizations" : {
@@ -16122,6 +16133,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "缩小"
+          }
+        }
+      }
+    },
+    "Zoom Pane" : {
+      "comment" : "Tooltip and menu item: enlarges one page of a split view over the others for a moment, without changing where it is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放大窗格"
           }
         }
       }
