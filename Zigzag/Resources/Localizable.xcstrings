@@ -15636,13 +15636,13 @@
         }
       }
     },
-    "Uses EasyList and EasyPrivacy, by the EasyList authors." : {
-      "comment" : "Explanation under “Block ads and trackers” in Settings › Privacy.",
+    "Uses EasyList and EasyPrivacy, by the EasyList authors, and uBlock Origin’s filter lists." : {
+      "comment" : "Explanation under “Block ads and trackers” in Settings › Privacy. EasyList, EasyPrivacy and uBlock Origin are names of open-source filter lists: keep them as they are.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "使用 EasyList 和 EasyPrivacy，由 EasyList 作者维护。"
+            "value" : "使用 EasyList 和 EasyPrivacy（由 EasyList 作者维护），以及 uBlock Origin 的过滤列表。"
           }
         }
       }

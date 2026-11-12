@@ -1863,8 +1863,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private func reloadBlocking() {
         blockingGroup.removeAllRows()
-        // EasyList's licence asks for credit; this is where people look for what does the blocking.
-        var detail = String(localized: "Uses EasyList and EasyPrivacy, by the EasyList authors.", comment: "Explanation under “Block ads and trackers” in Settings › Privacy.")
+        // EasyList's license asks for credit, and uBlock Origin's lists do the rest; this is where people look for what
+        // does the blocking.
+        var detail = String(localized: "Uses EasyList and EasyPrivacy, by the EasyList authors, and uBlock Origin’s filter lists.", comment: "Explanation under “Block ads and trackers” in Settings › Privacy. EasyList, EasyPrivacy and uBlock Origin are names of open-source filter lists: keep them as they are.")
         if ContentBlocker.isEnabled, let blocker = AdBlockers.active(in: profile) {
             detail += " " + String(localized: "\(blocker) is blocking ads on YouTube.",
                                    comment: "After the explanation under “Block ads and trackers” in Settings › Privacy, while an ad blocker extension (its name, like uBlock Origin Lite) handles YouTube instead of Zigzag.")

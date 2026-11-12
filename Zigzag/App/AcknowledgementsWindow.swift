@@ -78,10 +78,10 @@ enum Acknowledgements {
         out.append(style.paragraph(String(localized: "The Zigzag name, the app icon and the logo are trademarks of Zigao Wang, all rights reserved. They aren’t covered by the Apache License: see [TRADEMARKS.md](TRADEMARKS.md).",
                                           comment: "In the Acknowledgments window. Keep the Markdown link [TRADEMARKS.md](TRADEMARKS.md) as it is.")))
 
-        // The works shipped in the app, and the note on names and marks; what's only used to build or test stays in
-        // the repository's copy.
+        // The works shipped in the app, the filter lists it downloads, and the note on names and marks; what's only
+        // used to build or test stays in the repository's copy.
         if let notices = bundled("THIRD_PARTY_NOTICES", "md") {
-            let shown = sections(of: notices, keeping: ["Shipped in the app", "Names and marks"])
+            let shown = sections(of: notices, keeping: ["Shipped in the app", "Downloaded by the app, not shipped", "Names and marks"])
                 .replacingOccurrences(of: "## Shipped in the app",
                                       with: "## " + String(localized: "Works by others", comment: "Heading in the Acknowledgments window, above the open source works Zigzag ships with."))
             out.append(style.markdown(shown))
