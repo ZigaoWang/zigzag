@@ -1822,6 +1822,23 @@ enum DebugBridge {
                 "tabScripts": scripts.count, "tabScriptBytes": scripts.reduce(0) { $0 + $1.source.utf8.count },
             ]
             if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
+        case "userscripts":
+            // userscripts <path>: each live tab's page scripts, how many and how big, the largest by their first
+            // line (JSON). What a new page's process is sent as it starts, so it should stay the same as you browse.
+            var rows: [[String: Any]] = []
+            for window in WindowManager.shared.controllers {
+                for tab in window.tabManager.allTabs {
+                    guard let webView = tab.webView else { continue }
+                    let userContent = webView.configuration.userContentController
+                    let scripts = Array(userContent.userScripts)
+                    let largest = scripts.sorted { $0.source.utf8.count > $1.source.utf8.count }.prefix(8).map {
+                        "\($0.source.utf8.count) \($0.source.prefix(60).replacingOccurrences(of: "\n", with: " "))"
+                    }
+                    rows.append(["url": tab.url?.absoluteString ?? "", "controller": "\(ObjectIdentifier(userContent).hashValue)",
+                                 "count": scripts.count, "bytes": scripts.reduce(0) { $0 + $1.source.utf8.count }, "largest": largest])
+                }
+            }
+            if let data = try? JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "addext": controller.installExtension(arg)
         case "storeadd": WebStoreOffer.debugAdd()
         case "sheetcancel": ExtensionSheet.debugCancel()
