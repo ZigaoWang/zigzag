@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- Dark pages are drawn by [Dark Reader](https://darkreader.org)'s engine, with its fixes for thousands of sites: a site's own colors are made dark one by one, instead of the page being turned over with a filter and patched up afterward. Sites written with newer kinds of colors, like Cloudflare's dashboard, no longer stay mostly light. A site with a dark look of its own still uses it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
+
 ## [0.8.7] - 2026-11-12
 
 ### New
