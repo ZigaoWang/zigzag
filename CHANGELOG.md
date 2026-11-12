@@ -12,6 +12,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - In split view, a mouse's back and forward buttons and a swipe go back or forward in the page under the pointer, which becomes the page you're in, instead of in whichever page you were last in. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#170](https://github.com/ZigaoWang/zigzag/issues/170))
 - Ad blocking now also uses uBlock Origin's community filter lists, which Zigzag downloads and keeps up to date on its own, so YouTube and other sites that change how they serve ads keep working without waiting for a Zigzag update. ([#129](https://github.com/ZigaoWang/zigzag/issues/129))
+- Show All Tabs opens smoothly, the first time too.
 
 ## [0.8.7] - 2026-11-12
 
