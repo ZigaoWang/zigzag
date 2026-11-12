@@ -579,6 +579,43 @@ enum DebugBridge {
             if let root = controller.tabManager.selectedTab?.settingsView { rows(root).first?.openEditor() }
         case "saveprompt": if arg == "close" { SavePasswordPrompt.debugClose() } else { SavePasswordPrompt.debugPreview(in: controller) }
         case "select": controller.tabManager.select(at: Int(arg) ?? 0)
+        // groundprobe select <index> | load <url> | open <url>: does that, then for 1.5 s writes to the debug log what's
+        // behind the page in front every 50 ms (#134): the web view's own ground, its under-page color, the card's, and
+        // what the page script has put in (darkened, palette, prepaint).
+        case "groundprobe":
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            guard f.count == 2 else { break }
+            switch f[0] {
+            case "select": controller.tabManager.select(at: Int(f[1]) ?? 0)
+            case "load": if let url = URL(string: f[1]) { controller.open(url, disposition: .currentTab) }
+            case "open": if let url = URL(string: f[1]) { controller.open(url, disposition: .foregroundTab, allowSwitch: false) }
+            default: break
+            }
+            let start = Date()
+            func hex(_ c: NSColor?) -> String {
+                guard let c = c?.usingColorSpace(.sRGB) else { return "nil" }
+                return String(format: "#%02x%02x%02x/%.2f", Int(c.redComponent * 255), Int(c.greenComponent * 255), Int(c.blueComponent * 255), c.alphaComponent)
+            }
+            for i in 0...30 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) {
+                    MainActor.assumeIsolated {
+                        let tab = controller.tabManager.selectedTab
+                        guard let webView = tab?.webView else { debugLog("groundprobe \(i) no web view"); return }
+                        let own = webView.responds(to: NSSelectorFromString("_backgroundColor")) ? webView.value(forKey: "_backgroundColor") as? NSColor : nil
+                        let layer = webView.layer?.backgroundColor.flatMap { NSColor(cgColor: $0) }
+                        let native = String(format: "t=%.3f own=%@ layer=%@ under=%@ page=%@ url=%@ loading=%d", Date().timeIntervalSince(start),
+                                            hex(own), hex(layer), hex(webView.underPageBackgroundColor), hex(tab?.pageColor),
+                                            webView.url?.absoluteString ?? "nil", webView.isLoading ? 1 : 0)
+                        webView.callAsyncJavaScript("""
+                            const s = document.querySelector('style[data-zigzag-dark=""]'), p = document.querySelector('style[data-zigzag-dark=prepaint]');
+                            return JSON.stringify({ ready: document.readyState, style: !!s, filter: !!s && s.textContent.includes('invert'),
+                              prepaint: !!p, state: window.__zigzagDark ? window.__zigzagDark.state().palette : null });
+                            """, arguments: [:], in: nil, in: DarkPages.world) { result in
+                            debugLog("groundprobe \(i) \(native) js=\((try? result.get()).map { "\($0)" } ?? "none")")
+                        }
+                    }
+                }
+            }
         case "suspendtab": controller.tabManager.allTabs.first { $0.url?.absoluteString.hasPrefix(arg) == true }?.suspend(because: "debug")
         // pageicon <index> <icon|none>: gives the tab at that sidebar position an icon of its own, as Change Icon… does.
         case "pageicon":
