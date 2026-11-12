@@ -456,9 +456,41 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     func half(at point: NSPoint) -> Int {
         guard extraPartners.isEmpty else {
             let count = segmentCount
-            return min(count - 1, max(0, Int(point.x / max(1, bounds.width / CGFloat(count)))))
+            // The parts as laid out, each reaching to the middle of the gap on either side of it.
+            guard partEdges.count == count - 1 else { return min(count - 1, max(0, Int(point.x / max(1, bounds.width / CGFloat(count))))) }
+            return partEdges.filter { point.x >= $0 }.count
         }
         return isSplit && (point.x > bounds.midX) != partnerLeads ? 1 : 0
+    }
+
+    /// Where one part of a split or tile group's row ends and the next begins (the middle of the gap between them).
+    private var partEdges: [CGFloat] = []
+
+    /// Each part's span across the row, in the row's order of parts (the partner's half first when it leads).
+    private var partSpans: [(start: CGFloat, end: CGFloat)] {
+        let edges = [0] + partEdges + [bounds.width]
+        return (0..<(edges.count - 1)).map { (edges[$0], edges[$0 + 1]) }
+    }
+
+    /// The title labels of the row's parts, in `half(at:)`'s order: its own, the partner's, a group's others.
+    private var partTitles: [Label] { [title, partnerTitle] + (extraViews ?? []).map(\.title) }
+
+    /// Pointing at a part of a row of several pages names that page, as its title may be cut short or not shown.
+    private var showsPartTips = false
+
+    private func refreshPartTips() {
+        guard isSplit || showsPartTips else { return }
+        removeAllToolTips()
+        showsPartTips = isSplit
+        guard isSplit else { return }
+        for (start, end) in partSpans where end > start {
+            addToolTip(NSRect(x: start, y: 0, width: end - start, height: bounds.height), owner: self, userData: nil)
+        }
+    }
+
+    @objc func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
+        let index = half(at: point)
+        return partTitles.indices.contains(index) ? partTitles[index].stringValue : title.stringValue
     }
 
     /// The page the point is over.
@@ -481,7 +513,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     /// Whether a part this wide has room for its title beside its icon, or shows the icon alone.
-    static func segmentShowsTitle(width: CGFloat) -> Bool { width >= 58 }
+    /// A title cut to its first letter or two reads as noise: only where a few words fit.
+    static func segmentShowsTitle(width: CGFloat) -> Bool { width >= 84 }
 
     required init?(coder: NSCoder) { fatalError() }
 
@@ -651,8 +684,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             end = nestedButton.frame.minX - Self.buttonGap
         }
         layoutDropHalf()
+        defer { refreshPartTips() }
 
         guard isSplit else {
+            partEdges = []
             audioButton.frame.origin = NSPoint(x: end - size.width, y: y)
             return
         }
@@ -673,19 +708,32 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             title.frame = NSRect(x: x, y: titleY, width: max(0, textEnd + Label.inset - x), height: titleH)
         }
         let leadEnd = mid - edge, trailEnd = end
+        partEdges = [mid]
         if !extraPartners.isEmpty, let views = extraViews {
             // A tile group: a part for each page, in its order, a hairline between; a title only where it has room.
             let parts = Self.segments(count: segmentCount, start: 0, end: trailEnd, mid: mid, gap: edge)
+            partEdges = parts.dropFirst().map { round($0.start - edge / 2) }
             let lines = [divider] + views.map(\.divider)
             let pieces: [(NSView, NSView, IconButton)] = [(icon, title, audioButton), (partnerIcon, partnerTitle, partnerAudioButton)]
                 + views.map { ($0.icon, $0.title, $0.audio) }
-            // Every part the same: titles in all of them or in none.
+            // Every part the same: titles in all of them or in none. Without titles each part's icon (and its speaker,
+            // while it plays) sits in the middle of the part, so the row reads as even steps rather than icons pushed
+            // to the left of empty room; pointing at a part names its page.
             let titles = parts.first.map { Self.segmentShowsTitle(width: $0.end - $0.start) } ?? false
             for (i, part) in parts.enumerated() where i < pieces.count {
                 let (icon, title, audio) = pieces[i]
-                place(icon: icon, title: title, audio: audio, from: part.start, to: part.end)
-                if !titles { title.frame.size.width = 0 }
-                if i > 0 { lines[i - 1].frame = NSRect(x: part.start, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4) }
+                if titles {
+                    place(icon: icon, title: title, audio: audio, from: part.start, to: part.end)
+                } else {
+                    let width = side + (audio.isHidden ? 0 : Self.buttonGap + size.width)
+                    icon.frame = NSRect(x: round((part.start + part.end - width) / 2), y: iconY, width: side, height: side)
+                    if !audio.isHidden { audio.frame.origin = NSPoint(x: icon.frame.maxX + Self.buttonGap, y: y) }
+                    title.frame = NSRect(x: icon.frame.maxX, y: titleY, width: 0, height: titleH)
+                }
+                // In the middle of the gap between two parts.
+                if i > 0 {
+                    lines[i - 1].frame = NSRect(x: partEdges[i - 1], y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4)
+                }
             }
             return
         }
