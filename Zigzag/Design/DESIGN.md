@@ -336,26 +336,28 @@ something came from, answers at once, and can be interrupted.
   (`Color.surface` at night) and Auto, from `Reader.Palette`. Its one control, Aa, sits on the article's paper at
   the top right, there at the top and when you scroll back up, away while you read on; its panel holds size, face,
   width and colors. Reader itself comes and goes with the address's Reader button, ⌘⇧R or Esc.
-- **Mini player** (`MiniPlayer`): leave a tab while a video you were watching plays and it follows you in a card over
-  the page area: one you can hear, or one you started or turned up yourself; never a muted autoplay, a page's moving
+- **Mini player** (`MiniPlayer`): leave a tab while a video you were watching plays and it follows you in a card that
+  floats in a panel of its own (`MiniPlayerPanel`, #172), over the window and other apps, on every space and beside a
+  full screen window, as Picture in Picture does: one you can hear, or one you started or turned up yourself; never a muted autoplay, a page's moving
   background, a card's preview in a link, or anything on a page that's on its way out to another
   (`MiniPlayerLayout.followed`). The tab's own live page moved in and scaled so only its video shows, never laid out
   again. A third of the page area wide (240 to 480), the video's shape, never over half its height, until you resize
   it by any edge or corner, as a window: the video's shape kept, the opposite edge or corner staying put, from 200
-  wide to 80% of the window, its longer side kept for the next video; `Radius.panel` (the page clipped to it
-  with `clipsToBounds`, which a web view's layers obey), the floating layer's hairline and one shadow, first 12pt
-  into the page area's bottom right. It sits over the page and the sidebar, under everything floating. It grows out
-  of where the video was (`Motion.zoom`; a fade with Reduce Motion) and fades as it closes. Pointing at it brings its
+  wide to 80% of the screen, its longer side kept for the next video; `Radius.panel` (the page clipped to it
+  with `clipsToBounds`, which a web view's layers obey), the floating layer's hairline and the window's own shadow, first
+  12pt into the page area's bottom right. It grows out of where the video was (`Motion.zoom`; a fade with Reduce Motion) and fades as it closes. Pointing at it brings its
   controls in a quick fade over a 38% dim, deeper at the top and bottom, so white reads over any picture, words in
   it too: the arrow and the site's name at the top left (one button back to the tab), minimize and close at the top
   right, back 15 seconds, play or pause and forward 15 seconds in the middle (36pt, semibold 20 to 24pt white glyphs
   on a soft shadow), a thin time line to press or drag along the bottom (no skipping or time line for a live
-  stream). They go 2.5 seconds after the pointer stops. Drag it anywhere in the window, 4pt in from its edges and
-  under the bar above the page; let go, it glides (`Motion.snappy`) into the page area's nearest corner, 12pt in, as
-  the Mac's Picture in Picture does, and keeps to that corner as the window and the sidebar change. Let go with ⌘
-  held, it stays where it's let go, settling a margin in only within 16pt of an edge, and keeps its distance from the
-  window's nearest corner. Clicked, it takes the keyboard: Space plays or pauses, Esc and ⌘W close it. Double-click it, or its arrow or site name, to go
-  back to the tab, in its own space. Minimize makes it a pill in the card's corner, `Radius.tile`, on
+  stream). They go 2.5 seconds after the pointer stops. Drag it anywhere on screen, 4pt in from the edges of its usable
+  part (clear of the menu bar and the Dock); let go over its window, it glides (`Motion.snappy`) into the page area's
+  nearest corner, 12pt in, and keeps to that corner as the window moves and changes; let go anywhere else, into the
+  screen's nearest corner, 12pt in, as the Mac's Picture in Picture does, and stays there whatever the window does.
+  Let go with ⌘ held, it stays where it's let go, settling a margin in only within 16pt of an edge, and keeps its
+  distance from the screen's nearest corner. Clicked, it takes the keyboard without bringing Zigzag in front of the app
+  you're in: Space plays or pauses, Esc and ⌘W close it. Double-click it, or its arrow or site name, to go back to the
+  tab, in its own space, its window coming forward. Minimize makes it a pill in the card's corner, `Radius.tile`, on
   `panelBackground`: the video live in a 54 by 32 thumbnail, the tab's title, play or pause, and expand; a click
   brings the card back there. The video plays on all the while. (Not the sidebar's Now Playing row: that shows only
   for a tab you can hear, and a silent video plays on too.)

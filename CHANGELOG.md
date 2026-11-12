@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### New
+- The mini player can leave the window: drag it anywhere on screen, over other apps too, and it stays on top on every space, as Picture in Picture does. Let go outside the window, it rests in the screen's nearest corner; over the window, in the page's corner as before. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#172](https://github.com/ZigaoWang/zigzag/issues/172))
 - A video's full screen can fill just its page instead of the whole screen, the sidebar and the rest of the window still there: choose The Page for Full screen videos fill in Settings › Tabs, or turn on Full screen fills the page in a site's controls, for YouTube alone say. In a split, the video fills its own part. Esc, or the player's own button, leaves it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#168](https://github.com/ZigaoWang/zigzag/issues/168))
 
 ### Fixed
