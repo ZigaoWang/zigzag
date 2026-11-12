@@ -62,14 +62,27 @@ if $PUBLISHING; then
 fi
 
 xcodegen generate -q
-xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -configuration Release -allowProvisioningUpdates \
-  -derivedDataPath build/rd -archivePath "$OUT/Zigzag.xcarchive" archive "${VERSION_OVERRIDE[@]}" | pretty
+# Signing asks Apple's timestamp server for every file it signs, and that server drops a request now and then
+# ("The timestamp service is not available"): one drop fails the step, so archiving and exporting get a few tries.
+TRIES=4
+for try in $(seq 1 $TRIES); do
+  rm -rf "$OUT/Zigzag.xcarchive"
+  xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -configuration Release -allowProvisioningUpdates \
+    -derivedDataPath build/rd -archivePath "$OUT/Zigzag.xcarchive" archive "${VERSION_OVERRIDE[@]}" | pretty || true
+  [[ -d "$OUT/Zigzag.xcarchive" ]] && break
+  (( try < TRIES )) && { echo "Archive failed, trying again ($try of $TRIES)…"; sleep 20; }
+done
 [[ -d "$OUT/Zigzag.xcarchive" ]] || { echo "Archive failed"; exit 1; }
 
 # Exporting signs with Developer ID and its provisioning profile (which carries the Keychain access group).
-xcodebuild -exportArchive -archivePath "$OUT/Zigzag.xcarchive" -exportPath "$OUT/export" \
-  -exportOptionsPlist scripts/ExportOptions.plist -allowProvisioningUpdates | pretty
 APP="$OUT/export/Zigzag.app"
+for try in $(seq 1 $TRIES); do
+  rm -rf "$OUT/export"
+  xcodebuild -exportArchive -archivePath "$OUT/Zigzag.xcarchive" -exportPath "$OUT/export" \
+    -exportOptionsPlist scripts/ExportOptions.plist -allowProvisioningUpdates | pretty || true
+  [[ -d "$APP" ]] && break
+  (( try < TRIES )) && { echo "Export failed, trying again ($try of $TRIES)…"; sleep 20; }
+done
 [[ -d "$APP" ]] || { echo "Export failed"; exit 1; }
 VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP/Contents/Info.plist")
 
