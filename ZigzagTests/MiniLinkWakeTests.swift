@@ -1,3 +1,4 @@
+import AppKit
 import Testing
 @testable import Zigzag
 
@@ -32,5 +33,23 @@ struct MiniLinkWakeTests {
         #expect(!waits(click: 0.05, key: 30, modifier: 40, (false, "Dock")))
         #expect(!waits(click: 0.05, key: 30, modifier: 40, (false, "NotificationCenter")))
         #expect(!waits(click: 0.05, key: 30, modifier: 40, (true, "Zigzag")))
+    }
+
+    /// Where the windows sat as Zigzag went to the background is kept until the next time: a window closed meanwhile
+    /// isn't kept alive by it, and drops out of the places a wake puts back.
+    @MainActor @Test func theSettledPlacesHoldTheirWindowsWeakly() {
+        let kept = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: true)
+        weak var closed: NSWindow?
+        var settled: [MiniLinkWake.SettledPlace] = []
+        autoreleasepool {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: true)
+            window.isReleasedWhenClosed = false
+            closed = window
+            settled = MiniLinkWake.settledPlaces([(window, 7), (kept, 8)])
+            #expect(MiniLinkWake.places(of: [window, kept], in: settled).map(\.below) == [7, 8])
+        }
+        #expect(closed == nil && settled[0].window == nil)
+        let places = MiniLinkWake.places(of: [kept], in: settled)
+        #expect(places.count == 1 && places[0].window === kept && places[0].below == 8)
     }
 }

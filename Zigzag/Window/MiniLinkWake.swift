@@ -37,7 +37,7 @@ enum MiniLinkWake {
         guard reason == nil else { return }
         // Where they were as Zigzag went to the background: by now macOS may already have raised them, and their
         // places taken now would put them back on top.
-        places = settled.filter { place in windows.contains { $0 === place.window } }
+        places = Self.places(of: windows, in: settled)
         if places.count != windows.count { places = Self.places(of: windows) }
         waiting = windows
         windows.forEach { $0.alphaValue = 0 }
@@ -46,15 +46,34 @@ enum MiniLinkWake {
         DispatchQueue.main.asyncAfter(deadline: .now() + wait, execute: work)
     }
 
+    /// A window's place as Zigzag went to the background, held weakly: kept until the next time, it mustn't keep a
+    /// window closed meanwhile alive.
+    struct SettledPlace {
+        weak var window: NSWindow?
+        let below: Int?
+    }
+
     /// Zigzag went to the background: where its windows sit among every app's, for a wake to put them back to.
-    private static var settled: [(window: NSWindow, below: Int?)] = []
+    private static var settled: [SettledPlace] = []
 
     static func appDidResign() {
         guard MiniWindowController.opensExternalLinks else { settled = []; return }
         // A moment later, once the app you went to has come up over them.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             guard !NSApp.isActive else { return }
-            settled = places(of: WindowManager.shared.controllers.compactMap(\.window).filter { $0.isVisible && !$0.isMiniaturized })
+            settled = settledPlaces(places(of: WindowManager.shared.controllers.compactMap(\.window).filter { $0.isVisible && !$0.isMiniaturized }))
+        }
+    }
+
+    static func settledPlaces(_ places: [(window: NSWindow, below: Int?)]) -> [SettledPlace] {
+        places.map { SettledPlace(window: $0.window, below: $0.below) }
+    }
+
+    /// The settled places of `windows`, in the settled order; a window closed since (gone) or not among them is left out.
+    static func places(of windows: [NSWindow], in settled: [SettledPlace]) -> [(window: NSWindow, below: Int?)] {
+        settled.compactMap { place in
+            guard let window = place.window, windows.contains(where: { $0 === window }) else { return nil }
+            return (window, place.below)
         }
     }
 
