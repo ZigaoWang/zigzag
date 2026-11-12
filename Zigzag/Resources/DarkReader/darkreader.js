@@ -3877,9 +3877,6 @@
                                 imageDetails = await new Promise((resolve) =>
                                     awaiters.push(resolve)
                                 );
-                                if (!imageDetails) {
-                                    return null;
-                                }
                             } else {
                                 awaitingForImageLoading.set(url, []);
                                 imageDetails = await getImageDetails(url);

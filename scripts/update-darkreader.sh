@@ -6,9 +6,10 @@
 #   scripts/update-darkreader.sh 4.9.140    another one (pick one that's been out a couple of weeks)
 #
 # It writes:
-#   darkreader.js           the package's darkreader.js, with one change: instead of putting its proxy into the page as
+#   darkreader.js           the package's darkreader.js, with two changes: instead of putting its proxy into the page as
 #                           an inline <script> (which a page's Content-Security-Policy can block), it asks for it with an
-#                           event, and Zigzag's own page-world script runs it (see DarkPages.swift).
+#                           event, and Zigzag's own page-world script runs it (see DarkPages.swift); and a rule waiting
+#                           on a picture that failed to load keeps the picture rather than dropping it from its value.
 #   darkreader-proxy.js     that proxy (the package's `injectProxy`), as it is, for the page's own world.
 #   darkreader-fixes.config src/config/dynamic-theme-fixes.config from the repository, unchanged.
 #   darkreader.info.json    the version and where each file came from.
@@ -64,6 +65,14 @@ ${proxy}
 const inline = /const proxyScript = createOrUpdateScript\("darkreader--proxy"\);\s*proxyScript\.append\(\s*`\(\$\{injectProxy\}\)\(\$\{enableStyleSheetsProxy\}, \$\{enableCustomElementRegistryProxy\}\)`\s*\);\s*document\.head\.insertBefore\([\s\S]*?\);\s*proxyScript\.remove\(\);/;
 if (!inline.test(src)) throw new Error('The proxy is put in another way now: update the patch');
 src = src.replace(inline, 'document.dispatchEvent(new CustomEvent(`__zigzag_darkreader_proxy_${enableStyleSheetsProxy ? 1 : 0}${enableCustomElementRegistryProxy ? 1 : 0}`));');
+
+// A rule waiting on a picture another rule is already loading got nothing back when that load failed, and dropped the
+// picture from its value: "url(a), linear-gradient(...)" became ", linear-gradient(...)", which isn't a value, so the
+// element lost its background altogether (Hacker News's vote arrows). It keeps the picture as it was instead, as the
+// rule that did the loading does.
+const waited = /(imageDetails = await new Promise\(\(resolve\) =>\s*awaiters\.push\(resolve\)\s*\);)\s*if \(!imageDetails\) \{\s*return null;\s*\}/;
+if (!waited.test(src)) throw new Error('Waiting for a picture works another way now: check the patch is still needed');
+src = src.replace(waited, '$1');
 fs.writeFileSync(output, src);
 JS
 

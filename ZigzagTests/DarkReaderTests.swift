@@ -245,6 +245,21 @@ struct DarkReaderTests {
         #expect(!DarkPages.fetchableType("application/json"))
     }
 
+    /// An SVG picture is drawn for Dark Reader to look at, at its own size (Hacker News's vote arrow); anything else,
+    /// or too much, isn't.
+    @Test func anSVGIsDrawnForDarkReader() throws {
+        let svg = ##"<svg height="32" viewBox="0 0 32 16" width="32" xmlns="http://www.w3.org/2000/svg"><path d="m2 27 14-29 14 29z" fill="#999"/></svg>"##
+        let base64 = try #require(DarkPages.rasterize("data:image/svg+xml;base64," + Data(svg.utf8).base64EncodedString()))
+        #expect(base64.width == 32 && base64.height == 32)
+        let png = try #require(Data(base64Encoded: base64.png))
+        #expect(NSBitmapImageRep(data: png)?.pixelsWide == 32)
+        let escaped = try #require(DarkPages.rasterize("data:image/svg+xml," + (svg.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")))
+        #expect(escaped.width == 32)
+        #expect(DarkPages.rasterize("data:image/png;base64,iVBORw0KGgo=") == nil)
+        #expect(DarkPages.rasterize("data:image/svg+xml;base64,bm90IGFuIHN2Zw==") == nil)
+        #expect(DarkPages.rasterize("data:image/svg+xml," + String(repeating: "a", count: DarkPages.maxImageBytes)) == nil)
+    }
+
     // MARK: Pages
 
     private final class Loading: NSObject, WKNavigationDelegate {
@@ -361,6 +376,47 @@ struct DarkReaderTests {
             let webView = await page(html)
             let proxied = await until { (try? await js(webView, "return window.proxied") as? Bool) == true }
             #expect(proxied)
+        }
+    }
+
+    /// A page whose policy lets no image load a data: URL, with the same picture in two rules (Hacker News's vote
+    /// arrows): Dark Reader still gets to look at it, and neither rule loses its background.
+    @Test func picturesKeepTheirPlaceUnderAStrictImagePolicy() async throws {
+        try await withDefaults { () async throws in
+            DarkPages.mode = .always
+            let svg = ##"<svg height="32" viewBox="0 0 32 16" width="32" xmlns="http://www.w3.org/2000/svg"><path d="m2 27 14-29 14 29z" fill="#999"/></svg>"##
+            let icon = "data:image/svg+xml;base64," + Data(svg.utf8).base64EncodedString()
+            let html = """
+            <html><head><meta http-equiv="Content-Security-Policy" content="img-src 'self'"><style>
+            body { background: #fff; color: #111; min-height: 600px }
+            .arrow { width: 10px; height: 10px; background: url("\(icon)"), linear-gradient(transparent, transparent) no-repeat; background-size: 10px; }
+            @media screen { .arrow { background: url("\(icon)"), linear-gradient(transparent, transparent) no-repeat; background-size: 10px; } }
+            </style></head><body><p>Strict.</p><div class="arrow" id="a"></div></body></html>
+            """
+            let webView = await page(html)
+            let drawn = await until { (try? await js(webView, "return document.documentElement.getAttribute('data-darkreader-mode')") as? String) == "dynamic" }
+            #expect(drawn)
+            try? await Task.sleep(for: .milliseconds(1500))
+            let image = try await js(webView, "return getComputedStyle(document.getElementById('a')).backgroundImage") as? String ?? ""
+            #expect(image.contains("url("), "\(image)")
+        }
+    }
+
+    /// Dark Reader's first pass runs after a frame is drawn, even in a page that gets no frames (a tab behind others),
+    /// and its rough dark meanwhile is taken off once the pass is done.
+    @Test func aLightPageIsDrawnRoughlyDarkBeforeDarkReadersPass() async throws {
+        try await withDefaults { () async throws in
+            DarkPages.mode = .always
+            let html = """
+            <html><head><style>body { background: #fff; color: #111; min-height: 600px }</style>
+            </head><body><p>Light.</p></body></html>
+            """
+            let webView = await page(html)
+            let drawn = await until { (try? await js(webView, "return document.documentElement.getAttribute('data-darkreader-mode')") as? String) == "dynamic" }
+            #expect(drawn)
+            // Taken off once the pass is done.
+            let cleared = await until { (try? await js(webView, "return !document.querySelector('.zigzag-dark-fallback')") as? Bool) == true }
+            #expect(cleared)
         }
     }
 

@@ -173,8 +173,9 @@ from its `darkreader` npm package; `darkreader-fixes.config` is its site fixes
 (`src/config/dynamic-theme-fixes.config`), unchanged. `darkreader.info.json` records the version both came from.
 
 Changes made: `scripts/update-darkreader.sh` takes the package's proxy (`injectProxy`) out into
-`darkreader-proxy.js`, unchanged, and changes `darkreader.js` to ask for it with an event instead of putting it into
-the page as an inline script. Nothing else is changed.
+`darkreader-proxy.js`, unchanged, and changes `darkreader.js` in two places: it asks for the proxy with an event
+instead of putting it into the page as an inline script, and a style rule waiting on a picture that failed to load
+keeps the picture instead of dropping it from its value. Nothing else is changed.
 
 License: MIT. The full text, from the package's LICENSE:
 

@@ -49,6 +49,58 @@
   const DarkReader = (() => {
     const module = { exports: {} };
     const exports = module.exports;
+    // The pictures it looks at (a background icon, to tell whether it needs turning light) it loads as data: URLs,
+    // which a page's Content-Security-Policy can refuse even here, where an extension's own world wouldn't (Hacker
+    // News allows its own images only): the picture then counted as missing and the page's icons went with it. So
+    // its `Image` is this: a canvas, drawn with the picture as an image loads it where the page allows that, else
+    // decoded without loading anything, by the page's own decoder for a bitmap or by Zigzag for an SVG.
+    const Image = function () {
+      const canvas = document.createElement('canvas');
+      canvas.width = 0;
+      canvas.height = 0;
+      let done = false;
+      const fail = () => { if (!done) { done = true; if (canvas.onerror) canvas.onerror(); } };
+      const draw = (source, width, height) => {
+        if (done) return;
+        canvas.width = Math.max(1, Math.round(width));
+        canvas.height = Math.max(1, Math.round(height));
+        try { canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height); } catch (e) { fail(); return; }
+        done = true;
+        if (canvas.onload) canvas.onload();
+      };
+      // A data: URL's bytes, read here: fetching it is a request the page's policy could refuse too.
+      const blobOf = (url) => {
+        const comma = url.indexOf(',');
+        const head = url.slice(5, comma);
+        const body = url.slice(comma + 1);
+        const text = /;base64$/i.test(head) ? atob(body) : decodeURIComponent(body);
+        return new Blob([Uint8Array.from(text, (c) => c.charCodeAt(0))], { type: head.split(';')[0] });
+      };
+      const decode = async (url) => {
+        if (!url.startsWith('data:')) { fail(); return; }
+        try {
+          if (/^data:image\/svg\+xml/i.test(url)) {
+            const got = await window.webkit.messageHandlers.zigzagDarkImage.postMessage(url);
+            if (!got || !got.png) { fail(); return; }
+            const bytes = Uint8Array.from(atob(got.png), (c) => c.charCodeAt(0));
+            const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+            draw(bitmap, got.width, got.height);
+          } else {
+            const bitmap = await createImageBitmap(blobOf(url));
+            draw(bitmap, bitmap.width, bitmap.height);
+          }
+        } catch (e) { fail(); }
+      };
+      Object.defineProperty(canvas, 'src', {
+        set(url) {
+          const real = new window.Image();
+          real.onload = () => draw(real, real.naturalWidth, real.naturalHeight);
+          real.onerror = () => { decode(String(url)); };
+          real.src = url;
+        },
+      });
+      return canvas;
+    };
     __DARKREADER__
     return module.exports;
   })();
@@ -65,10 +117,62 @@
   const theme = () => config.theme;
   // A frame's address isn't the page's: the fix for every address alone.
   const fix = () => (isTop ? config.fix : config.frameFix) || null;
+  // Dark Reader's first pass over a big page's style takes a while, all in one go. Its own rough dark (its
+  // "fallback": every surface on its dark, every text in its light) goes on first, so the page is drawn at once and
+  // readable, and the pass runs just after that first paint. It comes off in the frame after the pass: style still
+  // loading then has Dark Reader's own fallback (Zigzag's is apart from it, so Dark Reader never empties it early).
+  const fallback = document.createElement('style');
+  fallback.className = 'darkreader zigzag-dark-fallback';
+  fallback.media = 'screen';
+  const fallbackCSS = () => {
+    const t = theme();
+    return `html, body, body :not(iframe) { background-color: ${t.darkSchemeBackgroundColor} !important; `
+      + `border-color: #776e62 !important; color: ${t.darkSchemeTextColor} !important; }`;
+  };
+  let started = 0;
+  // The page's first paint with something in it, which WebKit holds back until there's enough to show: the pass
+  // waits for it, so it doesn't hold the paint back too.
+  let painted = isTop ? performance.getEntriesByName('first-contentful-paint').length > 0 : true;
+  const paintWaiters = [];
+  if (!painted) {
+    try {
+      new PerformanceObserver((list, observer) => {
+        if (!list.getEntriesByName('first-contentful-paint').length) return;
+        observer.disconnect();
+        painted = true;
+        paintWaiters.splice(0).forEach((f) => f());
+      }).observe({ type: 'paint', buffered: true });
+    } catch (e) { painted = true; }
+  }
+  // Just after the page's first paint, else the next frame; a page that isn't being drawn (a tab behind others) gets
+  // neither, so a little later regardless.
+  const startSoon = () => {
+    const run = ++started;
+    const go = () => {
+      if (run !== started || !darkened) return;
+      started++;
+      DarkReader.enable(theme(), fix());
+      requestAnimationFrame(() => { if (darkened) fallback.remove(); });
+      setTimeout(() => { if (darkened) fallback.remove(); }, 1000);
+    };
+    if (painted) requestAnimationFrame(() => setTimeout(go, 0));
+    else paintWaiters.push(() => setTimeout(go, 0));
+    setTimeout(go, painted ? 150 : 1500);
+  };
   const apply = (on) => {
     if (on === darkened) return;
     darkened = on;
-    if (on) { dropPrepaint(); DarkReader.enable(theme(), fix()); } else DarkReader.disable();
+    started++;
+    if (on) {
+      dropPrepaint();
+      fallback.textContent = fallbackCSS();
+      const root = document.head || document.documentElement;
+      if (root && fallback.parentNode !== root) root.appendChild(fallback);
+      startSoon();
+    } else {
+      fallback.remove();
+      DarkReader.disable();
+    }
     send();
   };
 
