@@ -1576,8 +1576,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // slides out from under them or back, and go straight back to it as the floating sidebar leaves.
         // Beside a sidebar on the right they're in the bar the whole time, slid out or not.
         let stays = root.showsTopBar && (!root.isSidebarFloatingVisible || root.sidebarOnRight)
-        // On the right the bar's toggle is at the bar's other end from where the sidebar's lands: it isn't held.
-        if stays, duration > 0, !root.sidebarOnRight {
+        // On either side the bar's toggle is where the sidebar's lands (on the right, both at the window's right end).
+        if stays, duration > 0 {
             toggleHeldUntil = Date().addingTimeInterval(duration)
             DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.01) { [weak self] in self?.layoutTrafficLights() }
         }
@@ -1626,10 +1626,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let held = root.showsTopBar && holdsToggle
         root.topBar.showsSidebarButton = root.showsTopBar && !docked
         root.topBar.sidebarOnRight = onRight
-        let symbol = SidebarView.toggleSymbol(onRight: onRight)
-        if sidebar.sidebarButton.symbol != symbol { sidebar.sidebarButton.symbol = symbol; sidebar.needsLayout = true }
+        sidebar.isOnRight = onRight
+        // The sidebar's own, where the docked sidebar puts it: from the window's left edge, or on the right from where
+        // the docked sidebar starts.
+        let dockedMinX = onRight ? root.bounds.width - root.sidebarWidth : 0
         root.topBar.heldSidebarButtonOrigin = held && docked
-            ? NSPoint(x: sidebar.sidebarButton.frame.minX, y: Tokens.Sidebar.lightsCenter + root.sidebarTopRowDrop - SidebarView.toolbarButton / 2) : nil
+            ? NSPoint(x: dockedMinX + sidebar.sidebarButton.frame.minX, y: Tokens.Sidebar.lightsCenter + root.sidebarTopRowDrop - SidebarView.toolbarButton / 2) : nil
         sidebar.sidebarButton.alphaValue = held ? 0 : 1
         sidebar.sidebarButton.toolTip = Shortcuts.tooltip(docked ? String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows.")
                                                                   : String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."),

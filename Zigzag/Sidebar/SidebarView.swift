@@ -780,6 +780,15 @@ final class SidebarView: NSView {
     private let topSeparator = ColorView(color: Tokens.Color.separator)
     /// Width reserved on the left of the top row for the traffic lights.
     var trafficLightsWidth: CGFloat = 52 { didSet { needsLayout = true } }
+    /// The sidebar is on the window's right: its toggle's glyph shows that, and while the traffic lights aren't in it
+    /// its top row is the left one's mirror image (`topRowFrames`).
+    var isOnRight = false {
+        didSet {
+            guard isOnRight != oldValue else { return }
+            sidebarButton.symbol = Self.toggleSymbol(onRight: isOnRight)
+            needsLayout = true
+        }
+    }
     /// Back, forward, reload and the address are here, under the traffic lights; false while they're in the bar above
     /// the page (`TopBarView`), and the favorites and tabs move up into the address's place.
     var holdsAddress = true {
@@ -903,6 +912,30 @@ final class SidebarView: NSView {
 
     // MARK: Layout
 
+    /// The top row across the sidebar's width, x only: the toggle, and back, forward and reload, in that order.
+    /// The toggle sits right after the traffic lights, where Arc and Safari put it, its glyph `Sidebar.lightsGap`
+    /// after them (the button's own padding inside that); without them (full screen, or a sidebar on the right) it
+    /// starts the row, `Sidebar.edge` in. Back, forward and reload are at the trailing end, their glyphs a button
+    /// apart, reload's ink as far from the sidebar's edge as the lights' from the other.
+    /// `onRight` without the lights in it: the mirror image, the toggle at the sidebar's outer (right) end, where the
+    /// bar above the page keeps it while the sidebar is hidden, and back's ink as far from the left edge as reload's
+    /// is from the right one on the left. The lights at its left (slid out over the page with no bar) keep the
+    /// left's order, out of their way.
+    static func topRowFrames(width: CGFloat, trafficLightsWidth: CGFloat, onRight: Bool) -> (toggle: NSRect, buttons: [NSRect]) {
+        let b = toolbarButton, pad = Tokens.Sidebar.edge
+        func at(_ x: CGFloat) -> NSRect { NSRect(x: x, y: 0, width: b, height: b) }
+        if onRight && trafficLightsWidth == 0 {
+            let backInk = Tokens.Symbol.inkSize("chevron.left", size: Tokens.Sidebar.glyph).width
+            let x = round(trafficLightsX + backInk / 2 - b / 2)
+            return (at(width - pad - b), (0..<3).map { at(x + CGFloat($0) * b) })
+        }
+        let reloadInk = Tokens.Symbol.inkSize("arrow.clockwise", size: Tokens.Sidebar.glyph).width
+        let x = round(width - trafficLightsX - reloadInk / 2 - b / 2)
+        let glyph = Tokens.Symbol.inkSize(toggleSymbol(onRight: onRight), size: Tokens.Sidebar.glyph).width
+        let lead = trafficLightsWidth > 0 ? round(trafficLightsX + trafficLightsWidth + Tokens.Sidebar.lightsGap - (b - glyph) / 2) : pad
+        return (at(lead), (0..<3).map { at(x - CGFloat(2 - $0) * b) })
+    }
+
     /// Where the traffic lights start, from the sidebar's left edge.
     static let trafficLightsX = Tokens.Sidebar.lightsX
 
@@ -919,21 +952,10 @@ final class SidebarView: NSView {
         let width = bounds.width
         let rowCenter = trafficLightCenterY
         let button = Self.toolbarButton
-        // Back, forward and reload at the trailing end, their glyphs a button apart, reload's ink as far from the
-        // sidebar's edge as the lights' from the other.
-        let reloadInk = Tokens.Symbol.inkSize("arrow.clockwise", size: Tokens.Sidebar.glyph).width
-        var x = round(width - Self.trafficLightsX - reloadInk / 2 - button / 2)
-        for b in [reloadButton, forwardButton, backButton] where holdsAddress {
-            b.frame = NSRect(x: x, y: rowCenter - button / 2, width: button, height: button)
-            x -= button
-        }
-        // The sidebar toggle sits right after the traffic lights, where Arc and Safari put it.
-        // Without traffic lights (full screen) the sidebar button starts the row.
-        // Its glyph sits `Sidebar.lightsGap` after the lights (the button's own padding inside that), on their line.
-        let glyphWidth = Tokens.Symbol.inkSize(sidebarButton.symbol, size: Tokens.Sidebar.glyph).width
-        let lead = trafficLightsWidth > 0
-            ? round(Self.trafficLightsX + trafficLightsWidth + Tokens.Sidebar.lightsGap - (button - glyphWidth) / 2) : pad
-        sidebarButton.frame = NSRect(x: lead, y: rowCenter - button / 2, width: button, height: button)
+        let row = Self.topRowFrames(width: width, trafficLightsWidth: trafficLightsWidth, onRight: isOnRight)
+        func onLine(_ rect: NSRect) -> NSRect { NSRect(x: rect.minX, y: rowCenter - button / 2, width: button, height: button) }
+        for (b, rect) in zip([backButton, forwardButton, reloadButton], row.buttons) where holdsAddress { b.frame = onLine(rect) }
+        sidebarButton.frame = onLine(row.toggle)
         if holdsAddress {
             address.frame = NSRect(x: pad, y: Tokens.Sidebar.addressTop, width: width - pad * 2, height: Tokens.Sidebar.addressHeight)
         }
