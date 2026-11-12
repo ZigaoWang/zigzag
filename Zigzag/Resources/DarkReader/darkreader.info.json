@@ -1,0 +1,6 @@
+{
+  "version": "4.9.134",
+  "package": "https://registry.npmjs.org/darkreader/-/darkreader-4.9.134.tgz",
+  "integrity": "sha512-HAyEz97vK/UFLO6kcjxojji5OKr0+pwgGLrBzyg67xD2p6ySrSyCBvNxb+0KTSMYk9qNz9Hq85JR3TaKyqEV1w==",
+  "fixes": "https://raw.githubusercontent.com/darkreader/darkreader/v4.9.134/src/config/dynamic-theme-fixes.config"
+}
