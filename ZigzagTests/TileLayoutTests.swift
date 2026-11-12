@@ -360,12 +360,10 @@ struct TileLayoutTests {
     }
 
     @MainActor @Test func aGroupsStripHasNoSwapOrLayout() {
-        // Without them, the strip never puts ⋯ up for them alone.
-        for width in stride(from: 700, through: 60, by: -10) {
-            #expect(PaneHeaderView.fit(width: CGFloat(width), edge: 2, address: 180, splitButtons: false) != .splitInMore)
-        }
-        // Two buttons fewer, so the address fits whole sooner than beside them.
-        #expect(PaneHeaderView.fit(width: 310, edge: 2, address: 180, splitButtons: false) == .all)
-        #expect(PaneHeaderView.fit(width: 310, edge: 2, address: 180) != .all)
+        // Two buttons fewer (Zoom Pane stays), so the address fits whole sooner than beside them.
+        #expect(PaneHeaderView.fit(width: 335, edge: 2, address: 180, splitButtons: false) == .all)
+        #expect(PaneHeaderView.fit(width: 335, edge: 2, address: 180) != .all)
+        // Narrower, Zoom Pane goes into ⋯ first, as swap and the layout do.
+        #expect(PaneHeaderView.fit(width: 300, edge: 2, address: 180, splitButtons: false) == .splitInMore)
     }
 }

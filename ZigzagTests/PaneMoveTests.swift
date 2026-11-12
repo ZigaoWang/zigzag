@@ -148,6 +148,69 @@ struct PaneMoveTests {
         #expect(titles[0] != SplitDropHint.title(for: TileDrop.Kind.place(region: .left, regions: [])))
     }
 
+    // MARK: Zoom
+
+    @Test func aPaneZoomsAndGoesBack() {
+        let a = UUID(), b = UUID(), c = UUID()
+        var zoom = PaneZoom()
+        #expect(!zoom.isZoomed && zoom.index(in: [a, b, c]) == nil)
+        zoom.toggle(b, in: [a, b, c])
+        #expect(zoom.isZoomed && zoom.tabID == b && zoom.index(in: [a, b, c]) == 1)
+        // The same pane again: back in its place.
+        zoom.toggle(b, in: [a, b, c])
+        #expect(!zoom.isZoomed)
+        // Another pane while one is zoomed: that one instead.
+        zoom.toggle(a, in: [a, b, c])
+        zoom.toggle(c, in: [a, b, c])
+        #expect(zoom.tabID == c)
+        zoom.clear()
+        #expect(!zoom.isZoomed)
+    }
+
+    @Test func onlyAPageOfASplitZooms() {
+        let a = UUID(), b = UUID()
+        var zoom = PaneZoom()
+        zoom.toggle(a, in: [a])
+        #expect(!zoom.isZoomed)
+        zoom.toggle(UUID(), in: [a, b])
+        #expect(!zoom.isZoomed)
+    }
+
+    @Test func theZoomFollowsItsPageAcrossASwap() {
+        let a = UUID(), b = UUID(), c = UUID(), d = UUID()
+        var zoom = PaneZoom()
+        zoom.toggle(a, in: [a, b, c, d])
+        // Places traded: the same page, now third.
+        #expect(zoom.index(in: [c, b, a, d]) == 2)
+        #expect(zoom.isZoomed)
+    }
+
+    @Test func theZoomEndsWhenTheGroupChanges() {
+        let a = UUID(), b = UUID(), c = UUID()
+        // A page closed or left the group.
+        var zoom = PaneZoom()
+        zoom.toggle(a, in: [a, b, c])
+        #expect(zoom.index(in: [a, b]) == nil && !zoom.isZoomed)
+        // A page came in.
+        zoom.toggle(a, in: [a, b])
+        #expect(zoom.index(in: [a, b, c]) == nil && !zoom.isZoomed)
+        // The zoomed page itself closed.
+        zoom.toggle(a, in: [a, b, c])
+        #expect(zoom.index(in: [b, c]) == nil && !zoom.isZoomed)
+        // No split on screen (the group ended, or its pages moved to another window).
+        zoom.toggle(b, in: [a, b, c])
+        #expect(zoom.index(in: nil) == nil && !zoom.isZoomed)
+    }
+
+    @MainActor @Test func theStripNamesTheZoom() {
+        #expect(PaneHeaderView.zoomTitle(false) != PaneHeaderView.zoomTitle(true))
+        let header = PaneHeaderView()
+        #expect(header.zoom.toolTip == PaneHeaderView.zoomTitle(false))
+        header.isZoomed = true
+        #expect(header.zoom.toolTip == PaneHeaderView.zoomTitle(true))
+        #expect(header.zoom.symbol != "arrow.up.left.and.arrow.down.right")
+    }
+
     // MARK: The strip's ink
 
     @MainActor @Test func theStripsInkReadsOnItsPage() {
