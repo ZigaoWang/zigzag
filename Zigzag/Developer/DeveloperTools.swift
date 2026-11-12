@@ -113,6 +113,33 @@ enum DevelopmentSites {
         !isPrivate && site(of: url) != nil
     }
 
+    /// Whether a page looks like one being built rather than a site on the web: on this Mac, on the local network
+    /// (a private address, a `.local`, `.test`, `.internal` or `.localhost` name), or served from a port of its own.
+    /// Site Controls offers its Developer tools switch on these and on listed sites only, so the controls of every
+    /// other site stay as they were.
+    static func looksLikeDevelopment(_ url: URL?) -> Bool {
+        guard let url, ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let host = url.host()?.lowercased() else { return false }
+        if ErrorPage.isOnThisMac(url) { return true }
+        let name = host.hasSuffix(".") ? String(host.dropLast()) : host
+        if [".local", ".test", ".internal", ".localhost", ".lan", ".home.arpa"].contains(where: { name.hasSuffix($0) }) { return true }
+        let octets = name.split(separator: ".", omittingEmptySubsequences: false).compactMap { UInt8($0) }
+        if octets.count == 4, name.split(separator: ".").count == 4 {
+            switch (octets[0], octets[1]) {
+            case (10, _), (192, 168), (169, 254): return true
+            case (172, let b) where (16...31).contains(b): return true
+            default: break
+            }
+        }
+        if let port = url.port, port != (url.scheme?.lowercased() == "https" ? 443 : 80) { return true }
+        return false
+    }
+
+    /// Whether a site's controls offer its Developer tools switch: listing it is offered, and it's listed already
+    /// or looks like one being built.
+    static func isSwitchOffered(for url: URL?, isPrivate: Bool) -> Bool {
+        isOffered(for: url, isPrivate: isPrivate) && (covers(url) || looksLikeDevelopment(url))
+    }
+
     /// Puts the page's site on the list, or takes it off. Off takes away whatever covered it, its parent domain
     /// included, so it's off here at once.
     static func set(_ on: Bool, for url: URL?) {

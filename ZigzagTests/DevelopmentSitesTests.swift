@@ -31,6 +31,25 @@ struct DevelopmentSitesTests {
         }
     }
 
+    /// Site Controls offers the switch on a page being built, never on every site on the web.
+    @Test func theSwitchIsOfferedOnlyWhereAPageLooksBeingBuilt() {
+        withDefaults {
+            for local in ["http://localhost:3000/", "http://127.0.0.1/", "https://myapp.test/", "http://printer.local/",
+                          "http://192.168.1.20:8080/", "http://10.0.0.5/", "http://172.20.1.1/", "https://example.com:8443/",
+                          "http://app.internal/", "http://box.lan/"] {
+                #expect(DevelopmentSites.isSwitchOffered(for: url(local), isPrivate: false), "\(local)")
+            }
+            for web in ["https://example.com/", "http://example.com:80/", "https://github.com/", "http://172.32.0.1/",
+                        "https://192.168.1.20.nip.io/", "https://10.0.0.5.example.com/"] {
+                #expect(!DevelopmentSites.isSwitchOffered(for: url(web), isPrivate: false), "\(web)")
+            }
+            // Listed, any site has it, so it can be taken off there; never in a private window.
+            DevelopmentSites.add("staging.example.com")
+            #expect(DevelopmentSites.isSwitchOffered(for: url("https://staging.example.com/"), isPrivate: false))
+            #expect(!DevelopmentSites.isSwitchOffered(for: url("http://localhost:3000/"), isPrivate: true))
+        }
+    }
+
     @Test func aSiteCoversEveryPortAndItsSubdomains() {
         withDefaults {
             #expect(DevelopmentSites.covers(url("http://localhost/")))

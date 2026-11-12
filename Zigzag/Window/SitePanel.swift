@@ -621,7 +621,7 @@ final class SitePanel: FloatingPanelView {
         context.fullScreen = PageFullScreen.isOffered(for: url, isPrivate: isPrivate)
             && (PageFullScreen.choice(for: url) != nil || tab.webView.map({ PageVideos.shared.frames(in: $0).contains { !$0.videos.isEmpty } }) == true)
         context.foreignLanguage = tab.foreignLanguage != nil
-        context.developerTools = DeveloperTool.site.isOffered(for: tab, isPrivate: isPrivate)
+        context.developerTools = DeveloperTools.isOn && DevelopmentSites.isSwitchOffered(for: url, isPrivate: isPrivate)
         context.coveredPage = controller?.isShowingReader == true || tab.pdfViewer != nil || tab.webView == nil
         return context
     }
@@ -1534,8 +1534,8 @@ enum SitePanelRows {
         var fullScreen = false
         /// The page is in a language other than yours.
         var foreignLanguage = false
-        /// Listing the site as one you develop on is offered: Developer tools is on, for a web page, and not in a
-        /// private window (`DeveloperTool.site`).
+        /// The site's Developer tools switch is offered: Developer tools is on, for a web page that's listed or looks
+        /// like one being built, and not in a private window (`DevelopmentSites.isSwitchOffered`).
         var developerTools = false
         /// Reader or a PDF covers the page: the page's zoom isn't what you see.
         var coveredPage = false
