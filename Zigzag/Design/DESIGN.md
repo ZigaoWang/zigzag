@@ -283,6 +283,16 @@ something came from, answers at once, and can be interrupted.
   several pages keeps the close button's room while it's hidden, so nothing in it moves under the pointer.
   A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +.
+- **Sidebar on the right** (#166, Settings › Appearance, View › Move Sidebar to Right): the whole layout is the
+  left one's mirror image (`BrowserRootView.mirrored`): the page on the left, its window corners on its left side,
+  the resize edge on the sidebar's left, the hidden sidebar coming out of the right edge, panels that open beside
+  the sidebar (previews, the space editor, icons) opening left of it, the mini player first in the page's bottom
+  left. The traffic lights stay at the window's top left, as on every Mac window: docked, the page leaves them a
+  strip of the frame (`lightsStripHeight`, the sidebar's `addressTop`, so the page's top meets the address's line)
+  and the sidebar's top row keeps its toggle, back, forward and reload; with the bar above the page they're at the
+  bar's leading end, as with the sidebar hidden; slid out without the bar, the floating sidebar carries them, the one piece of
+  chrome then in view. The command bar stays centered on the window. Changing sides, the sidebar slides across
+  while the pages glide the other way (`gentle`).
 - **Pane header** (split view): on the page card, 30 tall: back, forward and reload, the address centered in a small
   field, and the split's own buttons. Everything in it is its own pane's page: its buttons act on it, its loading
   line and reload state follow it, and clicking its address focuses that pane and opens the address bar over it.

@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - Middle-click the address to close the tab you're on, as a middle-click on its row in the sidebar does. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#171](https://github.com/ZigaoWang/zigzag/issues/171))
+- The sidebar can sit on the right: turn on Sidebar on the right in Settings › Appearance, or choose View › Move Sidebar to Right. The page moves to the left, the window's buttons stay at its top left, and a hidden sidebar comes out from the right edge. ([#166](https://github.com/ZigaoWang/zigzag/issues/166))
 
 ## [0.8.7] - 2026-11-12
 
