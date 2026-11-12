@@ -256,6 +256,21 @@ struct DarkPagesFillTests {
         }
     }
 
+    /// A dark page with a few lines on it: below its body, the window is the body's dark, as CSS paints it, not white.
+    @Test func aShortDarkPageIsSeenDark() async throws {
+        try await withDefaults {
+            let origin = "https://short-\(UUID().uuidString.prefix(8).lowercased()).test"
+            let html = "<html><head><meta name='theme-color' content='#ffffff'></head><body style='margin:0;background:#15171c;color:#e6e6e6'><p>One line.</p></body></html>"
+            let webView = await page(html, at: origin)
+            let looked = await until { (try? await self.state(webView)["native"] as? Bool) == true }
+            let seen = try await state(webView)
+            #expect(looked, "\(seen)")
+            #expect(seen["darkened"] as? Bool == false)
+            #expect(seen["color"] as? String == "#15171c")
+            DarkPalettes.forget(scope: "default", site: DarkPalettes.site(ofOrigin: origin))
+        }
+    }
+
     /// Forced dark, a page that looks dark on its own is darkened all the same, and gets no fill.
     @Test func aForcedSiteIsDarkenedThoughItLooksDark() async throws {
         try await withDefaults {
