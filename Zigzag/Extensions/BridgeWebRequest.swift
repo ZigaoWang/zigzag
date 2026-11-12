@@ -74,7 +74,7 @@ final class BridgeWebRequest: BridgeNamespace {
         guard !ids.isEmpty else { return .none }
         // Asleep since it last listened: woken, and asked once it's listening again.
         for context in contexts where heard.contains(context.uniqueIdentifier) && !isListening(context.uniqueIdentifier) {
-            context.loadBackgroundContent { _ in }
+            Task { try? await context.loadBackgroundContent() }
         }
         let hint = contexts.first.flatMap { context in tab.map { Self.tabHint($0, for: context) } }
         let answer = await ask(Self.details(challenge, tabHint: hint), of: ids)

@@ -340,9 +340,10 @@ final class ExtensionHost: NSObject {
             Passkeys.refresh()
             changed.send()
             // A background that won't start leaves its popup waiting with nothing in the log; it says why here.
-            context.loadBackgroundContent { [weak self] error in
-                guard let error else { return }
-                ExtensionLog.write("background for \(self?.displayName(for: id) ?? id) didn't start: \(error.localizedDescription)")
+            Task { [weak self] in
+                do { try await context.loadBackgroundContent() } catch {
+                    ExtensionLog.write("background for \(self?.displayName(for: id) ?? id) didn't start: \(error.localizedDescription)")
+                }
             }
             return context
         } catch {
