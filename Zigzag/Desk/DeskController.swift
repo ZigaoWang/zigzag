@@ -681,8 +681,18 @@ final class DeskController {
         let root = controller.root
         let target = tab ?? controller.tabManager.selectedTab
         let card = target.flatMap { target in cards[manager?.split(for: target)?.left ?? target.id] ?? cards[target.id] }
-        if let tab { controller.tabManager.select(tab) }
-        if let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
+        // Switching tabs can keep the main thread busy for a while (the page coming forward, the sidebar and the
+        // address bar following), so the close starts first and the switch runs after, under the flying page.
+        let switchTab: @MainActor () -> Void = { [weak self, weak controller] in
+            guard let controller else { return }
+            if let tab { controller.tabManager.select(tab) }
+            #if DEBUG
+            self?.meter.mark("tab selected")
+            #endif
+            // Opened again in the meantime: the desk keeps the keyboard.
+            guard self?.transition == id else { return }
+            if let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
+        }
         // Back on a tab: the guide's overview step is done.
         Tutorial.overviewClosed()
         let finish: @MainActor () -> Void = { [weak self] in
@@ -699,6 +709,7 @@ final class DeskController {
         let shown = backdrop.layer?.presentation()?.opacity ?? Float(backdrop.alphaValue)
         guard !Tokens.Motion.reduceMotion, shown > 0.01 || flight != nil, let card, let page = card.tab else {
             // Nothing to grow, or Reduce Motion: the desk simply fades away.
+            switchTab()
             endFlight()
             Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 0 }, completion: finish)
             return
@@ -726,6 +737,10 @@ final class DeskController {
         #if DEBUG
         meter.mark("zoom started")
         #endif
+        // The render server has the move before the switch can hold the main thread, so the move doesn't wait on
+        // it. The pages stay hidden until the hand-off, which comes after the switch.
+        CATransaction.flush()
+        DispatchQueue.main.async { MainActor.assumeIsolated(switchTab) }
     }
 
     /// The picture has grown into the page area: the live pages show under it, and it fades off them quickly. When
