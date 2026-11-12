@@ -258,7 +258,18 @@ final class PageCardView: NSView {
         surface.layer?.masksToBounds = true
         // Resized with the card as its frame is set, inside the animation when there is one, so it glides too.
         surface.autoresizingMask = [.width, .height]
-        addSubview(surface)
+        // Its edges are drawn where they are, between two pixels too, as what it shows is. Cut to whole pixels, an
+        // edge stays put for a few frames and then jumps one, while the page glides on: at the end of a move, where
+        // a frame covers less than a pixel, the page seemed to catch up with its card.
+        surface.layer?.allowsEdgeAntialiasing = true
+        surface.layer?.edgeAntialiasingMask = [.layerLeftEdge, .layerRightEdge, .layerBottomEdge, .layerTopEdge]
+        turning.wantsLayer = true
+        turning.layer?.cornerCurve = .continuous
+        turning.layer?.masksToBounds = true
+        turning.layer?.maskedCorners = []
+        turning.autoresizingMask = [.width, .height]
+        addSubview(turning)
+        turning.addSubview(surface)
         clip.wantsLayer = true
         clip.layer?.masksToBounds = true
         surface.addSubview(clip)
@@ -283,42 +294,117 @@ final class PageCardView: NSView {
 
     override var isFlipped: Bool { true }
 
+    /// Around the surface, for the length of a move: the corners turning square or round again (`turnCorners`).
+    private let turning = FlippedView()
+    /// The corners that are round, as the last layout left them, and when the corners now turning will have turned.
+    private var roundCorners: CACornerMask = .all
+    private var turnsUntil: CFTimeInterval = 0
+
+    /// The animation a layout is part of (Borderless page switched): how long it is and how it eases.
+    private typealias Move = (duration: TimeInterval, timing: CAMediaTimingFunction?)
+    private var move: Move? {
+        let context = NSAnimationContext.current
+        return context.allowsImplicitAnimation && context.duration > 0 ? (context.duration, context.timingFunction) : nil
+    }
+
+    /// Whether what covers the page moves with the card. A website is laid out only once, so its page takes its new
+    /// size at once and the card's ground fills the rest. Settings is laid out by AppKit for any size and has a
+    /// tinted column the ground can't stand in for: it glides with the card.
+    ///
+    /// It sits on the surface for that, not on the clip. The surface counts from its top, so Settings hangs from the
+    /// card's top edge whatever the card's height is doing. On the clip, which counts from its bottom, its top would
+    /// be the clip's height less its own: two heights changing in two animations, which on screen don't keep step,
+    /// so Settings would run ahead of its card or behind it by a pixel or two.
+    private func glides(_ document: NSView?) -> Bool { document is SettingsView }
+
     override func layout() {
         super.layout()
+        // Everything is placed from the card's own bounds, not read back from the clip: inside an animation a view
+        // still answers with the frame it had.
+        let content = NSRect(x: 0, y: 0, width: bounds.width, height: bounds.height - contentTop)
+        // On the surface, under the band and the header; inside an animation it goes there with the card.
+        if glides(document) { document?.frame = content.offsetBy(dx: 0, dy: contentTop) }
+        let move = move
         Tokens.Motion.withoutAnimation {
+            turning.frame = bounds
             surface.frame = bounds
             clip.frame = bounds
-            let top = contentTop
             // The clip isn't flipped: the band and then the header are at its top edge, the page fills the rest below.
             if !liftsHeader {
-                header.frame = NSRect(x: 0, y: clip.bounds.height - band - PaneHeaderView.height, width: clip.bounds.width, height: PaneHeaderView.height)
+                header.frame = NSRect(x: 0, y: bounds.height - band - PaneHeaderView.height, width: bounds.width, height: PaneHeaderView.height)
             }
-            let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
             // The holder is sized, not the page (it fills the holder beside a docked Web Inspector, and in full screen
             // WebKit sizes it), and only while it's in this card: the mini player or another window may have borrowed it.
             if let holder, holder.superview === clip { holder.frame = content }
-            document?.frame = content
+            if !glides(document) { document?.frame = content }
             placeholder.frame = content
             overlay?.frame = content
             edge.frame = surface.bounds
             if progressLine.superlayer != nil { layoutProgress() }
+            // Inside an animation the corners and the shadows follow the card as it moves, not at once.
             let radius = cornerRadius
-            surface.layer?.cornerRadius = radius
-            edge.cornerRadius = radius
+            for layer in [surface.layer, edge].compactMap({ $0 }) where layer.cornerRadius != radius {
+                follow(move, layer, "cornerRadius", from: (layer.presentation() ?? layer).cornerRadius)
+                layer.cornerRadius = radius
+            }
             // A layer's own corners count from the bottom, whichever way up its view is: the top ones are at max Y.
-            var corners: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+            var corners = CACornerMask.all
             if squaresRightCorners.top { corners.remove(.layerMaxXMaxYCorner) }
             if squaresRightCorners.bottom { corners.remove(.layerMaxXMinYCorner) }
             if squaresLeftCorners.top { corners.remove(.layerMinXMaxYCorner) }
             if squaresLeftCorners.bottom { corners.remove(.layerMinXMinYCorner) }
+            corners = turnCorners(to: corners, radius: radius, over: move)
             surface.layer?.maskedCorners = corners
             edge.maskedCorners = corners
-            layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
-            Tokens.Motion.withoutAnimation {
-                ambient.frame = bounds
-                ambient.shadowPath = layer?.shadowPath
+            // At their final outline at once, the shadows showed past the card as a band along the edges it had yet
+            // to reach.
+            let outline = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
+            ambient.frame = bounds
+            for shadow in [layer, ambient].compactMap({ $0 }) {
+                follow(move, shadow, "shadowPath", from: (shadow.presentation() ?? shadow).shadowPath)
+                shadow.shadowPath = outline
             }
         }
+    }
+
+    /// Has a layer's property go from `from` to what it is set to next over `move`, when there is one.
+    private func follow(_ move: Move?, _ layer: CALayer, _ keyPath: String, from: Any?) {
+        guard let move, let from else { return }
+        let animation = CABasicAnimation(keyPath: keyPath)
+        animation.fromValue = from
+        animation.duration = move.duration
+        animation.timingFunction = move.timing
+        // Until it starts, a frame later than the card's own move can, the layer shows where it comes from.
+        animation.fillMode = .backwards
+        layer.add(animation, forKey: keyPath)
+    }
+
+    /// Takes the round corners to `corners` and returns the ones the surface rounds itself. A corner going square, or
+    /// round again, inside an animation turns over its length. A layer has one radius for all its corners, and the
+    /// others are turning to another one meanwhile, so those corners are handed to `turning` for the move: it takes
+    /// them from the radius they had to the one they are going to.
+    private func turnCorners(to corners: CACornerMask, radius: CGFloat, over move: Move?) -> CACornerMask {
+        let now = CACurrentMediaTime()
+        guard let move, corners != roundCorners, let turner = turning.layer else {
+            // A layout in the middle of a move leaves the corners to it.
+            guard now >= turnsUntil else { return surface.layer?.maskedCorners ?? corners }
+            // At rest the surface rounds every round corner itself.
+            turning.layer?.maskedCorners = []
+            turning.layer?.cornerRadius = 0
+            roundCorners = corners
+            return corners
+        }
+        let squaring = roundCorners.subtracting(corners), rounding = corners.subtracting(roundCorners)
+        // One way at a time: with corners going both ways at once, the ones rounding just appear.
+        let turned = squaring.isEmpty ? rounding : squaring
+        turner.maskedCorners = turned
+        follow(move, turner, "cornerRadius", from: squaring.isEmpty ? 0 : (surface.layer?.presentation() ?? surface.layer)?.cornerRadius ?? 0)
+        turner.cornerRadius = squaring.isEmpty ? radius : 0
+        roundCorners = corners
+        // Once they have turned, a layout hands them back to the surface.
+        turnsUntil = now + move.duration
+        DispatchQueue.main.asyncAfter(deadline: .now() + move.duration) { [weak self] in self?.needsLayout = true }
+        return corners.subtracting(turned)
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -427,7 +513,7 @@ final class PageCardView: NSView {
         let owner = (webView as? BrowserWebView)?.owner
         let viewer: NSView? = owner?.pdfViewer ?? owner?.settingsView
         guard viewer !== document else { return }
-        if let document, document.superview === clip {
+        if let document, document.superview === clip || document.superview === surface {
             // Typing was in the viewer going away: it goes back to the page rather than nowhere.
             if let window, let responder = window.firstResponder as? NSView, responder.isDescendant(of: document) {
                 window.makeFirstResponder(webView)
@@ -436,9 +522,14 @@ final class PageCardView: NSView {
         }
         document = viewer
         guard let viewer, let webView, let holder else { return }
-        viewer.frame = holder.frame
         viewer.autoresizingMask = [.width, .height]
-        clip.addSubview(viewer, positioned: .above, relativeTo: holder)
+        if glides(viewer) {
+            viewer.frame = holder.frame.offsetBy(dx: 0, dy: contentTop)
+            surface.addSubview(viewer, positioned: .above, relativeTo: clip)
+        } else {
+            viewer.frame = holder.frame
+            clip.addSubview(viewer, positioned: .above, relativeTo: holder)
+        }
         if let window, window.firstResponder === webView { window.makeFirstResponder((viewer as? PDFViewerView)?.pdfView ?? viewer) }
     }
 
@@ -447,4 +538,8 @@ final class PageCardView: NSView {
         placeholder.isHidden = true
         placeholder.image = nil
     }
+}
+
+private extension CACornerMask {
+    static let all: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
 }

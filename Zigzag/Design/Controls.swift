@@ -622,6 +622,16 @@ final class SlimScroller: NSScroller {
     override func mouseExited(with event: NSEvent) { super.mouseExited(with: event); isHovered = false; needsDisplay = true }
 }
 
+/// A scroll view whose scrollers lie over what it shows and never take room from it. A Mac with a mouse plugged in
+/// prefers scrollers that do, and gives every scroll view that style again whatever it was set to: then what the
+/// view shows gets narrower whenever a scroller appears, and a layout can't know its width from its frame.
+final class OverlayScrollView: NSScrollView {
+    override var scrollerStyle: NSScroller.Style {
+        get { super.scrollerStyle }
+        set { super.scrollerStyle = .overlay }
+    }
+}
+
 extension NSScrollView {
     /// Swaps in our slim scroller.
     func useSlimScroller() {
