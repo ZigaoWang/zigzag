@@ -811,6 +811,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let defaultButton = PillButton(title: String(localized: "Set as Default", comment: "Button in Settings › General that makes Zigzag the default browser."))
     private let defaultStatus = StatusLabel(String(localized: "Zigzag is your default browser", comment: "In Settings › General, in place of Set as Default once it's done."))
     private let blockingToggle = Toggle()
+    private let cookieBanners = DropdownButton()
     private let pipToggle = Toggle()
     private let fullScreenFill = DropdownButton()
     private let suggestionsToggle = Toggle()
@@ -1229,6 +1230,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             self?.reloadBlocking()
             self?.layoutDocument()
         }
+        cookieBanners.options = CookieBanners.Mode.allCases.map { mode in
+            let title = switch mode {
+            case .reject: String(localized: "Reject When Possible", comment: "A choice for “Cookie banners” in Settings › Privacy: Zigzag says no to a site's cookie consent pop-up, or hides one that only needs hiding.")
+            case .leave: String(localized: "Leave Alone", comment: "A choice for “Cookie banners” in Settings › Privacy: sites' cookie consent pop-ups are left for you to answer.")
+            }
+            return DropdownButton.Option(title: title)
+        }
+        cookieBanners.onSelect = { index in CookieBanners.mode = CookieBanners.Mode.allCases[index] }
         reloadBlocking()
 
         // Passwords
@@ -1862,6 +1871,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         blockingGroup.add(FormRow(title: String(localized: "Block ads and trackers", comment: "A setting in Settings › Privacy."),
                                   detail: detail, control: blockingToggle))
+        // Autoconsent's license is in Acknowledgments; this is where people look for what answers the pop-ups.
+        cookieBanners.selectedIndex = CookieBanners.Mode.allCases.firstIndex(of: CookieBanners.mode) ?? 0
+        let bannersDetail = String(localized: "Says no to the cookies a site’s pop-up asks for, or hides a pop-up that only needs hiding. Never says yes.",
+                                   comment: "Explanation under “Cookie banners” in Settings › Privacy.")
+            + " " + String(localized: "Uses Autoconsent, by DuckDuckGo.", comment: "After the explanation under “Cookie banners” in Settings › Privacy. Autoconsent is the name of DuckDuckGo's open-source library: keep both names as they are.")
+        let bannersRow = FormRow(title: String(localized: "Cookie banners", comment: "A setting in Settings › Privacy: what Zigzag does with a site's cookie consent pop-up."),
+                                 detail: bannersDetail, control: cookieBanners)
+        bannersRow.keywords = String(localized: "cookies consent gdpr pop-up popup notice reject accept privacy banner", comment: "Words that find the Cookie banners setting with Find a setting in Settings. Not shown.")
+        blockingGroup.add(bannersRow)
     }
 
     private func reloadPasswords() {
@@ -2377,6 +2395,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         defaultStatus.isHidden = !isDefault
         defaultButton.isHidden = isDefault
         blockingToggle.isOn = ContentBlocker.isEnabled
+        cookieBanners.selectedIndex = CookieBanners.Mode.allCases.firstIndex(of: CookieBanners.mode) ?? 0
         pipToggle.isOn = PictureInPicture.followsTabs
         fullScreenFill.selectedIndex = PageFullScreen.Fill.allCases.firstIndex(of: PageFullScreen.fill) ?? 0
         suggestionsToggle.isOn = SuggestionFetcher.isOn
@@ -2561,12 +2580,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // The choices made one site at a time, which otherwise have nowhere to be seen.
         let nothingChosen = ContentBlocker.allowedSites.isEmpty && ExtensionStore.extensionsOffSites.isEmpty && SitePermissions.sites.isEmpty
             && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty && DarkPages.sitesForced.isEmpty && KeepAwake.sites.isEmpty
-            && PageFullScreen.pageSites.isEmpty && PageFullScreen.screenSites.isEmpty
+            && PageFullScreen.pageSites.isEmpty && PageFullScreen.screenSites.isEmpty && CookieBanners.sitesHandled.isEmpty && CookieBanners.sitesLeft.isEmpty
         let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
         sitesReset = nothingChosen ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: String(localized: "Reset choices made for single sites?", comment: "Title of the sheet that forgets the choices made for single sites."),
-                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, dark pages and full screen follow your settings again, and every site’s tabs can sleep in the background.",
+                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background.",
                                           comment: "Message of the sheet that forgets the choices made for single sites."),
                           action: String(localized: "Reset All", comment: "Button of the sheet that forgets the choices made for single sites.")) {
                 ContentBlocker.allowedSites = []
@@ -2576,6 +2595,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 DarkPages.forgetAll()
                 KeepAwake.sites = []
                 PageFullScreen.forgetAll()
+                CookieBanners.forgetAll()
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
@@ -2592,7 +2612,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let origins = Dictionary(SitePermissions.sites.map { (SiteOrigin.label($0), $0) }, uniquingKeysWith: { a, _ in a })
         let sites = Set(origins.keys).union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites).union(ZoomLevels.all.keys)
             .union(DarkPages.sitesOn).union(DarkPages.sitesOff).union(DarkPages.sitesForced).union(KeepAwake.sites)
-            .union(PageFullScreen.pageSites).union(PageFullScreen.screenSites)
+            .union(PageFullScreen.pageSites).union(PageFullScreen.screenSites).union(CookieBanners.sitesHandled).union(CookieBanners.sitesLeft)
         var listed = 0, more = 0
         for site in sites.sorted() {
             var said: [String] = []
@@ -2632,6 +2652,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             } else if PageFullScreen.screenSites.contains(site) {
                 said.append(String(localized: "full screen fills the screen", comment: "A choice made for a site in Settings › Privacy, in a list of them: a video's full screen covers the whole screen, though the setting says the page."))
             }
+            if CookieBanners.sitesHandled.contains(site) {
+                said.append(String(localized: "cookie banners rejected", comment: "A choice made for a site in Settings › Privacy, in a list of them: its cookie consent pop-ups are answered with no, though the setting leaves them alone."))
+            } else if CookieBanners.sitesLeft.contains(site) {
+                said.append(String(localized: "cookie banners left alone", comment: "A choice made for a site in Settings › Privacy, in a list of them: its cookie consent pop-ups are left for you to answer."))
+            }
             guard !said.isEmpty else { continue }
             // The first 30 by name, as with site data, then the rest on request.
             guard sitesShowAll || listed < 30 else { more += 1; continue }
@@ -2652,6 +2677,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 awake.remove(site)
                 KeepAwake.sites = awake
                 PageFullScreen.setChoice(nil, for: URL(string: "https://\(site)"))
+                CookieBanners.setChoice(nil, for: URL(string: "https://\(site)"))
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
