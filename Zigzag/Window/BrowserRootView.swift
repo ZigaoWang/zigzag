@@ -493,6 +493,10 @@ final class BrowserRootView: SpaceFrameView {
     /// Also keeps it open: a panel that came out of it (the site panel, downloads) is still showing.
     var keepsRevealed: (() -> Bool)?
     private var isHeld: Bool { holdReveal || keepsRevealed?() == true }
+    /// The other way round: something floats over the window where the sidebar would slide in (the command bar, a
+    /// panel opened from the bar above the page), so the pointer at the edge leaves the sidebar hidden rather than
+    /// sliding it in under that. Asking for it outright (`reveal`) still brings it out.
+    var blocksEdgeReveal: (() -> Bool)?
 
     init(sidebar: SidebarView) {
         sidebarContainer = SidebarContainer(sidebar: sidebar)
@@ -1224,12 +1228,13 @@ final class BrowserRootView: SpaceFrameView {
     private var edgeTimer: Timer?
 
     private func pointerAtEdge() {
-        guard edgeTimer == nil, !sidebarVisible, !sidebarRevealed else { return }
+        guard edgeTimer == nil, !sidebarVisible, !sidebarRevealed, blocksEdgeReveal?() != true else { return }
         edgeTimer = Timer.scheduledTimer(withTimeInterval: Self.edgeGrace, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.edgeTimer = nil
-                if let point = self.pointer, self.edgeZone.opens(at: point) { self.reveal(true) }
+                // Something may have opened over the window in the meantime (⌘L with the pointer resting here).
+                if let point = self.pointer, self.edgeZone.opens(at: point), self.blocksEdgeReveal?() != true { self.reveal(true) }
             }
         }
     }
