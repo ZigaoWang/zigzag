@@ -617,6 +617,10 @@ enum DebugBridge {
                 }
             }
         case "suspendtab": controller.tabManager.allTabs.first { $0.url?.absoluteString.hasPrefix(arg) == true }?.suspend(because: "debug")
+        // iconpicker <index>: the Change Icon… grid beside the tab at that sidebar position, as its menu item opens it.
+        case "iconpicker":
+            let list = controller.tabManager.navigableTabs
+            if let n = Int(arg), list.indices.contains(n) { controller.chooseIcon(for: list[n]) }
         // pageicon <index> <icon|none>: gives the tab at that sidebar position an icon of its own, as Change Icon… does.
         case "pageicon":
             let f = arg.split(separator: " ", maxSplits: 1).map(String.init)

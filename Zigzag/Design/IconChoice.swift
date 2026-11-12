@@ -110,12 +110,15 @@ final class IconGrid: NSView, NSTextFieldDelegate {
     }
 
     /// `noneToolTip`: what the plain choice says it is, where that's more than no icon (a page's: its site's).
-    init(noneSymbol: String, noneToolTip: String? = nil, selected: String?) {
+    /// `noneImage`: what the plain choice shows when it's a picture of its own (a page's: its site's icon, so it reads
+    /// as "the site's icon" rather than one more icon to pick).
+    init(noneSymbol: String, noneImage: NSImage? = nil, noneToolTip: String? = nil, selected: String?) {
         self.noneSymbol = noneSymbol
         self.selected = selected
         super.init(frame: .zero)
         let none = IconButton(symbol: noneSymbol, size: Self.cell, symbolSize: Tokens.Symbol.row,
                               toolTip: noneToolTip ?? String(localized: "No Icon", comment: "Tooltip of the choice that takes a space's or a folder's icon away."))
+        if let noneImage { none.image = noneImage }
         none.onClick = { [weak self] _ in self?.pick(nil) }
         cells = [none] + IconChoice.symbols.map { name in
             let button = IconButton(symbol: name, size: Self.cell, symbolSize: Tokens.Symbol.row, toolTip: nil)
@@ -204,8 +207,8 @@ final class IconPickerPanel: FloatingPanelView {
     private let pad = Tokens.Space.x3
     static weak var current: IconPickerPanel?
 
-    init(noneSymbol: String, noneToolTip: String? = nil, selected: String?, onPick: @escaping (String?) -> Void) {
-        grid = IconGrid(noneSymbol: noneSymbol, noneToolTip: noneToolTip, selected: selected)
+    init(noneSymbol: String, noneImage: NSImage? = nil, noneToolTip: String? = nil, selected: String?, onPick: @escaping (String?) -> Void) {
+        grid = IconGrid(noneSymbol: noneSymbol, noneImage: noneImage, noneToolTip: noneToolTip, selected: selected)
         super.init(frame: .zero)
         radius = Tokens.Radius.panel
         grid.onPick = onPick

@@ -2166,7 +2166,9 @@ extension BrowserWindowController: SidebarDelegate {
         guard let row = sidebar.list.tabRow(tab.id) else { return }
         closeFloatingPanels()
         let id = tab.id
-        let panel = IconPickerPanel(noneSymbol: "globe", noneToolTip: SidebarMenus.useSiteIconTitle, selected: tab.customIcon) { [weak self] icon in
+        // The plain choice is the site's own icon, shown as it is.
+        let siteIcon = tab.favicon ?? tab.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) }
+        let panel = IconPickerPanel(noneSymbol: "globe", noneImage: siteIcon, noneToolTip: SidebarMenus.useSiteIconTitle, selected: tab.customIcon) { [weak self] icon in
             guard let self, let tab = self.tabManager.tab(with: id) else { return }
             self.setIconWithUndo(icon, for: tab)
         }
@@ -2180,7 +2182,8 @@ extension BrowserWindowController: SidebarDelegate {
         let anchor = Library.shared.isFavorite(id) ? sidebar.favorites.tile(for: id) : sidebar.list.bookmarkRow(id)
         guard let anchor else { return }
         closeFloatingPanels()
-        let panel = IconPickerPanel(noneSymbol: "globe", noneToolTip: SidebarMenus.useSiteIconTitle, selected: bookmark.icon) { [weak self] icon in
+        let siteIcon = tabManager.bookmarkTab(for: id)?.favicon ?? FaviconStore.shared.cachedIcon(for: bookmark.url)
+        let panel = IconPickerPanel(noneSymbol: "globe", noneImage: siteIcon, noneToolTip: SidebarMenus.useSiteIconTitle, selected: bookmark.icon) { [weak self] icon in
             self?.setIconWithUndo(icon, forBookmark: id)
         }
         panel.show(beside: anchor, in: root.overlay, x: root.sidebarContainer.frame.maxX + Tokens.Space.x2)
