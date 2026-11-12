@@ -13,6 +13,12 @@ protocol TabHost: AnyObject {
     func tab(_ tab: Tab, hoveringLink url: URL?)
     /// Its floating video's Return button: bring it on screen, so the video can go back into the page.
     func tabWantsToBeShown(_ tab: Tab)
+    /// Swiped back or forward in its page: in a split, that page becomes the one you're in, as a click on it would.
+    func tabWantsFocus(_ tab: Tab)
+}
+
+extension TabHost {
+    func tabWantsFocus(_ tab: Tab) {}
 }
 
 enum OpenDisposition {

@@ -1049,9 +1049,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let point = root.convert(windowPoint, from: nil)
         // Clicks on what floats over the page (find, the command bar, a prompt) are for it, not the pane below.
         if let base = root.overlay.superview, root.overlay.hitTest(base.convert(windowPoint, from: nil)) != nil { return }
-        guard let index = panes.firstIndex(where: { $0.contains(point) }), pair.ids.indices.contains(index) else { return }
-        let clickedID = pair.ids[index]
-        if clickedID != tab.id, let clicked = tabManager.tab(with: clickedID) { tabManager.select(clicked) }
+        guard let clickedID = Self.pane(at: point, frames: panes, ids: pair.ids, current: tab.id),
+              let clicked = tabManager.tab(with: clickedID) else { return }
+        tabManager.select(clicked)
+    }
+
+    /// The pane at a point of the page, when it isn't the one you're in already: the one to go to. Nil between panes,
+    /// outside them, or on the pane you're in.
+    nonisolated static func pane(at point: NSPoint, frames: [NSRect], ids: [UUID], current: UUID) -> UUID? {
+        guard let index = frames.firstIndex(where: { $0.contains(point) }), ids.indices.contains(index) else { return nil }
+        return ids[index] == current ? nil : ids[index]
     }
 
     /// The control shows the most recent tab making sound (or paused by it) that you aren't looking at.
@@ -1749,7 +1756,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if spaceSwitcher.handle(event) { return true }
         // A mouse's side buttons go back and forward, as in Chrome and Arc (Safari leaves them to the page, which rarely
         // uses them). On release, and the press is taken too, so the page never sees half of it.
+        // In a split, the page under the pointer is the one that goes, made the one you're in first as a click
+        // would, not whichever pane you were last in (#170).
         if event.type == .otherMouseDown || event.type == .otherMouseUp, event.buttonNumber == 3 || event.buttonNumber == 4 {
+            if event.type == .otherMouseDown, root.tiles != nil { focusPane(at: event.locationInWindow) }
             if event.type == .otherMouseUp { event.buttonNumber == 3 ? goBack(nil) : goForward(nil) }
             return true
         }
@@ -1847,6 +1857,13 @@ extension BrowserWindowController: TabHost {
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
         if tabManager.selectedTab !== tab { tabManager.select(tab) }
+    }
+
+    func tabWantsFocus(_ tab: Tab) {
+        // Only another pane of the split on screen, unless one is zoomed over the rest (that one is where you are).
+        guard let selected = tabManager.selectedTab, selected !== tab, !paneZoom.isZoomed,
+              tabManager.partners(of: selected).contains(where: { $0 === tab }) else { return }
+        tabManager.select(tab)
     }
 
     func tab(_ tab: Tab, hoveringLink url: URL?) {

@@ -84,8 +84,12 @@ final class BrowserWebView: WKWebView {
 
     /// Three-finger swipes, for Macs set to swipe between pages that way: these come as swipe events, not scrolls.
     override func swipe(with event: NSEvent) {
-        if event.deltaX > 0, let owner, owner.canGoBackOrReturn { owner.goBack(); return }
-        if event.deltaX < 0, canGoForward { if let owner { owner.goForward() } else { goForward() }; return }
+        // In a split, the page swiped is the one that goes, and the one you're in from now on (#170).
+        if event.deltaX > 0, let owner, owner.canGoBackOrReturn { owner.host?.tabWantsFocus(owner); owner.goBack(); return }
+        if event.deltaX < 0, canGoForward {
+            if let owner { owner.host?.tabWantsFocus(owner); owner.goForward() } else { goForward() }
+            return
+        }
         super.swipe(with: event)
     }
     /// Set by a context menu item right before WebKit asks this page for a new web view. WebKit asks the page first,

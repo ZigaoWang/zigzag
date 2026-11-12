@@ -289,6 +289,8 @@ final class SwipeNavigator {
         stopWatchingRest()
         // Let go after its tab went to the back: it isn't where you're looking, so it doesn't move.
         guard let webView, webView.window != nil else { cancel(); return }
+        // In a split, the page swiped is the one that goes, and the one you're in from now on (#170).
+        if let owner = webView.owner { owner.host?.tabWantsFocus(owner) }
         if direction < 0 { if let owner = webView.owner { owner.goBack() } else { webView.goBack() } } else if let owner = webView.owner { owner.goForward() } else { webView.goForward() }
         settlePage()
         arrow?.leave(toward: direction, navigated: true)
