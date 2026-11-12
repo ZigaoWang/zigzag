@@ -274,7 +274,9 @@ something came from, answers at once, and can be interrupted.
   `Sidebar.lightsGap` (12) to the toggle's glyph, then back, forward and reload at the trailing end, every glyph's
   ink centered on the lights' line (`Symbol.inkOffset`), in `Color.chromeIcon`, no fill until the pointer is on it.
   The address: a soft field of the space's color (`Chrome.field`, the host in `textPrimary`, its own small buttons, any pinned extensions by Site Controls at its right,
-  the accent ring from the keyboard). Favorites: small soft tiles four to a row in the same look. The space's name
+  the accent ring from the keyboard). A link, an address or words dragged over any address field (the sidebar's, the
+  bar above the page's, a pane strip's, Zigzag Mini's) get the accent drop ring around the field, and let go they
+  load in that field's page, or search for the words (`AddressDrop`, #182). Favorites: small soft tiles four to a row in the same look. The space's name
   over its pinned tabs. The tab you're on: the light card of the color, which slides when you pick another. A split row shows both pages, each half with its icon, its title and, while that page
   plays or is muted, its own speaker; a pinned page split beside a tab carries the pair in its own row, so each page
   shows once and one row is lit. A tile group of three or four tabs is one row too, a part for each page in reading
@@ -290,8 +292,8 @@ something came from, answers at once, and can be interrupted.
   the sidebar (previews, the space editor, icons) opening left of it, the mini player first in the page's bottom
   left. The traffic lights stay at the window's top left, as on every Mac window: docked, the page leaves them a
   strip of the frame (`lightsStripHeight`, the sidebar's `addressTop`, so the page's top meets the address's line)
-  and the sidebar's top row is the left one's mirror image, back, forward and reload toward the page and the toggle
-  at the outer end, where the bar above the page keeps it while the sidebar is hidden (`SidebarView.topRowFrames`,
+  that holds back, forward and reload right after them, as the bar above the page does (`LightsStripView`, #181),
+  and the sidebar's top row keeps the toggle at its outer end, where the bar above the page keeps it while the sidebar is hidden (`SidebarView.topRowFrames`,
   its glyph `sidebar.right`), so it stays put as the sidebar comes and goes; with the bar above the page they're at the
   bar's leading end, as with the sidebar hidden; slid out without the bar, the floating sidebar carries them, the one piece of
   chrome then in view. The command bar stays centered on the window. Changing sides, the sidebar slides across

@@ -1701,6 +1701,39 @@
         }
       }
     },
+    "A page from a site with no tabs open goes at the bottom." : {
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有打开标签页的网站，新页面放在底部。"
+          }
+        }
+      }
+    },
+    "A page from a site with no tabs open goes at the top." : {
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有打开标签页的网站，新页面放在顶部。"
+          }
+        }
+      }
+    },
+    "A page from a site with no tabs open goes next to the current tab." : {
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有打开标签页的网站，新页面放在当前标签页旁边。"
+          }
+        }
+      }
+    },
     "A password can’t be empty." : {
       "comment" : "Toast when saving a login with its password cleared.",
       "localizations" : {
@@ -2406,6 +2439,17 @@
         }
       }
     },
+    "Always Allow on This Site" : {
+      "comment" : "Menu item of the address bar's camera button: the site may use the camera and microphone from now on without asking.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此网站上始终允许"
+          }
+        }
+      }
+    },
     "Always Translate" : {
       "comment" : "A heading in Settings › Translation.",
       "localizations" : {
@@ -2582,17 +2626,6 @@
         }
       }
     },
-    "Ask Again Next Time" : {
-      "comment" : "Menu item of the address bar's camera button: forgets the site's camera and microphone answer.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下次重新询问"
-          }
-        }
-      }
-    },
     "Ask Each Time" : {
       "comment" : "Choice in the menu of where downloads go, in Settings and the downloads panel.\nItem in the downloads panel's … menu: asks where to save each download.",
       "localizations" : {
@@ -2600,6 +2633,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每次询问"
+          }
+        }
+      }
+    },
+    "Ask Every Time" : {
+      "comment" : "Menu item of the address bar's camera button: the site, allowed the camera and microphone for good, asks again on every visit.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每次都询问"
           }
         }
       }
@@ -7426,6 +7470,17 @@
         }
       }
     },
+    "Large" : {
+      "comment" : "A choice for “Sidebar size” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大"
+          }
+        }
+      }
+    },
     "Large Space Names" : {
       "comment" : "Item in a space's context menu. A checkmark item: shows every space's name large at the top of the sidebar.",
       "localizations" : {
@@ -7768,7 +7823,7 @@
       }
     },
     "Medium" : {
-      "comment" : "Choice of column width in Reader's text and color choices.",
+      "comment" : "A choice for “Sidebar size” in Settings › Appearance: the usual size.\nChoice of column width in Reader's text and color choices.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7807,6 +7862,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更多"
+          }
+        }
+      }
+    },
+    "More than %lld matches" : {
+      "comment" : "Find bar count when the page has more matches than are counted. The number is 1,000.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "超过 %lld 个匹配项"
           }
         }
       }
@@ -8556,6 +8622,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下一个色相"
+          }
+        }
+      }
+    },
+    "Next to Tabs from the Same Site" : {
+      "comment" : "A choice for “New tabs open” in Settings › Tabs: a page goes right after the tabs already open from its website, like other github.com pages.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在同一网站的标签页旁边"
           }
         }
       }
@@ -12882,7 +12959,7 @@
       }
     },
     "Show in Finder" : {
-      "comment" : "Button in the Import window: show the exported passwords file in Finder.\nButton in the toast after Install as App: shows the new app in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
+      "comment" : "Button in the Import window: show the exported passwords file in Finder.\nButton in the toast after Install as App: shows the new app in Finder.\nButton on an installed app's row in Settings › General: shows the app itself, selected in its folder in Finder.\nFile menu item of an installed app's window: shows the app itself, selected in its folder in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12936,6 +13013,17 @@
         }
       }
     },
+    "Show “%@” in Finder" : {
+      "comment" : "VoiceOver label of the Show in Finder button on an installed app's row in Settings › General; the app's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在“访达”中显示“%@”"
+          }
+        }
+      }
+    },
     "Shows the space’s name large and light above its tabs. When off, it’s a plain heading." : {
       "comment" : "Explanation under “Large space names” in Settings › Appearance.",
       "localizations" : {
@@ -12976,6 +13064,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "边栏放在右侧"
+          }
+        }
+      }
+    },
+    "Sidebar size" : {
+      "comment" : "A setting in Settings › Appearance: how large the sidebar's tabs, folders, space names, favorites and address are, as macOS's Sidebar icon size.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏大小"
           }
         }
       }
@@ -13152,6 +13251,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "石板灰"
+          }
+        }
+      }
+    },
+    "Small" : {
+      "comment" : "A choice for “Sidebar size” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小"
           }
         }
       }
@@ -14308,6 +14418,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "该网站的证书不是由你的 Mac 信任的机构颁发的。你自己网络上的网站（比如路由器）常常是这样。"
+          }
+        }
+      }
+    },
+    "The size of the tabs, folders, favorites and address. To make everything on your Mac larger, use Larger Text in System Settings › Displays." : {
+      "comment" : "Explanation under “Sidebar size” in Settings › Appearance. Larger Text and System Settings › Displays are macOS's own names.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签页、文件夹、收藏和地址栏的大小。若要放大 Mac 上的所有内容，请使用“系统设置 › 显示器”中的“更大字体”。"
           }
         }
       }
@@ -16950,50 +17071,6 @@
         }
       }
     },
-    "camera allowed" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许摄像头"
-          }
-        }
-      }
-    },
-    "camera and microphone allowed" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许摄像头和麦克风"
-          }
-        }
-      }
-    },
-    "camera and microphone blocked" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阻止摄像头和麦克风"
-          }
-        }
-      }
-    },
-    "camera blocked" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阻止摄像头"
-          }
-        }
-      }
-    },
     "check for updates" : {
       "comment" : "Words that find the version row with Find a setting in Settings. Not shown.",
       "localizations" : {
@@ -17498,28 +17575,6 @@
         }
       }
     },
-    "location allowed" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许位置"
-          }
-        }
-      }
-    },
-    "location blocked" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阻止位置"
-          }
-        }
-      }
-    },
     "macOS didn’t let Zigzag read Arc’s history. In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on Arc, then try again." : {
       "comment" : "Problem in the Import window. Arc is a browser's name; System Settings › Privacy & Security › Files & Folders is macOS's own wording.",
       "localizations" : {
@@ -17647,28 +17702,6 @@
         }
       }
     },
-    "microphone allowed" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许麦克风"
-          }
-        }
-      }
-    },
-    "microphone blocked" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阻止麦克风"
-          }
-        }
-      }
-    },
     "mini player picture in picture pip floating" : {
       "comment" : "Words that find the Keep videos playing setting with Find a setting in Settings. Not shown.",
       "localizations" : {
@@ -17702,35 +17735,13 @@
         }
       }
     },
-    "new tab homepage home page start page position order" : {
+    "new tab homepage home page start page position order same site domain group organize" : {
       "comment" : "Words that find the New tabs open setting with Find a setting in Settings. Zigzag has no homepage, so words about one find this row. Not shown.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新标签页 主页 首页 起始页 位置 顺序 homepage new tab"
-          }
-        }
-      }
-    },
-    "notifications allowed" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许通知"
-          }
-        }
-      }
-    },
-    "notifications blocked" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阻止通知"
+            "value" : "新标签页 主页 首页 起始页 位置 顺序 同一网站 域名 分组 整理 homepage new tab"
           }
         }
       }
@@ -17775,28 +17786,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在播放音频"
-          }
-        }
-      }
-    },
-    "pop-ups allowed" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许弹出式窗口"
-          }
-        }
-      }
-    },
-    "pop-ups blocked" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阻止弹出式窗口"
           }
         }
       }
@@ -17943,6 +17932,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "标签页保持唤醒"
+          }
+        }
+      }
+    },
+    "text size font bigger larger smaller scale zoom interface ui" : {
+      "comment" : "Words that find the Sidebar size setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字大小 字体 字号 放大 缩小 更大 缩放 界面 text size font bigger scale"
           }
         }
       }

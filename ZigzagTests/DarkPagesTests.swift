@@ -286,10 +286,13 @@ struct DarkPagesTests {
             #expect(scripts.filter(DarkPages.isOurs).count == 2)
             #expect(scripts.count == 6)
             #expect(each < 0.05, "attaching took \(Int(each * 1000)) ms")
-            // Where dark pages aren't wanted, Dark Reader isn't put in at all.
+            // Where dark pages aren't wanted, Dark Reader isn't put in at all: only the plain script, for the top page,
+            // which says how the page looks for the bar above it (#134).
             DarkPages.mode = .off
             DarkPages.attach(to: webView)
-            #expect(configuration.userContentController.userScripts.filter(DarkPages.isOurs).isEmpty)
+            let plain = configuration.userContentController.userScripts.filter(DarkPages.isOurs)
+            #expect(plain.count == 1 && plain.allSatisfy(\.isForMainFrameOnly))
+            #expect(plain.allSatisfy { $0.source.count < 100_000 })
             DarkPages.mode = .always
         }
     }

@@ -57,9 +57,10 @@ private final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
         Updater.getsBetas ? Updater.betaFeed : nil
     }
 
-    /// Restarting to finish an update isn't a quit to ask about.
+    /// Restarting to finish an update isn't a quit to ask about, and everything open comes back after it: the
+    /// windows, tabs and Zigzag Mini windows are written down before Sparkle quits Zigzag.
     func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
-        MainActor.assumeIsolated { AppDelegate.quitConfirmed = true }
+        MainActor.assumeIsolated { UpdateRelaunch.prepare() }
     }
 }
 

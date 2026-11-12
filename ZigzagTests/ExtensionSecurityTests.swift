@@ -124,7 +124,10 @@ struct ExtensionSecurityTests {
         #expect(hidden.webView(for: context) == nil)
         #expect(!hidden.shouldGrantPermissionsOnUserGesture(for: context))
         #expect(Profiles.shared.default.extensions.actions(for: hidden).isEmpty)
-        #expect(Profiles.shared.default.extensions.menuItems(for: hidden).isEmpty)
+        let menu = NSMenu()
+        menu.addItem(withTitle: "An extension's item WebKit put in", action: nil, keyEquivalent: "")
+        Profiles.shared.default.extensions.addMenuItems(for: hidden, to: menu)
+        #expect(menu.items.isEmpty)
     }
 
     @Test func captureIsOfTheTabYouUsedItOn() {

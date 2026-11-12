@@ -163,32 +163,65 @@ enum Tokens {
     /// 12pt, every title and label at 36pt. Pages (Settings, History) keep the calmer app scale (`Metric`,
     /// `TypeSize.row`).
     enum Sidebar {
+        /// Settings › Appearance › Sidebar size (#183), as macOS's own Sidebar icon size: the rows' text, icons and
+        /// heights, the space's name, the favorites' tiles and the address, all together. Medium is the sizes written
+        /// here; the toolbar's buttons, the traffic lights and the gaps between things stay as they are.
+        enum Size: String, CaseIterable {
+            case small, medium, large
+            var scale: CGFloat {
+                switch self {
+                case .small: 0.9
+                case .medium: 1
+                case .large: 1.15
+                }
+            }
+        }
+
+        static var size: Size {
+            get { current }
+            set {
+                guard newValue != current else { return }
+                current = newValue
+                UserDefaults.standard.set(newValue.rawValue, forKey: "SidebarSize")
+                NotificationCenter.default.post(name: sizeChanged, object: nil)
+            }
+        }
+        /// Posted after `size` changes: the sidebar and the addresses set their rows again.
+        static let sizeChanged = Notification.Name("SidebarSizeChanged")
+        /// Read once: the sidebar asks for its sizes on every layout.
+        private static var current: Size = UserDefaults.standard.string(forKey: "SidebarSize").flatMap(Size.init(rawValue:)) ?? .medium
+
+        /// A Medium size at the size chosen, in whole points.
+        static func scaled(_ value: CGFloat) -> CGFloat { (value * current.scale).rounded() }
+        /// The same for a height or an icon, in even points, so what's centered in it lands on whole points.
+        static func scaledEven(_ value: CGFloat) -> CGFloat { (value * current.scale / 2).rounded() * 2 }
+
         /// From the sidebar's edges to its rows, favorites and address.
         static let edge: CGFloat = 6
         /// The icon column (12), from the sidebar's leading edge.
         static var iconColumn: CGFloat { edge + rowInset }
         /// A row's title (tabs, pinned pages, folders, New Tab) and the address's host.
-        static let rowText: CGFloat = TypeSize.body
+        static var rowText: CGFloat { scaled(TypeSize.body) }
         /// A section's label ("Personal", "Tabs", Clear): small, medium, muted.
-        static let labelText: CGFloat = TypeSize.small
+        static var labelText: CGFloat { scaled(TypeSize.small) }
         /// A row, and the gap between two: rows sit 32pt apart.
-        static let rowHeight: CGFloat = 30
+        static var rowHeight: CGFloat { scaledEven(30) }
         static let rowGap: CGFloat = 2
         /// A row's favicon, or the symbol in its place.
-        static let favicon: CGFloat = 16
+        static var favicon: CGFloat { scaledEven(16) }
         /// From a row's edge to its icon, and from the icon to its title's first letter.
         static let rowInset: CGFloat = 6
         static let iconGap: CGFloat = Space.x2
         /// The corners of small things in the sidebar: a row's fill, a favorite, a button.
         static let rowRadius: CGFloat = Radius.control
         /// A row's own small buttons (a tab's close and mute): a 20pt target, an 11pt glyph.
-        static let rowButton: CGFloat = 20
-        static let rowGlyph: CGFloat = 11
+        static var rowButton: CGFloat { scaledEven(20) }
+        static var rowGlyph: CGFloat { scaled(11) }
         /// A section label's slot, the label low in it.
-        static let labelHeight: CGFloat = 24
+        static var labelHeight: CGFloat { scaledEven(24) }
         /// The space's name over its pinned tabs: larger and light, the one heading in the sidebar, with room above it.
-        static let spaceNameText: CGFloat = 26
-        static let spaceNameHeight: CGFloat = 36
+        static var spaceNameText: CGFloat { scaled(26) }
+        static var spaceNameHeight: CGFloat { scaledEven(36) }
         /// Tracking for the space's name, in points: display type sits tighter.
         /// The name's first letter's side bearing at that size, so its ink lands on the icon column.
         static let spaceNameBearing: CGFloat = 1
@@ -199,12 +232,12 @@ enum Tokens {
 
         /// Favorites: as many to a row as fit at least `favoriteMinWidth` wide (three at the sidebar's usual width,
         /// four from about 255, up to `favoriteMaxColumns`), or as many as chosen in Settings; soft tiles.
-        static let favoriteMinWidth: CGFloat = 56
+        static var favoriteMinWidth: CGFloat { scaled(56) }
         /// The narrowest a favorite gets so its row comes out whole instead of leaving one tile alone below.
-        static let favoriteTightWidth: CGFloat = 46
+        static var favoriteTightWidth: CGFloat { scaled(46) }
         static let favoriteMaxColumns = 6
-        static let favoriteHeight: CGFloat = 36
-        static let favoriteIcon: CGFloat = 18
+        static var favoriteHeight: CGFloat { scaledEven(36) }
+        static var favoriteIcon: CGFloat { scaledEven(18) }
         static let favoriteGap: CGFloat = 6
         static let favoriteRadius: CGFloat = Radius.field
         /// A favorite's close chip, tucked inside its top-right corner.
@@ -225,12 +258,12 @@ enum Tokens {
         /// The address: a 30pt field with 8pt corners, the favorites' faint fill and 1px edge, the host 10pt in; its
         /// own buttons the toolbar's 26pt with 14pt glyphs, inset evenly, so they're as easy to hit as the ones above.
         static let addressTop: CGFloat = 40
-        static let addressHeight: CGFloat = 30
+        static var addressHeight: CGFloat { scaledEven(30) }
         static let addressRadius: CGFloat = Radius.field
         static let addressButton: CGFloat = button
         static let addressGlyph: CGFloat = glyph
         /// The room the site's name always keeps: pinned extensions give way before it gets narrower.
-        static let addressMinText: CGFloat = 72
+        static var addressMinText: CGFloat { scaled(72) }
         /// An extension's icon in the address: a site's icon's size, so it reads as big as the field's glyphs.
         static let addressIcon: CGFloat = 16
         /// The pin button on a corner of an extension's tile in Site Controls: a 16pt round chip like a favorite's
@@ -253,6 +286,8 @@ enum Tokens {
         static let height: CGFloat = 30
         static let button: CGFloat = 24
         static let glyph: CGFloat = 13
+        /// The page's icon in a strip (Peek's): a favicon at the sidebar's Medium size, whatever size the sidebar is.
+        static let favicon: CGFloat = 16
         static let addressText: CGFloat = TypeSize.label
         static let addressHeight: CGFloat = 22
         /// The least room a pane's address keeps before its strip folds its own buttons away (as the sidebar's

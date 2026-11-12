@@ -66,7 +66,12 @@ final class TopBarView: NSView {
         setAccessibilityRole(.toolbar)
         sidebarButton.isHidden = true
         addSubview(sidebarButton)
+        // Settings › Appearance › Sidebar size: the address held here takes its new height.
+        sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.needsLayout = true }
+        }
     }
+    private var sizeObserver: NSObjectProtocol?
 
     required init?(coder: NSCoder) { fatalError() }
 
@@ -253,5 +258,47 @@ final class TopBarView: NSView {
             Tokens.Motion.withoutAnimation { place.view.frame = start }
             Tokens.Motion.glide(place.view, to: place.frame, duration: curve.duration, timing: curve.timing, resizes: true)
         }
+    }
+}
+
+/// The strip above the page beside a docked sidebar on the right, with the bar above the page off: the traffic lights
+/// at its leading end, and back, forward and reload right after them, where the bar above the page has them, so the
+/// lights sit in a toolbar rather than alone over an empty band (#181). The sidebar's own buttons, moved here while
+/// the strip is there. Like the bar, it moves the window and zooms it on a double-click.
+final class LightsStripView: NSView {
+    private(set) var buttons: [IconButton] = []
+    /// The traffic lights' width, for where the first button goes.
+    var trafficLightsWidth: CGFloat = 0 { didSet { if trafficLightsWidth != oldValue { needsLayout = true } } }
+
+    override var isFlipped: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { true }
+    override func mouseDown(with event: NSEvent) { window?.titleBarMouseDown(event) }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        setAccessibilityRole(.toolbar)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    /// Takes the sidebar's back, forward and reload, in order.
+    func hold(_ buttons: [IconButton]) {
+        self.buttons = buttons
+        for button in buttons {
+            button.isOnPage = false
+            addSubview(button)
+        }
+        needsLayout = true
+    }
+
+    /// Each button's place: as the bar above the page puts them after the lights, on the lights' line.
+    static func buttonFrames(count: Int, trafficLightsWidth: CGFloat) -> [NSRect] {
+        TopBarView.frames(width: 0, buttons: count, trafficLightsWidth: trafficLightsWidth, trailingInset: 0).buttons
+    }
+
+    override func layout() {
+        super.layout()
+        let frames = Self.buttonFrames(count: buttons.count, trafficLightsWidth: trafficLightsWidth)
+        for (button, frame) in zip(buttons, frames) where button.superview === self { button.frame = frame }
     }
 }

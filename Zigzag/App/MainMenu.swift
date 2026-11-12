@@ -195,6 +195,7 @@ enum MainMenu {
         ]))
         main.addItem(submenu(String(localized: "File", comment: "A menu in the menu bar."), [
             item(String(localized: "Open in Zigzag", comment: "File menu item of an installed app's window: opens the page it shows in a tab of a Zigzag window."), #selector(W.openInBrowser(_:)), ""),
+            item(String(localized: "Show in Finder", comment: "File menu item of an installed app's window: shows the app itself, selected in its folder in Finder."), #selector(W.showAppInFinder(_:)), ""),
             .separator(),
             item(String(localized: "Close Window", comment: "File menu item."), #selector(NSWindow.performClose(_:)), "w"),
         ]))

@@ -112,6 +112,29 @@ nonisolated enum TabTree {
         canInsert(at: index, parent: preferred, in: nodes) ? preferred : parentForInsertion(at: index, in: nodes)
     }
 
+    /// Settings › Tabs, Next to Tabs from the Same Site (#188): where a new tab from `site` goes to sit with the tabs
+    /// already open from it, and the tab it goes under. After the last of them, and everything under it, in its group;
+    /// opened from one of them (`opener`), after the run of that site's tabs that starts there, so a row of links stays
+    /// in reading order. Nil when no tab is from that site: the tab goes where it would have gone.
+    static func besideSameSite(_ site: String, sites: [UUID: String], opener: UUID?, in nodes: [Node]) -> (index: Int, parent: UUID?)? {
+        var anchor: Int
+        if let opener, sites[opener] == site, let at = nodes.firstIndex(where: { $0.id == opener }) {
+            anchor = at
+        } else if let last = nodes.lastIndex(where: { sites[$0.id] == site }) {
+            anchor = last
+        } else {
+            return nil
+        }
+        // The same site's tabs just after it at its level are part of the run.
+        while true {
+            let end = subtreeEnd(at: anchor, in: nodes)
+            guard end < nodes.count, nodes[end].parent == nodes[anchor].parent, sites[nodes[end].id] == site else { break }
+            anchor = end
+        }
+        let index = subtreeEnd(at: anchor, in: nodes)
+        return (index, parent(at: index, preferring: nodes[anchor].parent, in: nodes))
+    }
+
     /// A tab taken out of the list (closed, pinned, moved away): the tabs right under it move up a level, under its
     /// own parent, and keep their places.
     static func removing(_ id: UUID, from nodes: [Node]) -> [Node] {

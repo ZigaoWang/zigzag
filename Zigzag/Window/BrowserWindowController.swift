@@ -130,6 +130,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
+        // A link or words dropped on the address: the page you're on goes there (#182).
+        sidebar.address.drop.onDrop = { [weak self] url in
+            self?.open(url, disposition: .currentTab)
+            return self != nil
+        }
         // The address stands for the tab you're on: a middle-click closes it, as on the tab's own row.
         sidebar.address.onMiddleClick = { [weak self] in self?.closeTab(nil) }
         sidebar.address.onPinsMoved = { [weak self] in
@@ -148,10 +153,23 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         sidebar.address.captureButton.onClick = { [weak self] _ in
             guard let self, let tab = self.tabManager.selectedTab, let origin = SiteOrigin.of(tab.url) else { return }
-            MenuPanel.show([
+            var items: [MenuPanel.Entry] = [
                 .item(.init(title: String(localized: "Stop Camera and Microphone", comment: "Menu item of the address bar's camera button: stops the page using the camera and microphone."), symbol: "stop.circle") { tab.stopCapture() }),
-                .item(.init(title: String(localized: "Ask Again Next Time", comment: "Menu item of the address bar's camera button: forgets the site's camera and microphone answer."), symbol: "arrow.counterclockwise") { SitePermissions.forget(origin: origin) }),
-            ], from: self.sidebar.address.captureButton)
+            ]
+            // An answer to the question holds for this page only (Ask); Always Allow keeps it for the site, and
+            // Ask Every Time takes that back. A private window keeps nothing for a site.
+            if !tab.isPrivate {
+                if SitePermissions.choice(.cameraAndMicrophone, origin: origin) == .allow {
+                    items.append(.item(.init(title: String(localized: "Ask Every Time", comment: "Menu item of the address bar's camera button: the site, allowed the camera and microphone for good, asks again on every visit."), symbol: "arrow.counterclockwise") {
+                        SitePermissions.setChoice(.ask, for: .cameraAndMicrophone, origin: origin)
+                    }))
+                } else {
+                    items.append(.item(.init(title: String(localized: "Always Allow on This Site", comment: "Menu item of the address bar's camera button: the site may use the camera and microphone from now on without asking."), symbol: "checkmark.circle") {
+                        SitePermissions.setChoice(.allow, for: .cameraAndMicrophone, origin: origin)
+                    }))
+                }
+            }
+            MenuPanel.show(items, from: self.sidebar.address.captureButton)
         }
         sidebar.nowPlaying.onClick = { [weak self] _ in
             if let tab = self?.nowPlayingTab { self?.tabManager.select(tab) }
@@ -1644,6 +1662,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let y = center - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating || inBar, let image = window.trafficLightsImage() { trafficLightsPicture = image }
+        // Beside a docked sidebar on the right without the bar, the strip above the page that holds the lights holds
+        // back, forward and reload after them too, out of the sidebar's row (#181); anywhere else, the sidebar has them.
+        let stripHolds = root.lightsRoom > 0
+        if stripHolds, sidebar.holdsButtons, sidebar.holdsAddress {
+            sidebar.holdsButtons = false
+            root.lightsStrip.hold(sidebar.addressButtons)
+        } else if !stripHolds, !sidebar.holdsButtons {
+            sidebar.holdsButtons = true
+        }
+        root.lightsStrip.trafficLightsWidth = window.trafficLightsWidth
         // The lights' room in the bar stays while the sidebar floats over it, so nothing in the bar moves as it does.
         root.topBar.trafficLightsWidth = root.showsTopBar && (!docked || onRight) && !fullScreen ? window.trafficLightsWidth : 0
         // With the sidebar hidden its toggle goes with it, so the bar above the page has one of its own. While the
@@ -1833,7 +1861,7 @@ extension BrowserWindowController: TabHost {
         // A result opened from a search page keeps the search one Back away.
         if disposition == .backgroundTab || disposition == .foregroundTab, let current = tab.url, SearchFolding.isSearchResultsPage(current),
            let history = tab.interactionStateForSaving {
-            let newTab = tabManager.newTab(url: nil, select: disposition == .foregroundTab, opener: tab, title: url.host())
+            let newTab = tabManager.newTab(url: nil, select: disposition == .foregroundTab, opener: tab, title: url.host(), site: url)
             newTab.restoreHistory(history, thenLoad: url)
             return
         }
@@ -1849,7 +1877,7 @@ extension BrowserWindowController: TabHost {
                 WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: tabManager.isPrivate || pending == .privateWindow)
                 return nil
             }
-            let newTab = tabManager.newTab(url: nil, select: false, configuration: configuration, opener: tab)
+            let newTab = tabManager.newTab(url: nil, select: false, configuration: configuration, opener: tab, site: action.request.url)
             return newTab.ensureWebView()
         }
         // Peeked pages open their links in the card itself.
@@ -1870,7 +1898,7 @@ extension BrowserWindowController: TabHost {
         }
         let flags = action.modifierFlags
         let background = flags.contains(.command) && !flags.contains(.shift)
-        let newTab = tabManager.newTab(url: nil, select: !background, configuration: configuration, opener: tab)
+        let newTab = tabManager.newTab(url: nil, select: !background, configuration: configuration, opener: tab, site: action.request.url)
         return newTab.ensureWebView()
     }
 

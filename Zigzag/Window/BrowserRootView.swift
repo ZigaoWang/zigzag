@@ -445,6 +445,9 @@ final class BrowserRootView: SpaceFrameView {
     var onTilesChange: ((TileShape, Bool) -> Void)?
     /// Back, forward, reload and the address above the page, when they're there (`addressAbovePage`).
     let topBar = TopBarView()
+    /// The strip above the page for the traffic lights beside a sidebar on the right (`lightsRoom`), with back,
+    /// forward and reload after them (#181).
+    let lightsStrip = LightsStripView()
     var showsTopBar = false {
         didSet {
             guard oldValue != showsTopBar else { return }
@@ -512,6 +515,8 @@ final class BrowserRootView: SpaceFrameView {
         }
         topBar.isHidden = true
         addSubview(topBar)
+        lightsStrip.isHidden = true
+        addSubview(lightsStrip)
         // Never so narrow (or short) that a pane's header loses its buttons: a share of the window, and points too.
         columnHandle.onDrag = { [weak self] x in
             guard let self, var shape = self.tiles else { return }
@@ -947,6 +952,8 @@ final class BrowserRootView: SpaceFrameView {
         placeStrips(animated: false)
         layoutCards()
         layoutTopBar()
+        lightsStrip.isHidden = lightsRoom == 0
+        if lightsRoom > 0 { lightsStrip.frame = NSRect(x: bounds.minX, y: bounds.minY, width: max(0, pageAreaFrame.maxX - bounds.minX), height: lightsRoom) }
         sidebarContainer.frame = sidebarFrame
         sidebarContainer.isFloating = !sidebarVisible && !leavesDocked
         // Docked beside the bar above the page, the sidebar's top row stays on the bar's middle line.
