@@ -364,13 +364,14 @@
     // The page's color as it's drawn: its own, put through the filter when darkened.
     let c = document.body ? backgroundOf(document.body) : canvas();
     // A page dark on its own whose root and body paint white or nothing (a dark app laid over them): the dark at
-    // its top, else its middle, which is what's seen under the bar (#134).
+    // its top, else its middle, which is what's seen under the bar (#134). Only a quiet dark, not a button's green.
+    const calm = (k) => isDark(k) && Math.max(k[0], k[1], k[2]) - Math.min(k[0], k[1], k[2]) <= 48;
     if (native === true && !darkened && !isDark(c) && document.body) {
       for (const [x, y] of [[0.5, 0.02], [0.5, 0.5]]) {
         let el = document.elementFromPoint(innerWidth * x, innerHeight * y);
         while (el && el.parentElement && skip.test(el.tagName)) el = el.parentElement;
         const under = el && el !== style ? backgroundOf(el) : null;
-        if (under && isDark(under)) { c = under; break; }
+        if (under && calm(under)) { c = under; break; }
       }
     }
     let [r, g, b] = c;
