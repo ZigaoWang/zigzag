@@ -19,9 +19,9 @@ final class Launcher: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Zigzag quitting or crashing takes the app's window with it: the app goes too.
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main) { [weak self] note in
-            guard let self, let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                  app.bundleIdentifier == self.hostID else { return }
+            let quit = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier
             MainActor.assumeIsolated {
+                guard let self, let quit, quit == self.hostID else { return }
                 if self.runningHost == nil { exit(0) }
             }
         }
