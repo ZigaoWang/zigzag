@@ -53,17 +53,19 @@ Zigzag connects to on its own.
 | | |
 |---|---|
 | **Spaces** | Each with its own color, icon, pinned tabs and folders. Swipe on the sidebar, or nudge the mouse wheel sideways, to switch. |
-| **Favorites** | Your most used sites as tiles, above every space. |
+| **Favorites** | Your most used sites as tiles, above every space. Any tab, pinned tab or favorite can wear its own emoji or symbol. |
 | **Profiles** | Keep work and personal apart. Each profile has its own extensions, sign-ins, history and favorites, and every space is on one. |
 | **Command bar** | ⌘T or ⌘L. Finds open tabs, history and sites. Type `you`, press Tab, and you're searching YouTube. |
 | **Split view** | Drag a tab onto the page. Pin a split and it stays one. |
 | **Peek** | Shift-click a link to read it over the page you're on. |
+| **Mini player** | Leave a tab while its video plays and the video follows you in a small player. Resize it from any edge, and it snaps to a corner. |
 | **All tabs** | ⇧⌘\ shows every space at once. Type to filter, drag a tab to another space. |
 | **Clear** | Closes the tabs you've drifted away from and keeps the ones you're working with. Undo brings them back. |
 | **Zigzag Mini** | ⌃⌘N opens a small window for one quick page, and ⌘O moves it into your browser window. Links from other apps can open in it, like Little Arc. |
 | **Passwords** | In your Mac's Keychain, synced by iCloud Keychain. Touch ID, a generator, and a check for weak and reused ones. Passkeys work. |
+| **Dark pages** | Light sites in a dark version of their own colors, learned the first time you visit, so photos stay true. Pure black if you like it darker. On everywhere or per site. |
 | **Ad blocking** | Built in and on: about 130,000 EasyList, EasyPrivacy and EasyList China rules, compiled into WebKit content rule lists. |
-| **Extensions** | From the Chrome Web Store, with an Add to Zigzag button on each listing. 1Password, Bitwarden, Dark Reader, Tampermonkey and most popular ones work; see below for what doesn't. |
+| **Extensions** | From the Chrome Web Store, where the store's own button reads Add to Zigzag. 1Password, Bitwarden, Dark Reader, Tampermonkey and most popular ones work; see below for what doesn't. |
 | **Import** | Bookmarks, history, passwords, sign-ins and extensions from Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox, Zen and Orion. |
 | **Automation** | AppleScript, Shortcuts and `osascript` can list and open tabs and read pages, written the way Safari and Chrome take them. See [docs/automation.md](docs/automation.md). |
 | **AI apps** | Off until you turn it on: AI apps on your Mac can use your tabs over MCP, never private windows or passwords. See [docs/automation.md](docs/automation.md#ai-apps-mcp). |

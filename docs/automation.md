@@ -11,7 +11,7 @@ Both live in Settings › Automation.
 
 ## AI apps (MCP)
 
-Zigzag has a small MCP server built in. It listens on this Mac only (127.0.0.1), never on your network, and only while
+Zigzag 0.8.5 and later has a small MCP server built in. It listens on this Mac only (127.0.0.1), never on your network, and only while
 you have it turned on. Off, nothing listens at all.
 
 ### Turning it on
