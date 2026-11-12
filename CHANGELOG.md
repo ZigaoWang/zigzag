@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Notes at the top of the page slide back up when they go, the way they came down, instead of vanishing. Notes with a button (Undo, Pin This Page) have a close button, and the note after closing a pinned tab is shorter.
+- A tab Zigzag put to sleep has a thin, even dashed ring round its icon instead of chunky dots, and its preview says why it sleeps and about how much memory that freed, like "Asleep to save memory. Freed about 180 MB." ([#140](https://github.com/ZigaoWang/zigzag/issues/140))
 
 ## [0.8.7] - 2026-11-12
 
