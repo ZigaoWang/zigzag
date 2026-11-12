@@ -7822,6 +7822,17 @@
         }
       }
     },
+    "More than %lld matches" : {
+      "comment" : "Find bar count when the page has more matches than are counted. The number is 1,000.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "超过 %lld 个匹配项"
+          }
+        }
+      }
+    },
     "Move" : {
       "comment" : "Button of the sheet that asks before a space is put on another profile.",
       "localizations" : {

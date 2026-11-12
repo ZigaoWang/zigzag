@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Find count</title>
+<style>.gone { display: none; } .unseen { visibility: hidden; }</style>
+<script>const note = "apple apple apple in a script";</script>
+</head>
+<body>
+<!-- Shown: apple 3 times (one in capitals), one split across inline elements. -->
+<p>An apple a day.</p>
+<p>APPLE pie, and an <b>ap</b><i>ple</i> split across bold and italic.</p>
+<!-- Not shown: none of these count. -->
+<div class="gone">apple apple hidden with display none</div>
+<div class="unseen">apple hidden with visibility</div>
+<div hidden>apple in a hidden attribute</div>
+<noscript>apple in noscript</noscript>
+<!-- Two blocks side by side: "pear" then "plum", never "pearplum". -->
+<p>pear</p><p>plum</p>
+<!-- A frame from the same page: banana twice. Banana once here. -->
+<p>banana</p>
+<iframe srcdoc="<p>banana and banana</p>" width="300" height="80"></iframe>
+</body>
+</html>
