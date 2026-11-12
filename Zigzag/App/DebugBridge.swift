@@ -819,6 +819,15 @@ enum DebugBridge {
             if let tab = controller.tabManager.currentTabs.first(where: { $0.title.contains(arg) }) {
                 (controller.sidebar.list.row(for: tab) as? SidebarRowView)?.isHovered = true
             }
+        case "zoompane":
+            // zoompane <n>: the shown group's pane n zoomed over the rest, or put back, as ⇧-clicking its part of the
+            // row does; zoompane alone puts any zoomed pane back.
+            if let n = Int(arg), let current = controller.tabManager.selectedTab, let pair = controller.tabManager.split(for: current),
+               pair.ids.indices.contains(n), let tab = controller.tabManager.tab(with: pair.ids[n]) {
+                controller.listZoomPane(tab)
+            } else {
+                controller.unzoomPane()
+            }
         case "rowdump":
             // rowdump: the shown tab's row's parts, where each is and whether it shows, in the debug log.
             if let tab = controller.tabManager.selectedTab, let row = controller.sidebar.list.row(for: tab) {
