@@ -2147,18 +2147,6 @@
         }
       }
     },
-    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, dark pages follow your setting again, and every site’s tabs can sleep in the background." : {
-      "comment" : "Message of the sheet that forgets the choices made for single sites.",
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放会恢复为 100%，深色网页会重新跟随你的设置，所有网站的标签页也会在后台照常休眠。"
-          }
-        }
-      }
-    },
     "Advanced" : {
       "comment" : "A heading in the column of Settings, over Extensions, Shortcuts and Automation.",
       "localizations" : {
