@@ -256,7 +256,6 @@ final class DeskController {
     /// match while searching.
     private var focused: UUID?
     private(set) var isVisible = false
-    private var marquee: CAShapeLayer?
     /// The page's picture while it flies between the page area and its card, over the desk.
     private let flightView = DeskFlightView()
     private var flight: PagePicture?
