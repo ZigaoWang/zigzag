@@ -5,6 +5,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.8.6] - 2026-11-12
+
 ### New
 - Settings' sections sit under headings: Browser, Tools, Privacy & Security and Advanced.
 
