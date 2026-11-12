@@ -24,12 +24,19 @@ final class CarriedCopy {
 
     /// A copy of `view`, held where the pointer pressed it (a point on screen). `ground`: drawn under the picture, for
     /// rows that are see-through on the sidebar. `alternate`: the second shape, the pointer holding it at `grab`.
-    init(of view: NSView, picture image: NSImage?, grabbedAt screenPoint: NSPoint, ground: NSColor?, radius: CGFloat,
-         alternate: (view: NSView, size: NSSize, grab: NSPoint, radius: CGFloat)? = nil) {
-        let window = view.window
-        let rect = window?.convertToScreen(view.convert(view.bounds, to: nil)) ?? .zero
-        size = rect.size
-        grab = NSPoint(x: screenPoint.x - rect.minX, y: screenPoint.y - rect.minY)
+    convenience init(of view: NSView, picture image: NSImage?, grabbedAt screenPoint: NSPoint, ground: NSColor?, radius: CGFloat,
+                     alternate: (view: NSView, size: NSSize, grab: NSPoint, radius: CGFloat)? = nil) {
+        let rect = view.window?.convertToScreen(view.convert(view.bounds, to: nil)) ?? .zero
+        self.init(picture: image, size: rect.size, grab: NSPoint(x: screenPoint.x - rect.minX, y: screenPoint.y - rect.minY),
+                  at: screenPoint, appearance: view.effectiveAppearance, ground: ground, radius: radius, alternate: alternate)
+    }
+
+    /// A copy of something not shown at this size (a pane's page, small): `image` at `size`, the pointer holding it at
+    /// `grab` (from its bottom-left corner), now at `screenPoint`.
+    init(picture image: NSImage?, size: NSSize, grab: NSPoint, at screenPoint: NSPoint, appearance: NSAppearance, ground: NSColor?,
+         radius: CGFloat, alternate: (view: NSView, size: NSSize, grab: NSPoint, radius: CGFloat)? = nil) {
+        self.size = size
+        self.grab = grab
         self.alternate = alternate?.view
         alternateSize = alternate?.size ?? size
         alternateGrab = alternate?.grab ?? grab
@@ -46,7 +53,7 @@ final class CarriedCopy {
         panel.hasShadow = false
         panel.level = .floating
         panel.ignoresMouseEvents = true
-        panel.appearance = view.effectiveAppearance
+        panel.appearance = appearance
         let content = NSView(frame: NSRect(x: 0, y: 0, width: width, height: height))
         content.wantsLayer = true
         panel.contentView = content
@@ -59,7 +66,7 @@ final class CarriedCopy {
         card.layer?.shadowRadius = 8
         card.layer?.shadowOffset = CGSize(width: 0, height: -3)
         var fill: CGColor?
-        view.effectiveAppearance.performAsCurrentDrawingAppearance { fill = ground?.cgColor }
+        appearance.performAsCurrentDrawingAppearance { fill = ground?.cgColor }
         card.layer?.backgroundColor = fill
         content.addSubview(card)
         picture.image = image
@@ -76,6 +83,15 @@ final class CarriedCopy {
         alternate?.view.frame = card.bounds
         updateShadow()
         follow(screenPoint)
+    }
+
+    /// A newer picture of the same thing, clipped to the copy's corners (a page's, taken once the drag began).
+    func show(picture image: NSImage?) {
+        picture.wantsLayer = true
+        picture.layer?.cornerRadius = radius
+        picture.layer?.cornerCurve = .continuous
+        picture.layer?.masksToBounds = true
+        picture.image = image
     }
 
     /// The item as it looks, from its layers.

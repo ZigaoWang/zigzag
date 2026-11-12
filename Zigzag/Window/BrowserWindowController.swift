@@ -838,6 +838,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 let keep = pair.isGroup ? page : pages[i == 0 ? 1 : 0]
                 card.header.close.onClick = { [weak self] _ in self?.unsplitWithUndo(page, keep: keep) }
                 card.header.closeTab.onClick = { [weak self] _ in self?.closeWithUndo(page) }
+                // Pressed and dragged, the strip carries its pane somewhere else (#160).
+                card.header.onDrag = { [weak self] tab, press, moved in self?.dragPane(tab, press: press, moved: moved) }
                 card.header.onEditAddress = { [weak self, weak card] tab in
                     guard let self, let card else { return }
                     self.editAddress(of: tab, from: card.header.address)

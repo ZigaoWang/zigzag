@@ -94,6 +94,7 @@
 		4489417AC1F72B028FA0998A /* ProfileSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77B2EE3B0C5A70C2E6A8A77 /* ProfileSheets.swift */; };
 		44ECB58B498642EB6DB3648B /* PasswordGeneratorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */; };
 		45B26CB65A31C4BEFCFB7CA2 /* EnergyWarningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0DE85F403C80DB6286E463D /* EnergyWarningTests.swift */; };
+		45DB5724896F8B0B56478A3E /* PaneDrag.swift in Sources */ = {isa = PBXBuildFile; fileRef = B44BD209A49B5F5B73ECE2BD /* PaneDrag.swift */; };
 		47481B98A075C26B774A694A /* PageStatePrivacyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D2E0F2330CC776A71AC19D /* PageStatePrivacyTests.swift */; };
 		477BB8ED8D0C8DC49A0AFC15 /* PopupNotice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9569CB3512DF9E729E1FDA49 /* PopupNotice.swift */; };
 		4796C99DFA31C01F7EBCB5AF /* SystemAudioTap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 514E259958AB77A6CA393296 /* SystemAudioTap.swift */; };
@@ -319,6 +320,7 @@
 		F1CF78DD9C9374F3869A4FC3 /* youtube-player-response.json in Resources */ = {isa = PBXBuildFile; fileRef = 972F89371A17ECD75CE64757 /* youtube-player-response.json */; };
 		F2B2D57349048BBF7D703BD1 /* BridgeNamespaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5C531844DCB5F002266118C /* BridgeNamespaces.swift */; };
 		F33B0673811E66F305F2EC55 /* favourites.plist in Resources */ = {isa = PBXBuildFile; fileRef = FA1F3192157697E1DC3F2FA2 /* favourites.plist */; };
+		F428675EDF7E08FC94B923B0 /* PaneMoveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC0CE69695B808069A887E8D /* PaneMoveTests.swift */; };
 		F44995777C048CCAB085C8AA /* MCPSetupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F62FA2BF2A457B8137CE704 /* MCPSetupTests.swift */; };
 		F5D219451BC618FC595D20BA /* MCPService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62205A849DC72ED60ABA5EB7 /* MCPService.swift */; };
 		F642AD8EB346945EEB6E2E67 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4363A8C97194CFB82618511C /* main.swift */; };
@@ -569,6 +571,7 @@
 		B13E82E7DA1A290559EC8C20 /* SplitDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDropTests.swift; sourceTree = "<group>"; };
 		B1C94BBE34DB020CBB3EA2A2 /* ProxyRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyRulesTests.swift; sourceTree = "<group>"; };
 		B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptHost.swift; sourceTree = "<group>"; };
+		B44BD209A49B5F5B73ECE2BD /* PaneDrag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneDrag.swift; sourceTree = "<group>"; };
 		B61ECD99BC5A8E42155612FF /* MCPToolsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPToolsTests.swift; sourceTree = "<group>"; };
 		B788AB64DB761375F0FEFA16 /* DarkPagesFallbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPagesFallbackTests.swift; sourceTree = "<group>"; };
 		BAD3351437EE20BC819F95CD /* ConfirmSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmSheet.swift; sourceTree = "<group>"; };
@@ -651,6 +654,7 @@
 		E95FE283163E55EA089497AE /* SaveFailure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveFailure.swift; sourceTree = "<group>"; };
 		E97F4271F918C8D77FB14081 /* PageShots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageShots.swift; sourceTree = "<group>"; };
 		EA3A7F486E5CDD17A835B8A1 /* SystemPasswords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemPasswords.swift; sourceTree = "<group>"; };
+		EC0CE69695B808069A887E8D /* PaneMoveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneMoveTests.swift; sourceTree = "<group>"; };
 		EC407157FA36197709110D6E /* BridgeProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeProxy.swift; sourceTree = "<group>"; };
 		ECBBB2069512C8FAA5C9183D /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		ECFB222D7082B8C1D2724708 /* tab-capture.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "tab-capture.js"; sourceTree = "<group>"; };
@@ -1158,6 +1162,7 @@
 				46D2E0F2330CC776A71AC19D /* PageStatePrivacyTests.swift */,
 				64E2770A3BA856F78FB2CCFD /* PageWindowFrameTests.swift */,
 				C1A5DAD33DF3076DABEC1B08 /* PaneHeaderTests.swift */,
+				EC0CE69695B808069A887E8D /* PaneMoveTests.swift */,
 				C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */,
 				F5442E175B150EB5CA4E9BB9 /* PasswordHealthTests.swift */,
 				D9EC4A25A23CB02B95200F47 /* PasswordMenuTests.swift */,
@@ -1230,6 +1235,7 @@
 				67AF95E0EFA8B1BC26E4F70F /* MiniQuickOpen.swift */,
 				60AEE03EBEB4A7817E6E100A /* MiniWindowController.swift */,
 				979ECE3AE8285E787E972E3E /* PageCardView.swift */,
+				B44BD209A49B5F5B73ECE2BD /* PaneDrag.swift */,
 				0012A8BD741BA157B4BB07F0 /* PaneHeader.swift */,
 				B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */,
 				95BE2DC23683FEEFF817A678 /* SidebarUndo.swift */,
@@ -1525,6 +1531,7 @@
 				9D13ADE0196E39606D06C145 /* PageTranslator.swift in Sources */,
 				83383198F272FD26FC479A1F /* PageVideos.swift in Sources */,
 				CA3459F40D8BD64FDC4DD972 /* PageWindowFrame.swift in Sources */,
+				45DB5724896F8B0B56478A3E /* PaneDrag.swift in Sources */,
 				0D86B53D6483D5ACF7C2E10B /* PaneHeader.swift in Sources */,
 				6F00D32C32387168F17DADDA /* Passkeys.swift in Sources */,
 				666CC5A457A95E2BD07EA5FF /* PasswordCapture.swift in Sources */,
@@ -1665,6 +1672,7 @@
 				47481B98A075C26B774A694A /* PageStatePrivacyTests.swift in Sources */,
 				28269268A69C2F8ADB4080FA /* PageWindowFrameTests.swift in Sources */,
 				817A7D3D01285ED4BD6BA651 /* PaneHeaderTests.swift in Sources */,
+				F428675EDF7E08FC94B923B0 /* PaneMoveTests.swift in Sources */,
 				44ECB58B498642EB6DB3648B /* PasswordGeneratorTests.swift in Sources */,
 				C8C7123A186337D2903807F1 /* PasswordHealthTests.swift in Sources */,
 				73BEB8BF61DB6AA3E32A3ACB /* PasswordMenuTests.swift in Sources */,

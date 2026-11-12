@@ -1517,6 +1517,18 @@ final class TabManager {
         rememberPinnedLayout(splits[index])
     }
 
+    /// The group `old` laid out again as `new`, the same pages in other places (a pane dragged by its strip, and ⌘Z
+    /// putting it back). False if that group isn't on screen as `old` left it.
+    @discardableResult
+    func rearrange(_ old: SplitPair, to new: SplitPair) -> Bool {
+        guard Set(old.ids) == Set(new.ids), let index = splits.firstIndex(where: { $0.ids == old.ids && $0.shape.regions == old.shape.regions }) else { return false }
+        splits[index] = new
+        rememberPinnedLayout(new)
+        changed.send(.structure)
+        changed.send(.selection)
+        return true
+    }
+
     /// A pinned split keeps how it was last laid out, so it opens that way again.
     private func rememberPinnedLayout(_ pair: SplitPair) {
         guard !pair.isGroup, let left = tab(with: pair.left)?.bookmarkID, let right = tab(with: pair.right)?.bookmarkID else { return }

@@ -1159,15 +1159,31 @@ final class SplitDropHint: NSView {
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
+    /// Where a pane dragged by its strip would go now (`PaneMove`), in this view's terms; nil while it would stay.
+    private(set) var move: PaneMove?
+
     func show(_ drop: TileDrop?) {
-        guard drop != self.drop else { return }
+        guard drop != self.drop || move != nil else { return }
         self.drop = drop
-        isHidden = drop == nil
-        guard let drop else { return }
-        let target = drop.frame.insetBy(dx: Tokens.Space.x2, dy: Tokens.Space.x2)
+        move = nil
+        present(drop?.frame, title: drop.map { Self.title(for: $0.kind) })
+    }
+
+    /// The same hint for a pane picked up by its strip: where it lands, the same zone, named for the move.
+    func show(move: PaneMove?) {
+        guard move != self.move || drop != nil else { return }
+        self.move = move
+        drop = nil
+        present(move?.frame, title: move.map { Self.title(forMove: $0.kind) })
+    }
+
+    private func present(_ frame: CGRect?, title: String?) {
+        isHidden = frame == nil
+        guard let frame else { return }
+        let target = frame.insetBy(dx: Tokens.Space.x2, dy: Tokens.Space.x2)
         zone.color = Tokens.Color.accent.withAlphaComponent(0.16)
         zone.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.6))
-        label.stringValue = Self.title(for: drop.kind)
+        label.stringValue = title ?? ""
         label.textColor = Tokens.Color.accent
         Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) { self.zone.animator().frame = target }
         if zone.frame.isEmpty { zone.frame = target }
@@ -1198,6 +1214,28 @@ final class SplitDropHint: NSView {
         let p = convert(windowPoint, from: nil)
         // Beside a page alone, the halves meet in the middle, as they always did.
         return TileDrop.target(at: p, in: bounds, shape: shape, gap: shape == nil ? 0 : gap)
+    }
+
+    /// Where the pane at `index` of the group on screen would go, let go at a window point; nil where it stays.
+    func move(moving index: Int, at windowPoint: NSPoint, shape: TileShape, gap: CGFloat) -> PaneMove? {
+        PaneMove.target(moving: index, at: convert(windowPoint, from: nil), in: bounds, shape: shape, gap: gap)
+    }
+
+    /// What the hint says over where a pane would go.
+    static func title(forMove kind: PaneMove.Kind) -> String {
+        guard case .place(let region, _) = kind else {
+            return String(localized: "Swap Places", comment: "Shown over a page of a split view while another page of it is dragged there by its strip: the two trade places.")
+        }
+        return switch region {
+        case .left: String(localized: "Move to the Left", comment: "Shown over the left half of the page while a page of a split view is dragged there by its strip.")
+        case .right: String(localized: "Move to the Right", comment: "Shown over the right half of the page while a page of a split view is dragged there by its strip.")
+        case .top: String(localized: "Move to the Top", comment: "Shown over the top half of the page while a page of a split view is dragged there by its strip.")
+        case .bottom: String(localized: "Move to the Bottom", comment: "Shown over the bottom half of the page while a page of a split view is dragged there by its strip.")
+        case .topLeft: String(localized: "Move Top Left", comment: "Shown over the top left quarter of the page while a page of a split view is dragged there by its strip.")
+        case .topRight: String(localized: "Move Top Right", comment: "Shown over the top right quarter of the page while a page of a split view is dragged there by its strip.")
+        case .bottomLeft: String(localized: "Move Bottom Left", comment: "Shown over the bottom left quarter of the page while a page of a split view is dragged there by its strip.")
+        case .bottomRight: String(localized: "Move Bottom Right", comment: "Shown over the bottom right quarter of the page while a page of a split view is dragged there by its strip.")
+        }
     }
 }
 

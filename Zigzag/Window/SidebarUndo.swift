@@ -116,6 +116,74 @@ extension BrowserWindowController {
         }
     }
 
+    /// A pane dragged by its strip to another place in its group (#160). One ⌘Z puts every pane back where it was.
+    func rearrangeWithUndo(_ tab: Tab, _ move: PaneMove.Kind) {
+        guard let before = tabManager.split(for: tab), let after = before.moving(tab.id, move),
+              tabManager.rearrange(before, to: after) else { return }
+        registerRearrangeUndo(from: after, to: before)
+    }
+
+    private func registerRearrangeUndo(from now: TabManager.SplitPair, to target: TabManager.SplitPair) {
+        sidebarUndo.registerUndo(withTarget: self) { controller in
+            // The group changed since (a pane closed, another came in): nothing to put back.
+            guard controller.tabManager.rearrange(now, to: target) else {
+                Toast.show(String(localized: "Can’t undo: tabs have changed since then", comment: "Toast when ⌘Z can't take back a change because the tabs changed since."), symbol: "arrow.uturn.backward", duration: 2.5, in: controller)
+                return
+            }
+            controller.registerRearrangeUndo(from: target, to: now)
+        }
+        sidebarUndo.setActionName(Self.moveTabName)
+    }
+
+    static var moveTabName: String { String(localized: "Move Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Tab.") }
+
+    /// A pane dragged by its strip onto a sidebar's tab list: it leaves its group, which closes up, and is a tab of
+    /// its own there, as a tab dragged into the list lands. Another window's list: it leaves the group here and moves
+    /// to that window as a tab moved there does (#167), whose ⌘Z sends it back; ⌘Z here then puts it back in the group.
+    func movePaneToList(_ tab: Tab, of target: BrowserWindowController, at index: Int) {
+        guard tab.bookmarkID == nil, tabManager.split(for: tab) != nil else { return }
+        guard target !== self else {
+            let space = tabManager.currentSpaceID
+            pageChange(Self.moveTabName) { [tabManager] in
+                // The rest of the group stays on screen here.
+                if let rest = tabManager.leaveGroup(tab) { tabManager.select(rest) }
+                // A place counted with the tab still in the list, as the list draws it; a move counts without.
+                let at = tabManager.tabs(in: space).firstIndex { $0 === tab } ?? Int.max
+                if tab.spaceID == space { tabManager.move(tab, to: at < index ? index - 1 : index) } else { tabManager.move(tab, to: index, in: space) }
+            }
+            return
+        }
+        guard !tabManager.isPrivate, !target.tabManager.isPrivate else { return }
+        target.window?.makeKeyAndOrderFront(nil)
+        target.confirmProfileCrossing([tab], to: target.tabManager.currentSpaceID) { [weak self, weak target] in
+            guard let self, let target else { return }
+            self.leaveGroupWithUndo(tab)
+            self.move([tab], to: target, at: index)
+        }
+    }
+
+    /// A pane dragged by its strip out of every window: it leaves its group, which closes up here, into a new window
+    /// where it was let go.
+    func movePaneToNewWindow(_ tab: Tab, at screenPoint: NSPoint) {
+        guard !tabManager.isPrivate, tabManager.split(for: tab) != nil else { return }
+        let target = WindowManager.shared.newWindow(spaceID: tab.spaceID, showCommandBar: false)
+        if let window = target.window {
+            var frame = window.frame
+            frame.origin = NSPoint(x: screenPoint.x - 120, y: screenPoint.y - frame.height + 40)
+            window.setFrame(frame, display: true)
+        }
+        leaveGroupWithUndo(tab)
+        move([tab], to: target, at: 0)
+    }
+
+    /// The pane out of its group, the rest of which stays on screen; ⌘Z here puts it back in its place once it's
+    /// back in this window.
+    private func leaveGroupWithUndo(_ tab: Tab) {
+        pageChange(String(localized: "Separate Tabs", comment: "Undo action name, shown in the Edit menu as Undo Separate Tabs.")) { [tabManager] in
+            if let rest = tabManager.leaveGroup(tab) { tabManager.select(rest) }
+        }
+    }
+
     /// A split favorite parted into two favorites, side by side in the grid; open, its pages part on screen too.
     func separateFavoriteSplitWithUndo(_ favoriteID: UUID) {
         guard let pair = Library.shared.pinnedSplit(containing: favoriteID) else { return }

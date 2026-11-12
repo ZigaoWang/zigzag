@@ -65,8 +65,28 @@ final class PaneHeaderView: NSView {
 
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { isInBar }
+
+    /// Pressed on the strip (not its buttons or address) and moved past `dragThreshold`: the pane is picked up, to be
+    /// put somewhere else in its group (#160). Called with the press and the move that got past it.
+    var onDrag: ((Tab, _ press: NSEvent, _ moved: NSEvent) -> Void)?
+    /// How far the pointer goes before a press is a drag, so a click stays a click.
+    static let dragThreshold: CGFloat = 4
+
     override func mouseDown(with event: NSEvent) {
-        if isInBar { window?.titleBarMouseDown(event) } else { super.mouseDown(with: event) }
+        // Up in the bar, the strip is the bar's: it moves the window, as the rest of the bar does.
+        if isInBar { window?.titleBarMouseDown(event); return }
+        guard let window, let tab, let onDrag else { super.mouseDown(with: event); return }
+        let start = event.locationInWindow
+        var moved: NSEvent?
+        window.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { next, stop in
+            guard let next else { return }
+            if next.type == .leftMouseUp { stop.pointee = true; return }
+            if hypot(next.locationInWindow.x - start.x, next.locationInWindow.y - start.y) >= Self.dragThreshold {
+                moved = next
+                stop.pointee = true
+            }
+        }
+        if let moved { onDrag(tab, event, moved) }
     }
 
     // MARK: Ink

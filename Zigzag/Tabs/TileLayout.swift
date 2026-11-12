@@ -269,6 +269,63 @@ nonisolated struct TileDrop: Equatable, Sendable {
     }
 }
 
+/// Where a pane picked up by its strip would go, and how the hint shows it (#160). The places a dropped tab takes:
+/// the area's edges are its halves, its corners its quarters, the rest of the group closing up and making room as when
+/// a tab comes in. Over another pane the two trade places; over its own, or anywhere that leaves the group as it is,
+/// nothing changes (nil).
+nonisolated struct PaneMove: Equatable, Sendable {
+    enum Kind: Equatable, Sendable {
+        /// The pane trades places with the group's pane at this index.
+        case swap(Int)
+        /// The pane takes `region`; the group's places become `regions`, in its order (the pane's own among them).
+        case place(region: TileRegion, regions: [TileRegion])
+    }
+    var kind: Kind
+    /// Where the hint shows: where the pane lands.
+    var frame: CGRect
+
+    /// The move for the pane at `index` of `shape` let go at `point` (in the area's top-down coordinates).
+    static func target(moving index: Int, at point: CGPoint, in area: CGRect, shape: TileShape, gap: CGFloat) -> PaneMove? {
+        guard area.contains(point), shape.isValid, shape.regions.indices.contains(index) else { return nil }
+        let edge = TileDrop.edge(for: area)
+        let nearLeft = point.x < area.minX + edge, nearRight = point.x > area.maxX - edge
+        let nearTop = point.y < area.minY + edge, nearBottom = point.y > area.maxY - edge
+        // The others' places with the pane gone: beside one page, there's nothing to close up.
+        let rest = shape.regions.count == 2 ? [] : TileShape.removing(index, from: shape.regions)
+        // The pane into `target`, the rest making room as for a tab: nil if it can't go there; `.some(nil)` if every
+        // pane would stay where it is, which is the answer all the same.
+        func place(_ target: TileRegion) -> PaneMove?? {
+            guard let rest, let placed = TileShape.placing(target, beside: rest) else { return nil }
+            var regions = placed
+            regions.insert(target, at: index)
+            guard regions != shape.regions else { return .some(nil) }
+            var after = shape
+            after.regions = regions
+            guard after.isValid else { return nil }
+            return PaneMove(kind: .place(region: target, regions: regions), frame: after.frames(in: area, gap: gap)[index])
+        }
+        let corner: TileRegion? = switch (nearLeft, nearRight, nearTop, nearBottom) {
+        case (true, _, true, _): .topLeft
+        case (_, true, true, _): .topRight
+        case (true, _, _, true): .bottomLeft
+        case (_, true, _, true): .bottomRight
+        default: nil
+        }
+        if let corner, let move = place(corner) { return move }
+        // An edge's half; in a corner that can't take a quarter (beside one page), the nearer edge's half first.
+        let dx = min(point.x - area.minX, area.maxX - point.x), dy = min(point.y - area.minY, area.maxY - point.y)
+        let side: TileRegion? = nearLeft ? .left : nearRight ? .right : nil
+        let end: TileRegion? = nearTop ? .top : nearBottom ? .bottom : nil
+        for half in (dx <= dy ? [side, end] : [end, side]).compactMap({ $0 }) {
+            if let move = place(half) { return move }
+        }
+        // Over another pane: the two trade places. Over its own, it stays.
+        let frames = shape.frames(in: area, gap: gap)
+        guard let other = frames.firstIndex(where: { $0.insetBy(dx: -gap, dy: -gap).contains(point) }), other != index else { return nil }
+        return PaneMove(kind: .swap(other), frame: frames[other])
+    }
+}
+
 extension TabManager.SplitPair {
     /// A group of `ids` laid out as `shape`: two in their usual order (left or top first); nil if it isn't a group.
     init?(ids: [UUID], shape: TileShape) {
@@ -351,6 +408,21 @@ extension TabManager.SplitPair {
             after.replace(ids[index], with: new)
             return after
         }
+    }
+
+    /// With page `id` moved where `move` puts it (`PaneMove`): the same pages and the same lines; nil if it can't.
+    func moving(_ id: UUID, _ move: PaneMove.Kind) -> Self? {
+        guard let index = ids.firstIndex(of: id) else { return nil }
+        var pages = ids, after = shape
+        switch move {
+        case .swap(let other):
+            guard pages.indices.contains(other), other != index else { return nil }
+            pages.swapAt(index, other)
+        case .place(_, let regions):
+            guard regions.count == count else { return nil }
+            after.regions = regions
+        }
+        return Self(ids: pages, shape: after)
     }
 
     /// A page alone and `new` beside it, where `drop` puts it.
