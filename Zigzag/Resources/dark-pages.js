@@ -9,8 +9,12 @@
 // read and its colors turned into a dark set (dark-palette.js, put in as `palette` below), as a style sheet Zigzag
 // keeps for the site. From the next visit on that sheet is the page's look from its first frame: plain overrides of
 // the site's own colors, with no filter, so pictures and video are simply left alone, and nothing watches the page.
-// The first visit it's drawn with checks how much of the page came out dark, and goes back to the filter for good
-// if too little did. Later visits only check, when idle, whether the site's style changed, and read it again if so.
+// The first time a site is read, the palette is tried on the page there and then (in one go, so nothing is drawn in
+// between): if it covers the page it takes over from the filter on that visit already, and if it doesn't the site keeps
+// the filter, so no later visit starts with a palette that leaves the page light. A later visit drawn with a palette
+// checks it covers the page as soon as there's a page to look at (its first frame, then as it finishes loading), and
+// goes back to the filter at once if it doesn't. Later visits also check, when idle, whether the site's style changed,
+// and read it again if so.
 //
 // How: the whole page goes through one filter on the root (inverted, then its hues turned back), and pictures,
 // video and the like are turned back again, so they look as they are. A filter on the root keeps fixed headers in
@@ -56,8 +60,13 @@
   let darkened = false;
   // Drawn by the site's palette rather than the filter.
   let usingPalette = false;
-  // The palette left too much of this page light: the filter for the rest of this visit.
+  // The palette left too much of this page light: the filter for the rest of this visit, unless trying it again
+  // once the page is idle finds it covers the page after all.
   let refused = false;
+  // Refused as the page came in, before it had settled: tried again once it has.
+  let refusedEarly = false;
+  // Nothing sent to Zigzag while a palette is tried on the page.
+  let quiet = false;
   let lastSent = '';
 
   // Only the top page, and only the palette made for this site with these backgrounds.
@@ -343,7 +352,7 @@
   };
   // Only the top page tells Zigzag; a frame's look is the page's business.
   const send = () => {
-    if (!isTop) return;
+    if (!isTop || quiet) return;
     const message = { darkened, native: native === true, color: colorOf(), site, palette: usingPalette };
     const key = JSON.stringify(message);
     if (key === lastSent) return;
@@ -397,6 +406,31 @@
       }
     }
     return bad <= Math.max(1, all * 0.15);
+  };
+  // The site's palette tried on the page as it is now, in place of the filter, all in one go so nothing is drawn in
+  // between: kept if it covers the page, the filter back if it doesn't. True when it's kept.
+  const tryPalette = () => {
+    if (usingPalette) return true;
+    if (!darkened) return false;
+    quiet = true;
+    refused = false;
+    apply(true);
+    const ok = usingPalette && covered();
+    if (!ok) { refused = true; apply(true); }
+    quiet = false;
+    send();
+    return ok;
+  };
+  // A palette from an earlier visit, looked at as soon as there's a page to look at (and again as it finishes
+  // loading): a page it leaves light goes back to the filter now rather than once it's idle.
+  const checkEarly = () => {
+    if (!usingPalette || !document.body || !document.body.firstElementChild) return;
+    if (!covered()) { refused = true; refusedEarly = true; apply(true); }
+  };
+  const firstFrame = () => {
+    if (!usingPalette) return;
+    if (document.body && document.body.firstElementChild) { checkEarly(); return; }
+    requestAnimationFrame(firstFrame);
   };
   // A sheet from elsewhere that the page can't read (no CORS): Zigzag fetches its text, without cookies.
   const fetchRules = async (href) => {
@@ -457,7 +491,18 @@
       rules: state.rules, colors: made ? made.colors : 0, declarations: decls, sheets: lists.length, fetched, unread, finished };
     // Nothing to go on (too much to read, or no colors of its own): the filter, until the site's style changes.
     const useless = !made || made.colors === 0 || made.capped;
-    tellPalette({ fingerprint: fp, rules: useless ? [] : made.rules, invert: useless, stats: analysis });
+    // Tried on the page now: if it covers it, it takes over on this visit; if not, the site keeps the filter.
+    let covers;
+    if (!useless && darkened && !usingPalette) {
+      const before = config.palette;
+      config.palette = { origin: location.origin, black: config.black, css: made.rules.join('\n'), invert: false,
+        fingerprints: [fp], verified: true };
+      covers = tryPalette();
+      refusedEarly = false;
+      // Not covered: the filter stays (`refused`), and so does whatever palette the page started with.
+      if (!covers) config.palette = before;
+    }
+    tellPalette({ fingerprint: fp, rules: useless ? [] : made.rules, invert: useless, stats: analysis, checked: covers });
   };
   let looked = false;
   const paletteSoon = () => {
@@ -469,7 +514,12 @@
       const p = config.palette;
       const known = p && p.origin === location.origin && p.black === config.black ? p : null;
       const seen = !!known && known.fingerprints.includes(fp);
-      if (usingPalette && (!seen || !known.verified)) {
+      if (refusedEarly) {
+        // Refused as it came in: tried once more now that the page has settled, and the site told either way.
+        refusedEarly = false;
+        const ok = tryPalette();
+        if (seen) { tellPalette({ fingerprint: fp, verified: ok }); return; }
+      } else if (usingPalette && (!seen || !known.verified)) {
         const ok = covered();
         if (!ok) { refused = true; apply(true); }
         if (seen) { tellPalette({ fingerprint: fp, verified: ok }); return; }
@@ -524,11 +574,13 @@
   };
   // Darkened from the first moment, unless the site was last seen dark: no white page first.
   if (wanted && native !== true) apply(true); else send();
+  if (usingPalette) requestAnimationFrame(firstFrame);
   watch();
   if (document.documentElement) watchThemes(document.documentElement);
-  document.addEventListener('DOMContentLoaded', () => check());
+  document.addEventListener('DOMContentLoaded', () => { check(); checkEarly(); });
   addEventListener('load', () => {
     check();
+    checkEarly();
     setTimeout(check, 600);
     setTimeout(check, 2000);
     if (darkened && !usingPalette) idle(() => { try { lateHosts(document); } catch (e) {} });

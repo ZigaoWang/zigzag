@@ -517,8 +517,10 @@ enum DarkPages {
             entry = DarkPalettes.verified(old, fingerprint: fingerprint, ok: ok)
         } else {
             let rules = (body["rules"] as? [Any] ?? []).compactMap { $0 as? String }
-            entry = DarkPalettes.merged(old, origin: origin, black: black, fingerprint: fingerprint, rules: rules,
-                                        invert: body["invert"] as? Bool ?? rules.isEmpty)
+            let made = DarkPalettes.merged(old, origin: origin, black: black, fingerprint: fingerprint, rules: rules,
+                                           invert: body["invert"] as? Bool ?? rules.isEmpty)
+            // Tried on the page as soon as it was made: kept if it covered it, the filter for the site if not.
+            entry = (body["checked"] as? Bool).map { DarkPalettes.verified(made, fingerprint: fingerprint, ok: $0) } ?? made
             lastAnalysis = (body["stats"] as? [String: Any] ?? [:]).merging(["origin": origin, "kept": entry.rules.count, "bytes": entry.css.utf8.count]) { $1 }
         }
         guard entry != old else { return }
