@@ -2055,6 +2055,35 @@ extension BrowserWindowController: SidebarDelegate {
         hand(tab, to: target)
     }
 
+    /// Whether a tab's menu offers Open in Zigzag Mini (and a tab ⌥-dragged out of the windows goes there).
+    func canOpenInMini(_ tab: Tab) -> Bool {
+        !tab.isClosed && MiniWindowController.canTake(tab.url, isPinned: tab.bookmarkID != nil, isPrivate: tabManager.isPrivate)
+    }
+
+    /// Open in Zigzag Mini: the tab's page, live, goes into a Zigzag Mini window over this one (or where the tab was
+    /// let go, `point`), and the tab leaves the list, as if the page had been opened there. ⌘O there brings it back
+    /// as a new tab; ⌘Z here puts it back in its place.
+    func openInMini(_ tab: Tab, at point: NSPoint? = nil) {
+        guard canOpenInMini(tab), let place = tabManager.release(tab) else { return }
+        let mini = MiniWindowController.open(moving: tab, from: window, at: point)
+        sidebarUndo.registerUndo(withTarget: self) { [weak mini] controller in
+            guard let tab = mini?.handBack() else { return }
+            controller.tabManager.putBack(tab, at: place)
+            controller.window?.makeKeyAndOrderFront(nil)
+            controller.sidebarUndo.registerUndo(withTarget: controller) { $0.openInMini(tab) }
+            controller.sidebarUndo.setActionName(Self.openInMiniName)
+        }
+        sidebarUndo.setActionName(Self.openInMiniName)
+    }
+
+    static var openInMiniTitle: String {
+        String(localized: "Open in Zigzag Mini", comment: "Item in a tab's context menu in the sidebar: moves the tab's page into a Zigzag Mini window (the small window for one page, without the sidebar). Zigzag Mini is a name, kept in Latin letters.")
+    }
+
+    private static var openInMiniName: String {
+        String(localized: "Open in Zigzag Mini", comment: "Undo action name, shown in the Edit menu as Undo Open in Zigzag Mini.")
+    }
+
     /// `tab`'s page goes on screen in `target`, which comes forward; this window moves on from it if it was showing it.
     private func hand(_ tab: Tab, to target: BrowserWindowController) {
         guard target !== self, target.tabManager.store === tabManager.store, !tab.isClosed else { return }

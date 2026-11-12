@@ -400,18 +400,59 @@ final class TabManager {
         return tab
     }
 
-    /// Takes a tab out of this window without closing its page, so another window can adopt it.
-    func detach(_ tab: Tab) {
-        guard tab.bookmarkID == nil, let index = tabs(in: tab.spaceID).firstIndex(where: { $0 === tab }) else { return }
-        leaveGroup(tab, notify: false)
+    /// Where a tab stood in the list as it left without closing (into Zigzag Mini): `putBack` returns it there.
+    struct Place {
+        let spaceID: UUID
+        let index: Int
+        let parentID: UUID?
+        /// The tabs that sat right under it, a level up while it's away.
+        let childIDs: [UUID]
+        /// The split or tile group it was in.
+        let split: SplitPair?
+    }
+
+    /// Takes a tab out of the list, its page still open, for Zigzag Mini to show: as for a closed tab, the tabs under
+    /// it move up a level, its split or tile group closes up, and every window showing it goes on to another tab.
+    /// Returns where it was. Not for a pinned page's or favorite's: those belong to the sidebar.
+    func release(_ tab: Tab) -> Place? {
+        guard tab.bookmarkID == nil, let index = tabs(in: tab.spaceID).firstIndex(where: { $0 === tab }) else { return nil }
+        let place = Place(spaceID: tab.spaceID, index: index, parentID: tab.parentID,
+                          childIDs: tabs(in: tab.spaceID).filter { $0.parentID == tab.id }.map(\.id), split: split(for: tab))
         let wasSelected = selectedTab === tab
+        // Half of a split shown here: the rest of it stays on screen, as when the page closes.
+        let partner = leaveGroup(tab, notify: false)
         liftChildren(of: tab)
         tabsBySpace[tab.spaceID]?.remove(at: index)
         recentTabIDs.removeAll { $0 == tab.id }
         store.unwatch(tab.id)
+        tab.shownBy = nil
         if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
         notify(.structure)
-        if wasSelected { selectAfterClosing(tab, index: index) }
+        if wasSelected {
+            if let partner { select(partner) } else { selectAfterClosing(tab, index: index) }
+        } else if place.split != nil {
+            notify(.selection)
+        }
+        return place
+    }
+
+    /// A tab `release` took out comes back where it was (with the tabs that sat under it, in its split if the rest
+    /// is still as it was), and shows.
+    func putBack(_ tab: Tab, at place: Place) {
+        guard !tab.isClosed, self.tab(with: tab.id) == nil else { return }
+        let space = Library.shared.space(place.spaceID) != nil ? place.spaceID : currentSpaceID
+        tab.host = host
+        tab.setSpace(space)
+        watch(tab)
+        let at = min(place.index, tabs(in: space).count)
+        let nodes = TabTree.reinserting(tab.id, at: at, parent: space == place.spaceID ? place.parentID.map(reopenedID) : nil,
+                                        children: Set(place.childIDs.map(reopenedID)), in: treeNodes(in: space))
+        tabsBySpace[space, default: []].insert(tab, at: at)
+        applyTree(nodes, in: space)
+        if let pair = place.split { rejoin(tab, was: tab.id, in: pair, space: space) }
+        if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
+        notify(.structure)
+        select(tab)
     }
 
     /// A pinned page's or favorite's open page out of this window, still loaded, so another window can adopt it.
@@ -1237,35 +1278,42 @@ final class TabManager {
         reopenedAs[closed.id] = tab.id
         if reopenedAs.count > 500 { reopenedAs = [closed.id: tab.id] }
         // Half of a split: back beside its partner, on the same side and at the same size, if that's still free.
-        // A page of a tile group of more: back in its place, if the rest are still together as it left them.
-        if let pair = closed.split, pair.isGroup {
-            let others = pair.ids.filter { $0 != closed.id }
-            let now = others.map { reopenedAs[$0] ?? $0 }
-            let pages = now.compactMap { self.tab(with: $0) }
-            if pages.count == now.count, pages.allSatisfy({ $0.spaceID == space && $0.bookmarkID == nil }),
-               let current = split(for: pages[0]), Set(current.ids) == Set(now) {
-                var restored = pair
-                restored.replace(closed.id, with: tab.id)
-                for (old, new) in zip(others, now) { restored.replace(old, with: new) }
-                splits.removeAll { $0.contains(pages[0].id) }
-                splits.append(restored)
-            }
-        }
-        let otherID = closed.split.flatMap { $0.isGroup ? nil : $0.left == closed.id ? $0.right : $0.left }
-        if let pair = closed.split, let otherID, let other = self.tab(with: reopenedAs[otherID] ?? otherID),
-           other.spaceID == space, split(for: other) == nil, canSplit(tab, with: other) {
-            var restored = pair
-            let onLeft = pair.left == closed.id
-            restored.left = onLeft ? tab.id : other.id
-            restored.right = onLeft ? other.id : tab.id
-            splits.append(restored)
-        }
+        if let pair = closed.split { rejoin(tab, was: closed.id, in: pair, space: space) }
         notify(.structure)
         if select { self.select(tab) } else { recentTabIDs.insert(tab.id, at: min(1, recentTabIDs.count)) }
         return tab
     }
 
     // MARK: Moving
+
+    /// A tab back in the list (reopened, or back from Zigzag Mini) goes back into the split or tile group it left,
+    /// `oldID` being the id it had there. Half of a split: back beside its partner, on the same side and at the same
+    /// size, if that's still free. A page of a tile group of more: back in its place, if the rest are still together
+    /// as it left them.
+    private func rejoin(_ tab: Tab, was oldID: UUID, in pair: SplitPair, space: UUID) {
+        if pair.isGroup {
+            let others = pair.ids.filter { $0 != oldID }
+            let now = others.map { reopenedAs[$0] ?? $0 }
+            let pages = now.compactMap { self.tab(with: $0) }
+            if pages.count == now.count, pages.allSatisfy({ $0.spaceID == space && $0.bookmarkID == nil }),
+               let current = split(for: pages[0]), Set(current.ids) == Set(now) {
+                var restored = pair
+                restored.replace(oldID, with: tab.id)
+                for (old, new) in zip(others, now) { restored.replace(old, with: new) }
+                splits.removeAll { $0.contains(pages[0].id) }
+                splits.append(restored)
+            }
+            return
+        }
+        let otherID = pair.left == oldID ? pair.right : pair.left
+        if let other = self.tab(with: reopenedAs[otherID] ?? otherID), other.spaceID == space, split(for: other) == nil, canSplit(tab, with: other) {
+            var restored = pair
+            let onLeft = pair.left == oldID
+            restored.left = onLeft ? tab.id : other.id
+            restored.right = onLeft ? other.id : tab.id
+            splits.append(restored)
+        }
+    }
 
     /// The id a closed tab has now: itself, or the tab it reopened as (and so on, if that one closed and came back).
     private func reopenedID(_ id: UUID) -> UUID {

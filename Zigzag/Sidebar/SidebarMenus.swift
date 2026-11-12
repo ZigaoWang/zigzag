@@ -152,6 +152,9 @@ enum SidebarMenus {
         if !controller.tabManager.isPrivate, tab.bookmarkID == nil {
             menu.addItem(Item(String(localized: "Move Tab to New Window", comment: "Item in a tab's context menu in the sidebar.")) { controller.moveToNewWindow(tab) })
         }
+        if controller.canOpenInMini(tab) {
+            menu.addItem(Item(BrowserWindowController.openInMiniTitle) { controller.openInMini(tab) })
+        }
         menu.addItem(.separator())
         menu.addItem(Item(String(localized: "Reload Page", comment: "Item in a tab's context menu in the sidebar.")) { tab.reload() })
         if tab.isPlayingAudio || tab.isMuted {

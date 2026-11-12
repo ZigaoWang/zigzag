@@ -54,8 +54,14 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// one it takes the middle of the screen, a step down from any already there.
     @discardableResult
     static func open(url: URL, isSearch: Bool = false, from origin: NSRect? = nil, overFullScreen: Bool? = nil, fromAnotherApp: Bool = false) -> MiniWindowController {
-        let controller = MiniWindowController(url: url, origin: origin, overFullScreen: overFullScreen ?? (NSApp.keyWindow?.styleMask.contains(.fullScreen) == true))
-        controller.tab.isSearchTab = isSearch
+        let screen = origin.flatMap { o in NSScreen.screens.first { $0.frame.intersects(o) } } ?? NSApp.keyWindow?.screen ?? NSScreen.main
+        let area = screen?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
+        let size = Tokens.Metric.miniWindowSize
+        let frame = origin.map { Self.frame(size: size, under: $0, in: area) }
+            ?? Self.frame(size: size, in: area, taken: Self.all.compactMap { $0.window?.frame })
+        let tab = Tab(url: url, spaceID: MiniQuickOpen.space.id)
+        tab.isSearchTab = isSearch
+        let controller = MiniWindowController(tab: tab, frame: frame, overFullScreen: overFullScreen ?? (NSApp.keyWindow?.styleMask.contains(.fullScreen) == true))
         all.append(controller)
         Diagnostics.note("Zigzag Mini opened", site: url.host())
         controller.appear(from: origin)
@@ -69,6 +75,38 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             MiniLinkWake.linkOpenedInMini()
         }
         return controller
+    }
+
+    /// Open in Zigzag Mini, from a tab's menu or a tab ⌥-dragged out of every window: the tab's page, live (the same
+    /// history, nothing reloads), in a Zigzag Mini window of its own, as if it had been opened there. It wears the
+    /// tab's space. The tab has already left the list (`TabManager.release`). `browser`: the window it came from,
+    /// which it opens over the middle of; `point`: where on screen it was let go, which its strip's middle goes to.
+    @discardableResult
+    static func open(moving tab: Tab, from browser: NSWindow?, at point: NSPoint? = nil) -> MiniWindowController {
+        let screen = point.flatMap { p in NSScreen.screens.first { NSMouseInRect(p, $0.frame, false) } } ?? browser?.screen ?? NSScreen.main
+        let area = screen?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
+        let size = Tokens.Metric.miniWindowSize
+        let taken = Self.all.compactMap { $0.window?.frame }
+        let frame = point.map { Self.frame(size: size, under: NSRect(origin: $0, size: .zero), in: area) }
+            ?? Self.frame(size: size, in: area, taken: taken, around: browser.map { NSPoint(x: $0.frame.midX, y: $0.frame.midY) })
+        tab.pageHolder?.removeFromSuperview()
+        let controller = MiniWindowController(tab: tab, frame: frame, overFullScreen: browser?.styleMask.contains(.fullScreen) == true)
+        all.append(controller)
+        Diagnostics.note("Zigzag Mini opened", site: tab.url?.host())
+        // The page has the keyboard before the window comes forward: given it as the window becomes key, WebKit takes
+        // it for a Tab from the end and focuses the page's last link, scrolling down to it.
+        if let webView = controller.tab.webView { controller.window?.makeFirstResponder(webView) }
+        controller.appear(from: nil)
+        if #available(macOS 15.4, *) { ExtensionCenter.miniOpened(controller) }
+        return controller
+    }
+
+    /// Whether a tab's page can go into Zigzag Mini: an ordinary tab's web page or file. Not a pinned page's or a
+    /// favorite's, which belong to the sidebar, nor Zigzag's own pages, nor a private window's: Zigzag Mini isn't
+    /// private.
+    nonisolated static func canTake(_ url: URL?, isPinned: Bool, isPrivate: Bool) -> Bool {
+        guard !isPinned, !isPrivate, let url else { return false }
+        return ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "")
     }
 
     /// The app a link came from, to go back to when this closes, if you're still only here. Using a browser window
@@ -87,17 +125,11 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private var browserKeyToken: NSObjectProtocol?
     private var keepOnTopToken: NSObjectProtocol?
 
-    private init(url: URL, origin: NSRect?, overFullScreen: Bool) {
-        let spaceID = MiniQuickOpen.space.id
-        tab = Tab(url: url, spaceID: spaceID)
+    private init(tab: Tab, frame: NSRect, overFullScreen: Bool) {
+        self.tab = tab
         // Zigzag's own PDF viewer and Back to the page that opened it belong to a browser window's tabs; here the page
         // is shown as in peek, and becomes a full tab once it moves.
         tab.isPeek = true
-        let screen = origin.flatMap { o in NSScreen.screens.first { $0.frame.intersects(o) } } ?? NSApp.keyWindow?.screen ?? NSScreen.main
-        let area = screen?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
-        let size = Tokens.Metric.miniWindowSize
-        let frame = origin.map { Self.frame(size: size, under: $0, in: area) }
-            ?? Self.frame(size: size, in: area, taken: Self.all.compactMap { $0.window?.frame })
 
         let window = BrowserWindow(contentRect: frame)
         window.minSize = Tokens.Metric.miniWindowMinSize
@@ -143,12 +175,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// Where a new one goes: its size, cut to fit, centered on the screen's usable area. One already at that spot
-    /// moves it a step down and right, and so on, the way a Mac cascades windows; past the screen's edge it goes back
-    /// to the middle.
-    static func frame(size: NSSize, in area: NSRect, taken: [NSRect]) -> NSRect {
+    /// Where a new one goes: its size, cut to fit, centered on the screen's usable area, or on `middle` (the middle
+    /// of the browser window its page came from) as far as the area allows. One already at that spot moves it a step
+    /// down and right, and so on, the way a Mac cascades windows; past the screen's edge it goes back to the middle.
+    static func frame(size: NSSize, in area: NSRect, taken: [NSRect], around middle: NSPoint? = nil) -> NSRect {
         let size = NSSize(width: min(size.width, area.width), height: min(size.height, area.height))
-        let center = NSRect(x: round(area.midX - size.width / 2), y: round(area.midY - size.height / 2), width: size.width, height: size.height)
+        let mid = middle ?? NSPoint(x: area.midX, y: area.midY)
+        let center = NSRect(x: min(max(area.minX, round(mid.x - size.width / 2)), area.maxX - size.width),
+                            y: min(max(area.minY, round(mid.y - size.height / 2)), area.maxY - size.height),
+                            width: size.width, height: size.height)
         let step = Tokens.Space.x6
         var frame = center
         func isTaken(_ frame: NSRect) -> Bool {
@@ -462,6 +497,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private func moveIntoZigzag() {
         let target = Self.browserWindow()
         let spaceID = space.id
+        letGo()
+        target.tabManager.switchToSpace(spaceID)
+        target.tabManager.insertAsNewTab(tab)
+        window?.close()
+        target.window?.makeKeyAndOrderFront(nil)
+    }
+
+    /// The page is leaving for a browser window: this window lets go of it, and closing leaves it open.
+    private func letGo() {
         movedOut = true
         pageGone.send()
         tokens.removeAll()
@@ -469,10 +513,17 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
         tab.pageHolder?.removeFromSuperview()
         tab.isPeek = false
-        target.tabManager.switchToSpace(spaceID)
-        target.tabManager.insertAsNewTab(tab)
+    }
+
+    /// ⌘Z after Open in Zigzag Mini: the page goes back to the browser window it came from, and this window closes at
+    /// once. Returns the tab, or nil if the page has gone already (moved into Zigzag, or closing).
+    func handBack() -> Tab? {
+        guard !movedOut, !isLeaving, !isClosing, !tab.isClosed else { return nil }
+        commandBar.dismiss(restoringFocus: false)
+        linkStatus.hide()
+        letGo()
         window?.close()
-        target.window?.makeKeyAndOrderFront(nil)
+        return tab
     }
 
     /// ⌘O, as in Arc: Open File… becomes Open in (the space) while this window is in front.
