@@ -582,7 +582,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
 enum SettingsPane: String, CaseIterable {
     case general, appearance, tabs, spaces, profiles, search, mini, translation, passwords, privacy
     case websiteData = "website-data"
-    case extensions, shortcuts, automation
+    case extensions, shortcuts, automation, developer
 
     var title: String {
         switch self {
@@ -600,6 +600,7 @@ enum SettingsPane: String, CaseIterable {
         case .websiteData: String(localized: "Website Data", comment: "A section of Settings, there with more than one profile: what websites keep on this Mac in the profile chosen, and clearing it.")
         case .shortcuts: String(localized: "Shortcuts", comment: "A section of Settings: keyboard shortcuts.")
         case .automation: String(localized: "Automation", comment: "A section of Settings: AI apps over MCP, and what scripts and Shortcuts may do in Zigzag.")
+        case .developer: String(localized: "Developer", comment: "A section of Settings: tools for people who build websites, and the sites they build.")
         }
     }
 
@@ -607,6 +608,7 @@ enum SettingsPane: String, CaseIterable {
     var keywords: String {
         switch self {
         case .automation: String(localized: "mcp ai agent automation api", comment: "Words that find Settings › Automation with Find a setting, separated by spaces. Add your language's words for them. Not shown.")
+        case .developer: String(localized: "devtools web development localhost", comment: "Words that find Settings › Developer with Find a setting, separated by spaces. Add your language's words for them. Not shown.")
         default: ""
         }
     }
@@ -627,6 +629,7 @@ enum SettingsPane: String, CaseIterable {
         case .websiteData: "internaldrive"
         case .shortcuts: "command"
         case .automation: "point.3.connected.trianglepath.dotted"
+        case .developer: "hammer"
         }
     }
 
@@ -642,7 +645,7 @@ enum SettingsPane: String, CaseIterable {
     /// the profile chosen there follow under their own heading.
     static func columnGroups(manyProfiles: Bool) -> (shared: [[SettingsPane]], profile: [SettingsPane]) {
         let groups: [[SettingsPane]] = [[.general, .appearance, .tabs, .spaces, .profiles], [.search, .mini, .translation],
-                                        [.passwords, .privacy], [.extensions, .shortcuts, .automation]]
+                                        [.passwords, .privacy], [.extensions, .shortcuts, .automation, .developer]]
         guard manyProfiles else { return (groups, []) }
         return (groups.map { $0.filter { !perProfile.contains($0) } }.filter { !$0.isEmpty }, perProfile)
     }
@@ -665,7 +668,7 @@ enum SettingsPane: String, CaseIterable {
         case .general: String(localized: "Browser", comment: "A heading in the column of Settings, over General, Appearance, Tabs, Spaces and Profiles.")
         case .search: String(localized: "Tools", comment: "A heading in the column of Settings, over Search, Zigzag Mini and Translation.")
         case .passwords: String(localized: "Privacy & Security", comment: "A heading in the column of Settings, over Passwords and Privacy.")
-        case .extensions, .shortcuts: String(localized: "Advanced", comment: "A heading in the column of Settings, over Extensions, Shortcuts and Automation.")
+        case .extensions, .shortcuts: String(localized: "Advanced", comment: "A heading in the column of Settings, over Extensions, Shortcuts, Automation and Developer.")
         default: nil
         }
     }
@@ -740,6 +743,20 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let aiGroup = FormGroup()
     private let connectGroup = FormGroup()
     private let scriptsGroup = FormGroup()
+    /// Settings › Developer (#141): the switch, and the sites you develop on. (`developerGroup` is Extensions'
+    /// Developer mode.)
+    private let developerToolsGroup = FormGroup()
+    private let developmentSitesGroup = FormGroup()
+    /// The sizes the developer tools offer for a page.
+    private let pageSizesGroup = FormGroup()
+    private let addSizeButton = PillButton(title: String(localized: "Add Size…", comment: "Button beside Page Sizes in Settings › Developer: opens the sheet that adds a size to the list."))
+    private let developerToolsToggle = Toggle()
+    private let developerBarToggle = Toggle()
+    private let developerTrustToggle = Toggle()
+    private let localServersGroup = FormGroup()
+    private let addSiteButton = PillButton(title: String(localized: "Add Site…", comment: "Button beside Development Sites in Settings › Developer: opens the sheet that adds a site to the list."))
+    private var developerToken: SignalToken?
+    private var shortcutsToken: SignalToken?
     private let tabsGroup = FormGroup()
     private let searchGroup = FormGroup()
     private let blockingGroup = FormGroup()
@@ -1067,6 +1084,44 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                 control: scriptJavaScriptToggle)
         scriptRow.keywords = String(localized: "applescript osascript shortcuts apple events", comment: "Words that find the Allow JavaScript from Apple Events setting with Find a setting in Settings. Not shown.")
         scriptsGroup.add(scriptRow)
+
+        // Developer
+        developerToolsToggle.onChange = { on in DeveloperTools.isOn = on }
+        let developerRow = FormRow(title: String(localized: "Developer tools", comment: "A setting in Settings › Developer: turns on the tools for building websites, which show only on the sites listed under it."),
+                                   detail: String(localized: "Tools for building websites, on the sites listed here and nowhere else. A tab on one of them has a hammer on its row.",
+                                                  comment: "Explanation under “Developer tools” in Settings › Developer."),
+                                   control: developerToolsToggle)
+        developerToolsGroup.add(developerRow)
+        developerBarToggle.onChange = { on in DeveloperTools.showsInBar = on }
+        developerToolsGroup.add(FormRow(title: String(localized: "Tools above the page", comment: "A setting in Settings › Developer: on a development site, the developer tools are in the bar above the page, after the address."),
+                                        detail: String(localized: "In the bar above a development site’s page: the console, inspecting an element, the page’s look and size, and more. Off, they’re in the site’s controls.",
+                                                       comment: "Explanation under “Tools above the page” in Settings › Developer."),
+                                        control: developerBarToggle))
+        developerTrustToggle.onChange = { on in DeveloperTools.trustsLocalServers = on }
+        localServersGroup.add(FormRow(title: String(localized: "Trust certificates of servers on this Mac", comment: "A setting in Settings › Developer, under Local Servers: a development site served from this Mac over https with a certificate of its own opens without the warning."),
+                                      detail: String(localized: "A development site at localhost or 127.0.0.1 that uses its own certificate for https opens without the warning. Only for servers on this Mac, and only the certificate first shown.",
+                                                     comment: "Explanation under “Trust certificates of servers on this Mac” in Settings › Developer."),
+                                      control: developerTrustToggle))
+        addSiteButton.onClick = { [weak self] _ in if let self { DevelopmentSiteSheet.add(in: self) } }
+        addSizeButton.onClick = { [weak self] _ in if let self { PageSizeSheet.add(in: self) } }
+        // Changed here or in another window's Settings: the switch and the list follow.
+        developerToken = DeveloperTools.changed.observe { [weak self] in
+            guard let self else { return }
+            if self.developerToolsToggle.isOn != DeveloperTools.isOn { self.developerToolsToggle.isOn = DeveloperTools.isOn }
+            if self.developerBarToggle.isOn != DeveloperTools.showsInBar { self.developerBarToggle.isOn = DeveloperTools.showsInBar }
+            if self.developerTrustToggle.isOn != DeveloperTools.trustsLocalServers { self.developerTrustToggle.isOn = DeveloperTools.trustsLocalServers }
+            self.reloadDevelopmentSites()
+            self.reloadPageSizes()
+            if self.pane == .developer || self.isSearching { self.layoutDocument() }
+        }
+        reloadDevelopmentSites()
+        reloadPageSizes()
+        // The menu bar gained or lost items (Developer tools turned on or off): the list of shortcuts is of what's there.
+        shortcutsToken = Shortcuts.changed.observe { [weak self] in
+            guard let self, self.pane == .shortcuts || self.isSearching else { return }
+            self.reloadShortcuts()
+            self.layoutDocument()
+        }
 
         // Appearance
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
@@ -2103,6 +2158,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private static var webAppsHeading: String { String(localized: "Installed Apps", comment: "A heading in Settings › General: the sites installed as apps with File › Install as App.") }
     private static var updatesHeading: String { String(localized: "Updates", comment: "A heading in Settings › General: Zigzag's version and how it updates.") }
     private static var connectHeading: String { String(localized: "Connect an App", comment: "A heading in Settings › Automation: how to connect an AI app to Zigzag over MCP.") }
+    private static var localServersHeading: String { String(localized: "Local Servers", comment: "A heading in Settings › Developer: development servers running on this Mac.") }
+    private static var pageSizesHeading: String { String(localized: "Page Sizes", comment: "A heading in Settings › Developer: the sizes the developer tools offer for a page.") }
+    private static var developmentSitesHeading: String { String(localized: "Development Sites", comment: "A heading in Settings › Developer: the sites Developer tools show on.") }
     private static var scriptsHeading: String { String(localized: "Scripts", comment: "A heading in Settings › Automation: what AppleScript and Shortcuts may do in Zigzag.") }
     private static var spacesHeading: String { String(localized: "Your Spaces", comment: "A heading in Settings › Spaces.") }
     private static var profilesHeading: String { String(localized: "Your Profiles", comment: "A heading in Settings › Profiles.") }
@@ -2155,6 +2213,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .extensions: [(installedHeading, extensionsGroup), (Self.otherProfilesHeading, otherProfilesGroup), (nil, developerGroup)]
         case .shortcuts: shortcutGroups.map { ($0.0, $0.1) }
         case .automation: [(nil, aiGroup), (Self.connectHeading, connectGroup), (Self.scriptsHeading, scriptsGroup)]
+        case .developer: [(nil, developerToolsGroup), (Self.developmentSitesHeading, developmentSitesGroup), (Self.pageSizesHeading, pageSizesGroup), (Self.localServersHeading, localServersGroup)]
         }
     }
 
@@ -2305,6 +2364,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .translation:
             section(nil, translationGroup)
             section(Self.alwaysTranslateHeading, alwaysGroup, accessory: alwaysReset)
+        case .developer:
+            section(nil, developerToolsGroup)
+            section(Self.developmentSitesHeading, developmentSitesGroup, accessory: addSiteButton)
+            note(String(localized: "A site covers every port and its subdomains: localhost is localhost:3000 and app.localhost too.", comment: "Under the list in Settings › Developer."))
+            section(Self.pageSizesHeading, pageSizesGroup, accessory: addSizeButton)
+            section(Self.localServersHeading, localServersGroup)
         case .extensions:
             // With nothing installed, the empty row already offers Get Extensions; once said is enough.
             getExtensionsButton.isHidden = !hasExtensions
@@ -2476,6 +2541,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
         scriptJavaScriptToggle.isOn = Scripting.allowsJavaScript
         aiAppsToggle.isOn = MCPService.isOn
+        developerToolsToggle.isOn = DeveloperTools.isOn
+        developerBarToggle.isOn = DeveloperTools.showsInBar
+        developerTrustToggle.isOn = DeveloperTools.trustsLocalServers
         refreshAIApps()
         newTabPlace.selectedIndex = TabManager.NewTabPlace.allCases.firstIndex(of: TabManager.newTabPlace) ?? 0
         refreshNewTabPlace()
@@ -2789,6 +2857,41 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // What websites keep is read where it's listed: with more than one profile that's Website Data, and
         // Privacy has no use for it.
         if !(pane == .privacy && hasManyProfiles) { reloadSiteData() }
+    }
+
+    /// Settings › Developer's sizes: each with its width and height, and Remove.
+    private func reloadPageSizes() {
+        pageSizesGroup.removeAllRows()
+        let sizes = PageSizes.all
+        if sizes.isEmpty {
+            pageSizesGroup.add(FormRow(title: String(localized: "None yet", comment: "A row in Settings › Developer, shown when no page size is listed."),
+                                       detail: String(localized: "Sizes you add show up here.", comment: "Explanation under “None yet” in Settings › Developer › Page Sizes."),
+                                       control: NSView()))
+        }
+        for size in sizes {
+            let remove = PillButton(title: String(localized: "Remove", comment: "Button on a row in Settings › Developer: takes the site or the page size off its list."))
+            remove.setAccessibilityLabel(String(localized: "Remove \(size.name)", comment: "VoiceOver name of the Remove button on a row in Settings › Developer: a site, like localhost, or a page size, like iPhone."))
+            remove.onClick = { _ in PageSizes.remove(size) }
+            pageSizesGroup.add(FormRow(title: size.name, detail: size.dimensions, control: remove))
+        }
+    }
+
+    /// Settings › Developer's list: each site you develop on, with Remove.
+    private func reloadDevelopmentSites() {
+        developmentSitesGroup.removeAllRows()
+        let sites = DevelopmentSites.sites
+        if sites.isEmpty {
+            developmentSitesGroup.add(FormRow(title: String(localized: "None yet", comment: "A row in Settings › Developer, shown when no development site is listed."),
+                                              detail: String(localized: "Sites you add show up here.", comment: "Explanation under “None yet” in Settings › Developer."),
+                                              control: NSView()))
+        }
+        for site in sites {
+            let remove = PillButton(title: String(localized: "Remove", comment: "Button on a row in Settings › Developer: takes the site or the page size off its list."))
+            remove.setAccessibilityLabel(String(localized: "Remove \(site)", comment: "VoiceOver name of the Remove button on a row in Settings › Developer: a site, like localhost, or a page size, like iPhone."))
+            remove.onClick = { _ in DevelopmentSites.remove(site) }
+            let favicon = URL(string: "http://\(site)").flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
+            developmentSitesGroup.add(FormRow(title: site, icon: favicon, control: remove))
+        }
     }
 
     /// What each site keeps on this Mac, read from WebKit (it takes a moment, so the list fills in when it's ready),

@@ -207,7 +207,10 @@ enum ErrorPage {
     /// An address on this Mac (a dev server), where "the site may be down" would be the wrong guess.
     static func isOnThisMac(_ url: URL) -> Bool {
         let host = (url.host() ?? "").lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
-        return host == "localhost" || host.hasSuffix(".localhost") || host == "::1" || host.hasPrefix("127.")
+        // An address that starts with 127 is this Mac; a name that does (127.0.0.1.example.com) is looked up like any.
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+        let loopback = parts.count == 4 && parts[0] == "127" && parts.allSatisfy { UInt8($0) != nil }
+        return host == "localhost" || host.hasSuffix(".localhost") || host == "::1" || loopback
     }
 
     /// The site as the page names it: the host with its port, a file's name, or nothing for an extension's page.

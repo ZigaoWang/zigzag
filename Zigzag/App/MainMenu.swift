@@ -24,6 +24,75 @@ enum MainMenu {
         return top
     }
 
+    /// Marks the items Developer tools adds to View › Developer (#141), the line before them included.
+    private static let developerToolID = NSUserInterfaceItemIdentifier("ZigzagDeveloperTool")
+
+    /// Puts the developer tools' items into View › Developer, after the ones always there, or takes them out:
+    /// with Developer tools off they aren't in the menu bar at all, so Settings › Shortcuts doesn't list them and
+    /// their keys do nothing. True when the menu changed.
+    @discardableResult
+    static func setDeveloperTools(_ on: Bool, in main: NSMenu?) -> Bool {
+        func find(_ menu: NSMenu) -> NSMenu? {
+            if menu.items.contains(where: { $0.action == #selector(BrowserWindowController.viewSource(_:)) }) { return menu }
+            return menu.items.lazy.compactMap { $0.submenu.flatMap(find) }.first
+        }
+        guard let menu = main.flatMap(find) else { return false }
+        let ours = menu.items.filter { $0.identifier == developerToolID }
+        guard on == ours.isEmpty else { return false }
+        guard on else { ours.forEach(menu.removeItem); return true }
+        let line = NSMenuItem.separator()
+        line.identifier = developerToolID
+        menu.addItem(line)
+        // A tool that's a choice or a part of one thing (a look, a size, a browser) goes in that thing's submenu,
+        // under its short name; a line there sets the choices apart from the rest.
+        var submenus: [DeveloperTool.Group: NSMenu] = [:]
+        for tool in DeveloperTool.menuItems {
+            guard let group = tool.group else {
+                let added = item(tool.title, tool.action, tool.key?.0 ?? "", tool.key?.1 ?? [.command])
+                added.identifier = developerToolID
+                menu.addItem(added)
+                continue
+            }
+            let inside: NSMenu
+            if let made = submenus[group] {
+                inside = made
+            } else {
+                let top = submenu(group.title, [])
+                top.identifier = developerToolID
+                menu.addItem(top)
+                inside = top.submenu ?? NSMenu()
+                submenus[group] = inside
+            }
+            if let last = inside.items.last, !last.isSeparatorItem,
+               DeveloperTool(action: last.action)?.isChoice != tool.isChoice { inside.addItem(.separator()) }
+            inside.addItem(item(tool.shortTitle, tool.action, tool.key?.0 ?? "", tool.key?.1 ?? [.command]))
+        }
+        refreshPageSizes(in: main)
+        return true
+    }
+
+    /// Marks the listed sizes in View › Developer › Page Size. They follow the list in Settings › Developer and aren't
+    /// in Settings › Shortcuts: a key belongs to Toggle Page Size, not to a size that may be removed.
+    static let pageSizeItemID = NSUserInterfaceItemIdentifier("ZigzagDeveloperPageSize")
+
+    /// Puts the sizes listed in Settings › Developer into View › Developer › Page Size, after Fill the Window, in the
+    /// list's order, or takes them out with Developer tools. Each says which it is by its place (`tag`).
+    static func refreshPageSizes(in main: NSMenu?) {
+        func find(_ menu: NSMenu) -> NSMenu? {
+            if menu.items.contains(where: { $0.action == DeveloperTool.sizeFill.action }) { return menu }
+            return menu.items.lazy.compactMap { $0.submenu.flatMap(find) }.first
+        }
+        guard let menu = main.flatMap(find) else { return }
+        menu.items.filter { $0.identifier == pageSizeItemID }.forEach(menu.removeItem)
+        guard let fill = menu.items.firstIndex(where: { $0.action == DeveloperTool.sizeFill.action }) else { return }
+        for (i, size) in PageSizes.all.enumerated() {
+            let added = item(PageSizes.menuTitle(size), #selector(BrowserWindowController.pageSizeListed(_:)), "")
+            added.tag = i
+            added.identifier = pageSizeItemID
+            menu.insertItem(added, at: fill + 1 + i)
+        }
+    }
+
     static func build() -> NSMenu {
         let main = NSMenu()
         typealias C = BrowserWindowController
@@ -87,7 +156,7 @@ enum MainMenu {
             item(String(localized: "Back", comment: "View menu item."), #selector(C.goBack(_:)), "["),
             item(String(localized: "Forward", comment: "View menu item."), #selector(C.goForward(_:)), "]"),
             item(String(localized: "Reload Page", comment: "View menu item."), #selector(C.reloadPage(_:)), "r"),
-            item(String(localized: "Reload Ignoring Cache", comment: "View menu item."), #selector(C.reloadPageFromOrigin(_:)), "r", [.command, .option]),
+            item(DeveloperTool.reloadIgnoringCache.title, #selector(C.reloadPageFromOrigin(_:)), "r", [.command, .option]),
             item(String(localized: "Stop", comment: "View menu item."), #selector(C.stopLoading(_:)), "."),
             .separator(),
             item(String(localized: "Next Tab", comment: "View menu item."), #selector(C.selectNextTab(_:)), String(UnicodeScalar(NSDownArrowFunctionKey)!), [.command, .option]),
@@ -111,9 +180,9 @@ enum MainMenu {
             submenu(String(localized: "Developer", comment: "Submenu of the View menu."), [
                 item(String(localized: "Web Inspector", comment: "View › Developer menu item."), #selector(C.showWebInspector(_:)), "i", [.command, .option]),
                 // Chrome's keys, so its habits work here too.
-                item(String(localized: "JavaScript Console", comment: "View › Developer menu item: opens the Web Inspector's console."), #selector(C.showJavaScriptConsole(_:)), "j", [.command, .option]),
-                item(String(localized: "Inspect Element", comment: "View › Developer menu item: pick an element on the page to see it in the Web Inspector."), #selector(C.inspectElement(_:)), "c", [.command, .option]),
-                item(String(localized: "View Source", comment: "View › Developer menu item."), #selector(C.viewSource(_:)), "u", [.command, .option]),
+                item(DeveloperTool.console.title, #selector(C.showJavaScriptConsole(_:)), "j", [.command, .option]),
+                item(DeveloperTool.inspect.title, #selector(C.inspectElement(_:)), "c", [.command, .option]),
+                item(DeveloperTool.viewSource.title, #selector(C.viewSource(_:)), "u", [.command, .option]),
             ]),
             .separator(),
             item(String(localized: "Enter Full Screen", comment: "View menu item."), #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]),
@@ -170,6 +239,7 @@ enum MainMenu {
         ])
         main.addItem(help)
         NSApp.helpMenu = help.submenu
+        setDeveloperTools(DeveloperTools.isOn, in: main)
         return main
     }
 

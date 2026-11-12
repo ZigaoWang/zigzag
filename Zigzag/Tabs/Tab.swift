@@ -43,6 +43,11 @@ final class Tab: NSObject {
         case settings
         /// Dark pages began or stopped drawing its page dark (`darkPage`).
         case darkPage
+        /// Its developer side changed: it became or stopped being a development tab (`isDevelopment`), or what you
+        /// chose for it with the developer tools did (`developer`).
+        case developer
+        /// The count of its page's errors changed (`pageErrorCount`).
+        case pageErrors
     }
 
     let id: UUID
@@ -65,7 +70,7 @@ final class Tab: NSObject {
     /// The tabs under this one are folded away in the sidebar.
     var isCollapsed = false
 
-    private(set) var url: URL?
+    private(set) var url: URL? { didSet { refreshDevelopment() } }
     private(set) var title: String
     private(set) var favicon: NSImage?
     private(set) var themeColor: NSColor?
@@ -260,6 +265,7 @@ final class Tab: NSObject {
         self.createdAt = createdAt
         super.init()
         if let url = self.url { favicon = FaviconStore.shared.cachedIcon(for: url) }
+        isDevelopment = DeveloperTools.applies(to: self.url)
         snapshot = SnapshotStore.load(id)
         if #available(macOS 15.4, *) {
             extensionToken = changed.observe { [weak self] change in
@@ -292,6 +298,61 @@ final class Tab: NSObject {
     /// The icon you chose that stands for it, or nil for its site's. Kept up to date (`refreshChosenIcon`), and
     /// says `.favicon` when it changes, as a new site icon does.
     private(set) var chosenIcon: String?
+
+    /// A development tab (#141): Developer tools is on and the page it shows is on a site you develop
+    /// (`DevelopmentSites`). The page it shows is the one last committed; before any, the address it's going to, so
+    /// a new tab on its way to localhost and one restored asleep are told too. An address shown early, for a page
+    /// that hasn't come, changes nothing: a sign-in that passes through another site doesn't flicker it.
+    private(set) var isDevelopment = false
+
+    /// Looks again at whether it's a development tab: its page changed, or Settings › Developer did.
+    /// `settingsChanged`: the page is the one it was, so what it was told and allowed as it loaded (its user agent,
+    /// its scripts) only follows once it loads again.
+    func refreshDevelopment(settingsChanged: Bool = false) {
+        let now = DeveloperTools.applies(to: committedURL ?? url)
+        guard now != isDevelopment else { return }
+        isDevelopment = now
+        if !now { pageErrorCount = 0 }
+        if let webView { PageErrors.counts(in: webView, now) }
+        // Its choices come into effect with it, and are lifted with it.
+        if !developer.isUnchanged { applyDeveloperState(); applyDeveloperStateToPage() }
+        changed.send(.developer)
+        if settingsChanged, developer.needsReload(from: DeveloperState()) { reload() }
+    }
+
+    /// What you chose for this tab with the developer tools (`DeveloperState`). Read through `developerInEffect`.
+    /// The last size the page had with the developer tools, for Toggle Page Size to give it again.
+    private(set) var developerLastSize: CGSize?
+
+    var developer = DeveloperState() {
+        didSet {
+            guard developer != oldValue else { return }
+            if let size = developer.size { developerLastSize = size }
+            applyDeveloperState()
+            applyDeveloperStateToPage()
+            // What a page is told and allowed as it loads shows once it has loaded again.
+            if isDevelopment, developer.needsReload(from: oldValue) { reload() }
+            changed.send(.developer)
+        }
+    }
+
+    /// A development tab's uncaught errors and failed promises since its page came, in every frame of it
+    /// (`PageErrors`), for the count on the console's button. Nothing is counted on any other tab.
+    private(set) var pageErrorCount = 0
+
+    /// The page threw `count` more errors.
+    func countPageErrors(_ count: Int) {
+        guard isDevelopment, count > 0 else { return }
+        pageErrorCount += count
+        changed.send(.pageErrors)
+    }
+
+    /// A new page, or none: its errors went with the last one.
+    private func forgetPageErrors() {
+        guard pageErrorCount != 0 else { return }
+        pageErrorCount = 0
+        changed.send(.pageErrors)
+    }
 
     /// Looks again at which chosen icon shows: after its own changes, it becomes or stops being a pinned page's or a
     /// favorite's, or the library changes (that page given an icon, or ⌘Z taking one back).
@@ -394,6 +455,9 @@ final class Tab: NSObject {
         observe(webView)
         DarkPages.attach(to: webView)
         PageFullScreen.attach(to: webView)
+        // What you chose for this tab with the developer tools comes with a new web view, before its first page is
+        // asked for: it's asked for as the browser chosen, and starts with the look chosen.
+        if !developer.isUnchanged { applyDeveloperState() }
 
         if Self.isExtensionPage(url), let url {
             // Extension pages always load fresh: their saved history state can come back as a blank page, and one
@@ -411,6 +475,8 @@ final class Tab: NSObject {
         }
         // A new web view starts with sound and playing; carry over what you'd set on the old one.
         if isMuted { setMuted(true) }
+        // A development tab's pages are listened to for the count of their errors.
+        if isDevelopment { PageErrors.counts(in: webView, true) }
         isPlaybackPaused = false
         refreshSettingsPage()
         changed.send(.webView)
@@ -535,6 +601,7 @@ final class Tab: NSObject {
         isLoading = false
         isLeavingPage = false
         isPlayingAudio = false
+        forgetPageErrors()
     }
 
     /// History snapshot for session restore. Cheap when the web view is suspended.
@@ -912,6 +979,9 @@ final class Tab: NSObject {
                     // A page sending the tab somewhere: the address stays on the page you see until the new one
                     // arrives, so a navigation that never completes can't show another site's name over this page.
                     // In a tab its opener can script, Zigzag's own load waits too: WebKit names it before it starts.
+                    // What you chose for this tab with the developer tools is for a development page: the page the
+                    // web view is going to gets it, or goes without, before it starts.
+                    if let self, !self.developer.isUnchanged { self.applyDeveloperState() }
                     guard let self, !(self.addressWaitsForCommit && wv.isLoading), !(self.openedByPage && self.ownLoadPending) else { return }
                     self.followAddress(of: wv)
                 }
@@ -985,7 +1055,7 @@ final class Tab: NSObject {
     /// The site whose page was last committed here, so a private tab keeps its zoom from page to page on it.
     private var zoomHost: String?
     /// The page last committed here: the site the tab's icon belongs to.
-    private var committedURL: URL?
+    private var committedURL: URL? { didSet { refreshDevelopment() } }
 
     /// Whether the icon stays as a new page commits: only on the same site (www. or not). The first page committed
     /// in a tab keeps the icon it was restored with.
@@ -1053,6 +1123,26 @@ extension Tab: WKNavigationDelegate {
         if navigationAction.targetFrame?.isMainFrame == false, userInitiated { frameClickedAt = Date() }
 
         guard let url = navigationAction.request.url else { return (.cancel, preferences) }
+        // JavaScript turned off with the developer tools is off for a development page: decided for the page being
+        // gone to, so one anywhere else never loads without its scripts.
+        if decidesMainFrame, developerInEffect(at: url).javaScriptOff { preferences.allowsContentJavaScript = false }
+        // The page is asked for as the browser it's to be told it's in (the developer tools' User Agent): a request
+        // made as another is made again, so no page off the list is asked for as one you chose for your own site.
+        if decidesMainFrame {
+            let wanted = developerInEffect(at: url).userAgent.string
+            let again = Self.asksAgain(sent: webView.customUserAgent, wanted: wanted, isGet: (navigationAction.request.httpMethod ?? "GET") == "GET",
+                                       type: navigationAction.navigationType)
+            if (webView.customUserAgent ?? "") != (wanted ?? "") { webView.customUserAgent = wanted }
+            if again {
+                // Once this one is refused, so the new one is its own navigation, decided on its own.
+                let request = navigationAction.request
+                DispatchQueue.main.async { [weak self, weak webView] in
+                    guard let self, let webView, self.webView === webView else { return }
+                    if ownLoad { self.loadOwn(url, in: webView) } else { webView.load(request) }
+                }
+                return (.cancel, preferences)
+            }
+        }
 
         // Schemes the web view cannot handle go to the system (mailto:, facetime:, app links). Extension pages stay here.
         // "Visit this site anyway" on the certificate warning: trust it for this session and go. Only a click on the
@@ -1233,6 +1323,7 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         isLeavingPage = false
+        forgetPageErrors()
         // The new page is here: its address shows.
         addressWaitsForCommit = false
         if webView.url != url { followAddress(of: webView) }
@@ -1273,6 +1364,9 @@ extension Tab: WKNavigationDelegate {
                 changed.send(.favicon)
             }
             committedURL = url
+            // What the developer tools put into a page itself (its outlines) goes into the new one, now that the
+            // tab knows whether this is a development page.
+            if !developer.isUnchanged { applyDeveloperStateToPage() }
             // A private window's zoom isn't saved for the site, so it lasts while you stay on that site in this tab.
             let host = HistoryStore.normalizedHost(url)
             if !(isPrivate && host == zoomHost) {
@@ -1289,6 +1383,8 @@ extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         // Back, Forward and reload end here too, even where the address stays the same.
         navigatedSinceSave = true
+        // The page is all here now: what the developer tools put into it is too.
+        if !developer.isUnchanged { applyDeveloperStateToPage() }
         addressWaitsForCommit = false
         if let until = landingUntil, Date() < until, let url = webView.url { pinnedLanding = url }
         checkForPDF(webView)

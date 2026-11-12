@@ -21,7 +21,8 @@ enum Shortcuts {
     static func id(_ item: NSMenuItem) -> String? {
         // Hidden aliases (⌘= beside ⌘+, ⌘← beside ⌘[) share their item's action and tag; they keep their own keys and
         // aren't listed, so changing or resetting the visible one never rewrites them.
-        guard let action = item.action, !item.isAlternate, !(item.isHidden && item.allowsKeyEquivalentWhenHidden) else { return nil }
+        guard let action = item.action, !item.isAlternate, !(item.isHidden && item.allowsKeyEquivalentWhenHidden),
+              item.identifier != MainMenu.pageSizeItemID else { return nil }
         return NSStringFromSelector(action) + "#\(item.tag)"
     }
 
@@ -73,6 +74,21 @@ enum Shortcuts {
             }
         }
         walk(menu)
+    }
+
+    /// Items that came into the menu bar after launch (Developer tools turned on): they get the keys you gave them
+    /// before, as at launch. One whose keys you've since given to something else comes in without them, so your
+    /// choice stands, and that is kept, as taking its keys away in Settings is: its row stays there, and Reset
+    /// gives them back.
+    static func applyToNew(_ items: [NSMenuItem]) {
+        apply()
+        var saved = overrides
+        for item in items {
+            guard let id = id(item), owner(of: combo(of: item), besides: item) != nil else { continue }
+            write(Combo.none, to: item)
+            saved[id] = Combo.none
+        }
+        if saved != overrides { overrides = saved }
     }
 
     /// Changed by you, going by what's saved rather than the item's keys: macOS adjusts some of its own items

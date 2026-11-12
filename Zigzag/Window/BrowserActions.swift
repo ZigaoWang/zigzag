@@ -287,6 +287,98 @@ extension BrowserWindowController: NSMenuItemValidation {
         inspector.callIfPresent("toggleElementSelection")
     }
 
+    // MARK: Developer tools (#141)
+
+    /// View › Developer › Add This Site to Development Sites, or Remove: the list in Settings › Developer. It says
+    /// what it did, by the name on the list: taking a site off takes off what covered it, which may be its parent
+    /// domain.
+    @objc func toggleDevelopmentSite(_ sender: Any?) {
+        guard let tab = selectedTab, DeveloperTool.site.isOffered(for: tab, isPrivate: tabManager.isPrivate) else { return }
+        if let listed = DevelopmentSites.entry(covering: tab.url) {
+            DevelopmentSites.set(false, for: tab.url)
+            Toast.show(String(localized: "\(listed) is no longer a development site", comment: "Toast after a site is taken off the list in Settings › Developer. The site is a host, like localhost."), symbol: "hammer", in: self)
+        } else if let name = DevelopmentSites.name(for: tab.url) {
+            DevelopmentSites.set(true, for: tab.url)
+            Toast.show(String(localized: "\(name) is a development site", comment: "Toast after a site is put on the list in Settings › Developer. The site is a host, like localhost."), symbol: "hammer", in: self)
+        }
+    }
+
+    @objc func pageAppearanceFollowsMac(_ sender: Any?) { chooseForDevelopment { $0.appearance = .followsMac } }
+    @objc func pageAppearanceLight(_ sender: Any?) { chooseForDevelopment { $0.appearance = .light } }
+    @objc func pageAppearanceDark(_ sender: Any?) { chooseForDevelopment { $0.appearance = .dark } }
+    @objc func togglePrintStyles(_ sender: Any?) { chooseForDevelopment { $0.printStyles.toggle() } }
+
+    @objc func toggleJavaScript(_ sender: Any?) { chooseForDevelopment { $0.javaScriptOff.toggle() } }
+    @objc func toggleOutlines(_ sender: Any?) { chooseForDevelopment { $0.outlines.toggle() } }
+    @objc func userAgentZigzag(_ sender: Any?) { chooseForDevelopment { $0.userAgent = .zigzag } }
+    @objc func userAgentPhone(_ sender: Any?) { chooseForDevelopment { $0.userAgent = .iPhone } }
+    @objc func userAgentTablet(_ sender: Any?) { chooseForDevelopment { $0.userAgent = .iPad } }
+    @objc func userAgentChrome(_ sender: Any?) { chooseForDevelopment { $0.userAgent = .chrome } }
+    @objc func userAgentFirefox(_ sender: Any?) { chooseForDevelopment { $0.userAgent = .firefox } }
+
+    /// Whether the page you're on is one of a split's: a page's own size isn't for those.
+    private var selectedIsInSplit: Bool { selectedTab.flatMap { tabManager.split(for: $0) } != nil }
+
+    /// View › Developer › Page Size › Toggle Page Size (⌥⇧⌘M): the last size the page had, or a phone's, and back.
+    @objc func togglePageSize(_ sender: Any?) {
+        guard let tab = selectedTab, !selectedIsInSplit else { return }
+        let next = tab.developer.size == nil ? (tab.developerLastSize ?? PageSizes.firstToggled) : nil
+        chooseForDevelopment { $0.size = next }
+    }
+
+    /// View › Developer › Page Size › one of the sizes listed in Settings › Developer, by its place in the list.
+    @objc func pageSizeListed(_ sender: Any?) {
+        guard let item = sender as? NSMenuItem else { return }
+        let sizes = PageSizes.all
+        guard sizes.indices.contains(item.tag) else { return }
+        setPageSize(sizes[item.tag].size)
+    }
+
+    @objc func pageSizeFill(_ sender: Any?) { if !selectedIsInSplit { chooseForDevelopment { $0.size = nil } } }
+    @objc func rotatePage(_ sender: Any?) { if !selectedIsInSplit { chooseForDevelopment { $0.size = $0.rotatedSize } } }
+    @objc func pageSizeCustom(_ sender: Any?) {
+        guard let tab = selectedTab, tab.isDevelopment, !selectedIsInSplit else { return }
+        // From the size it has, or the room it fills now.
+        let current = tab.developer.size ?? tab.webView.map { CGSize(width: floor($0.bounds.width), height: floor($0.bounds.height)) }
+        // Still a development tab once you've typed: the choice is for one.
+        PageSizeSheet.custom(in: root.overlay, current: current) { [weak tab] size in
+            guard let tab, tab.isDevelopment else { return }
+            tab.developer.size = size
+        }
+    }
+    /// One of the listed sizes (Settings › Developer), from Page Size’s menu above the page.
+    func setPageSize(_ size: CGSize) { if !selectedIsInSplit { chooseForDevelopment { $0.size = size } } }
+
+    /// A choice made with the developer tools for the tab you're on, which is the tab's alone (`DeveloperState`).
+    private func chooseForDevelopment(_ change: (inout DeveloperState) -> Void) {
+        guard let tab = selectedTab, tab.isDevelopment else { return }
+        change(&tab.developer)
+    }
+
+    /// View › Developer › Open on Your Phone…: the page's address for a phone on the same network, as a QR code. A
+    /// page on this Mac is given at the Mac's network address; with none, a toast says so.
+    @objc func openOnPhone(_ sender: Any?) {
+        guard let tab = selectedTab, DeveloperTool.phone.isOffered(for: tab, isPrivate: tabManager.isPrivate), let page = tab.url else { return }
+        guard let url = PhoneLink.url(for: page, lanAddress: PhoneLink.lanAddress()) else {
+            Toast.show(String(localized: "This Mac isn’t on a network a phone can reach", comment: "Toast after Open on Your Phone in the developer tools, when this Mac has no address on a local network."), symbol: "wifi.slash", in: self)
+            return
+        }
+        PhoneLinkSheet.show(in: root.overlay, url: url) { [weak self] in
+            guard let self else { return }
+            Toast.show(String(localized: "Address copied", comment: "Toast after Copy Address in the Open on Your Phone sheet of the developer tools."), symbol: "doc.on.doc", in: self)
+        }
+    }
+
+    @objc func showDeveloperSettings(_ sender: Any?) { SettingsPage.open(.developer, in: self) }
+
+    @objc func clearSiteCache(_ sender: Any?) { clearSite(.cache, as: .clearCache) }
+    @objc func clearSiteCookies(_ sender: Any?) { clearSite(.cookies, as: .clearCookies) }
+
+    private func clearSite(_ kind: WebsiteData.Kind, as tool: DeveloperTool) {
+        guard let tab = selectedTab, tool.isOffered(for: tab, isPrivate: tabManager.isPrivate) else { return }
+        confirmClear(kind, of: tab)
+    }
+
     @objc func viewSource(_ sender: Any?) {
         guard let url = selectedTab?.url, url.scheme?.hasPrefix("http") == true else { return }
         selectedWebView?.evaluateJavaScript("document.documentElement.outerHTML") { [weak self] result, _ in
@@ -557,6 +649,25 @@ extension BrowserWindowController: NSMenuItemValidation {
                 : String(localized: "Pin Tab", comment: "Menu bar item: pins the tab.")
             return tab?.url != nil && !tabManager.isPrivate
         case #selector(addToFavorites(_:)): return tab?.url != nil && tab?.isFavorite != true && (tab?.bookmarkID != nil || !tabManager.isPrivate)
+        case #selector(toggleDevelopmentSite(_:)):
+            item.title = DeveloperTool.siteTitle(listed: DevelopmentSites.covers(tab?.url))
+            return DeveloperTool.site.isOffered(for: tab, isPrivate: tabManager.isPrivate)
+        case #selector(pageAppearanceFollowsMac(_:)), #selector(pageAppearanceLight(_:)), #selector(pageAppearanceDark(_:)), #selector(togglePrintStyles(_:)),
+             #selector(pageSizeFill(_:)), #selector(pageSizeCustom(_:)), #selector(rotatePage(_:)), #selector(togglePageSize(_:)),
+             #selector(toggleJavaScript(_:)), #selector(toggleOutlines(_:)), #selector(userAgentZigzag(_:)), #selector(userAgentPhone(_:)),
+             #selector(userAgentTablet(_:)), #selector(userAgentChrome(_:)), #selector(userAgentFirefox(_:)):
+            guard let tool = DeveloperTool(action: item.action) else { return false }
+            let state = tab?.developerInEffect ?? DeveloperState()
+            item.state = tab != nil && tab?.isDevelopment == true && tool.isChecked(in: state) ? .on : .off
+            return tool.isOffered(for: tab, isPrivate: tabManager.isPrivate, inSplit: selectedIsInSplit) && tool.applies(in: state)
+        case #selector(pageSizeListed(_:)):
+            let sizes = PageSizes.all
+            let state = tab?.developerInEffect ?? DeveloperState()
+            item.state = sizes.indices.contains(item.tag) && PageSizes.named(state.size) == sizes[item.tag] ? .on : .off
+            return DeveloperTool.sizeFill.isOffered(for: tab, isPrivate: tabManager.isPrivate, inSplit: selectedIsInSplit)
+        case #selector(openOnPhone(_:)): return DeveloperTool.phone.isOffered(for: tab, isPrivate: tabManager.isPrivate)
+        case #selector(clearSiteCache(_:)): return DeveloperTool.clearCache.isOffered(for: tab, isPrivate: tabManager.isPrivate)
+        case #selector(clearSiteCookies(_:)): return DeveloperTool.clearCookies.isOffered(for: tab, isPrivate: tabManager.isPrivate)
         case #selector(installAsApp(_:)): return WebAppInstallSheet.canInstall(tab, isPrivate: tabManager.isPrivate)
         case #selector(moveTabToNewWindow(_:)): return tab != nil && tab?.bookmarkID == nil && !tabManager.isPrivate
         case #selector(newSpace(_:)), #selector(renameSpace(_:)): return !tabManager.isPrivate

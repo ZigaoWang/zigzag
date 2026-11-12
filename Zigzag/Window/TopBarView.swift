@@ -5,6 +5,9 @@ import AppKit
 /// again, so their actions, the panels and popups that come out of them, the command bar and their tooltips work as
 /// they do in the sidebar. It lies on the window's frame as the sidebar does, its middle on the traffic lights' line,
 /// and like the sidebar it moves the window and zooms it on a double-click.
+///
+/// A page can bring tools of its own to the bar's trailing end (`accessory`), after the address. With the address
+/// kept in the sidebar, the bar is there for them alone, and they sit at its trailing end all the same.
 final class TopBarView: NSView {
     /// Twice the traffic lights' center line: the lights, the sidebar's toggle and everything here sit on one line.
     static let height: CGFloat = Tokens.Sidebar.lightsCenter * 2
@@ -56,7 +59,23 @@ final class TopBarView: NSView {
         let onPage = pageColor != nil
         for case let button as IconButton in [sidebarButton] + buttons { button.isOnPage = onPage }
         (address as? AddressView)?.isOnPage = onPage
+        accessory?.isOnPage = onPage
     }
+
+    /// The page's own tools, at the bar's trailing end after the address: as wide as they ask for in the room
+    /// there is, which leaves the address `addressMinWidth` at least. The bar only gives them their place; whoever
+    /// sets them owns what's in them.
+    var accessory: TopBarAccessory? {
+        didSet {
+            guard accessory !== oldValue else { return }
+            if oldValue?.superview === self { oldValue?.removeFromSuperview() }
+            if let accessory { addSubview(accessory) }
+            refreshOnPage()
+            needsLayout = true
+        }
+    }
+    /// The least the address keeps beside a page's tools, which give way first.
+    static let addressMinWidth: CGFloat = 200
 
     private var buttons: [NSView] = []
     private weak var address: NSView?
@@ -80,6 +99,16 @@ final class TopBarView: NSView {
     override func mouseDown(with event: NSEvent) { window?.titleBarMouseDown(event) }
 
     /// Takes the sidebar's buttons and address, in order.
+    /// Back, forward and reload alone, after the traffic lights, while the bar is there for a page's tools and the
+    /// address stays in the sidebar on the right: they're where the strip above the page has them there (#181), so
+    /// nothing moves as you go between a development tab and any other.
+    func hold(buttons: [NSView]) {
+        self.buttons = buttons
+        buttons.forEach(addSubview)
+        refreshOnPage()
+        needsLayout = true
+    }
+
     func hold(buttons: [NSView], address: NSView) {
         self.buttons = buttons
         self.address = address
@@ -92,6 +121,8 @@ final class TopBarView: NSView {
         var sidebarButton: NSRect?
         var buttons: [NSRect]
         var address: NSRect
+        /// The page's tools, when they take any room: the bar's whole height, ending where the address would.
+        var accessory: NSRect?
     }
 
     /// The sidebar's toggle when it's here, then the buttons, a button apart, then the address to the trailing inset,
@@ -99,8 +130,9 @@ final class TopBarView: NSView {
     /// as the toggle's does in the sidebar's own top row; without them the first button starts `leadingInset` in.
     /// `onRight`: the sidebar is on the right, so its toggle is at the bar's trailing end, where the sidebar's own
     /// lands (`trailingToggle`), with the address ending as far before it as it starts after the buttons.
+    /// `accessory`: the width the page's tools take at the trailing end; the address ends a gap before them.
     static func frames(width: CGFloat, buttons: Int, sidebarButton: Bool = false, onRight: Bool = false, trafficLightsWidth: CGFloat,
-                       leadingInset: CGFloat = Tokens.Sidebar.edge, trailingInset: CGFloat) -> Frames {
+                       leadingInset: CGFloat = Tokens.Sidebar.edge, trailingInset: CGFloat, accessory: CGFloat = 0) -> Frames {
         let mid = height / 2, b = Tokens.Sidebar.button
         let leads = sidebarButton && !onRight
         var x = leadX(sidebarButton: leads, trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset)
@@ -113,8 +145,10 @@ final class TopBarView: NSView {
         let last = sidebarButton && onRight ? trailingToggle(width: width) : nil
         let start = x + Tokens.Space.x2, h = Tokens.Sidebar.addressHeight
         let end = min(width - trailingInset, last.map { $0.minX - Tokens.Space.x2 } ?? .infinity)
+        let tools = accessory > 0 ? NSRect(x: max(start, end - accessory), y: 0, width: min(accessory, max(0, end - start)), height: height) : nil
+        let addressEnd = tools.map { $0.minX - Tokens.Space.x2 } ?? end
         return Frames(sidebarButton: first ?? last, buttons: rects,
-                      address: NSRect(x: start, y: round(mid - h / 2), width: max(0, end - start), height: h))
+                      address: NSRect(x: start, y: round(mid - h / 2), width: max(0, addressEnd - start), height: h), accessory: tools)
     }
 
     /// The toggle at the bar's trailing end, for a sidebar on the right: `Sidebar.edge` in from the window's edge
@@ -207,9 +241,21 @@ final class TopBarView: NSView {
 
     /// Each control showing here and where it goes.
     private var places: [(view: NSView, frame: NSRect)] {
-        let frames = Self.frames(width: bounds.width, buttons: buttons.count, sidebarButton: showsSidebarButton, onRight: sidebarOnRight,
-                                 trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset, trailingInset: trailingInset)
+        func frames(accessory: CGFloat) -> Frames {
+            Self.frames(width: bounds.width, buttons: buttons.count, sidebarButton: showsSidebarButton, onRight: sidebarOnRight,
+                        trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset, trailingInset: trailingInset, accessory: accessory)
+        }
+        // The page's tools take what they ask for of the room the address has, less what the address keeps while
+        // it's here; with the panes' strips in the row (a split), there are none.
+        var tools: CGFloat = 0
+        if let accessory, strips.isEmpty {
+            let holdsAddress = address?.superview === self
+            tools = accessory.width(fitting: max(0, frames(accessory: 0).address.width - (holdsAddress ? Self.addressMinWidth + Tokens.Space.x2 : 0)))
+        }
+        accessory?.isHidden = tools <= 0
+        let frames = frames(accessory: tools)
         var places: [(view: NSView, frame: NSRect)] = []
+        if let accessory, let rect = frames.accessory { places.append((accessory, rect)) }
         if let toggle = frames.sidebarButton { places.append((sidebarButton, toggle)) }
         for (button, rect) in zip(buttons, frames.buttons) where button.superview === self { places.append((button, rect)) }
         if let address, address.superview === self { places.append((address, frames.address)) }
@@ -240,7 +286,7 @@ final class TopBarView: NSView {
 
     /// Where each control showing is now, in the superview's terms: taken before the sidebar comes or goes.
     var controlPositions: [ObjectIdentifier: NSRect] {
-        Dictionary(uniqueKeysWithValues: ([sidebarButton] + buttons + [address].compactMap { $0 } + (strips as [NSView]))
+        Dictionary(uniqueKeysWithValues: ([sidebarButton] + buttons + [address, accessory].compactMap { $0 } + (strips as [NSView]))
             .filter { $0.superview === self && !$0.isHidden }
             .map { (ObjectIdentifier($0), $0.frame.offsetBy(dx: frame.minX, dy: frame.minY)) })
     }
@@ -259,6 +305,14 @@ final class TopBarView: NSView {
             Tokens.Motion.glide(place.view, to: place.frame, duration: curve.duration, timing: curve.timing, resizes: true)
         }
     }
+}
+
+/// A page's own tools in the bar above it (`TopBarView.accessory`).
+protocol TopBarAccessory: NSView {
+    /// The width they take when they have `room`: all of them, or as many as fit.
+    func width(fitting room: CGFloat) -> CGFloat
+    /// The bar is the top of the page's card, in the page's color: their fills are a page's, not the frame's.
+    var isOnPage: Bool { get set }
 }
 
 /// The strip above the page beside a docked sidebar on the right, with the bar above the page off: the traffic lights

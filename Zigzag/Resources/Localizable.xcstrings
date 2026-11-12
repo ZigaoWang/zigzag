@@ -119,6 +119,17 @@
         }
       }
     },
+    "%@ at %lld%%" : {
+      "comment" : "Beside Page Size among the developer tools above the page, while a page larger than the window is shown smaller to fit: its size, then how large it's shown, like “1440 × 900 at 72%”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，缩放至 %2$lld%%"
+          }
+        }
+      }
+    },
     "%@ can be your search engine" : {
       "comment" : "Toast after adding an extension that gives a search engine. The name is the engine's, like ChatGPT.",
       "localizations" : {
@@ -225,6 +236,17 @@
         }
       }
     },
+    "%@ is a development site" : {
+      "comment" : "Toast after a site is put on the list in Settings › Developer. The site is a host, like localhost.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 已成为开发网站"
+          }
+        }
+      }
+    },
     "%@ is blocking ads on YouTube." : {
       "comment" : "After the explanation under “Block ads and trackers” in Settings › Privacy, while an ad blocker extension (its name, like uBlock Origin Lite) handles YouTube instead of Zigzag.",
       "localizations" : {
@@ -243,6 +265,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 正在收听此标签页"
+          }
+        }
+      }
+    },
+    "%@ is no longer a development site" : {
+      "comment" : "Toast after a site is taken off the list in Settings › Developer. The site is a host, like localhost.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 不再是开发网站"
           }
         }
       }
@@ -565,8 +598,25 @@
         }
       }
     },
+    "%@ × %@" : {
+      "comment" : "A page's size in points, width then height, like “393 × 852”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ × %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ × %2$@"
+          }
+        }
+      }
+    },
     "%@, %@" : {
-      "comment" : "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nOn the Permissions row of the site panel: how many allowed, then how many blocked, like “2 allowed, 1 blocked”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.",
+      "comment" : "A size in the Page Size menu of the developer tools above the page: its name, then its width and height, like “iPhone, 393 × 852”.\nAccessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nOn the Permissions row of the site panel: how many allowed, then how many blocked, like “2 allowed, 1 blocked”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1679,6 +1729,17 @@
         }
       }
     },
+    "A development site at localhost or 127.0.0.1 that uses its own certificate for https opens without the warning. Only for servers on this Mac, and only the certificate first shown." : {
+      "comment" : "Explanation under “Trust certificates of servers on this Mac” in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位于 localhost 或 127.0.0.1、使用自有证书提供 https 的开发网站，打开时不再显示警告。仅限这台 Mac 上的服务器，且只信任它最先出示的证书。"
+          }
+        }
+      }
+    },
     "A few of your sign-ins from %@ couldn’t come over, so some sites may ask you to sign in again." : {
       "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome. Sign-ins are the sites a browser keeps you signed in to.",
       "localizations" : {
@@ -1774,6 +1835,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "看一眼，不离开当前位置"
+          }
+        }
+      }
+    },
+    "A site covers every port and its subdomains: localhost is localhost:3000 and app.localhost too." : {
+      "comment" : "Under the list in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一个网站涵盖它的所有端口和子域名：localhost 也包括 localhost:3000 和 app.localhost。"
           }
         }
       }
@@ -1895,7 +1967,7 @@
       }
     },
     "Add" : {
-      "comment" : "Button on an extension another profile has, in Settings › Extensions: adds it to the profile shown.",
+      "comment" : "Button on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the site, in the sheet that adds a development site.\nButton that adds the size, in the sheet that adds a page size.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2000,6 +2072,61 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加第二种颜色"
+          }
+        }
+      }
+    },
+    "Add Site…" : {
+      "comment" : "Button beside Development Sites in Settings › Developer: opens the sheet that adds a site to the list.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加网站…"
+          }
+        }
+      }
+    },
+    "Add Size…" : {
+      "comment" : "Button beside Page Sizes in Settings › Developer: opens the sheet that adds a size to the list.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加尺寸…"
+          }
+        }
+      }
+    },
+    "Add This Site to Development Sites" : {
+      "comment" : "View › Developer menu item and command, on a site that isn't on the list in Settings › Developer: puts it on, and the developer tools show on it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将此网站添加到开发网站"
+          }
+        }
+      }
+    },
+    "Add a Development Site" : {
+      "comment" : "Title of the sheet that adds a site to the list in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加开发网站"
+          }
+        }
+      }
+    },
+    "Add a Page Size" : {
+      "comment" : "Title of the sheet that adds a page size to the list in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加网页尺寸"
           }
         }
       }
@@ -2208,6 +2335,17 @@
         }
       }
     },
+    "Address copied" : {
+      "comment" : "Toast after Copy Address in the Open on Your Phone sheet of the developer tools.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地址已拷贝"
+          }
+        }
+      }
+    },
     "Ads and trackers blocked" : {
       "comment" : "Badge on a sample page in the welcome window’s picture of Zigzag.",
       "localizations" : {
@@ -2231,7 +2369,7 @@
       }
     },
     "Advanced" : {
-      "comment" : "A heading in the column of Settings, over Extensions, Shortcuts and Automation.",
+      "comment" : "A heading in the column of Settings, over Extensions, Shortcuts, Automation and Developer.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -3585,6 +3723,17 @@
         }
       }
     },
+    "Choices in effect" : {
+      "comment" : "Spoken by VoiceOver after More Developer Tools while something chosen in its menu is in effect: JavaScript off, another user agent, or outlines.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有选项正在生效"
+          }
+        }
+      }
+    },
     "Choices you make for one site, like allowing ads, a camera or notifications, show up here." : {
       "comment" : "Explanation under “None yet” in Settings › Privacy.",
       "localizations" : {
@@ -3762,7 +3911,7 @@
       }
     },
     "Clear Cache for This Site…" : {
-      "comment" : "Item in the … menu of the site panel.",
+      "comment" : "Item in the … menu of the site panel.\nView › Developer menu item, command and item in the … menu of the site panel: clears the cache of the site you're on, after asking.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -3801,6 +3950,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除 Cookie 和数据…"
+          }
+        }
+      }
+    },
+    "Clear Cookies for This Site…" : {
+      "comment" : "View › Developer menu item, command and item in the … menu of the site panel: clears the cookies of the site you're on, after asking.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除此网站的 Cookie…"
           }
         }
       }
@@ -4432,6 +4592,17 @@
         }
       }
     },
+    "Console" : {
+      "comment" : "Under a tile in the site panel's Developer group: opens the JavaScript console.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "控制台"
+          }
+        }
+      }
+    },
     "Contents" : {
       "comment" : "Switch in the PDF viewer's sidebar: shows the document's table of contents.",
       "localizations" : {
@@ -4560,6 +4731,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拷贝"
+          }
+        }
+      }
+    },
+    "Copy Address" : {
+      "comment" : "Button in the Open on Your Phone sheet of the developer tools: copies the page's address for a phone.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝地址"
           }
         }
       }
@@ -4960,6 +5142,28 @@
         }
       }
     },
+    "Custom Page Size" : {
+      "comment" : "Title of the sheet that asks for a size of your own for the page, with the developer tools.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定网页尺寸"
+          }
+        }
+      }
+    },
+    "Custom Page Size…" : {
+      "comment" : "View › Developer menu item and command, on a development site: asks for a width and height for the page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定网页尺寸…"
+          }
+        }
+      }
+    },
     "Cut" : {
       "comment" : "Edit menu item.",
       "localizations" : {
@@ -4972,7 +5176,7 @@
       }
     },
     "Dark" : {
-      "comment" : "Color choice in Reader.",
+      "comment" : "Choice in the Page Appearance menu of the developer tools above the page: the page is asked for its dark look.\nColor choice in Reader.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5203,12 +5407,23 @@
       }
     },
     "Developer" : {
-      "comment" : "Row in the About window: the developer's website.\nSubmenu of the View menu.",
+      "comment" : "A section of Settings: tools for people who build websites, and the sites they build.\nRow in the About window: the developer's website.\nSection label over the developer tools' tiles in the site panel, on a development site.\nSubmenu of the View menu.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "开发者"
+          }
+        }
+      }
+    },
+    "Developer Settings…" : {
+      "comment" : "Item in the ⋯ menu of the developer tools above the page, and a command: opens Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发者设置…"
           }
         }
       }
@@ -5220,6 +5435,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "开发者模式"
+          }
+        }
+      }
+    },
+    "Developer tools" : {
+      "comment" : "A setting in Settings › Developer: turns on the tools for building websites, which show only on the sites listed under it.\nRow in the site panel's This Site group: this site is one you develop on, listed in Settings › Developer, and gets the developer tools.\nVoiceOver name of the developer tools' buttons in the bar above a development site's page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发者工具"
+          }
+        }
+      }
+    },
+    "Developer tools show on this site, on every port and on its subdomains." : {
+      "comment" : "Under the title of the sheet that adds a site to the list in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发者工具会在这个网站上显示，包括它的所有端口和子域名。"
+          }
+        }
+      }
+    },
+    "Development Sites" : {
+      "comment" : "A heading in Settings › Developer: the sites Developer tools show on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发网站"
           }
         }
       }
@@ -5253,6 +5501,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未完成。%@。"
+          }
+        }
+      }
+    },
+    "Disable JavaScript" : {
+      "comment" : "View › Developer menu item and command, on a development site, checked while so: the page's scripts don't run.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停用 JavaScript"
           }
         }
       }
@@ -5670,6 +5929,17 @@
         }
       }
     },
+    "Errors: %lld" : {
+      "comment" : "Spoken by VoiceOver after JavaScript Console on a development site: how many errors the page has thrown since it loaded.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "错误：%lld"
+          }
+        }
+      }
+    },
     "Espresso" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor.",
       "localizations" : {
@@ -5971,6 +6241,17 @@
         }
       }
     },
+    "Fill the Window" : {
+      "comment" : "Choice in the Page Size menu of the developer tools above the page: the page takes all its room in the window, as any page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "填满窗口"
+          }
+        }
+      }
+    },
     "Fills %@ from Contacts" : {
       "comment" : "Under the person's name in the menu that fills a form. The placeholder lists what the card holds, like “email, phone and address”.",
       "localizations" : {
@@ -6099,6 +6380,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文件夹名称"
+          }
+        }
+      }
+    },
+    "Follow the Mac" : {
+      "comment" : "Choice in the Page Appearance menu of the developer tools above the page: the page looks light or dark as the Mac does.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随 Mac"
           }
         }
       }
@@ -6549,6 +6841,17 @@
         }
       }
     },
+    "Height" : {
+      "comment" : "Label of the height field in the sheet that asks for a page's size, in points.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高度"
+          }
+        }
+      }
+    },
     "Help" : {
       "comment" : "A menu in the menu bar.",
       "localizations" : {
@@ -6881,6 +7184,45 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "其他个人资料中的扩展"
+          }
+        }
+      }
+    },
+    "In points, from %@ to %@." : {
+      "comment" : "Note under the width and height fields in the sheet that asks for a page's size: the least and the most a side can be.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "In points, from %1$@ to %2$@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以点为单位，从 %1$@ 到 %2$@。"
+          }
+        }
+      }
+    },
+    "In the bar above a development site’s page: the console, inspecting an element, the page’s look and size, and more. Off, they’re in the site’s controls." : {
+      "comment" : "Explanation under “Tools above the page” in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在开发网站页面上方的栏里：控制台、检查元素、页面的外观和大小等。关闭后，这些工具在网站设置里。"
+          }
+        }
+      }
+    },
+    "Inspect" : {
+      "comment" : "Under a tile in the site panel's Developer group: picks an element on the page to inspect.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查"
           }
         }
       }
@@ -7603,7 +7945,7 @@
       }
     },
     "Light" : {
-      "comment" : "Color choice in Reader.",
+      "comment" : "Choice in the Page Appearance menu of the developer tools above the page: the page is asked for its light look.\nColor choice in Reader.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7686,6 +8028,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从文件夹载入扩展以进行测试。"
+          }
+        }
+      }
+    },
+    "Local Servers" : {
+      "comment" : "A heading in Settings › Developer: development servers running on this Mac.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地服务器"
           }
         }
       }
@@ -7862,6 +8215,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更多"
+          }
+        }
+      }
+    },
+    "More Developer Tools" : {
+      "comment" : "Tooltip of the ⋯ button among the developer tools above a development site's page: opens a menu with the rest of the tools.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更多开发者工具"
           }
         }
       }
@@ -8362,6 +8726,17 @@
         }
       }
     },
+    "Name this size" : {
+      "comment" : "Placeholder of the name field in the sheet that adds a page size to the list in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "给这个尺寸起个名字"
+          }
+        }
+      }
+    },
     "Name this space" : {
       "comment" : "Placeholder of the name field in the space editor.",
       "localizations" : {
@@ -8858,7 +9233,7 @@
       }
     },
     "None yet" : {
-      "comment" : "A setting in Settings › Privacy.\nUnder Always Translate in Settings › Translation, when there's no language.",
+      "comment" : "A row in Settings › Developer, shown when no development site is listed.\nA row in Settings › Developer, shown when no page size is listed.\nA setting in Settings › Privacy.\nUnder Always Translate in Settings › Translation, when there's no language.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9462,6 +9837,17 @@
         }
       }
     },
+    "Open In" : {
+      "comment" : "Heading in the ⋯ menu of the developer tools above the page, over the other browsers on this Mac: opens the page in one of them.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开方式"
+          }
+        }
+      }
+    },
     "Open Link in New Tab" : {
       "comment" : "Item in a page's right-click menu.",
       "localizations" : {
@@ -9726,6 +10112,28 @@
         }
       }
     },
+    "Open on Your Phone" : {
+      "comment" : "Title of the developer tools' sheet with a QR code of the page's address for a phone on the same network.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在手机上打开"
+          }
+        }
+      }
+    },
+    "Open on Your Phone…" : {
+      "comment" : "View › Developer menu item, command and item in the ⋯ menu of the developer tools above the page, on a development site: shows a QR code of the page's address for a phone on the same network.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在手机上打开…"
+          }
+        }
+      }
+    },
     "Open on the Left" : {
       "comment" : "Shown over the left half of the page while a link or tab is dragged there, to open it in a split view.",
       "localizations" : {
@@ -9880,6 +10288,17 @@
         }
       }
     },
+    "Outline Every Element" : {
+      "comment" : "View › Developer menu item and command, on a development site, checked while on: draws a line around each element of the page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "给每个元素加轮廓"
+          }
+        }
+      }
+    },
     "Oxblood" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor. A deep red.",
       "localizations" : {
@@ -9919,6 +10338,105 @@
         }
       }
     },
+    "Page Appearance" : {
+      "comment" : "Tooltip and menu heading of a button among the developer tools above a development site's page: how the page looks, light or dark, and with its print styles.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页外观"
+          }
+        }
+      }
+    },
+    "Page Appearance: Dark" : {
+      "comment" : "View › Developer menu item and command, on a development site: the page is asked for its dark look, whatever the Mac's is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页外观：深色"
+          }
+        }
+      }
+    },
+    "Page Appearance: Follow the Mac" : {
+      "comment" : "View › Developer menu item and command, on a development site: the page looks light or dark as the Mac does, as any page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页外观：跟随 Mac"
+          }
+        }
+      }
+    },
+    "Page Appearance: Light" : {
+      "comment" : "View › Developer menu item and command, on a development site: the page is asked for its light look, whatever the Mac's is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页外观：浅色"
+          }
+        }
+      }
+    },
+    "Page Size" : {
+      "comment" : "Tooltip and menu heading of a button among the developer tools above a development site's page: gives the page the size of a phone, a tablet or one of your own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页尺寸"
+          }
+        }
+      }
+    },
+    "Page Size: %@, %@" : {
+      "comment" : "A command in the command bar, on a development site: gives the page a listed size. The size's name, then its width and height, like “Page Size: iPhone 16, 393 × 852”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页尺寸：%1$@，%2$@"
+          }
+        }
+      }
+    },
+    "Page Size: Fill the Window" : {
+      "comment" : "View › Developer menu item and command, on a development site, checked while so: the page takes all its room in the window, as any page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页尺寸：填满窗口"
+          }
+        }
+      }
+    },
+    "Page Sizes" : {
+      "comment" : "A heading in Settings › Developer: the sizes the developer tools offer for a page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页尺寸"
+          }
+        }
+      }
+    },
+    "Page height" : {
+      "comment" : "VoiceOver name of the grip under a page with a size of its own, among the developer tools: drag it to change the page's height.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页高度"
+          }
+        }
+      }
+    },
     "Page saved" : {
       "comment" : "Toast after File › Save Page As saves the page.",
       "localizations" : {
@@ -9926,6 +10444,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已存储页面"
+          }
+        }
+      }
+    },
+    "Page size" : {
+      "comment" : "VoiceOver name of the grip at the corner of a page with a size of its own, among the developer tools: drag it to change the page's width and height.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页尺寸"
+          }
+        }
+      }
+    },
+    "Page width" : {
+      "comment" : "VoiceOver name of the grip beside a page with a size of its own, among the developer tools: drag it to change the page's width.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页宽度"
           }
         }
       }
@@ -10532,6 +11072,17 @@
         }
       }
     },
+    "Point your phone's camera at the code to open this page there." : {
+      "comment" : "Under the title of the Open on Your Phone sheet of the developer tools.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用手机相机扫描这个二维码，就能在手机上打开这个页面。"
+          }
+        }
+      }
+    },
     "Pop-up blocked" : {
       "comment" : "Toast when Zigzag blocks a page's pop-up window.",
       "localizations" : {
@@ -10836,6 +11387,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "让耗电的后台标签页休眠"
+          }
+        }
+      }
+    },
+    "QR code of the address" : {
+      "comment" : "VoiceOver name of the QR code in the Open on Your Phone sheet of the developer tools.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地址的二维码"
           }
         }
       }
@@ -11171,7 +11733,7 @@
       }
     },
     "Reload" : {
-      "comment" : "Tooltip of a button in the strip on top of each page of a split view: reloads the page.\nTooltip of the sidebar's reload button.",
+      "comment" : "Tooltip of a button in the strip on top of each page of a split view: reloads the page.\nTooltip of the sidebar's reload button.\nUnder a tile in the site panel's Developer group: reloads the page ignoring the cache.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11188,6 +11750,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新载入并忽略缓存"
+          }
+        }
+      }
+    },
+    "Reload Options" : {
+      "comment" : "Tooltip of a button among the developer tools above a development site's page: opens a menu to reload ignoring the cache, or clear this site's cache or cookies.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新载入选项"
           }
         }
       }
@@ -11215,12 +11788,23 @@
       }
     },
     "Remove" : {
-      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nTooltip of a download's button in the downloads panel: takes the download off the list.",
+      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nButton on a row in Settings › Developer: takes the site or the page size off its list.\nTooltip of a download's button in the downloads panel: takes the download off the list.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "移除"
+          }
+        }
+      }
+    },
+    "Remove %@" : {
+      "comment" : "VoiceOver name of the Remove button on a row in Settings › Developer: a site, like localhost, or a page size, like iPhone.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除 %@"
           }
         }
       }
@@ -11331,6 +11915,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "移除快捷键"
+          }
+        }
+      }
+    },
+    "Remove This Site from Development Sites" : {
+      "comment" : "View › Developer menu item and command, on a site that's on the list in Settings › Developer: takes it off, and the developer tools go from it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从开发网站中移除此网站"
           }
         }
       }
@@ -11852,6 +12447,17 @@
         }
       }
     },
+    "Rotate Page" : {
+      "comment" : "View › Developer menu item and command, on a development site whose page has a size of its own: swaps its width and height.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "旋转网页"
+          }
+        }
+      }
+    },
     "Run" : {
       "comment" : "Action label at the right of the selected command bar result, saying what Return does: runs the command.",
       "localizations" : {
@@ -11870,6 +12476,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在它可访问的网站上运行你添加的脚本"
+          }
+        }
+      }
+    },
+    "Safari on iPad" : {
+      "comment" : "Choice under User Agent in the developer tools' menus: the page is told it's in Safari on an iPad.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPad 上的 Safari"
+          }
+        }
+      }
+    },
+    "Safari on iPhone" : {
+      "comment" : "Choice under User Agent in the developer tools' menus: the page is told it's in Safari on an iPhone.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone 上的 Safari"
           }
         }
       }
@@ -12606,6 +13234,17 @@
         }
       }
     },
+    "Set Size" : {
+      "comment" : "Button that gives the page the size typed, in the sheet that asks for a page's size.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设定尺寸"
+          }
+        }
+      }
+    },
     "Set as Default" : {
       "comment" : "Answer in the welcome window’s default browser step.\nButton in Settings › General that makes Zigzag the default browser.\nButton in the toast offering to make Zigzag the default browser.",
       "localizations" : {
@@ -12624,6 +13263,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设为默认浏览器"
+          }
+        }
+      }
+    },
+    "Set by developer tools" : {
+      "comment" : "Short, it fits beside a switch. Under Dark page in the site panel's This Site group, on a development site whose page was set to Light or Dark with the developer tools: dark pages leave this tab's page alone.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由开发者工具设定"
           }
         }
       }
@@ -12866,6 +13516,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示已固定标签页"
+          }
+        }
+      }
+    },
+    "Show Print Styles" : {
+      "comment" : "View › Developer menu item and command, on a development site, checked while on: the page is laid out with its styles for print.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示打印样式"
           }
         }
       }
@@ -13211,6 +13872,17 @@
         }
       }
     },
+    "Sites you add show up here." : {
+      "comment" : "Explanation under “None yet” in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你添加的网站会显示在这里。"
+          }
+        }
+      }
+    },
     "Sites you visit can keep cookies and files here, to keep you signed in and load faster." : {
       "comment" : "Explanation under “None yet” in Settings › Privacy.",
       "localizations" : {
@@ -13218,6 +13890,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你访问的网站可以在这里保存 Cookie 和文件，让你保持登录，并加快载入速度。"
+          }
+        }
+      }
+    },
+    "Sizes you add show up here." : {
+      "comment" : "Explanation under “None yet” in Settings › Developer › Page Sizes.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你添加的尺寸会显示在这里。"
           }
         }
       }
@@ -14081,6 +14764,23 @@
         }
       }
     },
+    "That’s every port of %@, not only %@." : {
+      "comment" : "Added to the message of the sheet that asks before clearing one site's cache or cookies, on a development site whose address has a port, like localhost:3000. The first placeholder is the site, the second the port's number.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "That’s every port of %1$@, not only %2$@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这会清除 %1$@ 的所有端口，而不只是 %2$@。"
+          }
+        }
+      }
+    },
     "That’s switching spaces" : {
       "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
       "localizations" : {
@@ -14473,6 +15173,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "内容直接出现，而不是滑入或放大。淡入淡出效果保留。"
+          }
+        }
+      }
+    },
+    "This Mac isn’t on a network a phone can reach" : {
+      "comment" : "Toast after Open on Your Phone in the developer tools, when this Mac has no address on a local network.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 不在手机能访问的网络上"
           }
         }
       }
@@ -14972,6 +15683,17 @@
         }
       }
     },
+    "Toggle Page Size" : {
+      "comment" : "View › Developer menu item and command, on a development site: gives the page the last size it had (a phone's at first), or takes it back to filling the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换网页尺寸"
+          }
+        }
+      }
+    },
     "Tonight" : {
       "comment" : "Name of a History session that began today.",
       "localizations" : {
@@ -15001,6 +15723,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "工具"
+          }
+        }
+      }
+    },
+    "Tools above the page" : {
+      "comment" : "A setting in Settings › Developer: on a development site, the developer tools are in the bar above the page, after the address.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在页面上方显示工具"
+          }
+        }
+      }
+    },
+    "Tools for building websites, on the sites listed here and nowhere else. A tab on one of them has a hammer on its row." : {
+      "comment" : "Explanation under “Developer tools” in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用于构建网站的工具，只在这里列出的网站上显示。打开这些网站的标签页，所在的行上会有一个锤子标记。"
           }
         }
       }
@@ -15089,6 +15833,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "旅行灵感"
+          }
+        }
+      }
+    },
+    "Trust certificates of servers on this Mac" : {
+      "comment" : "A setting in Settings › Developer, under Local Servers: a development site served from this Mac over https with a certificate of its own opens without the warning.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "信任这台 Mac 上服务器的证书"
           }
         }
       }
@@ -15724,6 +16479,72 @@
         }
       }
     },
+    "User Agent" : {
+      "comment" : "Submenu of View › Developer and heading in the ⋯ menu of the developer tools above the page: the browser a development site's page is told it's in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户代理"
+          }
+        }
+      }
+    },
+    "User Agent: Chrome" : {
+      "comment" : "View › Developer menu item and command, on a development site: the page is told it's in Chrome on a Mac.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户代理：Chrome"
+          }
+        }
+      }
+    },
+    "User Agent: Firefox" : {
+      "comment" : "View › Developer menu item and command, on a development site: the page is told it's in Firefox on a Mac.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户代理：Firefox"
+          }
+        }
+      }
+    },
+    "User Agent: Safari on iPad" : {
+      "comment" : "View › Developer menu item and command, on a development site: the page is told it's in Safari on an iPad.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户代理：iPad 上的 Safari"
+          }
+        }
+      }
+    },
+    "User Agent: Safari on iPhone" : {
+      "comment" : "View › Developer menu item and command, on a development site: the page is told it's in Safari on an iPhone.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户代理：iPhone 上的 Safari"
+          }
+        }
+      }
+    },
+    "User Agent: Zigzag" : {
+      "comment" : "View › Developer menu item and command, on a development site: the page is told it's in Zigzag, as any page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户代理：Zigzag"
+          }
+        }
+      }
+    },
     "Username" : {
       "comment" : "Name of a field of a saved login in the Passwords window.\nPlaceholder of the name field in a site's HTTP sign-in sheet.\nPlaceholder of the username field in the save-password prompt.",
       "localizations" : {
@@ -16209,6 +17030,17 @@
         }
       }
     },
+    "Width" : {
+      "comment" : "Label of the width field in the sheet that asks for a page's size, in points.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "宽度"
+          }
+        }
+      }
+    },
     "Window" : {
       "comment" : "A menu in the menu bar.",
       "localizations" : {
@@ -16469,6 +17301,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的密码存储在 Zigzag 中，保存在你 Mac 的钥匙串里，并通过 iCloud 钥匙串同步。可以在“Zigzag › 密码”中找到它们。"
+          }
+        }
+      }
+    },
+    "Your phone needs to be on the same network as this Mac, and your development server needs to listen on it too, not only on localhost (for most, a host of 0.0.0.0)." : {
+      "comment" : "Under the address in the Open on Your Phone sheet of the developer tools. 0.0.0.0 is a server setting, kept as is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手机需要和这台 Mac 连接同一个网络，你的开发服务器也需要在这个网络上监听，而不只是 localhost（多数情况下把主机设为 0.0.0.0）。"
           }
         }
       }
@@ -17199,6 +18042,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "默认 应用 链接 打开 启动 default"
+          }
+        }
+      }
+    },
+    "development site" : {
+      "comment" : "Spoken by VoiceOver after a tab row's name: the tab is on a site listed in Settings › Developer, and has a hammer on its row.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发网站"
+          }
+        }
+      }
+    },
+    "devtools web development localhost" : {
+      "comment" : "Words that find Settings › Developer with Find a setting, separated by spaces. Add your language's words for them. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "devtools web development localhost 开发 开发者 调试 本地"
           }
         }
       }

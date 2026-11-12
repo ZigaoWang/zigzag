@@ -47,13 +47,138 @@ final class PageCardView: NSView {
     /// ground shows there in the page's own color (`ground`), so the bar and the page read as one card: its
     /// corners, edge and shadow are the card's, and it moves with it.
     var band: CGFloat = 0 { didSet { if band != oldValue { needsLayout = true } } }
-    /// The card's color wherever the page isn't: the page's own (`Tab.pageColor`), so a split's two cards each have
-    /// theirs; the plain card's with no page, or under what covers it.
-    private var ground: NSColor { (webView as? BrowserWebView)?.owner?.pageColor ?? Tokens.Color.cardBackground }
+    /// The page's own color (`Tab.pageColor`), for the card's ground and what lies on it. None for a page at a
+    /// size of its own: it stands on plain ground, so its edges show.
+    var pageColor: NSColor? { pageSize == nil ? (webView as? BrowserWebView)?.owner?.pageColor : nil }
+    /// The card's color wherever the page isn't: the page's own, so a split's two cards each have theirs; the plain
+    /// card's with no page, under what covers it, or around a page at a size of its own.
+    /// Around a page at a size of its own, the backdrop a PDF's pages lie on: the page reads as a sheet on it, as a
+    /// device's screen does in a responsive view, whatever color the page is.
+    private var ground: NSColor { pageColor ?? (pageSize != nil ? Tokens.Color.pdfBackdrop : Tokens.Color.cardBackground) }
+    /// A hairline around a page at a size of its own, so its edges show on any backdrop, light page or dark.
+    private let pageOutline = ColorView(color: Tokens.Color.cardEdge)
     /// The page's part of the card, in the superview's terms: under the band.
     var pageFrame: NSRect { NSRect(x: frame.minX, y: frame.minY + band, width: frame.width, height: max(0, frame.height - band)) }
+    /// The page at a size of its own rather than filling the card: in the middle of its room, the card's plain
+    /// ground around it. What's docked beside the page (the Web Inspector) is beside it, not in it:
+    /// the page keeps its size. What covers the page (a PDF, Settings, Reader) fills the room as ever.
+    var pageSize: CGSize? {
+        didSet {
+            guard pageSize != oldValue else { return }
+            needsLayout = true
+            refreshGround()
+        }
+    }
+
+    /// Where the page's holder goes in the page's room. No size: all of it. A size: that, plus the room what's
+    /// docked beside the page takes, in the middle of the room both ways. A page larger than its room is shown
+    /// smaller, whole (`pageFit`); without the view scale to do that, it's cut to the room.
+    static func pageRect(content: NSRect, size: CGSize?, docked: NSSize, scales: Bool = false) -> NSRect {
+        pageFit(content: content, size: size, docked: docked, scales: scales).frame
+    }
+
+    /// The holder's place for a page of `size` in `content`, and the scale the page is shown at: 1 where it fits.
+    /// Larger than the room, it's laid out at its own size and shown smaller to fit, as a responsive view in Chrome
+    /// or Polypane does, so a desktop width can be checked in a laptop's window. What's docked beside it (the Web
+    /// Inspector) keeps its own size beside the page.
+    static func pageFit(content: NSRect, size: CGSize?, docked: NSSize, scales: Bool) -> (frame: NSRect, scale: CGFloat) {
+        guard let size, size.width > 0, size.height > 0 else { return (content, 1) }
+        let room = NSSize(width: max(0, content.width - docked.width), height: max(0, content.height - docked.height))
+        let scale = scales ? max(minimumScale, min(1, room.width / size.width, room.height / size.height)) : 1
+        let page = NSSize(width: scale < 1 ? round(size.width * scale) : size.width, height: scale < 1 ? round(size.height * scale) : size.height)
+        let width = min(content.width, page.width + docked.width), height = min(content.height, page.height + docked.height)
+        let frame = NSRect(x: content.minX + floor((content.width - width) / 2), y: content.minY + floor((content.height - height) / 2), width: width, height: height)
+        // The scale the page's whole points come to, a hair under, so it's laid out at exactly its width: WebKit
+        // divides in single precision and drops the fraction, and 1040 / (1040 / 1920) came out 1919.
+        return (frame, scale < 1 ? page.width / (size.width + 0.25) : 1)
+    }
+
+    /// The smallest a page is shown at: a full HD width still reads in a small window.
+    static let minimumScale: CGFloat = 0.25
+
+    /// WebKit's view scale (`_setViewScale:`, macOS only, private): the page is laid out at its view's size divided by
+    /// it and drawn that much smaller. Asked before use, so a WebKit without it leaves the page cut to its room.
+    static let setViewScale = NSSelectorFromString("_setViewScale:")
+    static func canScale(_ webView: WKWebView?) -> Bool { webView?.responds(to: setViewScale) == true }
+
+    /// The grips beside a page at a size of its own, to drag it to another (`PageSizeHandle`).
+    private lazy var sizeHandles: [PageSizeHandle] = PageSizeHandle.Edge.allCases.map { edge in
+        let handle = PageSizeHandle(edge: edge)
+        handle.isHidden = true
+        handle.current = { [weak self] in
+            guard let self, let size = self.pageSize else { return nil }
+            return (size, self.pageScale)
+        }
+        handle.onResize = { [weak self] size in self?.onResizePage?(size) }
+        return handle
+    }
+    /// A grip was dragged: the size to give the page (the window's tab's choice, `BrowserWindowController`).
+    var onResizePage: ((CGSize) -> Void)?
+
+    /// The grips go beside the page while it has a size of its own and is shown as itself: not under Settings, a
+    /// PDF or Reader, and not with the Web Inspector docked beside it, where they'd lie between the two.
+    private func placeHandles(in content: NSRect) {
+        let shows = pageSize != nil && onResizePage != nil && document == nil && overlay == nil
+        guard shows, let holder, holder.superview === clip, holder.dockedRoom == .zero else {
+            for handle in sizeHandles where !handle.isHidden { handle.isHidden = true }
+            return
+        }
+        let frames = PageSizeHandle.frames(page: holder.frame, room: content, flipped: clip.isFlipped)
+        for handle in sizeHandles {
+            if handle.superview !== clip { clip.addSubview(handle, positioned: .above, relativeTo: holder) }
+            if let frame = frames[handle.edge] {
+                handle.frame = frame
+                handle.isHidden = false
+            } else {
+                handle.isHidden = true
+            }
+        }
+    }
+
+    /// The scale the shown page is drawn at (`pageFit`), 1 at its own size.
+    private(set) var pageScale: CGFloat = 1 { didSet { if pageScale != oldValue { onPageArea?(pageArea) } } }
+
+    /// Gives a page the view scale, or takes it back to 1, only when it changes.
+    private static func apply(scale: CGFloat, to webView: WKWebView?) {
+        guard let webView, canScale(webView) else { return }
+        let now = webView.value(forKey: "viewScale") as? CGFloat ?? 1
+        if abs(now - scale) > 0.0001 { webView.setValue(scale, forKey: "viewScale") }
+    }
+
+    /// Places the shown page's holder for its size, the view scale with it, and says the page's area.
+    private func place(_ holder: PageHolder, in content: NSRect) {
+        // A page with a size of its own keeps it as the card changes; any other fills the card with it.
+        holder.autoresizingMask = pageSize == nil ? [.width, .height] : []
+        let fit = Self.pageFit(content: content, size: pageSize, docked: holder.dockedRoom, scales: Self.canScale(webView))
+        holder.frame = fit.frame
+        Self.apply(scale: fit.scale, to: webView)
+        pageScale = fit.scale
+        // The page's own area, as its styles see it: its size when shown smaller, else what the holder leaves it.
+        let shown = NSSize(width: holder.frame.width - holder.dockedRoom.width, height: holder.frame.height - holder.dockedRoom.height)
+        pageArea = fit.scale < 1 ? (pageSize ?? shown) : shown
+    }
+
+    /// The hairline goes round the page's holder while the page has a size of its own, under it, and is hidden
+    /// otherwise.
+    private func placeOutline() {
+        guard pageSize != nil, let holder, holder.superview === clip else {
+            if !pageOutline.isHidden { pageOutline.isHidden = true }
+            return
+        }
+        let line = Tokens.Metric.hairline
+        if pageOutline.superview !== clip || clip.subviews.firstIndex(of: pageOutline).map({ $0 + 1 }) != clip.subviews.firstIndex(of: holder) {
+            clip.addSubview(pageOutline, positioned: .below, relativeTo: holder)
+        }
+        pageOutline.frame = holder.frame.insetBy(dx: -line, dy: -line)
+        pageOutline.isHidden = false
+    }
+
     /// How far down the card the page starts: under the bar's band and a split pane's header.
     private var contentTop: CGFloat { band + (headerOnCard ? PaneHeaderView.height : 0) }
+    /// The page's own area as the card last laid it out, without what's docked beside it; whoever says the page's
+    /// size hears when it changes.
+    private(set) var pageArea = NSSize.zero { didSet { if pageArea != oldValue { onPageArea?(pageArea) } } }
+    var onPageArea: ((NSSize) -> Void)?
     /// Reader, over the page, which stays loaded underneath.
     private(set) var overlay: NSView?
     /// What covers the shown tab's page: its PDF viewer, over WebKit's own, or Settings.
@@ -335,7 +460,12 @@ final class PageCardView: NSView {
             }
             // The holder is sized, not the page (it fills the holder beside a docked Web Inspector, and in full screen
             // WebKit sizes it), and only while it's in this card: the mini player or another window may have borrowed it.
-            if let holder, holder.superview === clip { holder.frame = content }
+            if let holder, holder.superview === clip {
+                // A page with a size of its own keeps it as the card changes; any other fills the card with it.
+                place(holder, in: content)
+            }
+            placeOutline()
+            placeHandles(in: content)
             if !glides(document) { document?.frame = content }
             placeholder.frame = content
             overlay?.frame = content
@@ -435,7 +565,7 @@ final class PageCardView: NSView {
     /// The page's color changed, or the page did: the card's ground follows, and so does the web view's own.
     private func refreshGround() {
         Tokens.Motion.withoutAnimation { surface.layer?.backgroundColor = cgColor(ground) }
-        let pageColor = (webView as? BrowserWebView)?.owner?.pageColor
+        let pageColor = pageColor
         Self.paintGround(of: webView, pageColor)
         // The pane's strip lies on that color: its ink follows it.
         header.ground = pageColor
@@ -462,8 +592,13 @@ final class PageCardView: NSView {
         let newHolder = owner?.pageHolder
         if let newHolder {
             let top = contentTop
-            newHolder.frame = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
-            newHolder.autoresizingMask = [.width, .height]
+            let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
+            let fit = Self.pageFit(content: content, size: pageSize, docked: newHolder.dockedRoom, scales: Self.canScale(newWebView))
+            newHolder.frame = fit.frame
+            Self.apply(scale: fit.scale, to: newWebView)
+            newHolder.autoresizingMask = pageSize == nil ? [.width, .height] : []
+            // The Web Inspector docking beside a page with a size of its own makes room for itself.
+            newHolder.onDockedRoomChange = { [weak self] in self?.needsLayout = true }
             if newHolder.superview !== clip { clip.addSubview(newHolder, positioned: .below, relativeTo: placeholder) }
         }
         webView = newWebView
@@ -471,6 +606,13 @@ final class PageCardView: NSView {
         // The old page's holder goes, unless it's this one again (its tab has a new page) or another card has it by now.
         // One whose video is in full screen stays until that ends: WebKit puts the page back in it then, and taken
         // out now, the full screen would be left without it.
+        // The page that left is whoever shows it next's to size, filling its place as ever.
+        if let oldHolder, oldHolder !== newHolder {
+            oldHolder.onDockedRoomChange = nil
+            oldHolder.autoresizingMask = [.width, .height]
+            // At its own scale again wherever it's shown next (the mini player, another window).
+            if old !== newWebView { Self.apply(scale: 1, to: old) }
+        }
         if let oldHolder, oldHolder !== newHolder, oldHolder.superview === clip {
             if let old, old.fullscreenState != .notInFullscreen {
                 fullScreenWatch = old.observe(\.fullscreenState) { [weak self] page, _ in
@@ -522,12 +664,16 @@ final class PageCardView: NSView {
         }
         document = viewer
         guard let viewer, let webView, let holder else { return }
+        // The page's whole room, whatever the page's own size is: a page at a size of its own has a holder
+        // smaller than that. Laid out again with the card.
+        let room = NSRect(x: 0, y: 0, width: clip.bounds.width, height: max(0, clip.bounds.height - contentTop))
+        needsLayout = true
         viewer.autoresizingMask = [.width, .height]
         if glides(viewer) {
-            viewer.frame = holder.frame.offsetBy(dx: 0, dy: contentTop)
+            viewer.frame = room.offsetBy(dx: 0, dy: contentTop)
             surface.addSubview(viewer, positioned: .above, relativeTo: clip)
         } else {
-            viewer.frame = holder.frame
+            viewer.frame = room
             clip.addSubview(viewer, positioned: .above, relativeTo: holder)
         }
         if let window, window.firstResponder === webView { window.makeFirstResponder((viewer as? PDFViewerView)?.pdfView ?? viewer) }

@@ -188,16 +188,30 @@ final class PageMessages: NSObject, WKScriptMessageHandler {
 /// A website's uncaught errors and failed promises, and requests it makes that fail, for the diagnostics record: so
 /// "I click it and nothing happens" comes with the error the page hit. Only the message and the site, never the page's
 /// address or data (`Diagnostics.clean`), at most a few per page, and nothing from a private window.
+///
+/// A development tab counts its page's errors and failed promises too (`Tab.pageErrorCount`, #141), every one of
+/// them: past the few it describes, the page says only how many more there were, at most twice a second, so a page
+/// that throws in a loop costs two small messages a second. It says so only where someone listens for it
+/// (`counts(in:)`, a development tab's pages): on every other page the script stops at those few, as it always has.
 final class PageErrors: NSObject, WKScriptMessageHandler {
     static let shared = PageErrors()
     static let messageName = "zigzagPageError"
+    /// What a development tab's pages say how many more errors on (`counts(in:)`).
+    static let countName = "zigzagPageErrorCount"
 
     static let script = WKUserScript(source: """
     (() => {
       if (!/^https?:$/.test(location.protocol)) return;
-      let sent = 0;
+      let sent = 0, more = 0, waiting = 0;
+      // The page's own timers may be stood in for (a test's fake clock): the real one, from before the page ran.
+      const later = window.setTimeout.bind(window);
+      const tell = () => { waiting = 0; const count = more; more = 0; try { window.webkit.messageHandlers.\(countName).postMessage(count); } catch (e) {} };
       const post = (kind, text) => {
-        if (++sent > 8) return;
+        if (++sent > 8) {
+          // Counted on only where a development tab listens.
+          if (kind !== 'http' && window.webkit.messageHandlers.\(countName)) { more++; if (!waiting) waiting = later(tell, 500); }
+          return;
+        }
         try { window.webkit.messageHandlers.\(messageName).postMessage({ kind, text: String(text || '').slice(0, 300) }); } catch (e) {}
       };
       const where = (file, line) => { try { return ' (' + new URL(file).host + ':' + line + ')'; } catch (e) { return ''; } };
@@ -218,9 +232,56 @@ final class PageErrors: NSObject, WKScriptMessageHandler {
     })();
     """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
 
+    /// How many errors a message the page describes stands for: one for an error or a failed promise, none for a
+    /// request that failed.
+    static func errors(in body: [String: Any]) -> Int {
+        switch body["kind"] as? String {
+        case "error", "rejection": 1
+        default: 0
+        }
+    }
+
+    /// How many more a page says there were, past the ones it described.
+    static func more(_ body: Any) -> Int { max(0, min(body as? Int ?? 0, 100_000)) }
+
+    /// Hears a development tab's pages say how many more errors there were.
+    private final class Counter: NSObject, WKScriptMessageHandler {
+        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+            (message.webView as? BrowserWebView)?.owner?.countPageErrors(PageErrors.more(message.body))
+        }
+    }
+    private static let counter = Counter()
+    /// The sets of scripts the counter is in, so it's put in once and taken out once.
+    private static let counting = NSHashTable<WKUserContentController>.weakObjects()
+    /// Per set of scripts, the web views listened to. A page and the pop-ups it opened share one set: the counter
+    /// stays in it while any of them is a development tab's, rather than one that isn't taking it from one that is.
+    private static let listened = NSMapTable<WKUserContentController, NSHashTable<WKWebView>>.weakToStrongObjects()
+
+    /// Whether the counter is in a web view's set of scripts.
+    static func isCounting(in webView: WKWebView) -> Bool { counting.contains(webView.configuration.userContentController) }
+
+    /// A web view's pages are listened to for the count, or no longer: a development tab's are. The page script
+    /// looks for the listener each time it would count, so a page already open follows at once.
+    static func counts(in webView: WKWebView, _ on: Bool) {
+        let controller = webView.configuration.userContentController
+        let webViews = listened.object(forKey: controller) ?? NSHashTable<WKWebView>.weakObjects()
+        if on { webViews.add(webView) } else { webViews.remove(webView) }
+        listened.setObject(webViews, forKey: controller)
+        let wanted = !webViews.allObjects.isEmpty
+        guard wanted != counting.contains(controller) else { return }
+        if wanted {
+            controller.add(counter, contentWorld: .page, name: countName)
+            counting.add(controller)
+        } else {
+            controller.removeScriptMessageHandler(forName: countName, contentWorld: .page)
+            counting.remove(controller)
+        }
+    }
+
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any], let kind = body["kind"] as? String, let text = body["text"] as? String,
               let webView = message.webView else { return }
+        (webView as? BrowserWebView)?.owner?.countPageErrors(Self.errors(in: body))
         let origin = message.frameInfo.securityOrigin
         let title = kind == "http" ? "Request failed" : kind == "rejection" ? "Page error (promise)" : "Page error"
         // An error in a frame (a sign-in, a payment) says which frame, beside the page it's in.
