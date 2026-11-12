@@ -414,6 +414,19 @@ struct TopBarTests {
         #expect(root.paneTargets.right == root.paneFrames.right)
     }
 
+    @Test func stackedTheZoomedTopPaneLeavesTheBarsControlsAside() {
+        let (root, sidebar) = splitRoot(vertical: true)
+        root.setZoomedPane(0, animated: false)
+        root.layoutSubtreeIfNeeded()
+        // The top pane took the only strip in the bar with it; the bar's own controls stay out all the same.
+        #expect(root.card.header.isDescendant(of: root.card) && !root.card.header.isInBar)
+        #expect(sidebar.addressButtons.allSatisfy(\.isHidden) && sidebar.address.isHidden)
+        #expect(root.stripsInBar)
+        root.setZoomedPane(nil, animated: false)
+        root.layoutSubtreeIfNeeded()
+        #expect(root.card.header.superview === root.topBar && sidebar.address.isHidden)
+    }
+
     @Test func outOfSplitOrWithTheBarOffTheStripsGoBack() {
         var (root, sidebar) = splitRoot()
         root.splitRatio = nil

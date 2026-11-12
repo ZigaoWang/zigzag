@@ -1009,17 +1009,21 @@ final class BrowserRootView: SpaceFrameView {
         return frames.indices.filter { frames[$0].minY <= top + 0.5 && $0 != zoomedPane }.sorted { frames[$0].minX < frames[$1].minX }.map { paneCards[$0] }
     }
 
-    /// Whether the panes' strips are in the bar's row.
-    var stripsInBar: Bool { !liftedCards.isEmpty }
+    /// Whether the bar's own controls have stepped aside for the panes' strips: in split view under the bar, also
+    /// while the zoomed pane (stacked, the top one) has taken the only strip up there back to its card.
+    private(set) var stripsInBar = false
 
     /// Moves the strips up into the bar or gives them back to their cards. Into a split or out of one, the bar holds
     /// still and its own controls and the strips cross-fade in place as the panes slide (the first pane's back, forward
     /// and reload come in where the bar's were); anything else changes at once.
     private func placeStrips(animated: Bool) {
         let cards = cardsForBar
-        guard cards != liftedCards else { return }
-        let entering = liftedCards.isEmpty, leaving = cards.isEmpty
+        // A split's pages each have their own controls: the bar's stay out the whole time, zoomed or not.
+        let stepsAside = showsTopBar && tiles != nil
+        guard cards != liftedCards || stepsAside != stripsInBar else { return }
+        let entering = stepsAside && !stripsInBar, leaving = !stepsAside && stripsInBar
         liftedCards = cards
+        stripsInBar = stepsAside
         stripFades += 1
         let fade = stripFades
         for card in cards { card.liftsHeader = true }
@@ -1030,7 +1034,7 @@ final class BrowserRootView: SpaceFrameView {
             Tokens.Motion.withoutAnimation {
                 given.forEach { $0.liftsHeader = false }
                 cards.forEach { $0.header.alphaValue = $0.headerAlpha }
-                own.forEach { $0.alphaValue = 1; $0.isHidden = !cards.isEmpty }
+                own.forEach { $0.alphaValue = 1; $0.isHidden = stepsAside }
             }
             return
         }

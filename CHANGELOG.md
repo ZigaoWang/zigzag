@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - A zoomed page of a split goes back in its place when the pages swap, move or change layout, as it does when one comes or goes. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+- With the address bar above the page and a split stacked, zooming the top page no longer brings back the bar's own buttons and address beside it. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 
 ## [0.9.0] - 2026-11-12
 
