@@ -23,9 +23,33 @@ final class FaviconView: NSView {
 
     var image: NSImage? { didSet { refreshImage() } }
     var isLoading = false { didSet { if oldValue != isLoading { refreshLoading() } } }
-    /// A tab put to sleep: a dotted ring round its icon, as Chrome marks a tab whose page it let go.
-    var isAsleep = false { didSet { if oldValue != isAsleep { asleepRing.isHidden = !isAsleep } } }
+    /// A tab put to sleep: a thin dashed ring round its icon, as Chrome marks a tab whose page it let go.
+    var isAsleep = false { didSet { if oldValue != isAsleep { asleepRing.isHidden = !isAsleep; needsLayout = true } } }
     private let asleepRing = CAShapeLayer()
+
+    /// The sleeping mark's look, as Chrome marks a tab it let go: a hairline ring of short even dashes in a quiet
+    /// ink, an even gap out from the icon, which is drawn a little smaller inside it so the two never crowd.
+    struct AsleepStyle {
+        /// From the icon's usual square to the ring's inner edge.
+        var gap: CGFloat
+        var lineWidth: CGFloat
+        /// A dash and the space after it, before they're evened out round the circle (`evenDashes`).
+        var dash: CGFloat
+        var space: CGFloat
+        /// The icon inside the ring, as a share of its usual side.
+        var iconScale: CGFloat
+    }
+    static let asleepStyle = AsleepStyle(gap: 1.5, lineWidth: 0.75, dash: 1.5, space: 1.3, iconScale: 0.85)
+
+    /// A dash and the space after it, stretched or squeezed a little so a whole number of them goes exactly round a
+    /// circle of this circumference: no short dash or long gap where the circle starts and ends.
+    nonisolated static func evenDashes(circumference: CGFloat, dash: CGFloat, space: CGFloat) -> (dash: CGFloat, space: CGFloat, count: Int) {
+        let period = dash + space
+        guard circumference > 0, period > 0 else { return (dash, space, 0) }
+        let count = max(4, Int((circumference / period).rounded()))
+        let scale = circumference / CGFloat(count) / period
+        return (dash * scale, space * scale, count)
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -36,9 +60,6 @@ final class FaviconView: NSView {
         imageLayer.masksToBounds = true
         layer?.addSublayer(imageLayer)
         asleepRing.fillColor = nil
-        asleepRing.lineWidth = 1.25
-        asleepRing.lineCap = .round
-        asleepRing.lineDashPattern = [0.01, 2.6]
         asleepRing.isHidden = true
         layer?.addSublayer(asleepRing)
 
@@ -61,11 +82,7 @@ final class FaviconView: NSView {
     override func layout() {
         super.layout()
         Tokens.Motion.withoutAnimation {
-            imageLayer.frame = bounds
-            // Just outside the icon, so the icon itself reads as it always does.
-            let ring = bounds.insetBy(dx: -2.5, dy: -2.5)
-            asleepRing.frame = bounds
-            asleepRing.path = CGPath(ellipseIn: ring.offsetBy(dx: -bounds.minX, dy: -bounds.minY), transform: nil)
+            layoutAsleep()
             spinner.frame = bounds
             spinner.ribbonWidth = bounds.width * 0.62
             fallback.frame = bounds
@@ -78,6 +95,23 @@ final class FaviconView: NSView {
         refreshColors()
     }
 
+    /// The ring an even gap out from the icon, clear of its corners, its dashes dividing the circle exactly.
+    private func layoutAsleep() {
+        let style = Self.asleepStyle
+        let local = NSRect(origin: .zero, size: bounds.size)
+        let shrink = isAsleep ? bounds.width * (1 - style.iconScale) / 2 : 0
+        imageLayer.frame = bounds.insetBy(dx: shrink, dy: shrink)
+        guard isAsleep else { return }
+        let ring = local.insetBy(dx: -style.gap - style.lineWidth / 2, dy: -style.gap - style.lineWidth / 2)
+        let even = Self.evenDashes(circumference: .pi * ring.width, dash: style.dash, space: style.space)
+        asleepRing.frame = bounds
+        asleepRing.path = CGPath(ellipseIn: ring, transform: nil)
+        asleepRing.lineWidth = style.lineWidth
+        // A dash centered on the circle's start, so the pattern is symmetric.
+        asleepRing.lineDashPattern = [NSNumber(value: Double(even.dash)), NSNumber(value: Double(even.space))]
+        asleepRing.lineDashPhase = even.dash / 2
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         imageLayer.contentsScale = window?.backingScaleFactor ?? 2
@@ -87,8 +121,8 @@ final class FaviconView: NSView {
     private func refreshColors() {
         Tokens.Motion.withoutAnimation {
             spinner.color = Tokens.Color.icon
-            var ink = Tokens.Color.textSecondary.cgColor
-            effectiveAppearance.performAsCurrentDrawingAppearance { ink = Tokens.Color.textSecondary.cgColor }
+            var ink = Tokens.Color.textTertiary.cgColor
+            effectiveAppearance.performAsCurrentDrawingAppearance { ink = Tokens.Color.textTertiary.cgColor }
             asleepRing.strokeColor = ink
             asleepRing.contentsScale = window?.backingScaleFactor ?? 2
             imageLayer.cornerRadius = isInk || isChosen ? 0 : Tokens.Radius.small - 1
