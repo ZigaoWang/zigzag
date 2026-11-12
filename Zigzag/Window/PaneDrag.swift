@@ -97,6 +97,7 @@ final class PaneDrag {
         if over !== list { list?.externalHover(at: nil) }
         list = over
         over?.externalHover(at: screenPoint)
+        controller.root.splitDropHint.follow(window.convertPoint(fromScreen: screenPoint))
         controller.root.splitDropHint.show(move: move)
         // A tick as it comes onto another place it would take.
         if next != target, next != .none, next != .outside { Haptics.snap() }

@@ -297,7 +297,9 @@ something came from, answers at once, and can be interrupted.
   columns and one between the rows, each dragged on its own and run only where it divides panes. A tab dragged over
   the page: its edges are halves, its corners quarters, anywhere else the half of the pane under the pointer (beside a
   page alone, the left or right half, as always), and a quarter that can't split takes the tab in its place. The drop
-  hint shows where it lands, in the split's one style, named for the place ("Open Top Left").
+  hint shows where it lands, in the split's one style, named for the place ("Open Top Left") on a toast's pill so it
+  reads over any page: near the zone's top, or its bottom while the pointer is in its upper half, clear of what hangs
+  under the pointer.
 - **Windows** (#167): each window has its own tabs, as in Chrome and Safari; pinned tabs and favorites are every
   window's. A tab dragged out of the sidebar follows the drag-and-drop model: its row stays faint, and over another
   window's sidebar that list's line shows where it lands. Let go there, or over that window's page, and it moves in,

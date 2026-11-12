@@ -1138,7 +1138,12 @@ final class PassthroughView: NSView {
 /// quarter of the page, or in place of a page that can't split again.
 final class SplitDropHint: NSView {
     private let zone = ColorView()
-    private let label = Label("", font: Tokens.Font.body(.semibold), color: .white)
+    /// What the hint says, on a toast's pill so it reads over any page, kept clear of what the pointer carries.
+    private let pill = FloatingPanelView()
+    private let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+    /// The pointer, in this view's terms, while something is carried over the page: the label keeps out from under
+    /// the picture that hangs below it.
+    private var pointer: CGPoint?
     /// Where a drop now would go, in this view's terms (it covers the page area); nil while it's not over the page.
     private(set) var drop: TileDrop?
 
@@ -1149,7 +1154,11 @@ final class SplitDropHint: NSView {
         zone.layer?.cornerCurve = .continuous
         zone.layer?.borderWidth = 2
         addSubview(zone)
-        zone.addSubview(label)
+        pill.radius = Tokens.Metric.toastHeight / 2
+        // Laid out with the pill, inside its surface, as a toast lays out its label.
+        pill.onLayout = { [weak self] in self?.layoutLabel() }
+        pill.addSubview(label)
+        addSubview(pill)
         label.alignment = .center
         isHidden = true
     }
@@ -1184,11 +1193,42 @@ final class SplitDropHint: NSView {
         zone.color = Tokens.Color.accent.withAlphaComponent(0.16)
         zone.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.6))
         label.stringValue = title ?? ""
-        label.textColor = Tokens.Color.accent
-        Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) { self.zone.animator().frame = target }
+        let place = labelFrame(in: target)
+        Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) {
+            self.zone.animator().frame = target
+            self.pill.animator().frame = place
+        }
         if zone.frame.isEmpty { zone.frame = target }
+        if pill.frame.isEmpty { pill.frame = place }
+        pill.needsLayout = true
+    }
+
+    /// The pointer moved (a window point; nil: nothing carried): the label moves out of its way if it has to.
+    func follow(_ windowPoint: NSPoint?) {
+        pointer = windowPoint.map { convert($0, from: nil) }
+        guard !isHidden, !zone.frame.isEmpty else { return }
+        let place = labelFrame(in: zone.frame)
+        guard place != pill.frame else { return }
+        Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) { self.pill.animator().frame = place }
+    }
+
+    /// The label's pill in `zone`: centered across it, near its top, or near its bottom while the pointer is in its
+    /// upper half, as what's carried hangs below the pointer.
+    private func labelFrame(in zone: CGRect) -> CGRect {
+        let h = Tokens.Metric.toastHeight, inset = Tokens.Space.x4
+        // A few points in hand, as a field's text keeps before it cuts.
+        let w = min(ceil(label.inkWidth) + Tokens.Space.x2 + inset * 2, max(0, zone.width - inset * 2))
+        // Clear of a pane's strip at the top, so the pane's address still shows.
+        let top = zone.minY + Tokens.Pane.height + Tokens.Space.x3
+        let high = pointer.map { $0.y < zone.midY } ?? false
+        let y = high ? max(top, zone.maxY - inset - h) : min(top, max(zone.minY, zone.maxY - inset - h))
+        return CGRect(x: round(zone.midX - w / 2), y: round(y), width: w, height: h)
+    }
+
+    private func layoutLabel() {
         let h = label.lineHeight
-        label.frame = NSRect(x: 0, y: (target.height - h) / 2, width: target.width, height: h)
+        label.frame = NSRect(x: Tokens.Space.x4 - Label.inset, y: (pill.bounds.height - h) / 2,
+                             width: max(0, pill.bounds.width - Tokens.Space.x4 * 2 + Label.inset * 2), height: h)
     }
 
     /// What the hint says over where the page would open.

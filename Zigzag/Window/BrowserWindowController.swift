@@ -2268,6 +2268,7 @@ extension BrowserWindowController: SidebarDelegate {
     /// Where a tab let go at a window point would open beside `current` and the pages with it (#160): the hint over
     /// that half or quarter, with a tick as it moves to another.
     func showDropHint(at windowPoint: NSPoint, beside current: Tab) {
+        root.splitDropHint.follow(windowPoint)
         let drop = root.splitDropHint.drop(at: windowPoint, shape: tabManager.split(for: current)?.shape, gap: root.paneGap)
         if let drop, drop.kind != root.splitDropHint.drop?.kind { Haptics.snap() }
         root.splitDropHint.show(drop)
