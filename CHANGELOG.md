@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - In split view, drag a page by its strip to move it: onto another page and the two swap places, onto the page's edges or corners and it takes that half or quarter, onto the sidebar's tabs and it leaves the split as a tab of its own, out of the window and it opens in a new one (hold Option for Zigzag Mini). The same preview as for a dragged tab shows where it lands, Esc calls it off, and ⌘Z puts it back. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+- Zoom Pane enlarges one page of a split view over the others for a moment, without moving anything: ⇧-click its part of the row in the sidebar, use the button in its strip, or press ⇧⌘↩. Click beside it, press Esc or zoom it again and it goes back where it was. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - Double-clicking a split's row in the sidebar renames the page you clicked. A group of three or four shows its icons evenly in the row, and pointing at one names its page. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 
 ### Fixed

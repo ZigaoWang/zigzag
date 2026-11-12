@@ -293,6 +293,12 @@ something came from, answers at once, and can be interrupted.
   Left"): another pane's middle swaps, the page's edges and corners take a half or quarter as for a tab, the sidebar's
   list (its line) makes it a tab of its own there, outside every window a new window (⌥: Zigzag Mini). Esc, or its own
   place, changes nothing; one ⌘Z puts it back. Up in the bar above the page the strip moves the window instead.
+- **Zoom Pane** (#160): a terminal's or editor's "maximize pane", in Peek's look: the pane (live, the same page, never
+  reloaded) grows out of its place to Peek's card frame over the rest, which stay live under Peek's dimming
+  (`BrowserRootView.setZoomedPane`, `PaneZoom`). From ⇧-clicking its part of the row of the pages on screen (elsewhere
+  ⇧ still picks rows), the strip's button (with zoom, swap and the layout, into ⋯ first) or View › Zoom Pane, ⇧⌘↩.
+  Esc, a click beside it, zooming it again or going to another pane puts it back; so does any change to the group.
+  Nothing is saved. The row lights the zoomed part with the pressed fill. With Reduce Motion, a crossfade.
 - **Tiling** (`TileLayout.swift`): two to four panes on a 2×2 grid, halves and quarters, with a line between the
   columns and one between the rows, each dragged on its own and run only where it divides panes. A tab dragged over
   the page: its edges are halves, its corners quarters, anywhere else the half of the pane under the pointer (beside a
