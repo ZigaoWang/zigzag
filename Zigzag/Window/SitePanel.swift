@@ -1186,8 +1186,8 @@ final class PanelGroup: NSView {
     }
 }
 
-/// One line of "This site", as Settings draws its rows: a name with what it's set to under it, and a switch or a
-/// pill button at the right. No symbols: the names say what each is.
+/// One line of "This site", as Settings draws its rows: a name, with what it's set to under it for a switch, and a
+/// switch, a dropdown or the zoom stepper at the right. No symbols: the names say what each is.
 final class PanelRow: NSView {
     static let height = Tokens.Page.groupRowHeight
     private let title: Label
@@ -1237,12 +1237,6 @@ final class PanelRow: NSView {
         if let status { value?.stringValue = status(on) }
     }
 
-    static func value(_ title: String, _ value: String, action: String, run: @escaping () -> Void) -> PanelRow {
-        let button = PillButton(title: action)
-        button.onClick = { _ in run() }
-        return PanelRow(title, control: button, value: value)
-    }
-
     /// A name and a dropdown of choices: a permission's Ask, Allow or Block.
     static func choice(_ title: String, options: [String], selected: Int, chose: @escaping (Int) -> Void) -> PanelRow {
         let dropdown = DropdownButton()
@@ -1274,8 +1268,7 @@ final class PanelRow: NSView {
 
     override func layout() {
         super.layout()
-        var size = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
-        if let pill = control as? PillButton { size = NSSize(width: pill.fittingWidth, height: Tokens.Page.controlHeight) }
+        let size = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
         control.frame = NSRect(x: bounds.width - size.width, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
         let x = -Label.inset
         let right = control.frame.minX - Tokens.Space.x2 - x
