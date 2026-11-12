@@ -7,7 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [0.9.0] - 2026-11-12
 
-0.9.0 gives you more ways to lay out the web: split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
+Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
 
 ### New
 - Split view takes up to four tabs. Drag a tab over the page: its edges place it in a half, its corners in a quarter, and a preview with a small label shows where it lands. Three tabs are a half and two quarters, four a grid; the lines between them drag, and the group is one row in the sidebar that comes back after a restart. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
