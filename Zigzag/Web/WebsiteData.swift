@@ -22,8 +22,8 @@ enum WebsiteData {
     /// Clears `kind` for a site ("youtube.com", covering its subdomains), or for every site when `site` is nil, in
     /// one store: a profile's, or a private window's own.
     static func clear(_ kind: Kind, site: String? = nil, in store: WKWebsiteDataStore) async {
-        // Dark pages' palettes name the sites they were made for: they go with either.
-        DarkPalettes.forget(in: store, site: site)
+        // Dark pages' sites seen dark name the sites they were seen on: they go with either.
+        DarkSeen.forget(in: store, site: site)
         guard let site else {
             await store.removeData(ofTypes: kind.types, modifiedSince: .distantPast)
             return

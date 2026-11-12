@@ -652,9 +652,9 @@ enum DebugBridge {
                                             hex(own), hex(layer), hex(webView.underPageBackgroundColor), hex(tab?.pageColor),
                                             webView.url?.absoluteString ?? "nil", webView.isLoading ? 1 : 0)
                         webView.callAsyncJavaScript("""
-                            const s = document.querySelector('style[data-zigzag-dark=""]'), p = document.querySelector('style[data-zigzag-dark=prepaint]');
-                            return JSON.stringify({ ready: document.readyState, style: !!s, filter: !!s && s.textContent.includes('invert'),
-                              prepaint: !!p, state: window.__zigzagDark ? window.__zigzagDark.state().palette : null,
+                            const p = document.querySelector('style[data-zigzag-dark=prepaint]');
+                            return JSON.stringify({ ready: document.readyState, darkreader: document.documentElement && document.documentElement.getAttribute('data-darkreader-mode'),
+                              fallback: !!document.querySelector('.darkreader--fallback'), prepaint: !!p,
                               prefersDark: matchMedia('(prefers-color-scheme: dark)').matches, mode: document.documentElement && document.documentElement.getAttribute('data-color-mode'),
                               darkened: window.__zigzagDark ? window.__zigzagDark.state().darkened : null });
                             """, arguments: [:], in: nil, in: DarkPages.world) { result in
@@ -967,10 +967,10 @@ enum DebugBridge {
             controller.selectedWebView?.callAsyncJavaScript("return window.__zigzagDark ? JSON.stringify(window.__zigzagDark.state()) : 'none'",
                                                             arguments: [:], in: nil, in: DarkPages.world) { result in
                 let tab = controller.tabManager.selectedTab?.darkPage
-                debugLog("darkstate => \(result) tab=\(String(describing: tab)) analysis=\(DarkPages.lastAnalysis)")
+                debugLog("darkstate => \(result) tab=\(String(describing: tab))")
             }
-        // darkpalettes forget: drops the profile's dark palettes, as clearing History does.
-        case "darkpalettes": if arg == "forget" { DarkPalettes.forget(in: controller.tabManager.profile.store) }
+        // darkseen forget: drops the profile's sites seen dark, as clearing History does.
+        case "darkseen": if arg == "forget" { DarkSeen.forget(in: controller.tabManager.profile.store) }
         case "resize":
             let n = arg.split(separator: " ").compactMap { Double($0) }
             if n.count == 2, let window = controller.window {

@@ -15278,6 +15278,17 @@
         }
       }
     },
+    "Uses Dark Reader, by Dark Reader Ltd." : {
+      "comment" : "After the explanation under “Dark pages” in Settings › Appearance. Dark Reader is the name of the open-source dark mode engine, Dark Reader Ltd. its maker: keep both as they are.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Dark Reader，由 Dark Reader Ltd. 开发。"
+          }
+        }
+      }
+    },
     "Uses EasyList and EasyPrivacy, by the EasyList authors." : {
       "comment" : "Explanation under “Block ads and trackers” in Settings › Privacy.",
       "localizations" : {

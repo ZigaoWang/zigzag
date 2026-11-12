@@ -141,9 +141,11 @@ struct DarkPagesTests {
         }
         try await Task.sleep(for: .milliseconds(300))
         let state = try await webView.callAsyncJavaScript("return window.__zigzagDark.state()", arguments: [:], in: nil, contentWorld: DarkPages.world)
-        let filter = try await webView.callAsyncJavaScript("return getComputedStyle(document.documentElement).filter", arguments: [:], in: nil, contentWorld: .page)
+        let engine = try await webView.callAsyncJavaScript("return document.documentElement.getAttribute('data-darkreader-mode') || ''", arguments: [:], in: nil, contentWorld: .page)
+        let body = try await webView.callAsyncJavaScript("return getComputedStyle(document.body).backgroundColor", arguments: [:], in: nil, contentWorld: .page)
         var result = state as? [String: Any] ?? [:]
-        result["filter"] = filter as? String ?? ""
+        result["engine"] = engine as? String ?? ""
+        result["body"] = body as? String ?? ""
         return result
     }
 
@@ -151,14 +153,17 @@ struct DarkPagesTests {
         let state = try await state(of: "<html><body style='background:#fff;color:#222'><main><p>Light page</p></main></body></html>")
         #expect(state["darkened"] as? Bool == true)
         #expect(state["native"] as? Bool == false)
-        #expect((state["filter"] as? String)?.contains("invert") == true)
+        // Dark Reader's dynamic theme, its own dark under the page.
+        #expect(state["engine"] as? String == "dynamic")
+        #expect(state["body"] as? String == "rgb(24, 26, 27)")
     }
 
     @Test func aDarkPageIsLeftAlone() async throws {
         let state = try await state(of: "<html><body style='background:#111;color:#eee'><main><p>Dark page</p></main></body></html>")
         #expect(state["darkened"] as? Bool == false)
         #expect(state["native"] as? Bool == true)
-        #expect((state["filter"] as? String)?.contains("invert") == false)
+        #expect(state["engine"] as? String == "")
+        #expect(state["body"] as? String == "rgb(17, 17, 17)")
     }
 
     @Test func aPageWithItsOwnDarkThemeUsesIt() async throws {
@@ -265,17 +270,27 @@ struct DarkPagesTests {
     /// A new tab next to a megabyte of other scripts gets its page script at once, and only one, however often it's
     /// put in: telling the scripts apart once searched every one of them and held each new tab up.
     @Test func puttingTheScriptInIsQuickAndLeavesOne() {
-        let configuration = WKWebViewConfiguration()
-        let big = WKUserScript(source: "/* other */" + String(repeating: "let a = 1; // window.__zigzag\n", count: 40_000),
-                               injectionTime: .atDocumentStart, forMainFrameOnly: false)
-        for _ in 0..<4 { configuration.userContentController.addUserScript(big) }
-        let webView = WKWebView(frame: .zero, configuration: configuration)
-        let started = Date()
-        for _ in 0..<5 { DarkPages.attach(to: webView) }
-        let each = Date().timeIntervalSince(started) / 5
-        let scripts = configuration.userContentController.userScripts
-        #expect(scripts.filter(DarkPages.isOurs).count == 1)
-        #expect(scripts.count == 5)
-        #expect(each < 0.05, "attaching took \(Int(each * 1000)) ms")
+        withDefaults {
+            DarkPages.mode = .always
+            let configuration = WKWebViewConfiguration()
+            let big = WKUserScript(source: "/* other */" + String(repeating: "let a = 1; // window.__zigzag\n", count: 40_000),
+                                   injectionTime: .atDocumentStart, forMainFrameOnly: false)
+            for _ in 0..<4 { configuration.userContentController.addUserScript(big) }
+            let webView = WKWebView(frame: .zero, configuration: configuration)
+            DarkPages.attach(to: webView)
+            let started = Date()
+            for _ in 0..<5 { DarkPages.attach(to: webView) }
+            let each = Date().timeIntervalSince(started) / 5
+            let scripts = configuration.userContentController.userScripts
+            // The page script and Dark Reader's proxy, once each.
+            #expect(scripts.filter(DarkPages.isOurs).count == 2)
+            #expect(scripts.count == 6)
+            #expect(each < 0.05, "attaching took \(Int(each * 1000)) ms")
+            // Where dark pages aren't wanted, Dark Reader isn't put in at all.
+            DarkPages.mode = .off
+            DarkPages.attach(to: webView)
+            #expect(configuration.userContentController.userScripts.filter(DarkPages.isOurs).isEmpty)
+            DarkPages.mode = .always
+        }
     }
 }

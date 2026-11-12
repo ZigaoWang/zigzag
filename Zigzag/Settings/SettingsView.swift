@@ -1096,10 +1096,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             DarkPages.mode = DarkPages.Mode.allCases[index]
             self?.refreshPureBlack()
         }
+        // Dark Reader's license asks for its notice, which is in Acknowledgments; this is where people look for what
+        // draws pages dark.
+        let darkDetail = String(localized: "Websites without a dark look of their own are drawn dark. Pictures and video stay as they are.",
+                                comment: "Explanation under “Dark pages” in Settings › Appearance.")
+            + " " + String(localized: "Uses Dark Reader, by Dark Reader Ltd.", comment: "After the explanation under “Dark pages” in Settings › Appearance. Dark Reader is the name of the open-source dark mode engine, Dark Reader Ltd. its maker: keep both as they are.")
         let darkRow = FormRow(title: String(localized: "Dark pages", comment: "A setting in Settings › Appearance: websites without a dark look of their own are drawn dark."),
-                              detail: String(localized: "Websites without a dark look of their own are drawn dark. Pictures and video stay as they are.",
-                                             comment: "Explanation under “Dark pages” in Settings › Appearance."),
-                              control: darkPages)
+                              detail: darkDetail, control: darkPages)
         darkRow.keywords = String(localized: "dark mode light appearance night theme black invert", comment: "Words that find the Dark pages setting with Find a setting in Settings. Not shown.")
         appearanceGroup.add(darkRow)
         pureBlackToggle.onChange = { on in DarkPages.pureBlack = on }

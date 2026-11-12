@@ -1,17 +1,17 @@
 import Foundation
 import WebKit
 
-/// The sites dark pages saw dark on their own (#134), kept for each profile beside its palettes, so a site's pages start
-/// on its own dark from its first moment, the next time and after a restart too, rather than going through the filter
-/// first: GitHub's dark, turned white by it, showed for half a second on the first visit of every session.
+/// The sites dark pages saw dark on their own (#134), kept for each profile, so a site's pages start on its own dark
+/// from its first moment, the next time and after a restart too, rather than being darkened first and then let go:
+/// GitHub's dark showed white for half a second on the first visit of every session.
 ///
 /// For each site: the dark its page was drawn on, which a page of it starts on until it's looked at, and the mark its
 /// own dark look sets on the page's root by script (a class of "dark", or data-theme="dark"), if it sets one, so its
 /// dark style applies from the first sheet. Only a mark the site was seen setting itself is kept, never one it doesn't use.
 ///
-/// It's a list of sites you've been to, so it goes with them as palettes do: clearing a site's cache or cookies takes
-/// it, clearing all of either or all of History takes them all, and clearing History since a time takes the ones seen
-/// since. Never for a private window, which learns nothing and is given nothing.
+/// It's a list of sites you've been to, so it goes with them: clearing a site's cache or cookies takes it, clearing all
+/// of either or all of History takes them all, and clearing History since a time takes the ones seen since. Never for
+/// a private window, which learns nothing and is given nothing.
 @MainActor
 enum DarkSeen {
     struct Site: Codable, Equatable {
@@ -28,9 +28,35 @@ enum DarkSeen {
     static let maxSites = 1000
 
     private static var loaded: [String: [String: Site]] = [:]
-    private static var disk: DispatchQueue { DarkPalettes.disk }
+    /// Where the lists are written and removed, in order.
+    static let disk = DispatchQueue(label: "app.zigzag.dark-seen", qos: .utility)
 
-    private static func file(_ scope: String) -> URL? { DarkPalettes.folder(scope)?.appendingPathComponent(fileName) }
+    /// The profile scope (`DarkPages.nativeScope`) of a profile.
+    nonisolated static func scope(ofProfile id: UUID) -> String { id == Profile.defaultID ? "default" : id.uuidString }
+
+    /// A profile's folder for it. Tests never use a real profile's: they get one of their own.
+    static var folder: (String) -> URL? = { scope in
+        let name = "Dark Pages"
+        if AppDelegate.isHostingTests {
+            return FileManager.default.temporaryDirectory.appendingPathComponent("ZigzagTests-DarkSeen-\(ProcessInfo.processInfo.processIdentifier)")
+                .appendingPathComponent(scope).appendingPathComponent(name)
+        }
+        if scope == "default" { return Paths.support.appendingPathComponent(name, isDirectory: true) }
+        guard let id = UUID(uuidString: scope) else { return nil }
+        return Profiles.folder(of: id).appendingPathComponent(name, isDirectory: true)
+    }
+
+    private static func file(_ scope: String) -> URL? { folder(scope)?.appendingPathComponent(fileName) }
+
+    /// The palettes dark pages made before they used Dark Reader (a file for each site, beside the list), which nothing
+    /// reads now: taken away the first time a profile's list is read.
+    private static func dropPalettes(_ scope: String) {
+        guard let dir = folder(scope) else { return }
+        disk.async {
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+            for name in names where name.hasSuffix(".json") { try? FileManager.default.removeItem(at: dir.appendingPathComponent(name)) }
+        }
+    }
 
     /// A profile's sites seen dark (`DarkPages.nativeScope`); none for a private window.
     static func sites(in scope: String?) -> [String: Site] {
@@ -38,6 +64,7 @@ enum DarkSeen {
         if let known = loaded[scope] { return known }
         let read = file(scope).flatMap { try? Data(contentsOf: $0) }.flatMap { try? PropertyListDecoder().decode([String: Site].self, from: $0) } ?? [:]
         loaded[scope] = read
+        dropPalettes(scope)
         return read
     }
 
@@ -85,6 +112,12 @@ enum DarkSeen {
         guard kept.count != all.count || (site == nil && since == nil) else { return }
         loaded[scope] = kept
         write(kept, scope: scope)
+    }
+
+    /// The same for a website data store: a private window's has none.
+    static func forget(in store: WKWebsiteDataStore, site: String? = nil) {
+        guard let scope = DarkPages.nativeScope(of: store) else { return }
+        forget(scope: scope, site: site)
     }
 
     /// Waits for the list to be written (tests).

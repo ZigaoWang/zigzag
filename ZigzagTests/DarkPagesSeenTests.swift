@@ -6,20 +6,17 @@ import WebKit
 
 /// A site dark on its own never shows white first (#134): what's learned of it (that it's dark, its own dark, the mark
 /// its dark look sets) is kept for each profile across restarts and cleared with its data, and its pages start on it;
-/// a dark page seen for the first time loses the filter before its first frame with style is drawn.
+/// a page that turns dark on its own is let go of by Dark Reader.
 @MainActor
 @Suite(.serialized)
 struct DarkPagesSeenTests {
     private func withDefaults<T>(_ body: () async throws -> T) async rethrows -> T {
         let name = "DarkPagesSeenTests-\(UUID().uuidString)"
         let saved = DarkPages.defaults
-        let delay = DarkPages.paletteDelay
         DarkPages.defaults = UserDefaults(suiteName: name)!
-        DarkPages.paletteDelay = 60_000
         defer {
             DarkPages.defaults.removePersistentDomain(forName: name)
             DarkPages.defaults = saved
-            DarkPages.paletteDelay = delay
             DarkPages.refreshAll()
         }
         return try await body()
@@ -35,7 +32,7 @@ struct DarkPagesSeenTests {
     @Test func aSiteSeenDarkIsKeptAcrossRestarts() {
         let scope = UUID().uuidString, other = UUID().uuidString, name = site()
         #expect(DarkPages.learn(DarkPages.State(darkened: false, native: true, color: Self.navy, site: name, marker: "class:dark"), in: scope))
-        DarkPalettes.settle()
+        DarkSeen.settle()
         DarkSeen.reload()
         let kept = DarkSeen.site(name, in: scope)
         #expect(kept?.color == "#0d1117")
@@ -53,7 +50,7 @@ struct DarkPagesSeenTests {
         #expect(DarkSeen.site(name, in: scope)?.marker == nil)
         // Seen light, it goes, from disk too.
         #expect(DarkPages.learn(DarkPages.State(darkened: true, native: false, color: nil, site: name), in: scope))
-        DarkPalettes.settle()
+        DarkSeen.settle()
         DarkSeen.reload()
         #expect(DarkSeen.site(name, in: scope) == nil)
     }
@@ -67,22 +64,22 @@ struct DarkPagesSeenTests {
         #expect(DarkPages.config(for: .nonPersistent(), url: URL(string: "https://\(name)/"))["marker"] is NSNull)
     }
 
-    /// Cleared with the site's data, with History since a time, and with all of it, as palettes are.
+    /// Cleared with the site's data, with History since a time, and with all of it.
     @Test func whatsKeptIsClearedWithTheSite() {
         let scope = UUID().uuidString
         let a = "a-" + site(), b = "b-" + site()
         for name in [a, "www." + b, "docs." + b] {
             DarkPages.learn(DarkPages.State(darkened: false, native: true, color: Self.navy, site: name), in: scope)
         }
-        DarkPalettes.forget(scope: scope, site: b)
+        DarkSeen.forget(scope: scope, site: b)
         #expect(Set(DarkSeen.sites(in: scope).keys) == [a])
-        DarkPalettes.forget(scope: scope, since: Date().addingTimeInterval(3600))
+        DarkSeen.forget(scope: scope, since: Date().addingTimeInterval(3600))
         #expect(Set(DarkSeen.sites(in: scope).keys) == [a])
-        DarkPalettes.forget(scope: scope, since: Date().addingTimeInterval(-60))
+        DarkSeen.forget(scope: scope, since: Date().addingTimeInterval(-60))
         #expect(DarkSeen.sites(in: scope).isEmpty)
         DarkPages.learn(DarkPages.State(darkened: false, native: true, color: Self.navy, site: a), in: scope)
-        DarkPalettes.forget(scope: scope)
-        DarkPalettes.settle()
+        DarkSeen.forget(scope: scope)
+        DarkSeen.settle()
         DarkSeen.reload()
         #expect(DarkSeen.sites(in: scope).isEmpty)
     }
@@ -92,7 +89,7 @@ struct DarkPagesSeenTests {
     @Test func thePrepaintIsTheSitesOwnDark() {
         #expect(DarkPages.prepaintCSS(black: false, color: "#0d1117").contains("background-color: #0d1117 !important"))
         // Only a dark, and only a color: anything else is the usual ground.
-        #expect(DarkPages.prepaintCSS(black: false, color: "#f6f8fa").contains("#121212"))
+        #expect(DarkPages.prepaintCSS(black: false, color: "#f6f8fa").contains("#181a1b"))
         #expect(DarkPages.prepaintCSS(black: true, color: "red; } * { color: red").contains("#000000"))
         #expect(!DarkPages.prepaintCSS(black: true, color: "red; } * { color: red").contains("color: red"))
     }
@@ -165,37 +162,33 @@ struct DarkPagesSeenTests {
         try await withDefaults { () async throws in
             let name = site()
             DarkPages.learn(DarkPages.State(darkened: false, native: true, color: Self.navy, site: name), in: "default")
-            defer { DarkPalettes.forget(scope: "default", site: name) }
+            defer { DarkSeen.forget(scope: "default", site: name) }
             let html = "<html><head>\(Self.early)<style>body { background: #0d1117; color: #eee }</style></head><body><p>Dark.</p></body></html>"
             let webView = await page(html, at: "https://" + name)
             #expect(try await js(webView, "return window.early.ground") as? String == "rgb(13, 17, 23)")
         }
     }
 
-    /// A darkened page that turns dark on its own (an app drawn after a light loading screen) is let go of in the
-    /// frame it does, before that frame is drawn, rather than after a timer with its dark shown through the filter as
-    /// white: the page's own frame callback, which runs after Zigzag's, already sees no filter.
-    @Test func aPageTurningDarkLosesTheFilterInThatFrame() async throws {
+    /// A darkened page that turns dark on its own (an app drawn after a light loading screen) is let go of: Dark
+    /// Reader's theme comes off and the page keeps its own dark.
+    @Test func aPageTurningDarkIsLetGoOf() async throws {
         try await withDefaults { () async throws in
             let name = site()
-            defer { DarkPalettes.forget(scope: "default", site: name) }
+            defer { DarkSeen.forget(scope: "default", site: name) }
             let html = """
             <html><head><style>body { background: #fff; color: #111; min-height: 500px } body.dark { background: #0d1117; color: #eee }</style></head>
             <body><p>Loading.</p><script>addEventListener('load', () => setTimeout(() => {
-              window.before = getComputedStyle(document.documentElement).filter;
+              window.before = document.documentElement.getAttribute('data-darkreader-mode');
               document.body.classList.add('dark');
-              requestAnimationFrame(() => { window.first = getComputedStyle(document.documentElement).filter; });
             }, 300));</script></body></html>
             """
-            let window = NSWindow(contentRect: NSRect(x: -20_000, y: -20_000, width: 800, height: 600), styleMask: [.borderless],
-                                  backing: .buffered, defer: false)
-            window.isReleasedWhenClosed = false
-            defer { window.close() }
-            let webView = await page(html, at: "https://" + name, in: window)
-            let seen = await until { (try? await js(webView, "return window.first !== undefined") as? Bool) == true }
-            #expect(seen)
-            #expect((try await js(webView, "return window.before") as? String)?.contains("invert") == true)
-            #expect(try await js(webView, "return window.first") as? String == "none")
+            let webView = await page(html, at: "https://" + name)
+            let turned = await until { (try? await js(webView, "return window.before !== undefined") as? Bool) == true }
+            #expect(turned)
+            #expect(try await js(webView, "return window.before") as? String == "dynamic")
+            let letGo = await until { (try? await js(webView, "return !document.documentElement.hasAttribute('data-darkreader-mode')") as? Bool) == true }
+            #expect(letGo)
+            #expect(try await js(webView, "return getComputedStyle(document.body).backgroundColor") as? String == "rgb(13, 17, 23)")
         }
     }
 
@@ -204,7 +197,7 @@ struct DarkPagesSeenTests {
     @Test func aSitesOwnDarkMarkIsLearnedAndStartedWith() async throws {
         try await withDefaults { () async throws in
             let name = site()
-            defer { DarkPalettes.forget(scope: "default", site: name) }
+            defer { DarkSeen.forget(scope: "default", site: name) }
             let html = """
             <html><head>\(Self.early)<style>body { background: #fff; color: #111 } .dark body { background: #0d1117; color: #eee }</style></head>
             <body><p>Marked.</p><script>document.documentElement.classList.add('dark');</script></body></html>
@@ -226,7 +219,7 @@ struct DarkPagesSeenTests {
     @Test func aMarkTheSiteNoLongerSetsIsTakenOffAndForgotten() async throws {
         try await withDefaults { () async throws in
             let name = site()
-            defer { DarkPalettes.forget(scope: "default", site: name) }
+            defer { DarkSeen.forget(scope: "default", site: name) }
             DarkPages.learn(DarkPages.State(darkened: false, native: true, color: Self.navy, site: name, marker: "class:dark"), in: "default")
             let html = """
             <html><head>\(Self.early)<style>body { background: #0d1117; color: #eee }</style></head><body><p>Dark without it.</p></body></html>
@@ -245,7 +238,7 @@ struct DarkPagesSeenTests {
     @Test func aMarkIsNeverPutOverTheSitesOwn() async throws {
         try await withDefaults { () async throws in
             let name = site()
-            defer { DarkPalettes.forget(scope: "default", site: name) }
+            defer { DarkSeen.forget(scope: "default", site: name) }
             DarkPages.learn(DarkPages.State(darkened: false, native: true, color: Self.navy, site: name, marker: "attr:data-theme=dark"), in: "default")
             let html = """
             <html data-theme="light"><head><script>window.served = document.documentElement.getAttribute('data-theme');</script>

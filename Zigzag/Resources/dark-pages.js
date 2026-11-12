@@ -1,48 +1,21 @@
-// Dark pages (Settings › Appearance): a light page is drawn dark, one that's already dark is left alone.
+// Dark pages (Settings › Appearance): a page that's dark on its own is left alone, any other is drawn dark by Dark
+// Reader's dynamic theme (darkreader.js, MIT, in Zigzag/Resources/DarkReader; see THIRD_PARTY_NOTICES.md), which
+// rewrites the site's own style (its sheets, custom properties, inline styles, shadow roots) rather than filtering it.
 // Runs in Zigzag's own script world, in every frame, from the start of the document. DarkPages.swift puts the
-// choices in `config` below: { on: default for sites without a choice, sitesOn, sitesOff, native: sites last seen
-// already dark, marker: the mark this site's own dark look sets on the root, if it was seen setting one, black: Pure
-// black backgrounds, strength: how far white is turned over, root, canvas, media: the
-// style's parts, marks: the attributes it looks for, palette: the site's own dark palette if one was made, fill: a
-// dark site's fill for its light parts if one was made, sitesForced: sites darkened even when dark, learn:
-// whether one may be made here (never in a private window), paletteDelay }.
+// choices in `config` below: { on: default for sites without a choice, sitesOn, sitesOff, sitesForced, native: sites
+// last seen dark on their own, marker: the mark this site's own dark look sets on the root, prepaint: the ground a
+// page starts on, topWanted and topForced: the top page's choice, for frames, theme: Dark Reader's theme, fix and
+// frameFix: Dark Reader's fixes for the page and for its frames }, and Dark Reader itself where it's marked below.
 //
-// A palette (#134): the first time a light site is seen, once it has loaded and the page is idle, its style sheets are
-// read and its colors turned into a dark set (dark-palette.js, put in as `palette` below), as a style sheet Zigzag
-// keeps for the site. From the next visit on that sheet is the page's look from its first frame: plain overrides of
-// the site's own colors, with no filter, so pictures and video are simply left alone, and nothing watches the page.
-// The first time a site is read, the palette is tried on the page there and then (in one go, so nothing is drawn in
-// between): if it covers the page it takes over from the filter on that visit already, and if it doesn't the site keeps
-// the filter, so no later visit starts with a palette that leaves the page light. A later visit drawn with a palette
-// checks it covers the page as soon as there's a page to look at (its first frame, then as it finishes loading), and
-// goes back to the filter at once if it doesn't. Later visits also check, when idle, whether the site's style changed,
-// and read it again if so.
-//
-// White never shows first (#134): a page that's darkened starts so at document start (the filter, or the palette with
-// its own dark ground), and one that isn't yet, since its site was last seen dark, starts on its own dark
-// (`prepaint`: a dark color-scheme and the site's dark on the root, the body clear) and with the mark its dark look
-// sets (`marker`), until it's looked at; then the ground goes, so a site dark on its own shows its own colors, and a
-// light one is darkened. The page is looked at just before each frame is drawn while it comes in, once its style
-// sheets are there, so the switch is made before the frame its own colors would first show in: a dark site seen for
-// the first time loses the filter before its dark is drawn through it (as white), and a page that turns dark as it
-// runs (an app after a light loading screen) is let go of in the frame it does.
-//
-// How: the whole page goes through one filter on the root (inverted, then its hues turned back), and pictures,
-// video and the like are turned back again, so they look as they are. A filter on the root keeps fixed headers in
-// place (it isn't a containing block there) and WebKit draws it on the GPU, so scrolling isn't touched. Whether a
-// page is already dark is read from what it draws: the background under the page's middle, its body, and the
-// color-scheme it declares.
-//
-// Frames: a frame's page says hello to the page around it, which turns that frame back and tells it whether dark
-// pages are wanted (the top page's choice), so the frame darkens itself only if it's light: a light widget comes out
-// dark and a dark video player as it is. A frame that never says hello (no script can run there) stays darkened with
-// the page around it, as before. Shadow roots get the pictures' rules of their own, since the page's style doesn't
-// reach inside them. Pictures that arrive later are looked at when the page is idle, never on every change.
+// First the site gets to do it: the web view is dark wherever dark pages are on, so `prefers-color-scheme: dark`
+// matches and a site with a dark theme of its own uses it. A page starts on a plain dark ground (`prepaint`), so no
+// white shows first: its site's own dark if it was last seen dark (with the mark its dark look sets, `marker`), else
+// the dark Dark Reader draws white as. Just before the first frame the page has its style in, it's looked at: one
+// dark on its own keeps its own colors, any other is drawn by Dark Reader from that frame on. A page that switches its
+// theme later is looked at again, with Dark Reader's style switched off.
 (() => {
   if (window.__zigzagDark) return;
   const config = __CONFIG__;
-  const palette = __PALETTE__;
-  const marks = config.marks;
   const isTop = window === window.top;
   const type = document.contentType || '';
   // A page left alone still says so: what Zigzag heard about the page before this one doesn't hold here.
@@ -53,44 +26,55 @@
   // A picture, video or PDF opened on its own has nothing to darken.
   if (!/html|xml|text\/plain/.test(type)) { leftAlone(); return; }
   // Web pages, files and Zigzag's own pages; an extension's own page is its own business. A frame with no address of
-  // its own (about:blank, srcdoc) is part of the page around it, and darkened with it.
-  if (!(isTop ? /^(https?|file|about|zigzag):$/ : /^(https?|file):$/).test(location.protocol)) { leftAlone(); return; }
+  // its own (about:blank, srcdoc) is part of the page around it.
+  if (!(isTop ? /^(https?|file|about|zigzag):$/ : /^(https?|file|about):$/).test(location.protocol)) { leftAlone(); return; }
 
   const siteOf = (host) => host.toLowerCase().replace(/^www\./, '');
   const matches = (site, list) => list.some((s) => site === s || site.endsWith('.' + s));
   const site = siteOf(location.hostname || '');
-  // A frame follows the top page's choice, which the page around it passes on; nothing until then.
-  let told = isTop ? null : false;
-  // Whether this page knows its choice: the top page always, a frame once told.
-  let heard = isTop;
-  const choice = () => (!isTop ? told === true
+  // A frame follows the top page's choice.
+  const choice = () => (!isTop ? config.topWanted === true
     : matches(site, config.sitesOn) ? true : matches(site, config.sitesOff) ? false : config.on);
+  // Force dark (the site panel, #134): darkened even when it looks dark on its own.
+  const forced = () => (isTop ? matches(site, config.sitesForced || []) : config.topForced === true);
   let wanted = choice();
-  // Force dark (the site panel, #134): darkened even when it looks dark on its own. The top page only.
-  const forced = () => isTop && matches(site, config.sitesForced || []);
-  // Whether the page is drawn dark: wanted, and light, or not looked at yet, or forced.
-  const darkens = () => native !== true || forced();
-  // null until the page has been looked at.
+  // null until the page has been looked at; a site last seen dark starts as dark.
   let native = isTop && matches(site, config.native) ? true : null;
   let darkened = false;
-  // Drawn by the site's palette rather than the filter.
-  let usingPalette = false;
-  // The palette left too much of this page light: the filter for the rest of this visit, unless trying it again
-  // once the page is idle finds it covers the page after all.
-  let refused = false;
-  // Refused as the page came in, before it had settled: tried again once it has.
-  let refusedEarly = false;
-  // Nothing sent to Zigzag while a palette is tried on the page.
-  let quiet = false;
   let lastSent = '';
 
-  // Only the top page, and only the palette made for this site with these backgrounds.
-  const paletteFits = () => isTop && !refused && !!config.palette && config.palette.origin === location.origin
-    && config.palette.black === config.black && !config.palette.invert && !!config.palette.css;
-  const css = () => (usingPalette ? config.palette.css + '\n' : config.root + (isTop ? config.canvas : '') + config.media);
-  const style = document.createElement('style');
-  style.setAttribute('data-zigzag-dark', '');
-  // The plain dark ground a page starts on while it's not known whether it's dark on its own (`prepaint` in the header).
+  // MARK: Dark Reader
+
+  // Dark Reader in this world alone: the page never sees it, and its `window.chrome` stand-in stays here.
+  const DarkReader = (() => {
+    const module = { exports: {} };
+    const exports = module.exports;
+    __DARKREADER__
+    return module.exports;
+  })();
+  // What it can't fetch itself (a style sheet or picture from another site, without CORS) Zigzag fetches for it,
+  // without cookies.
+  DarkReader.setFetchMethod(async (address) => {
+    const url = new URL(address, location.href);
+    if (url.origin === location.origin || url.protocol === 'data:' || url.protocol === 'blob:') return fetch(url.href);
+    const got = await window.webkit.messageHandlers.zigzagDarkFetch.postMessage(url.href);
+    if (!got || typeof got.body !== 'string') throw new Error('Not fetched: ' + url.href);
+    const bytes = Uint8Array.from(atob(got.body), (c) => c.charCodeAt(0));
+    return new Response(bytes, { status: 200, headers: { 'Content-Type': got.type || '' } });
+  });
+  const theme = () => config.theme;
+  // A frame's address isn't the page's: the fix for every address alone.
+  const fix = () => (isTop ? config.fix : config.frameFix) || null;
+  const apply = (on) => {
+    if (on === darkened) return;
+    darkened = on;
+    if (on) { dropPrepaint(); DarkReader.enable(theme(), fix()); } else DarkReader.disable();
+    send();
+  };
+
+  // MARK: The site's own dark ground and mark
+
+  // The plain dark ground a page starts on while it's not known whether it's dark on its own (`prepaint`).
   const prepaint = document.createElement('style');
   prepaint.setAttribute('data-zigzag-dark', 'prepaint');
   prepaint.textContent = config.prepaint || '';
@@ -99,8 +83,6 @@
     if (isTop && config.prepaint && root && prepaint.parentNode !== root) root.appendChild(prepaint);
   };
   const dropPrepaint = () => { if (prepaint.parentNode) prepaint.remove(); };
-
-  // MARK: The site's own dark mark
 
   // A site that marks its dark look on the root by script (a class of "dark", data-theme="dark") draws light until that
   // script has run. Seen setting one, the site's pages start with it (`config.marker`), so its dark style applies from
@@ -162,613 +144,160 @@
     return set.length ? set[0] : '';
   };
 
-  // MARK: Shadow roots
+  // MARK: Is the page dark on its own?
 
-  // One sheet shared by every open shadow root: the pictures' rules alone, empty while the page isn't darkened.
-  const shadowRoots = new Set();
-  let shadowSheet = null;
-  try { shadowSheet = new CSSStyleSheet(); } catch (e) {}
-  const shadowStyles = [];
-  const shadowCSS = () => (darkened && !usingPalette ? config.media : '');
-  const restyleShadows = () => {
-    const text = shadowCSS();
-    if (shadowSheet) { try { shadowSheet.replaceSync(text); } catch (e) {} }
-    for (const s of shadowStyles) s.textContent = text;
+  // Any color the page's computed style gives (rgb(), oklch(), lab(), color()...) as sRGB, by drawing it: a page's own
+  // design system may be written in any of them.
+  let ink = null;
+  const known = new Map();
+  const rgba = (text) => {
+    if (!text) return null;
+    if (known.has(text)) return known.get(text);
+    try {
+      if (!ink) ink = new OffscreenCanvas(1, 1).getContext('2d', { willReadFrequently: true });
+      ink.clearRect(0, 0, 1, 1);
+      ink.fillStyle = '#000';
+      ink.fillStyle = text;
+      ink.fillRect(0, 0, 1, 1);
+      const d = ink.getImageData(0, 0, 1, 1).data;
+      const c = { r: d[0], g: d[1], b: d[2], a: d[3] / 255 };
+      if (known.size > 256) known.clear();
+      known.set(text, c);
+      return c;
+    } catch (e) { return null; }
   };
-  const adopt = (root) => {
-    if (shadowRoots.has(root)) return;
-    shadowRoots.add(root);
-    let adopted = false;
-    if (shadowSheet) {
-      try { root.adoptedStyleSheets = [...root.adoptedStyleSheets, shadowSheet]; adopted = true; } catch (e) {}
+  const lightness = (c) => (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255;
+
+  // Dark Reader's own test for a site with a dark theme of its own (its detector.ts, MIT): points across the window,
+  // each one's background light or not (its text, where the background is see-through), then the root and body.
+  const drawsDark = () => {
+    const rootStyle = getComputedStyle(document.documentElement);
+    if (rootStyle.filter.includes('invert(1)') || rootStyle.colorScheme === 'dark') return true;
+    const w = innerWidth, h = innerHeight;
+    const stepX = Math.floor(w / Math.min(4, Math.ceil(w / 256))), stepY = Math.floor(h / Math.min(4, Math.ceil(h / 256)));
+    const done = new Set();
+    for (let y = Math.floor(stepY / 2); y < h; y += stepY) {
+      for (let x = Math.floor(stepX / 2); x < w; x += stepX) {
+        const el = document.elementFromPoint(x, y);
+        if (!el || done.has(el) || el.tagName.toLowerCase() === 'img') continue;
+        done.add(el);
+        const style = el === document.documentElement ? rootStyle : getComputedStyle(el);
+        const bg = rgba(style.backgroundColor);
+        if (!bg) return false;
+        if (bg.a === 1) {
+          if (lightness(bg) > 0.6) return false;
+        } else {
+          const text = rgba(style.color);
+          if (!text || lightness(text) < 0.4) return false;
+        }
+      }
     }
-    if (!adopted) {
-      const s = document.createElement('style');
-      s.textContent = shadowCSS();
-      shadowStyles.push(s);
-      root.appendChild(s);
+    const root = rgba(rootStyle.backgroundColor);
+    const body = document.body ? rgba(getComputedStyle(document.body).backgroundColor) : { r: 0, g: 0, b: 0, a: 0 };
+    if (!root || !body) return false;
+    if (root.a === 0 && body.a === 0) {
+      const text = rgba(rootStyle.color);
+      if (text) return lightness(text) > 0.5;
     }
-    added.observe(root, { childList: true, subtree: true });
-    scanSoon(root);
+    const rootL = (1 - root.a) + root.a * lightness(root);
+    return (1 - body.a) * rootL + body.a * lightness(body) < 0.5;
   };
-
-  const put = () => {
-    const root = document.documentElement;
-    if (root && style.parentNode !== root) root.appendChild(style);
+  // Dark Reader's style, and Zigzag's ground: switched off to look at the page as it draws itself, and on again in
+  // the same go, so nothing is drawn in between.
+  const ownSheets = () => {
+    const out = [];
+    for (const s of document.styleSheets) {
+      const node = s.ownerNode;
+      if (node && node.classList && (node.classList.contains('darkreader') || node === prepaint)) out.push(s);
+    }
+    for (const s of document.adoptedStyleSheets || []) {
+      try { if (s.cssRules[0] && s.cssRules[0].selectorText && s.cssRules[0].selectorText.startsWith('#__darkreader')) out.push(s); } catch (e) {}
+    }
+    return out.filter((s) => !s.disabled);
   };
-  const apply = (on) => {
-    const how = on && paletteFits();
-    if (on) dropPrepaint();
-    if (on === darkened && how === usingPalette) { if (on) put(); return; }
-    darkened = on;
-    usingPalette = how;
-    if (on) {
-      style.textContent = css();
-      put();
-      if (!usingPalette) scanSoon(document.documentElement);
-    } else { style.textContent = ''; style.remove(); }
-    watch();
-    restyleShadows();
-    refreshFill();
-    send();
-  };
-
-  // MARK: Is the page already dark?
-
-  const parse = (text) => {
-    const m = /rgba?\(([^)]+)\)/.exec(text || '');
-    if (!m) return null;
-    const p = m[1].split(/[\s,/]+/).filter(Boolean).map(parseFloat);
-    return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1];
-  };
-  const luminance = ([r, g, b]) => {
-    const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
-    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-  };
-  const prefersDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
-  // What's under the page when nothing paints a background: dark when the page says it's dark (color-scheme).
-  const canvas = () => {
-    const root = document.documentElement;
-    const declared = getComputedStyle(root).colorScheme;
+  // True when the page draws itself dark, false when light.
+  const isDarkOnItsOwn = () => {
     const meta = document.querySelector('meta[name="color-scheme"]');
-    const schemes = ((declared && declared !== 'normal' ? declared : meta && meta.content) || '').toLowerCase().split(/[\s,]+/);
-    const dark = schemes.includes('dark') && (prefersDark() || !schemes.includes('light'));
-    return dark ? [30, 30, 30, 1] : [255, 255, 255, 1];
-  };
-  const backgroundOf = (el) => {
-    for (; el && el.nodeType === 1; el = el.parentElement) {
-      const c = parse(getComputedStyle(el).backgroundColor);
-      if (c && c[3] > 0.6) return c;
+    if (meta) {
+      const content = (meta.content || '').toLowerCase().trim();
+      if (content === 'dark' || content === 'only dark') return true;
+      if (content === 'light' || content === 'only light') return false;
     }
-    // Below a short body, the root with no background of its own: the body's color is the whole window's, as CSS
-    // paints it, so a dark page with little on it isn't read as white there (#134).
-    const body = document.body;
-    const own = body && parse(getComputedStyle(body).backgroundColor);
-    if (own && own[3] > 0.6) return own;
-    return canvas();
+    // A dark mark the site set itself (not one Zigzag put there to start it on its own dark).
+    const root = document.documentElement;
+    if (!markPut && (root.classList.contains('dark') || (document.body && document.body.classList.contains('dark'))
+      || (root.dataset.theme || '').toLowerCase() === 'dark')) return true;
+    const sheets = ownSheets();
+    sheets.forEach((s) => { s.disabled = true; });
+    try { return drawsDark(); } finally { sheets.forEach((s) => { s.disabled = false; }); }
   };
-  const skip = /^(IMG|VIDEO|CANVAS|IFRAME|EMBED|OBJECT|PICTURE|SVG)$/i;
-  const isDark = (c) => luminance(c) < 0.2;
-  // A style sheet the page is still waiting for: WebKit draws nothing of the page until they're in, and what's read
-  // before then is the page without its own style, white.
-  const failedSheets = new WeakSet();
-  addEventListener('error', (e) => { if (e.target && e.target.tagName === 'LINK') failedSheets.add(e.target); }, true);
-  const sheetPending = () => {
-    for (const link of document.querySelectorAll('link[rel~="stylesheet" i]')) {
-      // One with no address loads nothing (GitHub keeps some for later that way).
-      if (link.sheet || !link.getAttribute('href') || link.disabled || failedSheets.has(link) || /\balternate\b/i.test(link.rel)) continue;
-      if (link.media && !matchMedia(link.media).matches) continue;
-      return true;
+  // Whether there's a page to look at: a body with something drawn in it, and some style of its own.
+  const hasStyle = () => {
+    if (document.querySelector('meta[name="color-scheme"]')) return true;
+    if (document.documentElement.style.backgroundColor || (document.body && document.body.style.backgroundColor)) return true;
+    for (const s of document.styleSheets) {
+      const node = s.ownerNode;
+      if (node && !(node.classList && node.classList.contains('darkreader')) && node !== prepaint) return true;
     }
     return false;
   };
-  // Whether there's a page to look at: a body with something in it, and its style.
   const styled = () => {
     const body = document.body;
     if (!body) return false;
     if (document.readyState === 'complete') return true;
-    return !!body.firstElementChild && !sheetPending();
-  };
-  // True when the page draws itself dark, false when light, null when there's no page to look at yet.
-  const pageIsDark = () => {
-    const body = document.body;
-    if (!body) return null;
-    const w = innerWidth, h = innerHeight;
-    let dark = 0, light = 0;
-    const count = (c, weight) => { if (isDark(c)) dark += weight; else light += weight; };
-    count(backgroundOf(body), 2);
-    for (const [x, y] of [[0.5, 0.5], [0.3, 0.3], [0.7, 0.3], [0.3, 0.7], [0.7, 0.7], [0.5, 0.15]]) {
-      let el = document.elementFromPoint(w * x, h * y);
-      while (el && el.parentElement && skip.test(el.tagName)) el = el.parentElement;
-      if (el && el !== style) count(backgroundOf(el), 1);
-    }
-    // Light ink on the body is a dark theme's.
-    const ink = parse(getComputedStyle(body).color);
-    if (ink && luminance(ink) > 0.5) dark += 2;
-    return dark > light;
+    if (body.scrollHeight < 32 || body.clientHeight < 32 || !hasStyle()) return false;
+    for (const child of body.children) if (!/^(SCRIPT|STYLE|LINK)$/.test(child.tagName)) return true;
+    return false;
   };
 
   const check = () => {
     wanted = choice();
-    // Not wanted here: said, so a bar colored after the last page's darkened look doesn't keep it.
-    if (!wanted) { dropPrepaint(); apply(false); refreshFill(); send(); return; }
-    // Looked at as the page draws itself: our style forces a light color-scheme, which a page drawn with
-    // light-dark() would follow. Off and on again in one go, so nothing is drawn in between.
-    const sheet = darkened && style.sheet;
-    const ground = prepaint.parentNode && prepaint.sheet;
-    const fill = fillStyle.parentNode && fillStyle.sheet;
-    // Nothing decided before the page has its style: unstyled, every page reads as white.
-    const ready = styled();
-    if (ready) for (const s of [sheet, ground, fill]) if (s) s.disabled = true;
-    const found = ready ? pageIsDark() : null;
-    if (ready) for (const s of [sheet, ground, fill]) if (s) s.disabled = false;
-    if (found !== null) { native = found; dropPrepaint(); }
-    // Until the page can be looked at, a site last seen dark stays as it is and any other is darkened, so it
-    // never comes up white first.
-    apply(darkens());
-    refreshFill();
+    if (!wanted) { dropPrepaint(); releaseMark(); apply(false); send(); return; }
+    if (forced()) { native = null; apply(true); return; }
+    if (styled()) { native = isDarkOnItsOwn(); dropPrepaint(); }
+    // Until the page can be looked at it stays on its dark ground (`prepaint`), never white: Dark Reader goes to work
+    // only on a page that needs it, not first on every page with a dark look of its own too.
+    else if (native === null) { putPrepaint(); send(); return; }
+    apply(native !== true);
     send();
   };
 
-  // MARK: Pictures the selectors can't see
+  // MARK: Telling Zigzag
 
-  // An element showing a photo as its background (a hero, a card, a ::before), and open shadow roots, found when
-  // the page is idle: each element once, a slice at a time, so a long page never holds up scrolling or typing.
-  // Icon-sized ones and SVG drawings are drawn in the text's ink and stay darkened; so does a repeating texture
-  // behind a lot of the page.
-  // A page WebKit isn't drawing (a tab in the background) may not get its idle callbacks at all, timeout or not: a
-  // timer stands in once it's clearly late.
-  const idle = (f) => {
-    let ran = false;
-    const run = (deadline) => { if (!ran) { ran = true; f(deadline); } };
-    if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 1000 });
-    setTimeout(() => { const end = performance.now() + 12; run({ timeRemaining: () => end - performance.now() }); },
-      window.requestIdleCallback ? 1500 : 120);
-  };
-  const seen = new WeakSet();
-  const roots = [];
-  let list = [], at = 0;
-  let scanning = false;
-  const scanSoon = (root) => {
-    if (!root || !darkened || usingPalette) return;
-    roots.push(root);
-    if (!scanning) { scanning = true; idle(scan); }
-  };
-  const isIcon = (w, h) => w > 0 && h > 0 && w <= 24 && h <= 24;
-  const drawingsOnly = (image) => {
-    const urls = image.match(/url\([^)]*\)/g) || [];
-    return urls.length > 0 && urls.every((u) => /svg/i.test(u));
-  };
-  const showsPicture = (s) => {
-    const image = s.backgroundImage;
-    return !!image && image !== 'none' && image.includes('url(') && !drawingsOnly(image);
-  };
-  const isTexture = (s) => !/no-repeat/.test(s.backgroundRepeat) && !/cover|contain/.test(s.backgroundSize);
-  const look = (el) => {
-    if (el.shadowRoot) adopt(el.shadowRoot);
-    if (el === document.documentElement || el === document.body || el === style) return;
-    if (!el.hasAttribute(marks.image)) {
-      const s = getComputedStyle(el);
-      if (showsPicture(s)) {
-        const box = el.getBoundingClientRect();
-        const big = isTexture(s) && el.getElementsByTagName('*').length > 60;
-        if (!isIcon(box.width, box.height) && !big) el.setAttribute(marks.image, '');
-      }
-    }
-    for (const [pseudo, mark] of [['::before', marks.before], ['::after', marks.after]]) {
-      if (el.hasAttribute(mark)) continue;
-      const s = getComputedStyle(el, pseudo);
-      const content = s.content;
-      if (!content || content === 'none' || content === 'normal') continue;
-      const picture = (content.includes('url(') && !drawingsOnly(content))
-        || (showsPicture(s) && !isIcon(parseFloat(s.width) || 0, parseFloat(s.height) || 0));
-      if (picture) el.setAttribute(mark, '');
-    }
-  };
-  const scan = (deadline) => {
-    if (!darkened || usingPalette) { roots.length = 0; list = []; at = 0; scanning = false; return; }
-    let n = 0;
-    while (true) {
-      if (at >= list.length) {
-        if (!roots.length) break;
-        const root = roots.shift();
-        if (!root.isConnected) continue;
-        const all = root.querySelectorAll ? root.querySelectorAll('*') : [];
-        list = root.nodeType === 1 ? [root, ...all] : [...all];
-        at = 0;
-      }
-      const el = list[at++];
-      if (seen.has(el)) continue;
-      seen.add(el);
-      if (el.isConnected) look(el);
-      if (++n % 32 === 0 && deadline.timeRemaining() < 2) break;
-    }
-    if (at < list.length || roots.length) idle(scan); else { list = []; at = 0; scanning = false; }
-  };
-  // Shadow roots made after their element was looked at (a custom element defined late), once more as the page
-  // finishes loading: their element is found again by its name, not by looking at every element.
-  const waiting = new Set();
-  const lateHosts = (root) => {
-    if (!window.customElements || !customElements.whenDefined) return;
-    for (const el of root.querySelectorAll(':not(:defined)')) {
-      const name = el.localName;
-      if (waiting.has(name) || !name.includes('-')) continue;
-      waiting.add(name);
-      customElements.whenDefined(name).then(() => {
-        for (const scope of [document, ...shadowRoots]) {
-          for (const host of scope.querySelectorAll(name)) if (host.shadowRoot) adopt(host.shadowRoot);
-        }
-      }).catch(() => {});
-    }
-  };
-
-  // MARK: Frames
-
-  const message = (data) => (data && typeof data === 'object' ? data.zigzagDark : undefined);
-  // What a frame inside is told: whether it's wanted, and the style for it, never the lists of sites.
-  const forFrames = () => ({ wanted, black: config.black, strength: config.strength, root: config.root, media: config.media });
-  const frames = new Set();
-  const asked = [];
-  const tell = (win) => { try { win.postMessage({ zigzagDark: forFrames() }, '*'); } catch (e) {} };
-  const frameOf = (source) => {
-    for (const scope of [document, ...shadowRoots]) {
-      for (const frame of scope.querySelectorAll('iframe')) if (frame.contentWindow === source) return frame;
+  const hex = (c) => '#' + [c.r, c.g, c.b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+  const backgroundOf = (el) => {
+    for (; el && el.nodeType === 1; el = el.parentElement) {
+      const c = rgba(getComputedStyle(el).backgroundColor);
+      if (c && c.a > 0.6) return c;
     }
     return null;
   };
-  const tellFrames = () => {
-    for (const frame of frames) {
-      if (!frame.isConnected) { frames.delete(frame); continue; }
-      if (frame.contentWindow) tell(frame.contentWindow);
-    }
-  };
-  addEventListener('message', (e) => {
-    const source = e.source;
-    if (!source || source === window) return;
-    // From the page around this frame: Zigzag's choice for the top page.
-    if (!isTop && source === window.parent) {
-      const said = message(e.data);
-      if (!said || typeof said !== 'object') return;
-      told = said.wanted === true;
-      heard = true;
-      Object.assign(config, { black: said.black, strength: said.strength, root: said.root, media: said.media });
-      if (darkened) style.textContent = css();
-      restyleShadows();
-      check();
-      tellFrames();
-      asked.splice(0).forEach(tell);
-      return;
-    }
-    // A frame inside this page saying hello: it's turned back from now on and darkens itself.
-    let parent = null;
-    try { parent = source.parent; } catch (e2) { return; }
-    if (parent !== window || message(e.data) !== 'hello') return;
-    const frame = frameOf(source);
-    if (!frame) return;
-    if (!frame.hasAttribute(marks.frame)) frame.setAttribute(marks.frame, '');
-    frames.add(frame);
-    // A frame not yet told answers its own once it is.
-    if (heard) tell(source); else asked.push(source);
-  });
-  if (!isTop) { try { window.parent.postMessage({ zigzagDark: 'hello' }, '*'); } catch (e) {} }
-
-  // MARK: Telling Zigzag
-
+  // The page's color as it's drawn now, for the bar above it.
   const colorOf = () => {
-    // The page's color as it's drawn: its own, put through the filter when darkened.
-    let c = document.body ? backgroundOf(document.body) : canvas();
-    // A page dark on its own whose root and body paint white or nothing (a dark app laid over them): the dark at
-    // its top, else its middle, which is what's seen under the bar (#134). Only a quiet dark, not a button's green.
-    const calm = (k) => isDark(k) && Math.max(k[0], k[1], k[2]) - Math.min(k[0], k[1], k[2]) <= 48;
-    if (native === true && !darkened && !isDark(c) && document.body) {
+    const body = document.body;
+    let c = body ? backgroundOf(body) : null;
+    if (!c) c = darkened || native === true ? rgba(theme().darkSchemeBackgroundColor) : { r: 255, g: 255, b: 255, a: 1 };
+    // A page dark on its own whose root and body paint white or nothing (a dark app laid over them): the dark at its
+    // top, else its middle, which is what's seen under the bar (#134). Only a quiet dark, not a button's green.
+    if (native === true && !darkened && lightness(c) >= 0.5 && body) {
       for (const [x, y] of [[0.5, 0.02], [0.5, 0.5]]) {
-        let el = document.elementFromPoint(innerWidth * x, innerHeight * y);
-        while (el && el.parentElement && skip.test(el.tagName)) el = el.parentElement;
-        const under = el && el !== style ? backgroundOf(el) : null;
-        if (under && calm(under)) { c = under; break; }
+        const el = document.elementFromPoint(innerWidth * x, innerHeight * y);
+        const under = el ? backgroundOf(el) : null;
+        if (under && lightness(under) < 0.3 && Math.max(under.r, under.g, under.b) - Math.min(under.r, under.g, under.b) <= 48) { c = under; break; }
       }
     }
-    let [r, g, b] = c;
-    if (darkened && !usingPalette) {
-      const k = config.strength;
-      [r, g, b] = [r, g, b].map((v) => k * (255 - v) + (1 - k) * v);
-      // hue-rotate(180deg) leaves gray alone and turns a color to its opposite; the page's background is nearly
-      // always a gray, and anything else is close enough for the bar's tint.
-      const mean = (r + g + b) / 3;
-      [r, g, b] = [r, g, b].map((v) => Math.max(0, Math.min(255, 2 * mean - v)));
-    }
-    return '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+    return hex(c);
   };
   // Only the top page tells Zigzag; a frame's look is the page's business.
   const send = () => {
-    if (!isTop || quiet) return;
-    const message = { darkened, native: native === true, color: colorOf(), site, palette: usingPalette };
+    if (!isTop) return;
+    const message = { darkened, native: native === true, color: colorOf(), site };
     if (native === true && !darkened) { const mark = markNow(); if (mark !== undefined) message.marker = mark; }
     const key = JSON.stringify(message);
     if (key === lastSent) return;
     lastSent = key;
     try { window.webkit.messageHandlers.zigzagDark.postMessage(message); } catch (e) {}
   };
-
-  // MARK: Palette
-
-  // Only a top page on the web, in a profile that keeps things (never a private window).
-  const learnable = () => isTop && config.learn === true && /^https?:$/.test(location.protocol);
-  const ownSheet = (sheet) => {
-    const node = sheet.ownerNode;
-    return node === style || !!(node && node.hasAttribute && node.hasAttribute('data-zigzag-dark'));
-  };
-  // What the page's style is made of, cheaply: each sheet's address and how many rules it has, each <style>'s length.
-  const pieces = () => {
-    const out = [];
-    for (const sheet of document.styleSheets) {
-      if (ownSheet(sheet)) continue;
-      if (sheet.href) {
-        let n = '?';
-        try { n = sheet.cssRules.length; } catch (e) {}
-        out.push('h ' + sheet.href.split('#')[0] + ' ' + n);
-      } else {
-        const node = sheet.ownerNode;
-        out.push('i ' + (node && node.textContent ? node.textContent.length : 0));
-      }
-    }
-    const own = document.documentElement && document.documentElement.getAttribute('style');
-    if (own) out.push('r ' + own.length);
-    return out;
-  };
-  // How much of the page came out dark with the palette on: a grid of points, each one's background, and the ink
-  // of the ones with text. True when nearly all of it did.
-  const covered = () => {
-    if (pageIsDark() !== true) return false;
-    const w = innerWidth, h = innerHeight;
-    let all = 0, bad = 0;
-    for (let i = 1; i <= 4; i++) {
-      for (let j = 1; j <= 4; j++) {
-        let el = document.elementFromPoint((w * i) / 5, (h * j) / 5);
-        while (el && el.parentElement && skip.test(el.tagName)) el = el.parentElement;
-        if (!el) continue;
-        all++;
-        const bg = backgroundOf(el);
-        if (luminance(bg) > 0.3) { bad++; continue; }
-        const hasText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
-        const ink = hasText && parse(getComputedStyle(el).color);
-        if (ink && palette.contrast(ink, bg) < 3) bad++;
-      }
-    }
-    return bad <= Math.max(1, all * 0.15);
-  };
-  // The site's palette tried on the page as it is now, in place of the filter, all in one go so nothing is drawn in
-  // between: kept if it covers the page, the filter back if it doesn't. True when it's kept.
-  const tryPalette = () => {
-    if (usingPalette) return true;
-    if (!darkened) return false;
-    quiet = true;
-    refused = false;
-    apply(true);
-    const ok = usingPalette && covered();
-    if (!ok) { refused = true; apply(true); }
-    quiet = false;
-    send();
-    return ok;
-  };
-  // A palette from an earlier visit, looked at as soon as there's a page to look at (and again as it finishes
-  // loading): a page it leaves light goes back to the filter now rather than once it's idle.
-  const checkEarly = () => {
-    if (!usingPalette || !document.body || !document.body.firstElementChild) return;
-    if (!covered()) { refused = true; refusedEarly = true; apply(true); }
-  };
-  const firstFrame = () => {
-    if (!usingPalette) return;
-    if (document.body && document.body.firstElementChild) { checkEarly(); return; }
-    requestAnimationFrame(firstFrame);
-  };
-  // A sheet from elsewhere that the page can't read (no CORS): Zigzag fetches its text, without cookies.
-  const fetchRules = async (href) => {
-    try {
-      const text = await window.webkit.messageHandlers.zigzagDarkSheet.postMessage(href);
-      if (typeof text !== 'string' || !text) return null;
-      const sheet = new CSSStyleSheet();
-      sheet.replaceSync(text);
-      return sheet.cssRules;
-    } catch (e) { return null; }
-  };
-  const tellPalette = (message) => {
-    try { window.webkit.messageHandlers.zigzagDark.postMessage(Object.assign({ kind: 'palette', black: config.black }, message)); } catch (e) {}
-  };
-  let analysis = null;
-  // Reading the sheets takes no more than this much of the page's idle time, all told.
-  const budget = 400;
-  const maxColors = 20000;
-  // The page's sheets, read into a palette's state; sheets from elsewhere it can't read are fetched by Zigzag.
-  const readSheets = async (state) => {
-    const lists = [];
-    let fetched = 0, unread = 0;
-    for (const sheet of [...document.styleSheets, ...(document.adoptedStyleSheets || [])]) {
-      if (ownSheet(sheet) || sheet.disabled) continue;
-      const media = sheet.media && sheet.media.mediaText;
-      if (palette.skips(media)) continue;
-      let rules = null;
-      try { rules = sheet.cssRules; } catch (e) {}
-      if (!rules && sheet.href && fetched < 16) { fetched++; rules = await fetchRules(sheet.href); }
-      if (!rules) { unread++; continue; }
-      lists.push([rules, media ? ['@media ' + media] : []]);
-    }
-    // Read in the page's order: the last added is read first.
-    for (const [rules, media] of lists.reverse()) palette.add(state, rules, media);
-    return { sheets: lists.length, fetched, unread };
-  };
-  // Work done in the page's idle time, a slice at a time, while `still()` holds and inside `limit` ms all told.
-  // `work(more)` does a slice and says whether it's all done. Resolves with whether it finished, and the time taken.
-  const inSlices = (work, still, limit) => new Promise((done) => {
-    let busy = 0;
-    const step = (deadline) => {
-      if (!still()) { done({ finished: false, busy }); return; }
-      const t0 = performance.now();
-      // A few milliseconds each time even when the page says it has less to spare (it often does), and up to a
-      // frame's worth when it has more.
-      const over = work(() => { const t = performance.now() - t0; return t < 4 || (t < 16 && deadline.timeRemaining() > 1); });
-      busy += performance.now() - t0;
-      if (over) done({ finished: true, busy }); else if (busy > limit) done({ finished: false, busy }); else idle(step);
-    };
-    idle(step);
-  });
-  const analyse = async (fp) => {
-    const began = performance.now();
-    const state = palette.start();
-    const { sheets, fetched, unread } = await readSheets(state);
-    const read = await inSlices((more) => palette.collect(state, more), () => darkened, budget);
-    const finished = read.finished;
-    let busy = read.busy;
-    if (!darkened) return;
-    const t1 = performance.now();
-    // Writing the sheet is done in one go: past this many colors it would hold the page up, and the sheet would be
-    // too big to start every page with anyway.
-    const decls = state.entries.reduce((n, e) => n + e.decls.length, 0);
-    const made = finished && decls <= maxColors ? palette.generate(state, config.black) : null;
-    const writing = performance.now() - t1;
-    busy += writing;
-    analysis = { ms: Math.round(busy * 10) / 10, writing: Math.round(writing * 10) / 10, wall: Math.round(performance.now() - began),
-      rules: state.rules, colors: made ? made.colors : 0, declarations: decls, sheets, fetched, unread, finished };
-    // Nothing to go on (too much to read, or no colors of its own): the filter, until the site's style changes.
-    const useless = !made || made.colors === 0 || made.capped;
-    // Tried on the page now: if it covers it, it takes over on this visit; if not, the site keeps the filter.
-    let covers;
-    if (!useless && darkened && !usingPalette) {
-      const before = config.palette;
-      config.palette = { origin: location.origin, black: config.black, css: made.rules.join('\n'), invert: false,
-        fingerprints: [fp], verified: true };
-      covers = tryPalette();
-      refusedEarly = false;
-      // Not covered: the filter stays (`refused`), and so does whatever palette the page started with.
-      if (!covers) config.palette = before;
-    }
-    tellPalette({ fingerprint: fp, rules: useless ? [] : made.rules, invert: useless, stats: analysis, checked: covers });
-  };
-  let looked = false;
-  const paletteSoon = () => {
-    if (looked || !learnable()) return;
-    looked = true;
-    setTimeout(() => idle(() => {
-      if (!darkened) return;
-      const fp = palette.fingerprint(pieces());
-      const p = config.palette;
-      const known = p && p.origin === location.origin && p.black === config.black ? p : null;
-      const seen = !!known && known.fingerprints.includes(fp);
-      if (refusedEarly) {
-        // Refused as it came in: tried once more now that the page has settled, and the site told either way.
-        refusedEarly = false;
-        const ok = tryPalette();
-        if (seen) { tellPalette({ fingerprint: fp, verified: ok }); return; }
-      } else if (usingPalette && (!seen || !known.verified)) {
-        const ok = covered();
-        if (!ok) { refused = true; apply(true); }
-        if (seen) { tellPalette({ fingerprint: fp, verified: ok }); return; }
-      }
-      if (!seen) analyse(fp).catch((e) => { analysis = { error: String(e) }; });
-    }), config.paletteDelay || 1200);
-  };
-
-  // MARK: Filling in a dark site
-
-  // A site dark on its own can still draw some things light: a suggestion list, a dialog, a sheet's cells (#134). Its
-  // style is read once, as a light site's is, for those alone (`generateFill` in dark-palette.js), and kept for the site
-  // as its `fill`: a sheet that turns its light surfaces dark, and the ink and lines on them light, while its own dark
-  // colors are left as they are. Something light added later (a suggestion list as you type) is covered as it comes,
-  // since the sheet names it; a sheet the page adds later is read when the page has added one, after typing, and
-  // on the next visit.
-  const fillStyle = document.createElement('style');
-  fillStyle.setAttribute('data-zigzag-dark', 'fill');
-  const fillFits = () => isTop && !!config.fill && config.fill.origin === location.origin && config.fill.black === config.black
-    && !config.fill.invert && !!config.fill.css;
-  const filling = () => wanted && native === true && !darkened && !forced();
-  const refreshFill = () => {
-    const root = document.documentElement;
-    if (filling() && fillFits() && root) {
-      if (fillStyle.textContent !== config.fill.css) fillStyle.textContent = config.fill.css;
-      if (fillStyle.parentNode !== root) root.appendChild(fillStyle);
-    } else if (fillStyle.parentNode) fillStyle.remove();
-  };
-  // The page's answer for a selector: is what it declares dark already where it applies (the site's own dark look
-  // overriding it)? Only the first element it matches is asked; one that matches nothing now is kept.
-  const overridden = (candidate) => {
-    for (const one of palette.splitList(candidate.selector)) {
-      const [base, pseudo] = palette.pseudoOf(one);
-      let el = null;
-      try { el = document.querySelector(base); } catch (e) { continue; }
-      if (!el) continue;
-      const s = getComputedStyle(el, pseudo);
-      const now = palette.parse(candidate.name.startsWith('--') ? s.getPropertyValue(candidate.name).trim() : s.backgroundColor);
-      if (!now) return false;
-      return candidate.kind === 'light' ? !palette.isLightSurface(now) : !palette.isDarkInk(now);
-    }
-    return false;
-  };
-  let fillBusy = false;
-  let fillRuns = 0;
-  let fillAnalysis = null;
-  const fillBudget = 300;
-  const analyseFill = async (fp) => {
-    const began = performance.now();
-    const state = palette.start();
-    const { sheets, fetched, unread } = await readSheets(state);
-    const read = await inSlices((more) => palette.collect(state, more), filling, budget);
-    if (!filling()) return;
-    // Asked of the page in slices too: each is a selector looked up.
-    const candidates = read.finished ? palette.fillCandidates(state) : [];
-    const rejected = new Set();
-    let at = 0;
-    const asked = await inSlices((more) => {
-      while (at < candidates.length) {
-        const c = candidates[at++];
-        if (overridden(c)) rejected.add(c.key);
-        if (at % 16 === 0 && !more()) return false;
-      }
-      return true;
-    }, filling, fillBudget);
-    if (!filling()) return;
-    const t1 = performance.now();
-    const made = read.finished && asked.finished ? palette.generateFill(state, config.black, rejected) : null;
-    const writing = performance.now() - t1;
-    const useless = !made || made.colors === 0 || made.capped;
-    fillAnalysis = { ms: Math.round((read.busy + asked.busy + writing) * 10) / 10, wall: Math.round(performance.now() - began),
-      rules: state.rules, colors: made ? made.colors : 0, candidates: candidates.length, rejected: rejected.size, sheets, fetched, unread,
-      finished: read.finished && asked.finished };
-    if (!useless) {
-      // Drawn at once, with what was kept for the site's other pages before.
-      const known = config.fill && config.fill.origin === location.origin && config.fill.black === config.black && !config.fill.invert ? config.fill : null;
-      const css = (known ? known.css + '\n' : '') + made.rules.join('\n');
-      config.fill = { origin: location.origin, black: config.black, css, invert: false, fingerprints: [...(known ? known.fingerprints : []), fp] };
-      refreshFill();
-    }
-    tellPalette({ fill: true, fingerprint: fp, rules: useless ? [] : made.rules, invert: useless, stats: fillAnalysis });
-  };
-  // Read the site's style for its fill, if it's one not read before.
-  const fillLook = () => {
-    // A few times a visit at most: a page that keeps adding style as it runs isn't read over and over (#89).
-    if (fillBusy || fillRuns >= 3 || !learnable() || !filling()) return;
-    const fp = palette.fingerprint(pieces());
-    const p = config.fill;
-    if (p && p.origin === location.origin && p.black === config.black && p.fingerprints.includes(fp)) return;
-    fillBusy = true;
-    fillRuns++;
-    analyseFill(fp).catch((e) => { fillAnalysis = { error: String(e) }; }).finally(() => { fillBusy = false; });
-  };
-  let fillTimer = 0;
-  const fillSoon = (delay) => {
-    if (!learnable()) return;
-    clearTimeout(fillTimer);
-    fillTimer = setTimeout(() => idle(fillLook), delay);
-  };
-  // A sheet added to the head later, and the sheets a page loads as you type into it (a suggestion list's own).
-  let typed = 0;
-  if (isTop) {
-    addEventListener('input', () => { if (typed < 8 && filling()) { typed++; fillSoon(1500); } }, true);
-    const heads = new MutationObserver((records) => {
-      if (!filling()) return;
-      for (const r of records) for (const n of r.addedNodes) if (n.tagName === 'LINK' || n.tagName === 'STYLE') { fillSoon(1000); return; }
-    });
-    document.addEventListener('DOMContentLoaded', () => { if (document.head) heads.observe(document.head, { childList: true }); });
-  }
 
   // MARK: When to look
 
@@ -777,103 +306,43 @@
     clearTimeout(checkTimer);
     checkTimer = setTimeout(check, delay);
   };
-  // A theme switched on the page itself (a class or data-theme on the root or body) is looked at again.
+  // A theme switched on the page itself (a class or data-theme on the root or body) is looked at again; Dark Reader's
+  // own marks on the root aren't.
   const themes = new MutationObserver(() => checkSoon(150));
-  const watchThemes = (el) => themes.observe(el, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-color-mode', 'data-mode'] });
+  const themeAttributes = ['class', 'data-theme', 'data-color-mode', 'data-mode', 'data-bs-theme', 'data-color-scheme'];
   let watchedBody = null;
-  let watchedRoot = null;
-  // New elements, in the page and in its shadow roots: only noted here, looked at when idle. Drawn by a palette or
-  // not darkened, only the root and the body arriving (or the root put back) are watched, not every change.
-  let watching = '';
-  const added = new MutationObserver((records) => {
-    if (darkened && style.parentNode !== document.documentElement) put();
-    const root = document.documentElement;
-    if (watching === 'top' && root && root !== watchedRoot) { watchedRoot = root; added.observe(root, { childList: true }); }
-    if (document.body && document.body !== watchedBody) { watchedBody = document.body; watchThemes(watchedBody); checkSoon(60); }
-    if (!darkened || usingPalette) return;
-    for (const r of records) {
-      for (const node of r.addedNodes) {
-        if (node.nodeType !== 1 || node === style) continue;
-        if (node.tagName === 'LINK' || node.tagName === 'STYLE') checkSoon(100);
-        else scanSoon(node);
-      }
-    }
-  });
-  const watch = () => {
-    const want = darkened && !usingPalette ? 'all' : 'top';
-    if (want === watching) return;
-    watching = want;
-    added.disconnect();
-    watchedRoot = null;
-    if (want === 'all') {
-      added.observe(document, { childList: true, subtree: true });
-      for (const root of shadowRoots) added.observe(root, { childList: true, subtree: true });
-    } else {
-      // The root can be put back by a page that writes itself over (document.write), taking the style with it.
-      added.observe(document, { childList: true });
-      if (document.documentElement) { watchedRoot = document.documentElement; added.observe(watchedRoot, { childList: true }); }
+  const watchBody = () => {
+    if (document.body && document.body !== watchedBody) {
+      watchedBody = document.body;
+      themes.observe(watchedBody, { attributes: true, attributeFilter: themeAttributes });
     }
   };
-
-  // MARK: Before each frame
-
-  // While the page comes in, and for a moment after it has loaded, it's looked at just before each frame is drawn
-  // (`requestAnimationFrame` runs then), so what's drawn follows the page in that same frame rather than after a timer.
-  // The first look, once the page has its style, decides it; after that a quick one (its body and its middle, with
-  // nothing switched off) each frame, and a full look only when that changes: a darkened page turning dark on its own,
-  // or one let go of turning light.
-  let loadedAt = 0;
+  // While the page comes in it's looked at just before each frame is drawn (`requestAnimationFrame` runs then), until
+  // it has its style: the first look decides it in the frame its own colors would first show in.
   let decided = false;
-  let lastQuick = null;
-  const quickDark = () => {
-    const body = document.body;
-    if (!body) return null;
-    const a = backgroundOf(body);
-    let el = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
-    while (el && el.parentElement && skip.test(el.tagName)) el = el.parentElement;
-    const b = el && el !== style && el !== prepaint ? backgroundOf(el) : a;
-    if (isDark(a) && isDark(b)) return true;
-    if (!isDark(a) && !isDark(b)) return false;
-    return null;
-  };
   const beforeFrame = () => {
-    if (loadedAt && performance.now() - loadedAt > 3000) return;
+    if (decided) return;
+    watchBody();
+    if (!wanted || forced()) { decided = true; return; }
+    if (styled()) { decided = true; check(); return; }
     requestAnimationFrame(beforeFrame);
-    if (!wanted || forced() || !styled()) return;
-    if (!decided || prepaint.parentNode) {
-      decided = true;
-      check();
-      lastQuick = darkened && usingPalette ? null : quickDark();
-      return;
-    }
-    // A palette draws the page's own colors dark: read with it on, every page would look dark (it's checked on its own).
-    if (darkened && usingPalette) return;
-    const quick = quickDark();
-    if (quick === null || quick === lastQuick) return;
-    lastQuick = quick;
-    if (quick === darkened) check();
   };
 
-  // Darkened from the first moment, unless the site was last seen dark: no white page first. One last seen dark
-  // starts on its own dark ground, and with its own dark mark, until it's looked at.
-  if (wanted && darkens()) apply(true);
-  else { if (wanted) { putPrepaint(); if (!forced()) putMark(); refreshFill(); } send(); }
-  if (isTop) requestAnimationFrame(beforeFrame);
-  if (usingPalette) requestAnimationFrame(firstFrame);
-  watch();
-  if (document.documentElement) watchThemes(document.documentElement);
-  document.addEventListener('DOMContentLoaded', () => { check(); checkEarly(); });
+  // No white page first: a page starts on a dark ground until it's looked at, its site's own dark if it was last
+  // seen dark (with its own dark mark), else the dark Dark Reader draws white as. A forced one is darkened at once.
+  if (wanted && forced()) apply(true);
+  else { if (wanted) { putPrepaint(); if (native === true) putMark(); } send(); }
+  requestAnimationFrame(beforeFrame);
+  if (document.documentElement) themes.observe(document.documentElement, { attributes: true, attributeFilter: themeAttributes });
+  document.addEventListener('DOMContentLoaded', () => { watchBody(); if (!decided && styled()) { decided = true; check(); } });
   addEventListener('load', () => {
-    loadedAt = performance.now();
+    decided = true;
     // A mark the site never touched isn't one its look uses now.
-    if (markPut) setTimeout(() => { if (markPut) { releaseMark(); send(); } }, 2000);
+    if (markPut) setTimeout(() => { if (markPut) { releaseMark(); check(); } }, 2000);
     check();
-    checkEarly();
+    // An app that draws a light loading screen, then its own dark.
     setTimeout(check, 600);
     setTimeout(check, 2000);
-    if (darkened && !usingPalette) idle(() => { try { lateHosts(document); } catch (e) {} });
-    paletteSoon();
-    fillSoon(config.paletteDelay || 1200);
   });
   addEventListener('pageshow', (e) => { if (e.persisted) check(); });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => checkSoon(100));
@@ -881,20 +350,13 @@
   window.__zigzagDark = {
     // Zigzag's choice changed (a setting, the site's own row, the Mac's appearance).
     set(config2) {
+      const themeWas = JSON.stringify(config.theme);
       Object.assign(config, config2);
-      if (darkened) {
-        const was = usingPalette;
-        usingPalette = paletteFits();
-        style.textContent = css();
-        watch();
-        if (was && !usingPalette) scanSoon(document.documentElement);
-      }
-      restyleShadows();
+      // Pure black changed: drawn again with the new theme.
+      if (darkened && JSON.stringify(config.theme) !== themeWas) DarkReader.enable(theme(), fix());
       check();
-      tellFrames();
     },
     check,
-    state: () => ({ wanted, darkened, native, color: colorOf(), frames: frames.size, shadowRoots: shadowRoots.size,
-      palette: usingPalette, refused, analysis, fill: !!fillStyle.parentNode, fillAnalysis }),
+    state: () => ({ wanted, darkened, native, color: colorOf(), engine: 'darkreader', forced: forced() }),
   };
 })();
