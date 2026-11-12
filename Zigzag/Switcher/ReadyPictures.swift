@@ -41,24 +41,23 @@ enum ReadyPictures {
         let scale = window?.backingScaleFactor ?? 2
         let width = size == .full ? nil : Int(ceil(Tokens.Metric.deskCardMaxWidth * scale))
         let space = colorSpace(of: window)
-        nonisolated(unsafe) let pictures = sources
         nonisolated(unsafe) let done = completion
         DispatchQueue.global(qos: .userInitiated).async {
-            var made = [(CGImage, Bool)?](repeating: nil, count: pictures.count)
+            var made = [(CGImage, Bool)?](repeating: nil, count: sources.count)
             made.withUnsafeMutableBufferPointer { buffer in
                 nonisolated(unsafe) let out = buffer
-                DispatchQueue.concurrentPerform(iterations: pictures.count) { i in
-                    guard let source = pictures[i], let image = render(source, width: width, in: space) else { return }
+                DispatchQueue.concurrentPerform(iterations: sources.count) { i in
+                    guard let source = sources[i], let image = render(source, width: width, in: space) else { return }
                     out[i] = (image, TabThumbnailView.isBlank(image))
                 }
             }
-            nonisolated(unsafe) let results = made
+            let results = made
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     for (i, picture) in wanted.enumerated() {
                         guard let (image, blank) = results[i] else { continue }
                         // Smaller than a card's picture, it's the whole of it, and good for flying too.
-                        let entry = Entry(image: image, full: size == .full || image.width >= (pictures[i]?.width ?? 0))
+                        let entry = Entry(image: image, full: size == .full || image.width >= (sources[i]?.width ?? 0))
                         objc_setAssociatedObject(picture, &key, entry, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
                         TabThumbnailView.remember(picture, blank: blank)
                     }

@@ -347,10 +347,9 @@ final class FaviconStore {
         missing.remove(key)
         failures[key] = nil
         // Encoded and written off the main thread, in order; clearing history waits for what's still being written.
-        nonisolated(unsafe) let written = normalized
         let url = file(for: key)
         Self.writer.async {
-            if let tiff = written.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+            if let tiff = normalized.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
                let png = rep.representation(using: .png, properties: [:]) {
                 try? png.write(to: url, options: .atomic)
             }
@@ -451,10 +450,9 @@ enum SnapshotStore {
         guard let image = NSImage(contentsOf: url) else { return nil }
         // Whether it's blank, from the file's small thumbnail: the picture itself stays undecoded until it's shown.
         // Worked out off the main thread: every restored tab reads its picture as Zigzag opens (#89).
-        nonisolated(unsafe) let shown = image
         DispatchQueue.global(qos: .utility).async {
             guard let blank = blankness(ofFile: url) else { return }
-            DispatchQueue.main.async { MainActor.assumeIsolated { TabThumbnailView.remember(shown, blank: blank) } }
+            DispatchQueue.main.async { MainActor.assumeIsolated { TabThumbnailView.remember(image, blank: blank) } }
         }
         // Read back from disk, it counts toward the limit like a fresh one, so the cache never grows without end.
         remember(image, for: id)
