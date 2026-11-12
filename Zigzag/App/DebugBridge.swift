@@ -564,6 +564,14 @@ enum DebugBridge {
         case "saveprompt": if arg == "close" { SavePasswordPrompt.debugClose() } else { SavePasswordPrompt.debugPreview(in: controller) }
         case "select": controller.tabManager.select(at: Int(arg) ?? 0)
         case "suspendtab": controller.tabManager.allTabs.first { $0.url?.absoluteString.hasPrefix(arg) == true }?.suspend(because: "debug")
+        // pageicon <index> <icon|none>: gives the tab at that sidebar position an icon of its own, as Change Icon… does.
+        case "pageicon":
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            let list = controller.tabManager.navigableTabs
+            if let n = f.first.flatMap({ Int($0) }), list.indices.contains(n) {
+                let icon = f.count > 1 && f[1] != "none" ? f[1] : nil
+                if let id = list[n].bookmarkID { Library.shared.setIcon(icon, forBookmark: id) } else { list[n].customIcon = icon }
+            }
         case "killpage":
             // killpage <url prefix>: ends that tab's page process, as macOS does when it takes memory back.
             if let webView = controller.tabManager.allTabs.first(where: { $0.url?.absoluteString.hasPrefix(arg) == true })?.webView,
