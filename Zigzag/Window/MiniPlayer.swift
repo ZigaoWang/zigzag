@@ -114,9 +114,7 @@ final class MiniPlayer {
     func tabsChanged() {
         unpark { entry in
             guard let tab = entry.tab, let webView = entry.webView else { return true }
-            // Or one another window has put on screen since (#162).
-            let elsewhere = entry.holder.map { $0.window != nil && $0.window !== controller?.window } ?? false
-            return tab.isClosed || controller?.tabManager.tab(with: tab.id) !== tab || tab.webView !== webView || elsewhere
+            return tab.isClosed || controller?.tabManager.tab(with: tab.id) !== tab || tab.webView !== webView
         }
         guard let id = model.tab else { return }
         if let tab, !tab.isClosed, controller?.tabManager.tab(with: id) === tab, let webView, tab.webView === webView,

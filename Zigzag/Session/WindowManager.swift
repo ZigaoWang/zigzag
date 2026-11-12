@@ -1,11 +1,6 @@
 import AppKit
 
 /// Saved state of every window and tab, written often so a crash loses nothing.
-///
-/// Every everyday window shows the same tabs (#162): the first window carries the whole list (each space's tabs, the
-/// open pages of pinned tabs and favorites, the splits), and the others only their own place, space and chosen tab in
-/// each space. A session from before kept each window's own tabs; read back, the windows' lists join up space by
-/// space, in window order. (An older Zigzag reading a new session finds every tab in its first window.)
 nonisolated struct SessionState: Codable, Sendable {
     nonisolated struct TabState: Codable, Sendable {
         var id: UUID
@@ -43,9 +38,6 @@ nonisolated struct SessionState: Codable, Sendable {
         var bookmarkTabs: [BookmarkTabState]
         var isFullScreen: Bool?
         var splits: [TabManager.SplitPair]?
-
-        /// A window that carries no tabs of its own, only which it had chosen: one beside another that has the list.
-        var isViewOnly: Bool { spaces.allSatisfy(\.tabs.isEmpty) && bookmarkTabs.isEmpty }
     }
 
     var windows: [WindowState]
@@ -87,22 +79,6 @@ final class WindowManager {
     /// The browser window's controller, for a window that's one.
     func controller(for window: NSWindow?) -> BrowserWindowController? {
         controllers.first { $0.window === window }
-    }
-
-    /// The window a tab belongs to (#162): the one that has it on screen or last had, else the first that lists it.
-    /// Every everyday window lists the same tabs, so this is what says which one a tab is "in" (extensions, scripts).
-    func window(of tab: Tab) -> BrowserWindowController? {
-        if let host = tab.host as? BrowserWindowController, !host.tabManager.isInvalidated, host.tabManager.tab(with: tab.id) === tab { return host }
-        return controllers.first { $0.tabManager.tab(with: tab.id) === tab }
-    }
-
-    /// Every open tab once, however many windows show it.
-    var openTabs: [Tab] {
-        var seen = Set<ObjectIdentifier>()
-        return controllers.flatMap { controller -> [Tab] in
-            guard seen.insert(ObjectIdentifier(controller.tabManager.store)).inserted else { return [] }
-            return controller.tabManager.allTabs
-        }
     }
 
     #if DEBUG
@@ -155,11 +131,7 @@ final class WindowManager {
             restored.window?.makeKeyAndOrderFront(nil)
             return restored
         }
-        // An everyday window shows the tabs the others do (#162); a private window has its own.
-        let front = keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 } ?? controllers.last { !$0.tabManager.isPrivate }
-        let manager = TabManager(spaceID: spaceID ?? keyController?.tabManager.currentSpaceID, isPrivate: isPrivate,
-                                 store: isPrivate ? nil : front?.tabManager.store)
-        if !isPrivate, let front { manager.startSelection(from: front.tabManager) }
+        let manager = TabManager(spaceID: spaceID ?? keyController?.tabManager.currentSpaceID, isPrivate: isPrivate)
         var frame: NSRect?
         if let key = keyController, let window = key.window {
             // Cascade from the current window, like every Mac app. From full screen, from where it was before.
@@ -206,30 +178,20 @@ final class WindowManager {
 
     private func windowClosed(_ controller: BrowserWindowController) {
         guard !isTerminating else { return }
-        let manager = controller.tabManager
-        // The other windows show the same tabs: closing one closes none of them (#162). The last one's are kept for
-        // next launch even if it is closed before quitting. (A private window open alongside doesn't count: it isn't
-        // saved, and its tabs are its own.)
-        let isLast = !manager.isPrivate && manager.isLastView
-        if isLast { saveNow(synchronously: true) }
-        // Kept to reopen (⇧⌘T's sibling in the File menu). Never private windows. The last one with its tabs, each with
-        // its back/forward list; another, only its place, space and chosen tabs, since its tabs stay open.
-        if isLast, manager.allTabs.contains(where: { $0.url != nil }) {
+        // Keep the last window's tabs for next launch even if it is closed before quitting.
+        // (A private window open alongside doesn't count: it isn't saved.)
+        if !controller.tabManager.isPrivate, controllers.filter({ !$0.tabManager.isPrivate }).count == 1 { saveNow(synchronously: true) }
+        // Kept to reopen (⇧⌘T's sibling in the File menu), with each tab's back/forward list. Never private windows.
+        if !controller.tabManager.isPrivate, controller.tabManager.allTabs.contains(where: { $0.url != nil }) {
             var history: [UUID: Data] = [:]
-            for tab in manager.allTabs { if let data = tab.interactionStateForSaving { history[tab.id] = data } }
-            // The windows closed before it go back to tabs that are closing now: only this one can come back.
-            closedWindows.removeAll { $0.state.isViewOnly }
+            for tab in controller.tabManager.allTabs { if let data = tab.interactionStateForSaving { history[tab.id] = data } }
             closedWindows.append((windowState(controller), history))
-        } else if !manager.isPrivate, !isLast {
-            closedWindows.append((windowState(controller, withTabs: false), [:]))
+            if closedWindows.count > 10 { closedWindows.removeFirst() }
         }
-        if closedWindows.count > 10 { closedWindows.removeFirst() }
         controllers.removeAll { $0 === controller }
         if lastKey === controller { lastKey = nil }
-        // Its tabs go to the windows still showing them first, so extensions see them move there, not close with it.
-        if !manager.isLastView { manager.invalidate() }
         if #available(macOS 15.4, *) { ExtensionCenter.windowClosed(controller) }
-        if !manager.isInvalidated { manager.invalidate() }
+        controller.tabManager.invalidate()
         if controller.tabManager.isPrivate, !controllers.contains(where: { $0.tabManager.isPrivate }) { DownloadManager.shared.forgetPrivate() }
         if !controllers.isEmpty { scheduleSave() }
     }
@@ -298,23 +260,12 @@ final class WindowManager {
         guard !saved.isEmpty else { return }
         // Gathered here, where the windows and tabs are; encoded and written on the writer's queue, and only when
         // it says something the file doesn't already (a page rewriting its address back and forth).
-        // The tabs go with the first window of those that show them; the others keep their own place and choices.
-        var listed: [ObjectIdentifier] = []
-        let state = SessionState(windows: saved.map { controller in
-            let store = ObjectIdentifier(controller.tabManager.store)
-            defer { listed.append(store) }
-            return windowState(controller, withTabs: !listed.contains(store))
-        })
+        let state = SessionState(windows: saved.map(windowState))
         // Back/forward lists live in their own files: opaque and occasionally large. Only changed ones are
         // written, and never on the main thread.
         var keep = Set<UUID>()
         var writes: [(URL, Data)] = []
-        var stores: [ObjectIdentifier] = []
         for controller in saved {
-            // Each store's tabs once, however many windows show them.
-            let store = ObjectIdentifier(controller.tabManager.store)
-            guard !stores.contains(store) else { continue }
-            stores.append(store)
             for tab in controller.tabManager.allTabs {
                 keep.insert(tab.id)
                 // Only the tabs that went somewhere or were scrolled are encoded again: with many tabs, the rest cost
@@ -358,27 +309,26 @@ final class WindowManager {
         }
     }
 
-    /// `withTabs`: the tabs it shows are written with it; without, only which it has chosen in each space.
-    private func windowState(_ controller: BrowserWindowController, withTabs: Bool = true) -> SessionState.WindowState {
+    private func windowState(_ controller: BrowserWindowController) -> SessionState.WindowState {
         let manager = controller.tabManager
         let fullScreen = controller.window?.styleMask.contains(.fullScreen) == true
         let frame = (fullScreen ? controller.windowedFrame : nil) ?? controller.window?.frame ?? .zero
         func state(_ tab: Tab, parent: UUID? = nil) -> SessionState.TabState { SessionState.TabState(tab, parent: parent) }
         let spaces = Library.shared.spaces.map { space in
-            let tabs = withTabs ? manager.tabs(in: space.id) : []
+            let tabs = manager.tabs(in: space.id)
             // New tabs with no page aren't kept: the tabs under one come back a level up, as if it had closed.
             let parents = SessionState.savedParents(manager.treeNodes(in: space.id), keeping: Set(tabs.filter { $0.url != nil }.map(\.id)))
             return SessionState.SpaceTabs(spaceID: space.id, tabs: tabs.filter { $0.url != nil }.map { state($0, parent: parents[$0.id]) },
                                           selectedTabID: manager.selectedTab(in: space.id)?.id)
         }
-        let bookmarkTabs = withTabs ? manager.bookmarkTabs.map { SessionState.BookmarkTabState(bookmarkID: $0.key, tab: state($0.value)) } : []
+        let bookmarkTabs = manager.bookmarkTabs.map { SessionState.BookmarkTabState(bookmarkID: $0.key, tab: state($0.value)) }
         return SessionState.WindowState(frame: [frame.origin.x, frame.origin.y, frame.width, frame.height],
                                         sidebarVisible: controller.root.sidebarVisible,
                                         sidebarWidth: Double(controller.root.sidebarWidth),
                                         currentSpaceID: manager.currentSpaceID,
                                         spaces: spaces, bookmarkTabs: bookmarkTabs,
                                         isFullScreen: controller.window?.styleMask.contains(.fullScreen),
-                                        splits: withTabs ? manager.splits : nil)
+                                        splits: manager.splits)
     }
 
     // MARK: Restoring
@@ -393,7 +343,10 @@ final class WindowManager {
         sessionWaiting = false
         finishSaving()
         guard let state = JSONStore.load(SessionState.self, from: Paths.session), !state.windows.isEmpty else { return false }
-        let allIDs = restoreWindows(state.windows)
+        var allIDs = Set<UUID>()
+        for windowState in state.windows {
+            allIDs.formUnion(restoreWindow(windowState))
+        }
         SnapshotStore.prune(keeping: allIDs)
         return !controllers.isEmpty
     }
@@ -402,8 +355,7 @@ final class WindowManager {
     private var closedWindows: [(state: SessionState.WindowState, history: [UUID: Data])] = []
     var canReopenClosedWindow: Bool {
         let open = openTabIDs
-        let shared = controllers.contains { !$0.tabManager.isPrivate }
-        return closedWindows.contains { !isBack($0.state, open: open) && (shared || !$0.state.isViewOnly) }
+        return closedWindows.contains { !isBack($0.state, open: open) }
     }
 
     /// Brings back the last closed window, its spaces, tabs, history and place on screen.
@@ -411,12 +363,9 @@ final class WindowManager {
         // Already back (the Dock icon restored it after the last window closed): never a second copy of the same tabs,
         // so it's passed over for the one closed before it.
         let open = openTabIDs
-        let shared = controllers.contains { !$0.tabManager.isPrivate }
         while let closed = closedWindows.popLast() {
             guard !isBack(closed.state, open: open) else { continue }
-            // One closed beside others shows their tabs again, if they're open.
-            if closed.state.isViewOnly, !shared { continue }
-            restoreWindows([closed.state], history: closed.history)
+            restoreWindow(closed.state, history: closed.history)
             return
         }
     }
@@ -428,37 +377,12 @@ final class WindowManager {
         return ids.contains(where: open.contains)
     }
 
-    /// Windows from saved state, showing one list of tabs (#162): each window's saved tabs join it, space by space, in
-    /// window order, so a session from before, with tabs of each window's own, keeps them all. With everyday windows
-    /// open (a closed window reopened), they join those windows' tabs. Returns the tabs' ids. `history` stands in for
-    /// back/forward lists not on disk.
+    /// One window from saved state; returns its tabs' ids. `history` stands in for back/forward lists not on disk.
     @discardableResult
-    private func restoreWindows(_ states: [SessionState.WindowState], history: [UUID: Data] = [:]) -> Set<UUID> {
-        let store = controllers.first { !$0.tabManager.isPrivate }?.tabManager.store ?? TabStore()
-        let restored = Self.restoreTabs(states, history: history, into: store)
-        for (windowState, (manager, selection)) in zip(states, zip(restored.managers, restored.selections)) {
-            let f = windowState.frame
-            var frame: NSRect? = f.count == 4 ? NSRect(x: f[0], y: f[1], width: f[2], height: f[3]) : nil
-            if let rect = frame, !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(rect) }) { frame = nil }
-            let controller = makeController(manager: manager, frame: frame, sidebarVisible: windowState.sidebarVisible,
-                                            sidebarWidth: CGFloat(windowState.sidebarWidth))
-            manager.restoreSelection(selection, currentSpaceID: windowState.currentSpaceID)
-            controller.showWindow(nil)
-            if windowState.isFullScreen == true { controller.window?.toggleFullScreen(nil) }
-        }
-        return restored.ids
-    }
-
-    /// The tabs of saved windows into `store`, and a view of it for each window with the tab it had chosen in each
-    /// space (not yet applied: its window does that once it's made).
-    static func restoreTabs(_ states: [SessionState.WindowState], history: [UUID: Data] = [:], into store: TabStore)
-        -> (managers: [TabManager], selections: [[UUID: UUID]], ids: Set<UUID>) {
-        var allIDs = Set<UUID>()
-        let managers = states.map { TabManager(spaceID: $0.currentSpaceID, store: store) }
-        // A pinned page or favorite open in two windows of an old session comes back once: the other's id stands for it.
-        var sameAs: [UUID: UUID] = [:]
-        var splits: [TabManager.SplitPair] = []
-        for (windowState, manager) in zip(states, managers) {
+    private func restoreWindow(_ windowState: SessionState.WindowState, history: [UUID: Data] = [:]) -> Set<UUID> {
+            var allIDs = Set<UUID>()
+            let manager = TabManager(spaceID: windowState.currentSpaceID)
+            var selection: [UUID: UUID] = [:]
             // A space that's gone (the library couldn't be read and started over) keeps its tabs: they join the space
             // the window was on, or the first one, rather than vanish and be overwritten by the next save.
             let fallback = Library.shared.space(windowState.currentSpaceID) != nil ? windowState.currentSpaceID : Library.shared.spaces[0].id
@@ -466,13 +390,10 @@ final class WindowManager {
                 let space = Library.shared.space(spaceTabs.spaceID) != nil ? spaceTabs.spaceID : fallback
                 let tabs = spaceTabs.tabs.map { restoreTab($0, spaceID: space, history: history[$0.id]) }
                 manager.adopt(tabs, in: space)
+                if space == spaceTabs.spaceID, let selected = spaceTabs.selectedTabID { selection[space] = selected }
                 allIDs.formUnion(tabs.map(\.id))
             }
             for bookmarkState in windowState.bookmarkTabs {
-                if let open = store.bookmarkTabs[bookmarkState.bookmarkID] {
-                    sameAs[bookmarkState.tab.id] = open.id
-                    continue
-                }
                 let isFavorite = Library.shared.isFavorite(bookmarkState.bookmarkID)
                 // A favorite's page comes back in a space of the favorite's own profile: the one the window was in if
                 // that's on it, else that profile's first.
@@ -487,26 +408,19 @@ final class WindowManager {
                 manager.adoptBookmarkTab(tab, bookmarkID: bookmarkState.bookmarkID)
                 allIDs.insert(tab.id)
             }
-            splits += windowState.splits ?? []
-        }
-        let mapped = { (id: UUID) in sameAs[id] ?? id }
-        // The splits of every window: one a page can't be in twice, the first kept.
-        managers.first?.restoreSplits(store.splits + splits.map { pair in
-            var pair = pair
-            for id in pair.ids where sameAs[id] != nil { pair.replace(id, with: mapped(id)) }
-            return pair
-        })
-        let selections = states.map { windowState in
-            var selection: [UUID: UUID] = [:]
-            for spaceTabs in windowState.spaces where Library.shared.space(spaceTabs.spaceID) != nil {
-                if let selected = spaceTabs.selectedTabID { selection[spaceTabs.spaceID] = mapped(selected) }
-            }
-            return selection
-        }
-        return (managers, selections, allIDs)
+            let f = windowState.frame
+            var frame: NSRect? = f.count == 4 ? NSRect(x: f[0], y: f[1], width: f[2], height: f[3]) : nil
+            if let rect = frame, !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(rect) }) { frame = nil }
+            let controller = makeController(manager: manager, frame: frame, sidebarVisible: windowState.sidebarVisible,
+                                            sidebarWidth: CGFloat(windowState.sidebarWidth))
+            manager.restoreSplits(windowState.splits ?? [])
+            manager.restoreSelection(selection, currentSpaceID: windowState.currentSpaceID)
+            controller.showWindow(nil)
+            if windowState.isFullScreen == true { controller.window?.toggleFullScreen(nil) }
+            return allIDs
     }
 
-    private static func restoreTab(_ state: SessionState.TabState, spaceID: UUID, history: Data? = nil) -> Tab {
+    private func restoreTab(_ state: SessionState.TabState, spaceID: UUID, history: Data? = nil) -> Tab {
         let interaction = history ?? (try? Data(contentsOf: Paths.tabState.appendingPathComponent(state.id.uuidString)))
         let tab = Tab(id: state.id, url: state.url, title: state.title, spaceID: spaceID, interactionState: interaction,
                       lastActivated: state.lastActivated, createdAt: state.createdAt)

@@ -57,8 +57,6 @@ enum ExtensionCenter {
         tab.toldTo = nil
     }
     static func tabActivated(_ tab: Tab, previous: Tab?) { tab.extensionHost?.tabActivated(tab, previous: previous) }
-    /// Shown in another window now (#162): to extensions, it moved there.
-    static func tabMoved(_ tab: Tab, from window: BrowserWindowController) { tab.extensionHost?.tabMoved(tab, from: window) }
     static func tabChanged(_ tab: Tab, _ change: Tab.Change) { tab.extensionHost?.tabChanged(tab, change) }
 
     // MARK: Windows

@@ -1226,15 +1226,13 @@ enum DebugBridge {
         // selecttitle <text>: the tab here whose title starts so, chosen as a click on its row chooses it.
         case "selecttitle":
             if let tab = controller.tabManager.allTabs.first(where: { $0.displayTitle.hasPrefix(arg) }) { controller.listSelect(tab) }
-        case "showhere": if let tab = controller.tabManager.selectedTab { controller.showHere(tab) }
         case "windows":
-            // windows <path>: each browser window's space, chosen tab, whether another window has its page, and its list.
+            // windows <path>: each browser window's space, chosen tab and its list.
             let rows: [[String: Any]] = WindowManager.shared.controllers.enumerated().map { i, c in
                 let m = c.tabManager
                 return ["window": i + 1, "private": m.isPrivate, "space": m.currentSpace.name,
-                        "selected": m.selectedTab?.displayTitle ?? "", "elsewhere": m.selectedTab.map(m.isShownElsewhere) ?? false,
-                        "card": c.root.card.shownElsewhere?.displayTitle ?? "", "tabs": m.currentTabs.map(\.displayTitle),
-                        "host": m.currentTabs.map { WindowManager.shared.window(of: $0).map { w in (WindowManager.shared.controllers.firstIndex { $0 === w } ?? -1) + 1 } ?? 0 },
+                        "selected": m.selectedTab?.displayTitle ?? "", "tabs": m.currentTabs.map(\.displayTitle),
+                        "host": m.currentTabs.map { tab in (WindowManager.shared.controllers.firstIndex { $0 === tab.host } ?? -1) + 1 },
                         "frame": c.window.map { NSStringFromRect($0.frame) } ?? "", "number": c.window?.windowNumber ?? 0]
             }
             if let data = try? JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: arg)) }

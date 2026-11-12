@@ -12143,17 +12143,6 @@
         }
       }
     },
-    "Show Here" : {
-      "comment" : "Button over a tab's picture that brings its page from the other window it's shown in to this one.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在此显示"
-          }
-        }
-      }
-    },
     "Show History" : {
       "comment" : "Button in Settings › Privacy that opens History.\nHistory menu item.",
       "localizations" : {
@@ -12348,17 +12337,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示已固定标签页"
-          }
-        }
-      }
-    },
-    "Shown in another window" : {
-      "comment" : "Over a tab's picture, in place of its page, when another window has that page on screen.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在另一个窗口中显示"
           }
         }
       }

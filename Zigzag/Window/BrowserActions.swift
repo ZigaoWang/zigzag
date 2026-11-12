@@ -4,8 +4,7 @@ import WebKit
 /// Menu actions. Every one of these is reachable from the menu bar with its shortcut shown.
 extension BrowserWindowController: NSMenuItemValidation {
     var selectedTab: Tab? { tabManager.selectedTab }
-    /// The page on screen here: none while another window has it (#162), so what acts on a page waits for Show Here.
-    var selectedWebView: WKWebView? { selectedTab.flatMap { tabManager.isShownElsewhere($0) ? nil : $0.webView } }
+    var selectedWebView: WKWebView? { selectedTab?.webView }
 
     // MARK: File
 

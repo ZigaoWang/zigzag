@@ -263,8 +263,8 @@ final class BridgeFavicons: BridgeNamespace {
         guard let context = host.context(for: extensionID) else { return [] }
         let readsAll = context.hasPermission(.tabs)
         // Its own profile's tabs: the only ones it's told about.
-        let open = WindowManager.shared.openTabs.compactMap { tab -> OpenTab? in
-            guard !tab.isPrivate, tab.profile === host.profile, let url = tab.webView?.url ?? tab.url else { return nil }
+        let open = WindowManager.shared.controllers.filter { !$0.tabManager.isPrivate }.flatMap(\.tabManager.allTabs).compactMap { tab -> OpenTab? in
+            guard tab.profile === host.profile, let url = tab.webView?.url ?? tab.url else { return nil }
             return OpenTab(url: url.absoluteString, icon: tab.favicon, isPrivate: tab.isPrivate,
                            mayRead: readsAll || context.hasAccess(to: url, in: tab))
         }
@@ -1422,7 +1422,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
                 // A tab getMediaStreamId named: good once, for a few seconds, for the extension it was given to.
                 // Still on the site it was named on.
                 guard let named = pending.removeValue(forKey: streamID), let namedTab = named.tab,
-                      let owner = WindowManager.shared.window(of: namedTab),
+                      let owner = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === namedTab } }),
                       Self.namedStreamHolds(givenTo: named.extensionID, askedBy: extensionID, expires: named.expires, namedOrigin: named.origin,
                                             origin: SiteOrigin.of(namedTab.webView?.url ?? namedTab.url), isPrivate: owner.tabManager.isPrivate || namedTab.isPrivate)
                 else { throw BridgeError("Invalid stream ID") }
@@ -1603,8 +1603,10 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     }
 
     private func tab(_ id: UUID) -> (Tab, BrowserWindowController)? {
-        guard let tab = WindowManager.shared.openTabs.first(where: { $0.id == id }), let controller = WindowManager.shared.window(of: tab) else { return nil }
-        return (tab, controller)
+        for controller in WindowManager.shared.controllers {
+            if let tab = controller.tabManager.allTabs.first(where: { $0.id == id }) { return (tab, controller) }
+        }
+        return nil
     }
 
     /// Web Audio cannot capture some streamed or protected media. Failing here keeps the original tab's sound

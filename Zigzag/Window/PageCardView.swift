@@ -299,7 +299,6 @@ final class PageCardView: NSView {
             if let holder, holder.superview === clip { holder.frame = content }
             document?.frame = content
             placeholder.frame = content
-            elsewhere?.frame = content
             overlay?.frame = content
             edge.frame = surface.bounds
             if progressLine.superlayer != nil { layoutProgress() }
@@ -367,8 +366,6 @@ final class PageCardView: NSView {
 
     /// Puts a web view in the card, in its holder. The new one goes in before the old one leaves, so nothing flickers.
     func show(_ newWebView: WKWebView?, placeholderImage: NSImage? = nil) {
-        // A page here again: no longer standing in for one in another window.
-        if newWebView != nil, elsewhere != nil { showElsewhere(nil) }
         guard newWebView !== webView else { return }
         let old = webView, oldHolder = holder
         let owner = (newWebView as? BrowserWebView)?.owner
@@ -446,74 +443,5 @@ final class PageCardView: NSView {
         guard !placeholder.isHidden else { return }
         placeholder.isHidden = true
         placeholder.image = nil
-    }
-
-    /// Standing in for a page another window has on screen (#162): its picture, quietened, saying so, with a button
-    /// to show it here.
-    private var elsewhere: ShownElsewhereView?
-    /// The tab whose page is in another window, while the card stands in for it.
-    private(set) weak var shownElsewhere: Tab?
-
-    /// Shows that this tab's page is in another window (nil: the card shows pages again). `showHere` brings it here.
-    func showElsewhere(_ tab: Tab?, showHere: (() -> Void)? = nil) {
-        shownElsewhere = tab
-        guard let tab else {
-            elsewhere?.removeFromSuperview()
-            elsewhere = nil
-            return
-        }
-        show(nil)
-        let view = elsewhere ?? ShownElsewhereView()
-        if elsewhere == nil {
-            let top = contentTop
-            view.frame = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
-            view.autoresizingMask = [.width, .height]
-            if header.superview === clip { clip.addSubview(view, positioned: .below, relativeTo: header) } else { clip.addSubview(view) }
-            elsewhere = view
-        }
-        view.show(tab.snapshot)
-        view.showHere.onClick = { _ in showHere?() }
-    }
-}
-
-/// What a card shows for a page that's on screen in another window: its last picture behind a veil of the card's
-/// own ground, "Shown in another window", and Show Here.
-final class ShownElsewhereView: NSView {
-    private let picture = NSImageView()
-    private let veil = ColorView(color: Tokens.Color.cardBackground)
-    private let message = Label(String(localized: "Shown in another window", comment: "Over a tab's picture, in place of its page, when another window has that page on screen."),
-                                font: Tokens.Font.title(), color: Tokens.Color.textPrimary)
-    let showHere = PillButton(title: String(localized: "Show Here", comment: "Button over a tab's picture that brings its page from the other window it's shown in to this one."))
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        wantsLayer = true
-        picture.imageScaling = .scaleProportionallyUpOrDown
-        picture.imageAlignment = .alignTop
-        veil.alphaValue = 0.88
-        message.alignment = .center
-        [picture, veil, message, showHere].forEach { addSubview($0) }
-        setAccessibilityElement(true)
-        setAccessibilityRole(.group)
-        setAccessibilityLabel(message.stringValue)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    func show(_ image: NSImage?) {
-        picture.image = image
-        picture.isHidden = image == nil
-    }
-
-    override func layout() {
-        super.layout()
-        picture.frame = bounds
-        veil.frame = bounds
-        let height = message.lineHeight
-        let button = NSSize(width: showHere.fittingWidth, height: Tokens.Page.controlHeight)
-        let total = height + Tokens.Space.x4 + button.height
-        let top = (bounds.height + total) / 2
-        message.frame = NSRect(x: Tokens.Space.x4, y: top - height, width: max(0, bounds.width - Tokens.Space.x8), height: height)
-        showHere.frame = NSRect(x: ((bounds.width - button.width) / 2).rounded(), y: (top - total).rounded(), width: button.width, height: button.height)
     }
 }

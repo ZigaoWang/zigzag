@@ -195,17 +195,12 @@ final class Tab: NSObject {
     /// it, as Safari and Chrome do.
     var returnsToOpener: Bool {
         guard !canGoBack, !isPeek, bookmarkID == nil, let opener, !opener.isClosed else { return false }
-        // Moved to another space, the page it came from is no longer beside it. (Every everyday window has the same
-        // tabs; a private window's are its own.)
-        return opener.spaceID == spaceID && opener.privateStore === privateStore
+        // Dragged into another window, the page it came from is no longer beside it.
+        return opener.spaceID == spaceID && opener.host === host
     }
     var canGoBackOrReturn: Bool { canGoBack || returnsToOpener }
 
-    /// The window it belongs to: the one that last showed it, or made it. Its links open there, and extensions see it
-    /// there.
     weak var host: TabHost?
-    /// The window that has its page on screen, or last had (#162): another window on this tab shows that it's there.
-    weak var shownBy: TabManager?
     /// When its page last stopped unexpectedly, to tell a one-off from a page that keeps stopping.
     private var crashes: [Date] = []
     private var reloadWhenShown = false
@@ -441,7 +436,7 @@ final class Tab: NSObject {
     /// Its share of its page process's memory, as it goes to sleep: the process's footprint over the tabs awake in it.
     private func memoryInUse(by webView: BrowserWebView) -> UInt64? {
         guard let pid = EnergyWatch.processID(of: webView), pid > 0 else { return nil }
-        let sharing = WindowManager.shared.openTabs.filter { tab in
+        let sharing = WindowManager.shared.controllers.flatMap(\.tabManager.allTabs).filter { tab in
             tab.webView.flatMap(EnergyWatch.processID) == pid
         }.count
         return SleepMemory.share(footprint: ProcessMemory.footprint(pid), tabsSharing: sharing)

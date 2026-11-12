@@ -44,7 +44,7 @@ enum PopupNotice {
                 return
             }
             guard let webView = webView as? BrowserWebView, let tab = webView.owner,
-                  let controller = WindowManager.shared.window(of: tab),
+                  let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === tab } }),
                   shouldNotice("\(ObjectIdentifier(controller))|\(site)") else { return }
             blocked(url, from: page, opener: tab, in: controller)
         }

@@ -256,7 +256,8 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         if !dismissed {
             NSApp.activate()
             let tabID = entry?.tabID ?? key.split(separator: "|").first.flatMap { UUID(uuidString: String($0)) }
-            if let tabID, let tab = WindowManager.shared.openTabs.first(where: { $0.id == tabID }), let controller = WindowManager.shared.window(of: tab) {
+            if let tabID, let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.tab(with: tabID) != nil }),
+               let tab = controller.tabManager.tab(with: tabID) {
                 if controller.window?.isMiniaturized == true { controller.window?.deminiaturize(nil) }
                 controller.window?.makeKeyAndOrderFront(nil)
                 controller.tabManager.select(tab)

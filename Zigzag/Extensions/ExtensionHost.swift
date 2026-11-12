@@ -422,8 +422,7 @@ final class ExtensionHost: NSObject {
     private func announceExistingWindows(to context: WKWebExtensionContext) {
         for window in openWindows {
             controller.didOpenWindow(window)
-            // Every window lists the same tabs (#162): each is told of once, in the window it's in.
-            for tab in window.tabManager.allTabs where tab.extensionHost === self && WindowManager.shared.window(of: tab) === window {
+            for tab in window.tabManager.allTabs where tab.extensionHost === self {
                 tab.toldTo = self
                 controller.didOpenTab(tab)
             }
@@ -588,7 +587,7 @@ final class ExtensionHost: NSObject {
         // A click always does something: if the extension has no popup at all and opens no page, its options page
         // opens instead. One with a popup is left alone, however long it takes: a locked 1Password is slow, not broken.
         popupShownAt = nil
-        let tabsBefore = WindowManager.shared.openTabs.count
+        let tabsBefore = WindowManager.shared.controllers.map(\.tabManager.allTabs.count).reduce(0, +)
         let context = item.context
         let hasPopup = context.action(for: tab)?.presentsPopup ?? false
         ExtensionLog.write("click \(context.webExtension.displayName ?? "?") popup=\(hasPopup)")
@@ -634,7 +633,7 @@ final class ExtensionHost: NSObject {
             guard let self, self.popupShownAt == nil else { return }
             // Its side panel opening (Claude's, from its own click handler) is it doing something.
             if WindowManager.shared.controllers.contains(where: { $0.root.showsSidePanel && $0.root.sidePanel.extensionID == item.id }) { return }
-            let tabsNow = WindowManager.shared.openTabs.count
+            let tabsNow = WindowManager.shared.controllers.map(\.tabManager.allTabs.count).reduce(0, +)
             // This profile's copy of its options, in a space on this profile, never in a private window.
             let key = WindowManager.shared.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
             guard tabsNow == tabsBefore, let options = context.optionsPageURL, let controller = key ?? self.openWindows.first,
@@ -706,12 +705,6 @@ final class ExtensionHost: NSObject {
         guard !tab.isPrivate else { return }
         // The tab you left is only news to the extensions that knew it.
         controller.didActivateTab(tab, previousActiveTab: previous?.extensionHost === self ? previous : nil)
-    }
-    func tabMoved(_ tab: Tab, from window: BrowserWindowController) {
-        // Only news to extensions that know of it, about a window they know.
-        guard !tab.isPrivate, tab.toldTo === self, !window.tabManager.isPrivate else { return }
-        let index = window.tabManager.navigableTabs.firstIndex { $0 === tab } ?? 0
-        controller.didMoveTab(tab, from: index, in: window)
     }
     func tabChanged(_ tab: Tab, _ change: Tab.Change) {
         guard !tab.isPrivate else { return }
@@ -1171,10 +1164,12 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
 
 @available(macOS 15.4, *)
 extension Tab: WKWebExtensionTab {
-    /// The window the tab's in: the one that has it on screen or last had (every window lists the same tabs, #162),
-    /// else a look through them all. Asked for every tab each time an extension lists tabs, so the quick answer
-    /// comes first.
-    private var windowController: BrowserWindowController? { WindowManager.shared.window(of: self) }
+    /// The window the tab's in: its own host when that window holds it (most often), else a look through them all.
+    /// Asked for every tab each time an extension lists tabs, so the quick answer comes first.
+    private var windowController: BrowserWindowController? {
+        if let host = host as? BrowserWindowController, host.tabManager.tab(with: id) === self { return host }
+        return WindowManager.shared.controllers.first { $0.tabManager.tab(with: id) === self }
+    }
 
     /// Whether this context's extensions are the tab's own profile's.
     func isSeen(by context: WKWebExtensionContext) -> Bool {
@@ -1188,9 +1183,7 @@ extension Tab: WKWebExtensionTab {
     func indexInWindow(for context: WKWebExtensionContext) -> Int {
         // Which tabs a context sees depends only on whose extensions it runs with.
         let key = context.webExtensionController.map(ObjectIdentifier.init) ?? ObjectIdentifier(context)
-        // Counted among the tabs the window lists (`tabs(for:)`): those that are in it.
-        guard let window = windowController else { return 0 }
-        return window.tabManager.extensionPlace(of: self, seenBy: key) { $0.isSeen(by: context) && WindowManager.shared.window(of: $0) === window } ?? 0
+        return windowController?.tabManager.extensionPlace(of: self, seenBy: key) { $0.isSeen(by: context) } ?? 0
     }
     // A private tab that reaches an extension anyway (none should) tells it nothing: no page, title or address.
     // Nor does a tab on another profile: its page isn't one this context's extensions may reach.
@@ -1257,10 +1250,8 @@ extension Tab: WKWebExtensionTab {
 extension BrowserWindowController: WKWebExtensionWindow {
     // A private window is never listed, but should one be reached anyway, its tabs stay unseen.
     // An extension sees the tabs of its own profile: the window may be showing a space on another.
-    /// Only the tabs that are in this window: every window lists the same tabs (#162), and an extension hears of
-    /// each in one, the one it's on screen in or last was.
     func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] {
-        tabManager.isPrivate ? [] : tabManager.navigableTabs.filter { $0.isSeen(by: context) && WindowManager.shared.window(of: $0) === self }
+        tabManager.isPrivate ? [] : tabManager.navigableTabs.filter { $0.isSeen(by: context) }
     }
 
     /// The tab you're on if it's on the extension's profile; else the one you left selected in a space that is,
