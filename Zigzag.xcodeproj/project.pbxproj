@@ -207,6 +207,7 @@
 		8FFF17FE67210434B930B549 /* MCPServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521AE408AF88148280EB7303 /* MCPServerTests.swift */; };
 		902CD60C9DC21A528D47701B /* CrashReports.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8551A279CC24B357CC11755E /* CrashReports.swift */; };
 		91501632F628CC18660775E6 /* SecurityFixesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7890881D589D032D70E5DC20 /* SecurityFixesTests.swift */; };
+		91EDEB840F22A412835B1285 /* CookieBannersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076B80EC64306C6D0238E92E /* CookieBannersTests.swift */; };
 		92E095E45C00B0891F8EBF6B /* ConfirmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD3351437EE20BC819F95CD /* ConfirmSheet.swift */; };
 		93F7D9887CC5E8E2800B8E67 /* orion-extensions.plist in Resources */ = {isa = PBXBuildFile; fileRef = 9B8A46E0AC7442B76186A940 /* orion-extensions.plist */; };
 		94ADB66CC737D1DA231E3D74 /* ads.html in Resources */ = {isa = PBXBuildFile; fileRef = 016FF1BFB8B47B23AE450117 /* ads.html */; };
@@ -417,6 +418,7 @@
 		06AE52E198CC8E7B86B467BA /* BrowserWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWindow.swift; sourceTree = "<group>"; };
 		07247B1D1C9B9FA9D7014B32 /* WebStoreButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebStoreButton.swift; sourceTree = "<group>"; };
 		0737418196BB38BD7D36DDC5 /* WebSocketBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketBridge.swift; sourceTree = "<group>"; };
+		076B80EC64306C6D0238E92E /* CookieBannersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookieBannersTests.swift; sourceTree = "<group>"; };
 		0A6D4409217ACDE22F8A28EA /* api-surface.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "api-surface.js"; sourceTree = "<group>"; };
 		0AF7047E5A8FD4E834836B5B /* ad-engine.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "ad-engine.js"; sourceTree = "<group>"; };
 		0C054793F49E04AC36C79015 /* CertificateDetails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificateDetails.swift; sourceTree = "<group>"; };
@@ -1245,6 +1247,7 @@
 				CE6475CD75E987F5A8B0D182 /* CommandBarHistoryTests.swift */,
 				97B89F5BC1A42191D2C02C66 /* CommandBarRankingTests.swift */,
 				5D3D982B142CB7CC9AA89B6A /* ContrastTokensTests.swift */,
+				076B80EC64306C6D0238E92E /* CookieBannersTests.swift */,
 				8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */,
 				F4DC55DF34ED9099624A7CA8 /* DarkPagesSeenTests.swift */,
 				4295D4E75FDD1157FE955EBF /* DarkPagesTests.swift */,
@@ -1832,6 +1835,7 @@
 				23B86800C5070366304E8423 /* CommandBarHistoryTests.swift in Sources */,
 				AD66AB1C32F3990847A89971 /* CommandBarRankingTests.swift in Sources */,
 				87F8E37BD3315332966A7421 /* ContrastTokensTests.swift in Sources */,
+				91EDEB840F22A412835B1285 /* CookieBannersTests.swift in Sources */,
 				A5D888F02DA421D1BACDA2A3 /* DarkPagesSeenTests.swift in Sources */,
 				37417FBDF6F6A5A1633769C5 /* DarkPagesTests.swift in Sources */,
 				CED9701768E346915A2FD450 /* DarkReaderTests.swift in Sources */,
