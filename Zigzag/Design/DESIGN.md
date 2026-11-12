@@ -297,6 +297,31 @@ something came from, answers at once, and can be interrupted.
   bar's leading end, as with the sidebar hidden; slid out without the bar, the floating sidebar carries them, the one piece of
   chrome then in view. The command bar stays centered on the window. Changing sides, the sidebar slides across
   while the pages glide the other way (`gentle`).
+- **Developer tools in the bar** (`DeveloperBarTools`, #141): for a tab on a site listed in Settings › Developer and
+  shown on its own, with Tools above the page on. They're in the bar above the page, at its trailing end after
+  the address (`TopBarView.accessory`), the bar's own kind of button (`Tokens.Sidebar`: 26pt targets, 14pt
+  glyphs) wearing its ink and its fills: Console, Inspect Element, the page's look and size, reload's choices,
+  then ⋯. With the address kept in the sidebar the bar is there for them alone, on that tab only, and they sit
+  at its trailing end the same; the address and the sidebar's rows stay where the setting puts them, so nothing
+  in the sidebar moves for it. Beside the address they give way first, into ⋯, the last first; the address keeps
+  `TopBarView.addressMinWidth`. Never in a split, where the row is the panes' own strips: there, and with the
+  setting off, the console, inspecting and reloading are tiles under Developer in Site Controls, after the
+  page's actions. The console's button carries the page's errors as a count, the pill a pinned extension's
+  count is (`BadgeView`), "99+" past that; on ⋯ while the console is under it. A count of what happened on the
+  page, not a readout: nothing shows at zero.
+  A button that holds a choice wears the choice's symbol (Page Appearance: the half-filled circle following the
+  Mac, the sun, the moon, a printer for print styles), and its menu checks the one in effect.
+  Page Size's button is a phone, a tablet or a laptop by the size chosen, with the size after it at the label size
+  ("393 × 852", tabular as numbers that mark something), there only while the page has a size of its own and
+  there's room for it.
+  ⋯ is filled (`ellipsis.circle.fill`) while something chosen under it is in effect (JavaScript off, another user
+  agent, outlines), so no choice is one nothing shows. Its menu: what gave way, what's on or off, User Agent under
+  its heading with Open In after it, then View Source, Developer Settings and removing the site.
+- **A page at a size of its own** (`PageCardView.pageSize`, the developer tools'): in the middle of its room on
+  the card, both ways, the card's plain ground around it rather than the page's color, so its edges show; the
+  bar above the page turns plain with it. The Web Inspector docks beside it, in room of its own
+  (`PageHolder.dockedRoom`): the page keeps its size. A size larger than the room is cut to the room. What covers
+  the page (a PDF, Settings, Reader) fills the room as ever.
 - **Pane header** (split view): on the page card, 30 tall: back, forward and reload, the address centered in a small
   field, and the split's own buttons. Everything in it is its own pane's page: its buttons act on it, its loading
   line and reload state follow it, and clicking its address focuses that pane and opens the address bar over it.
