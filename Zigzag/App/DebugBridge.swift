@@ -1079,6 +1079,29 @@ enum DebugBridge {
             controller.selectedWebView?.evaluateJavaScript(arg) { result, error in
                 debugLog("js => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
             }
+        case "framejs":
+            // framejs <path> <body>: runs <body> (a function body; `return` its answer, awaited) in the page and in every
+            // frame that has said hello, as the page's own script, and writes each frame's address and answer (JSON).
+            guard let webView = controller.selectedWebView, let space = arg.firstIndex(of: " ") else { break }
+            let path = String(arg[..<space]), body = String(arg[arg.index(after: space)...])
+            let frames: [WKFrameInfo?] = [nil] + PageFrames.shared.frames(in: webView)
+            var rows: [[String: Any]] = []
+            let group = DispatchGroup()
+            for frame in frames {
+                group.enter()
+                webView.callAsyncJavaScript(body, arguments: [:], in: frame, in: .page) { result in
+                    var row: [String: Any] = ["frame": frame?.request.url?.absoluteString ?? "main", "origin": frame?.securityOrigin.host ?? ""]
+                    switch result {
+                    case .success(let value): row["result"] = String(describing: value)
+                    case .failure(let error): row["error"] = String(describing: error)
+                    }
+                    rows.append(row)
+                    group.leave()
+                }
+            }
+            group.notify(queue: .main) {
+                if let data = try? JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: path)) }
+            }
         case "slowmo":
             // slowmo <factor>: every animation in the window runs that many times slower, to film and judge it.
             let factor = max(1, Float(arg) ?? 1)
