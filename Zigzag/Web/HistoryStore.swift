@@ -67,7 +67,7 @@ final class HistoryStore {
         guard Self.shouldRecord(url) else { return }
         let address = url.absoluteString, host = Self.normalizedHost(url), title = title ?? "", count = Int32(count)
         let when = date.timeIntervalSince1970
-        database.write { db in
+        database.write { [weak self] db in
             HistoryDatabase.run(db, """
             INSERT INTO visits (url, host, title, visit_count, last_visit) VALUES (?1, ?2, ?3, ?4, ?5)
             ON CONFLICT(url) DO UPDATE SET visit_count = visit_count + ?4,
@@ -81,7 +81,7 @@ final class HistoryStore {
                 sqlite3_bind_double(statement, 5, when)
             }
             // Once it's in: whoever hears of it can look it up.
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async {
                 MainActor.assumeIsolated { self?.onVisit?(url) }
             }
         }
