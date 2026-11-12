@@ -4,10 +4,14 @@
 // asks Zigzag: allowing ads on YouTube turns it off, and so does an ad blocker extension, which then handles YouTube
 // itself). It does what established blockers do there (uBlock Origin's and AdGuard's YouTube filters), and no more:
 // - What YouTube sends about a video has its ads taken out before the page reads it: the keys YouTube keeps them
-//   under (adPlacements, adSlots, playerAds), and the blocker warning's (under auxiliaryUi.messageRenderers), at those
-//   places only, in its responses (fetch and XHR), in what the page parses and in the data built into the page. A
-//   Short that is an ad is taken out of the list of Shorts. Anything that doesn't read as expected reaches the page
-//   exactly as YouTube sent it.
+//   under (adPlacements, adSlots, playerAds), at those places only, in its responses (fetch and XHR), in what the page
+//   parses and in the data built into the page. A Short that is an ad is taken out of the list of Shorts. Anything
+//   that doesn't read as expected reaches the page exactly as YouTube sent it.
+// - YouTube signs some of what it sends: the player response lists values the page checks before it plays, and one
+//   that changed turns the video into "Something went wrong. Please try again later." (marked 282054944). Its blocker
+//   warnings (auxiliaryUi.messageRenderers) are among them, so they're never touched. Should the ads be among them
+//   too, YouTube's error is caught, the page loads again with what YouTube sent left whole, and it stays that way on
+//   YouTube for a while: the video plays, and an ad in it is sped through as below.
 // - The places ads take in the page (in the feed, beside a video, the banner on Home) are hidden with a stylesheet.
 // - YouTube's own dialogs, overlays, scrolling and controls are never hidden, closed or changed: hiding its blocker
 //   warning left the page gray and taking no clicks (#86), then closing it left it not scrolling (#113). A warning
@@ -31,10 +35,7 @@
   // MARK: What YouTube sends
 
   // Where a player response keeps its ads, and the places a player response is found. `[]` is every item of a list.
-  const adKeys = [
-    'adPlacements', 'adSlots', 'playerAds',
-    'auxiliaryUi.messageRenderers.enforcementMessageViewModel', 'auxiliaryUi.messageRenderers.bkaEnforcementMessageViewModel',
-  ];
+  const adKeys = ['adPlacements', 'adSlots', 'playerAds'];
   const holders = ['', 'playerResponse.', '[].playerResponse.', 'endpoint.watchEndpoint.unserializedPrefetchData.playerResponse.'];
   const paths = holders.flatMap((holder) => adKeys.map((key) => (holder + key).split('.')));
   const owns = (node, key) => Object.prototype.hasOwnProperty.call(node, key);
@@ -68,14 +69,24 @@
     return removed;
   };
 
+  // Whether what YouTube sends is passed on whole for now, because YouTube refused a video it had been taken out
+  // of: until a time kept for YouTube's site, in its own storage.
+  const holdKey = 'zigzag-youtube-ads-hold';
+  const holdFor = 12 * 60 * 60 * 1000;
+  let holding = false;
+  try { holding = Date.now() < Number(localStorage.getItem(holdKey) || 0); } catch (e) {}
+
   // Takes the ads out of what YouTube sent, in place. True when anything was taken out; never throws.
+  const recent = [];
+  let watching = false;
   const prune = (value) => {
-    if (!blocking || !value || typeof value !== 'object') return false;
+    if (!blocking || holding || !value || typeof value !== 'object') return false;
     let removed = false;
     try {
       for (const keys of paths) removed = removeAt(value, keys, 0) || removed;
       removed = dropAdShorts(value) || removed;
     } catch (e) {}
+    if (removed) { try { recent.push(value); if (recent.length > 4) recent.shift(); watchRefusal(); } catch (e) {} }
     return removed;
   };
 
@@ -202,6 +213,56 @@
   };
   watch('ytInitialPlayerResponse');
   watch('ytInitialReelWatchSequenceResponse');
+
+  // MARK: If YouTube refuses
+
+  // YouTube's mark on the error it puts in place of a video whose signed values changed.
+  const refusalMark = '282054944';
+  const marked = (value) => {
+    try { return !!value && nativeStringify(value).includes(refusalMark); } catch (e) { return false; }
+  };
+  const refused = () => {
+    if (recent.some((value) => marked(value.playabilityStatus))) return true;
+    try {
+      const player = document.getElementById('movie_player');
+      const response = player && typeof player.getPlayerResponse === 'function' ? player.getPlayerResponse() : null;
+      if (response && marked(response.playabilityStatus)) return true;
+    } catch (e) {}
+    try {
+      for (const shown of document.querySelectorAll('yt-player-error-message-renderer, #error-screen, .ytp-error')) {
+        if (String(shown.textContent).includes(refusalMark)) return true;
+      }
+    } catch (e) {}
+    return false;
+  };
+  // From now on what YouTube sends is passed on whole, and the page loads again to get the video YouTube refused;
+  // once a minute at most, so a refusal for another reason never keeps reloading the page.
+  const reloadKey = 'zigzag-youtube-ads-reloaded';
+  const giveWay = () => {
+    if (holding || !recent.length || !refused()) return;
+    holding = true;
+    try { localStorage.setItem(holdKey, String(Date.now() + holdFor)); } catch (e) {}
+    try {
+      if (Date.now() - Number(sessionStorage.getItem(reloadKey) || 0) < 60 * 1000) return;
+      sessionStorage.setItem(reloadKey, String(Date.now()));
+    } catch (e) { return; }
+    try { location.reload(); } catch (e) {}
+  };
+  // YouTube checks a response as it takes it in and shows its error soon after: looked for a few times after ads
+  // were taken out, and as each video comes in.
+  function watchRefusal() {
+    if (watching || holding) return;
+    watching = true;
+    try {
+      for (const delay of [300, 1000, 2500, 5000, 10000]) setTimeout(giveWay, delay);
+      setTimeout(() => { watching = false; }, 10000);
+    } catch (e) { watching = false; }
+  }
+  try {
+    for (const name of ['yt-navigate-finish', 'yt-page-data-updated', 'yt-player-updated']) {
+      document.addEventListener(name, () => { if (recent.length) watchRefusal(); });
+    }
+  } catch (e) {}
 
   // MARK: What shows
 
