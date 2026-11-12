@@ -7596,6 +7596,28 @@
         }
       }
     },
+    "Move Sidebar to Left" : {
+      "comment" : "View menu item: puts the sidebar back along the window's left edge.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将边栏移到左侧"
+          }
+        }
+      }
+    },
+    "Move Sidebar to Right" : {
+      "comment" : "View menu item: puts the sidebar along the window's right edge.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将边栏移到右侧"
+          }
+        }
+      }
+    },
     "Move Space" : {
       "comment" : "What Edit › Undo undoes after a space is dragged to a new place.",
       "localizations" : {
@@ -12473,6 +12495,17 @@
         }
       }
     },
+    "Sidebar on the right" : {
+      "comment" : "A setting in Settings › Appearance: puts the sidebar along the window's right edge.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏放在右侧"
+          }
+        }
+      }
+    },
     "Sign In" : {
       "comment" : "Button in a site's HTTP sign-in sheet.",
       "localizations" : {
@@ -13669,6 +13702,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "安全连接被切断了，通常是你所在的网络造成的。请再试一次，或换一个网络。"
+          }
+        }
+      }
+    },
+    "The sidebar sits along the window’s right edge, with the page on its left." : {
+      "comment" : "Explanation under “Sidebar on the right” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏沿窗口右侧边缘放置，页面在它的左边。"
           }
         }
       }
@@ -17136,6 +17180,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示你在 %@ 的密码"
+          }
+        }
+      }
+    },
+    "sidebar right left side position move" : {
+      "comment" : "Words that find the Sidebar on the right setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏 右侧 左侧 右边 左边 位置 移动 sidebar right left side position move"
           }
         }
       }
