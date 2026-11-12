@@ -1214,6 +1214,36 @@ enum DebugBridge {
         case "movetonewwindow":
             if let tab = controller.tabManager.selectedTab { controller.moveToNewWindow(tab) }
             WindowManager.shared.debugTarget = WindowManager.shared.controllers.last
+        // dragout <n> <x> <y>: the nth tab of this space (0: the tab you're on) let go at that point on screen, as a
+        // drag out of the sidebar ends there: into a new window, or onto another window's page (#167).
+        case "dragout":
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            let list = controller.tabManager.currentTabs
+            guard f.count == 3, let tab = list.indices.contains(Int(f[0]) - 1) ? list[Int(f[0]) - 1] : controller.tabManager.selectedTab else { break }
+            debugLog("dragout \(tab.displayTitle) handled=\(controller.listDropOutside([tab], at: NSPoint(x: f[1], y: f[2])))")
+            WindowManager.shared.debugTarget = WindowManager.shared.keyController
+        // droplist <n> <window> <index>: the nth tab of this space (0: the tab you're on) dropped in another window's
+        // sidebar, at that place among its tabs, as where its line showed (#167).
+        case "droplist":
+            let f = arg.split(separator: " ").compactMap { Int($0) }
+            let list = controller.tabManager.currentTabs, all = WindowManager.shared.controllers
+            guard f.count == 3, all.indices.contains(f[1] - 1),
+                  let tab = list.indices.contains(f[0] - 1) ? list[f[0] - 1] : controller.tabManager.selectedTab else { break }
+            debugLog("droplist \(tab.displayTitle) handled=\(controller.listMoveToWindow([tab], controller: all[f[1] - 1], index: f[2]))")
+            WindowManager.shared.debugTarget = all[f[1] - 1]
+        // droppage <window>: the tab you're on let go over the middle of another window's page.
+        case "droppage":
+            let all = WindowManager.shared.controllers
+            guard let n = Int(arg), all.indices.contains(n - 1), let tab = controller.tabManager.selectedTab, let target = all[n - 1].window else { break }
+            let frame = target.frame
+            debugLog("droppage \(tab.displayTitle) handled=\(controller.listDropOutside([tab], at: NSPoint(x: frame.maxX - 200, y: frame.midY)))")
+            WindowManager.shared.debugTarget = all[n - 1]
+        // hoverline <window> <x> <y>: that window's sidebar shows its line for a tab from another window carried to
+        // that point on screen (none: hidden), as during a drag.
+        case "hoverline":
+            let f = arg.split(separator: " ").compactMap { Double($0) }, all = WindowManager.shared.controllers
+            guard let n = f.first.map(Int.init), all.indices.contains(n - 1) else { break }
+            all[n - 1].sidebar.list.externalHover(at: f.count == 3 ? NSPoint(x: f[1], y: f[2]) : nil)
         // tabtomini [n] [x y]: the tab menu's Open in Zigzag Mini for the nth tab of this space (1 = the first; none:
         // the tab you're on), or, with a point on screen, the tab let go there with ⌥ held. Logs whether it's offered.
         case "tabtomini":
