@@ -171,8 +171,8 @@ struct PageSizeTests {
 
     @Test func aSizeIsNamedEitherWayUp() {
         withDefaults {
-            #expect(PageSizes.named(CGSize(width: 393, height: 852))?.name == "iPhone")
-            #expect(PageSizes.named(CGSize(width: 852, height: 393))?.name == "iPhone")
+            #expect(PageSizes.named(CGSize(width: 393, height: 852))?.name == "iPhone 16")
+            #expect(PageSizes.named(CGSize(width: 852, height: 393))?.name == "iPhone 16")
             #expect(PageSizes.named(CGSize(width: 400, height: 852)) == nil)
             #expect(PageSizes.named(nil) == nil)
         }
@@ -197,7 +197,11 @@ struct PageSizeTests {
             state.size = size.size
             return DeveloperBarTools.symbol(of: part, in: state)
         }
-        #expect(symbols == ["iphone", "iphone", "ipad", "ipad", "laptopcomputer", "laptopcomputer"])
+        #expect(symbols == ["iphone", "iphone", "iphone", "iphone", "iphone", "ipad", "ipad", "ipad", "laptopcomputer", "laptopcomputer", "laptopcomputer"])
+        // Every size Zigzag comes with is a real device's or a common screen's, upright, within the limits.
+        #expect(PageSizes.seed.allSatisfy { $0.height > $0.width || $0.width >= 1280 })
+        #expect(PageSizes.seed.allSatisfy { PageSizes.limits.contains($0.width) && PageSizes.limits.contains($0.height) })
+        #expect(Set(PageSizes.seed.map(\.name)).count == PageSizes.seed.count)
         #expect(DeveloperBarTools.grouped(part.tools) == [[.sizeFill], [.sizeCustom, .rotate]])
     }
 }

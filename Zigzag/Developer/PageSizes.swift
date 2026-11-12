@@ -14,10 +14,15 @@ enum PageSizes {
     }
 
     private static let key = "DeveloperPageSizes"
-    /// The list before you change it. Nothing is written until you do.
-    static let seed = [Size(name: "iPhone SE", width: 375, height: 667), Size(name: "iPhone", width: 393, height: 852),
-                       Size(name: "iPad mini", width: 744, height: 1133), Size(name: "iPad", width: 820, height: 1180),
-                       Size(name: "Laptop", width: 1280, height: 800), Size(name: "Desktop", width: 1440, height: 900)]
+    /// The list before you change it. Nothing is written until you do. Real devices by name, as browsers' device
+    /// toolbars list them, each at the size its browser lays a page out at (CSS pixels, upright): the phones and
+    /// tablets people check a site on most, then two common laptop windows and a full HD screen.
+    static let seed = [Size(name: "iPhone SE", width: 375, height: 667), Size(name: "iPhone 16", width: 393, height: 852),
+                       Size(name: "iPhone 16 Pro Max", width: 440, height: 956), Size(name: "Pixel 7", width: 412, height: 915),
+                       Size(name: "Galaxy S24", width: 360, height: 780), Size(name: "iPad mini", width: 744, height: 1133),
+                       Size(name: "iPad Air", width: 820, height: 1180), Size(name: "iPad Pro 13″", width: 1032, height: 1376),
+                       Size(name: "Laptop", width: 1280, height: 800), Size(name: "Desktop", width: 1440, height: 900),
+                       Size(name: "Full HD", width: 1920, height: 1080)]
     /// The least and the most a page's side can be: narrower than any phone, and no larger than a page ever is.
     static let limits = 200...8000
 
