@@ -1745,6 +1745,17 @@
         }
       }
     },
+    "A site covers every port and its subdomains: localhost is localhost:3000 and app.localhost too." : {
+      "comment" : "Under the list in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一个网站涵盖它的所有端口和子域名：localhost 也包括 localhost:3000 和 app.localhost。"
+          }
+        }
+      }
+    },
     "A small window for a quick look at a page. Esc closes it, and ⌘O moves it into your browser window to keep it." : {
       "comment" : "Explanation under “New Zigzag Mini” in Settings › Zigzag Mini: what Zigzag Mini is.",
       "localizations" : {
@@ -1862,7 +1873,7 @@
       }
     },
     "Add" : {
-      "comment" : "Button on an extension another profile has, in Settings › Extensions: adds it to the profile shown.",
+      "comment" : "Button on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the site, in the sheet that adds a development site.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1967,6 +1978,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加第二种颜色"
+          }
+        }
+      }
+    },
+    "Add Site…" : {
+      "comment" : "Button beside Development Sites in Settings › Developer: opens the sheet that adds a site to the list.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加网站…"
+          }
+        }
+      }
+    },
+    "Add a Development Site" : {
+      "comment" : "Title of the sheet that adds a site to the list in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加开发网站"
           }
         }
       }
@@ -2198,7 +2231,7 @@
       }
     },
     "Advanced" : {
-      "comment" : "A heading in the column of Settings, over Extensions, Shortcuts and Automation.",
+      "comment" : "A heading in the column of Settings, over Extensions, Shortcuts, Automation and Developer.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5159,7 +5192,7 @@
       }
     },
     "Developer" : {
-      "comment" : "Row in the About window: the developer's website.\nSubmenu of the View menu.",
+      "comment" : "A section of Settings: tools for people who build websites, and the sites they build.\nRow in the About window: the developer's website.\nSubmenu of the View menu.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5176,6 +5209,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "开发者模式"
+          }
+        }
+      }
+    },
+    "Developer tools" : {
+      "comment" : "A setting in Settings › Developer: turns on the tools for building websites, which show only on the sites listed under it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发者工具"
+          }
+        }
+      }
+    },
+    "Developer tools show on this site, on every port and on its subdomains." : {
+      "comment" : "Under the title of the sheet that adds a site to the list in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发者工具会在这个网站上显示，包括它的所有端口和子域名。"
+          }
+        }
+      }
+    },
+    "Development Sites" : {
+      "comment" : "A heading in Settings › Developer: the sites Developer tools show on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发网站"
           }
         }
       }
@@ -8781,7 +8847,7 @@
       }
     },
     "None yet" : {
-      "comment" : "A setting in Settings › Privacy.\nUnder Always Translate in Settings › Translation, when there's no language.",
+      "comment" : "A row in Settings › Developer, shown when no development site is listed.\nA setting in Settings › Privacy.\nUnder Always Translate in Settings › Translation, when there's no language.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11138,12 +11204,23 @@
       }
     },
     "Remove" : {
-      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nTooltip of a download's button in the downloads panel: takes the download off the list.",
+      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nButton on a site's row in Settings › Developer: takes the site off the list of development sites.\nTooltip of a download's button in the downloads panel: takes the download off the list.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "移除"
+          }
+        }
+      }
+    },
+    "Remove %@" : {
+      "comment" : "VoiceOver name of the Remove button on a site's row in Settings › Developer. The site is a host, like localhost.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除 %@"
           }
         }
       }
@@ -13112,6 +13189,17 @@
         }
       }
     },
+    "Sites you add show up here." : {
+      "comment" : "Explanation under “None yet” in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你添加的网站会显示在这里。"
+          }
+        }
+      }
+    },
     "Sites you visit can keep cookies and files here, to keep you signed in and load faster." : {
       "comment" : "Explanation under “None yet” in Settings › Privacy.",
       "localizations" : {
@@ -14880,6 +14968,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "工具"
+          }
+        }
+      }
+    },
+    "Tools for building websites, on the sites listed here and nowhere else. A tab on one of them has a hammer on its row." : {
+      "comment" : "Explanation under “Developer tools” in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用于构建网站的工具，只在这里列出的网站上显示。打开这些网站的标签页，所在的行上会有一个锤子标记。"
           }
         }
       }
@@ -17111,6 +17210,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "默认 应用 链接 打开 启动 default"
+          }
+        }
+      }
+    },
+    "development site" : {
+      "comment" : "Spoken by VoiceOver after a tab row's name: the tab is on a site listed in Settings › Developer, and has a hammer on its row.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发网站"
+          }
+        }
+      }
+    },
+    "devtools web development localhost" : {
+      "comment" : "Words that find Settings › Developer with Find a setting, separated by spaces. Add your language's words for them. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "devtools web development localhost 开发 开发者 调试 本地"
           }
         }
       }
