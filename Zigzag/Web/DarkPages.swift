@@ -230,13 +230,15 @@ enum DarkPages {
     }()
 
     /// The choices as the page script reads them, for pages in this store, going to `url`.
-    static func config(for store: WKWebsiteDataStore?, url: URL? = nil) -> [String: Any] {
+    /// `standsBack`: the page's look was chosen for it (`standsBack(for:)`), so the page is told what one is told
+    /// where dark pages are off.
+    static func config(for store: WKWebsiteDataStore?, url: URL? = nil, standsBack: Bool = false) -> [String: Any] {
         let black = pureBlack
         let seen = seen(for: store, url: url)
-        let top = applies(to: url) && wants(url)
+        let top = !standsBack && applies(to: url) && wants(url)
         return [
-            "on": wants(mode: mode, systemIsDark: systemIsDark, site: nil), "sitesOn": sitesOn.sorted(), "sitesOff": sitesOff.sorted(),
-            "sitesForced": sitesForced.sorted(), "topWanted": top, "topForced": top && isForced(url),
+            "on": !standsBack && wants(mode: mode, systemIsDark: systemIsDark, site: nil), "sitesOn": standsBack ? [] : sitesOn.sorted(), "sitesOff": sitesOff.sorted(),
+            "sitesForced": standsBack ? [] : sitesForced.sorted(), "topWanted": top, "topForced": top && isForced(url),
             "native": nativeSites(in: nativeScope(of: store)).sorted(), "prepaint": prepaintCSS(black: black, color: seen?.color),
             "marker": seen?.marker ?? NSNull(), "theme": theme(black: black),
             "fix": DarkReaderFixes.fix(for: url).json, "frameFix": DarkReaderFixes.fix(for: nil).json]
@@ -284,7 +286,7 @@ enum DarkPages {
         let controller = webView.configuration.userContentController
         OwnScripts.remove(from: controller, where: isOurs)
         let store = webView.configuration.websiteDataStore
-        let wanted = applies(to: webView.url) && wants(webView.url)
+        let wanted = wanted(in: webView)
         if wanted {
             controller.addUserScript(proxyScript)
             controller.addUserScript(script(for: store, url: webView.url))
@@ -329,7 +331,7 @@ enum DarkPages {
         guard let given = installed[key], given.generation == generation else { install(in: webView); return }
         let url = webView.url
         // Going somewhere dark pages are wanted, or aren't, while the last place was the other way.
-        if given.wanted != (applies(to: url) && wants(url)) { install(in: webView); return }
+        if given.wanted != wanted(in: webView) { install(in: webView); return }
         guard given.wanted else { return }
         let store = webView.configuration.websiteDataStore
         let now = nativeSites(in: nativeScope(of: store))
@@ -399,10 +401,11 @@ enum DarkPages {
     /// window, as always.
     private static func applyLook(to webView: WKWebView) {
         let url = webView.url
-        let wanted = applies(to: url) && wants(url)
+        let wanted = wanted(in: webView)
         // Forced dark, the site is asked for its light look, which is darkened as a light site's is: its own dark
-        // look, which drew parts of it light, is what Force dark is for.
-        let appearance = wanted ? NSAppearance(named: isForced(url) ? .aqua : .darkAqua) : nil
+        // look, which drew parts of it light, is what Force dark is for. A look chosen for the page is the page's,
+        // whatever dark pages would have asked.
+        let appearance = (chosenLook(of: webView) ?? (wanted ? (isForced(url) ? .aqua : .darkAqua) : nil)).flatMap(NSAppearance.init(named:))
         if webView.appearance?.name != appearance?.name { webView.appearance = appearance }
         let tab = (webView as? BrowserWebView)?.owner
         // Not wanted here, the page has no script to say so: what was heard of the page before doesn't hold, and the
@@ -421,6 +424,43 @@ enum DarkPages {
         // WebKit holds what's shown while a page is on its way. Clear instead, the dark of the card shows there.
         let draws = !wanted
         if webView.value(forKey: "drawsBackground") as? Bool != draws { webView.setValue(draws, forKey: "drawsBackground") }
+    }
+
+    /// The look chosen for this page alone, light or dark whatever the Mac and dark pages say (`Tab.chosenLook`).
+    /// Dark pages then leave the page as its site made it for that look. Asked for the address the web view is at,
+    /// as every choice here is, so the page it's going to starts the right way.
+    static func chosenLook(of webView: WKWebView) -> NSAppearance.Name? {
+        (webView as? BrowserWebView)?.owner?.chosenLook(at: webView.url)
+    }
+
+    /// Whether dark pages stand back from a web view's pages: its look was chosen. A page and the pop-ups it opened
+    /// share one set of scripts: all of them go without while any of them has a look chosen, rather than each
+    /// putting its own in as it goes somewhere and undoing the other's.
+    private static func standsBack(for webView: WKWebView) -> Bool {
+        if chosenLook(of: webView) != nil { return true }
+        let controller = webView.configuration.userContentController
+        return entries.values.contains { entry in
+            guard let other = entry.webView, other !== webView, other.configuration.userContentController === controller else { return false }
+            return chosenLook(of: other) != nil
+        }
+    }
+
+    /// Whether the page is as its site made it (`Tab.pageIsUntouched`): nothing is learned from one that isn't.
+    private static func isUntouched(_ webView: WKWebView) -> Bool {
+        (webView as? BrowserWebView)?.owner?.pageIsUntouched(at: webView.url) ?? true
+    }
+
+    /// Whether dark pages are wanted for the page a web view is at: for its address, and not where they stand back.
+    private static func wanted(in webView: WKWebView) -> Bool {
+        !standsBack(for: webView) && applies(to: webView.url) && wants(webView.url)
+    }
+
+    /// A page's look was chosen, or given back to follow the Mac: it changes at once, without loading again, and
+    /// its page hears what dark pages now want of it.
+    static func lookChanged(for webView: WKWebView) {
+        applyLook(to: webView)
+        installIfStale(in: webView)
+        refresh(webView)
     }
 
     /// Behind a page where dark pages are wanted: a page dark on its own (and not darkened anyway), its own dark as the
@@ -458,8 +498,8 @@ enum DarkPages {
     /// pages just turned on there) is given it.
     private static func refresh(_ webView: WKWebView) {
         let store = webView.configuration.websiteDataStore
-        let wanted = applies(to: webView.url) && wants(webView.url)
-        let config = config(for: store, url: webView.url)
+        let wanted = wanted(in: webView)
+        let config = config(for: store, url: webView.url, standsBack: standsBack(for: webView))
         let frames: [WKFrameInfo?] = [nil] + PageFrames.shared.frames(in: webView)
         for frame in frames {
             webView.callAsyncJavaScript("if (window.__zigzagDark) { window.__zigzagDark.set(config); return true; } return false;",
@@ -523,7 +563,9 @@ enum DarkPages {
         // scripts at once held Zigzag up for seconds with many tabs open (#89).
         // This web view takes them at once, though: loading the same page again doesn't change its address, and it would
         // start darkened again, Dark Reader at work on a site that's dark on its own.
-        if learn(state, in: nativeScope(of: webView.configuration.websiteDataStore)) {
+        // Not from a page whose look was chosen for it, or that the developer tools changed some other way: what it
+        // shows then says nothing of the site as you'd find it.
+        if !standsBack(for: webView), isUntouched(webView), learn(state, in: nativeScope(of: webView.configuration.websiteDataStore)) {
             generation += 1
             install(in: webView)
         }

@@ -104,6 +104,26 @@ enum PageDialogs {
         return certificate.isEmpty || leaf(of: trust) == certificate
     }
 
+    /// Per data store, the certificate each development server on this Mac first showed, by host and port: two
+    /// servers on localhost each have their own. Kept apart from the ones you chose to trust on the warning page,
+    /// and only read while the setting that trusts them is on.
+    private static let localServers = NSMapTable<WKWebsiteDataStore, NSMutableDictionary>.weakToStrongObjects()
+
+    /// Whether a development server on this Mac is trusted with the certificate it shows (#141,
+    /// `DeveloperTools.trustsServer`): the first one it shows is, and is the only one for the session, so another
+    /// later gets the warning as anywhere. `page`: the address of the page that asks. Only a development page's own
+    /// loads are trusted this way: a page from anywhere else that reaches for a server on this Mac gets what it
+    /// always got.
+    static func allowsLocalServer(_ host: String, port: Int, leaf: Data?, askedBy page: URL?, in store: WKWebsiteDataStore) -> Bool {
+        guard let leaf, DeveloperTools.trustsServer(host), DeveloperTools.applies(to: page) else { return false }
+        let key = "\(host.lowercased()):\(port)"
+        let servers = localServers.object(forKey: store) ?? NSMutableDictionary()
+        if let shown = servers[key] as? Data { return shown == leaf }
+        servers[key] = leaf
+        localServers.setObject(servers, forKey: store)
+        return true
+    }
+
     /// The site's own certificate (not its issuers'), as data to compare.
     nonisolated static func leaf(of trust: SecTrust) -> Data? {
         guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate], let first = chain.first else { return nil }
@@ -160,6 +180,12 @@ enum AuthenticationPrompt {
         // A certificate you chose to trust on the warning page: accepted for this session.
         if method == NSURLAuthenticationMethodServerTrust, let trust = challenge.protectionSpace.serverTrust,
            CertificateExceptions.allows(challenge.protectionSpace.host, trust: trust, in: store) {
+            return (.useCredential, URLCredential(trust: trust))
+        }
+        // A development server on this Mac, asked for by a development page (Settings › Developer › Local Servers).
+        if method == NSURLAuthenticationMethodServerTrust, let trust = challenge.protectionSpace.serverTrust,
+           CertificateExceptions.allowsLocalServer(challenge.protectionSpace.host, port: challenge.protectionSpace.port,
+                                                   leaf: CertificateExceptions.leaf(of: trust), askedBy: page?.url, in: store) {
             return (.useCredential, URLCredential(trust: trust))
         }
         guard method == NSURLAuthenticationMethodHTTPBasic || method == NSURLAuthenticationMethodHTTPDigest || method == NSURLAuthenticationMethodNTLM else {

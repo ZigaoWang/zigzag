@@ -995,6 +995,8 @@ extension CommandBarController {
         case "reopen": controller.reopenClosedTab(nil)
         case "new-space": controller.newSpace(nil)
         default:
+            // A developer tool does what its menu item does.
+            if let tool = DeveloperTool(commandID: id) { tool.run(in: controller); return }
             if id.hasPrefix("space:"), let space = UUID(uuidString: String(id.dropFirst(6))), Library.shared.space(space) != nil {
                 controller.tabManager.switchToSpace(space)
             } else if id.hasPrefix("move:"), let space = UUID(uuidString: String(id.dropFirst(5))), Library.shared.space(space) != nil,

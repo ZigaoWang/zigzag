@@ -42,6 +42,9 @@ final class SitePanel: FloatingPanelView {
     /// Whose extensions these are, at the label's end, once there's more than one profile.
     private let extensionsProfileLabel = Label("", font: Tokens.Font.label(), color: Tokens.Color.textTertiary)
     private var extensionTiles: [PanelTile] = []
+    /// The developer tools (#141), for a development page that doesn't have them in the bar above it.
+    private var developerTiles: [PanelTile] = []
+    private let developerLabel = Label.section(String(localized: "Developer", comment: "Section label over the developer tools' tiles in the site panel, on a development site."))
     /// No extensions: the + is alone, with its name under it.
     private var addsAlone = false
     /// The pin button on each extension's tile: the panel's child over the tile, a control of its own.
@@ -162,6 +165,7 @@ final class SitePanel: FloatingPanelView {
             page = .extensions
         } else {
             buildTiles()
+            buildDeveloperTiles()
             buildRows()
         }
         applyPage()
@@ -324,6 +328,31 @@ final class SitePanel: FloatingPanelView {
             addSubview(tile)
             return tile
         }
+    }
+
+    /// The console, inspecting and reloading as tiles, where a development page doesn't have them above it: Tools above the page is off, or
+    /// the page is in a split, whose panes keep their headers. They come after the page's actions, which never move.
+    private func buildDeveloperTiles() {
+        guard let controller else { return }
+        guard tab.isDevelopment, !controller.showsDeveloperBarTools(for: tab) else { return }
+        let tools = DeveloperTool.tiles.filter { $0.isOffered(for: tab, isPrivate: isPrivate) }
+        developerTiles = tools.map { tool in
+            let tile = PanelTile(symbol: tool.symbol, caption: tool.caption)
+            tile.toolTip = Shortcuts.tooltip(tool.title, for: tool.action)
+            tile.setAccessibilityLabel(tool.title)
+            if tool == .console {
+                tile.badge = DeveloperTool.errorBadge(tab.pageErrorCount)
+                tile.setAccessibilityValue(DeveloperTool.errorValue(tab.pageErrorCount))
+            }
+            tile.onClick = { [weak self] _ in
+                guard let self, let controller = self.controller else { return }
+                self.close()
+                tool.run(in: controller)
+            }
+            addSubview(tile)
+            return tile
+        }
+        if !developerTiles.isEmpty { addSubview(developerLabel) }
     }
 
     /// Only a web site has a cache and cookies of its own to clear: not a file, an extension's page or a new tab.
@@ -592,6 +621,7 @@ final class SitePanel: FloatingPanelView {
         context.fullScreen = PageFullScreen.isOffered(for: url, isPrivate: isPrivate)
             && (PageFullScreen.choice(for: url) != nil || tab.webView.map({ PageVideos.shared.frames(in: $0).contains { !$0.videos.isEmpty } }) == true)
         context.foreignLanguage = tab.foreignLanguage != nil
+        context.developerTools = DeveloperTool.site.isOffered(for: tab, isPrivate: isPrivate)
         context.coveredPage = controller?.isShowingReader == true || tab.pdfViewer != nil || tab.webView == nil
         return context
     }
@@ -646,7 +676,13 @@ final class SitePanel: FloatingPanelView {
                 let native = String(localized: "This site is dark already", comment: "Under Dark page in the site panel's This Site group: dark pages are on, and the site has a dark look of its own, so it's left as it is.")
                 let tab = tab, url = url
                 let row = PanelRow.toggle(String(localized: "Dark page", comment: "Row in the site panel's This Site group: draws this site's pages dark."), on: DarkPages.wants(url),
-                                          status: { on in on && tab.darkPage?.native == true && !DarkPages.isForced(url) ? native : on ? Self.onHere : Self.offHere }) { [weak self] on in
+                                          status: { on in
+                    // This tab's page was asked for a look of its own with the developer tools: the site's choice waits.
+                    if tab.developerInEffect.appearance != .followsMac {
+                        return String(localized: "Set by the developer tools in this tab", comment: "Under Dark page in the site panel's This Site group, on a development site whose page was set to Light or Dark with the developer tools: dark pages leave this tab's page alone.")
+                    }
+                    return on && tab.darkPage?.native == true && !DarkPages.isForced(url) ? native : on ? Self.onHere : Self.offHere
+                }) { [weak self] on in
                     guard let self else { return }
                     DarkPages.setChoice(on, for: self.url)
                     if !on { forceRow?.setOn(false) }
@@ -670,6 +706,13 @@ final class SitePanel: FloatingPanelView {
                                     on: KeepAwake.isOn(for: url), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                     guard let self else { return }
                     KeepAwake.set(on, for: self.url)
+                })
+            case .developerTools:
+                // The site is one you develop on (#141): on the list in Settings › Developer, or off it.
+                rows.append(.toggle(String(localized: "Developer tools", comment: "Row in the site panel's This Site group: this site is one you develop on, listed in Settings › Developer, and gets the developer tools."),
+                                    on: DevelopmentSites.covers(url), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                    guard let self else { return }
+                    DevelopmentSites.set(on, for: self.url)
                 })
             case .fullScreenFills:
                 // Full screen in the page's own area instead of the whole screen (#168), for this site alone.
@@ -752,30 +795,9 @@ final class SitePanel: FloatingPanelView {
 
     /// Asks first: cookies sign you out of the site, and neither can be taken back.
     private func clear(_ kind: WebsiteData.Kind) {
-        let site = site, tab = tab
+        let tab = tab
         close()
-        guard let controller else { return }
-        let cookies = kind == .cookies
-        ConfirmSheet.show(in: controller.root.overlay,
-                          title: cookies ? String(localized: "Clear cookies for \(site)?", comment: "Title of the sheet that asks before clearing one site's cookies. The site is a domain, like example.com.")
-                                         : String(localized: "Clear the cache for \(site)?", comment: "Title of the sheet that asks before clearing one site's cache. The site is a domain, like example.com."),
-                          message: cookies ? String(localized: "You’ll be signed out of \(site). Other sites aren’t touched.", comment: "Message of the sheet that asks before clearing one site's cookies.")
-                                           : String(localized: "It loads a little slower the first time. You stay signed in.", comment: "Message of the sheet that asks before clearing one site's cache."),
-                          confirmTitle: cookies ? String(localized: "Clear Cookies", comment: "Button that clears cookies, in the sheet that asks first.")
-                                                : String(localized: "Clear Cache", comment: "Button that clears the cache, in the sheet that asks first."), destructive: cookies) { [weak controller] confirmed in
-            guard confirmed else { return }
-            Self.clearNow(kind, site: site, tab: tab, controller: controller)
-        }
-    }
-
-    private static func clearNow(_ kind: WebsiteData.Kind, site: String, tab: Tab, controller: BrowserWindowController?) {
-        Task { @MainActor [weak controller] in
-            await WebsiteData.clear(kind, site: site, in: tab.privateStore ?? tab.profile.store)
-            tab.reload()
-            if let controller { Toast.show(kind == .cache ? String(localized: "Cache cleared for \(site)", comment: "Toast after one site's cache is cleared. The site is a domain, like example.com.")
-                                                       : String(localized: "Cookies cleared for \(site)", comment: "Toast after one site's cookies are cleared. The site is a domain, like example.com."),
-                                        symbol: "checkmark.circle", in: controller) }
-        }
+        controller?.confirmClear(kind, of: tab)
     }
 
     // MARK: Layout
@@ -887,6 +909,18 @@ final class SitePanel: FloatingPanelView {
                                          comfortable: actionTiles.map(\.captionWidth).max() ?? 0,
                                          tightest: actionTiles.map(\.captionTightWidth).max() ?? 0)
             Self.grid(actionTiles, columns: layout.first ?? 1, gap: 0, centered: true, height: PanelTile.captionedHeight,
+                      x: pad, inner: inner, y: &y, place: place)
+            end(Tokens.Space.x4)
+        }
+
+        // The developer tools of a development page that doesn't have them above it, under their own name, laid out as the actions are.
+        if !developerTiles.isEmpty {
+            place(developerLabel, NSRect(x: pad - Label.inset, y: y, width: inner + Label.inset * 2, height: developerLabel.lineHeight))
+            y += developerLabel.lineHeight + Tokens.Space.x2
+            let layout = Self.actionRows(count: developerTiles.count, width: inner,
+                                         comfortable: developerTiles.map(\.captionWidth).max() ?? 0,
+                                         tightest: developerTiles.map(\.captionTightWidth).max() ?? 0)
+            Self.grid(developerTiles, columns: layout.first ?? 1, gap: 0, centered: true, height: PanelTile.captionedHeight,
                       x: pad, inner: inner, y: &y, place: place)
             end(Tokens.Space.x4)
         }
@@ -1480,7 +1514,7 @@ final class PanelPageHeader: NSView {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, forceDark, keepAwake, fullScreenFills, alwaysTranslate }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, forceDark, keepAwake, developerTools, fullScreenFills, alwaysTranslate }
     /// The rows into the panel's other pages.
     enum Link: Equatable { case connection, permissions, extensions }
 
@@ -1500,6 +1534,9 @@ enum SitePanelRows {
         var fullScreen = false
         /// The page is in a language other than yours.
         var foreignLanguage = false
+        /// Listing the site as one you develop on is offered: Developer tools is on, for a web page, and not in a
+        /// private window (`DeveloperTool.site`).
+        var developerTools = false
         /// Reader or a PDF covers the page: the page's zoom isn't what you see.
         var coveredPage = false
         /// The site asked for something, or has an answer kept.
@@ -1518,6 +1555,7 @@ enum SitePanelRows {
             if c.forceDarkOffered { rows.append(.forceDark) }
             rows.append(.keepAwake)
         }
+        if c.developerTools { rows.append(.developerTools) }
         if c.fullScreen { rows.append(.fullScreenFills) }
         if c.foreignLanguage { rows.append(.alwaysTranslate) }
         return rows

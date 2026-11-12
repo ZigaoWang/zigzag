@@ -173,6 +173,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         tabManager.host = self
         tokens.append(tabManager.changed.observe { [weak self] change in self?.tabManagerChanged(change) })
         tokens.append(Library.shared.changed.observe { [weak self] in self?.libraryChanged() })
+        // Tools above the page turned on or off (Settings › Developer): the page you're on gains or loses them.
+        tokens.append(DeveloperTools.changed.observe { [weak self] in self?.showDeveloperBarTools() })
         // Reduce Transparency turned on or off while Zigzag is open: the window follows at once.
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(displayOptionsChanged),
                                                           name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
@@ -511,10 +513,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if window?.isVisible == true { closeFloatingPanels() }
         sidebar.holdsAddress = !above
         if above { root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address) }
-        root.showsTopBar = above
-        root.needsLayout = true
-        root.layoutSubtreeIfNeeded()
-        layoutTrafficLights()
+        root.barHoldsAddress = above
+        showTopBar()
     }
 
     /// Settings › Appearance › Sidebar on the right, or View › Move Sidebar to Right: the sidebar slides over to the
@@ -676,6 +676,38 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 if let self { Toast.show(String(localized: "Cookies cleared. You’re signed out everywhere.", comment: "Toast after every site's cookies are cleared."), symbol: "trash", duration: 2.4, in: self) }
             }
         }
+    }
+
+    /// Clears one site's cache or cookies, then loads its page again: from Site Controls' ⋯ menu, View › Developer
+    /// and the command bar, which all ask the same way. Only a web site has a cache and cookies of its own.
+    func confirmClear(_ kind: WebsiteData.Kind, of tab: Tab) {
+        guard let url = tab.url, ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let site = ContentBlocker.site(of: url) else { return }
+        let cookies = kind == .cookies
+        let message = cookies ? String(localized: "You’ll be signed out of \(site). Other sites aren’t touched.", comment: "Message of the sheet that asks before clearing one site's cookies.")
+                              : String(localized: "It loads a little slower the first time. You stay signed in.", comment: "Message of the sheet that asks before clearing one site's cache.")
+        ConfirmSheet.show(in: root.overlay,
+                          title: cookies ? String(localized: "Clear cookies for \(site)?", comment: "Title of the sheet that asks before clearing one site's cookies. The site is a domain, like example.com.")
+                                         : String(localized: "Clear the cache for \(site)?", comment: "Title of the sheet that asks before clearing one site's cache. The site is a domain, like example.com."),
+                          message: Words.sentences(message, tab.isDevelopment ? Self.everyPortNote(for: url, site: site) : nil),
+                          confirmTitle: cookies ? String(localized: "Clear Cookies", comment: "Button that clears cookies, in the sheet that asks first.")
+                                                : String(localized: "Clear Cache", comment: "Button that clears the cache, in the sheet that asks first."), destructive: cookies) { [weak self, weak tab] confirmed in
+            guard confirmed, let tab else { return }
+            Task { @MainActor [weak self] in
+                await WebsiteData.clear(kind, site: site, in: tab.privateStore ?? tab.profile.store)
+                tab.reload()
+                if let self { Toast.show(kind == .cache ? String(localized: "Cache cleared for \(site)", comment: "Toast after one site's cache is cleared. The site is a domain, like example.com.")
+                                                        : String(localized: "Cookies cleared for \(site)", comment: "Toast after one site's cookies are cleared. The site is a domain, like example.com."),
+                                         symbol: "checkmark.circle", in: self) }
+            }
+        }
+    }
+
+    /// Added to that sheet on a development tab whose address has a port of its own (a development server): what
+    /// a site keeps is kept for its host, so clearing localhost:3000 clears every other project on localhost too.
+    /// `site`: the site as the sheet names it.
+    static func everyPortNote(for url: URL, site: String) -> String? {
+        guard let port = url.port, port != (url.scheme?.lowercased() == "https" ? 443 : 80) else { return nil }
+        return String(localized: "That’s every port of \(site), not only \(String(port)).", comment: "Added to the message of the sheet that asks before clearing one site's cache or cookies, on a development site whose address has a port, like localhost:3000. The first placeholder is the site, the second the port's number.")
     }
 
     private var offeredExtensionID: String?
@@ -872,8 +904,61 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// The developer tools' buttons (#141), in the bar above the page of a development tab shown on its own.
+    private lazy var developerBarTools: DeveloperBarTools = {
+        let tools = DeveloperBarTools()
+        // It says the size the page really is, which the card knows.
+        root.card.onPageArea = { [weak tools] area in tools?.pageRoom = area }
+        tools.pageRoom = root.card.pageArea
+        return tools
+    }()
+
+    /// Gives the page you're on its developer tools in the bar above it, or takes them away: a development tab, on
+    /// its own. With the address kept in the sidebar, the bar comes for them alone.
+    private func showDeveloperBarTools() {
+        let tab = tabManager.selectedTab
+        showPageSize()
+        let shows = showsDeveloperBarTools(for: tab)
+        // Never made for a window that has no use for it.
+        let had = root.topBar.accessory != nil
+        guard shows || had else { return }
+        root.topBar.accessory = shows ? developerBarTools : nil
+        developerBarTools.show(shows ? tab : nil, in: self)
+        if shows != had { showTopBar() }
+    }
+
+    /// The bar above the page is there while it holds the address (Settings › Appearance) or a page's own tools.
+    /// The address and the sidebar's rows are where the setting puts them either way: nothing in the sidebar moves
+    /// for a bar that's there for the tools alone.
+    private func showTopBar() {
+        root.showsTopBar = root.barHoldsAddress || root.topBar.accessory != nil
+        root.needsLayout = true
+        root.layoutSubtreeIfNeeded()
+        layoutTrafficLights()
+        paintTopBar()
+    }
+
+    /// Gives the page you're on the size chosen for it with the developer tools, or its room back. A page's own
+    /// size is for a page shown on its own: a split's panes share the window as they are.
+    private func showPageSize() {
+        let tab = tabManager.selectedTab
+        let size = tab.flatMap { tabManager.split(for: $0) } == nil ? tab?.developerInEffect.size : nil
+        guard root.card.pageSize != size else { return }
+        root.card.pageSize = size
+        paintTopBar()
+    }
+
+    /// Whether a tab has the tools in the bar above its page: Site Controls shows them where it doesn’t.
+    func showsDeveloperBarTools(for tab: Tab?) -> Bool {
+        DeveloperBarTools.shows(isDevelopment: tab?.isDevelopment == true, showsInBar: DeveloperTools.showsInBar,
+                             inSplit: tab.flatMap { tabManager.split(for: $0) } != nil)
+    }
+
     /// Puts the selected tab in the page card, or the pages of its split or tile group side by side, each in a card.
     private func showPages() {
+        // Before the page goes on its card, so it never takes the size of the page that was there.
+        showPageSize()
+        defer { showDeveloperBarTools() }
         // A link address belongs to the page it was pointed at in: a different page, a different space, it goes.
         linkStatus.show(nil, in: root.cardFrame)
         let tab = tabManager.selectedTab
@@ -1002,7 +1087,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Settings, Reader), which has a color of its own: the bar is the plain one then.
     private func paintTopBar() {
         let covered = reader != nil && readerCard === root.card
-        root.paintTopBar(covered ? nil : shownTab?.pageColor)
+        // The card's own word on its page's color: a page at a size of its own stands on plain ground, bar included.
+        root.paintTopBar(covered ? nil : root.card.pageColor)
     }
 
     /// Where popovers that belong to the address bar (extension popups) open from: the address bar while the sidebar
@@ -1218,6 +1304,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             paintTopBar()
         case .pdf, .settings:
             paintTopBar()
+        case .developer:
+            showDeveloperBarTools()
         case .capture:
             sidebar.address.setCapture(camera: tab.isUsingCamera, microphone: tab.isUsingMicrophone)
         case .reader:

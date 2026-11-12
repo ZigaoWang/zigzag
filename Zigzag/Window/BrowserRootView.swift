@@ -445,6 +445,9 @@ final class BrowserRootView: SpaceFrameView {
     var onTilesChange: ((TileShape, Bool) -> Void)?
     /// Back, forward, reload and the address above the page, when they're there (`addressAbovePage`).
     let topBar = TopBarView()
+    /// The bar holds the address and its buttons (the setting), rather than being there for a page's tools alone,
+    /// with the address in the sidebar. What follows the address up there (the sidebar's rows) follows this.
+    var barHoldsAddress = false { didSet { if barHoldsAddress != oldValue { needsLayout = true } } }
     var showsTopBar = false {
         didSet {
             guard oldValue != showsTopBar else { return }
@@ -965,7 +968,7 @@ final class BrowserRootView: SpaceFrameView {
     /// where the frame comes and goes with the sidebar: there the row would move as the sidebar is shown, and its
     /// toggle, the one thing you reach for in that corner, stays where it is with the sidebar hidden.
     var sidebarTopRowDrop: CGFloat {
-        showsTopBar && !sidebarContainer.isFloating && !frameComesWithSidebar ? topBarFrame.minY : 0
+        showsTopBar && barHoldsAddress && !sidebarContainer.isFloating && !frameComesWithSidebar ? topBarFrame.minY : 0
     }
 
     private func layoutTopBar() {

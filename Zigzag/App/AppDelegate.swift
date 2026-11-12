@@ -96,7 +96,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Developer tools turned on or off, or a site put on its list or taken off: open tabs are told at once.
         developerToken = DeveloperTools.changed.observe {
-            for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) { tab.refreshDevelopment() }
+            for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) { tab.refreshDevelopment(settingsChanged: true) }
+            // Its menu items come and go with it, and whatever lists the menu bar's shortcuts hears of it.
+            if MainMenu.setDeveloperTools(DeveloperTools.isOn, in: NSApp.mainMenu) {
+                if DeveloperTools.isOn {
+                    Shortcuts.applyToNew(Shortcuts.allItems.filter { item in DeveloperTool.menuItems.contains { $0.action == item.action } })
+                }
+                Shortcuts.changed.send()
+            }
         }
         if #available(macOS 15.4, *) {
             // An ad blocker extension turned on or off, or let onto YouTube or not: open pages follow on their next load.

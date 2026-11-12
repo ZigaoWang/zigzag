@@ -179,6 +179,10 @@ enum CommandRanker {
         var canReopen = false
         var spaces: [Space] = []
         var currentSpaceID: UUID?
+        /// The developer tools (#141) that would do something on the page you're on.
+        var developerTools: [DeveloperTool] = []
+        /// The site you're on is on the list of development sites.
+        var isDevelopmentSite = false
     }
 
     /// The commands about the page and window you're in, each named as in the menu bar, and only those that apply.
@@ -213,6 +217,9 @@ enum CommandRanker {
         if c.canReopen {
             list.append(Action(id: "reopen", title: String(localized: "Reopen Closed Tab", comment: "A command in the command bar, named as in the menu bar."),
                                keywords: ["reopen", "closed", "tab", "undo", "restore", "back"], symbol: "arrow.uturn.backward"))
+        }
+        list += c.developerTools.map {
+            Action(id: $0.commandID, title: $0 == .site ? DeveloperTool.siteTitle(listed: c.isDevelopmentSite) : $0.title, keywords: $0.keywords, symbol: $0.symbol)
         }
         // Spaces are kept for good; a private window keeps nothing and has one space.
         guard !c.isPrivate else { return list }
@@ -287,6 +294,8 @@ enum CommandRanker {
         let tabs = manager.currentTabs
         guard let tab = manager.selectedTab else { return c }
         c.hasPage = tab.url != nil
+        c.developerTools = DeveloperTool.allCases.filter { $0.isOffered(for: tab, isPrivate: manager.isPrivate, inSplit: manager.split(for: tab) != nil) }
+        c.isDevelopmentSite = DevelopmentSites.covers(tab.url)
         c.isFavorite = tab.isFavorite
         c.isPinned = tab.bookmarkID != nil && !tab.isFavorite
         c.inSplit = manager.split(for: tab) != nil
