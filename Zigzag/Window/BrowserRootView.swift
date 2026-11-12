@@ -884,12 +884,6 @@ final class BrowserRootView: SpaceFrameView {
         }
     }
 
-    /// The mini player's card: over the pages and the sidebar, so it can go anywhere in the window; under everything
-    /// floating (the command bar, popovers, sheets).
-    func showMiniPlayer(_ view: NSView) {
-        addSubview(view, positioned: .below, relativeTo: splitDropHint)
-    }
-
     var sidebarFrame: NSRect {
         Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: sidebarVisible, revealed: sidebarRevealed, onRight: sidebarOnRight)
     }

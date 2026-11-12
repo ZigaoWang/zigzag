@@ -193,13 +193,13 @@ nonisolated enum MiniPlayerLayout {
 
     // MARK: Where it sits
 
-    /// It never goes nearer the window's edges than this, so its rounded edge always shows whole.
+    /// It never goes nearer the screen's edges than this, so its rounded edge always shows whole.
     static let edgeInset: CGFloat = 4
-    /// Let go this near an edge's resting line (`margin` from the window's edge), it settles on it; anywhere else,
+    /// Let go this near an edge's resting line (`margin` from the screen's edge), it settles on it; anywhere else,
     /// it stays where it was let go.
     static let snapDistance: CGFloat = 16
 
-    /// Where the card sits: how far its edges are from the nearest corner's edges. As the window resizes, it keeps
+    /// Where the card sits: how far its edges are from the nearest corner's edges. As its room changes, it keeps
     /// that distance from that corner, so a card at the bottom right stays at the bottom right.
     struct Anchor: Equatable, Sendable {
         var corner: Corner
@@ -242,7 +242,7 @@ nonisolated enum MiniPlayerLayout {
     }
 
     /// Where a card let go at `frame` comes to rest: where it is, inside `area`, except near an edge, where it settles
-    /// on the line a margin in from the window's edge (two edges, at a corner).
+    /// on the line a margin in from the screen's edge (two edges, at a corner).
     static func dropped(_ frame: CGRect, in area: CGRect) -> CGRect {
         var f = clamp(frame, in: area)
         let inset = max(0, margin - edgeInset)
@@ -254,65 +254,75 @@ nonisolated enum MiniPlayerLayout {
         return clamp(f, in: area)
     }
 
-    /// Where the card may go in a window this big: anywhere in it, an `edgeInset` in, over the sidebar too; under the
-    /// bar above the page when there is one (`below`, its bottom), so it never covers the address or its buttons.
-    static func movableArea(in bounds: CGRect, below bar: CGFloat?) -> CGRect {
-        var area = bounds.insetBy(dx: edgeInset, dy: edgeInset)
-        if let bar, bar + edgeInset > area.minY {
-            area.size.height = max(0, area.maxY - bar - edgeInset)
-            area.origin.y = bar + edgeInset
-        }
-        return area
+    /// Where the card may go on a screen (#172): anywhere in its usable part (`visible`: clear of the menu bar and
+    /// the Dock), an `edgeInset` in, over the window and other apps' windows too.
+    static func movableArea(onScreen visible: CGRect) -> CGRect {
+        visible.insetBy(dx: edgeInset, dy: edgeInset)
     }
 
     // MARK: Snapping to a corner
 
-    /// Where the card rests: in a corner of the page area, a margin in, as the Mac's own Picture in Picture does; or,
-    /// let go with ⌘ held, wherever it was let go (`Anchor`, from the window's nearest corner).
+    /// Where the card rests (#172): in a corner of the page area of its window, a margin in, as #156 had it; in a
+    /// corner of the screen, as the Mac's own Picture in Picture does, once let go outside the window; or, let go
+    /// with ⌘ held, wherever it was let go (`Anchor`, from the screen's nearest corner).
     enum Place: Equatable, Sendable {
         case corner(Corner)
+        case screen(Corner)
         case free(Anchor)
 
-        /// As saved: "bottomRight" for a corner, "bottomRight 8 8" for a free place (as every place was saved before
-        /// the card snapped, so those keep where they were).
+        /// As saved: "bottomRight" for a page's corner, "screen bottomRight" for the screen's, "bottomRight 8 8" for a
+        /// free place (as every place was saved before the card snapped, so those keep where they were).
         var stored: String {
             switch self {
             case .corner(let corner): corner.rawValue
+            case .screen(let corner): "screen " + corner.rawValue
             case .free(let anchor): anchor.stored
             }
         }
         init?(stored: String) {
             if let corner = Corner(rawValue: stored) { self = .corner(corner) }
+            else if stored.hasPrefix("screen "), let corner = Corner(rawValue: String(stored.dropFirst(7))) { self = .screen(corner) }
             else if let anchor = Anchor(stored: stored) { self = .free(anchor) }
             else { return nil }
         }
     }
 
-    /// The card of this size at its place: in its corner of `page` (the page area), or at its anchor in `area` (where
-    /// it may go at all), and wholly inside `area` either way.
+    /// The card of this size at its place: in its corner of `page` (the page area), in its corner of the screen
+    /// whose room is `area` (where it may go at all, `edgeInset` in from the screen's usable part), or at its anchor
+    /// in `area`; and wholly inside `area` either way.
     static func frame(for place: Place, size: CGSize, page: CGRect, in area: CGRect) -> CGRect {
         switch place {
         case .corner(let corner): clamp(frame(at: corner, size: size, in: page), in: area)
+        case .screen(let corner): clamp(frame(at: corner, size: size, in: area.insetBy(dx: -edgeInset, dy: -edgeInset)), in: area)
         case .free(let anchor): frame(for: anchor, size: size, in: area)
         }
     }
 
-    /// Where a card let go at `frame` comes to rest, and its place from then on: in the page area's corner nearest its
-    /// middle; with `free` (⌘ held), where it was let go, settling on an edge only near one (`dropped`).
-    static func rest(_ frame: CGRect, free: Bool, page: CGRect, in area: CGRect) -> (frame: CGRect, place: Place) {
+    /// Where a card let go at `frame` comes to rest, and its place from then on. Over its window (`window`, the
+    /// page and the sidebar both), in the page area's corner nearest its middle; anywhere else on the screen, the
+    /// screen's nearest corner; with `free` (⌘ held), where it was let go, settling on an edge only near one
+    /// (`dropped`).
+    static func rest(_ frame: CGRect, free: Bool, page: CGRect, window: CGRect?, in area: CGRect) -> (frame: CGRect, place: Place) {
         if free {
             let target = dropped(frame, in: area)
             return (target, .free(anchor(of: target, in: area)))
         }
-        let corner = nearestCorner(to: CGPoint(x: frame.midX, y: frame.midY), in: page)
-        return (self.frame(for: .corner(corner), size: frame.size, page: page, in: area), .corner(corner))
+        let middle = CGPoint(x: frame.midX, y: frame.midY)
+        let place: Place = window?.contains(middle) == true ? .corner(nearestCorner(to: middle, in: page)) : .screen(nearestCorner(to: middle, in: area))
+        return (self.frame(for: place, size: frame.size, page: page, in: area), place)
+    }
+
+    /// A rectangle in the Mac's screen coordinates (y up from the bottom of the main screen) in the same space with y
+    /// running down from its top, as the card's arithmetic is done, or back: the same flip either way.
+    static func flipped(_ rect: CGRect, mainScreenHeight: CGFloat) -> CGRect {
+        CGRect(x: rect.minX, y: mainScreenHeight - rect.maxY, width: rect.width, height: rect.height)
     }
 
     // MARK: Resizing
 
     /// The smallest card: room for its controls.
     static let smallestCard = CGSize(width: 200, height: 112)
-    /// The largest: this much of the window either way.
+    /// The largest: this much of the screen either way.
     static let largestShare: CGFloat = 0.8
 
     /// The widths a card of this shape may take in an area this big (where it may go).

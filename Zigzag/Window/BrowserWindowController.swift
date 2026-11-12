@@ -1688,6 +1688,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         Autofill.shared.forget(windowOf: window)
         // The peeked page isn't one of the window's tabs: it goes with the window, not whenever this is freed.
         peek.close()
+        // The mini player floats in a panel of its own: it goes with the window too.
+        miniPlayer.windowClosing()
         // So is a folder's icon picker, and the event monitor it holds.
         iconPicker?.close()
         // Nor does Reader's key monitor outlive it.
