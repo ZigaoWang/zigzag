@@ -1017,14 +1017,75 @@ enum DebugBridge {
         // developer on|off: Settings › Developer › Developer tools. devsite add|remove <site>: its list.
         // devstate: the switch, the list and which open tabs are development tabs, in the debug log.
         case "developer": DeveloperTools.isOn = arg == "on"
+        // devtrust on|off: Settings › Developer › Trust certificates of servers on this Mac.
+        case "devtrust": DeveloperTools.trustsLocalServers = arg == "on"
         case "devsite":
             let parts = arg.split(separator: " ").map(String.init)
             if parts.count == 2, let site = DevelopmentSites.entry(from: parts[1]) {
                 if parts[0] == "add" { DevelopmentSites.add(site) } else if parts[0] == "remove" { DevelopmentSites.remove(site) }
             }
+        // devlook follow|light|dark and devprint on|off: the developer tools' Page Appearance and Show Print Styles for
+        // the tab in front. devlook alone: what the tab chose, what's in effect and what the page itself sees.
+        case "devlook", "devprint":
+            guard let tab = controller.tabManager.selectedTab else { break }
+            if name == "devprint", arg == "on" || arg == "off" { tab.developer.printStyles = arg == "on" }
+            if name == "devlook" {
+                switch arg {
+                case "follow": tab.developer.appearance = .followsMac
+                case "light": tab.developer.appearance = .light
+                case "dark": tab.developer.appearance = .dark
+                default: break
+                }
+            }
+            let chosen = tab.developer, effect = tab.developerInEffect
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                let script = "[matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light', matchMedia('print').matches ? 'print' : 'screen', getComputedStyle(document.documentElement).filter].join(' ')"
+                tab.webView?.evaluateJavaScript(script) { result, _ in
+                    debugLog("devlook => chose=\(chosen.appearance) print=\(chosen.printStyles) effect=\(effect.appearance) print=\(effect.printStyles) view=\(tab.webView?.appearance?.name.rawValue ?? "-") media=\(tab.webView?.mediaType ?? "-") page: \(result as? String ?? "-") darkened=\(tab.darkPage?.darkened ?? false)")
+                }
+            }
+        // devjs on|off, devua zigzag|iphone|ipad|chrome|firefox, devoutline on|off: the developer tools' Disable
+        // JavaScript, User Agent and Outline Every Element for the tab in front. Then, once the page has loaded again,
+        // what the page was told and whether its scripts ran, in the debug log.
+        case "devjs", "devua", "devoutline":
+            guard let tab = controller.tabManager.selectedTab else { break }
+            if name == "devjs", arg == "on" || arg == "off" { tab.developer.javaScriptOff = arg == "off" }
+            if name == "devoutline", arg == "on" || arg == "off" { tab.developer.outlines = arg == "on" }
+            if name == "devua", let agent = ["zigzag": DeveloperState.UserAgent.zigzag, "iphone": .iPhone, "ipad": .iPad, "chrome": .chrome, "firefox": .firefox][arg] {
+                tab.developer.userAgent = agent
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                let script = "[navigator.userAgent.includes('iPhone') ? 'iPhone' : navigator.userAgent.includes('iPad') ? 'iPad' : navigator.userAgent.includes('Chrome') ? 'Chrome' : navigator.userAgent.includes('Firefox') ? 'Firefox' : 'Zigzag', document.title, !!document.getElementById('\(PageOutlines.styleID)')].join(' | ')"
+                tab.webView?.evaluateJavaScript(script, in: nil, in: PageOutlines.world) { result in
+                    let page = (try? result.get()) as? String ?? "-"
+                    debugLog("devpage => tab=\(tab.url?.host() ?? "-") js=\(tab.developer.javaScriptOff ? "off" : "on") ua=\(tab.developer.userAgent) outline=\(tab.developer.outlines) page: \(page)")
+                }
+            }
+        // devsize <width> <height> | fill | rotate: the developer tools' Page Size for the tab in front; then the
+        // page's size and its holder's, and what's docked in it, in the debug log.
+        case "devsize":
+            guard let tab = controller.tabManager.selectedTab else { break }
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            if n.count == 2 { tab.developer.size = CGSize(width: n[0], height: n[1]) }
+            if arg == "fill" { tab.developer.size = nil }
+            if arg == "rotate" { tab.developer.size = tab.developer.rotatedSize }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                controller.root.layoutSubtreeIfNeeded()
+                let holder = tab.pageHolder
+                let subs = (holder?.subviews ?? []).map { "\(type(of: $0)) \(Int($0.frame.width))x\(Int($0.frame.height))" }.joined(separator: " | ")
+                debugLog("devsize => chose=\(tab.developer.size.map { "\(Int($0.width))x\(Int($0.height))" } ?? "fill") card=\(controller.root.card.pageSize.map { "\(Int($0.width))x\(Int($0.height))" } ?? "fill") holder=\(holder.map { NSStringFromRect($0.frame) } ?? "-") docked=\(holder.map { NSStringFromSize($0.dockedRoom) } ?? "-") subs: \(subs) color=\(tab.pageColor != nil)")
+            }
+        // devbar on|off: Settings › Developer › Tools above the page. devbar: where the tools are, in the debug log.
+        case "devbar":
+            if arg == "on" || arg == "off" { DeveloperTools.showsInBar = arg == "on" }
+            let card = controller.root.card
+            let tools = controller.root.topBar.accessory as? DeveloperBarTools
+            let on = controller.tabManager.selectedTab
+            debugLog("devbar => tab=\(on?.url?.host() ?? "-") development=\(on?.isDevelopment ?? false) errors=\(on?.pageErrorCount ?? 0) shows=\(tools != nil) frame=\(tools.map { NSStringFromRect($0.frame) } ?? "-") buttons=\(tools?.shown ?? 0) page=\(card.webView?.superview.map { NSStringFromRect($0.frame) } ?? "-")")
         case "devstate":
             let tabs = controller.tabManager.allTabs.map { "\($0.url?.host() ?? "-"):\($0.url?.port ?? 0)=\($0.isDevelopment)" }.sorted()
-            debugLog("devstate => on=\(DeveloperTools.isOn) sites=\(DevelopmentSites.sites) tabs=\(tabs)")
+            let front = controller.tabManager.selectedTab
+            debugLog("devstate => on=\(DeveloperTools.isOn) sites=\(DevelopmentSites.sites) tabs=\(tabs) front=\(front?.displayTitle ?? "-") failed=\(front?.showsErrorPage ?? false)")
         case "darkstate":
             controller.selectedWebView?.callAsyncJavaScript("return window.__zigzagDark ? JSON.stringify(window.__zigzagDark.state()) : 'none'",
                                                             arguments: [:], in: nil, in: DarkPages.world) { result in
