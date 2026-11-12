@@ -140,4 +140,11 @@ struct PageIconTests {
         #expect(symbol.size == NSSize(width: Tokens.Sidebar.favicon, height: Tokens.Sidebar.favicon))
         #expect(emoji.size == symbol.size)
     }
+
+    @Test func deletingTheEmojiGoesBackToTheSiteIcon() {
+        #expect(IconGrid.clearsEmoji(text: "", selected: "🍕"))
+        #expect(!IconGrid.clearsEmoji(text: "", selected: "star.fill"))
+        #expect(!IconGrid.clearsEmoji(text: "", selected: nil))
+        #expect(!IconGrid.clearsEmoji(text: "🍕", selected: "🍕"))
+    }
 }

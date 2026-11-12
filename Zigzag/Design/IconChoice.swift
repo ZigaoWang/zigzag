@@ -159,15 +159,25 @@ final class IconGrid: NSView, NSTextFieldDelegate {
 
     /// The last emoji typed is the icon; anything that isn't one is left out.
     func controlTextDidChange(_ obj: Notification) {
+        let composing = (emojiField.field.currentEditor() as? NSTextView)?.hasMarkedText() == true
         guard let emoji = Self.lastEmoji(in: emojiField.stringValue) else {
             // Letters, or a digit or a symbol on its own, don't stay in the field as if they were the icon.
             // (Not while an input method is still composing: that text isn't settled.)
-            if (emojiField.field.currentEditor() as? NSTextView)?.hasMarkedText() != true { emojiField.stringValue = "" }
+            guard !composing else { return }
+            emojiField.stringValue = ""
+            // The emoji deleted: back to no icon (a page's own site icon), as the plain choice does.
+            if Self.clearsEmoji(text: emojiField.stringValue, selected: selected) { pick(nil) }
             return
         }
         emojiField.stringValue = emoji
         selected = emoji
         onPick?(emoji)
+    }
+
+    /// Whether an edit to the field takes the icon away: an emoji was the icon and the field is now empty. A symbol
+    /// chosen from the grid isn't in the field, so emptying it leaves that alone.
+    static func clearsEmoji(text: String, selected: String?) -> Bool {
+        text.isEmpty && selected.map { !IconChoice.isSymbol($0) } == true
     }
 
     /// The last emoji in some text: one that shows as an emoji on its own (😀), a symbol asked to (❤️ ☀️ ✈️, with
