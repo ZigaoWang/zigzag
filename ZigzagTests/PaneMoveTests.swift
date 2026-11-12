@@ -233,6 +233,17 @@ struct PaneMoveTests {
         #expect(PageBar.inkAppearance(on: nil) == nil)
     }
 
+    @MainActor @Test func peeksStripReadsOnItsPageToo() {
+        let header = PeekHeaderView()
+        header.ground = NSColor(srgbRed: 0.05, green: 0.07, blue: 0.09, alpha: 1)
+        #expect(header.appearance?.name == .darkAqua && header.closeButton.isOnPage && header.expandButton.isOnPage)
+        header.ground = .white
+        #expect(header.appearance?.name == .aqua)
+        // No page color yet: the panel's own.
+        header.ground = nil
+        #expect(header.appearance == nil && !header.closeButton.isOnPage)
+    }
+
     @Test func thePicturesShapeIsThePanes() {
         #expect(PaneDrag.pictureSize(for: CGSize(width: 800, height: 600)) == CGSize(width: 220, height: 165))
         // Very tall or very wide, it's cut to fit: never taller than wide, never under half as tall.

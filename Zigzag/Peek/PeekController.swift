@@ -28,6 +28,16 @@ final class PeekHeaderView: NSView {
 
     override var isFlipped: Bool { true }
 
+    /// The color under the strip: the peeked page's (nil: the panel's own surface). Its icons and text turn light or
+    /// dark, whichever reads more clearly on it, as a split view pane's strip does (`PaneHeaderView.ground`).
+    var ground: NSColor? {
+        didSet {
+            guard ground != oldValue else { return }
+            appearance = PageBar.inkAppearance(on: ground).flatMap(NSAppearance.init(named:))
+            [expandButton, closeButton].forEach { $0.isOnPage = ground != nil }
+        }
+    }
+
     override func layout() {
         super.layout()
         // Close sits as far from the panel's side as from its top, so its corner runs with the panel's
@@ -140,6 +150,7 @@ final class PeekController {
             content.addSubview(holder)
         }
         refreshHeader()
+        refreshGround()
 
         if !isVisible {
             isVisible = true
@@ -166,6 +177,10 @@ final class PeekController {
         case .url, .favicon, .title, .loading: refreshHeader()
         default: break
         }
+        switch change {
+        case .loading, .themeColor, .darkPage, .pdf, .settings: refreshGround()
+        default: break
+        }
         // Painted: pages that leave their background to the browser get white again.
         if change == .loading, let tab, !tab.isLoading, let webView = tab.webView {
             webView.setValue(true, forKey: "drawsBackground")
@@ -180,6 +195,16 @@ final class PeekController {
         header.host.stringValue = tab.url.map(HistoryStore.normalizedHost) ?? tab.displayTitle
         header.icon.image = tab.favicon
         header.icon.isLoading = tab.isLoading
+    }
+
+    /// The panel and its strip in the page's own color, as a split view pane's card and strip are (and a zoomed
+    /// pane, in Peek's look): over a page drawn dark, no light band across its top. Until the page has a color,
+    /// the panel's own surface.
+    private func refreshGround() {
+        let color = tab?.pageColor
+        panel.tintStrength = color == nil ? nil : 1
+        panel.surfaceTint = color
+        header.ground = color
     }
 
     /// The link you clicked, if the pointer is over the page: the peek opens from there.
