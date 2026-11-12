@@ -1200,7 +1200,10 @@ final class BrowserRootView: SpaceFrameView {
     /// Where the pointer is now, in this view's terms, whatever event is being handled and wherever the pointer is
     /// on screen, outside the window included.
     private var pointer: NSPoint? {
-        window.map { convert($0.mouseLocationOutsideOfEventStream, from: nil) }
+        #if DEBUG
+        if let debugPointer { return debugPointer }
+        #endif
+        return window.map { convert($0.mouseLocationOutsideOfEventStream, from: nil) }
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -1321,6 +1324,16 @@ final class BrowserRootView: SpaceFrameView {
     var isSidebarFloatingVisible: Bool { !sidebarVisible && sidebarRevealed }
 
     #if DEBUG
+    /// Testing builds: the pointer counts as here (top-down, in the window's terms; left of the window is negative),
+    /// wherever the real one is.
+    private var debugPointer: NSPoint?
+
+    /// Testing builds: the pointer moves to `point` (nil: back to the real one), as the edge sees it.
+    func debugEdgePointer(_ point: NSPoint?) {
+        debugPointer = point
+        if let point, edgeZone.opens(at: point) { pointerAtEdge() }
+    }
+
     /// Testing builds: a drag on the sidebar's edge, step by step ("begin", an x, "end"), as the handle reports it.
     func debugEdgeDrag(_ step: String) {
         switch step {

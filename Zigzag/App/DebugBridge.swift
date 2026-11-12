@@ -552,6 +552,12 @@ enum DebugBridge {
                      + "lights=\(close.map { $0.convert($0.bounds, to: nil) } ?? .zero) hidden=\(close?.isHidden ?? true) room=\(r.lightsRoom)")
         case "reveal": controller.root.holdReveal = arg == "hold"; controller.root.reveal(true)
         case "unreveal": controller.root.holdReveal = false; controller.root.reveal(false)
+        // edgepointer <x> <y>|off: the pointer counts as there for the sidebar's edge (top-down, left of the window
+        // is negative), wherever the real one is. edgestate: whether the sidebar is out, in the debug log.
+        case "edgepointer":
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            controller.root.debugEdgePointer(f.count == 2 ? NSPoint(x: f[0], y: f[1]) : nil)
+        case "edgestate": debugLog("edgestate \(controller.root.isSidebarFloatingVisible ? "out" : controller.root.sidebarVisible ? "docked" : "hidden")")
         // numbers [control|off]: the ⌘ number hints, as holding ⌘ shows them (with control, the spaces' ⌃ ones, as
         // holding ⌃ shows them), even with the window not in front. off hides both.
         case "numbers":
