@@ -71,6 +71,13 @@ targets:
         buildPhase: resources
     dependencies:
       - package: Sparkle
+      # The small app each site installed as an app runs (File › Install as App…): copied out of here into the
+      # app Zigzag makes, which is then signed on this Mac.
+      - target: ZigzagWebApp
+        embed: true
+        codeSign: true
+        copy:
+          destination: executables
     info:
       path: Zigzag/Info.plist
       properties:
@@ -138,6 +145,15 @@ targets:
         # build (its own bundle id) can't carry it. The two files are the same apart from that key.
         Release:
           CODE_SIGN_ENTITLEMENTS: Zigzag/ZigzagRelease.entitlements
+  ZigzagWebApp:
+    type: tool
+    platform: macOS
+    sources:
+      - path: ZigzagWebApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: wang.zigao.zigzag.webapp
+        SKIP_INSTALL: YES
   ZigzagTests:
     type: bundle.unit-test
     platform: macOS

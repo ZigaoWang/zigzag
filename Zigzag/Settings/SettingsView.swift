@@ -724,6 +724,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private let versionGroup = FormGroup()
     private let generalGroup = FormGroup()
+    /// Sites installed as apps, each with Remove. Only there when there's one.
+    private let webAppsGroup = FormGroup()
+    private var webAppsToken: SignalToken?
     /// Settings › Automation: AI apps, connecting one, and scripts.
     private let aiGroup = FormGroup()
     private let connectGroup = FormGroup()
@@ -1008,6 +1011,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // There's no startup setting: your tabs always come back. Quitting is the nearest, and where people look.
         quitRow.keywords = String(localized: "startup launch on start restore reopen session close quit", comment: "Words that find the Ask before quitting setting with Find a setting in Settings. Zigzag has no startup setting (tabs always come back), so words about starting up find this row. Not shown.")
         generalGroup.add(quitRow)
+        reloadWebApps()
+        webAppsToken = WebAppStore.shared.changed.observe { [weak self] in
+            guard let self else { return }
+            self.reloadWebApps()
+            if self.pane == .general || self.isSearching { self.layoutDocument() }
+        }
 
         // Automation
         aiAppsToggle.onChange = { [weak self] on in
@@ -2008,6 +2017,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     // The groups' headings, each said once for the page and its search.
+    private static var webAppsHeading: String { String(localized: "Installed Apps", comment: "A heading in Settings › General: the sites installed as apps with File › Install as App.") }
     private static var updatesHeading: String { String(localized: "Updates", comment: "A heading in Settings › General: Zigzag's version and how it updates.") }
     private static var connectHeading: String { String(localized: "Connect an App", comment: "A heading in Settings › Automation: how to connect an AI app to Zigzag over MCP.") }
     private static var scriptsHeading: String { String(localized: "Scripts", comment: "A heading in Settings › Automation: what AppleScript and Shortcuts may do in Zigzag.") }
@@ -2067,7 +2077,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Each section's groups and their headings, as a search goes through them.
     private func groups(of pane: SettingsPane) -> [(title: String?, group: FormGroup)] {
         switch pane {
-        case .general: [(nil, generalGroup), (Self.updatesHeading, versionGroup)]
+        case .general: [(nil, generalGroup)] + (webAppsGroup.rows.isEmpty ? [] : [(Self.webAppsHeading, webAppsGroup)]) + [(Self.updatesHeading, versionGroup)]
         case .appearance: [(nil, appearanceGroup)]
         case .tabs: [(nil, tabsGroup)]
         case .search: [(nil, searchGroup)]
@@ -2705,6 +2715,32 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case (false, true, false): return String(localized: "Saved data", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
         case (false, false, true): return String(localized: "Cache", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
         case (false, false, false): return String(localized: "Data", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
+        }
+    }
+
+    /// Settings › General › Installed Apps: each site installed as an app, with Remove, which asks first.
+    private func reloadWebApps() {
+        webAppsGroup.removeAllRows()
+        let store = WebAppStore.shared
+        store.pruneMissing()
+        for app in store.apps.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending }) {
+            let remove = PillButton(title: String(localized: "Remove…", comment: "Button on an installed app's row in Settings › General › Installed Apps."))
+            remove.setAccessibilityLabel(String(localized: "Remove “\(app.name)”", comment: "VoiceOver label of the Remove button on an installed app's row in Settings › General; the app's name."))
+            remove.onClick = { [weak self] _ in
+                self?.confirm(title: String(localized: "Remove \(app.name)?", comment: "Title of the sheet that removes a site installed as an app. The placeholder is the app's name."),
+                              message: String(localized: "The app is deleted from your Applications folder. You stay signed in to the site in Zigzag.", comment: "Message of the sheet that removes a site installed as an app."),
+                              action: String(localized: "Remove", comment: "Button of the sheet that removes a site installed as an app.")) {
+                    WebAppStore.shared.remove(app.id)
+                }
+            }
+            var detail = app.url.host() ?? app.url.absoluteString
+            if hasManyProfiles, let profile = Library.shared.directory.profile(app.profileID) {
+                detail = String(localized: "\(detail) on \(profile.displayName)", comment: "Under an installed app in Settings › General with more than one profile: the site, then the profile it uses, like “github.com on Work”.")
+            }
+            let icon = store.bundle(of: app).map { NSWorkspace.shared.icon(forFile: $0.path) } ?? SettingsIcon.symbol("app")
+            let row = FormRow(title: app.name, detail: detail, icon: icon, control: remove)
+            row.keywords = String(localized: "web app dock install application", comment: "Words that find Installed Apps with Find a setting in Settings. Not shown.")
+            webAppsGroup.add(row)
         }
     }
 

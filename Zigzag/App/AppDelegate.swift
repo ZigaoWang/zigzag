@@ -3,6 +3,8 @@ import WebKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingURLs: [URL] = []
+    /// Sites installed as apps asked for before launch finished (one opened with Zigzag not running).
+    private var pendingWebApps: [URL] = []
     private var launched = false
     private var blockerToken: SignalToken?
     private var youTubeToken: SignalToken?
@@ -101,8 +103,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Onboarding not finished: it comes first, instead of the window that was waiting behind it. Opened for links that
         // all go to Zigzag Mini, only Zigzag Mini comes up, as Little Arc does; the windows come back when you ask.
         let miniOnly = !pendingURLs.isEmpty && !WindowManager.needsOnboarding && pendingURLs.allSatisfy(WindowManager.shared.opensInMini)
-        WindowManager.shared.sessionWaiting = miniOnly
-        let restored = WindowManager.needsOnboarding || miniOnly ? false : WindowManager.shared.restoreSession()
+        // Opened by a site installed as an app: only its window comes up, as Chrome's apps do; the browser windows
+        // wait until you ask for them.
+        let webAppOnly = pendingURLs.isEmpty && !pendingWebApps.isEmpty && !WindowManager.needsOnboarding
+        WindowManager.shared.sessionWaiting = miniOnly || webAppOnly
+        let restored = WindowManager.needsOnboarding || miniOnly || webAppOnly ? false : WindowManager.shared.restoreSession()
         // Opened from the disk image or a download macOS keeps apart: offered a move to Applications, so it can update.
         MoveToApplications.offerWhenReady()
         launched = true
@@ -113,9 +118,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             pendingURLs.forEach { WindowManager.shared.openExternal($0) }
             pendingURLs = []
-        } else if !restored {
+        } else if !restored, !webAppOnly {
             WindowManager.shared.newWindow()
         }
+        pendingWebApps.forEach(WebAppStore.handle)
+        pendingWebApps = []
         Updater.shared.start()
         // Just updated: what's new comes first, and the default browser offer waits for another launch. Profiles
         // that couldn't be read come before either: what's new waits a launch.
@@ -227,9 +234,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: Opening URLs from elsewhere
 
     @objc private func handleGetURL(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
+        guard let string = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue else { return }
+        // A site installed as an app, opened or quit (only its small app sends these).
+        if let link = URL(string: string), WebAppLink.parse(link) != nil {
+            if launched { WebAppStore.handle(link) } else { pendingWebApps.append(link) }
+            return
+        }
         // A link another app hands over (or a script's `open location`) is a web address: never one of Zigzag's own
         // pages, an extension's, or a file.
-        guard let string = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue, let url = Scripting.webAddress(string) else { return }
+        guard let url = Scripting.webAddress(string) else { return }
         // Zigzag handing a link to macOS (as the default browser) gets it straight back: that's a link from inside
         // Zigzag, so it opens in a tab here, not in Zigzag Mini as one from another app would.
         if launched, Self.isFromZigzag(event) { WindowManager.shared.openFromZigzag(url); return }

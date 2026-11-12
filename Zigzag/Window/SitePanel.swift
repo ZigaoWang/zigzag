@@ -241,7 +241,17 @@ final class SitePanel: FloatingPanelView {
     /// Clearing this site's cache or cookies: there when you need it, out of the way when you don't.
     private func showMoreMenu() {
         guard canClear else { return }
-        MenuPanel.show([
+        var entries: [MenuPanel.Entry] = []
+        if let controller, WebAppInstallSheet.canInstall(tab, isPrivate: controller.tabManager.isPrivate) {
+            entries.append(.item(.init(title: WebAppInstallSheet.title) { [weak self, weak controller] in
+                guard let self, let controller else { return }
+                let tab = self.tab
+                self.close()
+                WebAppInstallSheet.show(for: tab, in: controller)
+            }))
+            entries.append(.separator)
+        }
+        MenuPanel.show(entries + [
             .item(.init(title: String(localized: "Clear Cache for This Site…", comment: "Item in the … menu of the site panel.")) { [weak self] in self?.clear(.cache) }),
             .item(.init(title: String(localized: "Clear Cookies for This Site…", comment: "Item in the … menu of the site panel.")) { [weak self] in self?.clear(.cookies) }),
         ], from: moreButton)

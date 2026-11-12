@@ -115,6 +115,8 @@ final class Tab: NSObject {
     var isSearchTab = false
     /// True while the page lives in the peek card rather than the tab list. A PDF in peek is WebKit's; it gets
     /// Zigzag's viewer once it's a tab.
+    /// A site installed as an app (`WebAppWindowController`): a link you click to another site goes to the browser.
+    var keepsSite = false
     var isPeek = false {
         didSet { if oldValue, !isPeek, let webView { checkForPDF(webView) } }
     }
@@ -1096,8 +1098,9 @@ extension Tab: WKNavigationDelegate {
                 return (.download, preferences)
             }
             // A pinned tab or favorite keeps its site: a link that leaves it opens beside it, in a new tab, so the
-            // pinned Gmail is still Gmail when you come back. Signing in still happens right here.
-            if bookmarkID != nil || isFavorite, let here = self.url, Self.site(of: here) != Self.site(of: url), !Self.isSignIn(url) {
+            // pinned Gmail is still Gmail when you come back. A site installed as an app sends it to the browser.
+            // Signing in still happens right here.
+            if bookmarkID != nil || isFavorite || keepsSite, let here = self.url, Self.leavesSite(from: here, to: url) {
                 host?.tab(self, openURL: url, disposition: .foregroundTab)
                 return (.cancel, preferences)
             }
@@ -1129,7 +1132,7 @@ extension Tab: WKNavigationDelegate {
 
     /// The site a URL belongs to, so mail.google.com and accounts.google.com count as one: the last two parts of
     /// the host, or three under a country's own second level (bbc.co.uk).
-    static func site(of url: URL) -> String? {
+    nonisolated static func site(of url: URL) -> String? {
         guard let host = url.host()?.lowercased(), !host.isEmpty else { return nil }
         let parts = host.split(separator: ".")
         guard parts.count > 2 else { return host }
@@ -1138,8 +1141,14 @@ extension Tab: WKNavigationDelegate {
         return parts.suffix(keep).joined(separator: ".")
     }
 
+    /// Whether a link you click from `here` to `url` goes to another site, so a tab that keeps its site (a pinned
+    /// page, a favorite, a site installed as an app) hands it on. A page that signs you in stays.
+    nonisolated static func leavesSite(from here: URL, to url: URL) -> Bool {
+        site(of: here) != site(of: url) && !isSignIn(url)
+    }
+
     /// Pages that sign you in to the site you're on, which have to stay in its tab to work.
-    private static func isSignIn(_ url: URL) -> Bool {
+    nonisolated static func isSignIn(_ url: URL) -> Bool {
         let host = url.host()?.lowercased() ?? ""
         let path = url.path.lowercased()
         return ["accounts.", "login.", "auth.", "signin.", "sso.", "id.", "appleid."].contains { host.hasPrefix($0) }

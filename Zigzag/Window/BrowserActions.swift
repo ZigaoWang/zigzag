@@ -351,6 +351,11 @@ extension BrowserWindowController: NSMenuItemValidation {
         favoriteWithUndo(tab)
         Toast.show(String(localized: "Added to Favorites", comment: "Toast after the tab is added to Favorites."), symbol: "star.fill", in: self)
     }
+    /// File › Install as App…: the site as an app of its own, with its own Dock icon (#165).
+    @objc func installAsApp(_ sender: Any?) {
+        guard let tab = selectedTab else { return }
+        WebAppInstallSheet.show(for: tab, in: self)
+    }
     @objc func moveTabToNewWindow(_ sender: Any?) {
         guard let tab = selectedTab else { return }
         moveToNewWindow(tab)
@@ -556,6 +561,7 @@ extension BrowserWindowController: NSMenuItemValidation {
                 : String(localized: "Pin Tab", comment: "Menu bar item: pins the tab.")
             return tab?.url != nil && !tabManager.isPrivate
         case #selector(addToFavorites(_:)): return tab?.url != nil && tab?.isFavorite != true && (tab?.bookmarkID != nil || !tabManager.isPrivate)
+        case #selector(installAsApp(_:)): return WebAppInstallSheet.canInstall(tab, isPrivate: tabManager.isPrivate)
         case #selector(moveTabToNewWindow(_:)): return tab != nil && tab?.bookmarkID == nil && !tabManager.isPrivate
         case #selector(newSpace(_:)), #selector(renameSpace(_:)): return !tabManager.isPrivate
         case #selector(sharePage(_:)), #selector(savePageAs(_:)), #selector(togglePictureInPicture(_:)): return tab?.url != nil

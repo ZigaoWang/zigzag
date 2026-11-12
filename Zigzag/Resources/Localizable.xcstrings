@@ -437,6 +437,23 @@
         }
       }
     },
+    "%@ on %@" : {
+      "comment" : "Under an installed app in Settings › General with more than one profile: the site, then the profile it uses, like “github.com on Work”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ on %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，个人资料“%2$@”"
+          }
+        }
+      }
+    },
     "%@ paused: another tab is playing" : {
       "comment" : "Toast when an extension hearing a streamed tab (YouTube) pauses because another tab, a private window or a video in Picture in Picture has sound; it carries on when that stops. The placeholder is the extension's name.",
       "localizations" : {
@@ -2412,6 +2429,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "另一个 App 正在使用该文件"
+          }
+        }
+      }
+    },
+    "App icon" : {
+      "comment" : "VoiceOver name of the icon in the Install as App sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用图标"
+          }
+        }
+      }
+    },
+    "App name" : {
+      "comment" : "Placeholder of the name field in the Install as App sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用名称"
           }
         }
       }
@@ -4541,6 +4580,17 @@
         }
       }
     },
+    "Couldn’t install %@" : {
+      "comment" : "Toast when Install as App fails. The placeholder is the app's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法安装 %@"
+          }
+        }
+      }
+    },
     "Couldn’t load this extension" : {
       "comment" : "Title of the notice when an unpacked extension can't load.",
       "localizations" : {
@@ -6631,6 +6681,39 @@
         }
       }
     },
+    "Install" : {
+      "comment" : "Button of the Install as App sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装"
+          }
+        }
+      }
+    },
+    "Install as App" : {
+      "comment" : "Title of the sheet that makes the site an app of its own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装为应用"
+          }
+        }
+      }
+    },
+    "Install as App…" : {
+      "comment" : "File menu item and item in the … menu of Site Controls: makes the site an app of its own, with its own Dock icon.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装为应用…"
+          }
+        }
+      }
+    },
     "Installed" : {
       "comment" : "A heading in Settings › Extensions: the extensions you have.",
       "localizations" : {
@@ -6642,6 +6725,17 @@
         }
       }
     },
+    "Installed Apps" : {
+      "comment" : "A heading in Settings › General: the sites installed as apps with File › Install as App.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安装的应用"
+          }
+        }
+      }
+    },
     "Installed in %@" : {
       "comment" : "A heading in Settings › Extensions, with more than one profile: the extensions the profile has. The placeholder is a profile's name.",
       "localizations" : {
@@ -6649,6 +6743,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“%@”中已安装"
+          }
+        }
+      }
+    },
+    "Installed in your Applications folder" : {
+      "comment" : "Toast after Install as App made the app.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安装到“应用程序”文件夹"
           }
         }
       }
@@ -6671,6 +6776,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "导入到"
+          }
+        }
+      }
+    },
+    "It gets its own window and Dock icon, and stays signed in as you are here." : {
+      "comment" : "Under the title of the Install as App sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它会有自己的窗口和程序坞图标，登录状态和这里一样。"
           }
         }
       }
@@ -10730,7 +10846,7 @@
       }
     },
     "Remove" : {
-      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes one site's data.\nTooltip of a download's button in the downloads panel: takes the download off the list.",
+      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nTooltip of a download's button in the downloads panel: takes the download off the list.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10741,7 +10857,7 @@
       }
     },
     "Remove %@?" : {
-      "comment" : "Title of the sheet that asks before removing an extension. The placeholder is the extension's name.",
+      "comment" : "Title of the sheet that asks before removing an extension. The placeholder is the extension's name.\nTitle of the sheet that removes a site installed as an app. The placeholder is the app's name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10960,6 +11076,17 @@
         }
       }
     },
+    "Remove “%@”" : {
+      "comment" : "VoiceOver label of the Remove button on an installed app's row in Settings › General; the app's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除“%@”"
+          }
+        }
+      }
+    },
     "Removed %lld pinned pages" : {
       "comment" : "Toast after removing several pinned pages",
       "localizations" : {
@@ -10983,7 +11110,7 @@
       }
     },
     "Remove…" : {
-      "comment" : "Button on a site's row in Settings › Privacy › Site Data.",
+      "comment" : "Button on a site's row in Settings › Privacy › Site Data.\nButton on an installed app's row in Settings › General › Installed Apps.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12419,7 +12546,7 @@
       }
     },
     "Show in Finder" : {
-      "comment" : "Button in the Import window: show the exported passwords file in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
+      "comment" : "Button in the Import window: show the exported passwords file in Finder.\nButton in the toast after Install as App: shows the new app in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13552,6 +13679,17 @@
         }
       }
     },
+    "The app is deleted from your Applications folder. You stay signed in to the site in Zigzag." : {
+      "comment" : "Message of the sheet that removes a site installed as an app.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用会从“应用程序”文件夹中删除。你在 Zigzag 中的网站登录状态不受影响。"
+          }
+        }
+      }
+    },
     "The cache makes pages load faster. Cookies keep you signed in." : {
       "comment" : "Explanation under “Website data” in Settings › Privacy.",
       "localizations" : {
@@ -13867,6 +14005,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今天下午"
+          }
+        }
+      }
+    },
+    "This app opens in Zigzag, which isn’t on this Mac anymore." : {
+      "comment" : "Shown by an app made with Install as App when the Zigzag that made it is gone.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此应用要在 Zigzag 中打开，但这台 Mac 上已经没有 Zigzag 了。"
           }
         }
       }
@@ -17293,6 +17442,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "工具栏 顶栏 网址 地址 toolbar top bar url location"
+          }
+        }
+      }
+    },
+    "web app dock install application" : {
+      "comment" : "Words that find Installed Apps with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "web app dock install application 网页应用 程序坞 安装 应用"
           }
         }
       }

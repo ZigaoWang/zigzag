@@ -47,6 +47,8 @@
 		1EA0745E8CAC4A123D48C269 /* CapitalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF2F4BA4D4D31C1518CC7B9E /* CapitalizationTests.swift */; };
 		1F06D849CF746C1FF6AEE48B /* BrowserWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06AE52E198CC8E7B86B467BA /* BrowserWindow.swift */; };
 		202F156ED958778A3916C4D1 /* SpaceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B636331176C086C6157403B /* SpaceSwitcher.swift */; };
+		21DA496E027D0DB086F085DD /* WebAppIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C0617D63CB7D0886FC367E5 /* WebAppIcon.swift */; };
+		23B478D43B7412702A5848F6 /* WebAppWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45729EC68E69DC16773C6CA /* WebAppWindowController.swift */; };
 		23B86800C5070366304E8423 /* CommandBarHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE6475CD75E987F5A8B0D182 /* CommandBarHistoryTests.swift */; };
 		242E316E28B214F1B75E2B6F /* blocklist.info.json in Resources */ = {isa = PBXBuildFile; fileRef = F3B051247D50C308EF2FDA69 /* blocklist.info.json */; };
 		247132AF897197093E229872 /* CRXPackageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */; };
@@ -63,6 +65,7 @@
 		2E6B0BE7362F9BFA6D652A71 /* BrandContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C5CC6B99DC222FF742570A /* BrandContrastTests.swift */; };
 		2E8C9DF367FE32D045315D1C /* Brand.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64A4FFBD5B64DD888870043 /* Brand.swift */; };
 		2EB548A050B8877233F8E0C8 /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9102393493293F365ECD5D6 /* WindowManager.swift */; };
+		2FBAE3D3A28EFC9B0B121747 /* WebApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 506AEAAC9271F6C52EDF0AA4 /* WebApp.swift */; };
 		3048A1B301D8F87A94840074 /* MCPHTTP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81C684CBB391686C907F7D7C /* MCPHTTP.swift */; };
 		318A469BA7739143180BF844 /* DarkSeen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A69950C3F8014CFB7FAB861A /* DarkSeen.swift */; };
 		339255F1AB371362E5339EA4 /* MCPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 928D7647F31AE3EE93056E2F /* MCPServer.swift */; };
@@ -78,6 +81,7 @@
 		38280721DA958FF00E10EB8A /* ProxyRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C94BBE34DB020CBB3EA2A2 /* ProxyRulesTests.swift */; };
 		399F77AEC5D2395192042789 /* MiniWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14B29697A37D4F1246B87A27 /* MiniWindowTests.swift */; };
 		3A01F2505087356C0221A1D0 /* DownloadsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5A868C3F6FC798AA3459ACF /* DownloadsPanel.swift */; };
+		3B807A8BC2378803BB35B954 /* WebAppInstallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 946C16FE0634A5AE372B5725 /* WebAppInstallSheet.swift */; };
 		3BEF15777F24915D05FC1681 /* LocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B89CCE006086C641D713AAB /* LocalizationTests.swift */; };
 		3C594139A69C469E17BC1FA4 /* DeskController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D49789A1E612924BE5AD995 /* DeskController.swift */; };
 		3CBD062C1C7BADC2672D4998 /* webkit-differences.js in Resources */ = {isa = PBXBuildFile; fileRef = 3EA686DC56C7EA8E8C9FFD3D /* webkit-differences.js */; };
@@ -95,6 +99,7 @@
 		44ECB58B498642EB6DB3648B /* PasswordGeneratorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */; };
 		45B26CB65A31C4BEFCFB7CA2 /* EnergyWarningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0DE85F403C80DB6286E463D /* EnergyWarningTests.swift */; };
 		45DB5724896F8B0B56478A3E /* PaneDrag.swift in Sources */ = {isa = PBXBuildFile; fileRef = B44BD209A49B5F5B73ECE2BD /* PaneDrag.swift */; };
+		460CA84D79A128E0FA584DEC /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66EBD45517A6D288CBC8DFC7 /* main.swift */; };
 		47481B98A075C26B774A694A /* PageStatePrivacyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D2E0F2330CC776A71AC19D /* PageStatePrivacyTests.swift */; };
 		477BB8ED8D0C8DC49A0AFC15 /* PopupNotice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9569CB3512DF9E729E1FDA49 /* PopupNotice.swift */; };
 		4796C99DFA31C01F7EBCB5AF /* SystemAudioTap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 514E259958AB77A6CA393296 /* SystemAudioTap.swift */; };
@@ -256,6 +261,7 @@
 		B9BAF8A4CC1907F52C65274B /* Readability-LICENSE.md in Resources */ = {isa = PBXBuildFile; fileRef = 76DB536661E9E732536910C2 /* Readability-LICENSE.md */; };
 		BEC7556625226B96D886206F /* SafariImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CBCCC0F5050F641CEAB31 /* SafariImporter.swift */; };
 		C0B6755DFC601C9C358E67DA /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F70CA73E1EF5C8460E9286 /* TabManager.swift */; };
+		C0C41FEE6C185FBC845F1D51 /* ZigzagWebApp in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = B3AD1C19026E47583E6DC0CD /* ZigzagWebApp */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C0FC25E6C63A4DA77D76CA8D /* chrome-runtime.js in Resources */ = {isa = PBXBuildFile; fileRef = B030A4C0601F5AE1232B9288 /* chrome-runtime.js */; };
 		C11913DEEFC7AD66CBC10F50 /* PromptHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */; };
 		C2C05749A76907433E6BEC4D /* reading_list.plist in Resources */ = {isa = PBXBuildFile; fileRef = E37F1CA561517AA2505B9E24 /* reading_list.plist */; };
@@ -311,6 +317,7 @@
 		E6AA5B0A7E0A4A0D3BB43C2F /* dark-pages.js in Resources */ = {isa = PBXBuildFile; fileRef = 2968B96D6FBCB24867769B54 /* dark-pages.js */; };
 		E77131ED815A795FB7D6F9B8 /* Tutorial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D9F429D6C84167482CCFC1 /* Tutorial.swift */; };
 		E7E71F580428AFC67EE93EA2 /* SignInImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146D98C93CFFD5EA35B991D8 /* SignInImporter.swift */; };
+		E7F3E262C5A4F9691F5B7517 /* WebAppBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD3FFD0E9842AC75846BD4EB /* WebAppBundle.swift */; };
 		E81980017434711481EA11BC /* ExtensionSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC57DDCE27AFE0FDF383357E /* ExtensionSearch.swift */; };
 		E8C4FE93204783B7BF9A6F13 /* ExtensionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B8D72D98D3D83950CEE4AC3 /* ExtensionSheet.swift */; };
 		ECC981B8EFD81BC0FC98A4EC /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 55275BFA54A12BED1AC6C615 /* Sparkle */; };
@@ -340,6 +347,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		4E46490FEBB224418520BDC9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DAFC8E8057351FE56D640C13 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = ADB65228F05506D22DD1987E;
+			remoteInfo = ZigzagWebApp;
+		};
 		B8E4D03FC689942845411A0B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = DAFC8E8057351FE56D640C13 /* Project object */;
@@ -348,6 +362,20 @@
 			remoteInfo = Zigzag;
 		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C8D96F5529BAD85D3AF44BFB /* Embed Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				C0C41FEE6C185FBC845F1D51 /* ZigzagWebApp in Embed Dependencies */,
+			);
+			name = "Embed Dependencies";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		0012A8BD741BA157B4BB07F0 /* PaneHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneHeader.swift; sourceTree = "<group>"; };
@@ -425,6 +453,7 @@
 		36C7F87F644076D0EBA10F87 /* ExtensionScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionScriptTests.swift; sourceTree = "<group>"; };
 		370B2D212991FF35473E4478 /* WebNotificationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebNotificationsTests.swift; sourceTree = "<group>"; };
 		3BD5AAEBB8EB9458DBC73239 /* ImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportTests.swift; sourceTree = "<group>"; };
+		3C0617D63CB7D0886FC367E5 /* WebAppIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAppIcon.swift; sourceTree = "<group>"; };
 		3C753D7948805748B235F981 /* FreezeReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FreezeReportTests.swift; sourceTree = "<group>"; };
 		3CB299E45AC189FC47ACB508 /* custom-progress-bar.crx */ = {isa = PBXFileReference; path = "custom-progress-bar.crx"; sourceTree = "<group>"; };
 		3D49789A1E612924BE5AD995 /* DeskController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskController.swift; sourceTree = "<group>"; };
@@ -445,6 +474,7 @@
 		4BC90DFBBFAEA51FE582EDA9 /* BrowserWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWindowController.swift; sourceTree = "<group>"; };
 		4D065BFB53F6E46623C3C39E /* Page.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Page.swift; sourceTree = "<group>"; };
 		50674083F43B5C03C52E0107 /* MiniPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayer.swift; sourceTree = "<group>"; };
+		506AEAAC9271F6C52EDF0AA4 /* WebApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebApp.swift; sourceTree = "<group>"; };
 		514E259958AB77A6CA393296 /* SystemAudioTap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioTap.swift; sourceTree = "<group>"; };
 		51954CD51F2344D8639115AB /* InlineCompletion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineCompletion.swift; sourceTree = "<group>"; };
 		520390EE6EE00D66943EA4D3 /* PageWindowFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageWindowFrame.swift; sourceTree = "<group>"; };
@@ -473,6 +503,7 @@
 		652311E240EBA758AAC17D38 /* PowerSaving.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerSaving.swift; sourceTree = "<group>"; };
 		6567506B7F99FD1755289D6C /* SidebarMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarMenuTests.swift; sourceTree = "<group>"; };
 		66958B9657E4B52FE56AA408 /* TabPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabPreview.swift; sourceTree = "<group>"; };
+		66EBD45517A6D288CBC8DFC7 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		672B7AF38828D9E9738B29FD /* LinkStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkStatus.swift; sourceTree = "<group>"; };
 		67AF95E0EFA8B1BC26E4F70F /* MiniQuickOpen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniQuickOpen.swift; sourceTree = "<group>"; };
 		67B6B0BECF34D62E3B175E0A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -530,6 +561,7 @@
 		9272B1C4212C3BF6B875E0DB /* SiteSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteSearch.swift; sourceTree = "<group>"; };
 		928D7647F31AE3EE93056E2F /* MCPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPServer.swift; sourceTree = "<group>"; };
 		9318C9D9C45049E8105EA1CE /* HistoryPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPage.swift; sourceTree = "<group>"; };
+		946C16FE0634A5AE372B5725 /* WebAppInstallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAppInstallSheet.swift; sourceTree = "<group>"; };
 		9569CB3512DF9E729E1FDA49 /* PopupNotice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupNotice.swift; sourceTree = "<group>"; };
 		959ACDC16ECDF0A6CED7B431 /* PasswordGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordGenerator.swift; sourceTree = "<group>"; };
 		95BE2DC23683FEEFF817A678 /* SidebarUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarUndo.swift; sourceTree = "<group>"; };
@@ -556,6 +588,7 @@
 		A0872FF032E0FE3CBD091DB5 /* PublicSuffix.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicSuffix.swift; sourceTree = "<group>"; };
 		A31C428612569D93D17E6153 /* MiniPlayerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerTests.swift; sourceTree = "<group>"; };
 		A43306E6C8C1E74DFDB70B17 /* HistoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStoreTests.swift; sourceTree = "<group>"; };
+		A45729EC68E69DC16773C6CA /* WebAppWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAppWindowController.swift; sourceTree = "<group>"; };
 		A5C379E2BF735EEBC168D4E2 /* DarkPaletteScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPaletteScriptTests.swift; sourceTree = "<group>"; };
 		A61765B735BE30C84A0D55AA /* Feedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Feedback.swift; sourceTree = "<group>"; };
 		A64A4FFBD5B64DD888870043 /* Brand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Brand.swift; sourceTree = "<group>"; };
@@ -572,6 +605,7 @@
 		B13E82E7DA1A290559EC8C20 /* SplitDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDropTests.swift; sourceTree = "<group>"; };
 		B1C94BBE34DB020CBB3EA2A2 /* ProxyRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyRulesTests.swift; sourceTree = "<group>"; };
 		B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptHost.swift; sourceTree = "<group>"; };
+		B3AD1C19026E47583E6DC0CD /* ZigzagWebApp */ = {isa = PBXFileReference; includeInIndex = 0; path = ZigzagWebApp; sourceTree = BUILT_PRODUCTS_DIR; };
 		B44BD209A49B5F5B73ECE2BD /* PaneDrag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneDrag.swift; sourceTree = "<group>"; };
 		B61ECD99BC5A8E42155612FF /* MCPToolsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPToolsTests.swift; sourceTree = "<group>"; };
 		B788AB64DB761375F0FEFA16 /* DarkPagesFallbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPagesFallbackTests.swift; sourceTree = "<group>"; };
@@ -582,6 +616,7 @@
 		BCDDE0751DF4A678A1B2C2DC /* blocklist.json.lzfse */ = {isa = PBXFileReference; path = blocklist.json.lzfse; sourceTree = "<group>"; };
 		BD2664CEA2397AB72FA6371E /* ExternalLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalLinks.swift; sourceTree = "<group>"; };
 		BD3E507FE9CD5CD3025750FE /* chrome-bookmarks-work.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "chrome-bookmarks-work.json"; sourceTree = "<group>"; };
+		BD3FFD0E9842AC75846BD4EB /* WebAppBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAppBundle.swift; sourceTree = "<group>"; };
 		BDEA633FD3B5DC3FC7268252 /* ExtensionCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionCenter.swift; sourceTree = "<group>"; };
 		BF2F4BA4D4D31C1518CC7B9E /* CapitalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapitalizationTests.swift; sourceTree = "<group>"; };
 		BFA4024AB1ACBF6FB0BDD0BD /* web-store.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-store.js"; sourceTree = "<group>"; };
@@ -787,6 +822,18 @@
 			path = Onboarding;
 			sourceTree = "<group>";
 		};
+		33B8704FA0EC0DB1BC8AB595 /* WebApps */ = {
+			isa = PBXGroup;
+			children = (
+				506AEAAC9271F6C52EDF0AA4 /* WebApp.swift */,
+				BD3FFD0E9842AC75846BD4EB /* WebAppBundle.swift */,
+				3C0617D63CB7D0886FC367E5 /* WebAppIcon.swift */,
+				946C16FE0634A5AE372B5725 /* WebAppInstallSheet.swift */,
+				A45729EC68E69DC16773C6CA /* WebAppWindowController.swift */,
+			);
+			path = WebApps;
+			sourceTree = "<group>";
+		};
 		45578458512E00D5EB7061BF /* Sidebar */ = {
 			isa = PBXGroup;
 			children = (
@@ -862,6 +909,14 @@
 				D60AE774C9F1A97F60F3E627 /* MCPTools.swift */,
 			);
 			path = MCP;
+			sourceTree = "<group>";
+		};
+		727FA9FDF3F79DE1A19C683E /* ZigzagWebApp */ = {
+			isa = PBXGroup;
+			children = (
+				66EBD45517A6D288CBC8DFC7 /* main.swift */,
+			);
+			path = ZigzagWebApp;
 			sourceTree = "<group>";
 		};
 		7F46711B14040569495FEF80 /* Session */ = {
@@ -1045,6 +1100,7 @@
 				0DA4CA999A3CAEBA6DD1E436 /* Switcher */,
 				B5D091B4DB5A1AF40C949AA9 /* Tabs */,
 				AFF355173E201043FA2E138C /* Web */,
+				33B8704FA0EC0DB1BC8AB595 /* WebApps */,
 				F5DB143908BDB3FB1FB3440B /* Window */,
 			);
 			path = Zigzag;
@@ -1215,6 +1271,7 @@
 				FA29F3657E11FE3895D8BAC3 /* THIRD_PARTY_NOTICES.md */,
 				B228F7478163465F1BC541F3 /* Zigzag */,
 				DF27ED16EF9BB28D19F995E5 /* ZigzagTests */,
+				727FA9FDF3F79DE1A19C683E /* ZigzagWebApp */,
 				F72FDC008AFDE2EA8248DCDF /* Products */,
 			);
 			sourceTree = "<group>";
@@ -1257,6 +1314,7 @@
 			children = (
 				98C36FF6B8E4B6DBFC1DF273 /* Zigzag.app */,
 				6E9E28B1061F9D52B96C814E /* ZigzagTests.xctest */,
+				B3AD1C19026E47583E6DC0CD /* ZigzagWebApp */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -1280,10 +1338,12 @@
 				05DD779813C016C2EA23F3B0 /* Sources */,
 				A1441208B36A4091641A7B3F /* Resources */,
 				A9BECF73074118ECCC037D04 /* Frameworks */,
+				C8D96F5529BAD85D3AF44BFB /* Embed Dependencies */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				95AAE9C67B94616C6A1C83A4 /* PBXTargetDependency */,
 			);
 			name = Zigzag;
 			packageProductDependencies = (
@@ -1312,6 +1372,23 @@
 			productReference = 6E9E28B1061F9D52B96C814E /* ZigzagTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		ADB65228F05506D22DD1987E /* ZigzagWebApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 10AC42DA331C41DEE82149A4 /* Build configuration list for PBXNativeTarget "ZigzagWebApp" */;
+			buildPhases = (
+				0F5FF110008C29FB50BDBF22 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ZigzagWebApp;
+			packageProductDependencies = (
+			);
+			productName = ZigzagWebApp;
+			productReference = B3AD1C19026E47583E6DC0CD /* ZigzagWebApp */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1326,6 +1403,10 @@
 						ProvisioningStyle = Automatic;
 					};
 					1C41F196FFE2F1238082669C = {
+						DevelopmentTeam = 432GL3WKY2;
+						ProvisioningStyle = Automatic;
+					};
+					ADB65228F05506D22DD1987E = {
 						DevelopmentTeam = 432GL3WKY2;
 						ProvisioningStyle = Automatic;
 					};
@@ -1351,6 +1432,7 @@
 			targets = (
 				19FD92FF5E7C2232EBC622F1 /* Zigzag */,
 				1C41F196FFE2F1238082669C /* ZigzagTests */,
+				ADB65228F05506D22DD1987E /* ZigzagWebApp */,
 			);
 		};
 /* End PBXProject section */
@@ -1595,6 +1677,11 @@
 				51BD0DD0DD4AB16FB1D97CA8 /* TourDemo.swift in Sources */,
 				E77131ED815A795FB7D6F9B8 /* Tutorial.swift in Sources */,
 				DDFF8EFE3CB4DBF463105561 /* Updater.swift in Sources */,
+				2FBAE3D3A28EFC9B0B121747 /* WebApp.swift in Sources */,
+				E7F3E262C5A4F9691F5B7517 /* WebAppBundle.swift in Sources */,
+				21DA496E027D0DB086F085DD /* WebAppIcon.swift in Sources */,
+				3B807A8BC2378803BB35B954 /* WebAppInstallSheet.swift in Sources */,
+				23B478D43B7412702A5848F6 /* WebAppWindowController.swift in Sources */,
 				82FC26C29ED58C84FDC746B3 /* WebKitSetup.swift in Sources */,
 				8B3741625A4E5D67BD974F41 /* WebNotifications.swift in Sources */,
 				B7FC60AE25ED52099E5FDF43 /* WebSocketBridge.swift in Sources */,
@@ -1606,6 +1693,14 @@
 				2EB548A050B8877233F8E0C8 /* WindowManager.swift in Sources */,
 				B60594BC8CE7FA68B9229435 /* Words.swift in Sources */,
 				F642AD8EB346945EEB6E2E67 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0F5FF110008C29FB50BDBF22 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				460CA84D79A128E0FA584DEC /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1724,6 +1819,11 @@
 			target = 19FD92FF5E7C2232EBC622F1 /* Zigzag */;
 			targetProxy = B8E4D03FC689942845411A0B /* PBXContainerItemProxy */;
 		};
+		95AAE9C67B94616C6A1C83A4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = ADB65228F05506D22DD1987E /* ZigzagWebApp */;
+			targetProxy = 4E46490FEBB224418520BDC9 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -1813,6 +1913,20 @@
 					"@executable_path/../Frameworks",
 				);
 				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		8828653CDD471409E90AA208 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = wang.zigao.zigzag.webapp;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
 			};
 			name = Debug;
 		};
@@ -1943,9 +2057,32 @@
 			};
 			name = Release;
 		};
+		F4FCA6D78D02F4F892174403 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = wang.zigao.zigzag.webapp;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		10AC42DA331C41DEE82149A4 /* Build configuration list for PBXNativeTarget "ZigzagWebApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8828653CDD471409E90AA208 /* Debug */,
+				F4FCA6D78D02F4F892174403 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		66ACA099F57BE92D30BC66F7 /* Build configuration list for PBXProject "Zigzag" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

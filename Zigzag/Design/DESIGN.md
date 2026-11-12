@@ -359,6 +359,13 @@ something came from, answers at once, and can be interrupted.
   `panelBackground`: the video live in a 54 by 32 thumbnail, the tab's title, play or pause, and expand; a click
   brings the card back there. The video plays on all the while. (Not the sidebar's Now Playing row: that shows only
   for a tab you can hear, and a silent video plays on too.)
+- **A site installed as an app** (`WebAppWindowController`, #165): Zigzag Mini's window, its frame in the color of
+  the space it was installed from, with a strip as slim as a pane header's: the traffic lights, back, forward and
+  reload in `Tokens.Pane` sizes, and the app's name in the middle in the row ink (the host instead, on another site
+  it went to for a sign-in). No sidebar, no address. It opens at `Metric.webAppWindowSize` and keeps its own frame.
+  The install sheet is a `FormSheet`: the icon at 72pt over the name field, Install as its one prominent button. The
+  icon is the site's own picture filling the Mac's rounded square (824 of 1024, with the system's soft shadow), a
+  shape of its own on white with room around it, or the name's first letter on the site's color.
 - **Empty states** (`Tokens.EmptyState`, the same in HTML through `PageStyle`): the wordmark 120pt wide at 8%, 16pt
   to a quiet line no wider than 360, 24pt to an optional action. History, Passwords and the error page share it.
 - **Built-in pages** (History, Settings, Passwords): one plain `Color.surface` (the column of places in Settings and

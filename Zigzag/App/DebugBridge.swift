@@ -98,6 +98,37 @@ enum DebugBridge {
         }
     }
 
+    /// webapp install (the Install as App sheet over the front tab), webapp confirm|cancel (its answer),
+    /// webapp open|close <id> (as the app's small app asks), webapp remove <id>, webapp closeall, webapp removeall, webapp state <path> (JSON: the list,
+    /// the open windows), webapp settings (Settings › General).
+    private static func runWebApp(_ arg: String) {
+        let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+        let rest = f.count > 1 ? f[1] : ""
+        switch f.first ?? "" {
+        case "install":
+            if let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first { controller.installAsApp(nil) }
+        case "confirm": WebAppInstallSheet.current?.debugAnswer(true)
+        case "cancel": WebAppInstallSheet.current?.debugAnswer(false)
+        case "open": WebAppStore.handle(WebAppLink.make(.open, id: rest))
+        case "close": WebAppStore.handle(WebAppLink.make(.close, id: rest))
+        case "remove": WebAppStore.shared.remove(rest)
+        case "closeall": WebAppWindowController.all.forEach { $0.window?.close() }
+        case "removeall": WebAppStore.shared.apps.forEach { WebAppStore.shared.remove($0.id) }
+        case "settings":
+            if let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first { SettingsPage.open(.general, in: controller) }
+        case "state":
+            let apps: [[String: Any]] = WebAppStore.shared.apps.map {
+                ["id": $0.id, "name": $0.name, "url": $0.url.absoluteString, "bundle": $0.bundlePath,
+                 "running": !WebAppStore.runningLauncher(of: $0.id).isEmpty]
+            }
+            let state: [String: Any] = ["apps": apps, "windows": WebAppWindowController.all.map(\.debugState), "folder": WebApps.folder.path,
+                                        "browserWindows": WindowManager.shared.controllers.count, "sessionWaiting": WindowManager.shared.sessionWaiting,
+                                        "frontmost": NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "", "active": NSApp.isActive]
+            if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: rest)) }
+        default: break
+        }
+    }
+
     private static func runMini(_ name: String, _ arg: String) {
         let mini = MiniWindowController.all.last
         switch name {
@@ -403,6 +434,7 @@ enum DebugBridge {
         // Zigzag Mini windows come first: they work with no browser window open, and must not bring one forward.
         if name.hasPrefix("mini") { runMini(name, arg); return }
         if name == "windowsdump" { dumpWindows(to: arg); return }
+        if name == "webapp" { runWebApp(arg); return }
         if name == "keepontop" || name == "windowmenu" { runKeepOnTop(name, arg); return }
         // mcp on|off|reset|state <path>: Settings › Automation › Let AI apps use Zigzag, Reset Key, and the server's state (JSON).
         if name == "mcp" {

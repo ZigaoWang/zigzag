@@ -61,6 +61,7 @@ enum MainMenu {
             item(String(localized: "Pin Tab", comment: "File menu item."), #selector(C.toggleBookmark(_:)), "d"),
             item(String(localized: "Add to Favorites", comment: "File menu item."), #selector(C.addToFavorites(_:)), ""),
             item(String(localized: "Move Tab to New Window", comment: "File menu item."), #selector(C.moveTabToNewWindow(_:)), ""),
+            item(WebAppInstallSheet.title, #selector(C.installAsApp(_:)), ""),
             .separator(),
             item(String(localized: "Close Tab", comment: "File menu item."), #selector(C.closeTab(_:)), "w"),
             item(String(localized: "Close Other Tabs", comment: "File menu item."), #selector(C.closeOtherTabs(_:)), "w", [.command, .option]),

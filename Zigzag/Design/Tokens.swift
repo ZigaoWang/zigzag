@@ -118,6 +118,8 @@ enum Tokens {
         /// ⌘L's command bar over Zigzag Mini's strip, at its widest before you type.
         static let miniAddressWidth: CGFloat = 480
         static let windowDefaultSize = NSSize(width: 1280, height: 820)
+        /// A site installed as an app, the first time it opens: a working window, smaller than the browser's.
+        static let webAppWindowSize = NSSize(width: 1120, height: 760)
         static let windowMinSize = NSSize(width: 560, height: 400)
         static let deskCardWidth: CGFloat = 176
         static let deskCardMaxWidth: CGFloat = 440
