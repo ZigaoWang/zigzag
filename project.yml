@@ -124,6 +124,10 @@ targets:
           - CFBundleURLName: Web site URL
             CFBundleURLSchemes: [http, https]
             CFBundleTypeRole: Viewer
+          # What a site installed as an app (#165) sends when it's opened or quit: only that app's small app asks.
+          - CFBundleURLName: Zigzag web app
+            CFBundleURLSchemes: [zigzag-webapp]
+            CFBundleTypeRole: Viewer
         CFBundleDocumentTypes:
           - CFBundleTypeName: HTML document
             CFBundleTypeRole: Viewer

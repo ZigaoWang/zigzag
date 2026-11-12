@@ -29,6 +29,8 @@ enum ExternalLinks {
     /// and it never gets the page's saved answer.
     static func open(_ url: URL, isMainFrame: Bool, isClick: Bool, from webView: WKWebView, asker: WKSecurityOrigin? = nil) {
         let scheme = url.scheme?.lowercased() ?? ""
+        // Only a site installed as an app sends these, from its own small app: never a page.
+        if scheme == WebAppLink.scheme { return }
         // A background tab has no window, and a popup's isn't a browser window: ask in the tab's own window, or the
         // front one, so the link never just does nothing.
         let popup = PopupWindowController.all.first { $0.webView === webView }
