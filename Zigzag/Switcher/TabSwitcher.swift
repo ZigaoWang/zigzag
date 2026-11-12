@@ -328,9 +328,12 @@ final class TabThumbnailView: InteractiveView {
         if partner != nil {
             let share = shape.map { $0.isStacked ? 0.5 : $0.column } ?? 0.5
             let first = round(imageClip.frame.width * share)
-            place(icon, title, in: NSRect(x: imageClip.frame.minX, y: imageClip.frame.maxY, width: first, height: titleArea), audio: audio === tab)
-            place(icon2, title2, in: NSRect(x: imageClip.frame.minX + first, y: imageClip.frame.maxY, width: imageClip.frame.width - first, height: titleArea),
-                  audio: audio != nil && audio === partner)
+            let leftSide = NSRect(x: imageClip.frame.minX, y: imageClip.frame.maxY, width: first, height: titleArea)
+            let rightSide = NSRect(x: imageClip.frame.minX + first, y: imageClip.frame.maxY, width: imageClip.frame.width - first, height: titleArea)
+            // The card's own page on the right (a pinned page left of it has no card of its own): its title too.
+            let ownOnRight = shape.map { !$0.isStacked && $0.regions.first == .right } ?? false
+            place(icon, title, in: ownOnRight ? rightSide : leftSide, audio: audio === tab)
+            place(icon2, title2, in: ownOnRight ? leftSide : rightSide, audio: audio != nil && audio === partner)
         } else {
             place(icon, title, in: NSRect(x: inset, y: imageClip.frame.maxY, width: bounds.width - inset * 2, height: titleArea), audio: audio != nil)
         }

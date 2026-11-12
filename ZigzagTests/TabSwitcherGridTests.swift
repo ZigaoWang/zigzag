@@ -64,4 +64,16 @@ struct TabSwitcherGridTests {
         #expect(frame.minX >= window.minX && frame.maxX <= window.maxX)
         #expect(frame.minY >= window.minY && frame.maxY <= window.maxY)
     }
+
+    @Test func aCardHeldByTheSecondPageDrawsEachPageInItsPlace() {
+        // A pinned page on the left of a split isn't a tab, so Show All Tabs gives the card to the tab on the right:
+        // the card draws its own page first, so the shape's regions follow, the tab's on the right still.
+        let pair = TileShape(regions: [.left, .right], column: 0.4)
+        let held = DeskController.shape(pair, first: 1)
+        #expect(held.regions == [.right, .left] && held.column == 0.4)
+        #expect(DeskController.shape(pair, first: 0) == pair)
+        let three = TileShape(regions: [.left, .topRight, .bottomRight])
+        #expect(DeskController.shape(three, first: 2).regions == [.bottomRight, .left, .topRight])
+        #expect(DeskController.shape(three, first: 5) == three)
+    }
 }

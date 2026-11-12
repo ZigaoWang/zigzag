@@ -679,7 +679,7 @@ final class DeskController {
         controller.layoutTrafficLights()
         let root = controller.root
         let target = tab ?? controller.tabManager.selectedTab
-        let card = target.flatMap { target in cards[manager?.split(for: target)?.left ?? target.id] ?? cards[target.id] }
+        let card = target.flatMap { target in cards[cardID(for: target)] ?? cards[target.id] }
         // Switching tabs can keep the main thread busy for a while (the page coming forward, the sidebar and the
         // address bar following), so the close starts first and the switch runs after, under the flying page.
         let switchTab: @MainActor () -> Void = { [weak self, weak controller] in
@@ -837,11 +837,8 @@ final class DeskController {
     private func cardTabs(in space: UUID) -> [Tab] {
         guard let manager else { return [] }
         let tabs = manager.tabs(in: space)
-        let cards = tabs.filter { tab in
-            // The first page of a split or tile group in this list has the card.
-            guard let pair = manager.split(for: tab) else { return true }
-            return pair.ids.first { id in tabs.contains { $0.id == id } } == tab.id
-        }
+        // The first page of a split or tile group in this list has the card.
+        let cards = tabs.filter { cardID(for: $0) == $0.id }
         guard !query.isEmpty else { return cards }
         return cards.filter { matches($0) || partners(of: $0).contains(where: matches) }
     }
@@ -882,21 +879,40 @@ final class DeskController {
         scrollView.frame = NSRect(x: 0, y: backdrop.isFlipped ? Self.searchArea : 0, width: b.width, height: b.height - Self.searchArea)
     }
 
-    /// The pages sharing a split's or tile group's card with its first one; none for any other.
+    /// The page whose card a page shows on: the first of its split or tile group among the space's tabs (a pinned
+    /// page in a split isn't one of them, so the tab beside it has the card), or itself.
+    private func cardID(for tab: Tab) -> UUID {
+        guard let manager, let pair = manager.split(for: tab) else { return tab.id }
+        let tabs = manager.tabs(in: tab.spaceID)
+        return pair.ids.first { id in tabs.contains { $0.id == id } } ?? tab.id
+    }
+
+    /// The pages sharing a split's or tile group's card with the one that has it, in the group's order; none for any
+    /// other.
     private func partners(of tab: Tab) -> [Tab] {
-        guard let manager, let pair = manager.split(for: tab), pair.left == tab.id else { return [] }
+        guard let manager, manager.split(for: tab) != nil, cardID(for: tab) == tab.id else { return [] }
         return manager.partners(of: tab)
     }
 
-    /// How a split card's pages share it, as they share the page area.
+    /// How a split card's pages share it, as they share the page area: the card's own page first, as the card draws.
     private func shape(of tab: Tab) -> TileShape? {
-        manager?.split(for: tab)?.shape
+        guard let shape = manager?.split(for: tab)?.shape else { return nil }
+        return Self.shape(shape, first: manager?.split(for: tab)?.ids.firstIndex(of: tab.id) ?? 0)
+    }
+
+    /// A group's shape with the region of its page at `index` first and the rest in order after it.
+    nonisolated static func shape(_ shape: TileShape, first index: Int) -> TileShape {
+        guard index > 0, shape.regions.indices.contains(index) else { return shape }
+        var moved = shape
+        let region = moved.regions.remove(at: index)
+        moved.regions.insert(region, at: 0)
+        return moved
     }
 
     /// The card for the tab you're on, which with a split is the one both pages share.
     private var currentCard: TabThumbnailView? {
         guard let manager, let tab = manager.selectedTab else { return nil }
-        return cards[manager.split(for: tab)?.left ?? tab.id] ?? cards[tab.id]
+        return cards[cardID(for: tab)] ?? cards[tab.id]
     }
 
     private var currentCardID: UUID? { cards.first { $0.value === currentCard }?.key }
@@ -1215,7 +1231,8 @@ final class DeskController {
     private func close(_ ids: Set<UUID>) {
         guard let manager else { return }
         let tabs = ids.compactMap { id in cards[id]?.tab ?? manager.tab(with: id) }
-        let pages = tabs + tabs.flatMap { partners(of: $0) }
+        // A pinned page sharing a card stays pinned, and open: only the tabs on the card close.
+        let pages = tabs + tabs.flatMap { partners(of: $0).filter { $0.bookmarkID == nil } }
         guard !pages.isEmpty else { return }
         if let focused, ids.contains(focused) {
             let order = orderedCardIDs

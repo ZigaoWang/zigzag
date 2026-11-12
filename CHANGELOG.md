@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - With Site Controls or Downloads left open in one window, the button in another window opens them there on the first click, instead of only closing the other window's. Link previews and Esc in Reader no longer wait on a panel open in another window.
 - An installed app opened again right after its window closed, from the Dock or Finder, opens its window, instead of leaving its Dock icon with no window. ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
 - Dragging a pinned page's pane out of the window in split view no longer opens an empty window and unloads the pinned page. Pinned pages belong to every window, so it stays where it is. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+- In Show All Tabs, a split of a pinned page and a tab shows both pages on its card, each on its own side, and the card is the one picked when you're on the pinned page. It showed only the tab.
 
 ## [0.9.0] - 2026-11-12
 
