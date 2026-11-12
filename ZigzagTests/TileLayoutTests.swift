@@ -346,8 +346,10 @@ struct TileLayoutTests {
         #expect(four.count == 4 && four[0].start == 0 && four[3].end == 220)
         for i in 1..<4 { #expect(four[i].start >= four[i - 1].end) }
         #expect(TabRowView.segments(count: 1, start: 0, end: 220, mid: 125, gap: 4).count == 1)
-        // Titles where there's room: in thirds of a usual sidebar, not in its quarters.
-        #expect(TabRowView.segmentShowsTitle(width: 220 / 3 - 4))
+        // Titles only where a few words fit: in thirds of a wide sidebar, not a usual one's thirds or quarters,
+        // whose parts show their icons alone.
+        #expect(TabRowView.segmentShowsTitle(width: 300 / 3 - 4))
+        #expect(!TabRowView.segmentShowsTitle(width: 220 / 3 - 4))
         #expect(!TabRowView.segmentShowsTitle(width: 220 / 4 - 4))
     }
 
