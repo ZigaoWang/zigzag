@@ -147,4 +147,11 @@ struct PageIconTests {
         #expect(!IconGrid.clearsEmoji(text: "", selected: nil))
         #expect(!IconGrid.clearsEmoji(text: "🍕", selected: "🍕"))
     }
+
+    @Test func clickingTheChosenSymbolAgainTakesItAway() {
+        #expect(IconGrid.toggled("star.fill", from: "star.fill") == nil)
+        #expect(IconGrid.toggled("star.fill", from: "heart.fill") == "star.fill")
+        #expect(IconGrid.toggled("star.fill", from: nil) == "star.fill")
+        #expect(IconGrid.toggled("star.fill", from: "🍕") == "star.fill")
+    }
 }

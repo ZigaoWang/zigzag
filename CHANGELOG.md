@@ -6,7 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
-- Deleting the emoji in Change Icon puts the site's own icon back. ([#153](https://github.com/ZigaoWang/zigzag/issues/153))
+- In Change Icon, clicking the chosen icon again or deleting the emoji puts the site's own icon back. ([#153](https://github.com/ZigaoWang/zigzag/issues/153))
 
 ## [0.8.5] - 2026-11-12
 

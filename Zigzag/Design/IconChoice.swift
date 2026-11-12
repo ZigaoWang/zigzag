@@ -119,7 +119,8 @@ final class IconGrid: NSView, NSTextFieldDelegate {
         none.onClick = { [weak self] _ in self?.pick(nil) }
         cells = [none] + IconChoice.symbols.map { name in
             let button = IconButton(symbol: name, size: Self.cell, symbolSize: Tokens.Symbol.row, toolTip: nil)
-            button.onClick = { [weak self] _ in self?.pick(name) }
+            // Clicking the chosen one again takes it away, back to no icon (a page's own site icon).
+            button.onClick = { [weak self] _ in self.map { $0.pick(Self.toggled(name, from: $0.selected)) } }
             return button
         }
         // The chosen icon is the soft card, as the chosen row is anywhere.
@@ -172,6 +173,11 @@ final class IconGrid: NSView, NSTextFieldDelegate {
         emojiField.stringValue = emoji
         selected = emoji
         onPick?(emoji)
+    }
+
+    /// What a click on a symbol picks: that symbol, or nothing when it's the one already chosen.
+    static func toggled(_ symbol: String, from selected: String?) -> String? {
+        symbol == selected ? nil : symbol
     }
 
     /// Whether an edit to the field takes the icon away: an emoji was the icon and the field is now empty. A symbol
