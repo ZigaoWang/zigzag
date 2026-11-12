@@ -195,12 +195,17 @@ final class Tab: NSObject {
     /// it, as Safari and Chrome do.
     var returnsToOpener: Bool {
         guard !canGoBack, !isPeek, bookmarkID == nil, let opener, !opener.isClosed else { return false }
-        // Dragged into another window, the page it came from is no longer beside it.
-        return opener.spaceID == spaceID && opener.host === host
+        // Moved to another space, the page it came from is no longer beside it. (Every everyday window has the same
+        // tabs; a private window's are its own.)
+        return opener.spaceID == spaceID && opener.privateStore === privateStore
     }
     var canGoBackOrReturn: Bool { canGoBack || returnsToOpener }
 
+    /// The window it belongs to: the one that last showed it, or made it. Its links open there, and extensions see it
+    /// there.
     weak var host: TabHost?
+    /// The window that has its page on screen, or last had (#162): another window on this tab shows that it's there.
+    weak var shownBy: TabManager?
     /// When its page last stopped unexpectedly, to tell a one-off from a page that keeps stopping.
     private var crashes: [Date] = []
     private var reloadWhenShown = false
