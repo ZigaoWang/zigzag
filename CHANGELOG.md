@@ -5,14 +5,12 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- Middle-click the address to close the tab you're on, as a middle-click on its row in the sidebar does. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#171](https://github.com/ZigaoWang/zigzag/issues/171))
-- The sidebar can sit on the right: turn on Sidebar on the right in Settings › Appearance, or choose View › Move Sidebar to Right. The page moves to the left, the window's buttons stay at its top left, and a hidden sidebar comes out from the right edge. ([#166](https://github.com/ZigaoWang/zigzag/issues/166))
-- Install as App, in the File menu and the ⋯ menu of a site's controls, makes the site an app of its own in your Applications folder, with its icon in the Dock and in ⌘Tab. It opens in a window of its own, signed in as you are in Zigzag; a link to another site opens in Zigzag. Settings › General lists the apps, to remove one. ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
-
 ## [0.8.7] - 2026-11-12
 
 ### New
+- Install as App, in the File menu and the ⋯ menu of a site's controls, makes the site an app of its own in your Applications folder, with its icon in the Dock and in ⌘Tab. It opens in a window of its own, signed in as you are in Zigzag; a link to another site opens in Zigzag. Settings › General lists the apps, to remove one. ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
+- The sidebar can sit on the right: turn on Sidebar on the right in Settings › Appearance, or choose View › Move Sidebar to Right. The page moves to the left, the window's buttons stay at its top left, and a hidden sidebar comes out from the right edge. ([#166](https://github.com/ZigaoWang/zigzag/issues/166))
+- Middle-click the address to close the tab you're on, as a middle-click on its row in the sidebar does. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#171](https://github.com/ZigaoWang/zigzag/issues/171))
 - In split view, drag a page by its strip to move it: onto another page and the two swap places, onto the page's edges or corners and it takes that half or quarter, onto the sidebar's tabs and it leaves the split as a tab of its own, out of the window and it opens in a new one (hold Option for Zigzag Mini). The same preview as for a dragged tab shows where it lands, Esc calls it off, and ⌘Z puts it back. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - Zoom Pane enlarges one page of a split view over the others for a moment, without moving anything: ⇧-click its part of the row in the sidebar, use the button in its strip, or press ⇧⌘↩. Click beside it, press Esc or zoom it again and it goes back where it was. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - Double-clicking a split's row in the sidebar renames the page you clicked. A group of three or four shows its icons evenly in the row, and pointing at one names its page. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
