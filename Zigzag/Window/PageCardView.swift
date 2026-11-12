@@ -283,21 +283,34 @@ final class PageCardView: NSView {
 
     override var isFlipped: Bool { true }
 
+    /// Whether what covers the page moves with the card. A website is laid out only once, so its page takes its new
+    /// size at once and the card's ground fills the rest. Settings is laid out by AppKit for any size and has a
+    /// tinted column the ground can't stand in for: it glides with the card.
+    ///
+    /// It sits on the surface for that, not on the clip. The surface counts from its top, so Settings hangs from the
+    /// card's top edge whatever the card's height is doing. On the clip, which counts from its bottom, its top would
+    /// be the clip's height less its own: two heights changing in two animations, which on screen don't keep step,
+    /// so Settings would run ahead of its card or behind it by a pixel or two.
+    private func glides(_ document: NSView?) -> Bool { document is SettingsView }
+
     override func layout() {
         super.layout()
+        // Everything is placed from the card's own bounds, not read back from the clip: inside an animation a view
+        // still answers with the frame it had.
+        let content = NSRect(x: 0, y: 0, width: bounds.width, height: bounds.height - contentTop)
+        // On the surface, under the band and the header; inside an animation it goes there with the card.
+        if glides(document) { document?.frame = content.offsetBy(dx: 0, dy: contentTop) }
         Tokens.Motion.withoutAnimation {
             surface.frame = bounds
             clip.frame = bounds
-            let top = contentTop
             // The clip isn't flipped: the band and then the header are at its top edge, the page fills the rest below.
             if !liftsHeader {
-                header.frame = NSRect(x: 0, y: clip.bounds.height - band - PaneHeaderView.height, width: clip.bounds.width, height: PaneHeaderView.height)
+                header.frame = NSRect(x: 0, y: bounds.height - band - PaneHeaderView.height, width: bounds.width, height: PaneHeaderView.height)
             }
-            let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
             // The holder is sized, not the page (it fills the holder beside a docked Web Inspector, and in full screen
             // WebKit sizes it), and only while it's in this card: the mini player or another window may have borrowed it.
             if let holder, holder.superview === clip { holder.frame = content }
-            document?.frame = content
+            if !glides(document) { document?.frame = content }
             placeholder.frame = content
             overlay?.frame = content
             edge.frame = surface.bounds
@@ -427,7 +440,7 @@ final class PageCardView: NSView {
         let owner = (webView as? BrowserWebView)?.owner
         let viewer: NSView? = owner?.pdfViewer ?? owner?.settingsView
         guard viewer !== document else { return }
-        if let document, document.superview === clip {
+        if let document, document.superview === clip || document.superview === surface {
             // Typing was in the viewer going away: it goes back to the page rather than nowhere.
             if let window, let responder = window.firstResponder as? NSView, responder.isDescendant(of: document) {
                 window.makeFirstResponder(webView)
@@ -436,9 +449,14 @@ final class PageCardView: NSView {
         }
         document = viewer
         guard let viewer, let webView, let holder else { return }
-        viewer.frame = holder.frame
         viewer.autoresizingMask = [.width, .height]
-        clip.addSubview(viewer, positioned: .above, relativeTo: holder)
+        if glides(viewer) {
+            viewer.frame = holder.frame.offsetBy(dx: 0, dy: contentTop)
+            surface.addSubview(viewer, positioned: .above, relativeTo: clip)
+        } else {
+            viewer.frame = holder.frame
+            clip.addSubview(viewer, positioned: .above, relativeTo: holder)
+        }
         if let window, window.firstResponder === webView { window.makeFirstResponder((viewer as? PDFViewerView)?.pdfView ?? viewer) }
     }
 

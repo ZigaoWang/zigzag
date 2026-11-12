@@ -1327,21 +1327,25 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let arrangement = arrangement
         let line = Tokens.Metric.hairline
         let headerHeight = Tokens.Page.headerHeight
-        // Where the sections go, and where the chosen one's pane goes.
+        // Where the sections go, and where the chosen one's pane goes. The column's tint and its edge run past the
+        // page's far side, as far as a card grows in one move: the page hangs from its card's top, and its far side
+        // follows the card's in an animation of its own. A frame behind, the card's ground showed there as a line.
         let columnFrame: NSRect, area: NSRect
+        let past = Tokens.Metric.cardInset * 2
         switch arrangement {
         case .column, .rail:
             let width = arrangement == .column ? Tokens.Page.columnWidth : Tokens.Space.x16
             columnFrame = NSRect(x: 0, y: 0, width: width, height: bounds.height)
-            columnEdge.frame = NSRect(x: width, y: 0, width: line, height: bounds.height)
+            columnWash.frame = NSRect(x: 0, y: 0, width: width, height: bounds.height + past)
+            columnEdge.frame = NSRect(x: width, y: 0, width: line, height: bounds.height + past)
             area = NSRect(x: width + line, y: 0, width: max(0, bounds.width - width - line), height: bounds.height)
         case .row:
             // The header across the top, then the sections as a row of symbols under it.
             columnFrame = NSRect(x: 0, y: headerHeight, width: bounds.width, height: Tokens.Space.x10 + Tokens.Space.x2)
-            columnEdge.frame = NSRect(x: 0, y: columnFrame.maxY, width: bounds.width, height: line)
+            columnWash.frame = NSRect(x: 0, y: headerHeight, width: bounds.width + past, height: columnFrame.height)
+            columnEdge.frame = NSRect(x: 0, y: columnFrame.maxY, width: bounds.width + past, height: line)
             area = NSRect(x: 0, y: columnFrame.maxY + line, width: bounds.width, height: max(0, bounds.height - columnFrame.maxY - line))
         }
-        columnWash.frame = columnFrame
         columnScroll.frame = columnFrame
         header.frame = NSRect(x: area.minX, y: 0, width: area.width, height: headerHeight)
         // The page scrolls under the header; in a row, under the sections too.
