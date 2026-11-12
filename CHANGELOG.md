@@ -13,6 +13,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - Split view takes up to four tabs. Drag a tab over the page: the edges place it in a half, the corners in a quarter, and a preview shows where it lands. Three tabs are a half and two quarters, four a grid; the lines between them drag, and the group is one row in the sidebar that comes back after a restart. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+- Tabs move between windows as they are, without loading again: drag a tab into another window's sidebar, where a line shows where it lands, or onto its page, and it goes there. Let go outside Zigzag and it opens in a window of its own. A window left with no tabs closes, as in Chrome, and ⌘Z brings the tabs back. ([#167](https://github.com/ZigaoWang/zigzag/issues/167))
 - Open in Zigzag Mini, in a tab's right-click menu, moves the page into a Zigzag Mini window as it is, history and all; ⌘Z puts the tab back. Hold Option as you drag a tab out of the window to do the same. ([#164](https://github.com/ZigaoWang/zigzag/issues/164))
 - Dark pages fill in the light parts of a site that's dark on its own, like a white suggestion list under a dark search box, and leave the rest of its colors alone. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - Force dark, in a site's controls, draws a site dark even when it looks dark already, for one that leaves parts of itself light. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))

@@ -289,6 +289,12 @@ something came from, answers at once, and can be interrupted.
   the page: its edges are halves, its corners quarters, anywhere else the half of the pane under the pointer (beside a
   page alone, the left or right half, as always), and a quarter that can't split takes the tab in its place. The drop
   hint shows where it lands, in the split's one style, named for the place ("Open Top Left").
+- **Windows** (#167): each window has its own tabs, as in Chrome and Safari; pinned tabs and favorites are every
+  window's. A tab dragged out of the sidebar follows the drag-and-drop model: its row stays faint, and over another
+  window's sidebar that list's line shows where it lands. Let go there, or over that window's page, and it moves in,
+  on screen; let go outside Zigzag and it becomes a window of its own (with ⌥, Zigzag Mini). The page moves as it is,
+  never reloaded, a split or tile group whole. A window a move leaves with no tabs closes, unless it's the only one,
+  and one ⌘Z in the window they went to sends them back. A private window keeps its tabs to itself.
 - **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window. Beside the sidebar and
   meeting the window's edges it meets the frame cleanly: all four corners at the window's radius
   (`Radius.attached`), no outline, no shadow.
