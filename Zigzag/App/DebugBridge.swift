@@ -26,6 +26,12 @@ enum DebugBridge {
         // in the background, and a copy launched behind the app you're using never becomes active by itself.
         DistributedNotificationCenter.default().addObserver(Listener.shared, selector: #selector(Listener.received(_:)),
                                                             name: .init(channel), object: nil, suspensionBehavior: .deliverImmediately)
+        // ZIGZAG_DEBUG_COMMANDS: commands to run once launched, split by " ;; ", one every 1.5 s after a short wait,
+        // for when the Mac doesn't pass notifications along.
+        let script = ProcessInfo.processInfo.environment["ZIGZAG_DEBUG_COMMANDS"] ?? ""
+        for (i, command) in script.components(separatedBy: " ;; ").filter({ !$0.isEmpty }).enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4 + Double(i) * 1.5) { MainActor.assumeIsolated { run(command) } }
+        }
         #endif
     }
 
