@@ -359,7 +359,9 @@ final class DownloadsPanelView: FloatingPanelView {
         }
         controller.root.overlay.addSubview(self)
         reload()
-        growsFrom = CGPoint(x: 0.1, y: 1)
+        // Out of its button: at the panel's bottom right from the stand-in in a right sidebar's corner.
+        let standIn = !(controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible)
+        growsFrom = CGPoint(x: standIn && controller.root.sidebarOnRight ? 0.9 : 0.1, y: 1)
         present(arrival: arrival)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             // Only its own window: keys and clicks in Settings or another window are theirs. A menu open over it
@@ -473,7 +475,9 @@ final class DownloadsPanelView: FloatingPanelView {
         guard controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible else {
             let button = anchor.convert(anchor.bounds, to: controller.root.overlay)
             let width = controller.root.sidebarWidth - Tokens.Metric.sidebarPadding * 2
-            frame = NSRect(x: button.minX, y: button.minY - Tokens.Space.x2 - height, width: width, height: height)
+            // Its edge in line with the button's outer edge: the left one, or the right one for a sidebar on the right.
+            let x = controller.root.sidebarOnRight ? button.maxX - width : button.minX
+            frame = NSRect(x: x, y: button.minY - Tokens.Space.x2 - height, width: width, height: height)
             return
         }
         let anchorFrame = anchor.convert(anchor.bounds, to: controller.root.overlay)

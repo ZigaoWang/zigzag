@@ -363,6 +363,8 @@ final class IconPickerPanel: FloatingPanelView {
     private var monitor: Any?
     private let pad = Tokens.Space.x3
     static weak var current: IconPickerPanel?
+    /// How wide it is: the grid and its padding.
+    var preferredWidth: CGFloat { IconGrid.width + pad * 2 }
 
     init(noneSymbol: String, noneImage: NSImage? = nil, noneToolTip: String? = nil, selected: String?, onPick: @escaping (String?) -> Void) {
         grid = IconGrid(noneSymbol: noneSymbol, noneImage: noneImage, noneToolTip: noneToolTip, selected: selected)
@@ -382,11 +384,12 @@ final class IconPickerPanel: FloatingPanelView {
     func show(beside row: NSView, in overlay: NSView, x: CGFloat) {
         IconPickerPanel.current?.close()
         let rowFrame = row.convert(row.bounds, to: overlay)
-        let size = NSSize(width: IconGrid.width + pad * 2, height: IconGrid.height + pad * 2)
+        let size = NSSize(width: preferredWidth, height: IconGrid.height + pad * 2)
         let top = max(Tokens.Space.x2, min(rowFrame.minY - Tokens.Space.x2, overlay.bounds.height - size.height - Tokens.Space.x2))
         frame = NSRect(origin: NSPoint(x: x, y: top), size: size)
         overlay.addSubview(self)
-        growsFrom = CGPoint(x: 0, y: 0.1)
+        // Out of the sidebar's side: its left edge, or its right one beside a sidebar on the right.
+        growsFrom = CGPoint(x: x < rowFrame.minX ? 1 : 0, y: 0.1)
         present(arrival: .pop)
         IconPickerPanel.current = self
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in

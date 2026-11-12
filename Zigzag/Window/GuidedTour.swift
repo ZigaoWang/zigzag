@@ -570,7 +570,11 @@ final class GuidedTour: NSView {
         var cardArea = page
         if let root = controller?.root, root.isSidebarFloatingVisible {
             let sidebar = root.sidebarContainer.convert(root.sidebarContainer.bounds, to: self)
-            if sidebar.maxX > cardArea.minX, sidebar.maxX < cardArea.maxX {
+            if root.sidebarOnRight {
+                if sidebar.minX > cardArea.minX, sidebar.minX < cardArea.maxX {
+                    cardArea = NSRect(x: cardArea.minX, y: cardArea.minY, width: sidebar.minX - cardArea.minX, height: cardArea.height)
+                }
+            } else if sidebar.maxX > cardArea.minX, sidebar.maxX < cardArea.maxX {
                 cardArea = NSRect(x: sidebar.maxX, y: cardArea.minY, width: cardArea.maxX - sidebar.maxX, height: cardArea.height)
             }
         }
@@ -600,8 +604,10 @@ final class GuidedTour: NSView {
             // The page itself: the pill sits inside it, bottom right, clear of links.
             frame = NSRect(x: page.maxX - size.width - Tokens.Space.x6, y: page.maxY - size.height - Tokens.Space.x6, width: size.width, height: size.height)
         } else {
-            // Beside the lit place, to its right, level with it.
+            // Beside the lit place, to its right, level with it; to its left when there's no room on the right (a
+            // sidebar on the right).
             frame = NSRect(x: hole.maxX + Tokens.Space.x4, y: hole.midY - size.height / 2, width: size.width, height: size.height)
+            if frame.maxX > bounds.width - Tokens.Space.x4 { frame.origin.x = hole.minX - Tokens.Space.x4 - size.width }
         }
         frame.origin.x = min(max(Tokens.Space.x4, frame.origin.x), bounds.width - size.width - Tokens.Space.x4)
         frame.origin.y = min(max(Tokens.Space.x2, frame.origin.y), bounds.height - size.height - Tokens.Space.x4)

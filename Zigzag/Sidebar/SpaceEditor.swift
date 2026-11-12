@@ -1604,7 +1604,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     func show(from anchor: NSView? = nil) {
         guard let controller else { return }
         let overlay = controller.root.overlay
-        let sidebar = controller.root.sidebarContainer.frame
+        // Beside the sidebar, over the page: right of it, or left of it on the right.
+        let beside = controller.root.besideSidebar(width: Self.width)
         let height = contentHeight
         let x: CGFloat
         var top: CGFloat
@@ -1613,14 +1614,14 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
             // nor the tabs and the sidebar shows the new look in full.
             let dot = anchor.convert(anchor.bounds, to: overlay)
             top = dot.maxY - height
-            x = min(sidebar.maxX + Tokens.Space.x2, overlay.bounds.width - Self.width - Tokens.Space.x2)
+            x = min(max(Tokens.Space.x2, beside), overlay.bounds.width - Self.width - Tokens.Space.x2)
         } else {
             // From the space's name: beside the sidebar, level with that header.
             top = controller.root.cardFrame.minY + Tokens.Space.x2
             if let header = controller.sidebar.list.headerView, header.window != nil {
                 top = header.convert(header.bounds, to: overlay).minY - Tokens.Space.x2
             }
-            x = sidebar.maxX + Tokens.Space.x2
+            x = beside
             // Hanging from the header, it grows downward when the icons take the colors' place.
             anchoredBelow = true
         }
@@ -1628,7 +1629,9 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         frame = NSRect(x: x, y: top, width: Self.width, height: height)
         overlay.addSubview(self)
         // From a dot it rises out of the bottom; from the space's name it hangs from the top.
-        growsFrom = anchor is SpaceDotView ? CGPoint(x: 0.1, y: 1) : CGPoint(x: 0, y: 0.1)
+        // Out of the sidebar's side of it: the left, or the right beside a sidebar on the right.
+        let right = controller.root.sidebarOnRight
+        growsFrom = anchor is SpaceDotView ? CGPoint(x: right ? 0.9 : 0.1, y: 1) : CGPoint(x: right ? 1 : 0, y: 0.1)
         present(arrival: .pop)
         controller.window?.makeFirstResponder(nameField)
         // The cursor at the end, not the whole name selected: you came to change the color as often as the name. A

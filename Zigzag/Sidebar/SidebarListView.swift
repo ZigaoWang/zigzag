@@ -1763,13 +1763,17 @@ final class SidebarListView: NSView {
     /// Carry a row or a favorite to the sidebar's left or right edge and hold: the space flips that way, and keeps
     /// flipping while it's held there. Nil: the drag is over.
     func carryToEdge(at screenPoint: NSPoint?) {
-        let container = (window?.windowController as? BrowserWindowController)?.root.sidebarContainer
+        let root = (window?.windowController as? BrowserWindowController)?.root
+        let container = root?.sidebarContainer
         var edge: Int?
         // A private window keeps to one space: nothing to flip to.
         if let screenPoint, let window, let container, manager?.isPrivate == false {
             let local = container.convert(window.convertPoint(fromScreen: screenPoint), from: nil)
+            // A little past the window's edge, more past the edge by the page.
+            let outer = Tokens.Space.x6, inner = Tokens.Space.x12
+            let onRight = root?.sidebarOnRight == true
             if local.y >= 0, local.y <= container.bounds.height,
-               local.x > -Tokens.Space.x6, local.x < container.bounds.width + Tokens.Space.x12 {
+               local.x > -(onRight ? inner : outer), local.x < container.bounds.width + (onRight ? outer : inner) {
                 // The sidebar's very edge and just past it, clear of the icons and close buttons in the rows.
                 let zone = Tokens.Space.x2
                 let side = local.x < zone ? -1 : local.x > container.bounds.width - zone ? 1 : nil

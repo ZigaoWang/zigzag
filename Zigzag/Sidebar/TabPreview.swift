@@ -224,7 +224,8 @@ final class TabPreviewController {
         let aspect = card.height > 0 ? min(card.height / max(card.width, 1), 0.9) : 0.62
         let height = round(width * aspect) + panel.footerHeight(width: width)
         let rowFrame = row.convert(row.bounds, to: overlay)
-        let x = controller.root.sidebarContainer.frame.maxX + Tokens.Space.x2
+        // Beside the sidebar, over the page: right of it, or left of it on the right.
+        let x = controller.root.besideSidebar(width: width)
         var y = rowFrame.midY - height / 2
         y = max(Tokens.Metric.cardInset * 2, min(y, overlay.bounds.height - height - Tokens.Metric.cardInset * 2))
         let frame = NSRect(x: x, y: round(y), width: width, height: height)

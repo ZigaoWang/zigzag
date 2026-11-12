@@ -182,6 +182,10 @@ nonisolated enum MiniPlayerLayout {
         var isTop: Bool { self == .topLeft || self == .topRight }
     }
 
+    /// Where the card first goes, before it's ever moved: the page area's bottom corner away from the sidebar, the
+    /// bottom right as the Mac's Picture in Picture has it, or the bottom left beside a sidebar on the right.
+    static func firstCorner(sidebarOnRight: Bool) -> Corner { sidebarOnRight ? .bottomLeft : .bottomRight }
+
     /// The card in a corner of an area, a margin in (flipped: y runs down).
     static func frame(at corner: Corner, size: CGSize, in area: CGRect) -> CGRect {
         frame(for: Anchor(corner: corner, offset: CGSize(width: margin, height: margin)), size: size, in: area)

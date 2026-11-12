@@ -431,6 +431,11 @@ final class MiniPlayer {
         return page.isNull ? movableArea : page
     }
 
+    /// Where it goes before it's ever moved (`MiniPlayerLayout.firstCorner`).
+    private var firstPlace: MiniPlayerLayout.Place {
+        .corner(MiniPlayerLayout.firstCorner(sidebarOnRight: controller?.root.sidebarOnRight == true))
+    }
+
     /// Sizes the card for the video and the window, where you left it (or where it's being dragged).
     func place() {
         guard let controller, let card, let webView else { return }
@@ -439,8 +444,8 @@ final class MiniPlayer {
         let aspect = picture.height > 0 ? picture.width / picture.height : 16 / 9
         let size = Self.extent.map { MiniPlayerLayout.cardSize(aspect: aspect, extent: $0, in: area.size) }
             ?? MiniPlayerLayout.cardSize(aspect: aspect, in: controller.root.cardFrame.size)
-        // Until it's first moved, at the bottom right of the page.
-        let target = MiniPlayerLayout.frame(for: Self.place ?? .corner(.bottomRight), size: size, page: pageArea, in: area)
+        // Until it's first moved, at the bottom of the page away from the sidebar.
+        let target = MiniPlayerLayout.frame(for: Self.place ?? firstPlace, size: size, page: pageArea, in: area)
         card.dragArea = area
         if !card.isDragging, !card.isSettling, card.frame != target { card.frame = target }
         let shown = card.isDragging || card.isSettling ? card.frame.size : target.size
@@ -462,7 +467,7 @@ final class MiniPlayer {
     private func resized() {
         guard let card else { return }
         Self.extent = max(card.frame.width, card.frame.height)
-        switch Self.place ?? .corner(.bottomRight) {
+        switch Self.place ?? firstPlace {
         case .corner(let corner):
             Self.place = .corner(corner)
             card.settle(at: MiniPlayerLayout.frame(for: .corner(corner), size: card.frame.size, page: pageArea, in: movableArea))
