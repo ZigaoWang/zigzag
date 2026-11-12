@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- ⌘Z and ⇧⌘Z reach the page first, so web apps like Google Sheets undo their own changes. Zigzag's own undo for the sidebar still works when the page lets the key pass. Thanks to [Lakeland97](https://github.com/Lakeland97).
+
 ## [0.8.6] - 2026-11-12
 
 ### New

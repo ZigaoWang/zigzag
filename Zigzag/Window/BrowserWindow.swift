@@ -74,9 +74,14 @@ final class BrowserWindow: NSWindow {
            controller.switcher.handle(event) {
             return true
         }
-        if event.charactersIgnoringModifiers?.lowercased() == "z", mods == .command || mods == [.command, .shift],
-           let controller = windowController as? BrowserWindowController, controller.handleUndoKey(redo: mods.contains(.shift)) {
-            return true
+        if event.charactersIgnoringModifiers?.lowercased() == "z", mods == .command || mods == [.command, .shift] {
+            // On a page, the page hears it first, as in Safari and Chrome: web apps (Sheets, Docs, Figma) undo their own
+            // document on ⌘Z. One that lets it pass gets it back from WebKit, and then it's Zigzag's: the sidebar's
+            // undo if that was the last thing done, else the menu's Undo for what you typed.
+            if let view = firstResponder as? NSView, Self.isInPage(view), super.performKeyEquivalent(with: event) { return true }
+            if let controller = windowController as? BrowserWindowController, controller.handleUndoKey(redo: mods.contains(.shift)) {
+                return true
+            }
         }
         // ⌘← / ⌘→ move the cursor while you're typing; only away from a text field do they mean Back and Forward.
         // The key goes to the field or page here and is taken: let through, the menu bar would get it next, and its
