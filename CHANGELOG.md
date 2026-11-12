@@ -17,6 +17,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The mini player goes to the screen's corner while its window is on another space, instead of the corner of a window you can't see, and letting it go where that window would be no longer snaps it there. Closing the window while the player has the keyboard no longer brings that window forward for a moment. ([#172](https://github.com/ZigaoWang/zigzag/issues/172))
 - Peek takes the page's own color around it, as split view's pages do, so a page drawn dark no longer has a light strip across its top. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - An extension's items in a page's right-click menu show once, not twice (Bitwarden's, for one). Thanks to [rocavence](https://github.com/rocavence). ([#186](https://github.com/ZigaoWang/zigzag/issues/186))
+- Restarting to install an update brings back everything that was open, Zigzag Mini windows included, with your windows, spaces, tabs and splits saved the moment the update restarts Zigzag.
 
 ## [0.9.0] - 2026-11-12
 

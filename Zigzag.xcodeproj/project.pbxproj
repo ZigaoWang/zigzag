@@ -49,6 +49,7 @@
 		1D559D9E556FBB7102DFE892 /* OwnScriptsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B103184C04CE5BBD5558790 /* OwnScriptsTests.swift */; };
 		1EA0745E8CAC4A123D48C269 /* CapitalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF2F4BA4D4D31C1518CC7B9E /* CapitalizationTests.swift */; };
 		1F06D849CF746C1FF6AEE48B /* BrowserWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06AE52E198CC8E7B86B467BA /* BrowserWindow.swift */; };
+		200DCC325CAD013BD582FBF6 /* UpdateRelaunch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 795D70D21D90CC7FB8A2295D /* UpdateRelaunch.swift */; };
 		202F156ED958778A3916C4D1 /* SpaceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B636331176C086C6157403B /* SpaceSwitcher.swift */; };
 		20C8469FA3D89C3469C3AFA5 /* WebAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B47E6DBF13FBD56C4DF65E8 /* WebAppTests.swift */; };
 		21DA496E027D0DB086F085DD /* WebAppIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C0617D63CB7D0886FC367E5 /* WebAppIcon.swift */; };
@@ -362,6 +363,7 @@
 		F68205100699AE990735AFB7 /* ImportBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F8D15DA6B83F9C7DF8A4CB0 /* ImportBatch.swift */; };
 		F6E20DC18DFECE821A1E1AED /* OwnWindowTabsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8056AFCD49228FC19D70CCBD /* OwnWindowTabsTests.swift */; };
 		F728A9B75F07DB87FCA3BECF /* ghostery-adblocker.js in Resources */ = {isa = PBXBuildFile; fileRef = 03627381328E3E3CDA43C0B6 /* ghostery-adblocker.js */; };
+		F7D00C70AB65EFE781552078 /* UpdateRelaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C20AE02E87B17A9AB6935B /* UpdateRelaunchTests.swift */; };
 		F7D93036C3CDCBF8FC71B036 /* MiniLinkWakeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8679BD8FFD9BC3825E36199 /* MiniLinkWakeTests.swift */; };
 		F83EF7EEEA88AB7ECB4DBB05 /* ghostery-adblocker-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = D302D7F28821481E9ABC2148 /* ghostery-adblocker-LICENSE.txt */; };
 		F972A38781338935BAF22135 /* WebsiteData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B5A4CDA29A214770AB79A6 /* WebsiteData.swift */; };
@@ -571,6 +573,7 @@
 		77478845778FB285ADD29C14 /* Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library.swift; sourceTree = "<group>"; };
 		77ECA64FC76B1FB111087527 /* CookieBanners.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookieBanners.swift; sourceTree = "<group>"; };
 		7890881D589D032D70E5DC20 /* SecurityFixesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityFixesTests.swift; sourceTree = "<group>"; };
+		795D70D21D90CC7FB8A2295D /* UpdateRelaunch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateRelaunch.swift; sourceTree = "<group>"; };
 		79F70CA73E1EF5C8460E9286 /* TabManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabManager.swift; sourceTree = "<group>"; };
 		7A6A928496FC897893B22DF7 /* BrowserWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWebView.swift; sourceTree = "<group>"; };
 		7C84C04C118E8E4CC241C3B6 /* TabSleep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSleep.swift; sourceTree = "<group>"; };
@@ -658,6 +661,7 @@
 		B1C94BBE34DB020CBB3EA2A2 /* ProxyRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyRulesTests.swift; sourceTree = "<group>"; };
 		B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptHost.swift; sourceTree = "<group>"; };
 		B3AD1C19026E47583E6DC0CD /* ZigzagWebApp */ = {isa = PBXFileReference; includeInIndex = 0; path = ZigzagWebApp; sourceTree = BUILT_PRODUCTS_DIR; };
+		B3C20AE02E87B17A9AB6935B /* UpdateRelaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateRelaunchTests.swift; sourceTree = "<group>"; };
 		B44BD209A49B5F5B73ECE2BD /* PaneDrag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneDrag.swift; sourceTree = "<group>"; };
 		B61ECD99BC5A8E42155612FF /* MCPToolsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPToolsTests.swift; sourceTree = "<group>"; };
 		B6B4DC12DA4D88C56E886156 /* page-fullscreen.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "page-fullscreen.js"; sourceTree = "<group>"; };
@@ -1226,6 +1230,7 @@
 				DB9026CE3C5C707675A9BEEC /* ProblemReport.swift */,
 				EE1EE7853A66CE1029968DA5 /* Scripting.swift */,
 				DF9088949B9C029636E9E355 /* Updater.swift */,
+				795D70D21D90CC7FB8A2295D /* UpdateRelaunch.swift */,
 				88A5C020C85AEC572EC2BA4A /* ZigzagApplication.swift */,
 			);
 			path = App;
@@ -1350,6 +1355,7 @@
 				192E65AD41512C6227E9A03C /* TileLayoutTests.swift */,
 				4A3DD8FA3DF8FD4B034CA024 /* TopBarTests.swift */,
 				D4000F6FD774203F8D1BFAB0 /* TutorialTests.swift */,
+				B3C20AE02E87B17A9AB6935B /* UpdateRelaunchTests.swift */,
 				2C1EF45053176602E3D8A4C1 /* UserScriptsTests.swift */,
 				5B47E6DBF13FBD56C4DF65E8 /* WebAppTests.swift */,
 				9DA9C09A32B4F7885252E1D1 /* WebAppWindowTests.swift */,
@@ -1806,6 +1812,7 @@
 				E3CB22F1889EA1CC95A8B978 /* TopBarView.swift in Sources */,
 				51BD0DD0DD4AB16FB1D97CA8 /* TourDemo.swift in Sources */,
 				E77131ED815A795FB7D6F9B8 /* Tutorial.swift in Sources */,
+				200DCC325CAD013BD582FBF6 /* UpdateRelaunch.swift in Sources */,
 				DDFF8EFE3CB4DBF463105561 /* Updater.swift in Sources */,
 				2FBAE3D3A28EFC9B0B121747 /* WebApp.swift in Sources */,
 				E7F3E262C5A4F9691F5B7517 /* WebAppBundle.swift in Sources */,
@@ -1942,6 +1949,7 @@
 				A08F33F5B078BBE5F98A6003 /* TileLayoutTests.swift in Sources */,
 				9992350EAA124066EE5A5A1E /* TopBarTests.swift in Sources */,
 				E582C6F8B7C987D3FD4AE888 /* TutorialTests.swift in Sources */,
+				F7D00C70AB65EFE781552078 /* UpdateRelaunchTests.swift in Sources */,
 				0A3CE807B90BECEE35BCDB08 /* UserScriptsTests.swift in Sources */,
 				20C8469FA3D89C3469C3AFA5 /* WebAppTests.swift in Sources */,
 				D30B6BC041DF198669218EA9 /* WebAppWindowTests.swift in Sources */,

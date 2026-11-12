@@ -5,7 +5,8 @@ import WebKit
 /// quick look-up. A slim strip on top in the page's own color (`PageBar`), the page under it edge to edge: the space
 /// it goes to, the page's site, Keep on Top, Copy Link and Open in. Its page is a real tab, so
 /// history, blocking, autofill and extensions work as they do anywhere; Open in moves that same live page into a
-/// browser window, in the space chosen on the strip. It's never saved: quitting lets it go, as Arc did.
+/// browser window, in the space chosen on the strip. Quitting lets it go, as Arc did; an update's restart brings it
+/// back (`UpdateRelaunch`).
 final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// The last to be asked about a key: one nothing took goes by quietly (`QuietKeys`).
     override func noResponder(for eventSelector: Selector) {
@@ -625,6 +626,38 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     func windowDidBecomeKey(_ notification: Notification) {
         if #available(macOS 15.4, *) { ExtensionCenter.miniFocused(self) }
+    }
+}
+
+// MARK: - Through an update's restart
+
+extension MiniWindowController {
+    /// This window as an update's restart brings it back: its page, back/forward list, space, place and Keep on Top.
+    var savedForRelaunch: UpdateRelaunch.Mini? {
+        guard !isLeaving, let window, let url = tab.url else { return nil }
+        let frame = window.frame
+        return UpdateRelaunch.Mini(url: url, title: tab.title, spaceID: tab.spaceID,
+                                   frame: [frame.origin.x, frame.origin.y, frame.width, frame.height],
+                                   keepOnTop: KeepOnTop.isOn(window), interactionState: tab.interactionStateForSaving)
+    }
+
+    /// Opens one again as it was before an update's restart. A space that's gone gives way to the one Zigzag Mini
+    /// uses now; a place on a screen no longer there, to the middle of the screen.
+    @discardableResult
+    static func reopen(_ saved: UpdateRelaunch.Mini) -> MiniWindowController {
+        let space = Library.shared.space(saved.spaceID) != nil ? saved.spaceID : MiniQuickOpen.space.id
+        let tab = Tab(url: saved.url, title: saved.title, spaceID: space, interactionState: saved.interactionState)
+        let f = saved.frame
+        let area = NSScreen.main?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
+        var frame = f.count == 4 ? NSRect(x: f[0], y: f[1], width: f[2], height: f[3]) : nil
+        if let rect = frame, !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(rect) }) { frame = nil }
+        let controller = MiniWindowController(tab: tab, frame: frame ?? Self.frame(size: Tokens.Metric.miniWindowSize, in: area, taken: all.compactMap { $0.window?.frame }),
+                                              overFullScreen: false)
+        all.append(controller)
+        controller.appear(from: nil)
+        if #available(macOS 15.4, *) { ExtensionCenter.miniOpened(controller) }
+        if saved.keepOnTop, let window = controller.window { KeepOnTop.set(true, for: window) }
+        return controller
     }
 }
 

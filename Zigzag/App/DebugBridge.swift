@@ -1416,6 +1416,11 @@ enum DebugBridge {
             let factor = max(1, Float(arg) ?? 1)
             controller.window?.contentView?.layer?.speed = 1 / factor
         case "quit": NSApp.terminate(nil)
+        case "updaterelaunch":
+            // updaterelaunch: quits as Sparkle does to restart for an update (its willRelaunch first); launching the
+            // copy again is the restart.
+            UpdateRelaunch.prepare()
+            NSApp.terminate(nil)
         case "materials": MaterialsShowcase.debug(arg)
         case "history": HistoryPage.open(in: controller)
         case "clearhistory":
