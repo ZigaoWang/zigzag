@@ -668,7 +668,7 @@ enum DebugBridge {
         case "select": controller.tabManager.select(at: Int(arg) ?? 0)
         // groundprobe select <index> | load <url> | open <url>: does that, then for 1.5 s writes to the debug log what's
         // behind the page in front every 50 ms (#134): the web view's own ground, its under-page color, the card's, and
-        // what the page script has put in (darkened, palette, prepaint).
+        // what the page script has put in (Dark Reader's mode, the prepaint ground, darkened).
         case "groundprobe":
             let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
             guard f.count == 2 else { break }
