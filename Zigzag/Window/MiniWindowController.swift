@@ -118,7 +118,11 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             guard returnTo != nil else { return }
             browserKeyToken = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { [weak self] note in
                 guard let window = note.object as? NSWindow, window is BrowserWindow else { return }
-                MainActor.assumeIsolated { self?.returnTo = nil }
+                // Its own window turns key as Zigzag comes forward for the link: that isn't using another one.
+                MainActor.assumeIsolated {
+                    guard let self, window !== self.window else { return }
+                    self.returnTo = nil
+                }
             }
         }
     }
