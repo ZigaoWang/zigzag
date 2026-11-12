@@ -172,8 +172,6 @@ final class PeekController {
             // Unless dark pages keep it clear, so the dark under it shows (#134).
             DarkPages.restoreGround(of: webView)
             content.layer?.backgroundColor = nil
-            // A full-width scroll track looks heavy in a small card: a slim one that floats over the page instead.
-            webView.evaluateJavaScript(Self.slimScrollbars, completionHandler: nil)
         }
     }
 
@@ -258,19 +256,6 @@ final class PeekController {
             controller.tabManager.insert(tab)
         })
     }
-
-    private static let slimScrollbars = """
-    (() => {
-      if (document.getElementById('zigzag-peek-scrollbars')) return;
-      const style = document.createElement('style');
-      style.id = 'zigzag-peek-scrollbars';
-      style.textContent = '::-webkit-scrollbar{width:10px;height:10px;background:transparent}' +
-        '::-webkit-scrollbar-track{background:transparent}' +
-        '::-webkit-scrollbar-thumb{background:rgba(128,128,128,.45);border-radius:6px;border:3px solid transparent;background-clip:content-box}' +
-        '::-webkit-scrollbar-thumb:hover{background-color:rgba(128,128,128,.7)}';
-      (document.head || document.documentElement).appendChild(style);
-    })();
-    """
 
     var contentFrame: NSRect { panel.frame }
 

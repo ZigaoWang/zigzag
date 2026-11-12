@@ -140,6 +140,7 @@ The browser window's compact scale (`Tokens.Sidebar`, `Tokens.Pane`):
 | Section labels | 11pt medium, the space's quiet ink, on the icon column, low in a 24pt slot; Clear at its end in the same ink |
 | Bottom bar | 14pt glyphs in 26pt buttons; a space dot for each space (`SpaceDotView`) in a 26pt target: a 6pt dot in the space's ink at rest, the one you're in stretched into a 16pt pill in full ink, eased over `standard`; a space with an icon shows it at 14pt in place of its dot, brightest when it's yours. No numbers: the tooltip names the space and its ⌃ key, and holding ⌃ shows the numbers just above |
 | Pane header (split) | 30pt tall, 13pt glyphs in 24pt buttons, the address at 12pt in a 22pt field; narrow, swap and the layout fold into ⋯ first, then Separate, Forward and Reload, so the address keeps 72pt (`Pane.addressMinWidth`) and × is never cut |
+| Peek's strip | The pane header's scale: 30pt tall (`Metric.peekHeaderHeight`), 13pt glyphs in 24pt buttons, the host at 12pt after a 16pt favicon placed as a button's would be; the page 2pt inside the panel's rim at the sides and below (`Metric.peekInset`), its corners concentric. Pages keep WebKit's own scrollbars, as in Safari: overlay or always shown as the Mac is set, in the page's own light or dark |
 
 ## Spacing
 
