@@ -23,6 +23,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Restarting to install an update brings back everything that was open, Zigzag Mini windows included, with your windows, spaces, tabs and splits saved the moment the update restarts Zigzag.
 - A site that's dark on its own gives the bar above it, Zigzag Mini's bar and an installed app's toolbar its dark again with dark pages off, instead of white. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - With the sidebar on the right and the address bar beside the tabs, the strip above the page no longer holds the window's buttons alone: back, forward and reload sit right after them, as in the bar above the page. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#181](https://github.com/ZigaoWang/zigzag/issues/181))
+- A long site name in Site Controls no longer loses its start ("…mini.google.com"): it shrinks a little to show whole, its subdomains quieter than the domain that says whose site it is, and only when there's still no room do whole subdomains give way, never the domain itself. The full name is in its tooltip and for VoiceOver. Peek, Zigzag Mini, a split page's strip and an installed app's bar keep a site's domain whole too, and a long profile name that's cut short shows in full on hover. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#189](https://github.com/ZigaoWang/zigzag/issues/189))
 
 ## [0.9.0] - 2026-11-12
 
