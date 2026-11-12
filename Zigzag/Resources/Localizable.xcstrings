@@ -13080,13 +13080,13 @@
         }
       }
     },
-    "Set by the developer tools in this tab" : {
-      "comment" : "Under Dark page in the site panel's This Site group, on a development site whose page was set to Light or Dark with the developer tools: dark pages leave this tab's page alone.",
+    "Set by developer tools" : {
+      "comment" : "Short, it fits beside a switch. Under Dark page in the site panel's This Site group, on a development site whose page was set to Light or Dark with the developer tools: dark pages leave this tab's page alone.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "由此标签页的开发者工具设定"
+            "value" : "由开发者工具设定"
           }
         }
       }

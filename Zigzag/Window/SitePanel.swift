@@ -679,7 +679,7 @@ final class SitePanel: FloatingPanelView {
                                           status: { on in
                     // This tab's page was asked for a look of its own with the developer tools: the site's choice waits.
                     if tab.developerInEffect.appearance != .followsMac {
-                        return String(localized: "Set by the developer tools in this tab", comment: "Under Dark page in the site panel's This Site group, on a development site whose page was set to Light or Dark with the developer tools: dark pages leave this tab's page alone.")
+                        return String(localized: "Set by developer tools", comment: "Short, it fits beside a switch. Under Dark page in the site panel's This Site group, on a development site whose page was set to Light or Dark with the developer tools: dark pages leave this tab's page alone.")
                     }
                     return on && tab.darkPage?.native == true && !DarkPages.isForced(url) ? native : on ? Self.onHere : Self.offHere
                 }) { [weak self] on in
@@ -1132,10 +1132,16 @@ final class PanelTile: GlassTile {
             badgeView?.removeFromSuperview()
             badgeView = nil
             guard !badge.isEmpty else { return }
-            // The same pill as on a pinned button in the address, in the tile's corner.
+            // The same pill as on a pinned button in the address, in the tile's corner; on a tile with a name under
+            // its icon (the console's count), at the icon's corner, clear of the name.
             let view = BadgeView(text: badge, attention: isAttention)
-            view.inset = Self.badgeInset
-            addSubview(view)
+            if caption == nil {
+                view.inset = Self.badgeInset
+                addSubview(view)
+            } else {
+                view.inset = Self.iconBadgeInset
+                iconView.addSubview(view)
+            }
             badgeView = view
         }
     }
@@ -1187,6 +1193,8 @@ final class PanelTile: GlassTile {
 
     /// From the tile's edges to its count: inside its rounded corner.
     static let badgeInset: CGFloat = 3
+    /// Over a captioned tile's icon: hanging off its bottom-right corner, as on a Dock icon.
+    static let iconBadgeInset: CGFloat = -6
 
     override func stateDidChange(animated: Bool) {
         let accent = Brand.Theme.for(self).accent
