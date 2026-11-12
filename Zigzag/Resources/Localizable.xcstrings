@@ -2186,13 +2186,13 @@
         }
       }
     },
-    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, dark pages and full screen follow your settings again, and every site’s tabs can sleep in the background." : {
+    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background." : {
       "comment" : "Message of the sheet that forgets the choices made for single sites.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放会恢复为 100%，深色网页和全屏幕会重新跟随你的设置，所有网站的标签页也会在后台照常休眠。"
+            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放会恢复为 100%，深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠。"
           }
         }
       }
@@ -4410,6 +4410,17 @@
         }
       }
     },
+    "Cookie banners" : {
+      "comment" : "A setting in Settings › Privacy: what Zigzag does with a site's cookie consent pop-up.\nRow in the site panel's This Site group: whether Zigzag answers this site's cookie consent pop-ups with no.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cookie 弹窗"
+          }
+        }
+      }
+    },
     "Cookies" : {
       "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.",
       "localizations" : {
@@ -6516,6 +6527,17 @@
         }
       }
     },
+    "Hidden on this site" : {
+      "comment" : "Under Cookie banners in the site panel's This Site group: the site's cookie notice was only hidden, since there was nothing to say no to.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在此网站上隐藏"
+          }
+        }
+      }
+    },
     "Hide %@" : {
       "comment" : "First menu of an installed app's window: hides the app. The placeholder is the app's name, like Wikipedia.",
       "localizations" : {
@@ -7499,6 +7521,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "了解更多"
+          }
+        }
+      }
+    },
+    "Leave Alone" : {
+      "comment" : "A choice for “Cookie banners” in Settings › Privacy: sites' cookie consent pop-ups are left for you to answer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不处理"
           }
         }
       }
@@ -11027,6 +11060,28 @@
         }
       }
     },
+    "Reject When Possible" : {
+      "comment" : "A choice for “Cookie banners” in Settings › Privacy: Zigzag says no to a site's cookie consent pop-up, or hides one that only needs hiding.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尽可能拒绝"
+          }
+        }
+      }
+    },
+    "Rejected on this site" : {
+      "comment" : "Under Cookie banners in the site panel's This Site group: Zigzag said no to the cookies the site's consent pop-up asked for.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在此网站上拒绝"
+          }
+        }
+      }
+    },
     "Release Notes" : {
       "comment" : "Row in the About window.",
       "localizations" : {
@@ -11997,6 +12052,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "存储页面"
+          }
+        }
+      }
+    },
+    "Says no to the cookies a site’s pop-up asks for, or hides a pop-up that only needs hiding. Never says yes." : {
+      "comment" : "Explanation under “Cookie banners” in Settings › Privacy.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "替你拒绝网站弹窗索要的 Cookie，只需隐藏的弹窗则直接隐藏。绝不替你同意。"
           }
         }
       }
@@ -15548,6 +15614,17 @@
         }
       }
     },
+    "Uses Autoconsent, by DuckDuckGo." : {
+      "comment" : "After the explanation under “Cookie banners” in Settings › Privacy. Autoconsent is the name of DuckDuckGo's open-source library: keep both names as they are.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Autoconsent，由 DuckDuckGo 开发。"
+          }
+        }
+      }
+    },
     "Uses Dark Reader, by Dark Reader Ltd." : {
       "comment" : "After the explanation under “Dark pages” in Settings › Appearance. Dark Reader is the name of the open-source dark mode engine, Dark Reader Ltd. its maker: keep both as they are.",
       "localizations" : {
@@ -16924,6 +17001,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "检查更新 版本 check for updates"
+          }
+        }
+      }
+    },
+    "cookie banners left alone" : {
+      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its cookie consent pop-ups are left for you to answer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不处理 Cookie 弹窗"
+          }
+        }
+      }
+    },
+    "cookie banners rejected" : {
+      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its cookie consent pop-ups are answered with no, though the setting leaves them alone.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拒绝 Cookie 弹窗"
+          }
+        }
+      }
+    },
+    "cookies consent gdpr pop-up popup notice reject accept privacy banner" : {
+      "comment" : "Words that find the Cookie banners setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cookies consent gdpr pop-up popup notice reject accept privacy banner Cookie 弹窗 同意 拒绝 隐私 横幅 提示"
           }
         }
       }
