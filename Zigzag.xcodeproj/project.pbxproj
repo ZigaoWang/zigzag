@@ -87,6 +87,7 @@
 		40D4C0EB780B16A242E6E1E6 /* SplitDropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B13E82E7DA1A290559EC8C20 /* SplitDropTests.swift */; };
 		41236E9E7BE28A49C8AF9479 /* InlineCompletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51954CD51F2344D8639115AB /* InlineCompletion.swift */; };
 		42A440F3B55A86FCC2AD9490 /* THIRD_PARTY_NOTICES.md in Resources */ = {isa = PBXBuildFile; fileRef = FA29F3657E11FE3895D8BAC3 /* THIRD_PARTY_NOTICES.md */; };
+		43E5CAFBB170E9E6507AEB70 /* DarkPagesPrepaintTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BF2D2CE4ED8B3D974B52136 /* DarkPagesPrepaintTests.swift */; };
 		4489417AC1F72B028FA0998A /* ProfileSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77B2EE3B0C5A70C2E6A8A77 /* ProfileSheets.swift */; };
 		44ECB58B498642EB6DB3648B /* PasswordGeneratorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */; };
 		45B26CB65A31C4BEFCFB7CA2 /* EnergyWarningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0DE85F403C80DB6286E463D /* EnergyWarningTests.swift */; };
@@ -457,6 +458,7 @@
 		68FEA7FFF224DCD2FCBF7716 /* SettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPage.swift; sourceTree = "<group>"; };
 		6B6C77CFE33BFCD7CC963266 /* ChromeProfilesImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromeProfilesImportTests.swift; sourceTree = "<group>"; };
 		6B89CCE006086C641D713AAB /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
+		6BF2D2CE4ED8B3D974B52136 /* DarkPagesPrepaintTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPagesPrepaintTests.swift; sourceTree = "<group>"; };
 		6CE05E70848504F5FE346B61 /* ZigzagRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ZigzagRelease.entitlements; sourceTree = "<group>"; };
 		6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
 		6E9E28B1061F9D52B96C814E /* ZigzagTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZigzagTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1072,6 +1074,7 @@
 				5D3D982B142CB7CC9AA89B6A /* ContrastTokensTests.swift */,
 				8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */,
 				B788AB64DB761375F0FEFA16 /* DarkPagesFallbackTests.swift */,
+				6BF2D2CE4ED8B3D974B52136 /* DarkPagesPrepaintTests.swift */,
 				4295D4E75FDD1157FE955EBF /* DarkPagesTests.swift */,
 				A5C379E2BF735EEBC168D4E2 /* DarkPaletteScriptTests.swift */,
 				7E0B6E4ACCE3366126E94F4A /* DarkPalettesTests.swift */,
@@ -1564,6 +1567,7 @@
 				AD66AB1C32F3990847A89971 /* CommandBarRankingTests.swift in Sources */,
 				87F8E37BD3315332966A7421 /* ContrastTokensTests.swift in Sources */,
 				605786340091141429E15759 /* DarkPagesFallbackTests.swift in Sources */,
+				43E5CAFBB170E9E6507AEB70 /* DarkPagesPrepaintTests.swift in Sources */,
 				37417FBDF6F6A5A1633769C5 /* DarkPagesTests.swift in Sources */,
 				0F709940AA577364B18E6471 /* DarkPaletteScriptTests.swift in Sources */,
 				E6571244FE23DFDC7DEF5650 /* DarkPalettesTests.swift in Sources */,

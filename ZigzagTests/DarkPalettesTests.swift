@@ -271,7 +271,8 @@ struct DarkPalettesTests {
     }
 
     /// A page whose light comes from somewhere the sheets don't say (here, inline styles) isn't covered by its
-    /// palette: that visit goes back to the filter, and so does the site, until its style changes.
+    /// palette: it's tried on the page as soon as it's made, so the first visit stays with the filter, and so does the
+    /// site, until its style changes. The next visit never starts with a palette that would leave it white.
     @Test func aPaletteThatLeavesThePageLightGivesWayToTheFilter() async throws {
         try await withDefaults {
             let origin = "https://inline-\(UUID().uuidString.prefix(8).lowercased()).test"
@@ -280,17 +281,17 @@ struct DarkPalettesTests {
             <div style="background:#fff;color:#111;position:fixed;inset:0"><p>All of it painted white inline.</p></div></body></html>
             """
             let first = await page(html, at: origin)
-            let made = await until { DarkPalettes.entry(origin: origin, black: false, scope: "default") != nil }
-            let seen = try await state(first)
-            #expect(made, "\(seen) \(DarkPages.lastAnalysis)")
-            let second = await page(html, at: origin)
-            let refused = await until { (try? await state(second)["refused"] as? Bool) == true }
-            #expect(refused)
-            #expect(try await state(second)["palette"] as? Bool == false)
-            let filter = try await js(second, "return getComputedStyle(document.documentElement).filter") as? String
-            #expect(filter?.contains("invert") == true)
             let marked = await until { DarkPalettes.entry(origin: origin, black: false, scope: "default")?.invert == true }
-            #expect(marked)
+            let seen = try await state(first)
+            #expect(marked, "\(seen) \(DarkPages.lastAnalysis)")
+            #expect(seen["palette"] as? Bool == false)
+            let filter = try await js(first, "return getComputedStyle(document.documentElement).filter") as? String
+            #expect(filter?.contains("invert") == true)
+            let second = await page(html, at: origin)
+            let shown = try await state(second)
+            #expect(shown["palette"] as? Bool == false)
+            #expect(shown["refused"] as? Bool == false)
+            #expect(try await js(second, "return getComputedStyle(document.documentElement).filter") as? String == filter)
             DarkPalettes.forget(scope: "default", site: DarkPalettes.site(ofOrigin: origin))
         }
     }
