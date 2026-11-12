@@ -15,6 +15,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The Extensions page in Site Controls holds your extensions, whether they run on this site, and Manage Extensions, which opens Settings › Extensions. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#174](https://github.com/ZigaoWang/zigzag/issues/174))
 
 ### Fixed
+- Zigzag no longer crashes going back or forward or opening a link after a while of browsing with an extension on. Each page could give the extension's scripts one more copy, until there were too many to hand a new page. ([#178](https://github.com/ZigaoWang/zigzag/issues/178))
 - Dark pages are drawn by [Dark Reader](https://darkreader.org)'s engine, with its fixes for thousands of sites: a site's own colors are made dark one by one, instead of the page being turned over with a filter and patched up afterward. Sites written with newer kinds of colors, like Cloudflare's dashboard, no longer stay mostly light. A site with a dark look of its own, like GitHub or YouTube Music, is left exactly as it is, no longer painted partly light. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - ⌘Q in an installed app quits that app, not all of Zigzag. While its window is in front the menus are the app's own: Hide and Quit name it, and the browser's New Tab and the rest aren't there. ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
 - Peek's top strip is as slim as a split view's, and the frame around its page thinner, so the page gets more room.
