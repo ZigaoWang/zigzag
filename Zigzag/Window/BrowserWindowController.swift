@@ -95,6 +95,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) || GuidedTour.holdsSidebar(in: self?.window)
                 || self?.popupHoldsSidebar == true
         }
+        // One floating thing at a time, the sidebar that slides out included: while the command bar is up, or a panel
+        // opened from the bar above the page, the pointer at the window's edge leaves it hidden. It would slide in
+        // under them, and under a panel it would then be held there.
+        root.blocksEdgeReveal = { [weak self] in
+            self?.commandBar.isVisible == true || SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window)
+        }
         // A click beside a zoomed pane puts it back, as one beside Peek puts it away.
         root.zoomScrim.onClick = { [weak self] in self?.unzoomPane() }
         root.onTilesChange = { [weak self] shape, final in
@@ -2548,6 +2554,9 @@ extension BrowserWindowController: CommandBarHost {
         peek.close()
         previews.hide()
         linkStatus.show(nil, in: root.cardFrame)
+        // The sidebar slid out over the page steps aside too: the bar would open over its edge, and typing is no
+        // time for it. Not while something holds it out (the guide pointing into it).
+        root.reveal(false)
     }
 
     func commandBarRestoreFocus() {

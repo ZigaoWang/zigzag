@@ -493,6 +493,10 @@ final class BrowserRootView: SpaceFrameView {
     /// Also keeps it open: a panel that came out of it (the site panel, downloads) is still showing.
     var keepsRevealed: (() -> Bool)?
     private var isHeld: Bool { holdReveal || keepsRevealed?() == true }
+    /// The other way round: something floats over the window where the sidebar would slide in (the command bar, a
+    /// panel opened from the bar above the page), so the pointer at the edge leaves the sidebar hidden rather than
+    /// sliding it in under that. Asking for it outright (`reveal`) still brings it out.
+    var blocksEdgeReveal: (() -> Bool)?
 
     init(sidebar: SidebarView) {
         sidebarContainer = SidebarContainer(sidebar: sidebar)
@@ -913,11 +917,6 @@ final class BrowserRootView: SpaceFrameView {
     /// The sidebar's width for a drag of its edge to `x`: how far that is from the window's edge it's on.
     static func reach(of x: CGFloat, in bounds: NSRect, onRight: Bool) -> CGFloat { onRight ? bounds.maxX - x : x - bounds.minX }
 
-    /// Whether a point is in the strip along the sidebar's edge of the window, where a hidden sidebar comes out.
-    static func isAtRevealEdge(_ point: NSPoint, in bounds: NSRect, onRight: Bool) -> Bool {
-        onRight ? point.x >= bounds.maxX - Tokens.Metric.edgeRevealWidth : point.x <= bounds.minX + Tokens.Metric.edgeRevealWidth
-    }
-
     /// Where the glass needs to be: only what you can see through. With the page meeting the sidebar, that's the
     /// sidebar alone; the page covers the rest, and a live blur under it would cost the window server a fresh blur
     /// of the whole window every frame the page changes (a video, an animation). Otherwise the whole window.
@@ -1187,49 +1186,58 @@ final class BrowserRootView: SpaceFrameView {
         trackingArea = area
     }
 
+    /// The sidebar's edge of the window as the pointer meets it while the sidebar is hidden: where the pointer brings
+    /// the sidebar out and where it keeps it out, worked out in one place (`SidebarEdgeZone`).
+    private var edgeZone: SidebarEdgeZone {
+        // The bar's strip at the window's left edge holds the traffic lights while the sidebar is hidden: reaching
+        // for them there leaves the sidebar be, so they don't move off into it under the pointer. (A sidebar on the
+        // right comes out at the other edge, clear of them.)
+        let lights = showsTopBar && !sidebarVisible && !sidebarOnRight ? topBarFrame.maxY : 0
+        let out = Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: false, revealed: true, onRight: sidebarOnRight)
+        return SidebarEdgeZone(bounds: bounds, sidebar: out, onRight: sidebarOnRight, reservedTop: lights)
+    }
+
+    /// Where the pointer is now, in this view's terms, whatever event is being handled and wherever the pointer is
+    /// on screen, outside the window included.
+    private var pointer: NSPoint? {
+        #if DEBUG
+        if let debugPointer { return debugPointer }
+        #endif
+        return window.map { convert($0.mouseLocationOutsideOfEventStream, from: nil) }
+    }
+
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
-        let point = convert(event.locationInWindow, from: nil)
-        if isAtEdge(point), !isOverTopBarLights(point) { pointerAtEdge() }
+        if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge() }
     }
 
-    private func isAtEdge(_ point: NSPoint) -> Bool { Self.isAtRevealEdge(point, in: bounds, onRight: sidebarOnRight) }
-
-    /// The bar's strip at the window's left edge holds the traffic lights while the sidebar is hidden: reaching for
-    /// them there leaves the sidebar be, so they don't move off into it under the pointer. (A sidebar on the right
-    /// comes out at the other edge, clear of them.)
-    private func isOverTopBarLights(_ point: NSPoint) -> Bool {
-        showsTopBar && !sidebarVisible && !sidebarOnRight && point.y < topBarFrame.maxY
-    }
-
-    /// Crossing the sidebar's edge of the window opens the sidebar, however fast: a quick flick out of the window
-    /// may never land a moved event inside the edge strip, but it always leaves through it.
+    /// Leaving through the sidebar's edge of the window counts too: a quick move may never land a moved event
+    /// inside the edge strip, and at the screen's own edge the pointer stops there. Where it rests a moment later
+    /// decides (`pointerAtEdge`).
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
-        let point = convert(event.locationInWindow, from: nil)
-        if isAtEdge(point), point.y >= bounds.minY, point.y <= bounds.maxY, !isOverTopBarLights(point) { pointerAtEdge() }
+        if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge() }
     }
 
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
-        let point = convert(event.locationInWindow, from: nil)
-        if isAtEdge(point), !isOverTopBarLights(point) { pointerAtEdge() }
+        if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge() }
     }
 
     /// A breath before it opens, so touching the edge and coming straight back to the page (a web app's own list
-    /// along that side) leaves it be. Still at the edge, or gone out past it, it opens.
+    /// along that side) leaves it be, and so does crossing it on the way to the display beside this one. Still at
+    /// the edge, or just out past it, it opens.
     private static let edgeGrace: TimeInterval = 0.1
     private var edgeTimer: Timer?
 
     private func pointerAtEdge() {
-        guard edgeTimer == nil, !sidebarVisible, !sidebarRevealed else { return }
+        guard edgeTimer == nil, !sidebarVisible, !sidebarRevealed, blocksEdgeReveal?() != true else { return }
         edgeTimer = Timer.scheduledTimer(withTimeInterval: Self.edgeGrace, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, let window = self.window else { return }
+                guard let self else { return }
                 self.edgeTimer = nil
-                let point = self.convert(window.mouseLocationOutsideOfEventStream, from: nil)
-                if self.isAtEdge(point), point.y >= self.bounds.minY, point.y <= self.bounds.maxY,
-                   !self.isOverTopBarLights(point) { self.reveal(true) }
+                // Something may have opened over the window in the meantime (⌘L with the pointer resting here).
+                if let point = self.pointer, self.edgeZone.opens(at: point), self.blocksEdgeReveal?() != true { self.reveal(true) }
             }
         }
     }
@@ -1287,14 +1295,8 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     private func followPointer() {
-        guard let window, !sidebarVisible, sidebarRevealed else { watchPointer(false); return }
-        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-        let sidebar = sidebarContainer.frame
-        // Anywhere past the sidebar, toward the window's edge, counts as on it: that's where the pointer goes to summon it.
-        let beyond = sidebarOnRight ? point.x > sidebar.maxX : point.x < sidebar.minX
-        let keep = sidebar.insetBy(dx: -Tokens.Space.x1, dy: -Tokens.Space.x1).contains(point)
-            || (beyond && point.y >= bounds.minY && point.y <= bounds.maxY)
-        if keep || isHeld || NSEvent.pressedMouseButtons != 0 {
+        guard let point = pointer, !sidebarVisible, sidebarRevealed else { watchPointer(false); return }
+        if edgeZone.keeps(at: point) || isHeld || NSEvent.pressedMouseButtons != 0 {
             if pointerLeftAt != nil { pointerLeftAt = nil; pacePointer() }
         } else if let left = pointerLeftAt {
             if Date().timeIntervalSince(left) > Tokens.Motion.edgeHideDelay { reveal(false) }
@@ -1322,6 +1324,16 @@ final class BrowserRootView: SpaceFrameView {
     var isSidebarFloatingVisible: Bool { !sidebarVisible && sidebarRevealed }
 
     #if DEBUG
+    /// Testing builds: the pointer counts as here (top-down, in the window's terms; left of the window is negative),
+    /// wherever the real one is.
+    private var debugPointer: NSPoint?
+
+    /// Testing builds: the pointer moves to `point` (nil: back to the real one), as the edge sees it.
+    func debugEdgePointer(_ point: NSPoint?) {
+        debugPointer = point
+        if let point, edgeZone.opens(at: point) { pointerAtEdge() }
+    }
+
     /// Testing builds: a drag on the sidebar's edge, step by step ("begin", an x, "end"), as the handle reports it.
     func debugEdgeDrag(_ step: String) {
         switch step {
@@ -1331,6 +1343,54 @@ final class BrowserRootView: SpaceFrameView {
         }
     }
     #endif
+}
+
+/// The sidebar's edge of a window whose sidebar is hidden, as the pointer meets it: where the pointer brings the
+/// sidebar out (`opens`), and where it keeps it out once it's there (`keeps`). Both read the same shape, so they
+/// can't disagree: wherever the pointer opens the sidebar, it also keeps it. Top-down, in the window's own terms, and
+/// the pointer may be anywhere on screen, outside the window included. Worked out for a sidebar on the left, as the
+/// window's frames are; on the right it's the same shape turned over the window's middle.
+struct SidebarEdgeZone: Equatable {
+    /// The window's whole area.
+    var bounds: NSRect
+    /// Where the sidebar sits once it's out.
+    var sidebar: NSRect
+    /// The sidebar is along the window's right edge.
+    var onRight = false
+    /// A strip along the top, measured from the window's top, where the edge doesn't open the sidebar: the bar above
+    /// the page keeps the traffic lights there.
+    var reservedTop: CGFloat = 0
+    /// How far out past the window's edge the pointer still counts as at it. Further out it's somewhere else: on
+    /// the desktop, or on the display beside this one.
+    var reach: CGFloat = Tokens.Metric.edgeRevealReach
+
+    /// The point, and the sidebar, as they'd be with the sidebar on the left.
+    private func turned(_ point: NSPoint) -> NSPoint {
+        onRight ? NSPoint(x: bounds.minX + bounds.maxX - point.x, y: point.y) : point
+    }
+    private var turnedSidebar: NSRect { BrowserRootView.mirrored(sidebar, in: bounds, if: onRight) }
+
+    /// The strip just inside the window's edge ends here.
+    private var stripEnd: CGFloat { bounds.minX + Tokens.Metric.edgeRevealWidth }
+
+    /// Level with the window, and no further out past its edge than the reach.
+    private func isBeside(_ point: NSPoint) -> Bool {
+        point.y >= bounds.minY && point.y <= bounds.maxY && point.x >= bounds.minX - reach
+    }
+
+    /// At the sidebar's edge of the window: in the strip just inside it, or just out past it.
+    func opens(at point: NSPoint) -> Bool {
+        let point = turned(point)
+        return isBeside(point) && point.x <= stripEnd && point.y >= bounds.minY + reservedTop
+    }
+
+    /// On the sidebar, a little around it, or past it toward the window's edge as far as the edge reaches: that's
+    /// where the pointer went to summon it. The whole strip counts, so the pointer that opened it never lets it go by standing still.
+    func keeps(at point: NSPoint) -> Bool {
+        let point = turned(point), sidebar = turnedSidebar
+        return sidebar.insetBy(dx: -Tokens.Space.x1, dy: -Tokens.Space.x1).contains(point)
+            || (isBeside(point) && point.x <= max(stripEnd, sidebar.minX))
+    }
 }
 
 /// A full-size layer for floating UI that lets clicks fall through where it has nothing.

@@ -98,11 +98,15 @@ struct SidebarSideTests {
 
     @Test func aHiddenSidebarComesOutAtItsOwnEdge() {
         let middle = window.midY
-        #expect(BrowserRootView.isAtRevealEdge(NSPoint(x: 2, y: middle), in: window, onRight: false))
-        #expect(!BrowserRootView.isAtRevealEdge(NSPoint(x: 1278, y: middle), in: window, onRight: false))
-        #expect(BrowserRootView.isAtRevealEdge(NSPoint(x: 1278, y: middle), in: window, onRight: true))
-        #expect(!BrowserRootView.isAtRevealEdge(NSPoint(x: 2, y: middle), in: window, onRight: true))
-        #expect(!BrowserRootView.isAtRevealEdge(NSPoint(x: 640, y: middle), in: window, onRight: true))
+        func zone(onRight: Bool) -> SidebarEdgeZone {
+            let out = BrowserRootView.sidebarFrame(in: window, width: width, visible: false, revealed: true, onRight: onRight)
+            return SidebarEdgeZone(bounds: window, sidebar: out, onRight: onRight)
+        }
+        #expect(zone(onRight: false).opens(at: NSPoint(x: 2, y: middle)))
+        #expect(!zone(onRight: false).opens(at: NSPoint(x: 1278, y: middle)))
+        #expect(zone(onRight: true).opens(at: NSPoint(x: 1278, y: middle)))
+        #expect(!zone(onRight: true).opens(at: NSPoint(x: 2, y: middle)))
+        #expect(!zone(onRight: true).opens(at: NSPoint(x: 640, y: middle)))
     }
 
     @Test func theMiniPlayerFirstGoesToTheCornerAwayFromTheSidebar() {
