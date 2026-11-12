@@ -25,6 +25,8 @@ final class SitePanel: FloatingPanelView {
     private let isPrivate: Bool
     private let url: URL
     private let site: String
+    /// The name the header shows: the site, with its port when it has its own (`init`).
+    private var shownName = ""
     /// The page's origin, which its camera, location, notification and pop-up answers are kept under.
     private let origin: String?
     private let isBlank: Bool
@@ -37,6 +39,8 @@ final class SitePanel: FloatingPanelView {
 
     private let icon = FaviconView()
     private let siteName = Label("", font: Tokens.Font.voice(20), color: Tokens.Color.textPrimary)
+    /// Over the name, for its tooltip: a label lets the pointer through.
+    private let siteNameHover = NSView()
     private let moreButton = IconButton(symbol: "ellipsis", toolTip: String(localized: "More", comment: "Tooltip of the … button in the site panel."))
     private var actionTiles: [PanelTile] = []
     /// Whose extensions these are, at the label's end, once there's more than one profile.
@@ -132,7 +136,10 @@ final class SitePanel: FloatingPanelView {
         let web = ["http", "https"].contains(url?.scheme?.lowercased() ?? "")
         let full = origin.map(SiteOrigin.label).flatMap { $0.contains(":") ? $0 : nil }
         let named = web ? full ?? site : site
+        shownName = named
         siteName.attributedStringValue = Tokens.Font.voiceText(named, size: 20)
+        // However it's cut to fit, VoiceOver gets the whole name, and so does the pointer (`layoutContent`).
+        siteName.setAccessibilityValue(named)
         let address = self.url
         if ["http", "https"].contains(address.scheme ?? "") {
             // The connection, by its one word: secure, or not. Only an https page has a certificate to show; plain
@@ -148,7 +155,7 @@ final class SitePanel: FloatingPanelView {
             if !secure { row.valueColor = Tokens.Color.warning }
             connectionRow = row
         }
-        [icon, siteName, moreButton].forEach { addSubview($0) }
+        [icon, siteName, siteNameHover, moreButton].forEach { addSubview($0) }
         if let connectionRow { addSubview(connectionRow) }
         let shownSite = site
         pageToken = tab.changed.observe { [weak self, weak tab] change in
@@ -810,19 +817,13 @@ final class SitePanel: FloatingPanelView {
     }
 
     @discardableResult
-    /// The site's name at its size, a little smaller when it's long, and past that cut the way the address cuts it,
-    /// never clipped mid-letter.
-    private static func fitted(_ name: String, in width: CGFloat) -> NSAttributedString {
-        for size in stride(from: CGFloat(20), through: 15, by: -1) {
-            let text = Tokens.Font.voiceText(name, size: size)
-            if text.size().width <= width || size == 15 {
-                guard text.size().width > width else { return text }
-                let paragraph = NSMutableParagraphStyle()
-                paragraph.lineBreakMode = AddressView.lineBreak(forName: name)
-                return Tokens.Font.voiceText(name, size: size, paragraph: paragraph)
-            }
+    /// The site's name at its size, a little smaller when it's long, and past that cut so its domain stays whole
+    /// (`HostText`): the subdomains quiet, the domain that says whose site it is in the text's own ink.
+    static func fitted(_ name: String, in width: CGFloat) -> NSAttributedString {
+        let fit = HostText.fit(name, width: width, size: 20, shrink: 5, smallest: 13) { text, size in
+            ceil(Tokens.Font.voiceText(text, size: size).size().width)
         }
-        return Tokens.Font.voiceText(name, size: 20)
+        return HostText.styled(fit, font: { Tokens.Font.voice($0) }, kern: { Tokens.Font.voiceKern($0) })
     }
 
     fileprivate func layoutContent(dryRun: Bool) -> CGFloat {
@@ -897,8 +898,10 @@ final class SitePanel: FloatingPanelView {
         place(icon, NSRect(x: pad, y: y + (headerHeight - iconSide) / 2, width: iconSide, height: iconSide))
         let textX = pad + iconSide + Tokens.Space.x3
         let textWidth = (moreButton.isHidden ? width - pad : moreX) - textX
-        siteName.attributedStringValue = Self.fitted(site, in: textWidth)
+        siteName.attributedStringValue = Self.fitted(shownName, in: textWidth)
+        siteNameHover.toolTip = siteName.stringValue == shownName ? nil : shownName
         place(siteName, NSRect(x: textX - Label.inset, y: y + (headerHeight - siteName.lineHeight) / 2, width: textWidth + Label.inset * 2, height: siteName.lineHeight))
+        place(siteNameHover, NSRect(x: textX, y: y, width: min(textWidth, siteName.inkWidth), height: headerHeight))
         y += headerHeight
         end(Tokens.Space.x4)
 

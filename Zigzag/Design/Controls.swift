@@ -1127,6 +1127,8 @@ final class DropdownButton: InteractiveView {
         }
         chevron.frame = NSRect(x: bounds.width - Self.textInset - 10, y: (bounds.height - 14) / 2, width: 10, height: 14)
         label.frame = NSRect(x: x - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: max(0, chevron.frame.minX - x - Tokens.Space.x1), height: label.lineHeight)
+        // A choice cut short (a long profile name) shows whole under the pointer (#189).
+        if !showsPictureOnly { toolTip = label.frame.width < label.textWidth - Tokens.Space.x1 ? current?.title : nil }
     }
 
     func openMenu() {

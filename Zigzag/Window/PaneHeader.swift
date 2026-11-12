@@ -329,11 +329,10 @@ final class PaneAddressView: InteractiveView {
     }
     var showsSiteControls: Bool { !isHidden && !siteControls.isHidden }
 
-    var text: String {
-        get { label.stringValue }
-        set {
-            label.stringValue = newValue
-            setAccessibilityLabel(newValue.isEmpty ? String(localized: "Address", comment: "VoiceOver name of the address in a split view page's strip, while it has none.") : newValue)
+    var text: String = "" {
+        didSet {
+            label.stringValue = text
+            setAccessibilityLabel(text.isEmpty ? String(localized: "Address", comment: "VoiceOver name of the address in a split view page's strip, while it has none.") : text)
             needsLayout = true
         }
     }
@@ -341,10 +340,16 @@ final class PaneAddressView: InteractiveView {
     /// As wide as the whole address and the padding, with the few points a middle-truncating field keeps in hand
     /// before it cuts (centered, so they never show).
     var fittingWidth: CGFloat {
-        let cell = label.cell.map { ceil($0.cellSize.width) - Label.inset * 2 } ?? 0
-        return max(cell, label.inkWidth) + Self.padding * 2 + Self.slack + Self.buttonRoom
+        return fullTextWidth + Self.padding * 2 + Self.slack + Self.buttonRoom
     }
     private static let slack: CGFloat = Tokens.Space.x2
+    /// The whole address's width, measured as the field draws it, whatever it shows now.
+    private var fullTextWidth: CGFloat {
+        let cell = NSTextFieldCell(textCell: text)
+        cell.font = label.font
+        let ink = ceil((text as NSString).size(withAttributes: [.font: label.font ?? Tokens.Font.body()]).width)
+        return max(ceil(cell.cellSize.width) - Label.inset * 2, ink)
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -377,6 +382,14 @@ final class PaneAddressView: InteractiveView {
         siteControls.frame = NSRect(x: bounds.width - Self.buttonInset - side, y: (bounds.height - side) / 2, width: side, height: side)
         label.frame = NSRect(x: Self.padding - Label.inset, y: (bounds.height - h) / 2,
                              width: max(0, bounds.width - Self.padding * 2 - (button ? Self.buttonRoom : 0) + Label.inset * 2), height: h)
+        // An address too long for the strip shows its host alone, cut so its domain stays whole (#189): cut in the
+        // middle, "gemini.goo…/app" would hide whose site it is.
+        let fits = label.frame.width - Label.inset * 2 >= fullTextWidth - 0.5
+        let host = text.split(separator: "/", maxSplits: 1).first.map(String.init) ?? text
+        let shown = fits || host == text ? text : host
+        if label.stringValue != shown { label.stringValue = shown }
+        label.lineBreakMode = shown == text && fits ? .byTruncatingMiddle : AddressView.lineBreak(forName: shown)
+        toolTip = shown == text && fits ? nil : text
     }
 
     override func stateDidChange(animated: Bool) {

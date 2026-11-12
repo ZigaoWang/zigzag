@@ -1129,6 +1129,10 @@ final class SpaceLookEditor: NSView {
                                                  .text(String(localized: "Frosted", comment: "In the space editor, for a see-through space: frosted glass, the desktop blurred behind it."))])
     private let grainLabel = SpaceLookEditor.rowLabel(String(localized: "Grain", comment: "A slider in the space editor: how much film grain the color has."))
     private let grainSlider = LookSlider(.grain)
+    /// Puts back the colors the space was made with, there only to use once they've changed.
+    private let defaultsButton = TextButton(title: String(localized: "Use Default Colors", comment: "Button in the space editor, and item in a space's context menu: puts back the colors the space had when it was made."))
+    /// The color the space was made with, which `defaultsButton` goes back to.
+    private let defaultColor: SpaceColor
 
     var onPreview: ((SpaceInfo) -> Void)?
     var onCommit: ((SpaceInfo) -> Void)?
@@ -1137,23 +1141,25 @@ final class SpaceLookEditor: NSView {
 
     /// The space as the editor has it right now.
     private var draft: SpaceInfo
-    /// As it was when the editor opened.
-    private let original: SpaceInfo
+    /// As it was when the editor opened, or with its default colors once they're put back: what a space that
+    /// follows the Mac keeps.
+    private var original: SpaceInfo
     /// A space never given a color follows the Mac, light by day and dark at night, until you choose one.
     private var colorChosen: Bool
     /// Which color the wheel's selected knob is, and Shade shows: 0, or 1 for a gradient's second.
     private var selected = 0
 
     /// `dark`: whether the window looks dark right now, for where a space that follows the Mac starts.
-    init(space: SpaceInfo, dark: Bool) {
+    init(space: SpaceInfo, defaultColor: SpaceColor, dark: Bool) {
         let space = space.upgraded
         isDark = dark
+        self.defaultColor = defaultColor
         original = space
         draft = space
         colorChosen = space.brightness != nil
         super.init(frame: .zero)
         if draft.brightness == nil { draft.brightness = Self.startingDepth(space, dark: dark) }
-        let views: [NSView] = [wheel, colorsLabel, addSlot, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, glassLabel, glassSwitch, grainLabel, grainSlider, effects]
+        let views: [NSView] = [wheel, colorsLabel, addSlot, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, glassLabel, glassSwitch, grainLabel, grainSlider, effects, defaultsButton]
         showsEffects = space.hue2 != nil || space.isSeeThrough || (space.grain ?? 0) > 0.01
         (views + chips + swatches).forEach { addSubview($0) }
 
@@ -1223,6 +1229,7 @@ final class SpaceLookEditor: NSView {
             self.draft.angle = angle
             self.changed(final: final, animated: false)
         }
+        defaultsButton.onClick = { [weak self] _ in self?.useDefaultColors() }
         sync(animated: false)
     }
 
@@ -1305,6 +1312,17 @@ final class SpaceLookEditor: NSView {
         changed(final: true, animated: true)
     }
 
+    /// The colors a new space gets, back again: following the Mac, one color, solid and smooth.
+    func useDefaultColors() {
+        let fresh = draft.withDefaultColors(defaultColor)
+        original = fresh
+        draft = fresh
+        draft.brightness = Self.startingDepth(fresh, dark: isDark)
+        colorChosen = false
+        selected = 0
+        changed(final: true, animated: true)
+    }
+
     private func changed(final: Bool, animated: Bool) {
         if final { onCommit?(look) } else { onPreview?(look) }
         sync(animated: animated)
@@ -1350,6 +1368,7 @@ final class SpaceLookEditor: NSView {
         for view in [glassLabel, glassSwitch] as [NSView] { view.isHidden = !glassShown }
         if glassShown != showsGlass { showsGlass = glassShown; onResize?() }
         if !showsEffects { chips[1].isHidden = true; addSlot.isHidden = true }
+        defaultsButton.isEnabled = !shown.hasDefaultColors(defaultColor)
         showDial(two && showsEffects, animated: animated)
         needsLayout = true
     }
@@ -1421,7 +1440,11 @@ final class SpaceLookEditor: NSView {
         y += wheelHeight + Tokens.Space.x3
         row(shadeLabel, shadeSlider, y: y, height: sliderHeight)
         y += sliderHeight + Tokens.Space.x3
-        effects.frame = NSRect(x: 0, y: y, width: width, height: disclosureHeight)
+        // Use Default Colors at the end of the Effects row, out of the way until wanted.
+        let resetWidth = min(ceil(defaultsButton.fittingWidth), width / 2)
+        defaultsButton.frame = NSRect(x: width - resetWidth, y: y + (disclosureHeight - Tokens.Space.x7Height) / 2,
+                                      width: resetWidth, height: Tokens.Space.x7Height)
+        effects.frame = NSRect(x: 0, y: y, width: width - resetWidth - Tokens.Space.x2, height: disclosureHeight)
         y += disclosureHeight + Tokens.Space.x2
         // Colors: the space's own, then the slot for a second or, with two, which way they run.
         let lh = ceil(colorsLabel.intrinsicContentSize.height)
@@ -1485,7 +1508,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         self.controller = controller
         let space = Library.shared.space(spaceID) ?? SpaceInfo(name: "", color: .sky)
         let dark = (controller?.window?.effectiveAppearance ?? NSApp.effectiveAppearance).bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        editor = SpaceLookEditor(space: space, dark: dark)
+        editor = SpaceLookEditor(space: space, defaultColor: Library.shared.defaultColor(ofSpace: spaceID) ?? space.color, dark: dark)
         super.init(frame: .zero)
         radius = Tokens.Radius.panel
         nameField.stringValue = space.name
@@ -1780,6 +1803,9 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
             edited = true
         }
     }
+
+    /// Use Default Colors, as its button does (the debug bridge).
+    func useDefaultColors() { editor.useDefaultColors() }
 
     func controlTextDidChange(_ obj: Notification) { commitName() }
 

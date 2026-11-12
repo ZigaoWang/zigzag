@@ -820,6 +820,8 @@ enum DebugBridge {
             let space = Library.shared.addSpace(name: arg.isEmpty ? nil : arg)
             controller.tabManager.switchToSpace(space.id)
         case "spacehue": if let degrees = Double(arg) { Library.shared.setHue(degrees / 360, for: controller.tabManager.currentSpaceID) }
+        case "spacedefaults":
+            if let panel = SpaceEditorPanel.current { panel.useDefaultColors() } else { Library.shared.useDefaultColors(forSpace: controller.tabManager.currentSpaceID) }
         case "bookmark": if let tab = controller.tabManager.selectedTab { controller.tabManager.bookmarkTab(tab) }
         case "hover": controller.debugHover(index: Int(arg) ?? 0)
         case "desk": controller.toggleDeskView(nil)
