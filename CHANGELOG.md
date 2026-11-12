@@ -5,6 +5,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-11-12
+
 ### New
 - A new window shows the same spaces and tabs as your other windows, as in Arc: open, close, move or nest a tab in one and every window shows it. Each window keeps its own space and its own tab in each space. A page is on screen in one window at a time; another window on that tab says so, with Show Here to bring it over. Closing a window closes none of its tabs, and Move Tab to New Window opens a window on that tab. Private windows keep their tabs to themselves. ([#162](https://github.com/ZigaoWang/zigzag/issues/162))
 - Split view takes up to four tabs. Drag a tab over the page: the edges place it in a half, the corners in a quarter, and a preview shows where it lands. Three tabs are a half and two quarters, four a grid; the lines between them drag, and the group is one row in the sidebar that comes back after a restart. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
