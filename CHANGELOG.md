@@ -9,6 +9,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - With the address above the page, a zoomed pane in split view keeps its strip, with its address and buttons, on top of it, instead of leaving it behind in the bar. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - Site Controls opened from a pane in split view closes when the panes move, as when the split ends, a pane is zoomed or two swap, instead of staying where the pane's strip was. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - With Site Controls or Downloads left open in one window, the button in another window opens them there on the first click, instead of only closing the other window's. Link previews and Esc in Reader no longer wait on a panel open in another window.
+- An installed app opened again right after its window closed, from the Dock or Finder, opens its window, instead of leaving its Dock icon with no window. ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
 
 ## [0.9.0] - 2026-11-12
 

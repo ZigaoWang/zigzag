@@ -123,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else if !restored, !webAppOnly {
             WindowManager.shared.newWindow()
         }
-        pendingWebApps.forEach(WebAppStore.handle)
+        pendingWebApps.forEach { WebAppStore.handle($0) }
         pendingWebApps = []
         Updater.shared.start()
         // Just updated: what's new comes first, and the default browser offer waits for another launch. Profiles
@@ -239,7 +239,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let string = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue else { return }
         // A site installed as an app, opened or quit (only its small app sends these).
         if let link = URL(string: string), WebAppLink.parse(link) != nil {
-            if launched { WebAppStore.handle(link) } else { pendingWebApps.append(link) }
+            let sender = event.attributeDescriptor(forKeyword: AEKeyword(keySenderPIDAttr))?.int32Value
+            if launched { WebAppStore.handle(link, from: sender) } else { pendingWebApps.append(link) }
             return
         }
         // A link another app hands over (or a script's `open location`) is a web address: never one of Zigzag's own

@@ -192,12 +192,13 @@ final class WebAppStore {
     }
 
     /// What a zigzag-webapp: link asks: the app's window shown, or closed.
-    static func handle(_ link: URL) {
+    /// `sender`: the process that sent it, if known.
+    static func handle(_ link: URL, from sender: pid_t? = nil) {
         guard let (action, id) = WebAppLink.parse(link) else { return }
         switch action {
         case .open:
             guard let app = shared.app(id) ?? shared.recover(id) else { return }
-            WebAppWindowController.show(app)
+            WebAppWindowController.show(app, from: sender)
         case .close:
             WebAppWindowController.controller(for: id)?.window?.close()
         }

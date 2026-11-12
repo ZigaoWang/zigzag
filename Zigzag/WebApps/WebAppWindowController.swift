@@ -15,9 +15,18 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
 
     private(set) static var all: [WebAppWindowController] = []
     static func controller(for id: String) -> WebAppWindowController? { all.first { $0.app.id == id } }
-    /// When each app's window last closed: the small app becoming active as it goes asks for it again at once, which
-    /// isn't you asking.
+    /// When each app's window last closed, and the small apps that were running for it then: the small app becoming
+    /// active as it goes asks for it again at once, which isn't you asking. A new one, opened again from the Dock
+    /// right after, is.
     private static var closedAt: [String: Date] = [:]
+    private static var closedLaunchers: [String: Set<pid_t>] = [:]
+
+    /// Whether an ask to show an app's window is the leftover one from the small app that went as its window closed:
+    /// by which process asked when that's known, else by asking within a moment of the close.
+    nonisolated static func isLeftover(sender: pid_t?, closing: Set<pid_t>, closedAt: Date?, now: Date = Date()) -> Bool {
+        if let sender { return closing.contains(sender) }
+        return closedAt.map { now.timeIntervalSince($0) < 1.5 } ?? false
+    }
 
     let app: WebApp
     let tab: Tab
@@ -30,9 +39,10 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
     private var isClosing = false
 
     /// Shows the app's window, opening it if it isn't, and brings it forward on its own.
-    static func show(_ app: WebApp) {
+    /// `sender`: the process that asked, if known.
+    static func show(_ app: WebApp, from sender: pid_t? = nil) {
         if let open = controller(for: app.id) { open.bringForward(); return }
-        if let closed = closedAt[app.id], Date().timeIntervalSince(closed) < 1.5 { return }
+        if isLeftover(sender: sender, closing: closedLaunchers[app.id] ?? [], closedAt: closedAt[app.id]) { return }
         let controller = WebAppWindowController(app: app)
         all.append(controller)
         Diagnostics.note("Web app opened", site: app.url.host())
@@ -237,6 +247,7 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         isClosing = true
         Self.closedAt[app.id] = Date()
+        Self.closedLaunchers[app.id] = Set(WebAppStore.runningLauncher(of: app.id).map(\.processIdentifier))
         pageGone.send()
         linkStatus.hide()
         Autofill.shared.forget(windowOf: window)

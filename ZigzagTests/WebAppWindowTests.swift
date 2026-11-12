@@ -48,6 +48,18 @@ struct WebAppWindowTests {
 
     // MARK: The toolbar choice
 
+    @Test func onlyTheSmallAppThatWentIsIgnoredAfterAClose() {
+        let closed = Date()
+        // The small app that was running as the window closed asks again as it goes: not you asking.
+        #expect(WebAppWindowController.isLeftover(sender: 501, closing: [501], closedAt: closed, now: closed.addingTimeInterval(0.3)))
+        // A new one, opened again from the Dock right away, is you, however soon.
+        #expect(!WebAppWindowController.isLeftover(sender: 777, closing: [501], closedAt: closed, now: closed.addingTimeInterval(0.3)))
+        // Who asked unknown: only a moment after the close is taken for the leftover.
+        #expect(WebAppWindowController.isLeftover(sender: nil, closing: [501], closedAt: closed, now: closed.addingTimeInterval(1)))
+        #expect(!WebAppWindowController.isLeftover(sender: nil, closing: [501], closedAt: closed, now: closed.addingTimeInterval(2)))
+        #expect(!WebAppWindowController.isLeftover(sender: nil, closing: [], closedAt: nil))
+    }
+
     @Test func appsSavedBeforeTheChoiceShowTheToolbar() throws {
         let old = #"{"id":"0123456789abcdef","name":"Wiki","url":"https://en.wikipedia.org/","profileID":"11111111-2222-3333-4444-555555555555","spaceID":"11111111-2222-3333-4444-555555555555","bundlePath":"/x.app","created":0}"#
         let app = try JSONDecoder().decode(WebApp.self, from: Data(old.utf8))
