@@ -828,6 +828,37 @@ enum DebugBridge {
             } else {
                 controller.unzoomPane()
             }
+        case "moveregion":
+            // moveregion: whether a press would move the window, at points across each pane's strip and elsewhere in
+            // the title bar's band, from the drag region AppKit last gave the window server (which starts the move
+            // before the app sees the press), in the debug log.
+            guard let window = controller.window, let content = window.contentView else { break }
+            let band = window.standardWindowButton(.closeButton)?.superview?.superview?.frame ?? .zero
+            func probe(_ name: String, _ point: NSPoint) -> String {
+                let moves = windowServerMoves(window, at: point).map { $0 ? "MOVES" : "stays" } ?? "?"
+                return "\(name)(\(Int(point.x)),\(Int(point.y))\(band.contains(point) ? " band" : ""))=\(moves)"
+            }
+            var probes: [String] = []
+            for (i, card) in controller.root.paneCards.enumerated() where card.window != nil && !card.isHiddenOrHasHiddenAncestor {
+                let header = card.header
+                guard !header.isHiddenOrHasHiddenAncestor, !header.isInBar else { continue }
+                let r = header.convert(header.bounds, to: nil)
+                probes += [probe("strip\(i).lead", NSPoint(x: r.minX + 2, y: r.midY)),
+                           probe("strip\(i).mid", NSPoint(x: r.midX, y: r.maxY - 2)),
+                           probe("strip\(i).trail", NSPoint(x: r.maxX - 2, y: r.midY)),
+                           probe("strip\(i).line", NSPoint(x: r.midX + 7, y: r.minY + 0.5))]
+                if !header.address.isHidden { let a = header.address.convert(header.address.bounds, to: nil); probes.append(probe("strip\(i).address", NSPoint(x: a.midX, y: a.midY))) }
+                let b = header.back.convert(header.back.bounds, to: nil)
+                probes.append(probe("strip\(i).back", NSPoint(x: b.midX, y: b.midY)))
+            }
+            let top = content.bounds.maxY - 3
+            let side = controller.root.sidebarContainer
+            if !side.isHiddenOrHasHiddenAncestor, side.frame.width > 0 {
+                let s = side.convert(side.bounds, to: nil)
+                probes.append(probe("sidebar.top", NSPoint(x: s.midX, y: min(s.maxY, top + 3) - 6)))
+            }
+            probes.append(probe("frame.topEdge", NSPoint(x: content.bounds.maxX - 40, y: content.bounds.maxY - 1)))
+            debugLog("moveregion band=\(band) " + probes.joined(separator: " "))
         case "rowdump":
             // rowdump: the shown tab's row's parts, where each is and whether it shows, in the debug log.
             if let tab = controller.tabManager.selectedTab, let row = controller.sidebar.list.row(for: tab) {
@@ -2105,6 +2136,27 @@ enum DebugBridge {
         }
         controller.tabManager.switchToSpace(space.id)
         debugLog("seedfolders => \(pages.count) pages in \(Library.shared.folders(in: space.id).count) folders, deepest \(Library.shared.folders(in: space.id).map { Library.shared.depth(ofFolder: $0.id) }.max() ?? 0)")
+    }
+
+    /// Whether the window server would start moving the window on a press at this point (window coordinates), read
+    /// from the drag region AppKit last gave it; nil where that can't be read (it's AppKit's own, unpublished). The
+    /// region comes as rows from the bottom up, each 32-bit: its y, its length in words, then the x where each run
+    /// the window moves from starts and ends; a row holds until the next one.
+    static func windowServerMoves(_ window: NSWindow, at point: NSPoint) -> Bool? {
+        let selector = NSSelectorFromString("_lastDragRegionData")
+        guard window.responds(to: selector), let data = window.perform(selector)?.takeUnretainedValue() as? Data,
+              data.count >= 8, data.count % 4 == 0 else { return nil }
+        let words = data.withUnsafeBytes { Array($0.bindMemory(to: Int32.self)) }
+        var runs: [Int32] = []
+        var i = 2
+        while i + 1 < words.count {
+            let y = words[i], length = Int(words[i + 1])
+            guard length >= 2, i + length <= words.count else { return nil }
+            if CGFloat(y) > point.y { break }
+            runs = Array(words[(i + 2)..<(i + length)])
+            i += length
+        }
+        return stride(from: 0, to: runs.count - 1, by: 2).contains { CGFloat(runs[$0]) <= point.x && point.x < CGFloat(runs[$0 + 1]) }
     }
     #endif
 }

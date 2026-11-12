@@ -36,6 +36,8 @@ final class PaneHeaderView: NSView {
     /// The page's address: click it to edit it, as the sidebar's address does for the page you're in.
     let address = PaneAddressView()
     private let line = ColorView(color: Tokens.Color.separator)
+    /// Keeps the window still under the strip on the page, in the title bar's band too (`TitleBandGuard`).
+    let windowGuard = TitleBandGuard()
     private(set) weak var tab: Tab?
     private var token: SignalToken?
     static let height = Tokens.Pane.height
@@ -49,6 +51,7 @@ final class PaneHeaderView: NSView {
         didSet {
             guard isInBar != oldValue else { return }
             line.isHidden = isInBar
+            windowGuard.isHidden = isInBar
             refreshInk()
             needsLayout = true
         }
@@ -63,7 +66,7 @@ final class PaneHeaderView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [back, forward, reload, address, zoom, swap, orientation, close, more, closeTab, line].forEach { addSubview($0) }
+        [windowGuard, back, forward, reload, address, zoom, swap, orientation, close, more, closeTab, line].forEach { addSubview($0) }
         more.onClick = { [weak self] _ in self?.showMore() }
         back.onClick = { [weak self] _ in self?.tab?.goBack() }
         forward.onClick = { [weak self] _ in self?.tab?.goForward() }
@@ -258,7 +261,27 @@ final class PaneHeaderView: NSView {
         address.frame = NSRect(x: round(pillX), y: y + (b - h) / 2, width: pillWidth, height: h)
         address.isHidden = address.text.isEmpty || pillWidth < PaneAddressView.padding * 3
         line.frame = NSRect(x: 0, y: bounds.height - Tokens.Metric.hairline, width: bounds.width, height: Tokens.Metric.hairline)
+        windowGuard.frame = bounds
     }
+}
+
+/// Laid under a view in the band where a title bar would be, keeps a press there from moving the window. With
+/// `.fullSizeContentView` the window server itself starts moving the window on a press in that band, before the app
+/// sees it, everywhere but the parts AppKit marks as taken. It marks only controls (`NSControl`s) whose
+/// `mouseDownCanMoveWindow` is false; a plain view's own false counts below the band but not in it. This control
+/// marks its frame, and takes no clicks itself: they go to the view it lies under. Hidden, it marks nothing.
+final class TitleBandGuard: NSControl {
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        setAccessibilityElement(false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var mouseDownCanMoveWindow: Bool { false }
+    /// Out of the key view loop. Not by refusing first responder: AppKit then leaves the control out of the region.
+    override var canBecomeKeyView: Bool { false }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 /// A pane's address: the page's address in a small field, a faint fill and a 1px edge. A click edits it.
