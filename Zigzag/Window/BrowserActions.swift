@@ -234,22 +234,18 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func reloadPageFromOrigin(_ sender: Any?) { selectedTab?.reloadFromOrigin() }
     @objc func stopLoading(_ sender: Any?) { selectedTab?.stopLoading() }
 
-    private static let zoomSteps: [CGFloat] = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
-
     @objc func zoomIn(_ sender: Any?) {
         if zoomReader(1) { return }
         if let pdf = selectedTab?.pdfViewer { pdf.zoomIn(); return }
         guard let webView = selectedWebView else { return }
-        let next = Self.zoomSteps.first { $0 > webView.pageZoom + 0.001 } ?? Self.zoomSteps.last!
-        setZoom(next)
+        setZoom(ZoomLevels.step(webView.pageZoom, by: 1))
     }
 
     @objc func zoomOut(_ sender: Any?) {
         if zoomReader(-1) { return }
         if let pdf = selectedTab?.pdfViewer { pdf.zoomOut(); return }
         guard let webView = selectedWebView else { return }
-        let next = Self.zoomSteps.last { $0 < webView.pageZoom - 0.001 } ?? Self.zoomSteps.first!
-        setZoom(next)
+        setZoom(ZoomLevels.step(webView.pageZoom, by: -1))
     }
 
     @objc func actualSize(_ sender: Any?) {
@@ -591,6 +587,23 @@ extension BrowserWindowController: NSMenuItemValidation {
 /// Per-site zoom, remembered.
 enum ZoomLevels {
     private static let key = "ZoomLevels"
+
+    /// The zooms ⌘+ and ⌘− go through, and Site Controls' stepper.
+    static let steps: [CGFloat] = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
+
+    /// The next step in (`by` 1) or out (-1) from `zoom`, which needn't be a step itself (a pinch, an old level); at
+    /// either end it stays there.
+    static func step(_ zoom: CGFloat, by direction: Int) -> CGFloat {
+        direction > 0 ? steps.first { $0 > zoom + 0.001 } ?? steps.last! : steps.last { $0 < zoom - 0.001 } ?? steps.first!
+    }
+
+    /// Whether there's a step further that way.
+    static func canStep(_ zoom: CGFloat, by direction: Int) -> Bool {
+        direction > 0 ? zoom < steps.last! - 0.001 : zoom > steps.first! + 0.001
+    }
+
+    /// A zoom as people read it: "125%".
+    static func percent(_ zoom: CGFloat) -> String { "\(Int((zoom * 100).rounded()))%" }
 
     static func zoom(for url: URL) -> CGFloat {
         let levels = UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]

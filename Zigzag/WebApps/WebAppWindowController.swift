@@ -214,16 +214,14 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         NSApp.activate()
     }
 
-    private static let zoomSteps: [CGFloat] = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
-
     @objc func zoomIn(_ sender: Any?) {
         guard let webView = tab.webView else { return }
-        setZoom(Self.zoomSteps.first { $0 > webView.pageZoom + 0.001 } ?? Self.zoomSteps.last!)
+        setZoom(ZoomLevels.step(webView.pageZoom, by: 1))
     }
 
     @objc func zoomOut(_ sender: Any?) {
         guard let webView = tab.webView else { return }
-        setZoom(Self.zoomSteps.last { $0 < webView.pageZoom - 0.001 } ?? Self.zoomSteps.first!)
+        setZoom(ZoomLevels.step(webView.pageZoom, by: -1))
     }
 
     @objc func actualSize(_ sender: Any?) { setZoom(1) }
