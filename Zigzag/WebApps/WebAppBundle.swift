@@ -148,6 +148,23 @@ enum WebAppInstaller {
         String(localized: "This app opens in Zigzag, which isn’t on this Mac anymore.", comment: "Shown by an app made with Install as App when the Zigzag that made it is gone.")
     }
 
+    /// Opens the app just installed, as Chrome does: its small app starts and its window comes forward. The one it
+    /// replaced may still be on its way out; it waits for that first (briefly), so the new one isn't taken for it.
+    static func launch(_ app: WebApp, attempt: Int = 0) {
+        if !WebAppStore.runningLauncher(of: app.id).allSatisfy(\.isTerminated), attempt < 20 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { launch(app, attempt: attempt + 1) }
+            return
+        }
+        guard let bundle = WebAppStore.shared.bundle(of: app) else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.addsToRecentItems = false
+        configuration.promptsUserIfNeeded = false
+        NSWorkspace.shared.openApplication(at: bundle, configuration: configuration) { _, error in
+            guard let error else { return }
+            DispatchQueue.main.async { Diagnostics.note("Opening an installed app failed", site: app.url.host(), "\(error)") }
+        }
+    }
+
     /// Makes the app for `url` on `space`'s profile, named `name`, with `icon` (the 1024 one). `done` hears the record,
     /// or nil if it couldn't be made.
     static func install(name: String, url: URL, spaceID: UUID, icon: CGImage, folder: URL = WebApps.folder,

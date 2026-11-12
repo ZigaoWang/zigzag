@@ -3,7 +3,7 @@ import AppKit
 /// File › Install as App… and Site Controls' ⋯ menu: a small sheet with the app's icon and its name to change, then
 /// Install. While the site's own icon loads, Zigzag's spinner stands in its place and Install waits; the icon fades in
 /// when it comes, or the one Zigzag has (the tab's, else the letter) after a few seconds. The name follows the site's
-/// until you edit it.
+/// until you edit it. Installed, the app opens at once, as Chrome's do.
 enum WebAppInstallSheet {
     #if DEBUG
     private(set) static weak var current: FormSheet?
@@ -50,6 +50,7 @@ enum WebAppInstallSheet {
                            action: (String(localized: "Show in Finder", comment: "Button in the toast after Install as App: shows the new app in Finder."),
                                     { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: app.bundlePath)]) }),
                            duration: 6, closes: true, in: controller)
+                WebAppInstaller.launch(app)
             }
         }
         #if DEBUG
