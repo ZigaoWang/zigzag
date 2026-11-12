@@ -1204,8 +1204,9 @@ final class BrowserRootView: SpaceFrameView {
         if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge() }
     }
 
-    /// Crossing the sidebar's edge of the window opens the sidebar, however fast: a quick flick out of the window
-    /// may never land a moved event inside the edge strip, but it always leaves through it.
+    /// Leaving through the sidebar's edge of the window counts too: a quick move may never land a moved event
+    /// inside the edge strip, and at the screen's own edge the pointer stops there. Where it rests a moment later
+    /// decides (`pointerAtEdge`).
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
         if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge() }
@@ -1217,7 +1218,8 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     /// A breath before it opens, so touching the edge and coming straight back to the page (a web app's own list
-    /// along that side) leaves it be. Still at the edge, or gone out past it, it opens.
+    /// along that side) leaves it be, and so does crossing it on the way to the display beside this one. Still at
+    /// the edge, or just out past it, it opens.
     private static let edgeGrace: TimeInterval = 0.1
     private var edgeTimer: Timer?
 
@@ -1340,8 +1342,9 @@ struct SidebarEdgeZone: Equatable {
     /// A strip along the top, measured from the window's top, where the edge doesn't open the sidebar: the bar above
     /// the page keeps the traffic lights there.
     var reservedTop: CGFloat = 0
-    /// How far out past the window's edge the pointer still counts as at it.
-    var reach: CGFloat = .infinity
+    /// How far out past the window's edge the pointer still counts as at it. Further out it's somewhere else: on
+    /// the desktop, or on the display beside this one.
+    var reach: CGFloat = Tokens.Metric.edgeRevealReach
 
     /// The point, and the sidebar, as they'd be with the sidebar on the left.
     private func turned(_ point: NSPoint) -> NSPoint {
@@ -1357,14 +1360,14 @@ struct SidebarEdgeZone: Equatable {
         point.y >= bounds.minY && point.y <= bounds.maxY && point.x >= bounds.minX - reach
     }
 
-    /// At the sidebar's edge of the window: in the strip just inside it, or out past it.
+    /// At the sidebar's edge of the window: in the strip just inside it, or just out past it.
     func opens(at point: NSPoint) -> Bool {
         let point = turned(point)
         return isBeside(point) && point.x <= stripEnd && point.y >= bounds.minY + reservedTop
     }
 
-    /// On the sidebar, a little around it, or past it toward the window's edge: that's where the pointer went to
-    /// summon it. The whole strip counts, so the pointer that opened it never lets it go by standing still.
+    /// On the sidebar, a little around it, or past it toward the window's edge as far as the edge reaches: that's
+    /// where the pointer went to summon it. The whole strip counts, so the pointer that opened it never lets it go by standing still.
     func keeps(at point: NSPoint) -> Bool {
         let point = turned(point), sidebar = turnedSidebar
         return sidebar.insetBy(dx: -Tokens.Space.x1, dy: -Tokens.Space.x1).contains(point)
