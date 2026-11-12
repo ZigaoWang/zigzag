@@ -2094,6 +2094,12 @@ extension BrowserWindowController: SidebarDelegate {
 
     func listDropOutside(_ tabs: [Tab], at screenPoint: NSPoint) -> Bool {
         guard !tabManager.isPrivate, let tab = tabs.first else { return false }
+        // Let go with ⌥ held, one tab becomes a Zigzag Mini window there instead of a browser window.
+        if NSEvent.modifierFlags.contains(.option), tabs.count == 1, canOpenInMini(tab),
+           !WindowManager.shared.controllers.contains(where: { $0.window?.frame.contains(screenPoint) == true }) {
+            openInMini(tab, at: screenPoint)
+            return true
+        }
         let others = WindowManager.shared.controllers.filter { $0 !== self && !$0.tabManager.isPrivate }
         let target: BrowserWindowController
         if let existing = others.first(where: { $0.window?.frame.contains(screenPoint) == true }) {
