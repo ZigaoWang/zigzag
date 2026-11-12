@@ -812,6 +812,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let defaultStatus = StatusLabel(String(localized: "Zigzag is your default browser", comment: "In Settings › General, in place of Set as Default once it's done."))
     private let blockingToggle = Toggle()
     private let pipToggle = Toggle()
+    private let fullScreenFill = DropdownButton()
     private let suggestionsToggle = Toggle()
     private let borderlessToggle = Toggle()
     private let addressAboveToggle = Toggle()
@@ -1149,6 +1150,20 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                control: pipToggle)
         videoRow.keywords = String(localized: "mini player picture in picture pip floating", comment: "Words that find the Keep videos playing setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(videoRow)
+        fullScreenFill.options = PageFullScreen.Fill.allCases.map { fill in
+            let title = switch fill {
+            case .screen: String(localized: "The Whole Screen", comment: "A choice for “Full screen videos fill” in Settings › Tabs: a video in full screen covers the whole screen, as usual.")
+            case .page: String(localized: "The Page", comment: "A choice for “Full screen videos fill” in Settings › Tabs: a video in full screen fills the page's area in the window, with the sidebar and the rest of the window still there.")
+            }
+            return DropdownButton.Option(title: title)
+        }
+        fullScreenFill.onSelect = { index in PageFullScreen.fill = PageFullScreen.Fill.allCases[index] }
+        let fullScreenRow = FormRow(title: String(localized: "Full screen videos fill", comment: "A setting in Settings › Tabs: whether a video put in full screen covers the whole screen or only the page's area in the window. Followed by The Whole Screen or The Page."),
+                                    detail: String(localized: "With The Page, a video in full screen stays inside its tab, or its part of a split. Choose for a single site in its site controls.",
+                                                   comment: "Explanation under “Full screen videos fill” in Settings › Tabs. Site controls is the panel by the address."),
+                                    control: fullScreenFill)
+        fullScreenRow.keywords = String(localized: "full screen fullscreen window tab pane video youtube in window", comment: "Words that find the Full screen videos fill setting with Find a setting in Settings. Not shown.")
+        tabsGroup.add(fullScreenRow)
         swipeToggle.onChange = { on in SwipeNavigator.isOn = on }
         tabsGroup.add(FormRow(title: String(localized: "Swipe to go back and forward", comment: "A setting in Settings › Tabs: two fingers sideways on the trackpad go back or forward."),
                               detail: String(localized: "Two fingers sideways on the trackpad. When off, websites get every swipe.", comment: "Explanation under “Swipe to go back and forward” in Settings › Tabs."),
@@ -2360,6 +2375,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         defaultButton.isHidden = isDefault
         blockingToggle.isOn = ContentBlocker.isEnabled
         pipToggle.isOn = PictureInPicture.followsTabs
+        fullScreenFill.selectedIndex = PageFullScreen.Fill.allCases.firstIndex(of: PageFullScreen.fill) ?? 0
         suggestionsToggle.isOn = SuggestionFetcher.isOn
         borderlessToggle.isOn = BrowserRootView.isBorderless
         addressAboveToggle.isOn = BrowserRootView.addressAbovePage
@@ -2542,11 +2558,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // The choices made one site at a time, which otherwise have nowhere to be seen.
         let nothingChosen = ContentBlocker.allowedSites.isEmpty && ExtensionStore.extensionsOffSites.isEmpty && SitePermissions.sites.isEmpty
             && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty && DarkPages.sitesForced.isEmpty && KeepAwake.sites.isEmpty
+            && PageFullScreen.pageSites.isEmpty && PageFullScreen.screenSites.isEmpty
         let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
         sitesReset = nothingChosen ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: String(localized: "Reset choices made for single sites?", comment: "Title of the sheet that forgets the choices made for single sites."),
-                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, dark pages follow your setting again, and every site’s tabs can sleep in the background.",
+                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, dark pages and full screen follow your settings again, and every site’s tabs can sleep in the background.",
                                           comment: "Message of the sheet that forgets the choices made for single sites."),
                           action: String(localized: "Reset All", comment: "Button of the sheet that forgets the choices made for single sites.")) {
                 ContentBlocker.allowedSites = []
@@ -2555,6 +2572,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 ZoomLevels.resetAll()
                 DarkPages.forgetAll()
                 KeepAwake.sites = []
+                PageFullScreen.forgetAll()
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
@@ -2571,6 +2589,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let origins = Dictionary(SitePermissions.sites.map { (SiteOrigin.label($0), $0) }, uniquingKeysWith: { a, _ in a })
         let sites = Set(origins.keys).union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites).union(ZoomLevels.all.keys)
             .union(DarkPages.sitesOn).union(DarkPages.sitesOff).union(DarkPages.sitesForced).union(KeepAwake.sites)
+            .union(PageFullScreen.pageSites).union(PageFullScreen.screenSites)
         var listed = 0, more = 0
         for site in sites.sorted() {
             var said: [String] = []
@@ -2605,6 +2624,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             if KeepAwake.sites.contains(site) {
                 said.append(String(localized: "tabs kept awake", comment: "A choice made for a site in Settings › Privacy, in a list of them: its tabs never go to sleep in the background."))
             }
+            if PageFullScreen.pageSites.contains(site) {
+                said.append(String(localized: "full screen fills the page", comment: "A choice made for a site in Settings › Privacy, in a list of them: a video's full screen fills the page's area instead of the whole screen."))
+            } else if PageFullScreen.screenSites.contains(site) {
+                said.append(String(localized: "full screen fills the screen", comment: "A choice made for a site in Settings › Privacy, in a list of them: a video's full screen covers the whole screen, though the setting says the page."))
+            }
             guard !said.isEmpty else { continue }
             // The first 30 by name, as with site data, then the rest on request.
             guard sitesShowAll || listed < 30 else { more += 1; continue }
@@ -2624,6 +2648,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 var awake = KeepAwake.sites
                 awake.remove(site)
                 KeepAwake.sites = awake
+                PageFullScreen.setChoice(nil, for: URL(string: "https://\(site)"))
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }

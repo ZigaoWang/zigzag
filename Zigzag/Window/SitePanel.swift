@@ -421,6 +421,16 @@ final class SitePanel: FloatingPanelView {
                 KeepAwake.set(on, for: self.url)
             })
         }
+        // Full screen in the page's own area instead of the whole screen (#168), for this site alone. Offered on a
+        // page with a video, or once chosen; the setting is in Settings › Tabs.
+        if PageFullScreen.isOffered(for: url, isPrivate: isPrivate),
+           PageFullScreen.choice(for: url) != nil || tab.webView.map({ PageVideos.shared.frames(in: $0).contains { !$0.videos.isEmpty } }) == true {
+            rows.append(.toggle(String(localized: "Full screen fills the page", comment: "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen."),
+                                on: PageFullScreen.fills(for: url) == .page, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                guard let self else { return }
+                PageFullScreen.setChoice(on ? .page : .screen, for: self.url)
+            })
+        }
         if let language = tab.foreignLanguage {
             let name = PageTranslator.name(of: language)
             let title = String(localized: "Always translate \(name)", comment: "Row in the site panel's This Site group: pages in this language are translated as they open, on every site. The name is a language's, like English.")

@@ -2136,8 +2136,20 @@
         }
       }
     },
+    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, dark pages and full screen follow your settings again, and every site’s tabs can sleep in the background." : {
+      "comment" : "Message of the sheet that forgets the choices made for single sites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放会恢复为 100%，深色网页和全屏幕会重新跟随你的设置，所有网站的标签页也会在后台照常休眠。"
+          }
+        }
+      }
+    },
     "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, dark pages follow your setting again, and every site’s tabs can sleep in the background." : {
       "comment" : "Message of the sheet that forgets the choices made for single sites.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6148,6 +6160,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "磨砂"
+          }
+        }
+      }
+    },
+    "Full screen fills the page" : {
+      "comment" : "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全屏幕只填满网页"
+          }
+        }
+      }
+    },
+    "Full screen videos fill" : {
+      "comment" : "A setting in Settings › Tabs: whether a video put in full screen covers the whole screen or only the page's area in the window. Followed by The Whole Screen or The Page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全屏幕视频填满"
           }
         }
       }
@@ -13646,6 +13680,28 @@
         }
       }
     },
+    "The Page" : {
+      "comment" : "A choice for “Full screen videos fill” in Settings › Tabs: a video in full screen fills the page's area in the window, with the sidebar and the rest of the window still there.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页"
+          }
+        }
+      }
+    },
+    "The Whole Screen" : {
+      "comment" : "A choice for “Full screen videos fill” in Settings › Tabs: a video in full screen covers the whole screen, as usual.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整个屏幕"
+          }
+        }
+      }
+    },
     "The Zigzag name, the app icon and the logo are trademarks of Zigao Wang, all rights reserved. They aren’t covered by the Apache License: see [TRADEMARKS.md](TRADEMARKS.md)." : {
       "comment" : "In the Acknowledgments window. Keep the Markdown link [TRADEMARKS.md](TRADEMARKS.md) as it is.",
       "localizations" : {
@@ -15664,6 +15720,17 @@
         }
       }
     },
+    "With The Page, a video in full screen stays inside its tab, or its part of a split. Choose for a single site in its site controls." : {
+      "comment" : "Explanation under “Full screen videos fill” in Settings › Tabs. Site controls is the panel by the address.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择“网页”时，全屏幕视频会留在它的标签页里，或分屏浏览中它的那一块。也可以在网站设置里为单个网站选择。"
+          }
+        }
+      }
+    },
     "Won’t work in Zigzag: %@." : {
       "comment" : "In the extension install sheet. The placeholder lists features the extension uses that Zigzag lacks, like “side panel and notifications”.\nTooltip of an extension's row in Settings › Extensions: a list of the features Zigzag lacks.",
       "localizations" : {
@@ -16665,6 +16732,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "关闭扩展"
+          }
+        }
+      }
+    },
+    "full screen fills the page" : {
+      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: a video's full screen fills the page's area instead of the whole screen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全屏幕只填满网页"
+          }
+        }
+      }
+    },
+    "full screen fills the screen" : {
+      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: a video's full screen covers the whole screen, though the setting says the page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全屏幕填满整个屏幕"
+          }
+        }
+      }
+    },
+    "full screen fullscreen window tab pane video youtube in window" : {
+      "comment" : "Words that find the Full screen videos fill setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "full screen fullscreen window tab pane video youtube in window 全屏幕 全屏 窗口 标签页 视频 网页"
           }
         }
       }

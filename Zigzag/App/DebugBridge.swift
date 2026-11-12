@@ -952,6 +952,17 @@ enum DebugBridge {
         case "darkforce": DarkPages.setForced(arg == "on", for: controller.tabManager.selectedTab?.url)
         // keepawake on|off: the site panel's Keep tabs awake row for the page in front.
         case "keepawake": KeepAwake.set(arg == "on", for: controller.tabManager.selectedTab?.url)
+        // fsfill screen|page: Settings › Tabs › Full screen videos fill. fssite page|screen|follow: the site panel's
+        // Full screen fills the page row for the page in front. fsesc: Esc in the window, as the key would be.
+        // fsstate <path>: whether each tab of the window fills its page (JSON).
+        case "fsfill": if let fill = PageFullScreen.Fill(rawValue: arg) { PageFullScreen.fill = fill }
+        case "fssite": PageFullScreen.setChoice(arg == "follow" ? nil : PageFullScreen.Fill(rawValue: arg), for: controller.tabManager.selectedTab?.url)
+        case "fsesc": if let tab = controller.tabManager.selectedTab { PageFullScreen.exit(tab) }
+        case "fsstate":
+            let rows = controller.tabManager.navigableTabs.map { ["title": $0.displayTitle, "fills": $0.isInPageFullScreen, "selected": $0 === controller.tabManager.selectedTab] as [String: Any] }
+            if let data = try? JSONSerialization.data(withJSONObject: ["tabs": rows, "fill": PageFullScreen.fill.rawValue, "windowFullScreen": controller.window?.styleMask.contains(.fullScreen) == true], options: [.prettyPrinted]) {
+                try? data.write(to: URL(fileURLWithPath: arg))
+            }
         case "darkstate":
             controller.selectedWebView?.callAsyncJavaScript("return window.__zigzagDark ? JSON.stringify(window.__zigzagDark.state()) : 'none'",
                                                             arguments: [:], in: nil, in: DarkPages.world) { result in
@@ -1607,6 +1618,8 @@ enum DebugBridge {
         case "settings": SettingsPage.open(in: controller)
         // settingsprivacy: Settings › Privacy. flipblocking: its Block ads and trackers switch, as a click does.
         case "settingsprivacy": SettingsPage.open(.privacy, in: controller)
+        // settingspane <name>: that pane of Settings (tabs, appearance…).
+        case "settingspane": if let pane = SettingsPane(rawValue: arg) { SettingsPage.open(pane, in: controller) }
         case "flipblocking": controller.tabManager.selectedTab?.settingsView?.debugFlipBlocking()
         case "shortcutrecord":
             // shortcutrecord <command name>: starts recording keys on that row of Settings › Shortcuts.

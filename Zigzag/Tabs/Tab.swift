@@ -190,6 +190,9 @@ final class Tab: NSObject {
     }
     /// Its video is playing in the window's mini player, its page with it.
     var isInMiniPlayer = false
+    /// Its page fills the page's area with something in full screen, as Settings › Tabs › Full screen videos fill
+    /// The Page has it (PageFullScreen), so Esc in the window leaves it.
+    var isInPageFullScreen = false
     /// From a site you've let send notifications: kept awake and out of the archive, so they keep coming.
     var notifiesUser: Bool {
         guard !isPrivate, let origin = SiteOrigin.of(url) else { return false }
@@ -385,6 +388,7 @@ final class Tab: NSObject {
         if let pageHolder { pageHolder.hold(webView) } else { pageHolder = PageHolder(holding: webView) }
         observe(webView)
         DarkPages.attach(to: webView)
+        PageFullScreen.attach(to: webView)
 
         if Self.isExtensionPage(url), let url {
             // Extension pages always load fresh: their saved history state can come back as a blank page, and one
