@@ -180,6 +180,23 @@ content-blocker rules, and compresses the result with LZFSE. The converted WebKi
 adaptation of EasyList and EasyPrivacy, and is likewise licensed under CC BY-SA 3.0, not under Zigzag's
 license. Zigzag credits the lists in Settings and in About Zigzag › Acknowledgments.
 
+### Ghostery adblocker
+
+Matching the community filter lists below against each site. `Zigzag/Resources/AdEngine/ghostery-adblocker.js` is
+[@ghostery/adblocker](https://github.com/ghostery/adblocker) (version 2.20.3) by Ghostery GmbH, with the packages it
+uses, bundled unmodified and unminified into one script by `scripts/update_ad_engine.sh`. It runs in a JavaScript
+context of its own inside Zigzag; Zigzag's own code talks to it from a separate file
+(`Zigzag/Resources/AdEngine/ad-engine.js`), which is Zigzag's, under the Apache License.
+
+```
+Copyright (c) 2017-present Ghostery GmbH. All rights reserved.
+```
+
+License: [Mozilla Public License, Version 2.0](https://mozilla.org/MPL/2.0/), for @ghostery/adblocker and the
+@ghostery and @remusao packages bundled with it; MIT for tldts-core and tldts-experimental (Copyright (c) 2017
+Thomas Parisot, 2018 Rémi Berson). The bundled script is the Source Code Form; the full license texts and the list of
+bundled packages are in `Zigzag/Resources/AdEngine/ghostery-adblocker-LICENSE.txt`, which ships beside it.
+
 ### Public Suffix List
 
 Telling one site from another (which part of an address is the site, as in `bbc.co.uk`).
@@ -195,6 +212,28 @@ Telling an address from a search in the address bar. `Zigzag/Resources/tlds.txt`
 published by the [Internet Assigned Numbers Authority](https://www.iana.org/domains/root/db)
 ([data.iana.org/TLD/tlds-alpha-by-domain.txt](https://data.iana.org/TLD/tlds-alpha-by-domain.txt)), lowercased.
 IANA publishes it freely, without restrictions on its use.
+
+## Downloaded by the app, not shipped
+
+Zigzag doesn't include these. Each Mac downloads them from their publishers when Zigzag starts and again as they
+expire, as any ad blocker's users do, and keeps them in Zigzag's own folder in Application Support.
+
+### uBlock Origin's filter lists
+
+"uBlock filters", "uBlock filters – Quick fixes" and "uBlock filters – Unbreak", by Raymond Hill and the uBlock
+Origin contributors ([github.com/uBlockOrigin/uAssets](https://github.com/uBlockOrigin/uAssets)), downloaded from
+uBlock Origin's own addresses (ublockorigin.github.io, ublockorigin.pages.dev, cdn.jsdelivr.net). Zigzag uses their
+scriptlet and site-specific hiding filters.
+
+License: [GNU General Public License v3.0](https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE).
+
+### uBlock Origin's scriptlets
+
+The scriptlets those lists name, from [uBlock Origin](https://github.com/gorhill/uBlock) by Raymond Hill, as Ghostery
+publishes them for its engine (cdn.ghostery.com/adblocker/resources/ublock-resources-json). Zigzag checks each
+download against the SHA-256 Ghostery names it by, and runs them in the pages the lists name.
+
+License: [GNU General Public License v3.0](https://github.com/gorhill/uBlock/blob/master/LICENSE.txt).
 
 ## Used to build, not shipped
 
