@@ -85,14 +85,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppSwitching.start()
         // New lists or settings reach open pages on their next load.
         blockerToken = ContentBlocker.changed.observe {
-            for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
+            for tab in WindowManager.shared.openTabs {
                 if let webView = tab.webView, !Tab.isExtensionPage(tab.url) { ContentBlocker.apply(to: webView, for: tab.url) }
             }
         }
         if #available(macOS 15.4, *) {
             // An ad blocker extension turned on or off, or let onto YouTube or not: open pages follow on their next load.
             youTubeToken = ExtensionCenter.changed.observe {
-                for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
+                for tab in WindowManager.shared.openTabs {
                     if let webView = tab.webView, !Tab.isExtensionPage(tab.url) { ContentBlocker.applyYouTube(to: webView) }
                 }
             }

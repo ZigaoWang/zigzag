@@ -77,7 +77,7 @@ enum ProblemReport {
         lines.append("Zigzag running for \(Duration.seconds(ProcessInfo.processInfo.systemUptime - launchUptime).formatted(.units(allowed: [.hours, .minutes], width: .wide)))")
 
         let controllers = WindowManager.shared.controllers
-        let tabs = controllers.flatMap(\.tabManager.allTabs)
+        let tabs = WindowManager.shared.openTabs
         lines += ["", "Open now"]
         func count(_ n: Int, _ one: String) -> String { "\(n) \(one)\(n == 1 ? "" : "s")" }
         lines.append("\(count(controllers.count, "window")) (\(controllers.filter(\.tabManager.isPrivate).count) private), \(count(Library.shared.spaces.count, "space"))")

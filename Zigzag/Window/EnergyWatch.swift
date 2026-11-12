@@ -76,8 +76,10 @@ final class EnergyWatch {
                 if Self.isOnScreen(tab, in: controller) || tab.isPlayingAudio || tab.isInUse || tab.isInMiniPlayer { excused.insert(pid) }
             }
         }
-        for controller in WindowManager.shared.controllers {
-            for tab in controller.tabManager.allTabs {
+        // Every tab once, in the window it's in: every window shows the same tabs (#162).
+        for tab in WindowManager.shared.openTabs {
+            guard let controller = WindowManager.shared.window(of: tab) else { continue }
+            do {
                 guard let webView = tab.webView, let pid = Self.processID(of: webView), pid > 0,
                       seen.insert(pid).inserted else { continue }
                 let cpu = ProcessCPU.seconds(pid)
@@ -122,9 +124,7 @@ final class EnergyWatch {
         return webView.value(forKey: "_webProcessIdentifier") as? Int32
     }
 
-    private static func window(holding tab: Tab) -> BrowserWindowController? {
-        WindowManager.shared.controllers.first { $0.tabManager.allTabs.contains { $0 === tab } }
-    }
+    private static func window(holding tab: Tab) -> BrowserWindowController? { WindowManager.shared.window(of: tab) }
 
     /// Whether a busy background tab is only pointed out, not put to sleep: an extension's own page, one playing or in
     /// a call, a site that notifies, a favorite, a site kept awake in its site controls, or one with something typed.
@@ -138,13 +138,13 @@ final class EnergyWatch {
     private func tabs(of pid: Int32, url: URL) -> (sleepers: [Tab], awake: [Tab], soon: Bool) {
         let now = Date()
         var sleepers: [Tab] = [], awake: [Tab] = [], soon = false
-        for owner in WindowManager.shared.controllers {
-            // Each window's own page (and its split partner) never sleeps here, even in a covered or minimized window:
-            // it would only load again at once, losing what it was doing.
-            let selected = owner.tabManager.selectedTab
-            let kept = selected.map { owner.tabManager.panes(of: $0) } ?? []
-            for tab in owner.tabManager.allTabs where tab.webView.flatMap(Self.processID) == pid && !Self.isOnScreen(tab, in: owner)
-                && !kept.contains(where: { $0 === tab }) {
+        // Each window's own page (and its split partner) never sleeps here, even in a covered or minimized window:
+        // it would only load again at once, losing what it was doing. The windows show the same tabs (#162): one any
+        // of them has chosen stays.
+        let windows = WindowManager.shared.controllers
+        let kept = windows.flatMap { owner in owner.tabManager.selectedTab.map { owner.tabManager.panes(of: $0) } ?? [] }
+        do {
+            for tab in WindowManager.shared.openTabs where tab.webView.flatMap(Self.processID) == pid && !kept.contains(where: { $0 === tab }) {
                 let mustStay = spared.contains(tab.id)
                     || Self.staysAwake(extensionPage: url.scheme == "webkit-extension", playing: tab.isPlayingAudio, inUse: tab.isInUse,
                                        notifies: tab.notifiesUser, favorite: tab.isFavorite, keptAwake: KeepAwake.isOn(for: tab.url),

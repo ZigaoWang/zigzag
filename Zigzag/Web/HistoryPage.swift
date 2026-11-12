@@ -277,7 +277,7 @@ enum HistoryPage {
 
     /// Every open History page shows History as it is now, after a change made elsewhere or undone.
     static func refreshOpenPages() {
-        for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) where isHistory(tab.url) {
+        for tab in WindowManager.shared.openTabs where isHistory(tab.url) {
             tab.webView?.evaluateJavaScript("window.zigzagRefresh && window.zigzagRefresh()")
         }
     }
