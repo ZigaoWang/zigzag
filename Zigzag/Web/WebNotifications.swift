@@ -25,9 +25,6 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
     private var entries: [String: Entry] = [:]
     /// Sites whose question was put off in a tab (Esc): not asked again there this session.
     private var putOff: Set<String> = []
-    /// Sites that asked this session, answered or not, so site controls can offer the answer later: a question
-    /// that goes before you get to it (a click elsewhere, the page moving on) leaves no other way back.
-    private var asked: Set<String> = []
     private var authorized: Bool?
     private var started = false
 
@@ -57,7 +54,9 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         case "state":
             return (permission(origin: origin, tab: tab), nil)
         case "request":
-            if !tab.isPrivate { asked.insert(origin) }
+            // Noted answered or not, so Site Controls can offer the answer later: a question that goes before you
+            // get to it (a click elsewhere, the page moving on) leaves no other way back.
+            SitePermissions.noteAsked(.notifications, origin: origin, isPrivate: tab.isPrivate)
             let state = permission(origin: origin, tab: tab)
             // Only right after a click or key: the page's own word for it isn't enough, as a script can say anything.
             let clicked = body["gesture"] as? Bool == true && Date().timeIntervalSince(UndoClock.lastPageInput) < 5
@@ -81,9 +80,6 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
             return (nil, nil)
         }
     }
-
-    /// Whether the site asked to show notifications this session.
-    func hasAsked(origin: String) -> Bool { asked.contains(origin) }
 
     private func permission(origin: String, tab: Tab) -> String {
         if tab.isPrivate { return "denied" }

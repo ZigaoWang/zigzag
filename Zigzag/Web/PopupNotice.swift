@@ -86,6 +86,9 @@ enum PopupNotice {
             if let url { controller.open(url, disposition: .foregroundTab, opener: opener, allowSwitch: false) }
             return
         }
+        // Blocked in Site Controls: blocked without a word, as chosen.
+        if let origin, !isPrivate, SitePermissions.choice(.popups, origin: origin) == .block { return }
+        SitePermissions.noteAsked(.popups, origin: origin, isPrivate: isPrivate)
         if let origin, !isPrivate {
             Toast.show(String(localized: "Pop-up blocked", comment: "Toast when Zigzag blocks a page's pop-up window."), symbol: "macwindow.badge.plus", action: (String(localized: "Always Allow", comment: "Button in the toast when Zigzag blocks a page's pop-up: allows the site's pop-ups from now on."), { [weak controller] in
                 SitePermissions.setPopups(true, origin: origin)

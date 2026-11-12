@@ -132,7 +132,12 @@ enum SitePermissions {
         return keys(["location"], on: origin).compactMap { now[$0] }
     }
 
-    static func decision(origin: String, type: WKMediaCaptureType) -> Bool? { all["\(origin)|\(kind(type))"] }
+    /// A camera-only or microphone-only question takes the answer given to both at once (from a call, or chosen in
+    /// Site Controls) when it has none of its own.
+    static func decision(origin: String, type: WKMediaCaptureType) -> Bool? {
+        let now = all
+        return now["\(origin)|\(kind(type))"] ?? (type == .camera || type == .microphone ? now["\(origin)|cameraAndMicrophone"] : nil)
+    }
 
     static func remember(_ allowed: Bool, origin: String, type: WKMediaCaptureType) { all["\(origin)|\(kind(type))"] = allowed }
 
@@ -197,6 +202,72 @@ enum SitePermissions {
         return out
     }
 
+    // MARK: Site Controls' rows
+
+    /// Sites that asked for something this session, answered or not ("origin|kind"), so Site Controls shows the row
+    /// even when the question went by unanswered. Never a private window's: it remembers nothing about a site.
+    private static var asked: Set<String> = []
+
+    /// The site at `origin` asked for `permission`: its row shows in Site Controls from now on, this session.
+    static func noteAsked(_ permission: SitePermission, origin: String?, isPrivate: Bool) {
+        guard let origin, !isPrivate else { return }
+        asked.insert("\(origin)|\(permission.rawValue)")
+    }
+
+    static func hasAsked(_ permission: SitePermission, origin: String) -> Bool { asked.contains("\(origin)|\(permission.rawValue)") }
+
+    /// The answers a permission is kept under on a site's page: its own, and those of frames from elsewhere on it.
+    private static func keys(for permission: SitePermission, on origin: String) -> [String] {
+        keys(permission.kinds, on: origin)
+    }
+
+    /// Whether anything is kept for `permission` on the site's page.
+    static func hasDecision(_ permission: SitePermission, origin: String) -> Bool { !keys(for: permission, on: origin).isEmpty }
+
+    /// What Site Controls shows for a permission: Ask with nothing kept, Allow when every answer kept says yes,
+    /// otherwise Block. Pop-ups are blocked with a notice until allowed, so for them Ask is the start.
+    static func choice(_ permission: SitePermission, origin: String) -> PermissionChoice {
+        let now = all
+        return PermissionChoice(answers: keys(for: permission, on: origin).compactMap { now[$0] })
+    }
+
+    /// Ask forgets every answer kept for it on the site's page, its frames' too. Allow or Block is kept for the site,
+    /// for both camera and microphone at once, and for every frame from elsewhere that answered there before.
+    static func setChoice(_ choice: PermissionChoice, for permission: SitePermission, origin: String) {
+        var now = all
+        let existing = keys(for: permission, on: origin)
+        for k in existing { now[k] = nil }
+        if let allowed = choice.allowed {
+            // Frames from elsewhere keep a key of their own; the site's own answer is one key for the permission.
+            for k in existing where k.hasPrefix(origin + "|embed:") { now[k] = allowed }
+            now["\(origin)|\(permission.primaryKind)"] = allowed
+        }
+        all = now
+        if permission == .notifications, choice != .allow { WebNotifications.shared.removeAll(origin: origin) }
+    }
+
+    /// The permissions Site Controls has a row for on this site: once it asked this session, or once something is
+    /// kept for it. Notifications and pop-ups aren't offered in a private window, which never shows or allows them.
+    static func shown(origin: String, isPrivate: Bool) -> [SitePermission] {
+        SitePermission.allCases.filter { permission in
+            if isPrivate, !permission.inPrivate { return false }
+            return hasDecision(permission, origin: origin) || hasAsked(permission, origin: origin)
+        }
+    }
+
+    /// Reset Permissions: the site back to how it started, as if it never asked. Every answer kept for it goes (its
+    /// frames' and apps to open included), and its rows with them.
+    static func reset(origin: String) {
+        forgetEverything(origin: origin)
+        asked = asked.filter { !$0.hasPrefix(origin + "|") }
+        WebNotifications.shared.removeAll(origin: origin)
+    }
+
+    #if DEBUG
+    /// For tests: forgets which sites asked this session.
+    static func forgetAsked() { asked = [] }
+    #endif
+
     /// What a question names the site as: its label, or "This page" for one with no origin.
     static func askerName(_ origin: String?) -> String {
         origin.map(SiteOrigin.label) ?? String(localized: "This page", comment: "Stands for the site in a question when the page has no host.")
@@ -224,6 +295,7 @@ enum SitePermissions {
         let frame = SiteOrigin.of(securityOrigin), page = page(of: tab, frame: frame)
         let key = answerKey(frame: frame, page: page)
         if let key, let known = location(origin: key) { return known ? .grant : .deny }
+        noteAsked(.location, origin: page, isPrivate: isPrivate)
         guard let controller = WindowManager.shared.promptHost(for: window) else { return .deny }
         let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: "your location",
                                                 symbol: "location.fill", in: controller, tab: tab,
@@ -243,6 +315,7 @@ enum SitePermissions {
         let frame = SiteOrigin.of(securityOrigin), page = page(of: tab, frame: frame)
         let key = answerKey(frame: frame, page: page)
         if let key, let known = decision(origin: key, type: type) { return known ? .grant : .deny }
+        noteAsked(.cameraAndMicrophone, origin: page, isPrivate: isPrivate)
         let what: String, title: String
         switch type {
         case .camera: (what, title) = ("your camera", String(localized: "Use your camera", comment: "A site's permission question, without its question mark."))
@@ -267,6 +340,87 @@ enum SitePermissions {
             return .deny
         case .notNow:
             return .deny
+        }
+    }
+}
+
+/// What a site can ask for, as Site Controls has a row for each. Calls ask for the camera and microphone at once and
+/// are answered as one.
+enum SitePermission: String, CaseIterable {
+    case cameraAndMicrophone, location, notifications, popups
+
+    /// The kinds of answer kept for it.
+    var kinds: [String] {
+        switch self {
+        case .cameraAndMicrophone: ["camera", "microphone", "cameraAndMicrophone"]
+        case .location: ["location"]
+        case .notifications: ["notifications"]
+        case .popups: ["popups"]
+        }
+    }
+
+    /// The one kind a choice made in Site Controls is kept as.
+    var primaryKind: String { self == .cameraAndMicrophone ? "cameraAndMicrophone" : rawValue }
+
+    /// A private window asks for the camera and location (and keeps nothing); it never shows notifications or opens
+    /// pop-ups on its own.
+    var inPrivate: Bool { self == .cameraAndMicrophone || self == .location }
+
+    var title: String {
+        switch self {
+        case .cameraAndMicrophone: String(localized: "Camera and microphone", comment: "Row in the site panel's This Site group.")
+        case .location: String(localized: "Location", comment: "Row in the site panel's This Site group.")
+        case .notifications: String(localized: "Notifications", comment: "Row in the site panel's This Site group.")
+        case .popups: String(localized: "Pop-ups", comment: "Row in the site panel's This Site group.")
+        }
+    }
+}
+
+/// A site's answer for one permission, as Site Controls' dropdown offers it: ask each time (nothing kept), allow, or
+/// block.
+enum PermissionChoice: CaseIterable {
+    case ask, allow, block
+
+    /// From the answers kept: none is Ask, all yes is Allow, and any no is Block.
+    init(answers: [Bool]) {
+        self = answers.isEmpty ? .ask : answers.allSatisfy { $0 } ? .allow : .block
+    }
+
+    /// What's kept for it: nothing for Ask.
+    var allowed: Bool? {
+        switch self {
+        case .ask: nil
+        case .allow: true
+        case .block: false
+        }
+    }
+
+    /// A site's permissions in a few words, for the Permissions row: "2 allowed", "1 blocked", "2 allowed, 1 blocked",
+    /// or Ask when nothing's decided.
+    static func summary(_ choices: [PermissionChoice]) -> String {
+        let allowed = choices.filter { $0 == .allow }.count, blocked = choices.filter { $0 == .block }.count
+        let allowedText = String(localized: "\(allowed) allowed", comment: "On the Permissions row of the site panel: how many permissions the site has been allowed.")
+        let blockedText = String(localized: "\(blocked) blocked", comment: "On the Permissions row of the site panel: how many permissions the site has been blocked from.")
+        switch (allowed > 0, blocked > 0) {
+        case (true, true): return String(localized: "\(allowedText), \(blockedText)", comment: "On the Permissions row of the site panel: how many allowed, then how many blocked, like “2 allowed, 1 blocked”.")
+        case (true, false): return allowedText
+        case (false, true): return blockedText
+        case (false, false): return PermissionChoice.ask.title
+        }
+    }
+
+    /// The summary for a narrow panel: how many are decided, either way ("2 set"), or Ask.
+    static func shortSummary(_ choices: [PermissionChoice]) -> String {
+        let decided = choices.filter { $0 != .ask }.count
+        return decided == 0 ? PermissionChoice.ask.title
+            : String(localized: "\(decided) set", comment: "On the Permissions row of a narrow site panel: how many permissions have an answer, allowed or blocked.")
+    }
+
+    var title: String {
+        switch self {
+        case .ask: String(localized: "Ask", comment: "A choice in a permission's dropdown in Site Controls: the site asks each time.")
+        case .allow: String(localized: "Allow", comment: "A choice in a permission's dropdown in Site Controls: the site may use it.")
+        case .block: String(localized: "Block", comment: "A choice in a permission's dropdown in Site Controls: the site may not use it, and isn't asked about.")
         }
     }
 }
