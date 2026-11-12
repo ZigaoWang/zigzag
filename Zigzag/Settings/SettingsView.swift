@@ -250,8 +250,12 @@ final class FormRow: NSView, SettingsSearchable {
         return size.width > 0 ? size : control.intrinsicContentSize
     }
 
+    /// A row about the row above it (a site's permission, under the site): its text starts where that row's does,
+    /// past the picture it doesn't have.
+    var isIndented = false { didSet { needsLayout = true } }
+
     /// Where the row's text starts.
-    var textInset: CGFloat { icon.isHidden ? pad : pad + Self.iconSide + Tokens.Space.x3 }
+    var textInset: CGFloat { icon.isHidden && !isIndented ? pad : pad + Self.iconSide + Tokens.Space.x3 }
 
     /// Narrow (half of a split, a small window), the control goes under the text instead of squeezing it.
     private func isStacked(_ width: CGFloat) -> Bool {
@@ -751,6 +755,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var siteDataShowsAll = false
     /// Every site with a choice made for it, not only the first 30.
     private var sitesShowAll = false
+    /// Permissions changed here while Settings is open ("origin|permission"): set back to Ask, a row stays, so the
+    /// choice you just made doesn't vanish under the pointer.
+    private var permissionsChangedHere: Set<String> = []
     private var siteDataTask: Task<Void, Never>?
     /// Reset All beside the Sites heading, there only when something was chosen for a site.
     private var sitesReset: PillButton?
@@ -2094,25 +2101,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// What a button says for a moment once it has cleared something.
     private static var cleared: String { String(localized: "Cleared", comment: "Shown on a Clear button in Settings › Privacy for a moment after it clears.") }
 
-    /// A permission chosen for a site, as Settings › Privacy › Sites lists it: "camera allowed".
-    private static func siteChoice(_ kind: String, allowed: Bool) -> String? {
-        switch (kind, allowed) {
-        case ("camera", true): String(localized: "camera allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("camera", false): String(localized: "camera blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("microphone", true): String(localized: "microphone allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("microphone", false): String(localized: "microphone blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("cameraAndMicrophone", true): String(localized: "camera and microphone allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("cameraAndMicrophone", false): String(localized: "camera and microphone blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("location", true): String(localized: "location allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("location", false): String(localized: "location blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("notifications", true): String(localized: "notifications allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("notifications", false): String(localized: "notifications blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("popups", true): String(localized: "pop-ups allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        case ("popups", false): String(localized: "pop-ups blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
-        default: nil
-        }
-    }
-
     /// Each section's groups and their headings, as a search goes through them.
     private func groups(of pane: SettingsPane) -> [(title: String?, group: FormGroup)] {
         switch pane {
@@ -2621,11 +2609,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             var said: [String] = []
             let origin = origins[site]
             let choices = origin.map { SitePermissions.choices(origin: $0) } ?? [:]
-            for kind in ["camera", "microphone", "cameraAndMicrophone", "location", "notifications", "popups"] {
-                // A frame from elsewhere answered on the site's page: shown on the site's row when it has none of its own.
-                let allowed = choices[kind] ?? choices.first { $0.key.hasPrefix("embed:") && $0.key.hasSuffix("|" + kind) }?.value
-                if let allowed, let choice = Self.siteChoice(kind, allowed: allowed) { said.append(choice) }
-            }
+            // Its permissions get a row each under it, with Ask, Allow and Block, as in its Site Controls.
+            let permissions = origin.map { origin in
+                SitePermission.allCases.filter { SitePermissions.hasDecision($0, origin: origin) || permissionsChangedHere.contains("\(origin)|\($0.rawValue)") }
+            } ?? []
             for (kind, allowed) in choices.sorted(by: { $0.key < $1.key }) where allowed && kind.hasPrefix("app:") {
                 let app = ExternalLinks.appName(forScheme: String(kind.dropFirst(4)))
                 said.append(String(localized: "opens \(app)", comment: "A choice made for a site in Settings › Privacy: its links of this kind open in an app, by name."))
@@ -2660,7 +2647,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             } else if CookieBanners.sitesLeft.contains(site) {
                 said.append(String(localized: "cookie banners left alone", comment: "A choice made for a site in Settings › Privacy, in a list of them: its cookie consent pop-ups are left for you to answer."))
             }
-            guard !said.isEmpty else { continue }
+            guard !said.isEmpty || !permissions.isEmpty else { continue }
             // The first 30 by name, as with site data, then the rest on request.
             guard sitesShowAll || listed < 30 else { more += 1; continue }
             listed += 1
@@ -2690,9 +2677,24 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let favicon = siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
             let sentence = line.prefix(1).localizedUppercase + line.dropFirst()
             sitesGroup.add(FormRow(title: site,
-                                   detail: String(localized: "site-choices.sentence", defaultValue: "\(sentence).",
-                                                  comment: "Under a site in Settings › Privacy › Sites: the choices made for it, as one sentence."),
+                                   detail: said.isEmpty ? nil : String(localized: "site-choices.sentence", defaultValue: "\(sentence).",
+                                                                        comment: "Under a site in Settings › Privacy › Sites: the choices made for it, as one sentence."),
                                    icon: favicon, control: forget))
+            guard let origin else { continue }
+            let options = PermissionChoice.allCases
+            for permission in permissions {
+                let dropdown = DropdownButton()
+                dropdown.options = options.map { DropdownButton.Option(title: $0.title) }
+                dropdown.selectedIndex = options.firstIndex(of: SitePermissions.choice(permission, origin: origin)) ?? 0
+                dropdown.onSelect = { [weak self] index in
+                    SitePermissions.setChoice(options[index], for: permission, origin: origin)
+                    self?.permissionsChangedHere.insert("\(origin)|\(permission.rawValue)")
+                }
+                let row = FormRow(title: permission.title, control: dropdown)
+                row.isIndented = true
+                row.keywords = site
+                sitesGroup.add(row)
+            }
         }
         if more > 0 {
             let all = PillButton(title: String(localized: "Show All", comment: "Button under the first 30 sites in Settings › Privacy."))

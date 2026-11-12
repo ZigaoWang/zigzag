@@ -148,10 +148,23 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         sidebar.address.captureButton.onClick = { [weak self] _ in
             guard let self, let tab = self.tabManager.selectedTab, let origin = SiteOrigin.of(tab.url) else { return }
-            MenuPanel.show([
+            var items: [MenuPanel.Entry] = [
                 .item(.init(title: String(localized: "Stop Camera and Microphone", comment: "Menu item of the address bar's camera button: stops the page using the camera and microphone."), symbol: "stop.circle") { tab.stopCapture() }),
-                .item(.init(title: String(localized: "Ask Again Next Time", comment: "Menu item of the address bar's camera button: forgets the site's camera and microphone answer."), symbol: "arrow.counterclockwise") { SitePermissions.forget(origin: origin) }),
-            ], from: self.sidebar.address.captureButton)
+            ]
+            // An answer to the question holds for this page only (Ask); Always Allow keeps it for the site, and
+            // Ask Every Time takes that back. A private window keeps nothing for a site.
+            if !tab.isPrivate {
+                if SitePermissions.choice(.cameraAndMicrophone, origin: origin) == .allow {
+                    items.append(.item(.init(title: String(localized: "Ask Every Time", comment: "Menu item of the address bar's camera button: the site, allowed the camera and microphone for good, asks again on every visit."), symbol: "arrow.counterclockwise") {
+                        SitePermissions.setChoice(.ask, for: .cameraAndMicrophone, origin: origin)
+                    }))
+                } else {
+                    items.append(.item(.init(title: String(localized: "Always Allow on This Site", comment: "Menu item of the address bar's camera button: the site may use the camera and microphone from now on without asking."), symbol: "checkmark.circle") {
+                        SitePermissions.setChoice(.allow, for: .cameraAndMicrophone, origin: origin)
+                    }))
+                }
+            }
+            MenuPanel.show(items, from: self.sidebar.address.captureButton)
         }
         sidebar.nowPlaying.onClick = { [weak self] _ in
             if let tab = self?.nowPlayingTab { self?.tabManager.select(tab) }

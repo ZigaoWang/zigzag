@@ -5,7 +5,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Settings › Privacy › Sites lists each site's permissions under it, with Ask, Allow and Block as in its Site Controls, so you can change or take one back without opening the site. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#174](https://github.com/ZigaoWang/zigzag/issues/174))
+
 ### Fixed
+- A permission set to Ask asks every time, as in Safari: answering a site's question for the camera, microphone, location or notifications holds for that page only, and the site asks again on its next visit. Allow and Block are kept, chosen in Site Controls, Settings › Privacy, or the address bar's camera button with Always Allow on This Site. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#174](https://github.com/ZigaoWang/zigzag/issues/174))
 - A zoomed page of a split goes back in its place when the pages swap, move or change layout, as it does when one comes or goes. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - With the address bar above the page and a split stacked, zooming the top page no longer brings back the bar's own buttons and address beside it. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - The mini player goes to the screen's corner while its window is on another space, instead of the corner of a window you can't see, and letting it go where that window would be no longer snaps it there. Closing the window while the player has the keyboard no longer brings that window forward for a moment. ([#172](https://github.com/ZigaoWang/zigzag/issues/172))

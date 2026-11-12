@@ -193,6 +193,9 @@ final class Tab: NSObject {
     /// Its page fills the page's area with something in full screen, as Settings › Tabs › Full screen videos fill
     /// The Page has it (PageFullScreen), so Esc in the window leaves it.
     var isInPageFullScreen = false
+    /// What you answered the page's questions (camera, location, notifications) while it's open: asked again once
+    /// it loads another page or reloads, as a site set to Ask is.
+    var permissionAnswers = PagePermissionAnswers()
     /// From a site you've let send notifications: kept awake and out of the archive, so they keep coming.
     var notifiesUser: Bool {
         guard !isPrivate, let origin = SiteOrigin.of(url) else { return false }
@@ -1231,6 +1234,8 @@ extension Tab: WKNavigationDelegate {
         // The new page is here: its address shows.
         addressWaitsForCommit = false
         if webView.url != url { followAddress(of: webView) }
+        // Answers to the last page's questions were for that page: this one asks again.
+        permissionAnswers.forget()
         // A sign-in menu belongs to the page it opened on.
         Autofill.shared.hide()
         // Its dialogs start over: blocking them was for the page you blocked, not a reload of it.

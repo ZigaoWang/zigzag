@@ -2406,6 +2406,17 @@
         }
       }
     },
+    "Always Allow on This Site" : {
+      "comment" : "Menu item of the address bar's camera button: the site may use the camera and microphone from now on without asking.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此网站上始终允许"
+          }
+        }
+      }
+    },
     "Always Translate" : {
       "comment" : "A heading in Settings › Translation.",
       "localizations" : {
@@ -2582,17 +2593,6 @@
         }
       }
     },
-    "Ask Again Next Time" : {
-      "comment" : "Menu item of the address bar's camera button: forgets the site's camera and microphone answer.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下次重新询问"
-          }
-        }
-      }
-    },
     "Ask Each Time" : {
       "comment" : "Choice in the menu of where downloads go, in Settings and the downloads panel.\nItem in the downloads panel's … menu: asks where to save each download.",
       "localizations" : {
@@ -2600,6 +2600,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每次询问"
+          }
+        }
+      }
+    },
+    "Ask Every Time" : {
+      "comment" : "Menu item of the address bar's camera button: the site, allowed the camera and microphone for good, asks again on every visit.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每次都询问"
           }
         }
       }
@@ -16950,50 +16961,6 @@
         }
       }
     },
-    "camera allowed" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许摄像头"
-          }
-        }
-      }
-    },
-    "camera and microphone allowed" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许摄像头和麦克风"
-          }
-        }
-      }
-    },
-    "camera and microphone blocked" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阻止摄像头和麦克风"
-          }
-        }
-      }
-    },
-    "camera blocked" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阻止摄像头"
-          }
-        }
-      }
-    },
     "check for updates" : {
       "comment" : "Words that find the version row with Find a setting in Settings. Not shown.",
       "localizations" : {
@@ -17498,28 +17465,6 @@
         }
       }
     },
-    "location allowed" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许位置"
-          }
-        }
-      }
-    },
-    "location blocked" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阻止位置"
-          }
-        }
-      }
-    },
     "macOS didn’t let Zigzag read Arc’s history. In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on Arc, then try again." : {
       "comment" : "Problem in the Import window. Arc is a browser's name; System Settings › Privacy & Security › Files & Folders is macOS's own wording.",
       "localizations" : {
@@ -17647,28 +17592,6 @@
         }
       }
     },
-    "microphone allowed" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许麦克风"
-          }
-        }
-      }
-    },
-    "microphone blocked" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阻止麦克风"
-          }
-        }
-      }
-    },
     "mini player picture in picture pip floating" : {
       "comment" : "Words that find the Keep videos playing setting with Find a setting in Settings. Not shown.",
       "localizations" : {
@@ -17713,28 +17636,6 @@
         }
       }
     },
-    "notifications allowed" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许通知"
-          }
-        }
-      }
-    },
-    "notifications blocked" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阻止通知"
-          }
-        }
-      }
-    },
     "open" : {
       "comment" : "Spoken by VoiceOver after a favorite's name: its page is loaded.",
       "localizations" : {
@@ -17775,28 +17676,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在播放音频"
-          }
-        }
-      }
-    },
-    "pop-ups allowed" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许弹出式窗口"
-          }
-        }
-      }
-    },
-    "pop-ups blocked" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阻止弹出式窗口"
           }
         }
       }
