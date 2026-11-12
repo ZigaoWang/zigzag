@@ -131,14 +131,9 @@ final class PaneHeaderView: NSView {
         }
     }
 
-    /// Light ink (dark aqua) on `color`, dark ink (aqua) otherwise; nil keeps the window's own.
-    static func inkAppearance(on color: NSColor?) -> NSAppearance.Name? {
-        color.map { TopBarView.isDark($0) ? .darkAqua : .aqua }
-    }
-
     private func refreshInk() {
         // Up in the bar, the bar's own appearance is the strip's.
-        appearance = isInBar ? nil : Self.inkAppearance(on: ground).flatMap(NSAppearance.init(named:))
+        appearance = isInBar ? nil : PageBar.inkAppearance(on: ground).flatMap(NSAppearance.init(named:))
         let onPage = !isInBar && ground != nil
         [back, forward, reload, zoom, swap, orientation, close, more, closeTab, address.siteControls].forEach { $0.isOnPage = onPage }
     }

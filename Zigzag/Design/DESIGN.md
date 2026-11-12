@@ -372,7 +372,7 @@ something came from, answers at once, and can be interrupted.
   title bar is in Chrome and Safari, the page under it edge to edge so the two read as one surface. The color is the
   site's theme color (WebKit picks its light or dark one), an installed app's manifest `theme_color` after it, each
   only on the page's side of light and dark, else the page's own background; the plain card ground until the page
-  says. No space color or grain on it. Its ink is light or dark by contrast (`PaneHeaderView.inkAppearance`), its
+  says. No space color or grain on it. Its ink is light or dark by contrast (`PageBar.inkAppearance`), its
   controls take the neutral fills (`isOnPage`), and a 1px hairline marks its foot only when the page under it is
   within `PageBar.hairlineContrast` of it. Zigzag Mini keeps its space as the chip that says where Open in goes.
 - **A site installed as an app** (`WebAppWindowController`, #165): that bar, `Metric.miniStripHeight` tall: the

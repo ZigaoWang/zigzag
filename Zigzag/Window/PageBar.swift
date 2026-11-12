@@ -15,7 +15,7 @@ enum PageBar {
         for candidate in [theme, fallback] {
             guard let candidate else { continue }
             guard let page else { return candidate }
-            if TopBarView.isDark(candidate) == TopBarView.isDark(page) { return candidate }
+            if isDark(candidate) == isDark(page) { return candidate }
         }
         return page
     }
@@ -29,6 +29,15 @@ enum PageBar {
 
     /// Under this contrast two colors read as one surface.
     static let hairlineContrast = 1.25
+
+    /// Whether a page's color takes light ink: white contrasts with it more than black (WCAG), so a mid gray keeps
+    /// dark. The bar above the page (`TopBarView`), a split pane's strip (`PaneHeaderView`) and this bar all read it.
+    static func isDark(_ color: NSColor) -> Bool { Brand.contrast(color, .white) > Brand.contrast(color, .black) }
+
+    /// Light ink (dark aqua) on `color`, dark ink (aqua) otherwise; nil keeps the window's own.
+    static func inkAppearance(on color: NSColor?) -> NSAppearance.Name? {
+        color.map { isDark($0) ? .darkAqua : .aqua }
+    }
 
     /// The bar's color for a tab: its theme color, the given fallback, its page's color.
     static func color(for tab: Tab, fallback: NSColor? = nil) -> NSColor? {
@@ -52,7 +61,7 @@ final class PageBarView: ColorView {
 
     /// Paints the bar for a page: `bar` its color (nil: the page card's plain ground), `page` the page's own.
     func show(bar: NSColor?, page: NSColor?, animated: Bool) {
-        let name = PaneHeaderView.inkAppearance(on: bar)
+        let name = PageBar.inkAppearance(on: bar)
         inkAppearance = name.flatMap(NSAppearance.init(named:))
         appearance = inkAppearance
         setColor(bar ?? Tokens.Color.cardBackground, animated: animated, duration: Tokens.Motion.quick)

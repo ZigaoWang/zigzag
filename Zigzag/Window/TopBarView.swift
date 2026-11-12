@@ -47,7 +47,7 @@ final class TopBarView: NSView {
     var pageColor: NSColor? {
         didSet {
             guard pageColor != oldValue else { return }
-            appearance = pageColor.flatMap { NSAppearance(named: Self.isDark($0) ? .darkAqua : .aqua) }
+            appearance = PageBar.inkAppearance(on: pageColor).flatMap(NSAppearance.init(named:))
             refreshOnPage()
         }
     }
@@ -57,10 +57,6 @@ final class TopBarView: NSView {
         for case let button as IconButton in [sidebarButton] + buttons { button.isOnPage = onPage }
         (address as? AddressView)?.isOnPage = onPage
     }
-
-    /// Whether a page's color takes light controls: white contrasts with it more than black (WCAG), so a mid gray
-    /// keeps dark ones.
-    static func isDark(_ color: NSColor) -> Bool { Brand.contrast(color, .white) > Brand.contrast(color, .black) }
 
     private var buttons: [NSView] = []
     private weak var address: NSView?

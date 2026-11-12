@@ -214,11 +214,11 @@ struct PaneMoveTests {
     // MARK: The strip's ink
 
     @MainActor @Test func theStripsInkReadsOnItsPage() {
-        #expect(PaneHeaderView.inkAppearance(on: NSColor(srgbRed: 0.05, green: 0.07, blue: 0.09, alpha: 1)) == .darkAqua)
-        #expect(PaneHeaderView.inkAppearance(on: .white) == .aqua)
-        #expect(PaneHeaderView.inkAppearance(on: NSColor(srgbRed: 0.98, green: 0.96, blue: 0.9, alpha: 1)) == .aqua)
+        #expect(PageBar.inkAppearance(on: NSColor(srgbRed: 0.05, green: 0.07, blue: 0.09, alpha: 1)) == .darkAqua)
+        #expect(PageBar.inkAppearance(on: .white) == .aqua)
+        #expect(PageBar.inkAppearance(on: NSColor(srgbRed: 0.98, green: 0.96, blue: 0.9, alpha: 1)) == .aqua)
         // No page color: the window's own.
-        #expect(PaneHeaderView.inkAppearance(on: nil) == nil)
+        #expect(PageBar.inkAppearance(on: nil) == nil)
     }
 
     @Test func thePicturesShapeIsThePanes() {

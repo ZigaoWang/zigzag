@@ -223,10 +223,10 @@ struct TopBarTests {
         topBar.pageColor = nil
         #expect(!back.isOnPage && !address.isOnPage)
         // Light or dark controls, whichever contrasts more: a mid gray keeps dark ones.
-        #expect(TopBarView.isDark(.black) && !TopBarView.isDark(.white))
-        #expect(TopBarView.isDark(NSColor(srgbRed: 0.05, green: 0.07, blue: 0.09, alpha: 1)))
-        #expect(TopBarView.isDark(NSColor(srgbRed: 0.18, green: 0.44, blue: 0.31, alpha: 1)))
-        #expect(!TopBarView.isDark(NSColor(srgbRed: 0.54, green: 0.56, blue: 0.6, alpha: 1)))
+        #expect(PageBar.isDark(.black) && !PageBar.isDark(.white))
+        #expect(PageBar.isDark(NSColor(srgbRed: 0.05, green: 0.07, blue: 0.09, alpha: 1)))
+        #expect(PageBar.isDark(NSColor(srgbRed: 0.18, green: 0.44, blue: 0.31, alpha: 1)))
+        #expect(!PageBar.isDark(NSColor(srgbRed: 0.54, green: 0.56, blue: 0.6, alpha: 1)))
     }
 
     @Test func underThePagesColorTheCardReachesUpUnderTheBar() {
