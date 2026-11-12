@@ -5,10 +5,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- Each page in split view has its own Site Controls: the button at the end of the address in its strip, or in its ⋯ when the strip is narrow, opens them for that page, under its address, with the address bar above the page too. The Site Controls button by the sidebar's address is for the page you're in. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
-
-## [0.8.7] - 2026-11-12
+## [0.9.0] - 2026-11-12
 
 ### New
 - An installed app's toolbar takes the site's own color, as web apps do in Chrome and Safari, with its name in the middle in a window title's type, and no grain. Turn it off for just the page with the window's buttons over it: View › Hide Toolbar in the app, a right-click on the toolbar, or the Toolbar switch for the app in Settings › General. The top of the window still moves it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
@@ -36,6 +33,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The "Zigzag updated" note goes away by itself after 15 seconds, like a notification, and stays while your pointer is on it. What's New is still in the Help menu.
 
 ### Fixed
+- Each page in split view has its own Site Controls: the button at the end of the address in its strip, or in its ⋯ when the strip is narrow, opens them for that page, under its address, with the address bar above the page too. The Site Controls button by the sidebar's address is for the page you're in. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - Zigzag no longer crashes going back or forward or opening a link after a while of browsing with an extension on. Each page could give the extension's scripts one more copy, until there were too many to hand a new page. ([#178](https://github.com/ZigaoWang/zigzag/issues/178))
 - Dark pages are drawn by [Dark Reader](https://darkreader.org)'s engine, with its fixes for thousands of sites: a site's own colors are made dark one by one, instead of the page being turned over with a filter and patched up afterward. Sites written with newer kinds of colors, like Cloudflare's dashboard, no longer stay mostly light. A site with a dark look of its own, like GitHub or YouTube Music, is left exactly as it is, no longer painted partly light. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - ⌘Q in an installed app quits that app, not all of Zigzag. While its window is in front the menus are the app's own: Hide and Quit name it, and the browser's New Tab and the rest aren't there. ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
