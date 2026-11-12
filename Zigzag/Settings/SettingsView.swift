@@ -941,6 +941,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    isolated deinit { sideToken.map(NotificationCenter.default.removeObserver) }
+
     override var isFlipped: Bool { true }
     /// Covering the page, it takes the keyboard from the web view underneath, so typing goes nowhere unexpected.
     override var acceptsFirstResponder: Bool { true }
