@@ -71,11 +71,57 @@ final class PageCardView: NSView {
     }
 
     /// Where the page's holder goes in the page's room. No size: all of it. A size: that, plus the room what's
-    /// docked beside the page takes, cut to the room there is, in the middle of the room both ways.
-    static func pageRect(content: NSRect, size: CGSize?, docked: NSSize) -> NSRect {
-        guard let size else { return content }
-        let width = min(content.width, size.width + docked.width), height = min(content.height, size.height + docked.height)
-        return NSRect(x: content.minX + floor((content.width - width) / 2), y: content.minY + floor((content.height - height) / 2), width: width, height: height)
+    /// docked beside the page takes, in the middle of the room both ways. A page larger than its room is shown
+    /// smaller, whole (`pageFit`); without the view scale to do that, it's cut to the room.
+    static func pageRect(content: NSRect, size: CGSize?, docked: NSSize, scales: Bool = false) -> NSRect {
+        pageFit(content: content, size: size, docked: docked, scales: scales).frame
+    }
+
+    /// The holder's place for a page of `size` in `content`, and the scale the page is shown at: 1 where it fits.
+    /// Larger than the room, it's laid out at its own size and shown smaller to fit, as a responsive view in Chrome
+    /// or Polypane does, so a desktop width can be checked in a laptop's window. What's docked beside it (the Web
+    /// Inspector) keeps its own size beside the page.
+    static func pageFit(content: NSRect, size: CGSize?, docked: NSSize, scales: Bool) -> (frame: NSRect, scale: CGFloat) {
+        guard let size, size.width > 0, size.height > 0 else { return (content, 1) }
+        let room = NSSize(width: max(0, content.width - docked.width), height: max(0, content.height - docked.height))
+        let scale = scales ? max(minimumScale, min(1, room.width / size.width, room.height / size.height)) : 1
+        let page = NSSize(width: scale < 1 ? round(size.width * scale) : size.width, height: scale < 1 ? round(size.height * scale) : size.height)
+        let width = min(content.width, page.width + docked.width), height = min(content.height, page.height + docked.height)
+        let frame = NSRect(x: content.minX + floor((content.width - width) / 2), y: content.minY + floor((content.height - height) / 2), width: width, height: height)
+        // The scale the page's whole points come to, a hair under, so it's laid out at exactly its width: WebKit
+        // divides in single precision and drops the fraction, and 1040 / (1040 / 1920) came out 1919.
+        return (frame, scale < 1 ? page.width / (size.width + 0.25) : 1)
+    }
+
+    /// The smallest a page is shown at: a full HD width still reads in a small window.
+    static let minimumScale: CGFloat = 0.25
+
+    /// WebKit's view scale (`_setViewScale:`, macOS only, private): the page is laid out at its view's size divided by
+    /// it and drawn that much smaller. Asked before use, so a WebKit without it leaves the page cut to its room.
+    static let setViewScale = NSSelectorFromString("_setViewScale:")
+    static func canScale(_ webView: WKWebView?) -> Bool { webView?.responds(to: setViewScale) == true }
+
+    /// The scale the shown page is drawn at (`pageFit`), 1 at its own size.
+    private(set) var pageScale: CGFloat = 1 { didSet { if pageScale != oldValue { onPageArea?(pageArea) } } }
+
+    /// Gives a page the view scale, or takes it back to 1, only when it changes.
+    private static func apply(scale: CGFloat, to webView: WKWebView?) {
+        guard let webView, canScale(webView) else { return }
+        let now = webView.value(forKey: "viewScale") as? CGFloat ?? 1
+        if abs(now - scale) > 0.0001 { webView.setValue(scale, forKey: "viewScale") }
+    }
+
+    /// Places the shown page's holder for its size, the view scale with it, and says the page's area.
+    private func place(_ holder: PageHolder, in content: NSRect) {
+        // A page with a size of its own keeps it as the card changes; any other fills the card with it.
+        holder.autoresizingMask = pageSize == nil ? [.width, .height] : []
+        let fit = Self.pageFit(content: content, size: pageSize, docked: holder.dockedRoom, scales: Self.canScale(webView))
+        holder.frame = fit.frame
+        Self.apply(scale: fit.scale, to: webView)
+        pageScale = fit.scale
+        // The page's own area, as its styles see it: its size when shown smaller, else what the holder leaves it.
+        let shown = NSSize(width: holder.frame.width - holder.dockedRoom.width, height: holder.frame.height - holder.dockedRoom.height)
+        pageArea = fit.scale < 1 ? (pageSize ?? shown) : shown
     }
 
     /// The hairline goes round the page's holder while the page has a size of its own, under it, and is hidden
@@ -382,9 +428,7 @@ final class PageCardView: NSView {
             // WebKit sizes it), and only while it's in this card: the mini player or another window may have borrowed it.
             if let holder, holder.superview === clip {
                 // A page with a size of its own keeps it as the card changes; any other fills the card with it.
-                holder.autoresizingMask = pageSize == nil ? [.width, .height] : []
-                holder.frame = Self.pageRect(content: content, size: pageSize, docked: holder.dockedRoom)
-                pageArea = NSSize(width: holder.frame.width - holder.dockedRoom.width, height: holder.frame.height - holder.dockedRoom.height)
+                place(holder, in: content)
             }
             placeOutline()
             if !glides(document) { document?.frame = content }
@@ -514,7 +558,9 @@ final class PageCardView: NSView {
         if let newHolder {
             let top = contentTop
             let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
-            newHolder.frame = Self.pageRect(content: content, size: pageSize, docked: newHolder.dockedRoom)
+            let fit = Self.pageFit(content: content, size: pageSize, docked: newHolder.dockedRoom, scales: Self.canScale(newWebView))
+            newHolder.frame = fit.frame
+            Self.apply(scale: fit.scale, to: newWebView)
             newHolder.autoresizingMask = pageSize == nil ? [.width, .height] : []
             // The Web Inspector docking beside a page with a size of its own makes room for itself.
             newHolder.onDockedRoomChange = { [weak self] in self?.needsLayout = true }
@@ -529,6 +575,8 @@ final class PageCardView: NSView {
         if let oldHolder, oldHolder !== newHolder {
             oldHolder.onDockedRoomChange = nil
             oldHolder.autoresizingMask = [.width, .height]
+            // At its own scale again wherever it's shown next (the mini player, another window).
+            if old !== newWebView { Self.apply(scale: 1, to: old) }
         }
         if let oldHolder, oldHolder !== newHolder, oldHolder.superview === clip {
             if let old, old.fullscreenState != .notInFullscreen {

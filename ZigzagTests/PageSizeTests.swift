@@ -54,6 +54,40 @@ struct PageSizeTests {
         #expect(wide == NSRect(x: 0, y: 150, width: 1000, height: 400))
     }
 
+    /// Larger than its room, a page is laid out at its size and shown smaller, whole, in the middle.
+    @Test func aSizeLargerThanTheRoomIsShownSmallerToFit() {
+        let fit = PageCardView.pageFit(content: room, size: CGSize(width: 1440, height: 900), docked: .zero, scales: true)
+        // 1000 / 1440 is the tighter of the two.
+        #expect(abs(fit.scale - 1000.0 / 1440.0) < 0.001 && (fit.frame.width / fit.scale).rounded(.down) == 1440)
+        #expect(fit.frame.width == 1000 && fit.frame.height == round(900 * 1000 / 1440))
+        // One that fits is shown at its size.
+        let phone = PageCardView.pageFit(content: room, size: CGSize(width: 393, height: 600), docked: .zero, scales: true)
+        #expect(phone.scale == 1 && phone.frame.size == NSSize(width: 393, height: 600))
+        // The inspector keeps its room beside it; the page shrinks into what's left.
+        let docked = PageCardView.pageFit(content: room, size: CGSize(width: 1440, height: 900), docked: NSSize(width: 500, height: 0), scales: true)
+        #expect(abs(docked.scale - 500.0 / 1440.0) < 0.001 && docked.frame.width == 1000)
+        // Never smaller than a quarter, and then cut to the room.
+        let huge = PageCardView.pageFit(content: room, size: CGSize(width: 8000, height: 8000), docked: .zero, scales: true)
+        #expect(abs(huge.scale - PageCardView.minimumScale) < 0.001 && huge.frame == room)
+        // Without the view scale, cut to the room as before.
+        #expect(PageCardView.pageFit(content: room, size: CGSize(width: 1440, height: 900), docked: .zero, scales: false).scale == 1)
+    }
+
+    @Test func theSizeIsSaidWithHowLargeItsShown() {
+        #expect(DeveloperBarTools.sizeText(nil, scale: 1) == "")
+        #expect(DeveloperBarTools.sizeText(CGSize(width: 393, height: 852), scale: 1) == PageSizes.dimensions(CGSize(width: 393, height: 852)))
+        let shrunk = DeveloperBarTools.sizeText(CGSize(width: 1440, height: 900), scale: 0.72)
+        #expect(shrunk.hasPrefix(PageSizes.dimensions(CGSize(width: 1440, height: 900))) && shrunk.contains("72"))
+    }
+
+    /// WebKit's view scale is there on this Mac, and is read back as set.
+    @Test func webKitHasTheViewScale() {
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 720, height: 450))
+        #expect(PageCardView.canScale(webView))
+        webView.setValue(0.5, forKey: "viewScale")
+        #expect(webView.value(forKey: "viewScale") as? CGFloat == 0.5)
+    }
+
     @Test func theHolderSaysTheRoomWhatIsDockedTakes() {
         let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 900, height: 600))
         let holder = PageHolder(holding: webView)

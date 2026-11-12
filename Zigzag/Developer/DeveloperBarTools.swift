@@ -139,6 +139,17 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
 
     /// The page's own area as the card laid it out: the size said beside Page Size is the one the page really is.
     var pageRoom = NSSize.zero { didSet { if pageRoom != oldValue { refreshChoices() } } }
+    /// How much smaller than its size the page is shown, to fit the window (`PageCardView.pageFit`); 1 at its size.
+    var pageScale: CGFloat = 1 { didSet { if pageScale != oldValue { refreshChoices() } } }
+
+    /// What's said beside Page Size: the page's size, and how large it's shown when that's smaller.
+    static func sizeText(_ size: CGSize?, scale: CGFloat) -> String {
+        guard let size else { return "" }
+        let dimensions = PageSizes.dimensions(size)
+        guard scale < 0.995 else { return dimensions }
+        let percent = Int((scale * 100).rounded())
+        return String(localized: "\(dimensions) at \(percent)%", comment: "Beside Page Size among the developer tools above the page, while a page larger than the window is shown smaller to fit: its size, then how large it's shown, like “1440 × 900 at 72%”.")
+    }
 
     /// The size to say for a page of `chosen` size in `room`: the size it really is, which a small window cuts.
     static func shownSize(chosen: CGSize?, room: NSSize) -> CGSize? {
@@ -240,13 +251,13 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         for (part, button) in zip(Self.parts, buttons) {
             let symbol = Self.symbol(of: part, in: state)
             if button.symbol != symbol { button.symbol = symbol }
-            if part.tools.contains(.sizeFill) { button.setAccessibilityValue(Self.shownSize(chosen: state.size, room: pageRoom).map(PageSizes.dimensions)) }
+            if part.tools.contains(.sizeFill) { button.setAccessibilityValue(state.size == nil ? nil : Self.sizeText(Self.shownSize(chosen: state.size, room: pageRoom), scale: pageScale)) }
         }
         let hidden = Self.hasHiddenChoice(state)
         let symbol = hidden ? "ellipsis.circle.fill" : "ellipsis"
         if more.symbol != symbol { more.symbol = symbol }
         hiddenChoiceValue = hidden ? String(localized: "Choices in effect", comment: "Spoken by VoiceOver after More Developer Tools while something chosen in its menu is in effect: JavaScript off, another user agent, or outlines.") : nil
-        let size = Self.shownSize(chosen: state.size, room: pageRoom).map(PageSizes.dimensions) ?? ""
+        let size = Self.sizeText(Self.shownSize(chosen: state.size, room: pageRoom), scale: pageScale)
         if sizeLabel.stringValue != size {
             sizeLabel.stringValue = size
             needsLayout = true

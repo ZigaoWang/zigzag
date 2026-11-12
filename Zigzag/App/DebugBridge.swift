@@ -1073,7 +1073,7 @@ enum DebugBridge {
                 controller.root.layoutSubtreeIfNeeded()
                 let holder = tab.pageHolder
                 let subs = (holder?.subviews ?? []).map { "\(type(of: $0)) \(Int($0.frame.width))x\(Int($0.frame.height))" }.joined(separator: " | ")
-                debugLog("devsize => chose=\(tab.developer.size.map { "\(Int($0.width))x\(Int($0.height))" } ?? "fill") card=\(controller.root.card.pageSize.map { "\(Int($0.width))x\(Int($0.height))" } ?? "fill") holder=\(holder.map { NSStringFromRect($0.frame) } ?? "-") docked=\(holder.map { NSStringFromSize($0.dockedRoom) } ?? "-") subs: \(subs) color=\(tab.pageColor != nil)")
+                debugLog("devsize => chose=\(tab.developer.size.map { "\(Int($0.width))x\(Int($0.height))" } ?? "fill") card=\(controller.root.card.pageSize.map { "\(Int($0.width))x\(Int($0.height))" } ?? "fill") holder=\(holder.map { NSStringFromRect($0.frame) } ?? "-") docked=\(holder.map { NSStringFromSize($0.dockedRoom) } ?? "-") subs: \(subs) color=\(tab.pageColor != nil) scale=\(controller.root.card.pageScale)")
             }
         // devbar on|off: Settings › Developer › Tools above the page. devbar: where the tools are, in the debug log.
         case "devbar":

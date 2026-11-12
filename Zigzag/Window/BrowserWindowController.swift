@@ -926,7 +926,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private lazy var developerBarTools: DeveloperBarTools = {
         let tools = DeveloperBarTools()
         // It says the size the page really is, which the card knows.
-        root.card.onPageArea = { [weak tools] area in tools?.pageRoom = area }
+        root.card.onPageArea = { [weak tools, weak card = root.card] area in
+            tools?.pageScale = card?.pageScale ?? 1
+            tools?.pageRoom = area
+        }
+        tools.pageScale = root.card.pageScale
         tools.pageRoom = root.card.pageArea
         return tools
     }()

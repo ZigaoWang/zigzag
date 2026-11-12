@@ -324,7 +324,7 @@ something came from, answers at once, and can be interrupted.
   the card, both ways, on the PDF viewer's backdrop (`Color.pdfBackdrop`) rather than the page's color, with a
   hairline in `Color.cardEdge` round it, so its edges show on a light page or a dark one; the bar above the page
   turns plain with it. The Web Inspector docks beside it, in room of its own
-  (`PageHolder.dockedRoom`): the page keeps its size. A size larger than the room is cut to the room. What covers
+  (`PageHolder.dockedRoom`): the page keeps its size. A size larger than the room is laid out at its size and shown smaller, whole, through WebKit's view scale (`_setViewScale:`, asked first; without it, cut to the room), never below a quarter; the size beside the button then says how large ("1920 × 1080 at 54%"). What covers
   the page (a PDF, Settings, Reader) fills the room as ever.
 - **Pane header** (split view): on the page card, 30 tall: back, forward and reload, the address centered in a small
   field, and the split's own buttons. Everything in it is its own pane's page: its buttons act on it, its loading

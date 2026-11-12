@@ -119,6 +119,17 @@
         }
       }
     },
+    "%@ at %lld%%" : {
+      "comment" : "Beside Page Size among the developer tools above the page, while a page larger than the window is shown smaller to fit: its size, then how large it's shown, like “1440 × 900 at 72%”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，缩放至 %2$lld%%"
+          }
+        }
+      }
+    },
     "%@ can be your search engine" : {
       "comment" : "Toast after adding an extension that gives a search engine. The name is the engine's, like ChatGPT.",
       "localizations" : {
