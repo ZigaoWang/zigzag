@@ -9,6 +9,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Settings' sections sit under headings: Browser, Tools, Privacy & Security and Advanced.
 
 ### Fixed
+- Google Sheets stays sharp instead of turning blurry a moment after it opens: pages now know the size of the window they're in. ([#161](https://github.com/ZigaoWang/zigzag/issues/161))
 - With dark pages on, new tabs and tabs waking from sleep no longer flash white, and a site's saved dark colors are checked on the first frame. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - The loading line is back along the top of the page; 0.8.5 drew it at the bottom.
 - In Change Icon, clicking the chosen icon again or deleting the emoji puts the site's own icon back. ([#153](https://github.com/ZigaoWang/zigzag/issues/153))
