@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- In the icon choices for a space, a folder or a tab, typing a name like "cat" or "rocket" in the field under the grid finds matching emoji in the grid's place. Click one or press Return to pick it, and Esc goes back to the icons. Letters used to vanish as you typed. ([#163](https://github.com/ZigaoWang/zigzag/issues/163))
 - In Settings › Privacy, the Block ads and trackers switch stays at the right edge when you turn it on or off.
 - Cloudflare's "verify you are human" check (Turnstile) no longer logs an error each time it renews, as on linux.do.
 
