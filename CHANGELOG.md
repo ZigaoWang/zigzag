@@ -17,6 +17,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - The bar above a page that's dark on its own is dark too, instead of white. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
+- With dark pages on, sites that are dark on their own, like GitHub, no longer flash white before their dark theme shows, on the first visit or after a restart. Zigzag remembers which sites are dark for each profile, and forgets them when you clear the site's data or History. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - With dark pages on, a dark page with little on it is no longer turned light. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - Extensions know about pinned tabs and favorites as soon as they open, so 1Password's passkeys and other extension features work on them instead of failing with "Tab not found".
 - The "Zigzag updated" note goes away by itself after 15 seconds, like a notification, and stays while your pointer is on it. What's New is still in the Help menu.
