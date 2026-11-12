@@ -1,7 +1,8 @@
 // Dark pages (Settings › Appearance): a light page is drawn dark, one that's already dark is left alone.
 // Runs in Zigzag's own script world, in every frame, from the start of the document. DarkPages.swift puts the
 // choices in `config` below: { on: default for sites without a choice, sitesOn, sitesOff, native: sites last seen
-// already dark, black: Pure black backgrounds, strength: how far white is turned over, root, canvas, media: the
+// already dark, marker: the mark this site's own dark look sets on the root, if it was seen setting one, black: Pure
+// black backgrounds, strength: how far white is turned over, root, canvas, media: the
 // style's parts, marks: the attributes it looks for, palette: the site's own dark palette if one was made, fill: a
 // dark site's fill for its light parts if one was made, sitesForced: sites darkened even when dark, learn:
 // whether one may be made here (never in a private window), paletteDelay }.
@@ -18,13 +19,13 @@
 // and read it again if so.
 //
 // White never shows first (#134): a page that's darkened starts so at document start (the filter, or the palette with
-// its own dark ground), and one that isn't yet, since its site was last seen dark, starts on a plain dark ground
-// (`prepaint`: a dark color-scheme and background on the root, the body clear) until it's looked at; then that goes,
-// so a site dark on its own shows its own colors, and a light one is darkened. The page is looked at just before each
-// frame is drawn while it comes in, once its style sheets are there, so the switch is made before the frame its own
-// colors would first show in: a dark site seen for the first time loses the filter before its dark is drawn through
-// it (as white), and a page that turns dark as it runs (an app after a light loading screen) is let go of in the
-// frame it does.
+// its own dark ground), and one that isn't yet, since its site was last seen dark, starts on its own dark
+// (`prepaint`: a dark color-scheme and the site's dark on the root, the body clear) and with the mark its dark look
+// sets (`marker`), until it's looked at; then the ground goes, so a site dark on its own shows its own colors, and a
+// light one is darkened. The page is looked at just before each frame is drawn while it comes in, once its style
+// sheets are there, so the switch is made before the frame its own colors would first show in: a dark site seen for
+// the first time loses the filter before its dark is drawn through it (as white), and a page that turns dark as it
+// runs (an app after a light loading screen) is let go of in the frame it does.
 //
 // How: the whole page goes through one filter on the root (inverted, then its hues turned back), and pictures,
 // video and the like are turned back again, so they look as they are. A filter on the root keeps fixed headers in
@@ -98,6 +99,68 @@
     if (isTop && config.prepaint && root && prepaint.parentNode !== root) root.appendChild(prepaint);
   };
   const dropPrepaint = () => { if (prepaint.parentNode) prepaint.remove(); };
+
+  // MARK: The site's own dark mark
+
+  // A site that marks its dark look on the root by script (a class of "dark", data-theme="dark") draws light until that
+  // script has run. Seen setting one, the site's pages start with it (`config.marker`), so its dark style applies from
+  // the first sheet. Only a mark the site was seen setting itself, and only where the root has none of its own yet; the
+  // site touching it makes it the site's, and one the site never touches by a moment after the page has loaded is
+  // taken off again and forgotten (the site's look doesn't use it any more).
+  const markAttributes = ['data-color-mode', 'data-theme', 'data-bs-theme', 'data-mode', 'data-color-scheme', 'data-mantine-color-scheme'];
+  const markClasses = ['dark', 'dark-mode', 'theme-dark', 'dark-theme'];
+  const lightClasses = ['light', 'light-mode', 'theme-light', 'light-theme'];
+  const marksOn = (root) => {
+    const out = [];
+    if (!root || !root.getAttribute) return out;
+    for (const a of markAttributes) if ((root.getAttribute(a) || '').toLowerCase() === 'dark') out.push('attr:' + a + '=dark');
+    for (const c of markClasses) if (root.classList.contains(c)) out.push('class:' + c);
+    return out;
+  };
+  // What the page came with, before any script of its own ran.
+  const servedMarks = isTop ? marksOn(document.documentElement) : [];
+  // The mark Zigzag put on the root, while the site hasn't touched it.
+  let markPut = null;
+  // The site took it off without using it: said once, so it's forgotten.
+  let markDropped = false;
+  const markWatch = new MutationObserver(() => {
+    const root = document.documentElement;
+    markWatch.disconnect();
+    // The site's now; but a light look it asks for isn't held dark by the class left beside it.
+    if (markPut && markPut.cls && root && lightClasses.some((c) => root.classList.contains(c))) root.classList.remove(markPut.cls);
+    markPut = null;
+  });
+  const putMark = () => {
+    const root = document.documentElement;
+    const m = /^attr:([\w-]+)=dark$|^class:([\w-]+)$/.exec(config.marker || '');
+    if (!root || !m) return;
+    if (m[1]) {
+      if (!markAttributes.includes(m[1]) || root.hasAttribute(m[1])) return;
+      root.setAttribute(m[1], 'dark');
+      markPut = { attr: m[1] };
+    } else {
+      if (!markClasses.includes(m[2]) || [...markClasses, ...lightClasses].some((c) => root.classList.contains(c))) return;
+      root.classList.add(m[2]);
+      markPut = { cls: m[2] };
+    }
+    markWatch.observe(root, { attributes: true, attributeFilter: [markPut.attr || 'class'] });
+  };
+  const releaseMark = () => {
+    if (!markPut) return;
+    markWatch.disconnect();
+    const root = document.documentElement;
+    if (root) { if (markPut.attr) root.removeAttribute(markPut.attr); else root.classList.remove(markPut.cls); }
+    markPut = null;
+    markDropped = true;
+  };
+  // The mark the site's dark look set by script, for Zigzag to keep: "" for none, undefined until the page has loaded
+  // (a script setting it may not have run) or while it's the one Zigzag put.
+  const markNow = () => {
+    if (markDropped) return '';
+    if (markPut || document.readyState !== 'complete') return undefined;
+    const set = marksOn(document.documentElement).filter((m) => !servedMarks.includes(m));
+    return set.length ? set[0] : '';
+  };
 
   // MARK: Shadow roots
 
@@ -420,6 +483,7 @@
   const send = () => {
     if (!isTop || quiet) return;
     const message = { darkened, native: native === true, color: colorOf(), site, palette: usingPalette };
+    if (native === true && !darkened) { const mark = markNow(); if (mark !== undefined) message.marker = mark; }
     const key = JSON.stringify(message);
     if (key === lastSent) return;
     lastSent = key;
@@ -791,9 +855,9 @@
   };
 
   // Darkened from the first moment, unless the site was last seen dark: no white page first. One last seen dark
-  // starts on the plain dark ground until it's looked at.
+  // starts on its own dark ground, and with its own dark mark, until it's looked at.
   if (wanted && darkens()) apply(true);
-  else { if (wanted) { putPrepaint(); refreshFill(); } send(); }
+  else { if (wanted) { putPrepaint(); if (!forced()) putMark(); refreshFill(); } send(); }
   if (isTop) requestAnimationFrame(beforeFrame);
   if (usingPalette) requestAnimationFrame(firstFrame);
   watch();
@@ -801,6 +865,8 @@
   document.addEventListener('DOMContentLoaded', () => { check(); checkEarly(); });
   addEventListener('load', () => {
     loadedAt = performance.now();
+    // A mark the site never touched isn't one its look uses now.
+    if (markPut) setTimeout(() => { if (markPut) { releaseMark(); send(); } }, 2000);
     check();
     checkEarly();
     setTimeout(check, 600);

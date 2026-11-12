@@ -184,12 +184,31 @@ enum DarkPages {
     }
 
     /// What a page last seen dark on its own starts on until it's looked at (#134): a dark color-scheme, so WebKit's
-    /// own ground under the page is dark rather than white, and the palette's dark on the root, with the body clear so
-    /// it shows. It goes as soon as the page is looked at: one that's dark keeps its own colors, a light one is
-    /// darkened. Never with the filter, which would turn it light.
-    static func prepaintCSS(black: Bool) -> String {
-        let hex = black ? "#000000" : "#121212"
+    /// own ground under the page is dark rather than white, and the site's own dark on the root (as it was seen, else
+    /// the palette's), with the body clear so it shows. It goes in the frame the page is first looked at, before that
+    /// frame is drawn: one that's dark keeps its own colors, a light one is darkened. Never with the filter, which
+    /// would turn it light.
+    static func prepaintCSS(black: Bool, color: String? = nil) -> String {
+        let own = color.flatMap { hex -> String? in
+            guard let parsed = Self.color(hex: hex), isDark(parsed) else { return nil }
+            return self.hex(parsed)
+        }
+        let hex = own ?? (black ? "#000000" : "#121212")
         return ":root { color-scheme: dark !important; background-color: \(hex) !important; }\nbody { background-color: transparent !important; }\n"
+    }
+
+    /// Dark enough to start a page on, as dark-pages.js tells a dark page from a light one.
+    static func isDark(_ color: NSColor) -> Bool {
+        guard let c = color.usingColorSpace(.sRGB) else { return false }
+        func f(_ v: CGFloat) -> CGFloat { v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+        return 0.2126 * f(c.redComponent) + 0.7152 * f(c.greenComponent) + 0.0722 * f(c.blueComponent) < 0.2
+    }
+
+    /// "#0d1117".
+    static func hex(_ color: NSColor) -> String {
+        let c = color.usingColorSpace(.sRGB) ?? color
+        let v = [c.redComponent, c.greenComponent, c.blueComponent].map { min(255, max(0, Int(($0 * 255).rounded()))) }
+        return String(format: "#%02x%02x%02x", v[0], v[1], v[2])
     }
 
     // MARK: The style
@@ -245,11 +264,9 @@ enum DarkPages {
         """
     }
 
-    /// Sites seen already dark, this session only (never written down: it would be a list of where you've been),
-    /// so their pages aren't darkened first and then let go. Kept for each profile: a page can see whether it was
-    /// darkened from its first moment, so one profile's list would tell a site it had been visited in another.
-    /// A private window learns nothing and is given nothing.
-    private static var nativeSites: [String: Set<String>] = [:]
+    // Sites seen already dark are kept in `DarkSeen`, so their pages aren't darkened first and then let go. Kept for
+    // each profile: a page can see whether it was darkened from its first moment, so one profile's list would tell a
+    // site it had been visited in another. A private window learns nothing and is given nothing.
 
     /// Whose list of sites seen dark a page's store reads and adds to: its profile's; nil for a private one.
     static func nativeScope(of store: WKWebsiteDataStore?) -> String? {
@@ -259,7 +276,17 @@ enum DarkPages {
 
     /// Sites seen dark in a profile (`nativeScope`), as given to its pages.
     static func nativeSites(in scope: String?) -> Set<String> {
-        scope.flatMap { nativeSites[$0] } ?? []
+        Set(DarkSeen.sites(in: scope).keys)
+    }
+
+    /// What's kept for the site a page at `url` in this store is going to, if it was seen dark there.
+    static func seen(for store: WKWebsiteDataStore?, url: URL?) -> DarkSeen.Site? {
+        DarkSeen.site(site(of: url), in: nativeScope(of: store))
+    }
+
+    /// What a page's script is given from it: its dark and its mark, not when it was seen.
+    static func seenKey(_ seen: DarkSeen.Site?) -> String? {
+        seen.map { "\($0.color ?? "")|\($0.marker ?? "")" }
     }
 
     static func resource(_ name: String) -> String {
@@ -285,11 +312,13 @@ enum DarkPages {
     /// comes with them).
     static func config(for store: WKWebsiteDataStore?, url: URL? = nil) -> [String: Any] {
         let black = pureBlack
+        let seen = seen(for: store, url: url)
         var config: [String: Any] = [
             "on": wants(mode: mode, systemIsDark: systemIsDark, site: nil), "sitesOn": sitesOn.sorted(), "sitesOff": sitesOff.sorted(),
             "sitesForced": sitesForced.sorted(),
             "native": nativeSites(in: nativeScope(of: store)).sorted(), "black": black, "strength": strength(black: black),
-            "root": rootCSS(black: black), "canvas": canvasCSS, "media": mediaCSS(black: black), "prepaint": prepaintCSS(black: black),
+            "root": rootCSS(black: black), "canvas": canvasCSS, "media": mediaCSS(black: black), "prepaint": prepaintCSS(black: black, color: seen?.color),
+            "marker": seen?.marker ?? NSNull(),
             "marks": ["image": imageMark, "before": beforeMark, "after": afterMark, "frame": frameMark],
             "learn": nativeScope(of: store) != nil, "paletteDelay": paletteDelay, "palette": NSNull()]
         if let entry = palette(for: store, url: url) {
@@ -357,7 +386,8 @@ enum DarkPages {
         let store = webView.configuration.websiteDataStore
         controller.addUserScript(script(for: store, url: webView.url))
         installed[ObjectIdentifier(controller)] = Installed(generation: generation, native: nativeSites(in: nativeScope(of: store)),
-                                                            palette: paletteKey(for: store, url: webView.url))
+                                                            palette: paletteKey(for: store, url: webView.url),
+                                                            seen: seenKey(seen(for: store, url: webView.url)))
     }
 
     /// Counts up each time the choices change (the setting, a site's own, the Mac's appearance): a web view whose
@@ -370,6 +400,8 @@ enum DarkPages {
         var native: Set<String>
         /// The palette that came with it (`paletteKey`).
         var palette: String?
+        /// The dark and mark of the site it was going to (`seenKey`).
+        var seen: String?
     }
     private static var installed: [ObjectIdentifier: Installed] = [:]
 
@@ -387,6 +419,8 @@ enum DarkPages {
         let store = webView.configuration.websiteDataStore
         let now = nativeSites(in: nativeScope(of: store))
         if siteChanged(site(of: webView.url), given: given.native, now: now) { install(in: webView); return }
+        // The site's own dark or mark, learned or changed since: the page starts on them.
+        if let seen = seenKey(seen(for: store, url: webView.url)), seen != given.seen { install(in: webView); return }
         if paletteChanged(given: given.palette, now: paletteKey(for: store, url: webView.url), origin: DarkPalettes.origin(of: webView.url)) {
             install(in: webView)
         }
@@ -456,7 +490,10 @@ enum DarkPages {
         let tab = (webView as? BrowserWebView)?.owner
         // A page that's dark on its own shows its own dark past its edges, the one the bar above it takes (#134):
         // WebKit's own color there is the page's root's, which can be white under a dark page.
-        let ground = ground(black: pureBlack, palette: drawsWithPalette(palette(for: webView.configuration.websiteDataStore, url: url)))
+        let store = webView.configuration.websiteDataStore
+        // A site seen dark on its own starts on its own dark; any other on the dark its white will be.
+        let ground = seen(for: store, url: url)?.color.flatMap(color(hex:)).flatMap { isDark($0) ? $0 : nil }
+            ?? ground(black: pureBlack, palette: drawsWithPalette(palette(for: store, url: url)))
         webView.underPageBackgroundColor = wanted ? underPage(tab?.darkPage, site: site(of: url), ground: ground) : nil
         // No white of WebKit's own under the page (#134): a new web view's first frame, or one bringing back a tab that
         // slept, was drawn on it before the page came, and stayed on screen until the page had drawn itself, since
@@ -514,18 +551,34 @@ enum DarkPages {
         var site: String
         /// Drawn with the site's palette rather than the filter.
         var palette = false
+        /// The mark the page's own dark look set on its root by script (`DarkSeen.Site.marker`): "" for none, nil when
+        /// the page didn't say.
+        var marker: String? = nil
     }
 
-    /// What a page in this store found: a site it saw dark, or saw light, joins or leaves its profile's list.
-    /// True when the list changed.
+    /// What a page in this store found: a site it saw dark, or saw light, joins or leaves its profile's list, with
+    /// its own dark and the mark it sets for it. True when the list changed (a site joined or left).
     @discardableResult
     static func learn(_ state: State, in scope: String?) -> Bool {
         guard let scope, !state.site.isEmpty else { return false }
-        let before = nativeSites[scope] ?? []
-        var after = before
-        if state.native { after.insert(state.site) } else if state.darkened { after.remove(state.site) }
-        nativeSites[scope] = after
-        return after != before
+        let before = DarkSeen.site(state.site, in: scope)
+        var after: DarkSeen.Site?
+        if state.native {
+            var site = before ?? DarkSeen.Site(color: nil, marker: nil, date: Date())
+            // Its own look only: a page forced dark is drawn in Zigzag's.
+            if !state.darkened {
+                if let color = state.color, isDark(color) { site.color = hex(color) }
+                if let marker = state.marker { site.marker = marker.isEmpty ? nil : marker }
+            }
+            if let before, site != before { site.date = Date() }
+            after = site
+        } else if state.darkened {
+            after = nil
+        } else {
+            after = before
+        }
+        if after != before { DarkSeen.set(state.site, after, in: scope) }
+        return (before == nil) != (after == nil)
     }
 
     fileprivate static func received(_ state: State, from webView: WKWebView) {
@@ -549,7 +602,7 @@ enum DarkPages {
             }
             let state = State(darkened: body["darkened"] as? Bool ?? false, native: body["native"] as? Bool ?? false,
                               color: (body["color"] as? String).flatMap(DarkPages.color(hex:)), site: body["site"] as? String ?? "",
-                              palette: body["palette"] as? Bool ?? false)
+                              palette: body["palette"] as? Bool ?? false, marker: (body["marker"] as? String).flatMap(DarkPages.marker(_:)))
             DarkPages.received(state, from: webView)
         }
     }
@@ -605,6 +658,21 @@ enum DarkPages {
                 replyHandler(text, nil)
             }
         }
+    }
+
+    /// The marks a dark look is known by, as dark-pages.js reads them off the page's root.
+    static let markerAttributes = ["data-color-mode", "data-theme", "data-bs-theme", "data-mode", "data-color-scheme", "data-mantine-color-scheme"]
+    static let markerClasses = ["dark", "dark-mode", "theme-dark", "dark-theme"]
+
+    /// A mark a page said its dark look set, if it's one of those (else nil: not kept); "" for none.
+    static func marker(_ said: String) -> String? {
+        if said.isEmpty { return "" }
+        if said.hasPrefix("class:"), markerClasses.contains(String(said.dropFirst(6))) { return said }
+        if said.hasPrefix("attr:") {
+            let parts = said.dropFirst(5).split(separator: "=", maxSplits: 1).map(String.init)
+            if parts.count == 2, markerAttributes.contains(parts[0]), parts[1] == "dark" { return said }
+        }
+        return nil
     }
 
     static func color(hex: String) -> NSColor? {

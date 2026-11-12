@@ -63,6 +63,7 @@
 		2E8C9DF367FE32D045315D1C /* Brand.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64A4FFBD5B64DD888870043 /* Brand.swift */; };
 		2EB548A050B8877233F8E0C8 /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9102393493293F365ECD5D6 /* WindowManager.swift */; };
 		3048A1B301D8F87A94840074 /* MCPHTTP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81C684CBB391686C907F7D7C /* MCPHTTP.swift */; };
+		318A469BA7739143180BF844 /* DarkSeen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A69950C3F8014CFB7FAB861A /* DarkSeen.swift */; };
 		339255F1AB371362E5339EA4 /* MCPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 928D7647F31AE3EE93056E2F /* MCPServer.swift */; };
 		33E706A12F4E2336AF5BA09E /* PageState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E2214E6363E199754548C38 /* PageState.swift */; };
 		35D7E0C77E5DE66D9B871D4F /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = E35F3B1C28D9313BCCFA9CA4 /* LICENSE */; };
@@ -542,6 +543,7 @@
 		A5C379E2BF735EEBC168D4E2 /* DarkPaletteScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPaletteScriptTests.swift; sourceTree = "<group>"; };
 		A61765B735BE30C84A0D55AA /* Feedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Feedback.swift; sourceTree = "<group>"; };
 		A64A4FFBD5B64DD888870043 /* Brand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Brand.swift; sourceTree = "<group>"; };
+		A69950C3F8014CFB7FAB861A /* DarkSeen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkSeen.swift; sourceTree = "<group>"; };
 		A8679BD8FFD9BC3825E36199 /* MiniLinkWakeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniLinkWakeTests.swift; sourceTree = "<group>"; };
 		A9205F70718ADF73D6C096BD /* Freezes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Freezes.swift; sourceTree = "<group>"; };
 		A9C34787271E39E26E0156FC /* MainMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenu.swift; sourceTree = "<group>"; };
@@ -944,6 +946,7 @@
 				91506D36CD561CBD7E11897D /* ContentBlocker.swift */,
 				96D4CC131CEDF843998D604C /* DarkPages.swift */,
 				9703D528E793AC587C36CFED /* DarkPalettes.swift */,
+				A69950C3F8014CFB7FAB861A /* DarkSeen.swift */,
 				CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */,
 				DAC9B2535F5F2C950BA4096B /* DownloadPlace.swift */,
 				059DC09EA2D5589CB98D676B /* ErrorPage.swift */,
@@ -1418,6 +1421,7 @@
 				902CD60C9DC21A528D47701B /* CrashReports.swift in Sources */,
 				D8CF4BCBE8B4918517E852AD /* DarkPages.swift in Sources */,
 				527D48A79603E705320A86F2 /* DarkPalettes.swift in Sources */,
+				318A469BA7739143180BF844 /* DarkSeen.swift in Sources */,
 				2DAB6350F3AD369496F738CF /* DebugBridge.swift in Sources */,
 				3C594139A69C469E17BC1FA4 /* DeskController.swift in Sources */,
 				9D77B51AB8E43E0CD839E867 /* Diagnostics.swift in Sources */,

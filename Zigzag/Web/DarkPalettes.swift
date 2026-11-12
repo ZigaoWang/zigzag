@@ -8,7 +8,8 @@ import WebKit
 /// Kept for each profile, in its folder, and never for a private window. It's a list of sites you've been to, so it
 /// goes with them: clearing a site's cache or cookies takes its palette, clearing all of either or all of History
 /// takes them all, and clearing History since a time takes the ones made since. Each file is named after its site, so
-/// clearing one site never has to read the others.
+/// clearing one site never has to read the others. The sites seen dark on their own (`DarkSeen`) are kept beside them
+/// and go with them.
 @MainActor
 enum DarkPalettes {
     struct Entry: Codable, Equatable {
@@ -119,7 +120,8 @@ enum DarkPalettes {
     /// Each profile's files by name (read once), and the entries read from them so far (nil: read, and not usable).
     private static var names: [String: Set<String>] = [:]
     private static var entries: [String: [String: Entry?]] = [:]
-    private static let disk = DispatchQueue(label: "app.zigzag.dark-palettes", qos: .utility)
+    /// Where their files are written and removed, in order; the sites seen dark (`DarkSeen`) share it.
+    static let disk = DispatchQueue(label: "app.zigzag.dark-palettes", qos: .utility)
 
     private static func listing(_ scope: String) -> Set<String> {
         if let known = names[scope] { return known }
@@ -159,7 +161,9 @@ enum DarkPalettes {
     /// The oldest made go once there are more than `keeping`.
     nonisolated private static func prune(_ dir: URL, keeping: Int) {
         let keys: [URLResourceKey] = [.contentModificationDateKey]
-        guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: keys), files.count > keeping else { return }
+        // Palettes alone: the sites seen dark (`DarkSeen`) keep their own count.
+        guard let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: keys))?.filter({ $0.pathExtension == "json" }),
+              files.count > keeping else { return }
         let dated = files.map { ($0, (try? $0.resourceValues(forKeys: Set(keys)).contentModificationDate) ?? .distantPast) }
         for (file, _) in dated.sorted(by: { $0.1 < $1.1 }).prefix(files.count - keeping) { try? FileManager.default.removeItem(at: file) }
         let left = Set(((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []))
@@ -178,6 +182,9 @@ enum DarkPalettes {
     /// Takes a profile's palettes away: one site's (covering its subdomains), the ones made since a time, or all.
     /// Pages open there keep theirs until they next load.
     static func forget(scope: String, site: String? = nil, since: Date? = nil) {
+        // The sites seen dark go the same way, kept beside them.
+        DarkSeen.forget(scope: scope, site: site, since: since)
+        DarkPages.palettesForgotten()
         guard let dir = folder(scope) else { return }
         let listed = listing(scope)
         let matching: Set<String>
@@ -202,7 +209,6 @@ enum DarkPalettes {
             if all { try? FileManager.default.removeItem(at: dir); return }
             for name in matching { try? FileManager.default.removeItem(at: dir.appendingPathComponent(name)) }
         }
-        DarkPages.palettesForgotten()
     }
 
     /// The same for a website data store: a private window's has none.
@@ -215,7 +221,7 @@ enum DarkPalettes {
     static func settle() { disk.sync {} }
 
     /// Forgets what's been read, so the next look reads the folder again (tests).
-    static func reload() { names = [:]; entries = [:] }
+    static func reload() { names = [:]; entries = [:]; DarkSeen.reload() }
 
     // MARK: Fetching sheets
 
