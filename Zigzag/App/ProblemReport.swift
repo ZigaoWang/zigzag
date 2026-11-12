@@ -85,6 +85,8 @@ enum ProblemReport {
 
         lines += ["", "Settings"]
         lines.append("Ad blocking \(ContentBlocker.isEnabled ? "on" : "off")")
+        let filters = AdEngine.shared.status
+        lines.append("Ad filter lists: " + (filters.ready ? "\(filters.filters) filters, checked \(AdEngine.shared.listsChecked?.formatted(date: .abbreviated, time: .shortened) ?? "never")" : "not downloaded yet"))
         lines.append("Reduce motion \(Tokens.Motion.reduceMotion ? "on" : "off")")
 
         lines += ["", "Extensions"]

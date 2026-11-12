@@ -1744,6 +1744,21 @@ enum DebugBridge {
             // settingspane <general|appearance|tabs|spaces|search|mini|passwords|privacy|translation|extensions|shortcuts>
             SettingsPage.open(SettingsPane(rawValue: arg), in: controller)
         case "allowads": ContentBlocker.setAllowed(arg != "off", on: controller.tabManager.selectedTab?.url); controller.tabManager.selectedTab?.reload()
+        case "adfilters":
+            // adfilters update (downloads the lists now, whether or not they've expired), adfilters <path> (JSON: the
+            // engine, its lists, and the site filters in the front tab's web view).
+            let engine = AdEngine.shared
+            if arg == "update" { engine.refresh(force: true); break }
+            let status = engine.status
+            let scripts = controller.selectedWebView?.configuration.userContentController.userScripts.filter(PageFilters.isOurs) ?? []
+            let state: [String: Any] = [
+                "generation": status.generation, "ready": status.ready, "filters": status.filters, "scriptlets": status.scriptlets,
+                "builtInMs": Int(status.builtIn * 1000), "loadedInMs": Int(status.loadedIn * 1000),
+                "checked": engine.listsChecked.map { ISO8601DateFormatter().string(from: $0) } ?? "", "error": status.lastError ?? "",
+                "hosts": controller.selectedWebView.map { PageFilters.hosts(in: $0.configuration.userContentController).sorted() } ?? [],
+                "tabScripts": scripts.count, "tabScriptBytes": scripts.reduce(0) { $0 + $1.source.utf8.count },
+            ]
+            if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "addext": controller.installExtension(arg)
         case "storeadd": WebStoreOffer.debugAdd()
         case "sheetcancel": ExtensionSheet.debugCancel()
