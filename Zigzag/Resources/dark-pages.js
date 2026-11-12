@@ -173,6 +173,11 @@
       const c = parse(getComputedStyle(el).backgroundColor);
       if (c && c[3] > 0.6) return c;
     }
+    // Below a short body, the root with no background of its own: the body's color is the whole window's, as CSS
+    // paints it, so a dark page with little on it isn't read as white there (#134).
+    const body = document.body;
+    const own = body && parse(getComputedStyle(body).backgroundColor);
+    if (own && own[3] > 0.6) return own;
     return canvas();
   };
   const skip = /^(IMG|VIDEO|CANVAS|IFRAME|EMBED|OBJECT|PICTURE|SVG)$/i;
