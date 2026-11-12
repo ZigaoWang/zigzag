@@ -547,6 +547,9 @@ final class SitePanel: FloatingPanelView {
         context.isWeb = ["http", "https"].contains(url.scheme ?? "")
         context.isPrivate = isPrivate
         context.adBlocking = ContentBlocker.isEnabled
+        // Once a consent pop-up was found on the page, or a choice was made for the site (#175).
+        context.cookieBanners = CookieBanners.applies(to: url)
+            && (CookieBanners.outcome(in: tab.webView, site: site) != nil || CookieBanners.choice(for: url) != nil)
         if #available(macOS 15.4, *) { context.extensionHost = tab.extensionHost != nil && !isBlank }
         context.hasPermissions = origin.map { !SitePermissions.shown(origin: $0, isPrivate: isPrivate || tab.isPrivate).isEmpty } ?? false
         context.siteChoices = KeepAwake.isOffered(for: url, isPrivate: isPrivate)
@@ -585,6 +588,22 @@ final class SitePanel: FloatingPanelView {
                 rows.append(.toggle(String(localized: "Ad blocking", comment: "Row in the site panel's This Site group."), on: blocked, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                     guard let self else { return }
                     ContentBlocker.setAllowed(!on, on: self.url)
+                    self.tab.reload()
+                })
+            case .cookieBanners:
+                // Cookie banners (#175), for this site alone. What was done says so quietly, under its name.
+                let banner = CookieBanners.outcome(in: tab.webView, site: site)
+                let rejected = String(localized: "Rejected on this site", comment: "Under Cookie banners in the site panel's This Site group: Zigzag said no to the cookies the site's consent pop-up asked for.")
+                let hidden = String(localized: "Hidden on this site", comment: "Under Cookie banners in the site panel's This Site group: the site's cookie notice was only hidden, since there was nothing to say no to.")
+                let handledNow = CookieBanners.handles(url)
+                rows.append(.toggle(String(localized: "Cookie banners", comment: "Row in the site panel's This Site group: whether Zigzag answers this site's cookie consent pop-ups with no."),
+                                    on: handledNow, status: { on in
+                                        guard on, on == handledNow else { return on ? Self.onHere : Self.offHere }
+                                        return banner == .rejected ? rejected : banner == .hidden ? hidden : Self.onHere
+                                    }) { [weak self] on in
+                    guard let self else { return }
+                    CookieBanners.setChoice(on, for: self.url)
+                    if let webView = self.tab.webView { CookieBanners.forget(in: webView) }
                     self.tab.reload()
                 })
             case .darkPage:
@@ -1434,7 +1453,7 @@ final class PanelPageHeader: NSView {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, darkPage, forceDark, keepAwake, fullScreenFills, alwaysTranslate }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, forceDark, keepAwake, fullScreenFills, alwaysTranslate }
     /// The rows into the panel's other pages.
     enum Link: Equatable { case connection, permissions, extensions }
 
@@ -1444,6 +1463,8 @@ enum SitePanelRows {
         var isPrivate = false
         /// Ad blocking is on in Settings.
         var adBlocking = true
+        /// A cookie consent pop-up was found on the page, or a choice is kept for the site (#175).
+        var cookieBanners = false
         /// Choices kept for a site (dark page, keeping tabs awake) are offered for it (`KeepAwake.isOffered`).
         var siteChoices = true
         /// The site looks dark on its own, or was forced dark already.
@@ -1464,6 +1485,7 @@ enum SitePanelRows {
         var rows: [Row] = []
         if c.isWeb, !c.coveredPage { rows.append(.zoom) }
         if c.isWeb, c.adBlocking, !c.isPrivate { rows.append(.adBlocking) }
+        if c.isWeb, c.cookieBanners, !c.isPrivate { rows.append(.cookieBanners) }
         if c.siteChoices {
             rows.append(.darkPage)
             if c.forceDarkOffered { rows.append(.forceDark) }
