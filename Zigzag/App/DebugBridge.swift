@@ -11,6 +11,9 @@ enum DebugBridge {
     static let mutesEverything = ProcessInfo.processInfo.environment["ZIGZAG_MUTE_ALL"] == "1"
     private static var scrollLog: [String] = []
     private static var dragTimer: Timer?
+    /// A pane carried by `panedrag`, and where it is now (on screen).
+    private static var debugPaneDrag: PaneDrag?
+    private static var debugPaneDragPoint: NSPoint?
 
     static func recordScroll(_ event: NSEvent) {
         scrollLog.append(String(format: "%.3f phase=%lu mom=%lu dx=%.1f dy=%.1f precise=%d swipeEnabled=%d",
@@ -770,6 +773,67 @@ enum DebugBridge {
             } else {
                 controller.root.splitDropHint.show(nil)
             }
+        case "panedrag":
+            // panedrag <pane> <x> <y>: the group's pane at that index picked up by its strip and carried to that point
+            // (shares of the page area's width and height; below 0 is the sidebar), as a drag would (#160). Again moves
+            // it on; panedrag alone calls it off (Esc), panedrop [opt] lets go (opt: with ⌥ held).
+            let parts = arg.split(separator: " ").compactMap { Double($0) }
+            guard parts.count == 3, let window = controller.window, let current = controller.tabManager.selectedTab,
+                  let pair = controller.tabManager.split(for: current), pair.ids.indices.contains(Int(parts[0])),
+                  let tab = controller.tabManager.tab(with: pair.ids[Int(parts[0])]) else {
+                debugLog("panedrag \(arg): no pane (selected \(controller.tabManager.selectedTab?.title ?? "none"))")
+                debugPaneDrag?.cancel()
+                debugPaneDrag = nil
+                debugPaneDragPoint = nil
+                break
+            }
+            let area = controller.root.cardFrame
+            let point = window.convertPoint(toScreen: controller.root.convert(NSPoint(x: area.minX + area.width * parts[1], y: area.minY + area.height * parts[2]), to: nil))
+            if debugPaneDrag?.tab !== tab {
+                debugPaneDrag?.cancel()
+                let card = controller.root.paneCards[Int(parts[0])]
+                debugPaneDrag = PaneDrag(controller: controller, tab: tab, card: card, at: window.convertPoint(toScreen: card.header.convert(NSPoint(x: card.header.bounds.midX, y: card.header.bounds.midY), to: nil)))
+                debugPaneDrag?.lift()
+            }
+            debugPaneDrag?.moved(to: point)
+            debugPaneDragPoint = point
+            debugLog("panedrag \(arg) => \(String(describing: debugPaneDrag?.target)) at \(point)")
+        case "rowhover":
+            // rowhover <n>: the row of the tab at this place in the list as if the pointer were over it; off: none.
+            let tabs = controller.tabManager.currentTabs
+            for tab in tabs { (controller.sidebar.list.row(for: tab) as? SidebarRowView)?.isHovered = false }
+            if let n = Int(arg), tabs.indices.contains(n) { (controller.sidebar.list.row(for: tabs[n]) as? SidebarRowView)?.isHovered = true }
+        case "groupnamed":
+            // groupnamed <word>|<word>|...: the tabs whose titles have these words, side by side as a split (two), a
+            // half and two quarters (three) or a grid (four).
+            let words = arg.components(separatedBy: "|")
+            let tabs = words.compactMap { word in controller.tabManager.currentTabs.first { $0.title.contains(word) } }
+            let regions: [[TileRegion]] = [[.left, .right], [.left, .topRight, .bottomRight], [.topLeft, .topRight, .bottomLeft, .bottomRight]]
+            if tabs.count == words.count, (2...4).contains(tabs.count) {
+                controller.tabManager.makeGroup(tabs, shape: TileShape(regions: regions[tabs.count - 2]))
+            }
+        case "selectnamed":
+            if let tab = controller.tabManager.currentTabs.first(where: { $0.title.contains(arg) }) { controller.tabManager.select(tab) }
+        case "rowhovernamed":
+            for tab in controller.tabManager.currentTabs { (controller.sidebar.list.row(for: tab) as? SidebarRowView)?.isHovered = false }
+            if let tab = controller.tabManager.currentTabs.first(where: { $0.title.contains(arg) }) {
+                (controller.sidebar.list.row(for: tab) as? SidebarRowView)?.isHovered = true
+            }
+        case "rowdump":
+            // rowdump: the shown tab's row's parts, where each is and whether it shows, in the debug log.
+            if let tab = controller.tabManager.selectedTab, let row = controller.sidebar.list.row(for: tab) {
+                debugLog("rowdump \(row.frame) " + row.subviews.map { "\(type(of: $0)) \($0.frame) hidden=\($0.isHidden) alpha=\($0.alphaValue)" }.joined(separator: " | "))
+            }
+        case "rowrename":
+            // rowrename <n>: the shown tab's row starts renaming the page in its part n, as a double-click there does.
+            if let tab = controller.tabManager.selectedTab, let row = controller.sidebar.list.row(for: tab) as? TabRowView,
+               let n = Int(arg), row.pages.indices.contains(n) {
+                row.beginRename(page: row.pages[n])
+            }
+        case "panedrop":
+            guard let drag = debugPaneDrag, let point = debugPaneDragPoint else { break }
+            drag.drop(at: point, option: arg == "opt")
+            debugPaneDrag = nil
         case "unsplit": controller.closeSplitView(nil)
         // splitorient: side by side to stacked or back, as the split's own button does.
         case "splitorient": controller.toggleSplitOrientation(nil)
