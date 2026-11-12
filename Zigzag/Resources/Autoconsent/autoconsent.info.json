@@ -1,0 +1,6 @@
+{
+  "version": "16.63.0",
+  "package": "https://registry.npmjs.org/@duckduckgo/autoconsent/-/autoconsent-16.63.0.tgz",
+  "integrity": "sha512-h5cued2ofnqggiVz2vRd4OHqRzVv76cWe+gttPqNMqWDD9tiF8AMzBj3+Vpfo67JvnOx6vwXVLLayHpJf06XJA==",
+  "files": ["dist/autoconsent.playwright.js", "rules/compact-rules.json", "LICENSE"]
+}

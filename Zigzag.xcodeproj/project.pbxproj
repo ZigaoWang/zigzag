@@ -105,6 +105,7 @@
 		45B26CB65A31C4BEFCFB7CA2 /* EnergyWarningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0DE85F403C80DB6286E463D /* EnergyWarningTests.swift */; };
 		45DB5724896F8B0B56478A3E /* PaneDrag.swift in Sources */ = {isa = PBXBuildFile; fileRef = B44BD209A49B5F5B73ECE2BD /* PaneDrag.swift */; };
 		460CA84D79A128E0FA584DEC /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66EBD45517A6D288CBC8DFC7 /* main.swift */; };
+		473630690BB4A43DD003CB90 /* autoconsent.playwright.js in Resources */ = {isa = PBXBuildFile; fileRef = 8E07B70991B676D8FF0867A2 /* autoconsent.playwright.js */; };
 		47481B98A075C26B774A694A /* PageStatePrivacyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D2E0F2330CC776A71AC19D /* PageStatePrivacyTests.swift */; };
 		477BB8ED8D0C8DC49A0AFC15 /* PopupNotice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9569CB3512DF9E729E1FDA49 /* PopupNotice.swift */; };
 		4796C99DFA31C01F7EBCB5AF /* SystemAudioTap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 514E259958AB77A6CA393296 /* SystemAudioTap.swift */; };
@@ -230,6 +231,7 @@
 		9D77B51AB8E43E0CD839E867 /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B4B60FF2196B96D92F2D31D /* Diagnostics.swift */; };
 		9DFE67FDE820756905A9DEB7 /* SidebarSideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCDEF7114B3ECBE3F211615 /* SidebarSideTests.swift */; };
 		9EBDB7B646861E6CE816243B /* FormSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C928420068829E660FA04DC9 /* FormSheetTests.swift */; };
+		9FA6EC19557FF66339BC8957 /* autoconsent-compact-rules.json in Resources */ = {isa = PBXBuildFile; fileRef = 2FD8BEABF4B3488FB915B002 /* autoconsent-compact-rules.json */; };
 		9FEEA537DE55BC1099D8DB0D /* TabStateCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD11485F83B11770DF38CE2 /* TabStateCache.swift */; };
 		A05782BC7540B79FF1021BF4 /* ContentBlocker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91506D36CD561CBD7E11897D /* ContentBlocker.swift */; };
 		A08F33F5B078BBE5F98A6003 /* TileLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192E65AD41512C6227E9A03C /* TileLayoutTests.swift */; };
@@ -273,11 +275,13 @@
 		B8333FBBDA3A6AD9632258A0 /* TileLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3D2DE7666043EE722FAEF2 /* TileLayout.swift */; };
 		B9BAF8A4CC1907F52C65274B /* Readability-LICENSE.md in Resources */ = {isa = PBXBuildFile; fileRef = 76DB536661E9E732536910C2 /* Readability-LICENSE.md */; };
 		BEC7556625226B96D886206F /* SafariImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CBCCC0F5050F641CEAB31 /* SafariImporter.swift */; };
+		BEF065DF8F5D8B88001B1139 /* autoconsent.info.json in Resources */ = {isa = PBXBuildFile; fileRef = 89A07EB62BF2057B04CDC41A /* autoconsent.info.json */; };
 		C0B6755DFC601C9C358E67DA /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F70CA73E1EF5C8460E9286 /* TabManager.swift */; };
 		C0BAE33AABA9789FBBCB98B5 /* SiteControlsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9087E150435AD1151CE6852F /* SiteControlsTests.swift */; };
 		C0C41FEE6C185FBC845F1D51 /* ZigzagWebApp in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = B3AD1C19026E47583E6DC0CD /* ZigzagWebApp */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C0FC25E6C63A4DA77D76CA8D /* chrome-runtime.js in Resources */ = {isa = PBXBuildFile; fileRef = B030A4C0601F5AE1232B9288 /* chrome-runtime.js */; };
 		C11913DEEFC7AD66CBC10F50 /* PromptHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */; };
+		C2866E2B3C6D2530C1B61098 /* autoconsent-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = A65F87DB450F7C340B1F045C /* autoconsent-LICENSE.txt */; };
 		C2C05749A76907433E6BEC4D /* reading_list.plist in Resources */ = {isa = PBXBuildFile; fileRef = E37F1CA561517AA2505B9E24 /* reading_list.plist */; };
 		C422E0C6A62DCD279873BAF8 /* NestedTabsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95F44051F969F0AE56E0C778 /* NestedTabsTests.swift */; };
 		C48183B2BC3873DC93F30DF6 /* CommandBarModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD6F20366D4AE7C0A87CD0DA /* CommandBarModel.swift */; };
@@ -467,6 +471,7 @@
 		2D8E0E7DB1C952078DABEE2B /* MiniLinkWake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniLinkWake.swift; sourceTree = "<group>"; };
 		2E2214E6363E199754548C38 /* PageState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageState.swift; sourceTree = "<group>"; };
 		2FC330CEE0425B72CE83C21D /* PageHolder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageHolder.swift; sourceTree = "<group>"; };
+		2FD8BEABF4B3488FB915B002 /* autoconsent-compact-rules.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "autoconsent-compact-rules.json"; sourceTree = "<group>"; };
 		3014AEB17D7BEE4384710CD9 /* DeveloperToolsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperToolsTests.swift; sourceTree = "<group>"; };
 		30417C99681AAC2507555F94 /* ExtensionReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionReport.swift; sourceTree = "<group>"; };
 		316205FDAE606ECFE3682BA1 /* NumberHints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumberHints.swift; sourceTree = "<group>"; };
@@ -579,9 +584,11 @@
 		88D86346DE78193D507DCECC /* TabStateCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabStateCacheTests.swift; sourceTree = "<group>"; };
 		88E9A925D7802ECE0037DA97 /* AboutWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutWindow.swift; sourceTree = "<group>"; };
 		88F9F8B1C1119171EFC0072B /* DebugBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugBridge.swift; sourceTree = "<group>"; };
+		89A07EB62BF2057B04CDC41A /* autoconsent.info.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = autoconsent.info.json; sourceTree = "<group>"; };
 		8A7E9A550FE7FAD6F8CA7697 /* HistoryLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryLookup.swift; sourceTree = "<group>"; };
 		8C69310459FA2C067D241416 /* MCPPageScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPPageScript.swift; sourceTree = "<group>"; };
 		8D4C44C0E24339E50B51709A /* AdFiltersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdFiltersTests.swift; sourceTree = "<group>"; };
+		8E07B70991B676D8FF0867A2 /* autoconsent.playwright.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = autoconsent.playwright.js; sourceTree = "<group>"; };
 		8F50C552DADDAC51AC86787B /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportView.swift; sourceTree = "<group>"; };
 		8F62FA2BF2A457B8137CE704 /* MCPSetupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPSetupTests.swift; sourceTree = "<group>"; };
 		8F7FCA5586EF97D50AF36363 /* PageTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTranslator.swift; sourceTree = "<group>"; };
@@ -622,6 +629,7 @@
 		A45729EC68E69DC16773C6CA /* WebAppWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAppWindowController.swift; sourceTree = "<group>"; };
 		A61765B735BE30C84A0D55AA /* Feedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Feedback.swift; sourceTree = "<group>"; };
 		A64A4FFBD5B64DD888870043 /* Brand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Brand.swift; sourceTree = "<group>"; };
+		A65F87DB450F7C340B1F045C /* autoconsent-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "autoconsent-LICENSE.txt"; sourceTree = "<group>"; };
 		A69950C3F8014CFB7FAB861A /* DarkSeen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkSeen.swift; sourceTree = "<group>"; };
 		A8679BD8FFD9BC3825E36199 /* MiniLinkWakeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniLinkWakeTests.swift; sourceTree = "<group>"; };
 		A9205F70718ADF73D6C096BD /* Freezes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Freezes.swift; sourceTree = "<group>"; };
@@ -1029,6 +1037,7 @@
 				5795B0D3216D1BBB137286B3 /* tlds.txt */,
 				012184AB9B6339550C39951A /* Zigzag.sdef */,
 				0B58E860155F696028B3546F /* AdEngine */,
+				FDA8310DAB8A6E77D734D0C6 /* Autoconsent */,
 				FD03A396314996F5B50FD631 /* Blocklists */,
 				6F0DB7A8F6DDE9006664FEF2 /* DarkReader */,
 				0FD86EE0A3BE2E37ACEA5F8F /* Extensions */,
@@ -1398,6 +1407,17 @@
 			path = Blocklists;
 			sourceTree = "<group>";
 		};
+		FDA8310DAB8A6E77D734D0C6 /* Autoconsent */ = {
+			isa = PBXGroup;
+			children = (
+				2FD8BEABF4B3488FB915B002 /* autoconsent-compact-rules.json */,
+				A65F87DB450F7C340B1F045C /* autoconsent-LICENSE.txt */,
+				89A07EB62BF2057B04CDC41A /* autoconsent.info.json */,
+				8E07B70991B676D8FF0867A2 /* autoconsent.playwright.js */,
+			);
+			path = Autoconsent;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -1543,6 +1563,10 @@
 				94ADB66CC737D1DA231E3D74 /* ads.html in Resources */,
 				A1B642C243114E42A13CF1D0 /* api-surface.js in Resources */,
 				83A451FE075DF252B6AA5FD3 /* audio-routes.js in Resources */,
+				C2866E2B3C6D2530C1B61098 /* autoconsent-LICENSE.txt in Resources */,
+				9FA6EC19557FF66339BC8957 /* autoconsent-compact-rules.json in Resources */,
+				BEF065DF8F5D8B88001B1139 /* autoconsent.info.json in Resources */,
+				473630690BB4A43DD003CB90 /* autoconsent.playwright.js in Resources */,
 				B717C1AE92C7BF70BEBD1317 /* avoidxray.png in Resources */,
 				242E316E28B214F1B75E2B6F /* blocklist.info.json in Resources */,
 				2BAC5D63A9B904BE86762FE6 /* blocklist.json.lzfse in Resources */,

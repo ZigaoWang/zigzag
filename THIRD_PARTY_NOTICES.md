@@ -237,6 +237,18 @@ License: [Mozilla Public License, Version 2.0](https://mozilla.org/MPL/2.0/), fo
 Thomas Parisot, 2018 Rémi Berson). The bundled script is the Source Code Form; the full license texts and the list of
 bundled packages are in `Zigzag/Resources/AdEngine/ghostery-adblocker-LICENSE.txt`, which ships beside it.
 
+### Autoconsent
+
+Cookie banners. `Zigzag/Resources/Autoconsent/autoconsent.playwright.js` and
+`Zigzag/Resources/Autoconsent/autoconsent-compact-rules.json` are DuckDuckGo's
+[Autoconsent](https://github.com/duckduckgo/autoconsent), from its `@duckduckgo/autoconsent` npm package (its
+`dist/autoconsent.playwright.js` and `rules/compact-rules.json`), bundled unmodified by `scripts/update-autoconsent.sh`;
+`autoconsent.info.json` records the version. It runs in a script world of its own inside Zigzag; Zigzag's own code that
+talks to it (`Zigzag/Web/CookieBanners.swift`) is Zigzag's, under the Apache License.
+
+License: [Mozilla Public License, Version 2.0](https://mozilla.org/MPL/2.0/). The bundled files are the Source Code
+Form; the full license text is in `Zigzag/Resources/Autoconsent/autoconsent-LICENSE.txt`, which ships beside them.
+
 ### Public Suffix List
 
 Telling one site from another (which part of an address is the site, as in `bbc.co.uk`).
