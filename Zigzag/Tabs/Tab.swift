@@ -43,6 +43,8 @@ final class Tab: NSObject {
         case settings
         /// Dark pages began or stopped drawing its page dark (`darkPage`).
         case darkPage
+        /// It became or stopped being a development tab (`isDevelopment`).
+        case developer
     }
 
     let id: UUID
@@ -65,7 +67,7 @@ final class Tab: NSObject {
     /// The tabs under this one are folded away in the sidebar.
     var isCollapsed = false
 
-    private(set) var url: URL?
+    private(set) var url: URL? { didSet { refreshDevelopment() } }
     private(set) var title: String
     private(set) var favicon: NSImage?
     private(set) var themeColor: NSColor?
@@ -255,6 +257,7 @@ final class Tab: NSObject {
         self.createdAt = createdAt
         super.init()
         if let url = self.url { favicon = FaviconStore.shared.cachedIcon(for: url) }
+        isDevelopment = DeveloperTools.applies(to: self.url)
         snapshot = SnapshotStore.load(id)
         if #available(macOS 15.4, *) {
             extensionToken = changed.observe { [weak self] change in
@@ -287,6 +290,20 @@ final class Tab: NSObject {
     /// The icon you chose that stands for it, or nil for its site's. Kept up to date (`refreshChosenIcon`), and
     /// says `.favicon` when it changes, as a new site icon does.
     private(set) var chosenIcon: String?
+
+    /// A development tab (#141): Developer tools is on and the page it shows is on a site you develop
+    /// (`DevelopmentSites`). The page it shows is the one last committed; before any, the address it's going to, so
+    /// a new tab on its way to localhost and one restored asleep are told too. An address shown early, for a page
+    /// that hasn't come, changes nothing: a sign-in that passes through another site doesn't flicker it.
+    private(set) var isDevelopment = false
+
+    /// Looks again at whether it's a development tab: its page changed, or Settings › Developer did.
+    func refreshDevelopment() {
+        let now = DeveloperTools.applies(to: committedURL ?? url)
+        guard now != isDevelopment else { return }
+        isDevelopment = now
+        changed.send(.developer)
+    }
 
     /// Looks again at which chosen icon shows: after its own changes, it becomes or stops being a pinned page's or a
     /// favorite's, or the library changes (that page given an icon, or ⌘Z taking one back).
@@ -980,7 +997,7 @@ final class Tab: NSObject {
     /// The site whose page was last committed here, so a private tab keeps its zoom from page to page on it.
     private var zoomHost: String?
     /// The page last committed here: the site the tab's icon belongs to.
-    private var committedURL: URL?
+    private var committedURL: URL? { didSet { refreshDevelopment() } }
 
     /// Whether the icon stays as a new page commits: only on the same site (www. or not). The first page committed
     /// in a tab keeps the icon it was restored with.

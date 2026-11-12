@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var launched = false
     private var blockerToken: SignalToken?
     private var extensionsToken: SignalToken?
+    private var developerToken: SignalToken?
 
     /// What you type into a web page stays as you typed it, as in Chrome and Safari: WebKit would otherwise follow
     /// the Mac's text substitutions, turning `--` into `—` (breaking GitHub's `<!-- Uploading … -->` placeholders
@@ -92,6 +93,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
                 if let webView = tab.webView, !Tab.isExtensionPage(tab.url) { ContentBlocker.apply(to: webView, for: tab.url) }
             }
+        }
+        // Developer tools turned on or off, or a site put on its list or taken off: open tabs are told at once.
+        developerToken = DeveloperTools.changed.observe {
+            for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) { tab.refreshDevelopment() }
         }
         if #available(macOS 15.4, *) {
             // An ad blocker extension turned on or off, or let onto YouTube or not: open pages follow on their next load.
