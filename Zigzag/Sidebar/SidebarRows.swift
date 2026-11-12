@@ -642,7 +642,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             let height = NumberHintView.height
             hint.frame = NSRect(x: bounds.width - edge - hint.width, y: (bounds.height - height) / 2, width: hint.width, height: height)
         }
-        var end = endSlot > 0 ? bounds.width - edge - endSlot - Self.buttonGap : bounds.width - edge
+        // A row of several pages keeps the close button's room whether or not it shows, so its parts never move as
+        // the pointer comes and goes.
+        let slot = isSplit ? max(endSlot, size.width) : endSlot
+        var end = slot > 0 ? bounds.width - edge - slot - Self.buttonGap : bounds.width - edge
         if showsNested {
             nestedButton.frame = NSRect(x: end - size.width, y: y, width: size.width, height: size.height)
             end = nestedButton.frame.minX - Self.buttonGap
