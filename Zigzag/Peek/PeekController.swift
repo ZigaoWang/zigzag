@@ -1,12 +1,17 @@
 import AppKit
 import WebKit
 
-/// The peek's top strip, on the panel's glass: the site, then "Open as Tab" and close.
+/// The peek's top strip, on the panel's glass: the site, then "Open as Tab" and close. As slim as a split view pane's
+/// strip (`Tokens.Pane`), so the page gets the room.
 final class PeekHeaderView: NSView {
     let icon = FaviconView()
-    let host = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
-    let expandButton = IconButton(symbol: "arrow.up.left.and.arrow.down.right", toolTip: String(localized: "Open Peek as Tab", comment: "Tooltip of the button in Peek's top strip that keeps the page as a tab."))
-    let closeButton = IconButton(symbol: "xmark", toolTip: String(localized: "Close Peek", comment: "Tooltip of the close button in Peek's top strip."))
+    let host = Label("", font: .systemFont(ofSize: Tokens.Pane.addressText), color: Tokens.Color.textPrimary)
+    let expandButton = PeekHeaderView.button("arrow.up.left.and.arrow.down.right", toolTip: String(localized: "Open Peek as Tab", comment: "Tooltip of the button in Peek's top strip that keeps the page as a tab."))
+    let closeButton = PeekHeaderView.button("xmark", toolTip: String(localized: "Close Peek", comment: "Tooltip of the close button in Peek's top strip."))
+
+    private static func button(_ symbol: String, toolTip: String) -> IconButton {
+        IconButton(symbol: symbol, size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph, toolTip: toolTip)
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -25,16 +30,15 @@ final class PeekHeaderView: NSView {
 
     override func layout() {
         super.layout()
-        // Close sits as far from the panel's top and side as the page below sits from its sides, so its corner runs
-        // with the panel's (`FloatingPanelView` fits it).
-        let edge = PeekController.inset + 2
-        let b = Tokens.Metric.iconButton
-        let y = (bounds.height - b) / 2
-        closeButton.frame = NSRect(x: bounds.width - edge - b, y: y, width: b, height: b)
-        expandButton.frame = NSRect(x: closeButton.frame.minX - b, y: y, width: b, height: b)
-        [expandButton, closeButton].forEach { $0.radius = max(Tokens.Radius.control, Tokens.Radius.large - max(edge, y)) }
-        let iconSize = Tokens.Metric.favicon
-        icon.frame = NSRect(x: PeekController.inset + CardRow.inset, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
+        // Close sits as far from the panel's side as from its top, so its corner runs with the panel's
+        // (`FloatingPanelView` fits it); the favicon mirrors it at the leading end, where a button would be.
+        let b = Tokens.Pane.button
+        let edge = (bounds.height - b) / 2
+        closeButton.frame = NSRect(x: bounds.width - edge - b, y: edge, width: b, height: b)
+        expandButton.frame = NSRect(x: closeButton.frame.minX - b, y: edge, width: b, height: b)
+        [expandButton, closeButton].forEach { $0.radius = max(Tokens.Radius.control, Tokens.Radius.large - edge) }
+        let iconSize = Tokens.Sidebar.favicon
+        icon.frame = NSRect(x: edge + (b - iconSize) / 2, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
         let x = icon.frame.maxX + Tokens.Space.x2 - Label.inset
         let h = host.lineHeight
         host.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: max(0, expandButton.frame.minX - x - Tokens.Space.x2), height: h)
@@ -89,7 +93,7 @@ final class PeekController {
 
     private var headerHeight: CGFloat { Tokens.Metric.peekHeaderHeight }
     /// From the glass's edge to the page in it, at the sides and bottom.
-    static let inset = Tokens.Space.x1
+    static let inset = Tokens.Metric.peekInset
 
     private func panelFrame() -> NSRect {
         guard let controller else { return .zero }

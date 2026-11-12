@@ -134,9 +134,12 @@ enum Tokens {
         static let keyCapHeight: CGFloat = Space.x5 - 2
         /// A small round button floating over a page edge on its own (swipe arrows, the stand-in Downloads button).
         static let floatingButton: CGFloat = Space.x8 + Space.x1
-        /// A tab preview's caption under the picture, and Peek's top strip.
+        /// A tab preview's caption under the picture.
         static let previewCaptionHeight: CGFloat = Space.x12
-        static let peekHeaderHeight: CGFloat = Space.x10
+        /// Peek's top strip: a split view pane's, so the page under it gets the room.
+        static let peekHeaderHeight: CGFloat = Pane.height
+        /// Peek's rim around its page, at the sides and below: enough to hold the page, not a frame around it.
+        static let peekInset: CGFloat = 2
     }
 
     // MARK: - Pages
