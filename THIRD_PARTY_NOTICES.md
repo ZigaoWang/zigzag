@@ -249,6 +249,15 @@ talks to it (`Zigzag/Web/CookieBanners.swift`) is Zigzag's, under the Apache Lic
 License: [Mozilla Public License, Version 2.0](https://mozilla.org/MPL/2.0/). The bundled files are the Source Code
 Form; the full license text is in `Zigzag/Resources/Autoconsent/autoconsent-LICENSE.txt`, which ships beside them.
 
+### Chrome extension API names
+
+Filling in the Chrome extension APIs WebKit doesn't have. `Zigzag/Resources/Extensions/chrome-api.json` lists the
+names of Chrome's extension namespaces, functions, events, constants and permissions, taken by `scripts/chrome-api.py`
+from the type definitions in Google's [chrome-types](https://github.com/GoogleChrome/chrome-types) npm package, which
+are built from Chromium's API schemas. Only the names are kept; none of the package's text or code is.
+
+License: the chrome-types package is under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+
 ### Public Suffix List
 
 Telling one site from another (which part of an address is the site, as in `bbc.co.uk`).
@@ -277,7 +286,8 @@ Origin contributors ([github.com/uBlockOrigin/uAssets](https://github.com/uBlock
 uBlock Origin's own addresses (ublockorigin.github.io, ublockorigin.pages.dev, cdn.jsdelivr.net). Zigzag uses their
 scriptlet and site-specific hiding filters.
 
-License: [GNU General Public License v3.0](https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE).
+License: [GNU General Public License v3.0](https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE). Zigzag
+credits the lists in Settings › Privacy and in About Zigzag › Acknowledgments.
 
 ### uBlock Origin's scriptlets
 
