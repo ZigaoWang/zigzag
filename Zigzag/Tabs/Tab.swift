@@ -321,9 +321,13 @@ final class Tab: NSObject {
     }
 
     /// What you chose for this tab with the developer tools (`DeveloperState`). Read through `developerInEffect`.
+    /// The last size the page had with the developer tools, for Toggle Page Size to give it again.
+    private(set) var developerLastSize: CGSize?
+
     var developer = DeveloperState() {
         didSet {
             guard developer != oldValue else { return }
+            if let size = developer.size { developerLastSize = size }
             applyDeveloperState()
             applyDeveloperStateToPage()
             // What a page is told and allowed as it loads shows once it has loaded again.

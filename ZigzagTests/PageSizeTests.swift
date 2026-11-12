@@ -143,6 +143,11 @@ struct PageSizeTests {
             tab.developer.size = CGSize(width: 393, height: 852)
             #expect(tab.developerInEffect.size == CGSize(width: 393, height: 852))
             #expect(tab.developer.rotatedSize == CGSize(width: 852, height: 393))
+            // It remembers the last size it had, for Toggle Page Size, after filling the window again.
+            #expect(tab.developerLastSize == CGSize(width: 393, height: 852))
+            tab.developer.size = CGSize(width: 820, height: 1180)
+            tab.developer.size = nil
+            #expect(tab.developerLastSize == CGSize(width: 820, height: 1180))
         }
     }
 
@@ -236,6 +241,6 @@ struct PageSizeTests {
         #expect(PageSizes.seed.allSatisfy { $0.height > $0.width || $0.width >= 1280 })
         #expect(PageSizes.seed.allSatisfy { PageSizes.limits.contains($0.width) && PageSizes.limits.contains($0.height) })
         #expect(Set(PageSizes.seed.map(\.name)).count == PageSizes.seed.count)
-        #expect(DeveloperBarTools.grouped(part.tools) == [[.sizeFill], [.sizeCustom, .rotate]])
+        #expect(DeveloperBarTools.grouped(part.tools) == [[.sizeFill], [.sizeCustom, .rotate, .sizeToggle]])
     }
 }

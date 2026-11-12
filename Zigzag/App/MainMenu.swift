@@ -67,7 +67,30 @@ enum MainMenu {
                DeveloperTool(action: last.action)?.isChoice != tool.isChoice { inside.addItem(.separator()) }
             inside.addItem(item(tool.shortTitle, tool.action, tool.key?.0 ?? "", tool.key?.1 ?? [.command]))
         }
+        refreshPageSizes(in: main)
         return true
+    }
+
+    /// Marks the listed sizes in View › Developer › Page Size. They follow the list in Settings › Developer and aren't
+    /// in Settings › Shortcuts: a key belongs to Toggle Page Size, not to a size that may be removed.
+    static let pageSizeItemID = NSUserInterfaceItemIdentifier("ZigzagDeveloperPageSize")
+
+    /// Puts the sizes listed in Settings › Developer into View › Developer › Page Size, after Fill the Window, in the
+    /// list's order, or takes them out with Developer tools. Each says which it is by its place (`tag`).
+    static func refreshPageSizes(in main: NSMenu?) {
+        func find(_ menu: NSMenu) -> NSMenu? {
+            if menu.items.contains(where: { $0.action == DeveloperTool.sizeFill.action }) { return menu }
+            return menu.items.lazy.compactMap { $0.submenu.flatMap(find) }.first
+        }
+        guard let menu = main.flatMap(find) else { return }
+        menu.items.filter { $0.identifier == pageSizeItemID }.forEach(menu.removeItem)
+        guard let fill = menu.items.firstIndex(where: { $0.action == DeveloperTool.sizeFill.action }) else { return }
+        for (i, size) in PageSizes.all.enumerated() {
+            let added = item(PageSizes.menuTitle(size), #selector(BrowserWindowController.pageSizeListed(_:)), "")
+            added.tag = i
+            added.identifier = pageSizeItemID
+            menu.insertItem(added, at: fill + 1 + i)
+        }
     }
 
     static func build() -> NSMenu {

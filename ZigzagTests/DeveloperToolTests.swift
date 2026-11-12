@@ -116,6 +116,46 @@ struct DeveloperToolTests {
     private func items(_ menu: NSMenu) -> [NSMenuItem] { menu.items.flatMap { $0.submenu.map(items) ?? [$0] } }
     private func actions(_ menu: NSMenu) -> [Selector] { items(menu).compactMap(\.action) }
 
+    private func sizeItems(_ menu: NSMenu) -> [NSMenuItem] { items(menu).filter { $0.identifier == MainMenu.pageSizeItemID } }
+
+    /// View › Developer › Page Size lists the sizes from Settings › Developer after Fill the Window, follows the list,
+    /// and leaves them out of Settings › Shortcuts; Toggle Page Size has ⌥⇧⌘M.
+    @Test func thePageSizeMenuListsTheSizes() throws {
+        try withDefaults {
+            DeveloperTools.isOn = false
+            let menu = MainMenu.build()
+            #expect(sizeItems(menu).isEmpty)
+            MainMenu.setDeveloperTools(true, in: menu)
+            let listed = sizeItems(menu)
+            #expect(listed.map(\.title) == PageSizes.all.map(PageSizes.menuTitle))
+            #expect(listed.map(\.tag) == Array(PageSizes.all.indices))
+            let submenu = try #require(listed.first?.menu)
+            let fill = try #require(submenu.items.firstIndex { $0.action == DeveloperTool.sizeFill.action })
+            #expect(submenu.items[fill + 1] === listed.first)
+            #expect(listed.allSatisfy { Shortcuts.id($0) == nil })
+            let toggle = items(menu).first { $0.action == DeveloperTool.sizeToggle.action }
+            #expect(toggle?.keyEquivalent == "m" && toggle?.keyEquivalentModifierMask == [.command, .option, .shift])
+            // A size added or removed in Settings shows here.
+            PageSizes.add(PageSizes.Size(name: "Watch", width: 205, height: 251))
+            MainMenu.refreshPageSizes(in: menu)
+            #expect(sizeItems(menu).last?.title == PageSizes.menuTitle(PageSizes.Size(name: "Watch", width: 205, height: 251)))
+            #expect(sizeItems(menu).count == PageSizes.all.count)
+            MainMenu.setDeveloperTools(false, in: menu)
+            #expect(sizeItems(menu).isEmpty)
+        }
+    }
+
+    /// Toggle Page Size gives a page that never had a size the first phone listed.
+    @Test func toggleStartsFromAPhone() {
+        withDefaults {
+            #expect(PageSizes.firstToggled == CGSize(width: 375, height: 667))
+            PageSizes.all = [PageSizes.Size(name: "Laptop", width: 1280, height: 800)]
+            #expect(PageSizes.firstToggled == CGSize(width: 1280, height: 800))
+            PageSizes.all = []
+            #expect(PageSizes.firstToggled == nil)
+        }
+    }
+
     @Test func theMenuBarHasTheToolsOnlyWhileDeveloperToolsIsOn() {
         withDefaults {
             DeveloperTools.isOn = false

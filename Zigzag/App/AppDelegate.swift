@@ -98,6 +98,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         developerToken = DeveloperTools.changed.observe {
             for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) { tab.refreshDevelopment(settingsChanged: true) }
             // Its menu items come and go with it, and whatever lists the menu bar's shortcuts hears of it.
+            // The listed sizes in View › Developer › Page Size follow the list.
+            if DeveloperTools.isOn { MainMenu.refreshPageSizes(in: NSApp.mainMenu) }
             if MainMenu.setDeveloperTools(DeveloperTools.isOn, in: NSApp.mainMenu) {
                 if DeveloperTools.isOn {
                     Shortcuts.applyToNew(Shortcuts.allItems.filter { item in DeveloperTool.menuItems.contains { $0.action == item.action } })

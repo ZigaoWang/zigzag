@@ -319,6 +319,21 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// Whether the page you're on is one of a split's: a page's own size isn't for those.
     private var selectedIsInSplit: Bool { selectedTab.flatMap { tabManager.split(for: $0) } != nil }
 
+    /// View › Developer › Page Size › Toggle Page Size (⌥⇧⌘M): the last size the page had, or a phone's, and back.
+    @objc func togglePageSize(_ sender: Any?) {
+        guard let tab = selectedTab, !selectedIsInSplit else { return }
+        let next = tab.developer.size == nil ? (tab.developerLastSize ?? PageSizes.firstToggled) : nil
+        chooseForDevelopment { $0.size = next }
+    }
+
+    /// View › Developer › Page Size › one of the sizes listed in Settings › Developer, by its place in the list.
+    @objc func pageSizeListed(_ sender: Any?) {
+        guard let item = sender as? NSMenuItem else { return }
+        let sizes = PageSizes.all
+        guard sizes.indices.contains(item.tag) else { return }
+        setPageSize(sizes[item.tag].size)
+    }
+
     @objc func pageSizeFill(_ sender: Any?) { if !selectedIsInSplit { chooseForDevelopment { $0.size = nil } } }
     @objc func rotatePage(_ sender: Any?) { if !selectedIsInSplit { chooseForDevelopment { $0.size = $0.rotatedSize } } }
     @objc func pageSizeCustom(_ sender: Any?) {
@@ -638,13 +653,18 @@ extension BrowserWindowController: NSMenuItemValidation {
             item.title = DeveloperTool.siteTitle(listed: DevelopmentSites.covers(tab?.url))
             return DeveloperTool.site.isOffered(for: tab, isPrivate: tabManager.isPrivate)
         case #selector(pageAppearanceFollowsMac(_:)), #selector(pageAppearanceLight(_:)), #selector(pageAppearanceDark(_:)), #selector(togglePrintStyles(_:)),
-             #selector(pageSizeFill(_:)), #selector(pageSizeCustom(_:)), #selector(rotatePage(_:)),
+             #selector(pageSizeFill(_:)), #selector(pageSizeCustom(_:)), #selector(rotatePage(_:)), #selector(togglePageSize(_:)),
              #selector(toggleJavaScript(_:)), #selector(toggleOutlines(_:)), #selector(userAgentZigzag(_:)), #selector(userAgentPhone(_:)),
              #selector(userAgentTablet(_:)), #selector(userAgentChrome(_:)), #selector(userAgentFirefox(_:)):
             guard let tool = DeveloperTool(action: item.action) else { return false }
             let state = tab?.developerInEffect ?? DeveloperState()
             item.state = tab != nil && tab?.isDevelopment == true && tool.isChecked(in: state) ? .on : .off
             return tool.isOffered(for: tab, isPrivate: tabManager.isPrivate, inSplit: selectedIsInSplit) && tool.applies(in: state)
+        case #selector(pageSizeListed(_:)):
+            let sizes = PageSizes.all
+            let state = tab?.developerInEffect ?? DeveloperState()
+            item.state = sizes.indices.contains(item.tag) && PageSizes.named(state.size) == sizes[item.tag] ? .on : .off
+            return DeveloperTool.sizeFill.isOffered(for: tab, isPrivate: tabManager.isPrivate, inSplit: selectedIsInSplit)
         case #selector(openOnPhone(_:)): return DeveloperTool.phone.isOffered(for: tab, isPrivate: tabManager.isPrivate)
         case #selector(clearSiteCache(_:)): return DeveloperTool.clearCache.isOffered(for: tab, isPrivate: tabManager.isPrivate)
         case #selector(clearSiteCookies(_:)): return DeveloperTool.clearCookies.isOffered(for: tab, isPrivate: tabManager.isPrivate)

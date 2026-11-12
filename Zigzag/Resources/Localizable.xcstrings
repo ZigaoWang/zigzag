@@ -15650,6 +15650,17 @@
         }
       }
     },
+    "Toggle Page Size" : {
+      "comment" : "View › Developer menu item and command, on a development site: gives the page the last size it had (a phone's at first), or takes it back to filling the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换网页尺寸"
+          }
+        }
+      }
+    },
     "Tonight" : {
       "comment" : "Name of a History session that began today.",
       "localizations" : {

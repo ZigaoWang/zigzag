@@ -23,7 +23,7 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         Part(symbol: DeveloperTool.inspect.symbol, tools: [.inspect]),
         Part(symbol: DeveloperTool.appearanceFollowsMac.symbol, tools: [.appearanceFollowsMac, .appearanceLight, .appearanceDark, .printStyles],
              title: DeveloperTool.Group.appearance.title),
-        Part(symbol: DeveloperTool.sizeFill.symbol, tools: [.sizeFill, .sizeCustom, .rotate],
+        Part(symbol: DeveloperTool.sizeFill.symbol, tools: [.sizeFill, .sizeCustom, .rotate, .sizeToggle],
              title: DeveloperTool.Group.size.title),
         Part(symbol: "arrow.clockwise", tools: [.reloadIgnoringCache, .clearCache, .clearCookies],
              title: String(localized: "Reload Options", comment: "Tooltip of a button among the developer tools above a development site's page: opens a menu to reload ignoring the cache, or clear this site's cache or cookies.")),
@@ -201,7 +201,7 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
             let state = tab?.developerInEffect ?? DeveloperState()
             let now = PageSizes.named(state.size)
             groups[0] += PageSizes.all.map { size in
-                .item(.init(title: String(localized: "\(size.name), \(size.dimensions)", comment: "A size in the Page Size menu of the developer tools above the page: its name, then its width and height, like “iPhone, 393 × 852”."),
+                .item(.init(title: PageSizes.menuTitle(size),
                             isChecked: size == now, isEnabled: tab?.isDevelopment == true) { [weak self] in self?.controller?.setPageSize(size.size) })
             }
         }

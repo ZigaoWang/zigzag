@@ -29,6 +29,8 @@ enum DeveloperTool: String, CaseIterable {
     case userAgentFirefox = "user-agent-firefox"
     /// The page's address for a phone on the same network, as a QR code (`PhoneLink`).
     case phone = "open-on-phone"
+    /// The page's size and filling the window, one after the other: the last size it had, or a phone's.
+    case sizeToggle = "size-toggle"
 
     var title: String {
         switch self {
@@ -55,6 +57,7 @@ enum DeveloperTool: String, CaseIterable {
         case .userAgentTablet: String(localized: "User Agent: Safari on iPad", comment: "View › Developer menu item and command, on a development site: the page is told it's in Safari on an iPad.")
         case .userAgentChrome: String(localized: "User Agent: Chrome", comment: "View › Developer menu item and command, on a development site: the page is told it's in Chrome on a Mac.")
         case .userAgentFirefox: String(localized: "User Agent: Firefox", comment: "View › Developer menu item and command, on a development site: the page is told it's in Firefox on a Mac.")
+        case .sizeToggle: String(localized: "Toggle Page Size", comment: "View › Developer menu item and command, on a development site: gives the page the last size it had (a phone's at first), or takes it back to filling the window.")
         case .phone: String(localized: "Open on Your Phone…", comment: "View › Developer menu item, command and item in the ⋯ menu of the developer tools above the page, on a development site: shows a QR code of the page's address for a phone on the same network.")
         }
     }
@@ -114,7 +117,7 @@ enum DeveloperTool: String, CaseIterable {
     var group: Group? {
         switch self {
         case .appearanceFollowsMac, .appearanceLight, .appearanceDark, .printStyles: .appearance
-        case .sizeFill, .sizeCustom, .rotate: .size
+        case .sizeFill, .sizeCustom, .rotate, .sizeToggle: .size
         case .userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox: .userAgent
         default: nil
         }
@@ -180,6 +183,7 @@ enum DeveloperTool: String, CaseIterable {
         case .userAgentTablet: "ipad"
         case .userAgentChrome, .userAgentFirefox: "macwindow"
         case .phone: "qrcode"
+        case .sizeToggle: "arrow.left.and.right.square"
         }
     }
 
@@ -208,6 +212,7 @@ enum DeveloperTool: String, CaseIterable {
         case .userAgentChrome: #selector(BrowserWindowController.userAgentChrome(_:))
         case .userAgentFirefox: #selector(BrowserWindowController.userAgentFirefox(_:))
         case .phone: #selector(BrowserWindowController.openOnPhone(_:))
+        case .sizeToggle: #selector(BrowserWindowController.togglePageSize(_:))
         }
     }
 
@@ -245,6 +250,7 @@ enum DeveloperTool: String, CaseIterable {
         case .userAgentTablet: ["user", "agent", "safari", "ipad", "tablet", "developer"]
         case .userAgentChrome: ["user", "agent", "chrome", "developer"]
         case .userAgentFirefox: ["user", "agent", "firefox", "developer"]
+        case .sizeToggle: ["toggle", "page", "size", "device", "responsive", "mobile", "fill", "developer"]
         case .phone: ["open", "phone", "mobile", "qr", "code", "device", "network", "lan", "wifi", "developer"]
         }
     }
@@ -260,14 +266,22 @@ enum DeveloperTool: String, CaseIterable {
     /// Its shortcut as Zigzag ships it; none for most.
     /// ⌥⇧⌘D for listing the site: never a key a text field uses (⌃D deletes forward in every one of them, the
     /// address and a page's own fields included), and free in the menu bar and in macOS.
-    var key: (String, NSEvent.ModifierFlags)? { self == .site ? ("d", [.command, .option, .shift]) : nil }
+    /// ⌥⇧⌘M for Toggle Page Size: Chrome's device toolbar is ⇧⌘M, which is Mute Tab here, and ⌥⌘M is the system's
+    /// Minimize All.
+    var key: (String, NSEvent.ModifierFlags)? {
+        switch self {
+        case .site: ("d", [.command, .option, .shift])
+        case .sizeToggle: ("m", [.command, .option, .shift])
+        default: nil
+        }
+    }
 
     /// The tools with a tile of their own in Site Controls, where a development page doesn't have them above it.
     static let tiles: [DeveloperTool] = [.console, .inspect, .reloadIgnoringCache]
 
     /// The tools Developer tools adds to View › Developer. The others have had their items there all along.
     static let menuItems: [DeveloperTool] = [.site, .clearCache, .clearCookies, .appearanceFollowsMac, .appearanceLight, .appearanceDark, .printStyles,
-                                           .sizeFill, .sizeCustom, .rotate,
+                                           .sizeFill, .sizeCustom, .rotate, .sizeToggle,
                                            .userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox,
                                            .javaScript, .outlines, .phone]
 
@@ -287,7 +301,7 @@ enum DeveloperTool: String, CaseIterable {
         switch tool {
         case .site: isOn && DevelopmentSites.isOffered(for: url, isPrivate: isPrivate)
         case .clearCache, .clearCookies: isDevelopment && !isPrivate
-        case .sizeFill, .sizeCustom, .rotate: isDevelopment && !inSplit
+        case .sizeFill, .sizeCustom, .rotate, .sizeToggle: isDevelopment && !inSplit
         case .console, .inspect, .reloadIgnoringCache, .viewSource, .settings,
              .appearanceFollowsMac, .appearanceLight, .appearanceDark, .printStyles, .javaScript, .outlines,
              .userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox, .phone: isDevelopment

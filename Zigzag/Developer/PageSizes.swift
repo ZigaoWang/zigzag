@@ -84,6 +84,17 @@ enum PageSizes {
         return sizes.indices.contains(index) ? sizes[index] : nil
     }
 
+    /// A listed size in a menu: its name, then its width and height.
+    static func menuTitle(_ size: Size) -> String {
+        String(localized: "\(size.name), \(size.dimensions)", comment: "A size in the Page Size menu of the developer tools above the page: its name, then its width and height, like “iPhone, 393 × 852”.")
+    }
+
+    /// The size Toggle Page Size gives a page that never had one: the first phone listed, or the first size.
+    static var firstToggled: CGSize? {
+        let sizes = all
+        return (sizes.first { min($0.width, $0.height) < 500 } ?? sizes.first)?.size
+    }
+
     /// A listed size as a command: named as Page Size names it, with its width and height.
     static func commandTitle(_ size: Size) -> String {
         String(localized: "Page Size: \(size.name), \(size.dimensions)", comment: "A command in the command bar, on a development site: gives the page a listed size. The size's name, then its width and height, like “Page Size: iPhone 16, 393 × 852”.")
