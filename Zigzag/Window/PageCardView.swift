@@ -101,6 +101,40 @@ final class PageCardView: NSView {
     static let setViewScale = NSSelectorFromString("_setViewScale:")
     static func canScale(_ webView: WKWebView?) -> Bool { webView?.responds(to: setViewScale) == true }
 
+    /// The grips beside a page at a size of its own, to drag it to another (`PageSizeHandle`).
+    private lazy var sizeHandles: [PageSizeHandle] = PageSizeHandle.Edge.allCases.map { edge in
+        let handle = PageSizeHandle(edge: edge)
+        handle.isHidden = true
+        handle.current = { [weak self] in
+            guard let self, let size = self.pageSize else { return nil }
+            return (size, self.pageScale)
+        }
+        handle.onResize = { [weak self] size in self?.onResizePage?(size) }
+        return handle
+    }
+    /// A grip was dragged: the size to give the page (the window's tab's choice, `BrowserWindowController`).
+    var onResizePage: ((CGSize) -> Void)?
+
+    /// The grips go beside the page while it has a size of its own and is shown as itself: not under Settings, a
+    /// PDF or Reader, and not with the Web Inspector docked beside it, where they'd lie between the two.
+    private func placeHandles(in content: NSRect) {
+        let shows = pageSize != nil && onResizePage != nil && document == nil && overlay == nil
+        guard shows, let holder, holder.superview === clip, holder.dockedRoom == .zero else {
+            for handle in sizeHandles where !handle.isHidden { handle.isHidden = true }
+            return
+        }
+        let frames = PageSizeHandle.frames(page: holder.frame, room: content, flipped: clip.isFlipped)
+        for handle in sizeHandles {
+            if handle.superview !== clip { clip.addSubview(handle, positioned: .above, relativeTo: holder) }
+            if let frame = frames[handle.edge] {
+                handle.frame = frame
+                handle.isHidden = false
+            } else {
+                handle.isHidden = true
+            }
+        }
+    }
+
     /// The scale the shown page is drawn at (`pageFit`), 1 at its own size.
     private(set) var pageScale: CGFloat = 1 { didSet { if pageScale != oldValue { onPageArea?(pageArea) } } }
 
@@ -431,6 +465,7 @@ final class PageCardView: NSView {
                 place(holder, in: content)
             }
             placeOutline()
+            placeHandles(in: content)
             if !glides(document) { document?.frame = content }
             placeholder.frame = content
             overlay?.frame = content

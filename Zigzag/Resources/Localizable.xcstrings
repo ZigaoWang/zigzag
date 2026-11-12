@@ -10426,6 +10426,17 @@
         }
       }
     },
+    "Page height" : {
+      "comment" : "VoiceOver name of the grip under a page with a size of its own, among the developer tools: drag it to change the page's height.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页高度"
+          }
+        }
+      }
+    },
     "Page saved" : {
       "comment" : "Toast after File › Save Page As saves the page.",
       "localizations" : {
@@ -10433,6 +10444,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已存储页面"
+          }
+        }
+      }
+    },
+    "Page size" : {
+      "comment" : "VoiceOver name of the grip at the corner of a page with a size of its own, among the developer tools: drag it to change the page's width and height.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页尺寸"
+          }
+        }
+      }
+    },
+    "Page width" : {
+      "comment" : "VoiceOver name of the grip beside a page with a size of its own, among the developer tools: drag it to change the page's width.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页宽度"
           }
         }
       }

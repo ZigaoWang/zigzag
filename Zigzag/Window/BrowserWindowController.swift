@@ -965,6 +965,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func showPageSize() {
         let tab = tabManager.selectedTab
         let size = tab.flatMap { tabManager.split(for: $0) } == nil ? tab?.developerInEffect.size : nil
+        // Dragging a grip beside the page gives it that size, as choosing one does.
+        if size != nil, root.card.onResizePage == nil { root.card.onResizePage = { [weak self] size in self?.setPageSize(size) } }
         guard root.card.pageSize != size else { return }
         root.card.pageSize = size
         paintTopBar()
