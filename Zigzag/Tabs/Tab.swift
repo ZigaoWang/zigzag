@@ -1124,6 +1124,9 @@ extension Tab: WKNavigationDelegate {
             // Back, Forward and Reload go to pages you've had; anything else the page started waits to show.
             addressWaitsForCommit = openedByPage || (!ownLoad && ![.backForward, .reload].contains(navigationAction.navigationType))
         }
+        // The community lists' scriptlets for the document's site, in place before it starts (a frame's follow the
+        // page it's in, as the blocklist does).
+        if !showsExtensionPage { await ContentBlocker.prepareFilters(in: webView, for: url, mainFrame: isMainFrame) }
         return (.allow, preferences)
     }
 

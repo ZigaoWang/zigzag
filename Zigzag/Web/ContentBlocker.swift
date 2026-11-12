@@ -2,7 +2,9 @@ import WebKit
 
 /// Built-in ad and tracker blocking: EasyList, EasyPrivacy and EasyList China, converted to WebKit's own content-blocker
 /// rules when the app is built (scripts/update_blocklists.sh) and matched natively as pages load, with no
-/// extension and no JavaScript per request. On by default; can be turned off for everything, or allowed on a site.
+/// extension and no JavaScript per request. What those rules can't reach (YouTube's ads, mostly) the community lists'
+/// site filters do (AdFilters.swift), which update on their own. On by default; can be turned off for everything, or
+/// allowed on a site.
 enum ContentBlocker {
     /// The bundled lists, compiled. Nil until the first compile finishes (once per list version).
     private(set) static var ruleList: WKContentRuleList?
@@ -50,6 +52,8 @@ enum ContentBlocker {
 
     /// Looks up the compiled lists, compiling the bundled ones if this version hasn't been compiled yet.
     static func prepare() {
+        AdEngine.shared.onChange = { DispatchQueue.main.async { changed.send() } }
+        AdEngine.shared.start()
         let store = WKContentRuleListStore.default()!
         // The small built-in list, until the full one is ready: compiled once per version, then looked up. Compiling
         // it on every launch held the main thread for a few hundred milliseconds as Zigzag started (#89).
@@ -126,23 +130,11 @@ enum ContentBlocker {
     /// The list a page should be blocked with right now, if any.
     static var activeList: WKContentRuleList? { ruleList ?? fallbackList }
 
-    // MARK: YouTube
+    // MARK: Site filters
 
-    /// YouTube serves its video ads from its own servers, where no blocklist reaches: a script in its pages takes
-    /// them out instead (Resources/YouTubeAds.js), asking first whether ad blocking is on for the page.
-    static let youTubeScript: WKUserScript = {
-        let source = Bundle.main.url(forResource: "YouTubeAds", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
-        return WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
-    }()
-
-    static func attachYouTube(to configuration: WKWebViewConfiguration) {
-        configuration.userContentController.addUserScript(youTubeScript)
-        configuration.userContentController.addScriptMessageHandler(YouTubeAnswer.shared, contentWorld: .page, name: "zigzagAds")
-    }
-
-    /// The ad blocker extension that handles YouTube for this web view's pages, if one does. Private windows run no
+    /// The ad blocker extension that blocks ads for this web view's pages, if one does. Private windows run no
     /// extensions, so there it's always Zigzag.
-    static func youTubeBlocker(for webView: WKWebView) -> String? {
+    static func extensionBlocker(for webView: WKWebView) -> String? {
         let configuration = webView.configuration
         if #available(macOS 15.4, *), configuration.webExtensionController == nil { return nil }
         let store = configuration.websiteDataStore
@@ -150,36 +142,23 @@ enum ContentBlocker {
         return AdBlockers.active(in: profile)
     }
 
-    /// Takes Zigzag's YouTube script out of a web view while an ad blocker extension handles YouTube there, so two
-    /// blockers never change the same responses, and puts it back once none does. Pages see it from their next load.
-    static func applyYouTube(to webView: WKWebView) {
-        setYouTube(youTubeBlocker(for: webView) == nil, in: webView.configuration.userContentController)
+    /// Whether pages in a web view get the community lists' site filters (AdFilters.swift): when blocking is on, the
+    /// page's site isn't one you allow ads on, and no ad blocker extension runs the same lists there already.
+    static func filtersWanted(in webView: WKWebView, on page: URL?) -> Bool {
+        isEnabled && !isAllowed(on: page) && extensionBlocker(for: webView) == nil
     }
 
-    /// Puts Zigzag's YouTube script into a set of page scripts, or takes it out, leaving the others as they were.
-    static func setYouTube(_ wanted: Bool, in controller: WKUserContentController) {
-        let scripts = controller.userScripts
-        let has = scripts.contains { $0 === youTubeScript }
-        guard has != wanted else { return }
-        if wanted {
-            controller.addUserScript(youTubeScript)
-        } else {
-            // Picked out before they're removed: the list WebKit hands over is its own, and empties with them.
-            let others = scripts.filter { $0 !== youTubeScript }
-            controller.removeAllUserScripts()
-            others.forEach(controller.addUserScript)
-        }
+    /// Readies a document's site filters before it starts loading: the page's, or a frame's, which follows the page it's in.
+    static func prepareFilters(in webView: WKWebView, for url: URL, mainFrame: Bool) async {
+        let page = mainFrame ? url : webView.url
+        await PageFilters.prepare(webView.configuration.userContentController, for: url, mainFrame: mainFrame,
+                                  wanted: filtersWanted(in: webView, on: page))
     }
 
-    /// Answers whether ads are blocked on the page asking (the tab's own site decides, as for the blocklist), and
-    /// not while an ad blocker extension handles YouTube there.
-    private final class YouTubeAnswer: NSObject, WKScriptMessageHandlerWithReply {
-        static let shared = YouTubeAnswer()
-        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) async -> (Any?, String?) {
-            let page = message.webView?.url ?? message.frameInfo.request.url
-            let extensionBlocks = message.webView.map { ContentBlocker.youTubeBlocker(for: $0) != nil } ?? false
-            return (ContentBlocker.isEnabled && !ContentBlocker.isAllowed(on: page) && !extensionBlocks, nil)
-        }
+    /// Takes the site filters out of a web view where they're no longer wanted (blocking turned off, the site
+    /// allowed, an ad blocker extension turned on). Pages see it from their next load.
+    static func applyFilters(to webView: WKWebView, for url: URL?) {
+        if !filtersWanted(in: webView, on: url) { PageFilters.clear(webView.configuration.userContentController) }
     }
 
     static func attach(to configuration: WKWebViewConfiguration) {
@@ -196,7 +175,7 @@ enum ContentBlocker {
             controller.remove(list)
         }
         if let wanted { controller.add(wanted) }
-        applyYouTube(to: webView)
+        applyFilters(to: webView, for: url)
     }
 
     // MARK: Fallback
@@ -231,10 +210,10 @@ enum ContentBlocker {
     }
 }
 
-/// Ad blocker extensions. Where one is installed and on, and may run on YouTube, it blocks ads there and Zigzag's own
-/// YouTube script steps aside: in that profile, since each profile has its own extensions. Zigzag's blocklists stay
-/// on beside it, as browsers' built-in blockers do beside one: both only stop what their lists name, and a site you
-/// allow ads on in Zigzag is still allowed in Zigzag's lists.
+/// Ad blocker extensions. Where one is installed and on, and may run on YouTube, it runs the community lists' scriptlets
+/// itself and Zigzag's site filters step aside, so two blockers never change the same page: in that profile, since
+/// each profile has its own extensions. Zigzag's blocklists stay on beside it, as browsers' built-in blockers do beside
+/// one: both only stop what their lists name, and a site you allow ads on in Zigzag is still allowed in Zigzag's lists.
 enum AdBlockers {
     /// Each by the ID the Chrome Web Store gives it, with the name people know it by.
     static let known: [String: String] = [
