@@ -224,6 +224,7 @@
 		A50EE35A3FE6739F05634727 /* NativeKeepAliveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11F2F4A8F4A424FF36C24EBF /* NativeKeepAliveTests.swift */; };
 		A51ADDC4218AC8285461C618 /* Atmosphere.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1368F679CEF702DA00EC3E6 /* Atmosphere.swift */; };
 		A59C6B456EB71D4263B94AB1 /* IconChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = D33639F712B0A57DBFC66DB5 /* IconChoice.swift */; };
+		A5D888F02DA421D1BACDA2A3 /* DarkPagesSeenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4DC55DF34ED9099624A7CA8 /* DarkPagesSeenTests.swift */; };
 		A601B78AFE9B349C0C46968E /* PageShots.swift in Sources */ = {isa = PBXBuildFile; fileRef = E97F4271F918C8D77FB14081 /* PageShots.swift */; };
 		A6B3999818FDB11071ED1832 /* SidebarMenus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F78ECBEF8A16738C2C9DF0C /* SidebarMenus.swift */; };
 		A76473630DD07B1AC5E521EB /* RowDeleteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFB1B0DA956C3C2FEED46E90 /* RowDeleteTests.swift */; };
@@ -653,6 +654,7 @@
 		F2773876C78493A8043AE850 /* NumberHintsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumberHintsTests.swift; sourceTree = "<group>"; };
 		F32FB26AFED6DCCFDB468E39 /* public_suffix_list.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = public_suffix_list.txt; sourceTree = "<group>"; };
 		F3B051247D50C308EF2FDA69 /* blocklist.info.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = blocklist.info.json; sourceTree = "<group>"; };
+		F4DC55DF34ED9099624A7CA8 /* DarkPagesSeenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPagesSeenTests.swift; sourceTree = "<group>"; };
 		F51CBCCC0F5050F641CEAB31 /* SafariImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariImporter.swift; sourceTree = "<group>"; };
 		F5442E175B150EB5CA4E9BB9 /* PasswordHealthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordHealthTests.swift; sourceTree = "<group>"; };
 		F570CA64BC7C0FBBC6977BC3 /* YouTubeAdsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeAdsTests.swift; sourceTree = "<group>"; };
@@ -1093,6 +1095,7 @@
 				B788AB64DB761375F0FEFA16 /* DarkPagesFallbackTests.swift */,
 				D2D823C226C002B1E7CBAB6D /* DarkPagesFillTests.swift */,
 				6BF2D2CE4ED8B3D974B52136 /* DarkPagesPrepaintTests.swift */,
+				F4DC55DF34ED9099624A7CA8 /* DarkPagesSeenTests.swift */,
 				4295D4E75FDD1157FE955EBF /* DarkPagesTests.swift */,
 				A5C379E2BF735EEBC168D4E2 /* DarkPaletteScriptTests.swift */,
 				7E0B6E4ACCE3366126E94F4A /* DarkPalettesTests.swift */,
@@ -1593,6 +1596,7 @@
 				605786340091141429E15759 /* DarkPagesFallbackTests.swift in Sources */,
 				FD37C92280193E5C6BE56849 /* DarkPagesFillTests.swift in Sources */,
 				43E5CAFBB170E9E6507AEB70 /* DarkPagesPrepaintTests.swift in Sources */,
+				A5D888F02DA421D1BACDA2A3 /* DarkPagesSeenTests.swift in Sources */,
 				37417FBDF6F6A5A1633769C5 /* DarkPagesTests.swift in Sources */,
 				0F709940AA577364B18E6471 /* DarkPaletteScriptTests.swift in Sources */,
 				E6571244FE23DFDC7DEF5650 /* DarkPalettesTests.swift in Sources */,
