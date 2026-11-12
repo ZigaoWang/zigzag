@@ -27,6 +27,11 @@ enum DarkPalettes {
         var verified: Bool
         /// Counts up each time it changes, so a web view given an older one gets the new one.
         var revision: Int
+        /// A dark site's fill (#134): its light surfaces alone made dark, and the ink on them light, rather than a
+        /// light site's whole palette. Nil in files written before there were any.
+        var fill: Bool?
+
+        var isFill: Bool { fill == true }
 
         var css: String { rules.joined(separator: "\n") }
     }
@@ -42,7 +47,7 @@ enum DarkPalettes {
 
     /// The palette after a page of the site was read: the rules it needed join the ones other pages needed (the newest
     /// last, so they win), unless that grows too big or the old one wasn't any good.
-    static func merged(_ old: Entry?, origin: String, black: Bool, fingerprint: String, rules: [String], invert: Bool) -> Entry {
+    static func merged(_ old: Entry?, origin: String, black: Bool, fingerprint: String, rules: [String], invert: Bool, fill: Bool = false) -> Entry {
         var prints = (old?.fingerprints ?? []).filter { $0 != fingerprint } + [fingerprint]
         if prints.count > maxFingerprints { prints.removeFirst(prints.count - maxFingerprints) }
         let fresh = Array(rules.prefix(maxRules))
@@ -55,8 +60,9 @@ enum DarkPalettes {
             if together.count <= maxRules, together.reduce(0, { $0 + $1.utf8.count + 1 }) <= maxBytes { kept = together }
         }
         if invert { kept = [] }
-        return Entry(origin: origin, black: black, fingerprints: prints, rules: kept, invert: invert, verified: false,
-                     revision: (old?.revision ?? 0) + 1)
+        // A fill is used as soon as it's made: there's nothing to check it against, the page being dark already.
+        return Entry(origin: origin, black: black, fingerprints: prints, rules: kept, invert: invert, verified: fill,
+                     revision: (old?.revision ?? 0) + 1, fill: fill ? true : nil)
     }
 
     /// The palette after it was drawn: kept if it covered the page, the filter instead if it didn't. Only for the
@@ -84,9 +90,9 @@ enum DarkPalettes {
     static func site(ofOrigin origin: String) -> String? { URL(string: origin).flatMap(DarkPages.site(of:)) }
 
     /// The file a site's palette is kept in: its origin, spelled to be a file name, and which background it's for.
-    static func fileName(origin: String, black: Bool) -> String {
+    static func fileName(origin: String, black: Bool, fill: Bool = false) -> String {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-_"))
-        return (black ? "black " : "dark ") + (origin.addingPercentEncoding(withAllowedCharacters: allowed) ?? "site") + ".json"
+        return (fill ? "fill-" : "") + (black ? "black " : "dark ") + (origin.addingPercentEncoding(withAllowedCharacters: allowed) ?? "site") + ".json"
     }
 
     /// The origin a file is for, from its name.
@@ -123,20 +129,20 @@ enum DarkPalettes {
     }
 
     /// A site's palette in a profile, if one was made; nil for a private window (`scope` nil).
-    static func entry(origin: String?, black: Bool, scope: String?) -> Entry? {
+    static func entry(origin: String?, black: Bool, scope: String?, fill: Bool = false) -> Entry? {
         guard let scope, let origin else { return nil }
-        let name = fileName(origin: origin, black: black)
+        let name = fileName(origin: origin, black: black, fill: fill)
         if let known = entries[scope]?[name] { return known }
         guard listing(scope).contains(name), let url = folder(scope)?.appendingPathComponent(name) else { return nil }
         let read = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(Entry.self, from: $0) }
-        let usable = read?.origin == origin && read?.black == black ? read : nil
+        let usable = read?.origin == origin && read?.black == black && read?.isFill == fill ? read : nil
         entries[scope, default: [:]][name] = .some(usable)
         return usable
     }
 
     /// Keeps a site's palette in a profile, written to disk off the main thread.
     static func store(_ entry: Entry, scope: String) {
-        let name = fileName(origin: entry.origin, black: entry.black)
+        let name = fileName(origin: entry.origin, black: entry.black, fill: entry.isFill)
         entries[scope, default: [:]][name] = .some(entry)
         var listed = listing(scope)
         listed.insert(name)

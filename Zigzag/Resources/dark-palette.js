@@ -439,6 +439,129 @@
     return { rules: [base, ink, ...vars, ...rest], colors, rules_read: state.rules, capped: state.capped };
   };
 
+  // MARK: Filling in a dark site
+
+  // A site dark on its own that still draws some things light (a white suggestion list, a sheet's cells): only what
+  // doesn't fit the dark is mapped (#134). A light surface goes onto the dark ramp and is marked (`fillMark`, inherited);
+  // dark ink and light lines are mapped only inside a marked surface (a style query), or on the surface's own rule.
+  // The site's own dark colors, and its light text, are never touched. `rejected` holds the declarations (`entry index
+  // + '|' + name`) the page showed are already dark where they apply: the site's own dark look overriding them.
+  const fillMark = '--zigzag-dark-fill';
+  const isLightSurface = (c) => !!c && c[3] >= 0.5 && toOklch(c)[0] >= 0.8;
+  const isDarkInk = (c) => !!c && c[3] >= 0.5 && toOklch(c)[0] < 0.55;
+  const isLightLine = (c) => !!c && c[3] >= 0.5 && toOklch(c)[0] >= 0.75;
+  const misfits = { background: isLightSurface, text: isDarkInk, fill: isDarkInk, border: isLightLine };
+  // A custom property's color, written plainly or as channels for rgb()/hsl(); null otherwise.
+  const varColor = (value, fn) => {
+    const c = parse(value);
+    if (c || !fn || !triplet.test(value)) return c;
+    const p = parts(value);
+    const rgb = fn === 'hsl' ? hslToRgb(hue(p[0]), clamp(unit(p[1], 1), 0, 1), clamp(unit(p[2], 1), 0, 1))
+      : [unit(p[0], 255), unit(p[1], 255), unit(p[2], 255)];
+    return [...rgb.map((v) => clamp(v, 0, 255)), 1];
+  };
+  const writeVar = (m, fn, value) => {
+    if (!fn || parse(value)) return format(m);
+    const sep = value.includes(',') ? ', ' : ' ';
+    return fn === 'hsl'
+      ? (([h, s, l]) => `${Math.round(h * 10) / 10}${sep}${Math.round(s * 1000) / 10}%${sep}${Math.round(l * 1000) / 10}%`)(rgbToHsl(m.slice(0, 3).map(Math.round)))
+      : m.slice(0, 3).map(Math.round).join(sep);
+  };
+  const roleForVar = (settled, name, c) => settled[name] || roleByName(name.toLowerCase()) || (luminance(c) > 0.4 ? 'background' : 'text');
+
+  // What the page is asked about before the sheet is written: each declaration that would be mapped as a light
+  // surface, or a custom property that would be (as a surface, or as dark ink), with its selector. `kind` is what it
+  // should be where it applies for the mapping to be wanted: 'light' or 'dark'.
+  const fillCandidates = (state) => {
+    const settled = varRoles(state);
+    const fns = {};
+    for (const name of Object.keys(state.uses)) if (state.uses[name].fn) fns[name] = state.uses[name].fn;
+    const out = [];
+    state.entries.forEach((entry, i) => {
+      for (const [name, value] of entry.decls) {
+        if (name.startsWith('--')) {
+          const c = varColor(value, fns[name]);
+          if (!c) continue;
+          const role = roleForVar(settled, name, c);
+          if (role === 'background' && isLightSurface(c)) out.push({ key: i + '|' + name, selector: entry.selector, name, kind: 'light' });
+          else if (role === 'text' && isDarkInk(c)) out.push({ key: i + '|' + name, selector: entry.selector, name, kind: 'dark' });
+        } else if (name === 'background-color' && isLightSurface(parse(value))) {
+          out.push({ key: i + '|' + name, selector: entry.selector, name, kind: 'light' });
+        }
+      }
+    });
+    return out;
+  };
+
+  const generateFill = (state, black, rejected) => {
+    const skip = rejected || new Set();
+    const settled = varRoles(state);
+    const fns = {};
+    for (const name of Object.keys(state.uses)) if (state.uses[name].fn) fns[name] = state.uses[name].fn;
+    const memo = new Map();
+    const mapped = (c, role) => {
+      const key = role + c.join(',');
+      if (!memo.has(key)) memo.set(key, map(c, role, black));
+      return memo.get(key);
+    };
+    // Custom properties first: the surfaces mapped here mark the rules that paint with them.
+    const vars = [], marked = new Set();
+    let colors = 0;
+    state.entries.forEach((entry, i) => {
+      const decls = [];
+      for (const [name, value] of entry.decls) {
+        if (!name.startsWith('--') || skip.has(i + '|' + name)) continue;
+        const c = varColor(value, fns[name]);
+        if (!c) continue;
+        const role = roleForVar(settled, name, c);
+        if (role === 'background' ? !isLightSurface(c) : role === 'text' ? !isDarkInk(c) : true) continue;
+        decls.push(`${name}: ${writeVar(mapped(c, role), fns[name], value)} !important`);
+        if (role === 'background') marked.add(name);
+        colors++;
+      }
+      if (decls.length) vars.push(entry.media.reduceRight((inner, at) => `${at} { ${inner} }`, `${boost(entry.selector)} { ${decls.join('; ')} }`));
+    });
+    const own = [], inside = [];
+    state.entries.forEach((entry, i) => {
+      const surface = [], ink = [];
+      let mark = false;
+      for (const [name, value] of entry.decls) {
+        if (name.startsWith('--')) continue;
+        const role = roleOf[name];
+        const misfit = misfits[role];
+        if (!misfit) continue;
+        if (value.includes('var(')) {
+          if (role === 'background') for (const m of value.matchAll(varRef)) if (marked.has(m[1])) mark = true;
+          continue;
+        }
+        if (skip.has(i + '|' + name)) continue;
+        let out = null;
+        const c = name === 'background-image' ? null : parse(value);
+        if (c) out = misfit(c) ? format(mapped(c, role)) : null;
+        else if (role === 'background' && !/url\(/i.test(value)) {
+          // A gradient: its light stops only.
+          let changed = false;
+          out = value.replace(colorWord, (word, offset) => {
+            const before = value.slice(Math.max(0, offset - 2), offset);
+            if (/[-\w]$/.test(before) && word[0] !== '#') return word;
+            const w = parse(word);
+            if (!isLightSurface(w)) return word;
+            changed = true;
+            return format(mapped(w, role));
+          });
+          if (!changed) out = null;
+        }
+        if (!out) continue;
+        colors++;
+        if (role === 'background') { surface.push(`${name}: ${out} !important`); mark = true; } else ink.push(`${name}: ${out} !important`);
+      }
+      const wrap = (body) => entry.media.reduceRight((inner, at) => `${at} { ${inner} }`, body);
+      if (mark) own.push(wrap(`${boost(entry.selector)} { ${[...surface, ...ink, `${fillMark}: 1 !important`].join('; ')} }`));
+      else if (ink.length) inside.push(wrap(`@container style(${fillMark}: 1) { ${boost(entry.selector)} { ${ink.join('; ')} } }`));
+    });
+    return { rules: [...vars, ...own, ...inside], colors, rules_read: state.rules, capped: state.capped };
+  };
+
   // MARK: Fingerprint
 
   // FNV-1a over what the page's style is made of (each sheet's address and size, its own style's length), so a later
@@ -455,5 +578,12 @@
 
   const skips = (mediaText) => !!mediaText && skippedMedia.test(mediaText);
 
-  return { skips, parse, format, toOklch, fromOklch, luminance, contrast, map, rewrite, boost, splitList, ramp, start, add, collect, generate, fingerprint, roleOf };
+  // A selector as the page can ask about it: the element's part, and the pseudo-element it styles, if any.
+  const pseudoOf = (selector) => {
+    const m = pseudoElement.exec(selector);
+    return m ? [selector.slice(0, m.index) || '*', /::?[\w-]+/.exec(m[0])[0]] : [selector, null];
+  };
+
+  return { skips, parse, format, toOklch, fromOklch, luminance, contrast, map, rewrite, boost, splitList, ramp, start, add, collect, generate,
+    fingerprint, roleOf, fillMark, fillCandidates, generateFill, isLightSurface, isDarkInk, pseudoOf };
 })()

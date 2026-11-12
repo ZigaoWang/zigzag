@@ -11,7 +11,10 @@ import WebKit
 /// the page is idle its colors are read and turned into a dark palette for the site (`DarkPalettes`), and from the
 /// next visit on the page is drawn with that from its first frame: the site's own colors made dark, with pictures
 /// untouched and nothing watching the page. Where a palette doesn't cover a page, the filter stays. Every frame gets the script: a frame from elsewhere (a player, a map, a widget) is turned back by the
-/// page around it and darkens itself, or not, as a page would. Pure black backgrounds draws white as black instead of
+/// page around it and darkens itself, or not, as a page would. A page dark on its own that still draws parts of itself
+/// light (a white suggestion list) gets a fill: its style read once for those parts alone, kept for the site like a
+/// palette, and its own dark colors left as they are. Force dark, in the site panel, darkens a site that looks dark
+/// as if it didn't (#134). Pure black backgrounds draws white as black instead of
 /// a dark gray. Reader has its own themes and its own web view, and isn't touched.
 enum DarkPages {
     enum Mode: String, CaseIterable {
@@ -293,7 +296,22 @@ enum DarkPages {
             config["palette"] = ["origin": entry.origin, "black": entry.black, "css": entry.css, "invert": entry.invert,
                                  "fingerprints": entry.fingerprints, "verified": entry.verified]
         }
+        config["fill"] = NSNull()
+        if let entry = fill(for: store, url: url) {
+            config["fill"] = ["origin": entry.origin, "black": entry.black, "css": entry.css, "invert": entry.invert, "fingerprints": entry.fingerprints]
+        }
         return config
+    }
+
+    /// The fill a dark site's pages at `url` in this store start with (#134): its light parts made dark.
+    static func fill(for store: WKWebsiteDataStore?, url: URL?) -> DarkPalettes.Entry? {
+        DarkPalettes.entry(origin: DarkPalettes.origin(of: url), black: pureBlack, scope: nativeScope(of: store), fill: true)
+    }
+
+    /// Which palette and fill a web view's script was given (`paletteKey` of each), as one.
+    static func paletteKey(for store: WKWebsiteDataStore?, url: URL?) -> String? {
+        let keys = [paletteKey(palette(for: store, url: url)), paletteKey(fill(for: store, url: url))].compactMap { $0 }
+        return keys.isEmpty ? nil : keys.joined(separator: " ")
     }
 
     private static func configJSON(for store: WKWebsiteDataStore?, url: URL?) -> String {
@@ -302,7 +320,7 @@ enum DarkPages {
 
     /// Which palette a web view's script was given, to tell when the page it's going to has another.
     static func paletteKey(_ entry: DarkPalettes.Entry?) -> String? {
-        entry.map { "\($0.origin)|\($0.black)|\($0.revision)" }
+        entry.map { "\($0.origin)|\($0.black)|\($0.revision)" + ($0.isFill ? "|fill" : "") }
     }
 
     /// Whether a page going to `origin` needs the script put in again for its palette: when its site has one other
@@ -339,7 +357,7 @@ enum DarkPages {
         let store = webView.configuration.websiteDataStore
         controller.addUserScript(script(for: store, url: webView.url))
         installed[ObjectIdentifier(controller)] = Installed(generation: generation, native: nativeSites(in: nativeScope(of: store)),
-                                                            palette: paletteKey(palette(for: store, url: webView.url)))
+                                                            palette: paletteKey(for: store, url: webView.url))
     }
 
     /// Counts up each time the choices change (the setting, a site's own, the Mac's appearance): a web view whose
@@ -369,7 +387,7 @@ enum DarkPages {
         let store = webView.configuration.websiteDataStore
         let now = nativeSites(in: nativeScope(of: store))
         if siteChanged(site(of: webView.url), given: given.native, now: now) { install(in: webView); return }
-        if paletteChanged(given: given.palette, now: paletteKey(palette(for: store, url: webView.url)), origin: DarkPalettes.origin(of: webView.url)) {
+        if paletteChanged(given: given.palette, now: paletteKey(for: store, url: webView.url), origin: DarkPalettes.origin(of: webView.url)) {
             install(in: webView)
         }
     }
@@ -553,7 +571,9 @@ enum DarkPages {
     fileprivate static func receivedPalette(_ body: [String: Any], origin: String, from webView: WKWebView) {
         guard let scope = nativeScope(of: webView.configuration.websiteDataStore), DarkPalettes.origin(of: webView.url) == origin,
               let fingerprint = body["fingerprint"] as? String, let black = body["black"] as? Bool else { return }
-        let old = DarkPalettes.entry(origin: origin, black: black, scope: scope)
+        // A dark site's fill (#134) is kept apart from a light site's palette.
+        let fill = body["fill"] as? Bool ?? false
+        let old = DarkPalettes.entry(origin: origin, black: black, scope: scope, fill: fill)
         let entry: DarkPalettes.Entry
         if let ok = body["verified"] as? Bool {
             guard let old else { return }
@@ -561,10 +581,10 @@ enum DarkPages {
         } else {
             let rules = (body["rules"] as? [Any] ?? []).compactMap { $0 as? String }
             let made = DarkPalettes.merged(old, origin: origin, black: black, fingerprint: fingerprint, rules: rules,
-                                           invert: body["invert"] as? Bool ?? rules.isEmpty)
+                                           invert: body["invert"] as? Bool ?? rules.isEmpty, fill: fill)
             // Tried on the page as soon as it was made: kept if it covered it, the filter for the site if not.
             entry = (body["checked"] as? Bool).map { DarkPalettes.verified(made, fingerprint: fingerprint, ok: $0) } ?? made
-            lastAnalysis = (body["stats"] as? [String: Any] ?? [:]).merging(["origin": origin, "kept": entry.rules.count, "bytes": entry.css.utf8.count]) { $1 }
+            lastAnalysis = (body["stats"] as? [String: Any] ?? [:]).merging(["origin": origin, "fill": fill, "kept": entry.rules.count, "bytes": entry.css.utf8.count]) { $1 }
         }
         guard entry != old else { return }
         DarkPalettes.store(entry, scope: scope)

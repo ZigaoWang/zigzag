@@ -2,7 +2,8 @@
 // Runs in Zigzag's own script world, in every frame, from the start of the document. DarkPages.swift puts the
 // choices in `config` below: { on: default for sites without a choice, sitesOn, sitesOff, native: sites last seen
 // already dark, black: Pure black backgrounds, strength: how far white is turned over, root, canvas, media: the
-// style's parts, marks: the attributes it looks for, palette: the site's own dark palette if one was made, learn:
+// style's parts, marks: the attributes it looks for, palette: the site's own dark palette if one was made, fill: a
+// dark site's fill for its light parts if one was made, sitesForced: sites darkened even when dark, learn:
 // whether one may be made here (never in a private window), paletteDelay }.
 //
 // A palette (#134): the first time a light site is seen, once it has loaded and the page is idle, its style sheets are
@@ -141,6 +142,7 @@
     } else { style.textContent = ''; style.remove(); }
     watch();
     restyleShadows();
+    refreshFill();
     send();
   };
 
@@ -197,20 +199,20 @@
   const check = () => {
     wanted = choice();
     // Not wanted here: said, so a bar colored after the last page's darkened look doesn't keep it.
-    if (!wanted) { dropPrepaint(); apply(false); send(); return; }
+    if (!wanted) { dropPrepaint(); apply(false); refreshFill(); send(); return; }
     // Looked at as the page draws itself: our style forces a light color-scheme, which a page drawn with
     // light-dark() would follow. Off and on again in one go, so nothing is drawn in between.
     const sheet = darkened && style.sheet;
     const ground = prepaint.parentNode && prepaint.sheet;
-    if (sheet) sheet.disabled = true;
-    if (ground) ground.disabled = true;
+    const fill = fillStyle.parentNode && fillStyle.sheet;
+    for (const s of [sheet, ground, fill]) if (s) s.disabled = true;
     const found = pageIsDark();
-    if (sheet) sheet.disabled = false;
-    if (ground) ground.disabled = false;
+    for (const s of [sheet, ground, fill]) if (s) s.disabled = false;
     if (found !== null) { native = found; dropPrepaint(); }
     // Until the page can be looked at, a site last seen dark stays as it is and any other is darkened, so it
     // never comes up white first.
     apply(darkens());
+    refreshFill();
     send();
   };
 
@@ -481,10 +483,8 @@
   // Reading the sheets takes no more than this much of the page's idle time, all told.
   const budget = 400;
   const maxColors = 20000;
-  const analyse = async (fp) => {
-    const began = performance.now();
-    let busy = 0;
-    const state = palette.start();
+  // The page's sheets, read into a palette's state; sheets from elsewhere it can't read are fetched by Zigzag.
+  const readSheets = async (state) => {
     const lists = [];
     let fetched = 0, unread = 0;
     for (const sheet of [...document.styleSheets, ...(document.adoptedStyleSheets || [])]) {
@@ -499,18 +499,30 @@
     }
     // Read in the page's order: the last added is read first.
     for (const [rules, media] of lists.reverse()) palette.add(state, rules, media);
-    const finished = await new Promise((done) => {
-      const step = (deadline) => {
-        if (!darkened) { done(false); return; }
-        const t0 = performance.now();
-        // A few milliseconds each time even when the page says it has less to spare (it often does), and up
-        // to a frame's worth when it has more.
-        const over = palette.collect(state, () => { const t = performance.now() - t0; return t < 4 || (t < 16 && deadline.timeRemaining() > 1); });
-        busy += performance.now() - t0;
-        if (over) done(true); else if (busy > budget) done(false); else idle(step);
-      };
-      idle(step);
-    });
+    return { sheets: lists.length, fetched, unread };
+  };
+  // Work done in the page's idle time, a slice at a time, while `still()` holds and inside `limit` ms all told.
+  // `work(more)` does a slice and says whether it's all done. Resolves with whether it finished, and the time taken.
+  const inSlices = (work, still, limit) => new Promise((done) => {
+    let busy = 0;
+    const step = (deadline) => {
+      if (!still()) { done({ finished: false, busy }); return; }
+      const t0 = performance.now();
+      // A few milliseconds each time even when the page says it has less to spare (it often does), and up to a
+      // frame's worth when it has more.
+      const over = work(() => { const t = performance.now() - t0; return t < 4 || (t < 16 && deadline.timeRemaining() > 1); });
+      busy += performance.now() - t0;
+      if (over) done({ finished: true, busy }); else if (busy > limit) done({ finished: false, busy }); else idle(step);
+    };
+    idle(step);
+  });
+  const analyse = async (fp) => {
+    const began = performance.now();
+    const state = palette.start();
+    const { sheets, fetched, unread } = await readSheets(state);
+    const read = await inSlices((more) => palette.collect(state, more), () => darkened, budget);
+    const finished = read.finished;
+    let busy = read.busy;
     if (!darkened) return;
     const t1 = performance.now();
     // Writing the sheet is done in one go: past this many colors it would hold the page up, and the sheet would be
@@ -520,7 +532,7 @@
     const writing = performance.now() - t1;
     busy += writing;
     analysis = { ms: Math.round(busy * 10) / 10, writing: Math.round(writing * 10) / 10, wall: Math.round(performance.now() - began),
-      rules: state.rules, colors: made ? made.colors : 0, declarations: decls, sheets: lists.length, fetched, unread, finished };
+      rules: state.rules, colors: made ? made.colors : 0, declarations: decls, sheets, fetched, unread, finished };
     // Nothing to go on (too much to read, or no colors of its own): the filter, until the site's style changes.
     const useless = !made || made.colors === 0 || made.capped;
     // Tried on the page now: if it covers it, it takes over on this visit; if not, the site keeps the filter.
@@ -559,6 +571,108 @@
       if (!seen) analyse(fp).catch((e) => { analysis = { error: String(e) }; });
     }), config.paletteDelay || 1200);
   };
+
+  // MARK: Filling in a dark site
+
+  // A site dark on its own can still draw some things light: a suggestion list, a dialog, a sheet's cells (#134). Its
+  // style is read once, as a light site's is, for those alone (`generateFill` in dark-palette.js), and kept for the site
+  // as its `fill`: a sheet that turns its light surfaces dark, and the ink and lines on them light, while its own dark
+  // colors are left as they are. Something light added later (a suggestion list as you type) is covered as it comes,
+  // since the sheet names it; a sheet the page adds later is read when the page has added one, after typing, and
+  // on the next visit.
+  const fillStyle = document.createElement('style');
+  fillStyle.setAttribute('data-zigzag-dark', 'fill');
+  const fillFits = () => isTop && !!config.fill && config.fill.origin === location.origin && config.fill.black === config.black
+    && !config.fill.invert && !!config.fill.css;
+  const filling = () => wanted && native === true && !darkened && !forced();
+  const refreshFill = () => {
+    const root = document.documentElement;
+    if (filling() && fillFits() && root) {
+      if (fillStyle.textContent !== config.fill.css) fillStyle.textContent = config.fill.css;
+      if (fillStyle.parentNode !== root) root.appendChild(fillStyle);
+    } else if (fillStyle.parentNode) fillStyle.remove();
+  };
+  // The page's answer for a selector: is what it declares dark already where it applies (the site's own dark look
+  // overriding it)? Only the first element it matches is asked; one that matches nothing now is kept.
+  const overridden = (candidate) => {
+    for (const one of palette.splitList(candidate.selector)) {
+      const [base, pseudo] = palette.pseudoOf(one);
+      let el = null;
+      try { el = document.querySelector(base); } catch (e) { continue; }
+      if (!el) continue;
+      const s = getComputedStyle(el, pseudo);
+      const now = palette.parse(candidate.name.startsWith('--') ? s.getPropertyValue(candidate.name).trim() : s.backgroundColor);
+      if (!now) return false;
+      return candidate.kind === 'light' ? !palette.isLightSurface(now) : !palette.isDarkInk(now);
+    }
+    return false;
+  };
+  let fillBusy = false;
+  let fillRuns = 0;
+  let fillAnalysis = null;
+  const fillBudget = 300;
+  const analyseFill = async (fp) => {
+    const began = performance.now();
+    const state = palette.start();
+    const { sheets, fetched, unread } = await readSheets(state);
+    const read = await inSlices((more) => palette.collect(state, more), filling, budget);
+    if (!filling()) return;
+    // Asked of the page in slices too: each is a selector looked up.
+    const candidates = read.finished ? palette.fillCandidates(state) : [];
+    const rejected = new Set();
+    let at = 0;
+    const asked = await inSlices((more) => {
+      while (at < candidates.length) {
+        const c = candidates[at++];
+        if (overridden(c)) rejected.add(c.key);
+        if (at % 16 === 0 && !more()) return false;
+      }
+      return true;
+    }, filling, fillBudget);
+    if (!filling()) return;
+    const t1 = performance.now();
+    const made = read.finished && asked.finished ? palette.generateFill(state, config.black, rejected) : null;
+    const writing = performance.now() - t1;
+    const useless = !made || made.colors === 0 || made.capped;
+    fillAnalysis = { ms: Math.round((read.busy + asked.busy + writing) * 10) / 10, wall: Math.round(performance.now() - began),
+      rules: state.rules, colors: made ? made.colors : 0, candidates: candidates.length, rejected: rejected.size, sheets, fetched, unread,
+      finished: read.finished && asked.finished };
+    if (!useless) {
+      // Drawn at once, with what was kept for the site's other pages before.
+      const known = config.fill && config.fill.origin === location.origin && config.fill.black === config.black && !config.fill.invert ? config.fill : null;
+      const css = (known ? known.css + '\n' : '') + made.rules.join('\n');
+      config.fill = { origin: location.origin, black: config.black, css, invert: false, fingerprints: [...(known ? known.fingerprints : []), fp] };
+      refreshFill();
+    }
+    tellPalette({ fill: true, fingerprint: fp, rules: useless ? [] : made.rules, invert: useless, stats: fillAnalysis });
+  };
+  // Read the site's style for its fill, if it's one not read before.
+  const fillLook = () => {
+    // A few times a visit at most: a page that keeps adding style as it runs isn't read over and over (#89).
+    if (fillBusy || fillRuns >= 3 || !learnable() || !filling()) return;
+    const fp = palette.fingerprint(pieces());
+    const p = config.fill;
+    if (p && p.origin === location.origin && p.black === config.black && p.fingerprints.includes(fp)) return;
+    fillBusy = true;
+    fillRuns++;
+    analyseFill(fp).catch((e) => { fillAnalysis = { error: String(e) }; }).finally(() => { fillBusy = false; });
+  };
+  let fillTimer = 0;
+  const fillSoon = (delay) => {
+    if (!learnable()) return;
+    clearTimeout(fillTimer);
+    fillTimer = setTimeout(() => idle(fillLook), delay);
+  };
+  // A sheet added to the head later, and the sheets a page loads as you type into it (a suggestion list's own).
+  let typed = 0;
+  if (isTop) {
+    addEventListener('input', () => { if (typed < 8 && filling()) { typed++; fillSoon(1500); } }, true);
+    const heads = new MutationObserver((records) => {
+      if (!filling()) return;
+      for (const r of records) for (const n of r.addedNodes) if (n.tagName === 'LINK' || n.tagName === 'STYLE') { fillSoon(1000); return; }
+    });
+    document.addEventListener('DOMContentLoaded', () => { if (document.head) heads.observe(document.head, { childList: true }); });
+  }
 
   // MARK: When to look
 
@@ -607,7 +721,7 @@
   // Darkened from the first moment, unless the site was last seen dark: no white page first. One last seen dark
   // starts on the plain dark ground until it's looked at.
   if (wanted && darkens()) apply(true);
-  else { if (wanted) putPrepaint(); send(); }
+  else { if (wanted) { putPrepaint(); refreshFill(); } send(); }
   if (usingPalette) requestAnimationFrame(firstFrame);
   watch();
   if (document.documentElement) watchThemes(document.documentElement);
@@ -619,6 +733,7 @@
     setTimeout(check, 2000);
     if (darkened && !usingPalette) idle(() => { try { lateHosts(document); } catch (e) {} });
     paletteSoon();
+    fillSoon(config.paletteDelay || 1200);
   });
   addEventListener('pageshow', (e) => { if (e.persisted) check(); });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => checkSoon(100));
@@ -640,6 +755,6 @@
     },
     check,
     state: () => ({ wanted, darkened, native, color: colorOf(), frames: frames.size, shadowRoots: shadowRoots.size,
-      palette: usingPalette, refused, analysis }),
+      palette: usingPalette, refused, analysis, fill: !!fillStyle.parentNode, fillAnalysis }),
   };
 })();
