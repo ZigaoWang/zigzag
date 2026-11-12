@@ -15,6 +15,7 @@
 		0617A9798A9371758CAD4DE8 /* chrome-bookmarks-work.json in Resources */ = {isa = PBXBuildFile; fileRef = BD3E507FE9CD5CD3025750FE /* chrome-bookmarks-work.json */; };
 		06764E70C4314CFF3889E818 /* BridgeProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC407157FA36197709110D6E /* BridgeProxy.swift */; };
 		07B8E8D78400474F39A969F4 /* Readability-readerable.js in Resources */ = {isa = PBXBuildFile; fileRef = 5F60DCC2C5651A80DAADE8E8 /* Readability-readerable.js */; };
+		08513A78449385A0CE271CF2 /* ZigzagApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88A5C020C85AEC572EC2BA4A /* ZigzagApplication.swift */; };
 		087468A86D6129B66892F5D9 /* Autofill.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB39442D06F521CAE1203D0 /* Autofill.swift */; };
 		089B04904C4690F9A9C519AC /* WelcomeWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F12B055E9A9D600A2CAA8EAA /* WelcomeWindow.swift */; };
 		08FACDB4874ECAC187142B05 /* FolderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFFAB9323B9B8363B22FEE73 /* FolderTests.swift */; };
@@ -548,6 +549,7 @@
 		87D85B5B031BEAE510CBFC57 /* SpaceSwitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceSwitcherTests.swift; sourceTree = "<group>"; };
 		8830C7ACBFDB8BD7C5DCCEB4 /* KeepOnTop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepOnTop.swift; sourceTree = "<group>"; };
 		888D287756137DE5F88678F5 /* FaviconRankTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaviconRankTests.swift; sourceTree = "<group>"; };
+		88A5C020C85AEC572EC2BA4A /* ZigzagApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZigzagApplication.swift; sourceTree = "<group>"; };
 		88B983CBE21557E05E6C3E28 /* PageDialogSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageDialogSheet.swift; sourceTree = "<group>"; };
 		88D86346DE78193D507DCECC /* TabStateCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabStateCacheTests.swift; sourceTree = "<group>"; };
 		88E9A925D7802ECE0037DA97 /* AboutWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutWindow.swift; sourceTree = "<group>"; };
@@ -1139,6 +1141,7 @@
 				DB9026CE3C5C707675A9BEEC /* ProblemReport.swift */,
 				EE1EE7853A66CE1029968DA5 /* Scripting.swift */,
 				DF9088949B9C029636E9E355 /* Updater.swift */,
+				88A5C020C85AEC572EC2BA4A /* ZigzagApplication.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -1695,6 +1698,7 @@
 				7C42A54C2877285DE25719E2 /* WhatsNew.swift in Sources */,
 				2EB548A050B8877233F8E0C8 /* WindowManager.swift in Sources */,
 				B60594BC8CE7FA68B9229435 /* Words.swift in Sources */,
+				08513A78449385A0CE271CF2 /* ZigzagApplication.swift in Sources */,
 				F642AD8EB346945EEB6E2E67 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

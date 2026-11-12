@@ -100,7 +100,7 @@ targets:
         SUAutomaticallyUpdate: true
         SUScheduledCheckInterval: 86400
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
-        NSPrincipalClass: NSApplication
+        NSPrincipalClass: $(PRODUCT_MODULE_NAME).ZigzagApplication
         NSHighResolutionCapable: true
         NSSupportsAutomaticTermination: false
         NSSupportsSuddenTermination: false
