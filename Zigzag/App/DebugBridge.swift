@@ -22,12 +22,22 @@ enum DebugBridge {
         #if DEBUG
         // A second debug copy listens on its own channel, so commands for one never reach the other.
         let channel = ProcessInfo.processInfo.environment["ZIGZAG_DEBUG_CHANNEL"].flatMap { $0.isEmpty ? nil : $0 } ?? "app.zigzag.debug"
-        DistributedNotificationCenter.default().addObserver(forName: .init(channel), object: nil, queue: .main) { note in
-            let command = (note.object as? String) ?? ""
-            MainActor.assumeIsolated { run(command) }
-        }
+        // Delivered even while the copy isn't the active app: macOS holds back distributed notifications for an app
+        // in the background, and a copy launched behind the app you're using never becomes active by itself.
+        DistributedNotificationCenter.default().addObserver(Listener.shared, selector: #selector(Listener.received(_:)),
+                                                            name: .init(channel), object: nil, suspensionBehavior: .deliverImmediately)
         #endif
     }
+
+    #if DEBUG
+    private final class Listener: NSObject {
+        static let shared = Listener()
+        @objc func received(_ note: Notification) {
+            let command = (note.object as? String) ?? ""
+            DispatchQueue.main.async { MainActor.assumeIsolated { DebugBridge.run(command) } }
+        }
+    }
+    #endif
 
     #if DEBUG
     /// mini [url] (blank: the quick open bar, as ⌃⌘N), miniquick [text] (the quick open bar, with this typed in it),
