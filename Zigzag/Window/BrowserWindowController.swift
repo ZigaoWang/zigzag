@@ -174,6 +174,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         PowerSaving.start()
         NotificationCenter.default.addObserver(self, selector: #selector(displayOptionsChanged), name: PowerSaving.changed, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(placeAddress), name: BrowserRootView.addressPlaceChanged, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(placeSidebarSide), name: BrowserRootView.sidebarSideChanged, object: nil)
         placeAddress()
         tokens.append(DownloadManager.shared.changed.observe { [weak self] _ in self?.downloadsChanged() })
         tokens.append(DownloadManager.shared.started.observe { [weak self] item, window in
@@ -509,6 +510,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.layoutSubtreeIfNeeded()
         layoutTrafficLights()
     }
+
+    /// Settings › Appearance › Sidebar on the right, or View › Move Sidebar to Right: the sidebar slides over to the
+    /// other edge and the pages glide the other way. What was open beside the sidebar is put away first.
+    @objc func placeSidebarSide() {
+        let onRight = BrowserRootView.sidebarOnRight
+        guard root.sidebarOnRight != onRight else { return }
+        let shown = window?.isVisible == true
+        if shown { closeFloatingPanels() }
+        previews.hide()
+        hideFloatingDownloads()
+        switchingSides = true
+        root.setSidebarOnRight(onRight, animated: shown)
+        switchingSides = false
+        layoutTrafficLights()
+    }
+
+    /// While the sidebar changes sides: the lights' room in its row follows at once, with no picture riding over.
+    private var switchingSides = false
 
     /// Handoff, as in Safari: the web page you're on, offered to your iPhone, iPad or other Mac. Never a private
     /// window's, and never Zigzag's own pages or a local file.
@@ -944,7 +963,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard !(root.sidebarVisible || root.isSidebarFloatingVisible) else { return }
         let side = Tokens.Metric.floatingButton
         let inset = Tokens.Metric.sidebarPadding
-        floatingDownloads.frame = NSRect(x: inset, y: root.overlay.bounds.height - side - inset, width: side, height: side)
+        // In the sidebar's bottom corner, the left or the right one.
+        let x = root.sidebarOnRight ? root.overlay.bounds.width - side - inset : inset
+        floatingDownloads.frame = NSRect(x: x, y: root.overlay.bounds.height - side - inset, width: side, height: side)
         // With its shortcut, as the sidebar's Downloads button says it.
         (floatingDownloadsButton as? IconButton)?.toolTip = Shortcuts.tooltip(String(localized: "Downloads", comment: "Tooltip of the floating downloads button, shown while the sidebar is hidden."),
                                                                              for: #selector(showDownloads(_:)))
@@ -1546,8 +1567,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if !browserWindow.trafficLightsHidden, let image = browserWindow.trafficLightsImage() { trafficLightsPicture = image }
         // Docked and in the bar above the page, the lights are in the same spot: they stay put while the sidebar
         // slides out from under them or back, and go straight back to it as the floating sidebar leaves.
-        let stays = root.showsTopBar && !root.isSidebarFloatingVisible
-        if stays, duration > 0 {
+        // Beside a sidebar on the right they're in the bar the whole time, slid out or not.
+        let stays = root.showsTopBar && (!root.isSidebarFloatingVisible || root.sidebarOnRight)
+        // On the right the bar's toggle is at the bar's other end from where the sidebar's lands: it isn't held.
+        if stays, duration > 0, !root.sidebarOnRight {
             toggleHeldUntil = Date().addingTimeInterval(duration)
             DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.01) { [weak self] in self?.layoutTrafficLights() }
         }
@@ -1567,8 +1590,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // them on the sliding sidebar would only flash and vanish.
         let fullScreen = window.styleMask.contains(.fullScreen)
         // With the sidebar hidden, the bar above the page keeps them at its leading end, where they'd be docked.
-        let inBar = root.showsTopBar && !docked && !floating
-        sidebar.showTrafficLightsPicture(sliding && !fullScreen ? trafficLightsPicture : nil)
+        // Beside a sidebar on the right, that's always where they are: the window's top left.
+        let onRight = root.sidebarOnRight
+        let inBar = root.showsTopBar && (onRight || (!docked && !floating))
+        // Docked on the right without the bar, they're at the window's top left over the strip the page leaves them
+        // (`lightsStripHeight`), not in the sidebar; slid out, the floating sidebar carries them, as on the left, as
+        // the one piece of the window's chrome then in view.
+        let inSidebar = !onRight || (floating && !root.showsTopBar)
+        let room = fullScreen || !inSidebar ? 0 : window.trafficLightsWidth
+        // Their room in the sidebar's row comes at once as it slides out, and goes only once it's out of sight, so
+        // nothing in the row moves while it's on screen; until then their picture rides in it.
+        if switchingSides || !(sliding && room < sidebar.trafficLightsWidth) { sidebar.trafficLightsWidth = room }
+        sidebar.showTrafficLightsPicture(sliding && !fullScreen && sidebar.trafficLightsWidth > 0 ? trafficLightsPicture : nil)
         window.trafficLightsHidden = sliding || !(docked || floating || inBar)
         let container = root.sidebarContainer.frame
         let lightHeight = window.trafficLightHeight
@@ -1579,9 +1612,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let y = center - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating || inBar, let image = window.trafficLightsImage() { trafficLightsPicture = image }
-        sidebar.trafficLightsWidth = fullScreen ? 0 : window.trafficLightsWidth
         // The lights' room in the bar stays while the sidebar floats over it, so nothing in the bar moves as it does.
-        root.topBar.trafficLightsWidth = root.showsTopBar && !docked && !fullScreen ? window.trafficLightsWidth : 0
+        root.topBar.trafficLightsWidth = root.showsTopBar && (!docked || onRight) && !fullScreen ? window.trafficLightsWidth : 0
         // With the sidebar hidden its toggle goes with it, so the bar above the page has one of its own. While the
         // sidebar slides back in, the bar's stays where the sidebar's lands, and the sidebar's shows once it's there.
         let held = root.showsTopBar && holdsToggle
@@ -2280,7 +2312,7 @@ extension BrowserWindowController: SidebarDelegate {
         let panel = IconPickerPanel(noneSymbol: "folder", selected: folder.icon) { [weak self] icon in
             self?.libraryChange(String(localized: "Change Icon", comment: "Undo action name, shown in the Edit menu as Undo Change Icon.")) { Library.shared.setIcon(icon, forFolder: id) }
         }
-        panel.show(beside: row, in: root.overlay, x: root.sidebarContainer.frame.maxX + Tokens.Space.x2)
+        panel.show(beside: row, in: root.overlay, x: root.besideSidebar(width: panel.preferredWidth))
     }
 
     /// The icon grid beside a tab's row, as for a folder; its plain choice is the site's own icon. A private window's
@@ -2295,7 +2327,7 @@ extension BrowserWindowController: SidebarDelegate {
             guard let self, let tab = self.tabManager.tab(with: id) else { return }
             self.setIconWithUndo(icon, for: tab)
         }
-        panel.show(beside: row, in: root.overlay, x: root.sidebarContainer.frame.maxX + Tokens.Space.x2)
+        panel.show(beside: row, in: root.overlay, x: root.besideSidebar(width: panel.preferredWidth))
     }
 
     /// The icon grid beside a pinned page's row or a favorite's tile. Kept in the library, so never from a private
@@ -2309,7 +2341,7 @@ extension BrowserWindowController: SidebarDelegate {
         let panel = IconPickerPanel(noneSymbol: "globe", noneImage: siteIcon, noneToolTip: SidebarMenus.useSiteIconTitle, selected: bookmark.icon) { [weak self] icon in
             self?.setIconWithUndo(icon, forBookmark: id)
         }
-        panel.show(beside: anchor, in: root.overlay, x: root.sidebarContainer.frame.maxX + Tokens.Space.x2)
+        panel.show(beside: anchor, in: root.overlay, x: root.besideSidebar(width: panel.preferredWidth))
     }
 
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }

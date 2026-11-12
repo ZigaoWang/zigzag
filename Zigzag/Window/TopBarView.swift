@@ -110,8 +110,11 @@ final class TopBarView: NSView {
     }
 
     /// The inset the controls keep from the page's edges: none framed, `Sidebar.edge` where the page meets the
-    /// window's edge, so nothing comes closer to it than that.
-    static func edgeInset(page: NSRect, window: NSRect) -> CGFloat { max(0, Tokens.Sidebar.edge - (window.maxX - page.maxX)) }
+    /// window's edge, so nothing comes closer to it than that: its right edge, or its left one beside a sidebar on
+    /// the right.
+    static func edgeInset(page: NSRect, window: NSRect) -> CGFloat {
+        max(0, Tokens.Sidebar.edge - min(window.maxX - page.maxX, page.minX - window.minX))
+    }
 
     /// Where the bar's controls start and end, from its own edges: the page's edges, pulled in by one inset on both
     /// ends, enough that the address never comes closer than `Sidebar.edge` to the window's edge. Framed, that's the

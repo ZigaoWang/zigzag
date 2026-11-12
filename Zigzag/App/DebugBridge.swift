@@ -475,6 +475,13 @@ enum DebugBridge {
         case "sidebar": controller.toggleBrowserSidebar(nil)
         // topbar on|off: Settings › Appearance › Address bar above the page.
         case "topbar": BrowserRootView.addressAbovePage = arg == "on"
+        // sidebarside right|left: Settings › Appearance › Sidebar on the right.
+        case "sidebarside": BrowserRootView.sidebarOnRight = arg == "right"
+        // sideframes: where the sidebar, the page and the traffic lights are, in the debug log.
+        case "sideframes":
+            let r = controller.root, close = controller.window?.standardWindowButton(.closeButton)
+            debugLog("sideframes right=\(r.sidebarOnRight) sidebar=\(r.sidebarContainer.frame) card=\(r.cardFrame) bar=\(r.showsTopBar ? r.topBarFrame : .zero) "
+                     + "lights=\(close.map { $0.convert($0.bounds, to: nil) } ?? .zero) hidden=\(close?.isHidden ?? true) room=\(r.lightsRoom)")
         case "reveal": controller.root.holdReveal = arg == "hold"; controller.root.reveal(true)
         case "unreveal": controller.root.holdReveal = false; controller.root.reveal(false)
         // numbers [control|off]: the ⌘ number hints, as holding ⌘ shows them (with control, the spaces' ⌃ ones, as
