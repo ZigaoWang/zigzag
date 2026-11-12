@@ -1210,6 +1210,15 @@ enum DebugBridge {
         case "movetonewwindow":
             if let tab = controller.tabManager.selectedTab { controller.moveToNewWindow(tab) }
             WindowManager.shared.debugTarget = WindowManager.shared.controllers.last
+        // tabtomini [n] [x y]: the tab menu's Open in Zigzag Mini for the nth tab of this space (1 = the first; none:
+        // the tab you're on), or, with a point on screen, the tab let go there with ⌥ held. Logs whether it's offered.
+        case "tabtomini":
+            let parts = arg.split(separator: " ").compactMap { Double($0) }
+            let list = controller.tabManager.tabs(in: controller.tabManager.currentSpaceID)
+            let tab = parts.first.flatMap { n in list.indices.contains(Int(n) - 1) ? list[Int(n) - 1] : nil } ?? controller.tabManager.selectedTab
+            guard let tab else { debugLog("tabtomini: no tab"); break }
+            debugLog("tabtomini offered=\(controller.canOpenInMini(tab)) title=\(tab.displayTitle)")
+            controller.openInMini(tab, at: parts.count == 3 ? NSPoint(x: parts[1], y: parts[2]) : nil)
         // selecttitle <text>: the tab here whose title starts so, chosen as a click on its row chooses it.
         case "selecttitle":
             if let tab = controller.tabManager.allTabs.first(where: { $0.displayTitle.hasPrefix(arg) }) { controller.listSelect(tab) }
