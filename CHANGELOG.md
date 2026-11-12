@@ -5,18 +5,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- The mini player can leave the window: drag it anywhere on screen, over other apps too, and it stays on top on every space, as Picture in Picture does. Let go outside the window, it rests in the screen's nearest corner; over the window, in the page's corner as before. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#172](https://github.com/ZigaoWang/zigzag/issues/172))
-- A video's full screen can fill just its page instead of the whole screen, the sidebar and the rest of the window still there: choose The Page for Full screen videos fill in Settings › Tabs, or turn on Full screen fills the page in a site's controls, for YouTube alone say. In a split, the video fills its own part. Esc, or the player's own button, leaves it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#168](https://github.com/ZigaoWang/zigzag/issues/168))
-
-### Fixed
-- In split view, a mouse's back and forward buttons and a swipe go back or forward in the page under the pointer, which becomes the page you're in, instead of in whichever page you were last in. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#170](https://github.com/ZigaoWang/zigzag/issues/170))
-- Ad blocking now also uses uBlock Origin's community filter lists, which Zigzag downloads and keeps up to date on its own, so YouTube and other sites that change how they serve ads keep working without waiting for a Zigzag update. ([#129](https://github.com/ZigaoWang/zigzag/issues/129))
-- Show All Tabs opens smoothly, the first time too, and closes onto another tab without a pause.
-
 ## [0.8.7] - 2026-11-12
 
 ### New
+- The mini player can leave the window: drag it anywhere on screen, over other apps too, and it stays on top on every space, as Picture in Picture does. Let go outside the window, it rests in the screen's nearest corner; over the window, in the page's corner as before. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#172](https://github.com/ZigaoWang/zigzag/issues/172))
+- A video's full screen can fill just its page instead of the whole screen, the sidebar and the rest of the window still there: choose The Page for Full screen videos fill in Settings › Tabs, or turn on Full screen fills the page in a site's controls, for YouTube alone say. In a split, the video fills its own part. Esc, or the player's own button, leaves it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#168](https://github.com/ZigaoWang/zigzag/issues/168))
 - Install as App, in the File menu and the ⋯ menu of a site's controls, makes the site an app of its own in your Applications folder, with its icon in the Dock and in ⌘Tab. It opens right away in a window of its own, signed in as you are in Zigzag; a link to another site opens in Zigzag. Settings › General lists the apps, to remove one. ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
 - The sidebar can sit on the right: turn on Sidebar on the right in Settings › Appearance, or choose View › Move Sidebar to Right. The page moves to the left, the window's buttons stay at its top left, and a hidden sidebar comes out from the right edge. ([#166](https://github.com/ZigaoWang/zigzag/issues/166))
 - Middle-click the address to close the tab you're on, as a middle-click on its row in the sidebar does. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#171](https://github.com/ZigaoWang/zigzag/issues/171))
@@ -32,6 +25,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The "Zigzag updated" note goes away by itself after 15 seconds, like a notification, and stays while your pointer is on it. What's New is still in the Help menu.
 
 ### Fixed
+- In split view, a mouse's back and forward buttons and a swipe go back or forward in the page under the pointer, which becomes the page you're in, instead of in whichever page you were last in. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#170](https://github.com/ZigaoWang/zigzag/issues/170))
+- Ad blocking now also uses uBlock Origin's community filter lists, which Zigzag downloads and keeps up to date on its own, so YouTube and other sites that change how they serve ads keep working without waiting for a Zigzag update. ([#129](https://github.com/ZigaoWang/zigzag/issues/129))
+- Show All Tabs opens smoothly, the first time too, and closes onto another tab without a pause.
 - In a short window, the list of sections in Settings scrolls instead of running off the bottom ([#169](https://github.com/ZigaoWang/zigzag/issues/169)).
 - The strip over each page in split view reads clearly on dark pages: its address and buttons turn light, as the bar above the page does. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - A split's row in the sidebar no longer shifts its pages as the pointer comes and goes. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
