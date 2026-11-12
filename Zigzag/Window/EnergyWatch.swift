@@ -241,3 +241,16 @@ enum ProcessCPU {
         return Double(info.ri_user_time + info.ri_system_time) * Double(base.numer) / Double(base.denom) / 1_000_000_000
     }
 }
+
+/// How much memory a process holds, as Activity Monitor's Memory column counts it (its physical footprint).
+enum ProcessMemory {
+    static func footprint(_ pid: Int32) -> UInt64? {
+        guard pid > 0 else { return nil }
+        var info = rusage_info_v4()
+        let ok = withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V4, $0) }
+        }
+        guard ok == 0, info.ri_phys_footprint > 0 else { return nil }
+        return info.ri_phys_footprint
+    }
+}

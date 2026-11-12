@@ -265,6 +265,10 @@ final class Tab: NSObject {
     /// the sidebar marks it, so a tab never seems to have lost its page for no reason.
     private(set) var isAsleep = false
     private(set) var sleptForEnergy = false
+    /// About how much memory its page gave back as it slept (`SleepMemory.share`), for the hover card; nil awake.
+    private(set) var freedMemory: UInt64?
+    /// What the sidebar says of it while it sleeps, nil awake.
+    var asleepNote: String? { isAsleep ? SleepMemory.note(forEnergy: sleptForEnergy, freed: freedMemory) : nil }
     /// A name you gave the tab (double-click to rename); it stays whatever the page calls itself.
     /// While a pinned page is first loading, where it ends up on its own (a site that redirects, like
     /// calendar.google.com) counts as the pinned page, so it's never "moved on" before you've done anything.
@@ -322,6 +326,7 @@ final class Tab: NSObject {
         if let webView { return webView }
         isAsleep = false
         sleptForEnergy = false
+        freedMemory = nil
         let fromWebKit = pendingConfiguration != nil
         let extensionConfiguration = fromWebKit ? nil : Self.extensionConfiguration(for: url, in: profile)
         let configuration = pendingConfiguration ?? extensionConfiguration ?? WebKitSetup.makeConfiguration(for: profile)
@@ -423,12 +428,23 @@ final class Tab: NSObject {
         captureSnapshot { [weak self] in
             guard let self, self.webView === webView else { return }
             self.pendingInteractionState = webView.interactionState as? Data
+            let freed = self.memoryInUse(by: webView)
             self.tearDown(webView)
+            self.freedMemory = freed
             self.isAsleep = true
             self.sleptForEnergy = reason == EnergyWatch.sleepReason
             self.changed.send(.webView)
             if let reason { Diagnostics.note("Tab put to sleep", site: self.url?.host(), reason, isPrivate: self.isPrivate) }
         }
+    }
+
+    /// Its share of its page process's memory, as it goes to sleep: the process's footprint over the tabs awake in it.
+    private func memoryInUse(by webView: BrowserWebView) -> UInt64? {
+        guard let pid = EnergyWatch.processID(of: webView), pid > 0 else { return nil }
+        let sharing = WindowManager.shared.openTabs.filter { tab in
+            tab.webView.flatMap(EnergyWatch.processID) == pid
+        }.count
+        return SleepMemory.share(footprint: ProcessMemory.footprint(pid), tabsSharing: sharing)
     }
 
     /// Reads where you are on the page and what you've typed (`pageState`), as you leave it and before it sleeps.

@@ -260,3 +260,38 @@ extension TabSleep {
     /// Every tab on its way to sleep, whichever window or watcher sent it: two at a time, a tenth of a second apart.
     @MainActor static let queue = StagedQueue<UUID>()
 }
+
+/// What a sleeping tab gave back, and how that's said where you point at it.
+nonisolated enum SleepMemory {
+    /// One tab's part of its page process's memory: WebKit runs a site's tabs in one process, so the tabs still awake
+    /// in it share what it holds evenly. Nil when the process didn't say.
+    static func share(footprint: UInt64?, tabsSharing: Int) -> UInt64? {
+        guard let footprint, footprint > 0 else { return nil }
+        return footprint / UInt64(max(1, tabsSharing))
+    }
+
+    /// "180 MB", "1.2 GB": rounded to a whole megabyte, or a tenth of a gigabyte, as it's only ever about that much.
+    static func formatted(_ bytes: UInt64) -> String {
+        let mb: UInt64 = 1 << 20, gb: UInt64 = 1 << 30
+        let rounded = bytes < gb ? max(1, (bytes + mb / 2) / mb) * mb : (bytes * 10 + gb / 2) / gb * gb / 10
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .memory
+        formatter.allowedUnits = [.useMB, .useGB]
+        formatter.isAdaptive = false
+        formatter.formattingContext = .middleOfSentence
+        return formatter.string(fromByteCount: Int64(rounded))
+    }
+
+    /// Said of a tab Zigzag put to sleep: why, and about how much memory that gave back when it's known.
+    static func note(forEnergy: Bool, freed: UInt64?) -> String {
+        if let freed {
+            let size = formatted(freed)
+            return forEnergy
+                ? String(localized: "Asleep to save energy. Freed about \(size).", comment: "Under a sleeping tab's title in its hover card, or its tooltip: Zigzag put it to sleep because it used a lot of energy in the background. The size is how much memory that gave back, like 180 MB.")
+                : String(localized: "Asleep to save memory. Freed about \(size).", comment: "Under a sleeping tab's title in its hover card, or its tooltip: Zigzag put it to sleep because it wasn't used for a while or the Mac was low on memory. The size is how much memory that gave back, like 180 MB.")
+        }
+        return forEnergy
+            ? String(localized: "Asleep to save energy.", comment: "Under a sleeping tab's title in its hover card, or its tooltip: Zigzag put it to sleep because it used a lot of energy in the background.")
+            : String(localized: "Asleep to save memory.", comment: "Under a sleeping tab's title in its hover card, or its tooltip: Zigzag put it to sleep because it wasn't used for a while or the Mac was low on memory.")
+    }
+}
