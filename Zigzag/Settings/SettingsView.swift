@@ -2484,7 +2484,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
         // The choices made one site at a time, which otherwise have nowhere to be seen.
         let nothingChosen = ContentBlocker.allowedSites.isEmpty && ExtensionStore.extensionsOffSites.isEmpty && SitePermissions.sites.isEmpty
-            && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty && KeepAwake.sites.isEmpty
+            && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty && DarkPages.sitesForced.isEmpty && KeepAwake.sites.isEmpty
         let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
         sitesReset = nothingChosen ? nil : reset
         reset.onClick = { [weak self] _ in
@@ -2513,7 +2513,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // shares a row with the host's other choices, and anything else in full (http://localhost:3000).
         let origins = Dictionary(SitePermissions.sites.map { (SiteOrigin.label($0), $0) }, uniquingKeysWith: { a, _ in a })
         let sites = Set(origins.keys).union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites).union(ZoomLevels.all.keys)
-            .union(DarkPages.sitesOn).union(DarkPages.sitesOff).union(KeepAwake.sites)
+            .union(DarkPages.sitesOn).union(DarkPages.sitesOff).union(DarkPages.sitesForced).union(KeepAwake.sites)
         var listed = 0, more = 0
         for site in sites.sorted() {
             var said: [String] = []
@@ -2538,7 +2538,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 let percent = Int((zoom * 100).rounded())
                 said.append(String(localized: "zoom \(percent)%", comment: "A choice made for a site in Settings › Privacy, in a list of them: its zoom, like “zoom 125%”."))
             }
-            if DarkPages.sitesOn.contains(site) {
+            if DarkPages.sitesForced.contains(site) {
+                said.append(String(localized: "dark page forced", comment: "A choice made for a site in Settings › Privacy, in a list of them: its pages are drawn dark even though they look dark on their own (Force dark)."))
+            } else if DarkPages.sitesOn.contains(site) {
                 said.append(String(localized: "dark page on", comment: "A choice made for a site in Settings › Privacy, in a list of them: its pages are drawn dark."))
             } else if DarkPages.sitesOff.contains(site) {
                 said.append(String(localized: "dark page off", comment: "A choice made for a site in Settings › Privacy, in a list of them: its pages are never drawn dark."))

@@ -60,6 +60,10 @@
   const choice = () => (!isTop ? told === true
     : matches(site, config.sitesOn) ? true : matches(site, config.sitesOff) ? false : config.on);
   let wanted = choice();
+  // Force dark (the site panel, #134): darkened even when it looks dark on its own. The top page only.
+  const forced = () => isTop && matches(site, config.sitesForced || []);
+  // Whether the page is drawn dark: wanted, and light, or not looked at yet, or forced.
+  const darkens = () => native !== true || forced();
   // null until the page has been looked at.
   let native = isTop && matches(site, config.native) ? true : null;
   let darkened = false;
@@ -206,7 +210,7 @@
     if (found !== null) { native = found; dropPrepaint(); }
     // Until the page can be looked at, a site last seen dark stays as it is and any other is darkened, so it
     // never comes up white first.
-    apply(native !== true);
+    apply(darkens());
     send();
   };
 
@@ -602,7 +606,7 @@
   };
   // Darkened from the first moment, unless the site was last seen dark: no white page first. One last seen dark
   // starts on the plain dark ground until it's looked at.
-  if (wanted && native !== true) apply(true);
+  if (wanted && darkens()) apply(true);
   else { if (wanted) putPrepaint(); send(); }
   if (usingPalette) requestAnimationFrame(firstFrame);
   watch();

@@ -29,6 +29,7 @@ enum DarkPages {
     private static let modeKey = "DarkPages"
     private static let onKey = "DarkPagesOnSites"
     private static let offKey = "DarkPagesOffSites"
+    private static let forcedKey = "DarkPagesForcedSites"
     private static let blackKey = "DarkPagesPureBlack"
 
     static var mode: Mode {
@@ -53,6 +54,13 @@ enum DarkPages {
         set { defaults.set(Array(newValue).sorted(), forKey: offKey) }
     }
 
+    /// Sites darkened even when they look dark on their own (Force dark in the site panel, #134): for a site that
+    /// says it's dark and isn't all the way, or draws parts of itself light.
+    static var sitesForced: Set<String> {
+        get { Set(defaults.stringArray(forKey: forcedKey) ?? []) }
+        set { defaults.set(Array(newValue).sorted(), forKey: forcedKey) }
+    }
+
     static func site(of url: URL?) -> String? { ContentBlocker.site(of: url) }
 
     private static func covers(_ sites: Set<String>, _ site: String) -> Bool {
@@ -68,7 +76,7 @@ enum DarkPages {
     }
 
     /// Turns dark pages on or off for a site, or back to following the setting (nil). A choice the same as the
-    /// setting's (Always, or Off) isn't kept: the site simply follows it.
+    /// setting's (Always, or Off) isn't kept: the site simply follows it. Anything but on lets go of Force dark.
     static func setChoice(_ on: Bool?, for url: URL?) {
         guard let site = site(of: url) else { return }
         var yes = sitesOn.filter { !(site == $0 || site.hasSuffix("." + $0)) }
@@ -79,13 +87,30 @@ enum DarkPages {
         }
         sitesOn = yes
         sitesOff = no
+        if on != true { sitesForced = sitesForced.filter { !(site == $0 || site.hasSuffix("." + $0)) } }
         refreshAll()
+    }
+
+    /// Whether a site is darkened even when it looks dark on its own.
+    static func isForced(_ url: URL?) -> Bool {
+        guard let site = site(of: url) else { return false }
+        return covers(sitesForced, site)
+    }
+
+    /// Force dark for a site. On turns dark pages on there too, since forcing means drawing it dark.
+    static func setForced(_ on: Bool, for url: URL?) {
+        guard let site = site(of: url) else { return }
+        var forced = sitesForced.filter { !(site == $0 || site.hasSuffix("." + $0)) }
+        if on { forced.insert(site) }
+        sitesForced = forced
+        if on, !wants(url) { setChoice(true, for: url) } else { refreshAll() }
     }
 
     /// Every site's choice forgotten (Settings › Privacy › Sites › Reset All).
     static func forgetAll() {
         sitesOn = []
         sitesOff = []
+        sitesForced = []
         refreshAll()
     }
 
@@ -259,6 +284,7 @@ enum DarkPages {
         let black = pureBlack
         var config: [String: Any] = [
             "on": wants(mode: mode, systemIsDark: systemIsDark, site: nil), "sitesOn": sitesOn.sorted(), "sitesOff": sitesOff.sorted(),
+            "sitesForced": sitesForced.sorted(),
             "native": nativeSites(in: nativeScope(of: store)).sorted(), "black": black, "strength": strength(black: black),
             "root": rootCSS(black: black), "canvas": canvasCSS, "media": mediaCSS(black: black), "prepaint": prepaintCSS(black: black),
             "marks": ["image": imageMark, "before": beforeMark, "after": afterMark, "frame": frameMark],
@@ -405,7 +431,9 @@ enum DarkPages {
     private static func applyLook(to webView: WKWebView) {
         let url = webView.url
         let wanted = applies(to: url) && wants(url)
-        let appearance = wanted ? NSAppearance(named: .darkAqua) : nil
+        // Forced dark, the site is asked for its light look, which is darkened as a light site's is: its own dark
+        // look, which drew parts of it light, is what Force dark is for.
+        let appearance = wanted ? NSAppearance(named: isForced(url) ? .aqua : .darkAqua) : nil
         if webView.appearance?.name != appearance?.name { webView.appearance = appearance }
         let tab = (webView as? BrowserWebView)?.owner
         // A page that's dark on its own shows its own dark past its edges, the one the bar above it takes (#134):

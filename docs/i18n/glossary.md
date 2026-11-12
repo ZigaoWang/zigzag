@@ -61,6 +61,8 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Passkeys | 通行密钥 | | Apple's term. |
 | Sign-ins (staying signed in, imported) | 登录状态 | 登录信息 | Zigzag means "you stay signed in to your sites"; 登录状态 says that, 登录信息 sounds like saved passwords. |
 | Reader | 阅读器 | | Safari's 显示阅读器 / 隐藏阅读器. |
+| Dark pages, Dark page (one site's) | 深色网页 | 暗色网页, 夜间模式 | macOS says 深色 for Dark Mode. |
+| Force dark (a site's) | 强制深色 | 强制暗色 | 深色 as above; 强制 is the plain word for doing it anyway. |
 | Capture (screenshot of the page) | 截图 | 截取, 屏幕快照 | macOS's Screenshot app is 截屏; for a page, 截图 is what people say. |
 | Archive (old tabs put away) | 归档 | 存档 | Arc's Chinese users say 归档. |
 | Getting Started (the guide) | 入门 | 新手指南 | Short, Apple-like. |

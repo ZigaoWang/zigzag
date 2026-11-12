@@ -767,6 +767,8 @@ enum DebugBridge {
         case "darkpages": if let mode = DarkPages.Mode(rawValue: arg) { DarkPages.mode = mode }
         case "darkblack": DarkPages.pureBlack = arg == "on"
         case "darksite": DarkPages.setChoice(arg == "follow" ? nil : arg == "on", for: controller.tabManager.selectedTab?.url)
+        // darkforce on|off: the site panel's Force dark row for the page in front.
+        case "darkforce": DarkPages.setForced(arg == "on", for: controller.tabManager.selectedTab?.url)
         // keepawake on|off: the site panel's Keep tabs awake row for the page in front.
         case "keepawake": KeepAwake.set(arg == "on", for: controller.tabManager.selectedTab?.url)
         case "darkstate":

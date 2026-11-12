@@ -5904,6 +5904,17 @@
         }
       }
     },
+    "Force dark" : {
+      "comment" : "Row in the site panel's This Site group, under Dark page: draws this site dark even though it looks dark on its own, for a site that leaves parts of itself light.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "强制深色"
+          }
+        }
+      }
+    },
     "Forget" : {
       "comment" : "Button on a site's row in Settings › Privacy › Sites: forgets the choices made for it.",
       "localizations" : {
@@ -16142,6 +16153,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "深色模式 浅色 外观 夜间 暗色 主题 黑色 反色 dark mode appearance"
+          }
+        }
+      }
+    },
+    "dark page forced" : {
+      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its pages are drawn dark even though they look dark on their own (Force dark).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "强制深色网页"
           }
         }
       }

@@ -379,12 +379,28 @@ final class SitePanel: FloatingPanelView {
         // dark on its own says so: there's nothing for Zigzag to darken. Offered where keeping tabs awake is.
         if KeepAwake.isOffered(for: url, isPrivate: isPrivate) {
             let native = String(localized: "This site is dark already", comment: "Under Dark page in the site panel's This Site group: dark pages are on, and the site has a dark look of its own, so it's left as it is.")
-            let tab = tab
-            rows.append(.toggle(String(localized: "Dark page", comment: "Row in the site panel's This Site group: draws this site's pages dark."), on: DarkPages.wants(url),
-                                status: { on in on && tab.darkPage?.native == true ? native : on ? Self.onHere : Self.offHere }) { [weak self] on in
+            let tab = tab, url = url
+            // Force dark (#134): for a site that looks dark on its own but leaves parts light, or says it's dark and
+            // isn't. Offered where that's so, or once it's on.
+            let offersForce = tab.darkPage?.native == true || DarkPages.isForced(url)
+            weak var forceRow: PanelRow?
+            let darkRow = PanelRow.toggle(String(localized: "Dark page", comment: "Row in the site panel's This Site group: draws this site's pages dark."), on: DarkPages.wants(url),
+                                          status: { on in on && tab.darkPage?.native == true && !DarkPages.isForced(url) ? native : on ? Self.onHere : Self.offHere }) { [weak self] on in
                 guard let self else { return }
                 DarkPages.setChoice(on, for: self.url)
-            })
+                if !on { forceRow?.setOn(false) }
+            }
+            rows.append(darkRow)
+            if offersForce {
+                let row = PanelRow.toggle(String(localized: "Force dark", comment: "Row in the site panel's This Site group, under Dark page: draws this site dark even though it looks dark on its own, for a site that leaves parts of itself light."),
+                                          on: DarkPages.isForced(url), status: { $0 ? Self.onHere : Self.offHere }) { [weak self, weak darkRow] on in
+                    guard let self else { return }
+                    DarkPages.setForced(on, for: self.url)
+                    darkRow?.setOn(DarkPages.wants(self.url))
+                }
+                forceRow = row
+                rows.append(row)
+            }
         }
         // The site's tabs never sleep in the background (TabSleep, EnergyWatch). Not in a private window: its site
         // would be kept in the list.
@@ -869,11 +885,23 @@ final class PanelRow: NSView {
         let toggle = Toggle(isOn: on)
         toggle.setAccessibilityLabel(title)
         let row = PanelRow(title, control: toggle, value: status(on))
+        row.status = status
         toggle.onChange = { [weak row] on in
             row?.value?.stringValue = status(on)
             changed(on)
         }
         return row
+    }
+
+    /// What a toggle row's status says for each state.
+    private var status: ((Bool) -> String)?
+
+    /// A toggle row's switch moved by another row (Force dark turns Dark page on), without running its own change;
+    /// what it says is read again either way.
+    func setOn(_ on: Bool) {
+        guard let toggle = control as? Toggle else { return }
+        toggle.isOn = on
+        if let status { value?.stringValue = status(on) }
     }
 
     static func value(_ title: String, _ value: String, action: String, run: @escaping () -> Void) -> PanelRow {
