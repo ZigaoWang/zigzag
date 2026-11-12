@@ -5,6 +5,27 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-11-12
+
+### New
+- AI apps can use Zigzag over MCP, if you turn it on in Settings › Automation: list, open and read your tabs, take screenshots, click and type. It only works on this Mac, needs a key, and never touches private windows, passwords or Zigzag's own pages. A tab an app is using says so, with Stop. Copy Setup and Copy Prompt get an app connected in one paste. ([#99](https://github.com/ZigaoWang/zigzag/issues/99))
+- Settings is grouped, and Automation has its own pane. ([#99](https://github.com/ZigaoWang/zigzag/issues/99))
+- Give a tab, pinned tab or favorite its own emoji or symbol: right-click › Change Icon…, and Use Site Icon to go back. ([#153](https://github.com/ZigaoWang/zigzag/issues/153))
+- Dark pages draw a light site in a dark version of its own colors after your first visit, so photos and colors stay true and the page is dark from the first frame. The old filter is still there for sites it can't read. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
+- Dark pages handle pictures in frames, web components and backgrounds better, and there's a Pure black option. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
+- The mini player resizes from any edge or corner, snaps to the page's corners (hold ⌘ to place it anywhere), remembers its size and place, and takes Space and Esc. ([#156](https://github.com/ZigaoWang/zigzag/issues/156))
+- On the Chrome Web Store, the store's own button reads Add to Zigzag and installs through Zigzag. Thanks to [philigrin](https://github.com/philigrin) for working out how. ([#130](https://github.com/ZigaoWang/zigzag/issues/130))
+- Closing a tab whose nested tabs are folded away closes them too, with Undo. ([#155](https://github.com/ZigaoWang/zigzag/issues/155))
+
+### Fixed
+- Folders shut again when their pages are open. ([#154](https://github.com/ZigaoWang/zigzag/issues/154))
+- The mini player only follows a video you were watching, not a muted preview on the page you left. ([#156](https://github.com/ZigaoWang/zigzag/issues/156))
+- Two-finger swipes go back and forward the way your Mac scrolls, as in Safari. Thanks to [philigrin](https://github.com/philigrin). ([#147](https://github.com/ZigaoWang/zigzag/issues/147))
+- Pages embedded from sites you've never opened get their cookies, so shared chat artifacts and similar embeds open. Thanks to [vandenbulckjean](https://github.com/vandenbulckjean). ([#143](https://github.com/ZigaoWang/zigzag/issues/143))
+- A Web Inspector docked to the side stays with its own tab and isn't covered by the address bar. Thanks to [vandenbulckjean](https://github.com/vandenbulckjean). ([#148](https://github.com/ZigaoWang/zigzag/issues/148))
+- With the bar above the page, showing and hiding the sidebar slides smoothly and the address keeps room at its end. Thanks to [vandenbulckjean](https://github.com/vandenbulckjean). ([#151](https://github.com/ZigaoWang/zigzag/issues/151))
+- 1Password connects to its Mac app when your only Chrome-family browser is Vivaldi, Arc or a beta. ([#145](https://github.com/ZigaoWang/zigzag/issues/145))
+
 ## [0.8.4] - 2026-11-11
 
 ### New
