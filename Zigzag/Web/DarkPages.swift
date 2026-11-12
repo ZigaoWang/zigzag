@@ -408,15 +408,22 @@ enum DarkPages {
         let appearance = wanted ? NSAppearance(named: .darkAqua) : nil
         if webView.appearance?.name != appearance?.name { webView.appearance = appearance }
         let tab = (webView as? BrowserWebView)?.owner
-        // A page that's dark on its own shows its own color past its edges, as without dark pages.
-        let own = tab?.darkPage?.native == true && tab?.darkPage?.site == site(of: url)
+        // A page that's dark on its own shows its own dark past its edges, the one the bar above it takes (#134):
+        // WebKit's own color there is the page's root's, which can be white under a dark page.
         let ground = ground(black: pureBlack, palette: drawsWithPalette(palette(for: webView.configuration.websiteDataStore, url: url)))
-        webView.underPageBackgroundColor = wanted && !own ? ground : nil
+        webView.underPageBackgroundColor = wanted ? underPage(tab?.darkPage, site: site(of: url), ground: ground) : nil
         // No white of WebKit's own under the page (#134): a new web view's first frame, or one bringing back a tab that
         // slept, was drawn on it before the page came, and stayed on screen until the page had drawn itself, since
         // WebKit holds what's shown while a page is on its way. Clear instead, the dark of the card shows there.
         let draws = !wanted
         if webView.value(forKey: "drawsBackground") as? Bool != draws { webView.setValue(draws, forKey: "drawsBackground") }
+    }
+
+    /// Behind a page where dark pages are wanted: a page dark on its own (and not darkened anyway), its own dark as the
+    /// page script saw it; any other, the dark its white will be.
+    static func underPage(_ state: State?, site: String?, ground: NSColor) -> NSColor? {
+        guard let state, state.native, !state.darkened, state.site == site else { return ground }
+        return state.color
     }
 
     /// For what turns a page's own background on or off for a while (Peek): back to how dark pages want it.

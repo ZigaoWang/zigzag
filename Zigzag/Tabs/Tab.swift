@@ -72,9 +72,15 @@ final class Tab: NSObject {
     /// theme color. None with no page, or under what covers it with a color of its own (a PDF, Settings).
     var pageColor: NSColor? {
         guard let webView, pdfViewer == nil, settingsView == nil else { return nil }
-        // Drawn dark by Zigzag: the page's own colors are still light underneath, so it's the color as drawn.
-        if let darkPage, darkPage.darkened, let color = darkPage.color { return color }
-        return webView.underPageBackgroundColor ?? themeColor
+        return Self.pageColor(dark: darkPage, under: webView.underPageBackgroundColor, theme: themeColor)
+    }
+
+    /// The rule for `pageColor`. A page drawn dark, by Zigzag or on its own, is the dark the page script saw (#134): a
+    /// dark site can keep a white theme color for its header, and WebKit's own background under it can be white too,
+    /// which painted the bar white over a dark page. Otherwise the background under the page, else the theme color.
+    static func pageColor(dark: DarkPages.State?, under: NSColor?, theme: NSColor?) -> NSColor? {
+        if let dark, dark.darkened || dark.native, let color = dark.color { return color }
+        return under ?? theme
     }
     private(set) var isLoading = false
     /// A new page is on its way in (a link followed, an address typed): the one showing is about to go. Until it
