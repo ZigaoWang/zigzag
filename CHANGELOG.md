@@ -18,6 +18,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Force dark, in a site's controls, draws a site dark even when it looks dark already, for one that leaves parts of itself light. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 
 ### Fixed
+- YouTube videos play again instead of stopping at "Something went wrong. Please try again later." YouTube checks parts of what it sends before it plays a video, and Zigzag's ad blocking had changed one of them, the note it shows about ad blockers. That's left alone now, and should YouTube still refuse a video, the page loads again and plays it, with any ad in it sped through. ([#129](https://github.com/ZigaoWang/zigzag/issues/129))
 - The bar above a page that's dark on its own is dark too, instead of white. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - With dark pages on, sites that are dark on their own, like GitHub, no longer flash white before their dark theme shows, on the first visit or after a restart. Zigzag remembers which sites are dark for each profile, and forgets them when you clear the site's data or History. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - With dark pages on, a dark page with little on it is no longer turned light. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
