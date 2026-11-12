@@ -32,6 +32,8 @@ final class SitePanel: FloatingPanelView {
     private var pageToken: SignalToken?
     /// Whether this panel describes the page in this tab.
     func describes(_ other: Tab?) -> Bool { other === tab || other == nil && isBlank }
+    /// Opened from a split pane's strip, under its address: it belongs to where that strip is.
+    private(set) var isFromPane = false
 
     private let icon = FaviconView()
     private let siteName = Label("", font: Tokens.Font.voice(20), color: Tokens.Color.textPrimary)
@@ -179,6 +181,7 @@ final class SitePanel: FloatingPanelView {
         guard let panel = SitePanel(controller: controller, tab: tab) else { return }
         controller.closeFloatingPanels()
         panel.anchor = anchor
+        panel.isFromPane = Self.paneStrip(of: anchor) != nil
         let overlay = controller.root.overlay
         let anchorFrame = anchor.convert(anchor.bounds, to: overlay)
         // From the address bar in the sidebar: its width and left edge, just below it. With the sidebar slid out or

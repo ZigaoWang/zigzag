@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - With the address above the page, a zoomed pane in split view keeps its strip, with its address and buttons, on top of it, instead of leaving it behind in the bar. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+- Site Controls opened from a pane in split view closes when the panes move, as when the split ends, a pane is zoomed or two swap, instead of staying where the pane's strip was. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 
 ## [0.9.0] - 2026-11-12
 

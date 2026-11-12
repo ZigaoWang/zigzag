@@ -836,6 +836,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// The pane enlarged over the others for a moment, if any (#160).
     private(set) var paneZoom = PaneZoom()
+    /// The split's pages, shape and zoomed pane as last shown, to tell when the panes move (`showPages`).
+    private var shownPaneLayout = ""
     private var zoomEscMonitor: Any?
 
     /// Zooms `tab`'s pane over the rest of its split or group, or puts it back if it's the one zoomed. Zoomed, it's
@@ -882,6 +884,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Going to another pane of it (a click on its part of the row) puts the zoomed one back too.
         if paneZoom.isZoomed, paneZoom.tabID != tab?.id { paneZoom.clear() }
         let zoomed = paneZoom.index(in: pages.count == pair?.count ? pair?.ids : nil)
+        // Site Controls opened from a pane's strip sits under it: when the panes move (the split parts, a pane goes,
+        // swaps or zooms), it would be left over nothing.
+        let layout = pages.count == pair?.count ? "\(pair?.ids ?? []) \(String(describing: pair?.shape)) \(zoomed ?? -1)" : ""
+        if layout != shownPaneLayout {
+            shownPaneLayout = layout
+            if SitePanel.isOpen(in: window), SitePanel.shown?.isFromPane == true { SitePanel.closeCurrent() }
+        }
         defer {
             refreshZoomEsc()
             sidebar.list.zoomedTabID = paneZoom.tabID
