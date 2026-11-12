@@ -1,9 +1,11 @@
 import AppKit
 import WebKit
 
-/// Everything about the page you're on, behind one button by the address: the site, a row of quick actions, your
-/// extensions in the same grid, and this site's own settings. Rarer things (copying the link, clearing the site's
-/// cache or cookies) wait in the ⋯ menu. Changes apply at once and say so.
+/// Everything about the page you're on, behind one button by the address (#174). Its first page is short: the site,
+/// a row of quick actions, one line each into Connection (the certificate), Permissions (once the site asked) and
+/// Extensions, and the few switches that apply to this page. Each of those lines opens a page of its own in the same
+/// panel, with a way back. Rarer things (installing the site as an app, clearing its cookies or cache) wait in the
+/// ⋯ menu. Changes apply at once.
 final class SitePanel: FloatingPanelView {
     override var replacesExtensionPopup: Bool { true }
     private static weak var current: SitePanel?
@@ -31,11 +33,8 @@ final class SitePanel: FloatingPanelView {
 
     private let icon = FaviconView()
     private let siteName = Label("", font: Tokens.Font.voice(20), color: Tokens.Color.textPrimary)
-    private let security = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let securityIcon = NSImageView()
     private let moreButton = IconButton(symbol: "ellipsis", toolTip: String(localized: "More", comment: "Tooltip of the … button in the site panel."))
     private var actionTiles: [PanelTile] = []
-    private let extensionsLabel = Label.section(String(localized: "Extensions", comment: "Section label over the extensions' buttons in the site panel."))
     /// Whose extensions these are, at the label's end, once there's more than one profile.
     private let extensionsProfileLabel = Label("", font: Tokens.Font.label(), color: Tokens.Color.textTertiary)
     private var extensionTiles: [PanelTile] = []
@@ -47,6 +46,38 @@ final class SitePanel: FloatingPanelView {
     private let siteLabel = Label.section(String(localized: "This Site", comment: "Section label over the site's settings in the site panel."))
     private var rows: [PanelRow] = []
     private let group = PanelGroup()
+    /// The ways into the panel's pages, one line each with what's there: Connection, Permissions, Extensions on
+    /// This Site. Only those that apply.
+    private var connectionRow: PanelLinkRow?
+    private var permissionsRow: PanelLinkRow?
+    private var extensionsRow: PanelLinkRow?
+    /// Settings › Extensions, under the extensions.
+    private var manageExtensions: PanelLinkRow?
+    /// On the Extensions page: whether extensions run on this site.
+    private let extensionsSwitch = PanelGroup()
+    private let permissionsGroup = PanelGroup()
+    private var resetPermissions: PanelLinkRow?
+    private let permissionsHeader = PanelPageHeader(String(localized: "Permissions", comment: "Row in the site panel, and the title of its page: the site's camera, location, notifications and pop-ups."))
+    private let extensionsHeader = PanelPageHeader(SitePanel.extensionsTitle)
+    /// The certificate, its own page while it's open.
+    private var certificatePage: CertificatePage?
+    private var zoomStepper: ZoomStepper?
+
+    /// The panel's pages: the site at a glance, and one each for what's behind its rows.
+    enum Page: String { case main, connection, permissions, extensions }
+    private(set) var page = Page.main
+    var showsSubpage: Bool { page != .main && !(isBlank && page == .extensions) }
+    private let mainBox = FlippedView()
+    private let permissionsBox = FlippedView()
+    private let extensionsBox = FlippedView()
+    static let extensionsTitle = String(localized: "Extensions on This Site", comment: "Row in the site panel, and the title of its page: the extensions, whether they run on this site, and a way to manage them.")
+
+    /// The panel's content, in a sheet that scrolls when the window is too short for it.
+    private let scroll = NSScrollView()
+    private let content = FlippedView()
+    private var contentReady = false
+    /// The tallest it can be where it opened: down to the window's bottom.
+    fileprivate var maxHeight: CGFloat = .greatestFiniteMagnitude
 
     static let width: CGFloat = 300
     /// How a plain http page is marked, here and in the address bar: one symbol and one wording.
@@ -72,6 +103,21 @@ final class SitePanel: FloatingPanelView {
         let origin = SiteOrigin.of(url)
         self.origin = origin
         super.init(frame: .zero)
+        // Everything scrolls in one sheet when the window is too short for the whole panel.
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.scrollerStyle = .overlay
+        scroll.contentView = FlippedClipView()
+        scroll.contentView.drawsBackground = false
+        scroll.documentView = content
+        addSubview(scroll)
+        [mainBox, permissionsBox, extensionsBox].forEach { content.addSubview($0) }
+        contentReady = true
+        permissionsHeader.onBack = { [weak self] in self?.show(.main) }
+        extensionsHeader.onBack = { [weak self] in self?.show(.main) }
+        permissionsBox.addSubview(permissionsHeader)
+        extensionsBox.addSubview(extensionsHeader)
         radius = Tokens.Radius.panel
         icon.image = tab.favicon
         // In the app's voice, as a page names itself; a site's name keeps its own spelling. Plain http or a port of
@@ -80,21 +126,23 @@ final class SitePanel: FloatingPanelView {
         let full = origin.map(SiteOrigin.label).flatMap { $0.contains(":") ? $0 : nil }
         let named = web ? full ?? site : site
         siteName.attributedStringValue = Tokens.Font.voiceText(named, size: 20)
-        let page = self.url
-        let secure = page.scheme == "https" && (tab.webView?.hasOnlySecureContent ?? true)
-        if page.scheme == "webkit-extension" {
-            // An extension's own page never crosses the network: there's no connection to judge.
-            security.stringValue = String(localized: "Extension page", comment: "Under the site's name in the site panel, for an extension's own page.")
-            securityIcon.image = Tokens.Symbol.image("puzzlepiece.extension", size: Tokens.Symbol.inline)
-            securityIcon.contentTintColor = Tokens.Color.textSecondary
-        } else {
-            security.stringValue = secure ? String(localized: "Secure connection", comment: "Under the site's name in the site panel, for a page loaded over https.")
-                : page.scheme == "https" ? String(localized: "Some content isn’t secure", comment: "Under the site's name in the site panel, for an https page with some parts loaded over plain http.")
+        let address = self.url
+        if ["http", "https"].contains(address.scheme ?? "") {
+            // The connection, by its one word: secure, or not. Only an https page has a certificate to show; plain
+            // http just says it's not secure. An extension's own page never crosses the network: no row.
+            let secure = address.scheme == "https" && (tab.webView?.hasOnlySecureContent ?? true)
+            let opens = address.scheme == "https" && tab.webView?.serverTrust != nil
+            let value = secure ? String(localized: "Secure", comment: "On the Connection row of the site panel: the page came over https.")
+                : address.scheme == "https" ? String(localized: "Partly secure", comment: "On the Connection row of the site panel: an https page with some parts loaded over plain http.")
                 : Self.notSecure
-            securityIcon.image = Tokens.Symbol.image(secure ? "lock" : Self.notSecureSymbol, size: Tokens.Symbol.inline)
-            securityIcon.contentTintColor = secure ? Tokens.Color.textSecondary : Tokens.Color.warning
+            let row = PanelLinkRow(String(localized: "Connection", comment: "Row in the site panel: whether the page's connection is secure. On an https page it opens the site's certificate."),
+                                   value: value, goes: opens) { [weak self] in self?.showCertificate() }
+            row.isEnabled = opens
+            if !secure { row.valueColor = Tokens.Color.warning }
+            connectionRow = row
         }
-        [icon, siteName, security, securityIcon, moreButton].forEach { addSubview($0) }
+        [icon, siteName, moreButton].forEach { addSubview($0) }
+        if let connectionRow { addSubview(connectionRow) }
         let shownSite = site
         pageToken = tab.changed.observe { [weak self, weak tab] change in
             guard change == .url, let self, let now = tab?.url else { return }
@@ -102,14 +150,17 @@ final class SitePanel: FloatingPanelView {
         }
         moreButton.onClick = { [weak self] _ in self?.showMoreMenu() }
         moreButton.isHidden = !canClear
+        buildExtensions()
         if isBlank {
-            [security, securityIcon, moreButton].forEach { $0.isHidden = true }
-            icon.image = Tokens.Symbol.image("plus.square.on.square", size: Tokens.Symbol.row)
+            // No page: only your extensions, one click away, on a page of their own with nowhere to go back to.
+            extensionsHeader.title = String(localized: "Extensions", comment: "Title of the site panel on a new tab, over your extensions.")
+            extensionsHeader.showsBack = false
+            page = .extensions
         } else {
             buildTiles()
             buildRows()
         }
-        buildExtensions()
+        applyPage()
         onLayout = { [weak self] in self?.layoutContent() }
         frame.size = NSSize(width: width, height: layoutContent(dryRun: true))
         setAccessibilityLabel(String(localized: "Site controls for \(site)", comment: "VoiceOver name of the site panel. The site is a domain, like example.com."))
@@ -135,9 +186,11 @@ final class SitePanel: FloatingPanelView {
             // The same glass panel as Downloads over the sidebar's lane, with the tabs under it faded back.
             panel.recedes = [controller.sidebar.list]
         }
-        panel.frame.size = NSSize(width: panel.width, height: panel.layoutContent(dryRun: true))
         let x = aboveThePage ? anchorFrame.maxX - panel.width : anchorFrame.minX
         panel.frame.origin = NSPoint(x: max(Tokens.Metric.cardInset, x), y: anchorFrame.maxY + 4)
+        // Never past the window's bottom: what doesn't fit scrolls.
+        panel.maxHeight = max(PanelLinkRow.height * 4, controller.root.overlay.bounds.height - panel.frame.minY - Tokens.Metric.cardInset)
+        panel.frame.size = NSSize(width: panel.width, height: panel.fittedHeight)
         controller.root.overlay.addSubview(panel)
         panel.needsLayout = true
         // Out of the button that opened it (the site controls, at the address's right end), not a corner.
@@ -156,7 +209,11 @@ final class SitePanel: FloatingPanelView {
             // takes Esc and the click that closes it.
             guard let panel, event.window === panel.window, MenuPanel.current == nil else { return event }
             if event.type == .keyDown {
-                if event.keyCode == 53 { panel.close(); return nil }
+                // Esc on one of its pages goes back; on the panel, it closes.
+                if event.keyCode == 53 {
+                    if panel.showsSubpage { panel.show(.main) } else { panel.close() }
+                    return nil
+                }
                 return event
             }
             let inside = panel.bounds.contains(panel.convert(event.locationInWindow, from: nil))
@@ -251,11 +308,104 @@ final class SitePanel: FloatingPanelView {
             }))
             entries.append(.separator)
         }
+        // Clearing asks first: cookies sign you out of the site, and neither can be taken back.
         MenuPanel.show(entries + [
+            .item(.init(title: String(localized: "Clear Cookies and Data…", comment: "Item in the … menu of the site panel: clears the site's cookies and what it keeps on this Mac, after asking.")) { [weak self] in self?.clear(.cookies) }),
             .item(.init(title: String(localized: "Clear Cache for This Site…", comment: "Item in the … menu of the site panel.")) { [weak self] in self?.clear(.cache) }),
-            .item(.init(title: String(localized: "Clear Cookies for This Site…", comment: "Item in the … menu of the site panel.")) { [weak self] in self?.clear(.cookies) }),
         ], from: moreButton)
     }
+
+    // MARK: Pages
+
+    /// Goes to one of the panel's pages: the panel stays where it is and takes the page's height.
+    func show(_ next: Page) {
+        guard next != page else { return }
+        if page == .connection {
+            certificatePage?.removeFromSuperview()
+            certificatePage = nil
+        }
+        page = next
+        applyPage()
+        resize()
+        scroll.contentView.scroll(to: .zero)
+        if let shown = [mainBox, permissionsBox, extensionsBox, certificatePage].compactMap({ $0 }).first(where: { !$0.isHidden }) {
+            Tokens.Motion.present(shown, from: .inPlace, entering: true)
+        }
+    }
+
+    /// Only the page's own views show.
+    private func applyPage() {
+        mainBox.isHidden = page != .main
+        permissionsBox.isHidden = page != .permissions
+        extensionsBox.isHidden = page != .extensions
+        // The pins keep their own showing: one that faded while another page was up stays as it is now.
+        if page == .extensions { refreshHoverPins() }
+    }
+
+    /// The certificate, read from the trust WebKit checked the page with.
+    private func showCertificate() {
+        guard page != .connection, let trust = tab.webView?.serverTrust else { return }
+        let certificate = CertificatePage()
+        certificate.onBack = { [weak self] in self?.show(.main) }
+        content.addSubview(certificate)
+        certificatePage = certificate
+        show(.connection)
+        // WebKit checked it already; its answer is read off the main thread, as one never checked is checked there.
+        nonisolated(unsafe) let checked = trust
+        Task { [weak self, weak certificate] in
+            let details = await Task.detached { CertificateDetails.from(checked) }.value
+            guard let self, let certificate, self.certificatePage === certificate else { return }
+            certificate.details = details
+            self.resize()
+        }
+    }
+
+    private func resize() {
+        frame.size.height = fittedHeight
+        needsLayout = true
+    }
+
+    /// As tall as its content, up to `maxHeight`.
+    fileprivate var fittedHeight: CGFloat { min(layoutContent(dryRun: true), maxHeight) }
+
+    /// The site at a glance goes in its own page; the other pages add theirs where they're built.
+    override func addSubview(_ view: NSView) {
+        if contentReady { mainBox.addSubview(view) } else { super.addSubview(view) }
+    }
+
+    #if DEBUG
+    /// sitepage <main|connection|permissions|extensions>: goes to that page, as its row or back button does.
+    func debugPage(_ arg: String) {
+        guard let next = Page(rawValue: arg) else { return }
+        if next == .connection { showCertificate() } else { show(next) }
+    }
+
+    /// What the panel shows, for checking it without looking: its page, and its rows' names, top to bottom.
+    var debugState: [String: Any] {
+        ["site": site, "page": page.rawValue, "certificate": certificatePage?.debugState ?? [:],
+         "links": [connectionRow, permissionsRow, extensionsRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugTitle),
+         "rows": rows.map(\.debugTitle), "permissions": permissionsGroup.rows.map(\.debugTitle),
+         "extensionsSwitch": extensionsSwitch.rows.map(\.debugTitle),
+         "zoom": zoomStepper.map { ZoomLevels.percent($0.zoom) } ?? ""]
+    }
+
+    /// sitezoom in|out|reset: the Zoom row's buttons.
+    func debugZoom(_ arg: String) { zoomStepper?.debugPress(arg) }
+
+    /// sitepermrow <row> <ask|allow|block>: chooses in that permission row's dropdown; sitepermrow reset presses
+    /// Reset Permissions.
+    func debugPermissionRow(_ arg: String) {
+        let f = arg.split(separator: " ").map(String.init)
+        if f.first == "reset" {
+            if let click = NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil,
+                                              eventNumber: 0, clickCount: 1, pressure: 0) { resetPermissions?.onClick?(click) }
+            return
+        }
+        guard f.count == 2, let row = Int(f[0]), permissionsGroup.rows.indices.contains(row),
+              let choice = ["ask", "allow", "block"].firstIndex(of: f[1]) else { return }
+        permissionsGroup.rows[row].debugChoose(choice)
+    }
+    #endif
 
     private func buildExtensions() {
         // Extensions don't run in a private window, as in Chrome's incognito: none to show, nor to get here.
@@ -275,7 +425,7 @@ final class SitePanel: FloatingPanelView {
                 host.performAction(item, tab: self.tab, in: controller)
             }
             tile.onRightClick = { [weak self] _ in self?.controller?.extensionMenu(for: item.context) }
-            addSubview(tile)
+            extensionsBox.addSubview(tile)
             hoverPins.append((item.id, item.label, value, tile, HoverPin()))
             return tile
         }
@@ -289,19 +439,51 @@ final class SitePanel: FloatingPanelView {
             self?.controller?.tabManager.newTab(url: ExtensionStore.webStoreURL)
             self?.close()
         }
-        addSubview(add)
+        extensionsBox.addSubview(add)
         extensionTiles.append(add)
-        addSubview(extensionsLabel)
         extensionsProfileLabel.alignment = .right
         extensionsProfileLabel.lineBreakMode = .byTruncatingTail
-        addSubview(extensionsProfileLabel)
+        extensionsBox.addSubview(extensionsProfileLabel)
+        // Every extension, its sites and its pins: Settings › Extensions, one row under them.
+        let manage = PanelLinkRow(String(localized: "Manage Extensions", comment: "Row under the extensions in the site panel: opens Settings › Extensions."), goes: true) { [weak self] in
+            guard let self, let controller = self.controller else { return }
+            self.close()
+            SettingsPage.open(.extensions, in: controller)
+        }
+        extensionsBox.addSubview(manage)
+        manageExtensions = manage
         // Over its tile.
         for entry in hoverPins {
-            addSubview(entry.pin)
+            extensionsBox.addSubview(entry.pin)
             wireHoverPin(entry.tile, entry.pin, id: entry.id)
         }
         refreshHoverPins()
         extensionsToken = ExtensionCenter.changed.observe { [weak self] in self?.refreshHoverPins() }
+        guard !isBlank else { return }
+        // On the main page, one line: how many there are, or that they're off here.
+        let count = items.count
+        let value: (Bool) -> String = { off in
+            off ? String(localized: "Off", comment: "On the Extensions on This Site row of the site panel: extensions don't run on this site.")
+                : count == 0 ? String(localized: "None", comment: "On the Extensions on This Site row of the site panel: no extensions are installed.") : "\(count)"
+        }
+        let off = ExtensionStore.extensionsOffSites.contains(site)
+        let row = PanelLinkRow(String(localized: "Extensions", comment: "Row in the site panel's This Site group."), value: value(off), goes: true) { [weak self] in self?.show(.extensions) }
+        addSubview(row)
+        extensionsRow = row
+        // Whether they run here: on a web site, once there are extensions to run.
+        if count > 0, ["http", "https"].contains(url.scheme ?? ""), !isPrivate {
+            let toggle = PanelRow.toggle(String(localized: "Extensions", comment: "Row in the site panel's This Site group."), on: !off,
+                                         status: { $0 ? Self.onHere : Self.offHere }) { [weak self, weak row] on in
+                guard let self else { return }
+                var sites = ExtensionStore.extensionsOffSites
+                if on { sites.remove(self.site) } else { sites.insert(self.site) }
+                ExtensionStore.extensionsOffSites = sites
+                row?.value = value(!on)
+                self.tab.reload()
+            }
+            extensionsSwitch.rows = [toggle]
+            extensionsBox.addSubview(extensionsSwitch)
+        }
     }
 
     private func wireHoverPin(_ tile: PanelTile, _ pin: HoverPin, id: String) {
@@ -355,153 +537,164 @@ final class SitePanel: FloatingPanelView {
         }
     }
 
-    // What the rows of This Site say they're set to, and the button that forgets an answer.
+    // What the rows of This Site say they're set to.
     private static let onHere = String(localized: "On for this site", comment: "Under a row's name in the site panel's This Site group, what it's set to: on.")
     private static let offHere = String(localized: "Off for this site", comment: "Under a row's name in the site panel's This Site group, what it's set to: off.")
-    private static let allowed = String(localized: "Allowed", comment: "Under a row's name in the site panel's This Site group, what it's set to: the site may use it.")
-    private static let blocked = String(localized: "Blocked", comment: "Under a row's name in the site panel's This Site group, what it's set to: the site may not use it.")
-    private static let askAgain = String(localized: "Ask Again", comment: "Button on a row in the site panel's This Site group: forgets the answer, so the site asks next time.")
+
+    /// Which rows apply to this page, as `SitePanelRows` decides from what the page is.
+    private var rowContext: SitePanelRows.Context {
+        var context = SitePanelRows.Context()
+        context.isWeb = ["http", "https"].contains(url.scheme ?? "")
+        context.isPrivate = isPrivate
+        context.adBlocking = ContentBlocker.isEnabled
+        if #available(macOS 15.4, *) { context.extensionHost = tab.extensionHost != nil && !isBlank }
+        context.hasPermissions = origin.map { !SitePermissions.shown(origin: $0, isPrivate: isPrivate || tab.isPrivate).isEmpty } ?? false
+        context.siteChoices = KeepAwake.isOffered(for: url, isPrivate: isPrivate)
+        context.forceDarkOffered = tab.darkPage?.native == true || DarkPages.isForced(url)
+        // Offered on a page with a video, or once chosen; the setting is in Settings › Tabs.
+        context.fullScreen = PageFullScreen.isOffered(for: url, isPrivate: isPrivate)
+            && (PageFullScreen.choice(for: url) != nil || tab.webView.map({ PageVideos.shared.frames(in: $0).contains { !$0.videos.isEmpty } }) == true)
+        context.foreignLanguage = tab.foreignLanguage != nil
+        context.coveredPage = controller?.isShowingReader == true || tab.pdfViewer != nil || tab.webView == nil
+        return context
+    }
 
     private func buildRows() {
         rows = []
-        // The choices kept for a site (ad blocking, dark pages, keeping tabs awake) aren't offered in a private
-        // window: its site would be kept in Settings › Privacy › Sites. Its tabs still follow the ones made elsewhere.
-        if ContentBlocker.isEnabled, !isPrivate {
-            let blocked = !ContentBlocker.isAllowed(on: url)
-            rows.append(.toggle(String(localized: "Ad blocking", comment: "Row in the site panel's This Site group."), on: blocked, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
-                guard let self else { return }
-                ContentBlocker.setAllowed(!on, on: self.url)
-                self.tab.reload()
-            })
-        }
-        // Not in a private window, where extensions don't run (and its site would be kept in the list).
-        if #available(macOS 15.4, *), tab.extensionHost?.contexts.isEmpty == false {
-            let off = ExtensionStore.extensionsOffSites.contains(site)
-            rows.append(.toggle(String(localized: "Extensions", comment: "Row in the site panel's This Site group."), on: !off, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
-                guard let self else { return }
-                var sites = ExtensionStore.extensionsOffSites
-                if on { sites.remove(self.site) } else { sites.insert(self.site) }
-                ExtensionStore.extensionsOffSites = sites
-                self.tab.reload()
-            })
-        }
-        // Dark pages, for this site alone: on here though off everywhere else, or the other way round. A site that's
-        // dark on its own says so: there's nothing for Zigzag to darken. Offered where keeping tabs awake is.
-        if KeepAwake.isOffered(for: url, isPrivate: isPrivate) {
-            let native = String(localized: "This site is dark already", comment: "Under Dark page in the site panel's This Site group: dark pages are on, and the site has a dark look of its own, so it's left as it is.")
-            let tab = tab, url = url
-            // Force dark (#134): for a site that looks dark on its own but leaves parts light, or says it's dark and
-            // isn't. Offered where that's so, or once it's on.
-            let offersForce = tab.darkPage?.native == true || DarkPages.isForced(url)
-            weak var forceRow: PanelRow?
-            let darkRow = PanelRow.toggle(String(localized: "Dark page", comment: "Row in the site panel's This Site group: draws this site's pages dark."), on: DarkPages.wants(url),
+        zoomStepper = nil
+        // Each is offered only where it does something (`SitePanelRows`). The choices kept for a site (ad blocking,
+        // dark pages, keeping tabs awake) aren't offered in a private window: its site would be kept in Settings ›
+        // Privacy › Sites. Its tabs still follow the ones made elsewhere.
+        weak var darkRow: PanelRow?
+        weak var forceRow: PanelRow?
+        for kind in SitePanelRows.rows(rowContext) {
+            switch kind {
+            case .zoom:
+                // The page's zoom as it is: in a private window that's its own, which isn't saved for the site.
+                let stepper = ZoomStepper()
+                stepper.zoom = tab.webView?.pageZoom ?? ZoomLevels.zoom(for: url)
+                stepper.onChange = { [weak self] zoom in
+                    guard let self else { return }
+                    self.tab.webView?.pageZoom = zoom
+                    if !self.tab.isPrivate && !self.isPrivate { ZoomLevels.set(zoom, for: self.url) }
+                }
+                zoomStepper = stepper
+                rows.append(.custom(String(localized: "Zoom", comment: "Row in the site panel's This Site group."), control: stepper))
+            case .adBlocking:
+                let blocked = !ContentBlocker.isAllowed(on: url)
+                rows.append(.toggle(String(localized: "Ad blocking", comment: "Row in the site panel's This Site group."), on: blocked, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                    guard let self else { return }
+                    ContentBlocker.setAllowed(!on, on: self.url)
+                    self.tab.reload()
+                })
+            case .darkPage:
+                // Dark pages, for this site alone: on here though off everywhere else, or the other way round. A site
+                // that's dark on its own says so: there's nothing for Zigzag to darken.
+                let native = String(localized: "This site is dark already", comment: "Under Dark page in the site panel's This Site group: dark pages are on, and the site has a dark look of its own, so it's left as it is.")
+                let tab = tab, url = url
+                let row = PanelRow.toggle(String(localized: "Dark page", comment: "Row in the site panel's This Site group: draws this site's pages dark."), on: DarkPages.wants(url),
                                           status: { on in on && tab.darkPage?.native == true && !DarkPages.isForced(url) ? native : on ? Self.onHere : Self.offHere }) { [weak self] on in
-                guard let self else { return }
-                DarkPages.setChoice(on, for: self.url)
-                if !on { forceRow?.setOn(false) }
-            }
-            rows.append(darkRow)
-            if offersForce {
+                    guard let self else { return }
+                    DarkPages.setChoice(on, for: self.url)
+                    if !on { forceRow?.setOn(false) }
+                }
+                darkRow = row
+                rows.append(row)
+            case .forceDark:
+                // Force dark (#134): for a site that looks dark on its own but leaves parts light, or says it's dark
+                // and isn't. Offered where that's so, or once it's on.
                 let row = PanelRow.toggle(String(localized: "Force dark", comment: "Row in the site panel's This Site group, under Dark page: draws this site dark even though it looks dark on its own, for a site that leaves parts of itself light."),
-                                          on: DarkPages.isForced(url), status: { $0 ? Self.onHere : Self.offHere }) { [weak self, weak darkRow] on in
+                                          on: DarkPages.isForced(url), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                     guard let self else { return }
                     DarkPages.setForced(on, for: self.url)
                     darkRow?.setOn(DarkPages.wants(self.url))
                 }
                 forceRow = row
                 rows.append(row)
-            }
-        }
-        // The site's tabs never sleep in the background (TabSleep, EnergyWatch). Not in a private window: its site
-        // would be kept in the list.
-        if KeepAwake.isOffered(for: url, isPrivate: isPrivate) {
-            rows.append(.toggle(String(localized: "Keep tabs awake", comment: "Row in the site panel's This Site group: this site's tabs never go to sleep in the background to save memory."),
-                                on: KeepAwake.isOn(for: url), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
-                guard let self else { return }
-                KeepAwake.set(on, for: self.url)
-            })
-        }
-        // Full screen in the page's own area instead of the whole screen (#168), for this site alone. Offered on a
-        // page with a video, or once chosen; the setting is in Settings › Tabs.
-        if PageFullScreen.isOffered(for: url, isPrivate: isPrivate),
-           PageFullScreen.choice(for: url) != nil || tab.webView.map({ PageVideos.shared.frames(in: $0).contains { !$0.videos.isEmpty } }) == true {
-            rows.append(.toggle(String(localized: "Full screen fills the page", comment: "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen."),
-                                on: PageFullScreen.fills(for: url) == .page, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
-                guard let self else { return }
-                PageFullScreen.setChoice(on ? .page : .screen, for: self.url)
-            })
-        }
-        if let language = tab.foreignLanguage {
-            let name = PageTranslator.name(of: language)
-            let title = String(localized: "Always translate \(name)", comment: "Row in the site panel's This Site group: pages in this language are translated as they open, on every site. The name is a language's, like English.")
-            let always = String(localized: "As pages open, on every site", comment: "Under Always translate <language> in the site panel's This Site group, while it's on.")
-            let asked = String(localized: "Only when you ask", comment: "Under Always translate <language> in the site panel's This Site group, while it's off: pages are translated only when asked.")
-            rows.append(.toggle(title, status: { $0 ? always : asked }, on: PageTranslator.translatesAlways(language)) { [weak self] on in
-                PageTranslator.setTranslatesAlways(on, language)
-                if on, self?.tab.isTranslated == false { self?.controller?.translatePage() }
-            })
-        }
-        // Answers are the page's origin's: another port or scheme on the same host has its own.
-        if let origin {
-            // Calls (Meet, Zoom, Teams) ask for both at once and are kept as one answer; that counts here too, and
-            // so do the answers of a call from elsewhere embedded in the page.
-            let media = SitePermissions.mediaDecisions(origin: origin)
-            if !media.isEmpty {
-                let allowed = media.allSatisfy { $0 }
-                rows.append(.value(String(localized: "Camera and microphone", comment: "Row in the site panel's This Site group."), allowed ? Self.allowed : Self.blocked, action: Self.askAgain) { [weak self] in
-                    SitePermissions.forget(origin: origin)
-                    self?.rebuildRows()
+            case .keepAwake:
+                // The site's tabs never sleep in the background (TabSleep, EnergyWatch).
+                rows.append(.toggle(String(localized: "Keep tabs awake", comment: "Row in the site panel's This Site group: this site's tabs never go to sleep in the background to save memory."),
+                                    on: KeepAwake.isOn(for: url), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                    guard let self else { return }
+                    KeepAwake.set(on, for: self.url)
+                })
+            case .fullScreenFills:
+                // Full screen in the page's own area instead of the whole screen (#168), for this site alone.
+                rows.append(.toggle(String(localized: "Full screen fills the page", comment: "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen."),
+                                    on: PageFullScreen.fills(for: url) == .page, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                    guard let self else { return }
+                    PageFullScreen.setChoice(on ? .page : .screen, for: self.url)
+                })
+            case .alwaysTranslate:
+                guard let language = tab.foreignLanguage else { break }
+                let name = PageTranslator.name(of: language)
+                let title = String(localized: "Always translate \(name)", comment: "Row in the site panel's This Site group: pages in this language are translated as they open, on every site. The name is a language's, like English.")
+                let always = String(localized: "As pages open, on every site", comment: "Under Always translate <language> in the site panel's This Site group, while it's on.")
+                let asked = String(localized: "Only when you ask", comment: "Under Always translate <language> in the site panel's This Site group, while it's off: pages are translated only when asked.")
+                rows.append(.toggle(title, status: { $0 ? always : asked }, on: PageTranslator.translatesAlways(language)) { [weak self] on in
+                    PageTranslator.setTranslatesAlways(on, language)
+                    if on, self?.tab.isTranslated == false { self?.controller?.translatePage() }
                 })
             }
-            let locations = SitePermissions.locationDecisions(origin: origin)
-            if !locations.isEmpty {
-                let allowed = locations.allSatisfy { $0 }
-                rows.append(.value(String(localized: "Location", comment: "Row in the site panel's This Site group."), allowed ? Self.allowed : Self.blocked, action: Self.askAgain) { [weak self] in
-                    SitePermissions.forgetLocation(origin: origin)
-                    self?.rebuildRows()
-                })
-            }
-            // Once answered, the answer; asked and not answered (the question went before you got to it), off until
-            // you turn it on here.
-            let answer = SitePermissions.notifications(origin: origin)
-            if !tab.isPrivate, answer != nil || WebNotifications.shared.hasAsked(origin: origin) {
-                var decided = answer != nil
-                let unanswered = String(localized: "Not allowed yet", comment: "Under Notifications in the site panel's This Site group: the site asked to send notifications, and no one answered yet.")
-                rows.append(.toggle(String(localized: "Notifications", comment: "Row in the site panel's This Site group."), on: answer ?? false,
-                                    status: { $0 ? Self.allowed : (decided ? Self.blocked : unanswered) }) { on in
-                    decided = true
-                    SitePermissions.setNotifications(on, origin: origin)
-                    if !on { WebNotifications.shared.removeAll(origin: origin) }
-                })
-            }
-            if !tab.isPrivate, SitePermissions.popups(origin: origin) {
-                rows.append(.toggle(String(localized: "Pop-ups", comment: "Row in the site panel's This Site group."), on: true, status: { $0 ? Self.allowed : Self.blocked }) { on in
-                    SitePermissions.setPopups(on ? true : nil, origin: origin)
-                })
-            }
-        }
-        // The page's zoom as it is: in a private window that's its own, which isn't saved for the site.
-        let zoom = tab.webView?.pageZoom ?? ZoomLevels.zoom(for: url)
-        if abs(zoom - 1) > 0.001 {
-            rows.append(.value(String(localized: "Zoom", comment: "Row in the site panel's This Site group."), "\(Int((zoom * 100).rounded()))%",
-                                action: String(localized: "Reset", comment: "Button on the Zoom row of the site panel. It sets the page back to 100%.")) { [weak self] in
-                guard let self else { return }
-                if !self.tab.isPrivate { ZoomLevels.set(1, for: self.url) }
-                self.tab.webView?.pageZoom = 1
-                self.rebuildRows()
-            })
         }
         if group.superview == nil { addSubview(group) }
         group.rows = rows
         group.isHidden = rows.isEmpty
         siteLabel.isHidden = rows.isEmpty
         if siteLabel.superview == nil { addSubview(siteLabel) }
+        buildPermissions()
+    }
+
+    /// The Permissions page: a row for each permission the site asked for this session or has an answer kept for,
+    /// with Ask, Allow and Block; answers are the page's origin's, so another port or scheme on the same host has its
+    /// own. Calls (Meet, Zoom, Teams) ask for the camera and microphone at once, and are one row; the answers of a
+    /// call from elsewhere embedded in the page count there too. None asked, no page and no row into it.
+    private func buildPermissions() {
+        var permissionRows: [PanelRow] = []
+        if let origin {
+            let choices = PermissionChoice.allCases
+            for permission in SitePermissions.shown(origin: origin, isPrivate: isPrivate || tab.isPrivate) {
+                let now = SitePermissions.choice(permission, origin: origin)
+                permissionRows.append(.choice(permission.title, options: choices.map(\.title), selected: choices.firstIndex(of: now) ?? 0) { [weak self] index in
+                    SitePermissions.setChoice(choices[index], for: permission, origin: origin)
+                    self?.refreshPermissionsRow()
+                })
+            }
+        }
+        if permissionsGroup.superview == nil { permissionsBox.addSubview(permissionsGroup) }
+        permissionsGroup.rows = permissionRows
+        if resetPermissions == nil, let origin {
+            let row = PanelLinkRow(String(localized: "Reset Permissions", comment: "Row under a site's permissions in the site panel: forgets every answer given to the site, so it asks again.")) { [weak self] in
+                SitePermissions.reset(origin: origin)
+                self?.rebuildRows()
+                // Nothing left to show there.
+                self?.show(.main)
+            }
+            permissionsBox.addSubview(row)
+            resetPermissions = row
+        }
+        if permissionsRow == nil, origin != nil {
+            let row = PanelLinkRow(permissionsHeader.title, value: "", goes: true) { [weak self] in self?.show(.permissions) }
+            addSubview(row)
+            permissionsRow = row
+        }
+        refreshPermissionsRow()
+    }
+
+    /// The Permissions row says what was chosen, in a few words ("2 allowed"), and is there only once there's something.
+    private func refreshPermissionsRow() {
+        guard let origin, let row = permissionsRow else { return }
+        let shown = SitePermissions.shown(origin: origin, isPrivate: isPrivate || tab.isPrivate)
+        row.isHidden = shown.isEmpty
+        let choices = shown.map { SitePermissions.choice($0, origin: origin) }
+        row.value = PermissionChoice.summary(choices)
+        row.shortValue = PermissionChoice.shortSummary(choices)
+        needsLayout = true
     }
 
     private func rebuildRows() {
         buildRows()
-        frame.size.height = layoutContent(dryRun: true)
-        needsLayout = true
+        resize()
     }
 
     /// Asks first: cookies sign you out of the site, and neither can be taken back.
@@ -534,7 +727,12 @@ final class SitePanel: FloatingPanelView {
 
     // MARK: Layout
 
-    private func layoutContent() { _ = layoutContent(dryRun: false) }
+    private func layoutContent() {
+        let height = layoutContent(dryRun: false)
+        scroll.frame = bounds
+        content.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(height, bounds.height))
+        for box in [mainBox, permissionsBox, extensionsBox] { box.frame = content.bounds }
+    }
 
     @discardableResult
     /// The site's name at its size, a little smaller when it's long, and past that cut the way the address cuts it,
@@ -554,87 +752,157 @@ final class SitePanel: FloatingPanelView {
 
     fileprivate func layoutContent(dryRun: Bool) -> CGFloat {
         func place(_ view: NSView, _ rect: NSRect) { if !dryRun { view.frame = rect } }
+        // The certificate is a page of its own, laid out by itself.
+        if page == .connection, let certificate = certificatePage {
+            let h = certificate.height(for: width, pad: pad)
+            place(certificate, NSRect(x: 0, y: 0, width: width, height: h))
+            return h
+        }
         let inner = width - pad * 2
         var y = pad
-        // Header: the site, whether the connection is private, and ⋯.
+        // The room after the last thing placed, and the room under its words inside it: both are taken back at the
+        // end, so the panel's bottom margin counts from the words, as its top does.
+        var gapAfter: CGFloat = 0, slack: CGFloat = 0
+        func end(_ gap: CGFloat, slack s: CGFloat = 0) { y += gap; gapAfter = gap; slack = s }
+        func link(_ row: PanelLinkRow) {
+            place(row, NSRect(x: pad - PanelLinkRow.outset, y: y, width: inner + PanelLinkRow.outset * 2, height: PanelLinkRow.height))
+            y += PanelLinkRow.height
+        }
+        func finish() -> CGFloat { y - gapAfter - slack + pad }
+        // A page's box covers the panel, so what's in it is placed in the panel's own terms.
+        for box in [mainBox, permissionsBox, extensionsBox] where !box.isHidden { place(box, NSRect(x: 0, y: 0, width: width, height: 10_000)) }
+        func pageHeader(_ header: PanelPageHeader) {
+            place(header, NSRect(x: pad, y: y, width: inner, height: header.height))
+            y += header.height
+            end(Tokens.Space.x3)
+        }
+        func group(_ group: PanelGroup) {
+            place(group, NSRect(x: pad, y: y, width: inner, height: group.height))
+            y += group.height
+        }
+
+        switch page {
+        case .permissions:
+            pageHeader(permissionsHeader)
+            group(permissionsGroup)
+            if let resetPermissions {
+                y += Tokens.Space.x2
+                link(resetPermissions)
+                end(0, slack: resetPermissions.bottomSlack)
+            }
+            return finish()
+        case .extensions:
+            pageHeader(extensionsHeader)
+            if !extensionsSwitch.rows.isEmpty {
+                group(extensionsSwitch)
+                end(Tokens.Space.x4, slack: 0)
+            }
+            layoutExtensions(place: place, y: &y, inner: inner)
+            if let manageExtensions {
+                y += Tokens.Space.x2
+                link(manageExtensions)
+                end(0, slack: manageExtensions.bottomSlack)
+            } else {
+                end(0)
+            }
+            if !dryRun {
+                for entry in hoverPins { entry.pin.frame = Self.pinFrame(on: entry.tile.frame, left: !entry.tile.badge.isEmpty) }
+            }
+            return finish()
+        case .main, .connection:
+            break
+        }
+
+        // Header: the site's icon and name, and ⋯.
         let iconSide = Tokens.Space.x6
         let moreSide = Tokens.Metric.iconButton
-        let headerHeight = siteName.lineHeight + security.lineHeight + 4
-        place(moreButton, NSRect(x: width - pad - moreSide + Tokens.Space.x1, y: y + (headerHeight - moreSide) / 2, width: moreSide, height: moreSide))
+        let headerHeight = max(siteName.lineHeight, moreSide)
+        let moreX = width - pad - moreSide + Tokens.Space.x1
+        place(moreButton, NSRect(x: moreX, y: y + (headerHeight - moreSide) / 2, width: moreSide, height: moreSide))
         place(icon, NSRect(x: pad, y: y + (headerHeight - iconSide) / 2, width: iconSide, height: iconSide))
         let textX = pad + iconSide + Tokens.Space.x3
-        let textWidth = width - textX - pad - moreSide
+        let textWidth = (moreButton.isHidden ? width - pad : moreX) - textX
         siteName.attributedStringValue = Self.fitted(site, in: textWidth)
-        // Its ink, not the text field's inset edge, starts over the lock below, with all of `textWidth` to fit in.
-        place(siteName, NSRect(x: textX - Label.inset, y: y, width: textWidth + Label.inset * 2, height: siteName.lineHeight))
-        let lockSide: CGFloat = 10
-        place(securityIcon, NSRect(x: textX, y: y + siteName.lineHeight + 3, width: lockSide, height: lockSide))
-        place(security, NSRect(x: textX + lockSide + 4, y: y + siteName.lineHeight + 1, width: textWidth - lockSide - 4, height: security.lineHeight))
-        y += headerHeight + Tokens.Space.x4
+        place(siteName, NSRect(x: textX - Label.inset, y: y + (headerHeight - siteName.lineHeight) / 2, width: textWidth + Label.inset * 2, height: siteName.lineHeight))
+        y += headerHeight
+        end(Tokens.Space.x4)
 
-        // Actions are named tiles, as many to a row as fit; extensions are icons on the same rhythm below.
-        var gap = Tokens.Space.x2
-        func grid(_ tiles: [PanelTile], columns: Int, centered: Bool = false, height: ((CGFloat) -> CGFloat)? = nil) {
-            let side = floor((inner - gap * CGFloat(columns - 1)) / CGFloat(columns))
-            let h = height?(side) ?? side
-            let rows = (tiles.count + columns - 1) / columns
-            for (i, tile) in tiles.enumerated() {
-                let column = i % columns, row = i / columns
-                // A shorter last row sits in the middle under the full ones (three over two), not hanging to the left.
-                let inRow = row == rows - 1 ? tiles.count - row * columns : columns
-                let shift = centered ? CGFloat(columns - inRow) * (side + gap) / 2 : 0
-                place(tile, NSRect(x: pad + shift + CGFloat(column) * (side + gap), y: y + CGFloat(row) * (h + gap), width: side, height: h))
-            }
-            y += CGFloat((tiles.count + columns - 1) / columns) * (h + gap) - gap
-        }
-        let columns = inner >= 260 ? 6 : inner >= 200 ? 5 : 4
+        // Actions are named tiles: one row, like the markings along a device's edge. In a narrow panel, where a name
+        // wouldn't show whole, they share even rows instead, never one left alone under the rest.
         if !actionTiles.isEmpty {
-            // One row, like the markings along a device's edge: every action side by side. In a narrow panel,
-            // where a name wouldn't show whole, they share even rows instead, never one left alone under the rest.
-            let spacing = gap
-            gap = 0
-            let rows = Self.actionRows(count: actionTiles.count, width: inner,
-                                       comfortable: actionTiles.map(\.captionWidth).max() ?? 0,
-                                       tightest: actionTiles.map(\.captionTightWidth).max() ?? 0)
-            grid(actionTiles, columns: rows.first ?? 1, centered: true) { _ in PanelTile.captionedHeight }
-            gap = spacing
-            y += Tokens.Space.x5
-        }
-        if !extensionTiles.isEmpty {
-            let profile = Library.shared.hasManyProfiles && !tab.isPrivate ? Library.shared.directory.profile(tab.profile.id)?.displayName : nil
-            extensionsProfileLabel.stringValue = profile ?? ""
-            extensionsProfileLabel.isHidden = profile == nil
-            let profileWidth = profile == nil ? 0 : min(ceil(extensionsProfileLabel.textWidth), inner / 2)
-            place(extensionsLabel, NSRect(x: pad - Label.inset, y: y, width: inner + Label.inset * 2 - profileWidth, height: extensionsLabel.lineHeight))
-            if profile != nil {
-                place(extensionsProfileLabel, NSRect(x: pad + inner + Label.inset - profileWidth, y: y, width: profileWidth, height: extensionsLabel.lineHeight))
-            }
-            y += extensionsLabel.lineHeight + Tokens.Space.x2
-            if addsAlone, let add = extensionTiles.first {
-                // Named, as the actions are: its icon over its name, as wide as the name shows whole.
-                let w = max(add.captionWidth, PanelTile.captionedHeight)
-                place(add, NSRect(x: pad, y: y, width: w, height: PanelTile.captionedHeight))
-                y += PanelTile.captionedHeight
-            } else {
-                grid(extensionTiles, columns: columns)
-            }
-            y += Tokens.Space.x5
+            let layout = Self.actionRows(count: actionTiles.count, width: inner,
+                                         comfortable: actionTiles.map(\.captionWidth).max() ?? 0,
+                                         tightest: actionTiles.map(\.captionTightWidth).max() ?? 0)
+            Self.grid(actionTiles, columns: layout.first ?? 1, gap: 0, centered: true, height: PanelTile.captionedHeight,
+                      x: pad, inner: inner, y: &y, place: place)
+            end(Tokens.Space.x4)
         }
 
-        // This site's own settings.
+        // One line into each of the other pages, each saying what's there; only those that apply.
+        var c = SitePanelRows.Context()
+        c.isWeb = connectionRow != nil
+        c.hasPermissions = permissionsRow?.isHidden == false
+        c.extensionHost = extensionsRow != nil
+        let links = SitePanelRows.links(c)
+        let linkRows: [(SitePanelRows.Link, PanelLinkRow?)] = [(.connection, connectionRow), (.permissions, permissionsRow), (.extensions, extensionsRow)]
+        var placed = false
+        for (kind, row) in linkRows {
+            guard let row else { continue }
+            row.isHidden = !links.contains(kind)
+            guard !row.isHidden else { continue }
+            link(row)
+            placed = true
+            end(0, slack: row.bottomSlack)
+        }
+        if placed { end(Tokens.Space.x4, slack: slack) }
+
+        // This site's switches.
         if !rows.isEmpty {
             place(siteLabel, NSRect(x: pad - Label.inset, y: y, width: inner + Label.inset * 2, height: siteLabel.lineHeight))
             y += siteLabel.lineHeight + Tokens.Space.x2
-            let h = group.height
-            place(group, NSRect(x: pad, y: y, width: inner, height: h))
-            y += h - group.bottomSlack
+            group(self.group)
+            end(0, slack: self.group.bottomSlack)
+        }
+        return finish()
+    }
+
+    /// The extensions' grid on their page: the label (and whose they are), then the icons, or the + alone.
+    private func layoutExtensions(place: (NSView, NSRect) -> Void, y: inout CGFloat, inner: CGFloat) {
+        guard !extensionTiles.isEmpty else { return }
+        let profile = Library.shared.hasManyProfiles && !tab.isPrivate ? Library.shared.directory.profile(tab.profile.id)?.displayName : nil
+        extensionsProfileLabel.stringValue = profile ?? ""
+        extensionsProfileLabel.isHidden = profile == nil
+        // The page's title names them; with more than one profile, a quiet label says whose they are.
+        if profile != nil {
+            extensionsProfileLabel.alignment = .left
+            place(extensionsProfileLabel, NSRect(x: pad - Label.inset, y: y, width: inner + Label.inset * 2, height: extensionsProfileLabel.lineHeight))
+            y += extensionsProfileLabel.lineHeight + Tokens.Space.x2
+        }
+        if addsAlone, let add = extensionTiles.first {
+            // Named, as the actions are: its icon over its name, as wide as the name shows whole.
+            let w = max(add.captionWidth, PanelTile.captionedHeight)
+            place(add, NSRect(x: pad, y: y, width: w, height: PanelTile.captionedHeight))
+            y += PanelTile.captionedHeight
         } else {
-            y -= Tokens.Space.x5
+            let columns = inner >= 260 ? 6 : inner >= 200 ? 5 : 4
+            Self.grid(extensionTiles, columns: columns, gap: Tokens.Space.x2, centered: false, height: nil, x: pad, inner: inner, y: &y, place: place)
         }
-        if !dryRun {
-            for entry in hoverPins { entry.pin.frame = Self.pinFrame(on: entry.tile.frame, left: !entry.tile.badge.isEmpty) }
+    }
+
+    /// Tiles in rows of `columns`, square unless given a height. A shorter last row sits in the middle under the full
+    /// ones (three over two) when `centered`, not hanging to the left.
+    private static func grid(_ tiles: [PanelTile], columns: Int, gap: CGFloat, centered: Bool, height: CGFloat?, x: CGFloat, inner: CGFloat,
+                             y: inout CGFloat, place: (NSView, NSRect) -> Void) {
+        let side = floor((inner - gap * CGFloat(columns - 1)) / CGFloat(columns))
+        let h = height ?? side
+        let rows = (tiles.count + columns - 1) / columns
+        for (i, tile) in tiles.enumerated() {
+            let column = i % columns, row = i / columns
+            let inRow = row == rows - 1 ? tiles.count - row * columns : columns
+            let shift = centered ? CGFloat(columns - inRow) * (side + gap) / 2 : 0
+            place(tile, NSRect(x: x + shift + CGFloat(column) * (side + gap), y: y + CGFloat(row) * (h + gap), width: side, height: h))
         }
-        return y + pad
+        y += CGFloat(rows) * (h + gap) - gap
     }
 
     /// How many actions go on each row, top to bottom: all on one when every name shows whole with room around it,
@@ -930,6 +1198,35 @@ final class PanelRow: NSView {
         return PanelRow(title, control: button, value: value)
     }
 
+    /// A name and a dropdown of choices: a permission's Ask, Allow or Block.
+    static func choice(_ title: String, options: [String], selected: Int, chose: @escaping (Int) -> Void) -> PanelRow {
+        let dropdown = DropdownButton()
+        dropdown.options = options.map { DropdownButton.Option(title: $0) }
+        dropdown.selectedIndex = selected
+        dropdown.onSelect = chose
+        dropdown.setAccessibilityLabel(title)
+        return PanelRow(title, control: dropdown)
+    }
+
+    /// A name and a control of the panel's own (the zoom stepper).
+    static func custom(_ title: String, control: NSView) -> PanelRow { PanelRow(title, control: control) }
+
+    #if DEBUG
+    /// Its name, and what its dropdown or switch is set to.
+    var debugTitle: String {
+        if let dropdown = control as? DropdownButton { return "\(title.stringValue): \(dropdown.accessibilityValue() as? String ?? "")" }
+        if let toggle = control as? Toggle { return "\(title.stringValue): \(toggle.isOn ? "on" : "off")" }
+        return title.stringValue
+    }
+
+    /// choose <index>: picks that choice in the row's dropdown, as its menu would.
+    func debugChoose(_ index: Int) {
+        guard let dropdown = control as? DropdownButton, dropdown.options.indices.contains(index) else { return }
+        dropdown.selectedIndex = index
+        dropdown.onSelect?(index)
+    }
+    #endif
+
     override func layout() {
         super.layout()
         var size = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
@@ -938,11 +1235,250 @@ final class PanelRow: NSView {
         let x = -Label.inset
         let right = control.frame.minX - Tokens.Space.x2 - x
         guard let value else {
-            title.frame = NSRect(x: x, y: (bounds.height - title.lineHeight) / 2, width: right, height: title.lineHeight)
+            // A long name beside its control ("Camera and microphone" by a dropdown) takes a second line rather than
+            // being cut short; the row has room for two.
+            let twoLines = title.textWidth > right
+            title.usesSingleLineMode = !twoLines
+            title.maximumNumberOfLines = twoLines ? 2 : 1
+            title.lineBreakMode = twoLines ? .byWordWrapping : .byTruncatingTail
+            title.cell?.wraps = twoLines
+            let h = twoLines ? min(ceil(title.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: right, height: 200)).height ?? title.lineHeight), bounds.height) : title.lineHeight
+            title.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: right, height: h)
             return
         }
         let top = (bounds.height - title.lineHeight - value.lineHeight) / 2
         title.frame = NSRect(x: x, y: top, width: right, height: title.lineHeight)
         value.frame = NSRect(x: x, y: title.frame.maxY, width: right, height: value.lineHeight)
+    }
+}
+
+/// A row that is the control: its name, and a chevron when it goes somewhere (Settings › Extensions). The hover wash
+/// reaches `PanelLinkRow.outset` past the text on each side, so its words stand on the panel's text column.
+final class PanelLinkRow: InteractiveView {
+    static let height = Tokens.Page.rowHeight
+    static let outset = Tokens.Space.x2
+    private let title: Label
+    /// What's there, quiet at the trailing end, before the chevron: "Secure", "2 allowed".
+    private let valueLabel = Label("", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
+    private let chevron = NSImageView()
+    private let run: () -> Void
+    /// The room under the words inside the row: the panel's bottom margin counts from the words.
+    var bottomSlack: CGFloat { (Self.height - title.lineHeight) / 2 }
+    private var fullText = ""
+    var value: String {
+        get { fullText }
+        set { fullText = newValue; valueLabel.stringValue = newValue; setAccessibilityValue(newValue); needsLayout = true }
+    }
+    /// What the value says where the whole of it doesn't fit ("2 set" for "1 allowed, 1 blocked").
+    var shortValue: String? { didSet { needsLayout = true } }
+
+    private func fullValue(fits room: CGFloat) -> Bool {
+        ceil((fullText as NSString).size(withAttributes: [.font: valueLabel.font ?? Tokens.Font.body()]).width) + Tokens.Space.x2 <= room
+    }
+    /// The value's ink, when it warns ("Not secure").
+    var valueColor: NSColor? { didSet { valueLabel.textColor = valueColor ?? Tokens.Color.textTertiary } }
+
+    init(_ text: String, value: String = "", goes: Bool = false, run: @escaping () -> Void) {
+        title = Label(text, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+        self.run = run
+        super.init(frame: .zero)
+        pressScales = true
+        layer?.cornerRadius = Tokens.Radius.row
+        layer?.cornerCurve = .continuous
+        chevron.image = Tokens.Symbol.image("chevron.right", size: Tokens.Symbol.inline)
+        chevron.imageScaling = .scaleNone
+        chevron.isHidden = !goes
+        valueLabel.alignment = .right
+        [title, valueLabel, chevron].forEach { addSubview($0) }
+        onClick = { [weak self] _ in self?.run() }
+        setAccessibilityRole(.button)
+        setAccessibilityLabel(text)
+        self.value = value
+        stateDidChange(animated: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    var debugTitle: String { value.isEmpty ? title.stringValue : "\(title.stringValue): \(value)" }
+
+    override func layout() {
+        super.layout()
+        let side = Tokens.Space.x4
+        chevron.frame = NSRect(x: bounds.width - Self.outset - side, y: (bounds.height - side) / 2, width: side, height: side)
+        let right = chevron.isHidden ? bounds.width - Self.outset : chevron.frame.minX - Tokens.Space.x1
+        // The name whole, the value in the room left; a value too long for it says it the short way.
+        let room = right - Self.outset - title.textWidth - Tokens.Space.x2
+        if let shortValue, !value.isEmpty {
+            valueLabel.stringValue = fullValue(fits: room) ? value : shortValue
+        }
+        let valueWidth = value.isEmpty ? 0 : max(0, min(valueLabel.textWidth, max(room, (right - Self.outset) / 3)))
+        valueLabel.frame = NSRect(x: right - valueWidth + Label.inset, y: (bounds.height - valueLabel.lineHeight) / 2, width: valueWidth, height: valueLabel.lineHeight)
+        let titleRight = value.isEmpty ? right : right - valueWidth - Tokens.Space.x1
+        title.frame = NSRect(x: Self.outset - Label.inset, y: (bounds.height - title.lineHeight) / 2,
+                             width: titleRight - Self.outset + Label.inset * 2, height: title.lineHeight)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        // A row that goes nowhere (Connection on a plain http page) only says what it says: no wash.
+        if isEnabled { applyRowStyle(animated: animated) } else { layer?.backgroundColor = nil }
+        chevron.contentTintColor = Tokens.Color.textTertiary
+    }
+}
+
+/// − 100% +: the page's zoom a step out or in, and the percentage, which sets it back to 100%.
+final class ZoomStepper: NSView {
+    private let minus = IconButton(symbol: "minus", size: .compact, toolTip: String(localized: "Zoom Out", comment: "Tooltip of the − button on the Zoom row of the site panel."))
+    private let plus = IconButton(symbol: "plus", size: .compact, toolTip: String(localized: "Zoom In", comment: "Tooltip of the + button on the Zoom row of the site panel."))
+    private let percent = PillButton(title: "100%", style: .quiet)
+    /// The zoom now, as the page has it.
+    var zoom: CGFloat = 1 { didSet { refresh() } }
+    var onChange: ((CGFloat) -> Void)?
+
+    /// Wide enough for any step ("300%"), so the buttons around it never move.
+    private var percentWidth: CGFloat {
+        ceil(("300%" as NSString).size(withAttributes: [.font: Tokens.Font.control()]).width) + Tokens.Space.x4
+    }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        percent.toolTip = String(localized: "Actual Size", comment: "Tooltip of the percentage on the Zoom row of the site panel: sets the page back to 100%.")
+        [minus, percent, plus].forEach { addSubview($0) }
+        minus.onClick = { [weak self] _ in self?.go(-1) }
+        plus.onClick = { [weak self] _ in self?.go(1) }
+        percent.onClick = { [weak self] _ in self?.set(1) }
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: Tokens.Metric.compactIconButton * 2 + percentWidth, height: Tokens.Page.controlHeight)
+    }
+    override var fittingSize: NSSize { intrinsicContentSize }
+
+    #if DEBUG
+    func debugPress(_ which: String) {
+        switch which {
+        case "in": go(1)
+        case "out": go(-1)
+        default: set(1)
+        }
+    }
+    #endif
+
+    private func go(_ direction: Int) {
+        guard ZoomLevels.canStep(zoom, by: direction) else { return }
+        set(ZoomLevels.step(zoom, by: direction))
+    }
+
+    private func set(_ value: CGFloat) {
+        guard abs(value - zoom) > 0.001 else { return }
+        zoom = value
+        onChange?(value)
+    }
+
+    private func refresh() {
+        percent.title = ZoomLevels.percent(zoom)
+        percent.setAccessibilityLabel(String(localized: "Zoom \(ZoomLevels.percent(zoom)), Actual Size", comment: "VoiceOver name of the percentage on the Zoom row of the site panel: the zoom now, then what pressing it does."))
+        minus.isEnabled = ZoomLevels.canStep(zoom, by: -1)
+        plus.isEnabled = ZoomLevels.canStep(zoom, by: 1)
+    }
+
+    override func layout() {
+        super.layout()
+        let side = Tokens.Metric.compactIconButton
+        minus.frame = NSRect(x: 0, y: (bounds.height - side) / 2, width: side, height: side)
+        percent.frame = NSRect(x: side, y: 0, width: percentWidth, height: bounds.height)
+        plus.frame = NSRect(x: side + percentWidth, y: (bounds.height - side) / 2, width: side, height: side)
+    }
+}
+
+/// The top of the panel: the site's icon and name, and under it whether the connection is private. On an https page
+/// it's the way into the certificate, with a chevron at its end.
+/// The top of one of the panel's pages: a way back, and its title.
+final class PanelPageHeader: NSView {
+    private let back = IconButton(symbol: "chevron.left", size: .compact, toolTip: String(localized: "Back", comment: "Tooltip of the back button on a page of the site panel."))
+    private let label: Label
+    var onBack: (() -> Void)?
+    var title: String {
+        get { label.stringValue }
+        set { label.stringValue = newValue }
+    }
+    /// The panel on a new tab has nowhere to go back to.
+    var showsBack = true { didSet { back.isHidden = !showsBack; needsLayout = true } }
+    var height: CGFloat { max(label.lineHeight, Tokens.Metric.compactIconButton) }
+
+    init(_ text: String) {
+        label = Label(text, font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
+        super.init(frame: .zero)
+        back.onClick = { [weak self] _ in self?.onBack?() }
+        [back, label].forEach { addSubview($0) }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    override func layout() {
+        super.layout()
+        // The back glyph's ink on the panel's text column, the title after it.
+        let side = Tokens.Metric.compactIconButton
+        let ink = (side - Tokens.Symbol.compactGlyph) / 2
+        back.frame = NSRect(x: -ink, y: (bounds.height - side) / 2, width: side, height: side)
+        let x = showsBack ? side - ink + Tokens.Space.x1 : 0
+        label.frame = NSRect(x: x - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: bounds.width - x + Label.inset * 2, height: label.lineHeight)
+    }
+}
+
+/// Which of the panel's rows apply to the page: none is shown that does nothing there.
+enum SitePanelRows {
+    /// This Site's switches, on the panel's first page.
+    enum Row: Equatable { case zoom, adBlocking, darkPage, forceDark, keepAwake, fullScreenFills, alwaysTranslate }
+    /// The rows into the panel's other pages.
+    enum Link: Equatable { case connection, permissions, extensions }
+
+    struct Context {
+        /// An http or https page, not an extension's own page.
+        var isWeb = true
+        var isPrivate = false
+        /// Ad blocking is on in Settings.
+        var adBlocking = true
+        /// Choices kept for a site (dark page, keeping tabs awake) are offered for it (`KeepAwake.isOffered`).
+        var siteChoices = true
+        /// The site looks dark on its own, or was forced dark already.
+        var forceDarkOffered = false
+        /// Full screen in the page is offered here, and the page has a video or a choice was made.
+        var fullScreen = false
+        /// The page is in a language other than yours.
+        var foreignLanguage = false
+        /// Reader or a PDF covers the page: the page's zoom isn't what you see.
+        var coveredPage = false
+        /// The site asked for something, or has an answer kept.
+        var hasPermissions = false
+        /// Extensions run in this window (never a private one).
+        var extensionHost = true
+    }
+
+    static func rows(_ c: Context) -> [Row] {
+        var rows: [Row] = []
+        if c.isWeb, !c.coveredPage { rows.append(.zoom) }
+        if c.isWeb, c.adBlocking, !c.isPrivate { rows.append(.adBlocking) }
+        if c.siteChoices {
+            rows.append(.darkPage)
+            if c.forceDarkOffered { rows.append(.forceDark) }
+            rows.append(.keepAwake)
+        }
+        if c.fullScreen { rows.append(.fullScreenFills) }
+        if c.foreignLanguage { rows.append(.alwaysTranslate) }
+        return rows
+    }
+
+    static func links(_ c: Context) -> [Link] {
+        var links: [Link] = []
+        if c.isWeb { links.append(.connection) }
+        if c.hasPermissions { links.append(.permissions) }
+        if c.extensionHost { links.append(.extensions) }
+        return links
     }
 }

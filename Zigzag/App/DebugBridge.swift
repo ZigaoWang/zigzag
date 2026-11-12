@@ -1674,6 +1674,27 @@ enum DebugBridge {
             debugLog("engine \(engine.rawValue) \(engine.name) \(engine.searchURL("zigzag test").absoluteString) home=\(engine.homeURL.absoluteString) offered=\(ExtensionSearchProvider.available.map(\.name)) before=\(ExtensionSearchProvider.previousEngine.rawValue)")
         case "largenames": SpaceHeaderView.isLarge = arg != "off"
         case "sitepanel": SitePanel.toggle(in: controller, from: controller.sidebar.address)
+        // sitepage <main|connection|permissions|extensions>: the open site panel's page, as its rows and back button go.
+        // sitezoom in|out|reset: its Zoom row. sitepermrow <row> <ask|allow|block> | reset: a permission row's
+        // dropdown, or Reset Permissions. sitepanelstate <path>: what it shows (JSON).
+        case "sitepage": SitePanel.shown?.debugPage(arg)
+        case "sitezoom": SitePanel.shown?.debugZoom(arg)
+        case "sitepermrow": SitePanel.shown?.debugPermissionRow(arg)
+        case "sitepanelstate":
+            guard let state = SitePanel.shown?.debugState,
+                  let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) else { debugLog("sitepanelstate: no panel"); break }
+            try? data.write(to: URL(fileURLWithPath: arg))
+        case "siteperm":
+            // siteperm <camera|location|notifications|popups> <ask|allow|block|asked>: for the page in front's site,
+            // as its Site Controls row would choose, or as if it had just asked.
+            let f = arg.split(separator: " ").map(String.init)
+            let kinds: [String: SitePermission] = ["camera": .cameraAndMicrophone, "location": .location, "notifications": .notifications, "popups": .popups]
+            guard f.count == 2, let permission = kinds[f[0]], let origin = SiteOrigin.of(controller.tabManager.selectedTab?.url) else { debugLog("siteperm refused"); break }
+            if f[1] == "asked" {
+                SitePermissions.noteAsked(permission, origin: origin, isPrivate: false)
+            } else if let choice = ["ask": PermissionChoice.ask, "allow": .allow, "block": .block][f[1]] {
+                SitePermissions.setChoice(choice, for: permission, origin: origin)
+            }
         case "confirmsheet":
             // Confirms any open confirmation, in every window. Only in a test copy: what's asked first is asked
             // because it can't be taken back.
