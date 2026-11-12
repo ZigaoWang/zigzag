@@ -40,7 +40,8 @@ protocol SidebarListDelegate: AnyObject {
     func listSetNestedTabsCollapsed(_ tab: Tab, _ collapsed: Bool)
     /// While dragging, hovering a space's dot opens that space so the tab can be dropped into place.
     func listSwitchSpaceDuringDrag(_ spaceID: UUID)
-    /// Tabs dropped outside the window: into another window, or a new one, in order. Returns true if handled.
+    /// Tabs dropped outside the window: onto another window's page, or anywhere else for a new one, in order. Returns
+    /// true if handled.
     func listDropOutside(_ tabs: [Tab], at screenPoint: NSPoint) -> Bool
     /// Tabs dropped into another window's sidebar at an index, in order. Returns true if handled.
     func listMoveToWindow(_ tabs: [Tab], controller: BrowserWindowController, index: Int) -> Bool
@@ -1523,7 +1524,8 @@ final class SidebarListView: NSView {
         return nil
     }
 
-    private static func window(at screenPoint: NSPoint) -> BrowserWindowController? {
+    /// The browser window in front at a point on screen, if any.
+    static func window(at screenPoint: NSPoint) -> BrowserWindowController? {
         NSApp.orderedWindows.first { $0.isVisible && $0.frame.contains(screenPoint) }?.windowController as? BrowserWindowController
     }
 
@@ -1979,8 +1981,9 @@ final class SidebarListView: NSView {
             return landed
         }
 
-        // Somewhere that isn't any Zigzag window: the tabs become a new window there.
-        if tab != nil, Self.window(at: mouse) == nil, delegate?.listDropOutside(tabs, at: mouse) == true { return nil }
+        // Onto another window's page, they go into that window; somewhere that isn't any Zigzag window, the tabs
+        // become a new window there.
+        if tab != nil, Self.window(at: mouse) !== window?.windowController, delegate?.listDropOutside(tabs, at: mouse) == true { return nil }
 
         // Onto a space's dot: into that space, whichever one is showing.
         if let space = drag.hoverSpace {

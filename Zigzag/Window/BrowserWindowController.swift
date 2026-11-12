@@ -4,6 +4,15 @@ import WebKit
 
 /// One browser window: its tabs, its sidebar, its page card, and everything floating above them.
 final class BrowserWindowController: NSWindowController, NSWindowDelegate {
+    /// Where tabs moved out of this window go back to on ⌘Z (#167): this window, or once it has closed, the window ⌘Z
+    /// opened in its place.
+    final class MoveHome {
+        weak var window: BrowserWindowController?
+        var frame: NSRect?
+        var space = UUID()
+    }
+    var moveHome = MoveHome()
+
     /// The last to be asked about a key: one nothing took goes by quietly (`QuietKeys`).
     override func noResponder(for eventSelector: Selector) {
         if QuietKeys.passQuietly(eventSelector, NSApp.currentEvent) { return }
@@ -2032,10 +2041,7 @@ extension BrowserWindowController: SidebarDelegate {
         guard !tabManager.isPrivate, let frame = window?.frame else { return }
         let target = WindowManager.shared.newWindow(spaceID: tab.spaceID, showCommandBar: false)
         target.window?.setFrame(frame.offsetBy(dx: 30, dy: -30), display: true)
-        let undo = transferUndo([tab], to: target, closesTarget: true)
-        transfer(tab, to: target, at: 0)
-        undo()
-        target.window?.makeKeyAndOrderFront(nil)
+        move([tab], to: target, at: 0)
     }
 
     /// Whether a tab's menu offers Open in Zigzag Mini (and a tab ⌥-dragged out of the windows goes there).
@@ -2067,71 +2073,95 @@ extension BrowserWindowController: SidebarDelegate {
         String(localized: "Open in Zigzag Mini", comment: "Undo action name, shown in the Edit menu as Undo Open in Zigzag Mini.")
     }
 
-    /// Ready to register ⌘Z in the window tabs are about to go to (where you'll be): it sends them back here, where they
-    /// were, and closes a window that was made just for them once it's empty. Call it before the move, then call
-    /// what it returns after.
-    private func transferUndo(_ tabs: [Tab], to target: BrowserWindowController, closesTarget: Bool) -> () -> Void {
-        let places = tabs.map { tab in (tab, tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0) }
-        return { [weak self, weak target] in
-            guard let target else { return }
-            target.sidebarUndo.registerUndo(withTarget: target) { target in
-                guard let self, WindowManager.shared.controllers.contains(where: { $0 === self }) else { return }
-                // Lowest first, so each goes back in at the place it left.
-                for (tab, index) in places.sorted(by: { $0.1 < $1.1 }) where target.tabManager.allTabs.contains(where: { $0 === tab }) {
-                    target.transfer(tab, to: self, at: index)
-                }
-                if closesTarget, target.tabManager.allTabs.isEmpty { target.window?.performClose(nil) }
-                self.window?.makeKeyAndOrderFront(nil)
+    /// Tabs into another window's list at `index` (#167), pages and all, as they are: the window they land in shows
+    /// the first and comes forward, and one ⌘Z there sends them back to where they were. A window the move leaves
+    /// with no tabs closes, as in Chrome (`closeIfEmptied`).
+    func move(_ tabs: [Tab], to target: BrowserWindowController, at index: Int) {
+        let moving = tabs.filter { !$0.isClosed && $0.bookmarkID == nil && tabManager.tab(with: $0.id) === $0 }
+        guard target !== self, let first = moving.first else { return }
+        let places = moving.map { tab in (tab, tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0) }
+        let home = moveHome
+        home.window = self
+        home.frame = window?.frame
+        home.space = tabManager.currentSpaceID
+        // Each in at the same place, last first, so they keep their order.
+        for tab in moving.reversed() { transfer(tab, to: target, at: index) }
+        // The first is the one on screen there, whatever came in after it.
+        if target.tabManager.selectedTab !== first { target.tabManager.select(first) }
+        target.window?.makeKeyAndOrderFront(nil)
+        target.sidebarUndo.registerUndo(withTarget: target) { target in
+            let back = places.filter { tab, _ in target.tabManager.tab(with: tab.id) === tab }
+            guard !back.isEmpty else { return }
+            // Its window closed when they left: they come back in a window where it was.
+            // Its window closed when they left: they come back in a window where it was, and so do tabs a later ⌘Z
+            // sends back to it.
+            let source: BrowserWindowController
+            if let open = home.window, WindowManager.shared.controllers.contains(where: { $0 === open }) {
+                source = open
+            } else {
+                source = WindowManager.shared.newWindow(spaceID: home.space, showCommandBar: false)
+                if let frame = home.frame { source.window?.setFrame(frame, display: true) }
+                source.moveHome = home
+                home.window = source
             }
-            target.sidebarUndo.setActionName(String(localized: "Move to Window", comment: "Undo action name, shown in the Edit menu as Undo Move to Window."))
+            // Lowest first, so each goes back in at the place it left.
+            for (tab, index) in back.sorted(by: { $0.1 < $1.1 }) where target.tabManager.tab(with: tab.id) === tab {
+                target.transfer(tab, to: source, at: index)
+            }
+            source.window?.makeKeyAndOrderFront(nil)
+            target.closeIfEmptied()
+        }
+        target.sidebarUndo.setActionName(String(localized: "Move to Window", comment: "Undo action name, shown in the Edit menu as Undo Move to Window."))
+        closeIfEmptied()
+    }
+
+    /// A tab into another window's list (`TabManager.take`); extensions hear it left this window for that one.
+    private func transfer(_ tab: Tab, to target: BrowserWindowController, at index: Int) {
+        let moved = target.tabManager.take(tab, from: tabManager, at: index)
+        if #available(macOS 15.4, *) {
+            for (page, place) in moved { ExtensionCenter.tabMoved(page, from: place, in: self) }
         }
     }
 
-    /// A tab into another window's list. Half of a split of two tabs brings the other half, and a page of a tile group
-    /// the rest of it: they arrive as one, still side by side.
-    private func transfer(_ tab: Tab, to target: BrowserWindowController, at index: Int) {
-        let pair = tabManager.split(for: tab)
-        let panes = tabManager.panes(of: tab)
-        let together = pair != nil && panes.count == pair?.count && panes.allSatisfy { $0.bookmarkID == nil }
-        guard let pair, together else {
-            tabManager.release(tab)
-            target.tabManager.insert(tab, at: index)
-            return
+    /// Left with no tabs in any space by tabs moving out, the window closes, as in Chrome; pinned tabs and favorites
+    /// are every window's, so they don't keep it. Not the only window: that one stays, as an empty window would.
+    private func closeIfEmptied() {
+        guard !tabManager.isPrivate, !tabManager.hasTabs, WindowManager.shared.controllers.contains(where: { $0 !== self }) else { return }
+        // After the drag or menu that moved them is done with this window.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.tabManager.hasTabs else { return }
+            self.window?.close()
         }
-        panes.forEach { tabManager.release($0) }
-        // Each in at the same place, last first, so they keep their order.
-        for page in panes.reversed() { target.tabManager.insert(page, at: index) }
-        target.tabManager.restoreSplit(pair)
     }
 
     func listDropOutside(_ tabs: [Tab], at screenPoint: NSPoint) -> Bool {
         guard !tabManager.isPrivate, let tab = tabs.first else { return false }
+        let over = SidebarListView.window(at: screenPoint)
         // Let go with ⌥ held, one tab becomes a Zigzag Mini window there instead of a browser window.
         if NSEvent.modifierFlags.contains(.option), tabs.count == 1, canOpenInMini(tab),
            !WindowManager.shared.controllers.contains(where: { $0.window?.frame.contains(screenPoint) == true }) {
             openInMini(tab, at: screenPoint)
             return true
         }
-        let others = WindowManager.shared.controllers.filter { $0 !== self && !$0.tabManager.isPrivate }
-        let target: BrowserWindowController
-        var isNew = false
-        if let existing = others.first(where: { $0.window?.frame.contains(screenPoint) == true }) {
-            target = existing
-        } else {
-            isNew = true
-            // A new window, roughly where the tab was let go.
-            target = WindowManager.shared.newWindow(spaceID: tab.spaceID, showCommandBar: false)
-            if let window = target.window {
-                var frame = window.frame
-                frame.origin = NSPoint(x: screenPoint.x - 120, y: screenPoint.y - frame.height + 40)
-                window.setFrame(frame, display: true)
+        // Onto another window's page: the tabs go there, the first on screen.
+        if let over, over !== self {
+            guard !over.tabManager.isPrivate else { return false }
+            over.window?.makeKeyAndOrderFront(nil)
+            over.confirmProfileCrossing(tabs.flatMap(tabManager.panes(of:)), to: over.tabManager.currentSpaceID) { [weak self, weak over] in
+                guard let self, let over else { return }
+                self.move(tabs, to: over, at: 0)
             }
+            return true
         }
-        let undo = transferUndo(tabs, to: target, closesTarget: isNew)
-        // Each in at the top, last first, so they keep their order.
-        for tab in tabs.reversed() { transfer(tab, to: target, at: 0) }
-        undo()
-        target.window?.makeKeyAndOrderFront(nil)
+        guard over == nil else { return false }
+        // Somewhere that isn't a Zigzag window: a new window, roughly where the tab was let go.
+        let target = WindowManager.shared.newWindow(spaceID: tab.spaceID, showCommandBar: false)
+        if let window = target.window {
+            var frame = window.frame
+            frame.origin = NSPoint(x: screenPoint.x - 120, y: screenPoint.y - frame.height + 40)
+            window.setFrame(frame, display: true)
+        }
+        move(tabs, to: target, at: 0)
         return true
     }
 
@@ -2284,10 +2314,11 @@ extension BrowserWindowController: SidebarDelegate {
 
     func listMoveToWindow(_ tabs: [Tab], controller: BrowserWindowController, index: Int) -> Bool {
         guard !tabManager.isPrivate, !controller.tabManager.isPrivate else { return false }
-        let undo = transferUndo(tabs, to: controller, closesTarget: false)
-        for tab in tabs.reversed() { transfer(tab, to: controller, at: index) }
-        undo()
         controller.window?.makeKeyAndOrderFront(nil)
+        controller.confirmProfileCrossing(tabs.flatMap(tabManager.panes(of:)), to: controller.tabManager.currentSpaceID) { [weak self, weak controller] in
+            guard let self, let controller else { return }
+            self.move(tabs, to: controller, at: index)
+        }
         return true
     }
 

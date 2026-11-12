@@ -129,6 +129,8 @@ final class TabManager {
     func tabs(in spaceID: UUID) -> [Tab] { tabsBySpace[spaceID] ?? [] }
 
     var allTabs: [Tab] { tabsBySpace.values.flatMap { $0 } + Array(bookmarkTabs.values) }
+    /// Whether any space has a tab open here. Pinned tabs and favorites aren't counted: every window has those.
+    var hasTabs: Bool { tabsBySpace.values.contains { !$0.isEmpty } }
 
     var selectedTab: Tab? { selectedTab(in: currentSpaceID) }
 
@@ -261,11 +263,12 @@ final class TabManager {
         let split: SplitPair?
     }
 
-    /// Takes a tab out of the list, its page still open, for Zigzag Mini to show: as for a closed tab, the tabs under
-    /// it move up a level, its split or tile group closes up, and the window goes on to another tab.
-    /// Returns where it was. Not for a pinned page's or favorite's: those belong to the sidebar.
+    /// Takes a tab out of the list, its page still open, for Zigzag Mini or another window to show: as for a closed
+    /// tab, the tabs under it move up a level, its split or tile group closes up, and the window goes on to another
+    /// tab. Returns where it was. Not for a pinned page's or favorite's: those belong to the sidebar. `toWindow`: it's
+    /// going into another window, where extensions hear it moved (`ExtensionCenter.tabMoved`), not that it closed.
     @discardableResult
-    func release(_ tab: Tab) -> Place? {
+    func release(_ tab: Tab, toWindow: Bool = false) -> Place? {
         guard tab.bookmarkID == nil, let index = tabs(in: tab.spaceID).firstIndex(where: { $0 === tab }) else { return nil }
         let place = Place(spaceID: tab.spaceID, index: index, parentID: tab.parentID,
                           childIDs: tabs(in: tab.spaceID).filter { $0.parentID == tab.id }.map(\.id), split: split(for: tab))
@@ -276,7 +279,7 @@ final class TabManager {
         tabsBySpace[tab.spaceID]?.remove(at: index)
         recentTabIDs.removeAll { $0 == tab.id }
         tabTokens[tab.id] = nil
-        if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
+        if #available(macOS 15.4, *), !toWindow { ExtensionCenter.tabClosed(tab) }
         changed.send(.structure)
         if wasSelected {
             if let partner { select(partner) } else { selectAfterClosing(tab, index: index) }
@@ -340,6 +343,25 @@ final class TabManager {
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
         changed.send(.structure)
         select(tab)
+    }
+
+    /// A tab from another window's list into this one at `index`, its page as it is, and shown (#167). Half of a
+    /// split of two tabs brings the other half, and a page of a tile group the rest of it: they arrive as one, still
+    /// side by side, so a group is never in two windows. A split with a pinned page stays there, and the tab leaves
+    /// it. Returns the pages that came, each with its place among the other window's tabs as extensions count them.
+    @discardableResult
+    func take(_ tab: Tab, from other: TabManager, at index: Int) -> [(tab: Tab, from: Int)] {
+        guard other !== self, !tab.isClosed, tab.bookmarkID == nil, other.tab(with: tab.id) === tab else { return [] }
+        let pair = other.split(for: tab)
+        let panes = other.panes(of: tab)
+        let together = pair != nil && panes.count == pair?.count && panes.allSatisfy { $0.bookmarkID == nil }
+        let pages = together ? panes : [tab]
+        let places = pages.map { page in other.navigableTabs.firstIndex { $0 === page } ?? 0 }
+        pages.forEach { other.release($0, toWindow: true) }
+        // Each in at the same place, last first, so they keep their order.
+        for page in pages.reversed() { insert(page, at: index) }
+        if together, let pair { restoreSplit(pair) }
+        return Array(zip(pages, places))
     }
 
     /// A page that comes in from outside the list (Zigzag Mini's), placed where a new tab would go, and shown.

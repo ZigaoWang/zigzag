@@ -706,6 +706,10 @@ final class ExtensionHost: NSObject {
         // The tab you left is only news to the extensions that knew it.
         controller.didActivateTab(tab, previousActiveTab: previous?.extensionHost === self ? previous : nil)
     }
+    func tabMoved(_ tab: Tab, from index: Int, in window: BrowserWindowController) {
+        guard !tab.isPrivate, !window.tabManager.isPrivate else { return }
+        controller.didMoveTab(tab, from: index, in: window)
+    }
     func tabChanged(_ tab: Tab, _ change: Tab.Change) {
         guard !tab.isPrivate else { return }
         switch change {
