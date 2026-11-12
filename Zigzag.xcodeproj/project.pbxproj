@@ -322,6 +322,7 @@
 		FAF549DD3B7D4C4893E5DA34 /* NativeAudioOut.swift in Sources */ = {isa = PBXBuildFile; fileRef = 289F60BB400BACFDF97EA0E6 /* NativeAudioOut.swift */; };
 		FB2AE7D5BF0E44C75BDAEBBB /* chrome-local-state.json in Resources */ = {isa = PBXBuildFile; fileRef = DDA8091D12FF865D4C6F3952 /* chrome-local-state.json */; };
 		FC7890AF73B47C398FD5A153 /* ExtensionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEBF6D0A14B73E1B6D7748A8 /* ExtensionBridge.swift */; };
+		FD37C92280193E5C6BE56849 /* DarkPagesFillTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2D823C226C002B1E7CBAB6D /* DarkPagesFillTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -588,6 +589,7 @@
 		D0B754CF4F921CAA567C219B /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		D0FDA440FDF6324DAFBA1C61 /* PasswordsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordsWindow.swift; sourceTree = "<group>"; };
 		D1368F679CEF702DA00EC3E6 /* Atmosphere.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Atmosphere.swift; sourceTree = "<group>"; };
+		D2D823C226C002B1E7CBAB6D /* DarkPagesFillTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPagesFillTests.swift; sourceTree = "<group>"; };
 		D2EA6931C96DF7709CF8A2B6 /* ChromiumExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromiumExtensions.swift; sourceTree = "<group>"; };
 		D31A2391B831DAAD2A652FCA /* Onboarding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Onboarding.swift; sourceTree = "<group>"; };
 		D33639F712B0A57DBFC66DB5 /* IconChoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconChoice.swift; sourceTree = "<group>"; };
@@ -1079,6 +1081,7 @@
 				5D3D982B142CB7CC9AA89B6A /* ContrastTokensTests.swift */,
 				8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */,
 				B788AB64DB761375F0FEFA16 /* DarkPagesFallbackTests.swift */,
+				D2D823C226C002B1E7CBAB6D /* DarkPagesFillTests.swift */,
 				6BF2D2CE4ED8B3D974B52136 /* DarkPagesPrepaintTests.swift */,
 				4295D4E75FDD1157FE955EBF /* DarkPagesTests.swift */,
 				A5C379E2BF735EEBC168D4E2 /* DarkPaletteScriptTests.swift */,
@@ -1574,6 +1577,7 @@
 				AD66AB1C32F3990847A89971 /* CommandBarRankingTests.swift in Sources */,
 				87F8E37BD3315332966A7421 /* ContrastTokensTests.swift in Sources */,
 				605786340091141429E15759 /* DarkPagesFallbackTests.swift in Sources */,
+				FD37C92280193E5C6BE56849 /* DarkPagesFillTests.swift in Sources */,
 				43E5CAFBB170E9E6507AEB70 /* DarkPagesPrepaintTests.swift in Sources */,
 				37417FBDF6F6A5A1633769C5 /* DarkPagesTests.swift in Sources */,
 				0F709940AA577364B18E6471 /* DarkPaletteScriptTests.swift in Sources */,
