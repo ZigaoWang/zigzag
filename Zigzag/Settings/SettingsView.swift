@@ -812,6 +812,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let suggestionsToggle = Toggle()
     private let borderlessToggle = Toggle()
     private let addressAboveToggle = Toggle()
+    private let sidebarRightToggle = Toggle()
+    private var sideToken: NSObjectProtocol?
     private let largeNamesToggle = Toggle()
     private let quitToggle = Toggle()
     private let scriptJavaScriptToggle = Toggle()
@@ -1050,6 +1052,17 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                  control: addressAboveToggle)
         addressRow.keywords = String(localized: "toolbar top bar url location", comment: "Words that find the Address bar above the page setting with Find a setting in Settings. Not shown.")
         appearanceGroup.add(addressRow)
+        sidebarRightToggle.onChange = { on in BrowserRootView.sidebarOnRight = on }
+        let sideRow = FormRow(title: String(localized: "Sidebar on the right", comment: "A setting in Settings › Appearance: puts the sidebar along the window's right edge."),
+                              detail: String(localized: "The sidebar sits along the window’s right edge, with the page on its left.", comment: "Explanation under “Sidebar on the right” in Settings › Appearance."),
+                              control: sidebarRightToggle)
+        // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossary.md): found by it, never shown.
+        sideRow.keywords = String(localized: "sidebar right left side position move", comment: "Words that find the Sidebar on the right setting with Find a setting in Settings. Not shown.") + " 侧边栏"
+        appearanceGroup.add(sideRow)
+        // The View menu moves it too, with Settings open.
+        sideToken = NotificationCenter.default.addObserver(forName: BrowserRootView.sidebarSideChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.sidebarRightToggle.isOn = BrowserRootView.sidebarOnRight }
+        }
         largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
         appearanceGroup.add(FormRow(title: String(localized: "Large space names", comment: "A setting in Settings › Appearance."),
                                     detail: String(localized: "Shows the space’s name large and light above its tabs. When off, it’s a plain heading.", comment: "Explanation under “Large space names” in Settings › Appearance."),
@@ -2340,6 +2353,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         suggestionsToggle.isOn = SuggestionFetcher.isOn
         borderlessToggle.isOn = BrowserRootView.isBorderless
         addressAboveToggle.isOn = BrowserRootView.addressAbovePage
+        sidebarRightToggle.isOn = BrowserRootView.sidebarOnRight
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
         scriptJavaScriptToggle.isOn = Scripting.allowsJavaScript

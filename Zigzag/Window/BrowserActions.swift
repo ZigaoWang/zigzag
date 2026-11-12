@@ -225,6 +225,11 @@ extension BrowserWindowController: NSMenuItemValidation {
         onStateChange?()
     }
 
+    /// View › Move Sidebar to Right (or Left): the same as Settings › Appearance › Sidebar on the right, for every window.
+    @objc func toggleSidebarSide(_ sender: Any?) {
+        BrowserRootView.sidebarOnRight.toggle()
+    }
+
     @objc func reloadPage(_ sender: Any?) { selectedTab?.reload() }
     @objc func reloadPageFromOrigin(_ sender: Any?) { selectedTab?.reloadFromOrigin() }
     @objc func stopLoading(_ sender: Any?) { selectedTab?.stopLoading() }
@@ -536,6 +541,11 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(toggleBrowserSidebar(_:)):
             item.title = root.sidebarVisible ? String(localized: "Hide Sidebar", comment: "Menu bar item: hides the sidebar.")
                                               : String(localized: "Show Sidebar", comment: "Menu bar item: shows the sidebar.")
+            return true
+        case #selector(toggleSidebarSide(_:)):
+            item.title = BrowserRootView.sidebarOnRight
+                ? String(localized: "Move Sidebar to Left", comment: "View menu item: puts the sidebar back along the window's left edge.")
+                : String(localized: "Move Sidebar to Right", comment: "View menu item: puts the sidebar along the window's right edge.")
             return true
         case #selector(toggleBookmark(_:)):
             // As the sidebar names them: a favorite moves back to the tabs, and half of a split pins with its other half.

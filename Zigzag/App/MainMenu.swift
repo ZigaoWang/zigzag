@@ -123,6 +123,7 @@ enum MainMenu {
 
         var viewItems: [NSMenuItem] = [
             item(String(localized: "Hide Sidebar", comment: "View menu item."), #selector(C.toggleBrowserSidebar(_:)), "s", [.control]),
+            item(String(localized: "Move Sidebar to Right", comment: "View menu item: puts the sidebar along the window's right edge."), #selector(C.toggleSidebarSide(_:)), ""),
             item(String(localized: "Show All Tabs", comment: "View menu item."), #selector(C.toggleDeskView(_:)), "\\", [.command, .shift]),
             item(String(localized: "Stack Vertically", comment: "View menu item."), #selector(C.toggleSplitOrientation(_:)), ""),
             item(String(localized: "Separate Tabs", comment: "View menu item."), #selector(C.closeSplitView(_:)), "\\", [.command, .option]),
