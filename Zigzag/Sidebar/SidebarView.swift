@@ -794,7 +794,16 @@ final class SidebarView: NSView {
     var holdsAddress = true {
         didSet {
             guard holdsAddress != oldValue else { return }
-            if holdsAddress { addressViews.forEach(addSubview) }
+            if holdsAddress { (holdsButtons ? addressViews : [address]).forEach(addSubview) }
+            needsLayout = true
+        }
+    }
+    /// Back, forward and reload are in its top row; false while the strip above the page beside a sidebar on the
+    /// right holds them, after the traffic lights (`BrowserRootView.lightsStrip`, #181).
+    var holdsButtons = true {
+        didSet {
+            guard holdsButtons != oldValue else { return }
+            if holdsButtons, holdsAddress { addressButtons.forEach(addSubview) }
             needsLayout = true
         }
     }
@@ -954,7 +963,7 @@ final class SidebarView: NSView {
         let button = Self.toolbarButton
         let row = Self.topRowFrames(width: width, trafficLightsWidth: trafficLightsWidth, onRight: isOnRight)
         func onLine(_ rect: NSRect) -> NSRect { NSRect(x: rect.minX, y: rowCenter - button / 2, width: button, height: button) }
-        for (b, rect) in zip([backButton, forwardButton, reloadButton], row.buttons) where holdsAddress { b.frame = onLine(rect) }
+        for (b, rect) in zip([backButton, forwardButton, reloadButton], row.buttons) where holdsAddress && holdsButtons { b.frame = onLine(rect) }
         sidebarButton.frame = onLine(row.toggle)
         if holdsAddress {
             address.frame = NSRect(x: pad, y: Tokens.Sidebar.addressTop, width: width - pad * 2, height: Tokens.Sidebar.addressHeight)

@@ -1657,6 +1657,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let y = center - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating || inBar, let image = window.trafficLightsImage() { trafficLightsPicture = image }
+        // Beside a docked sidebar on the right without the bar, the strip above the page that holds the lights holds
+        // back, forward and reload after them too, out of the sidebar's row (#181); anywhere else, the sidebar has them.
+        let stripHolds = root.lightsRoom > 0
+        if stripHolds, sidebar.holdsButtons, sidebar.holdsAddress {
+            sidebar.holdsButtons = false
+            root.lightsStrip.hold(sidebar.addressButtons)
+        } else if !stripHolds, !sidebar.holdsButtons {
+            sidebar.holdsButtons = true
+        }
+        root.lightsStrip.trafficLightsWidth = window.trafficLightsWidth
         // The lights' room in the bar stays while the sidebar floats over it, so nothing in the bar moves as it does.
         root.topBar.trafficLightsWidth = root.showsTopBar && (!docked || onRight) && !fullScreen ? window.trafficLightsWidth : 0
         // With the sidebar hidden its toggle goes with it, so the bar above the page has one of its own. While the

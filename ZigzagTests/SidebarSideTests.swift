@@ -53,6 +53,20 @@ struct SidebarSideTests {
         #expect(Tokens.Sidebar.lightsCenter + 7 < BrowserRootView.lightsStripHeight)
     }
 
+    /// The strip holds back, forward and reload after the traffic lights, where the bar above the page has them, on
+    /// the lights' line and inside the strip (#181).
+    @Test func theStripsButtonsFollowTheLightsAsTheBarsDo() {
+        let lights: CGFloat = 52
+        let strip = LightsStripView.buttonFrames(count: 3, trafficLightsWidth: lights)
+        let bar = TopBarView.frames(width: 1200, buttons: 3, trafficLightsWidth: lights, trailingInset: Tokens.Sidebar.edge).buttons
+        #expect(strip == bar)
+        #expect(strip[0].minX > Tokens.Sidebar.lightsX + lights)
+        for frame in strip {
+            #expect(frame.midY == Tokens.Sidebar.lightsCenter)
+            #expect(frame.maxY <= BrowserRootView.lightsStripHeight)
+        }
+    }
+
     @Test func hiddenOrUnderTheBarThePageIsTheSameOnEitherSide() {
         for edgeToEdge in [false, true] {
             let left = BrowserRootView.pageArea(in: window, sidebarVisible: false, sidebarWidth: width, edgeToEdge: edgeToEdge, borderless: true, topBar: false)
