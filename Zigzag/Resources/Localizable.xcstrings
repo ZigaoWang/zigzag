@@ -29,6 +29,23 @@
         }
       }
     },
+    "%@ %lld-bit" : {
+      "comment" : "A certificate's public key on the certificate page of the site panel: its type, then its size in bits, like “RSA 2048-bit”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$lld-bit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$lld 位"
+          }
+        }
+      }
+    },
     "%@ (%@)" : {
       "comment" : "A button's tooltip: its name, then its keyboard shortcut in parentheses, like “Reload (⌘R)”.",
       "localizations" : {
@@ -549,7 +566,7 @@
       }
     },
     "%@, %@" : {
-      "comment" : "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.",
+      "comment" : "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nOn the Permissions row of the site panel: how many allowed, then how many blocked, like “2 allowed, 1 blocked”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -818,6 +835,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 的登录状态仍处于锁定状态。请点按“再试一次”，在 macOS 询问时输入你的 Mac 密码，然后点按“始终允许”。"
+          }
+        }
+      }
+    },
+    "%lld allowed" : {
+      "comment" : "On the Permissions row of the site panel: how many permissions the site has been allowed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已允许 %lld 项"
+          }
+        }
+      }
+    },
+    "%lld blocked" : {
+      "comment" : "On the Permissions row of the site panel: how many permissions the site has been blocked from.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已阻止 %lld 项"
           }
         }
       }
@@ -1469,6 +1508,17 @@
         }
       }
     },
+    "%lld set" : {
+      "comment" : "On the Permissions row of a narrow site panel: how many permissions have an answer, allowed or blocked.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已设置 %lld 项"
+          }
+        }
+      }
+    },
     "%lld sites with sign-ins" : {
       "comment" : "Item in the list of what came over, in the Import window.",
       "localizations" : {
@@ -1790,7 +1840,7 @@
       }
     },
     "Actual Size" : {
-      "comment" : "View menu item.",
+      "comment" : "Tooltip of the percentage on the Zoom row of the site panel: sets the page back to 100%.\nView menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2269,7 +2319,7 @@
       }
     },
     "Allow" : {
-      "comment" : "Button by a browser in the welcome window: let Zigzag read it.\nButton in the sheet shown when an extension asks for more access: gives it.\nButton of the folder panel that lets Zigzag read a browser’s data, from the welcome window.\nButton on a site's permission question.",
+      "comment" : "A choice in a permission's dropdown in Site Controls: the site may use it.\nButton by a browser in the welcome window: let Zigzag read it.\nButton in the sheet shown when an extension asks for more access: gives it.\nButton of the folder panel that lets Zigzag read a browser’s data, from the welcome window.\nButton on a site's permission question.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2330,17 +2380,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "只有当它需要这项权限来完成你刚才让它做的事时，才允许。"
-          }
-        }
-      }
-    },
-    "Allowed" : {
-      "comment" : "Under a row's name in the site panel's This Site group, what it's set to: the site may use it.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已允许"
           }
         }
       }
@@ -2532,13 +2571,13 @@
         }
       }
     },
-    "Ask Again" : {
-      "comment" : "Button on a row in the site panel's This Site group: forgets the answer, so the site asks next time.",
+    "Ask" : {
+      "comment" : "A choice in a permission's dropdown in Site Controls: the site asks each time.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重新询问"
+            "value" : "询问"
           }
         }
       }
@@ -2731,7 +2770,7 @@
       }
     },
     "Back" : {
-      "comment" : "Button of a step in the welcome window: the step before.\nHidden View menu item, named in Settings › Shortcuts.\nTooltip of a button in the strip on top of each page of a split view: goes back.\nTooltip of the sidebar's back button.\nView menu item.",
+      "comment" : "Button of a step in the welcome window: the step before.\nHidden View menu item, named in Settings › Shortcuts.\nTooltip of a button in the strip on top of each page of a split view: goes back.\nTooltip of the back button on a page of the site panel.\nTooltip of the back button on the certificate page of the site panel.\nTooltip of the sidebar's back button.\nView menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2851,6 +2890,17 @@
         }
       }
     },
+    "Block" : {
+      "comment" : "A choice in a permission's dropdown in Site Controls: the site may not use it, and isn't asked about.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阻止"
+          }
+        }
+      }
+    },
     "Block Ads" : {
       "comment" : "Answer in the welcome window’s ad blocking step.",
       "localizations" : {
@@ -2902,17 +2952,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拦截页面上的内容"
-          }
-        }
-      }
-    },
-    "Blocked" : {
-      "comment" : "Under a row's name in the site panel's This Site group, what it's set to: the site may not use it.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已阻止"
           }
         }
       }
@@ -3337,6 +3376,50 @@
         }
       }
     },
+    "Certificate" : {
+      "comment" : "Title of the site panel's page about the site's certificate.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "证书"
+          }
+        }
+      }
+    },
+    "Certificate is valid" : {
+      "comment" : "On the certificate page of the site panel: macOS trusts the site's certificate.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "证书有效"
+          }
+        }
+      }
+    },
+    "Certificate isn’t trusted" : {
+      "comment" : "On the certificate page of the site panel: macOS doesn't trust the site's certificate.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "证书不受信任"
+          }
+        }
+      }
+    },
+    "Chain" : {
+      "comment" : "Section label over the certificates from the site's up to the root, on the certificate page of the site panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "证书链"
+          }
+        }
+      }
+    },
     "Change Icon" : {
       "comment" : "Undo action name, shown in the Edit menu as Undo Change Icon.",
       "localizations" : {
@@ -3443,6 +3526,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请检查你的 Wi-Fi 或网络连接。恢复联网后，Zigzag 会自动再试一次。"
+          }
+        }
+      }
+    },
+    "Checking…" : {
+      "comment" : "On the certificate page of the site panel, while the certificate is read.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查…"
           }
         }
       }
@@ -3656,13 +3750,13 @@
         }
       }
     },
-    "Clear Cookies for This Site…" : {
-      "comment" : "Item in the … menu of the site panel.",
+    "Clear Cookies and Data…" : {
+      "comment" : "Item in the … menu of the site panel: clears the site's cookies and what it keeps on this Mac, after asking.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "清除此网站的 Cookie…"
+            "value" : "清除 Cookie 和数据…"
           }
         }
       }
@@ -4279,6 +4373,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "以 MCP 服务器的方式连接 Zigzag，也就是我的网页浏览器。使用 HTTP 传输，地址是 %@，每个请求都带上这个请求头：%@。它只在这台 Mac 上可用。连接后，你可以列出我的标签页，打开、读取页面和截图，并在页面中点按、输入和滚动。Zigzag 不会让你使用无痕浏览窗口、密码或它自己的页面，我也可以随时在任何标签页上让你停下。如果你无法自己添加 MCP 服务器，请告诉我在你的设置中哪里添加。"
+          }
+        }
+      }
+    },
+    "Connection" : {
+      "comment" : "Row in the site panel: whether the page's connection is secure. On an https page it opens the site's certificate.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接"
           }
         }
       }
@@ -5701,19 +5806,8 @@
         }
       }
     },
-    "Extension page" : {
-      "comment" : "Under the site's name in the site panel, for an extension's own page.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "扩展页面"
-          }
-        }
-      }
-    },
     "Extensions" : {
-      "comment" : "A section of Settings.\nChoice in the Import window: bring extensions over from the Chrome Web Store.\nHeading in the site panel, in the welcome window’s picture of Zigzag.\nLabel in the sheet that makes a profile: which extensions it starts with.\nRow in the site panel's This Site group.\nSection label over the extensions' buttons in the site panel.",
+      "comment" : "A section of Settings.\nChoice in the Import window: bring extensions over from the Chrome Web Store.\nHeading in the site panel, in the welcome window’s picture of Zigzag.\nLabel in the sheet that makes a profile: which extensions it starts with.\nRow in the site panel's This Site group.\nTitle of the site panel on a new tab, over your extensions.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5741,6 +5835,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "扩展只能从 Chrome 及基于它的浏览器导入。Firefox 和 Safari 的扩展来自它们各自的商店。"
+          }
+        }
+      }
+    },
+    "Extensions on This Site" : {
+      "comment" : "Row in the site panel, and the title of its page: the extensions, whether they run on this site, and a way to manage them.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此网站上的扩展"
           }
         }
       }
@@ -6813,6 +6918,17 @@
         }
       }
     },
+    "Intermediate" : {
+      "comment" : "Beside a certificate between the site's and the root in the chain on the certificate page of the site panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中级"
+          }
+        }
+      }
+    },
     "Into" : {
       "comment" : "Label in the Import window, with more than one profile, before the choice of the profile that what's imported goes into.",
       "localizations" : {
@@ -6820,6 +6936,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "导入到"
+          }
+        }
+      }
+    },
+    "Issued by" : {
+      "comment" : "On the certificate page of the site panel: who issued the certificate.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "颁发者"
+          }
+        }
+      }
+    },
+    "Issued to" : {
+      "comment" : "On the certificate page of the site panel: whom the certificate was issued to.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "颁发给"
           }
         }
       }
@@ -7537,6 +7675,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "创建一个空间"
+          }
+        }
+      }
+    },
+    "Manage Extensions" : {
+      "comment" : "Row under the extensions in the site panel: opens Settings › Extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理扩展"
           }
         }
       }
@@ -8588,7 +8737,7 @@
       }
     },
     "None" : {
-      "comment" : "In place of the keys of a command with no shortcut, in Settings › Shortcuts.",
+      "comment" : "In place of the keys of a command with no shortcut, in Settings › Shortcuts.\nOn the Extensions on This Site row of the site panel: no extensions are installed.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8638,17 +8787,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这不是网址。请使用以 https:// 或 http:// 开头的完整网址。"
-          }
-        }
-      }
-    },
-    "Not allowed yet" : {
-      "comment" : "Under Notifications in the site panel's This Site group: the site asked to send notifications, and no one answered yet.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "尚未允许"
           }
         }
       }
@@ -8929,7 +9067,7 @@
       }
     },
     "Off" : {
-      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.",
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.\nOn the Extensions on This Site row of the site panel: extensions don't run on this site.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9792,6 +9930,17 @@
         }
       }
     },
+    "Partly secure" : {
+      "comment" : "On the Connection row of the site panel: an https page with some parts loaded over plain http.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分安全"
+          }
+        }
+      }
+    },
     "Password" : {
       "comment" : "Name of a field of a saved login in the Passwords window.\nPlaceholder of the password field in a site's HTTP sign-in sheet.",
       "localizations" : {
@@ -10036,6 +10185,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "速览"
+          }
+        }
+      }
+    },
+    "Permissions" : {
+      "comment" : "Row in the site panel, and the title of its page: the site's camera, location, notifications and pop-ups.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权限"
           }
         }
       }
@@ -10511,6 +10671,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "代理脚本（PAC）"
+          }
+        }
+      }
+    },
+    "Public key" : {
+      "comment" : "On the certificate page of the site panel: the certificate's public key.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公钥"
           }
         }
       }
@@ -11285,17 +11456,6 @@
         }
       }
     },
-    "Reset" : {
-      "comment" : "Button on the Zoom row of the site panel. It sets the page back to 100%.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重置"
-          }
-        }
-      }
-    },
     "Reset All" : {
       "comment" : "Button beside Always Translate in Settings › Translation.\nButton of the sheet that forgets the choices made for single sites.\nButton of the sheet that puts every shortcut back.",
       "localizations" : {
@@ -11325,6 +11485,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重设密钥"
+          }
+        }
+      }
+    },
+    "Reset Permissions" : {
+      "comment" : "Row under a site's permissions in the site panel: forgets every answer given to the site, so it asks again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重置权限"
           }
         }
       }
@@ -11523,6 +11694,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "右键点按它的标签页，然后点按“固定标签页”"
+          }
+        }
+      }
+    },
+    "Root" : {
+      "comment" : "Beside the root certificate, the one macOS trusts, in the chain on the certificate page of the site panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "根"
           }
         }
       }
@@ -12050,8 +12232,19 @@
         }
       }
     },
+    "Secure" : {
+      "comment" : "On the Connection row of the site panel: the page came over https.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全"
+          }
+        }
+      }
+    },
     "Secure connection" : {
-      "comment" : "In the site panel, in the welcome window’s picture of Zigzag.\nUnder the site's name in the site panel, for a page loaded over https.\nVoiceOver label of the lock before the address in a pop-up window.",
+      "comment" : "In the site panel, in the welcome window’s picture of Zigzag.\nVoiceOver label of the lock before the address in a pop-up window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12787,6 +12980,17 @@
         }
       }
     },
+    "Site" : {
+      "comment" : "Beside the site's own certificate in the chain on the certificate page of the site panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站"
+          }
+        }
+      }
+    },
     "Site Access" : {
       "comment" : "Submenu of an extension's menu: which sites the extension may read and change.",
       "localizations" : {
@@ -12981,17 +13185,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不透明"
-          }
-        }
-      }
-    },
-    "Some content isn’t secure" : {
-      "comment" : "Under the site's name in the site panel, for an https page with some parts loaded over plain http.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "部分内容不安全"
           }
         }
       }
@@ -15410,6 +15603,28 @@
         }
       }
     },
+    "Valid from" : {
+      "comment" : "On the certificate page of the site panel: the first day the certificate is valid.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生效日期"
+          }
+        }
+      }
+    },
+    "Valid until" : {
+      "comment" : "On the certificate page of the site panel: the last day the certificate is valid.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到期日期"
+          }
+        }
+      }
+    },
     "Version %@" : {
       "comment" : "An extension's version, under its name in Settings › Extensions.\nIn the About window: the version.\nUnder the title of the What’s New sheet: the version number, like 0.5.2.\nZigzag's version, in Settings › General.",
       "localizations" : {
@@ -16451,8 +16666,19 @@
         }
       }
     },
+    "Zoom %@, Actual Size" : {
+      "comment" : "VoiceOver name of the percentage on the Zoom row of the site panel: the zoom now, then what pressing it does.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩放 %@，实际大小"
+          }
+        }
+      }
+    },
     "Zoom In" : {
-      "comment" : "Hidden View menu item, named in Settings › Shortcuts.\nToolbar button tooltip in the PDF viewer.\nView menu item.",
+      "comment" : "Hidden View menu item, named in Settings › Shortcuts.\nToolbar button tooltip in the PDF viewer.\nTooltip of the + button on the Zoom row of the site panel.\nView menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -16463,7 +16689,7 @@
       }
     },
     "Zoom Out" : {
-      "comment" : "Toolbar button tooltip in the PDF viewer.\nView menu item.",
+      "comment" : "Toolbar button tooltip in the PDF viewer.\nTooltip of the − button on the Zoom row of the site panel.\nView menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
