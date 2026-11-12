@@ -359,6 +359,10 @@ something came from, answers at once, and can be interrupted.
   `panelBackground`: the video live in a 54 by 32 thumbnail, the tab's title, play or pause, and expand; a click
   brings the card back there. The video plays on all the while. (Not the sidebar's Now Playing row: that shows only
   for a tab you can hear, and a silent video plays on too.)
+- **Full screen in the page** (`PageFullScreen`, #168): with Settings › Tabs › Full screen videos fill set to The Page,
+  or a site's own Full screen fills the page row in its controls, a page's full screen (a player's button, its key)
+  fills the page card, or its pane in a split, in black, the window's chrome as it was. No bar, no note: the player's
+  own controls say it's in full screen, and Esc, in the page or anywhere in the window, leaves it.
 - **A site installed as an app** (`WebAppWindowController`, #165): Zigzag Mini's window, its frame in the color of
   the space it was installed from, with a strip as slim as a pane header's: the traffic lights, back, forward and
   reload in `Tokens.Pane` sizes, and the app's name in the middle in the row ink (the host instead, on another site

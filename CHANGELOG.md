@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- A video's full screen can fill just its page instead of the whole screen, the sidebar and the rest of the window still there: choose The Page for Full screen videos fill in Settings › Tabs, or turn on Full screen fills the page in a site's controls, for YouTube alone say. In a split, the video fills its own part. Esc, or the player's own button, leaves it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#168](https://github.com/ZigaoWang/zigzag/issues/168))
+
 ### Fixed
 - In split view, a mouse's back and forward buttons and a swipe go back or forward in the page under the pointer, which becomes the page you're in, instead of in whichever page you were last in. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#170](https://github.com/ZigaoWang/zigzag/issues/170))
 
