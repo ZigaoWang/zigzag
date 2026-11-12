@@ -1503,12 +1503,6 @@ final class TabManager {
         changed.send(.structure)
     }
 
-    func setSplitRatio(_ ratio: Double, for tab: Tab) {
-        guard let index = splits.firstIndex(where: { $0.contains(tab.id) }), !splits[index].isGroup else { return }
-        splits[index].ratio = min(max(ratio, 0.2), 0.8)
-        rememberPinnedLayout(splits[index])
-    }
-
     /// Where the lines between a tile group's pages are (shares of the width and height); a split of two takes the
     /// one it has.
     func setTileRatios(column: CGFloat, row: CGFloat, for tab: Tab) {

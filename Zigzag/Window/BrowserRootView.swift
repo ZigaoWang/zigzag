@@ -318,11 +318,6 @@ final class BrowserRootView: SpaceFrameView {
         }
     }
 
-    /// Opens, closes or rotates the split. The pages slide to their new places; the new pane fades in beside.
-    func setSplit(ratio: CGFloat?, vertical: Bool, animated: Bool) {
-        setTiles(ratio.map { TileShape.pair(ratio: $0, vertical: vertical) }, animated: animated)
-    }
-
     /// Lays the panes out as `shape` (nil: one page). Panes that stay slide to their new places, new ones fade in
     /// beside, and ones that go stay where they are and fade while the rest grow over their place.
     func setTiles(_ shape: TileShape?, animated: Bool) {
