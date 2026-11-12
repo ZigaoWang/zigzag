@@ -156,8 +156,12 @@ final class MiniPlayer {
     func windowClosing() {
         unpark { _ in true }
         guard let id = model.tab else { return }
+        windowIsClosing = true
+        defer { windowIsClosing = false }
         apply(model.lost(id))
     }
+    /// While its window closes: the keyboard isn't handed back to it.
+    private var windowIsClosing = false
 
     /// Its minimize button: the card goes and the video plays on in its tab, out of sight; the sidebar's now-playing
     /// row goes back to it.
@@ -269,13 +273,16 @@ final class MiniPlayer {
         } else {
             tab?.isInMiniPlayer = false
         }
-        // It had the keyboard: back to the page you're on, in its window, when Zigzag is the app you're in.
-        if let card, let window = card.window, window.isKeyWindow, let browser = controller?.window {
+        // It had the keyboard: back to the page you're on, in its window, when Zigzag is the app you're in. Not to a
+        // window that's closing: the Mac picks the next one.
+        if let card, let window = card.window, window.isKeyWindow, !windowIsClosing, let browser = controller?.window {
             if NSApp.isActive { browser.makeKeyAndOrderFront(nil) }
             browser.makeFirstResponder(controller?.tabManager.selectedTab?.webView)
         }
         windowWatch.forEach(NotificationCenter.default.removeObserver)
         windowWatch = []
+        if let spaceWatch { NSWorkspace.shared.notificationCenter.removeObserver(spaceWatch) }
+        spaceWatch = nil
         panel = nil
         if let card {
             if closing {
@@ -466,15 +473,23 @@ final class MiniPlayer {
         }
     }
 
-    /// The window's page area on screen; nil while the window isn't on screen (closed, or put away in the Dock).
+    /// Whether the window is where you can see it: open, not put away in the Dock, and on the space you're on (the
+    /// card floats on every space; a window on another one is nowhere near it).
+    private static func isShowing(_ window: NSWindow?) -> Bool {
+        guard let window else { return false }
+        return window.isVisible && !window.isMiniaturized && window.isOnActiveSpace
+    }
+
+    /// The window's page area on screen; nil while the window isn't showing (`isShowing`): the card takes the
+    /// screen's corner then.
     private var pageArea: NSRect? {
-        guard let root = controller?.root, let window = root.window, window.isVisible, !window.isMiniaturized else { return nil }
+        guard let root = controller?.root, let window = root.window, Self.isShowing(window) else { return nil }
         return Self.global(window.convertToScreen(root.convert(root.cardFrame, to: nil)))
     }
 
     /// The whole window on screen, the sidebar too: let go over it, the card goes to the page's corner.
     private var windowArea: NSRect? {
-        guard let window = controller?.window, window.isVisible, !window.isMiniaturized else { return nil }
+        guard let window = controller?.window, Self.isShowing(window) else { return nil }
         return Self.global(window.frame)
     }
 
@@ -532,7 +547,12 @@ final class MiniPlayer {
                                           NSWindow.didMiniaturizeNotification, NSWindow.didDeminiaturizeNotification]
         windowWatch = names.map { center.addObserver(forName: $0, object: controller?.window, queue: .main, using: moved) }
             + [center.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main, using: moved)]
+        // Off to another space, the window is out of sight there as in the Dock: the screen's corner meanwhile.
+        spaceWatch = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification,
+                                                                       object: nil, queue: .main, using: moved)
     }
+    /// The space you're on changing, which takes the window out of sight or back.
+    private var spaceWatch: NSObjectProtocol?
 
     /// Let go after a drag: over the window, it glides into the page area's nearest corner; anywhere else, into the
     /// screen's nearest corner, as the Mac's Picture in Picture does. Let go with ⌘ held (`free`), it stays where it
