@@ -349,7 +349,10 @@ final class PageCardView: NSView {
     /// The page's color changed, or the page did: the card's ground follows, and so does the web view's own.
     private func refreshGround() {
         Tokens.Motion.withoutAnimation { surface.layer?.backgroundColor = cgColor(ground) }
-        Self.paintGround(of: webView, (webView as? BrowserWebView)?.owner?.pageColor)
+        let pageColor = (webView as? BrowserWebView)?.owner?.pageColor
+        Self.paintGround(of: webView, pageColor)
+        // The pane's strip lies on that color: its ink follows it.
+        header.ground = pageColor
     }
 
     private static let setGround = NSSelectorFromString("_setBackgroundColor:")

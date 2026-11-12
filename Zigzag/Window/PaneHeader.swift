@@ -33,6 +33,7 @@ final class PaneHeaderView: NSView {
         didSet {
             guard isInBar != oldValue else { return }
             line.isHidden = isInBar
+            refreshInk()
             needsLayout = true
         }
     }
@@ -66,6 +67,30 @@ final class PaneHeaderView: NSView {
     override var mouseDownCanMoveWindow: Bool { isInBar }
     override func mouseDown(with event: NSEvent) {
         if isInBar { window?.titleBarMouseDown(event) } else { super.mouseDown(with: event) }
+    }
+
+    // MARK: Ink
+
+    /// The color under the strip, its pane's page color on the card (nil: the card's plain ground). Its icons and text
+    /// turn light or dark, whichever reads more clearly on it, as the bar above the page does (`TopBarView.pageColor`):
+    /// on a dark page they'd be dark on dark otherwise.
+    var ground: NSColor? {
+        didSet {
+            guard ground != oldValue else { return }
+            refreshInk()
+        }
+    }
+
+    /// Light ink (dark aqua) on `color`, dark ink (aqua) otherwise; nil keeps the window's own.
+    static func inkAppearance(on color: NSColor?) -> NSAppearance.Name? {
+        color.map { TopBarView.isDark($0) ? .darkAqua : .aqua }
+    }
+
+    private func refreshInk() {
+        // Up in the bar, the bar's own appearance is the strip's.
+        appearance = isInBar ? nil : Self.inkAppearance(on: ground).flatMap(NSAppearance.init(named:))
+        let onPage = !isInBar && ground != nil
+        [back, forward, reload, swap, orientation, close, more, closeTab].forEach { $0.isOnPage = onPage }
     }
 
     func setVertical(_ vertical: Bool) {
