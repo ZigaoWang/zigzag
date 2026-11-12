@@ -563,7 +563,6 @@ final class PermissionPrompt: FloatingPanelView {
             shown[ObjectIdentifier(controller)] = prompt
             controller.promptOverlay.addSubview(prompt)
             prompt.isHidden = true
-            prompt.followTab()
             prompt.tabsToken = controller.observePromptTabs { [weak prompt] in prompt?.followTab() }
             // The tab went to another site: this question was that site's, so it's put off.
             prompt.urlToken = asking?.changed.observe { [weak prompt, weak asking] change in
@@ -593,6 +592,8 @@ final class PermissionPrompt: FloatingPanelView {
                 if event.keyCode == 53 { prompt.finish(.notNow); return nil }
                 return event
             }
+            // Last, once it listens: a tab already gone puts it off here, and that takes down what was just set up.
+            prompt.followTab()
         }
     }
 
