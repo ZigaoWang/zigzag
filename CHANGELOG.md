@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- Extensions know about pinned tabs and favorites as soon as they open, so 1Password's passkeys and other extension features work on them instead of failing with "Tab not found".
 - The "Zigzag updated" note goes away by itself after 15 seconds, like a notification, and stays while your pointer is on it. What's New is still in the Help menu.
 
 ## [0.8.6] - 2026-11-12

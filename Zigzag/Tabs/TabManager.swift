@@ -705,6 +705,9 @@ final class TabManager {
         tab.bookmarkID = bookmark.id
         tab.landingUntil = Date().addingTimeInterval(8)
         bookmarkTabs[bookmark.id] = tab
+        // Told to the extensions before its page loads: a content script that asks its extension about its tab as the
+        // page starts (1Password's) otherwise hears "Tab not found".
+        if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
         // Opened again after its folder was shut over it: it shows under the folder now, as a page opened there does.
         Library.shared.untuck(bookmark.id)
         changed.send(.structure)
@@ -790,6 +793,7 @@ final class TabManager {
             tab.customIcon = icon
             tab.host = host
             watch(tab)
+            if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
             let at = min(index, tabsBySpace[tab.spaceID]?.count ?? 0)
             tab.parentID = TabTree.parent(at: at, preferring: parent, in: treeNodes(in: tab.spaceID))
             tabsBySpace[tab.spaceID, default: []].insert(tab, at: at)
