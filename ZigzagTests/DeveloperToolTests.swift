@@ -92,16 +92,21 @@ struct DeveloperToolTests {
         #expect(CommandRanker.contextActions(context).map(\.id).contains("developer:clear-cache"))
     }
 
+    private func sizeCommands(_ context: CommandRanker.Context) -> [CommandRanker.Action] {
+        CommandRanker.contextActions(context).filter { $0.id.hasPrefix("developer-size:") }
+    }
+    private static func isIPhone16(_ action: CommandRanker.Action) -> Bool { action.keywords.contains("iphone") && action.keywords.contains("16") }
+
     /// The listed sizes are commands by name, where Page Size is offered, and each id leads back to its size.
     @Test func theCommandBarOffersEachListedSizeByName() {
         withDefaults {
             var context = CommandRanker.Context()
             context.pageSizes = PageSizes.all
-            #expect(!CommandRanker.contextActions(context).contains { $0.id.hasPrefix("developer-size:") })
+            #expect(sizeCommands(context).isEmpty)
             context.developerTools = [.sizeFill, .sizeCustom]
-            let sizes = CommandRanker.contextActions(context).filter { $0.id.hasPrefix("developer-size:") }
+            let sizes = sizeCommands(context)
             #expect(sizes.count == PageSizes.all.count)
-            let phone = sizes.first { $0.keywords.contains("iphone") && $0.keywords.contains("16") }
+            let phone = sizes.first(where: Self.isIPhone16)
             #expect(phone?.symbol == "iphone")
             #expect(phone.flatMap { PageSizes.size(commandID: $0.id) }?.size == CGSize(width: 393, height: 852))
             #expect(PageSizes.size(commandID: "developer-size:999") == nil && PageSizes.size(commandID: "developer:size-fill") == nil)
