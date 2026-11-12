@@ -547,9 +547,10 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
 }
 
 /// "Zigzag updated to 0.7.7", at the top of the page the first time a new version runs, with its notes a click away.
-/// The same panel a page's questions come in (`SavePasswordPrompt`): it slides down from the page's top edge and
-/// stays, without stopping anything, until you answer it: Not Now puts it away (Esc too), What’s New is the
-/// default (Return). The notes are in Help › What’s New in Zigzag after that.
+/// The same panel a page's questions come in (`SavePasswordPrompt`): it slides down from the page's top edge,
+/// without stopping anything. Not Now puts it away (Esc too), What’s New is the default (Return). Left alone it goes
+/// by itself after a while, as a notification banner does, but never while the pointer rests on it. The notes are in
+/// Help › What’s New in Zigzag after that.
 final class WhatsNewOffer: FloatingPanelView {
     private let header = DialogHeader(title: String(localized: "Zigzag updated to \(WhatsNew.version)", comment: "Title of the note shown after an update, with the new version number, like 0.5.2."),
                                       subtitle: String(localized: "See what’s new and what’s fixed in this version.", comment: "Under “Zigzag updated to 0.7.7” in the note shown after an update."))
@@ -562,6 +563,13 @@ final class WhatsNewOffer: FloatingPanelView {
     /// No click for its first half second, as on a site's question: a click meant for the page never lands on it.
     private var shownAt = Date.distantFuture
     private let pad = Tokens.Dialog.padding
+    /// Puts it away when left alone (`lifetime`), paused while the pointer is over it.
+    private var expiry: Timer?
+
+    /// How long it stays when nothing is done with it: long enough to read it and decide, as a banner stays.
+    static let lifetime: TimeInterval = 15
+    /// After the pointer leaves it, a little longer: it never goes the moment you look away.
+    static let lingerAfterHover: TimeInterval = 5
 
     private init(controller: BrowserWindowController) {
         self.controller = controller
@@ -613,6 +621,33 @@ final class WhatsNewOffer: FloatingPanelView {
             }
         }
         Announcement.post(offer.header.title.stringValue + ". " + offer.header.subtitle.stringValue, priority: .high)
+        offer.expire(after: lifetime)
+    }
+
+    private func expire(after seconds: TimeInterval) {
+        expiry?.invalidate()
+        expiry = Timer.scheduledTimer(withTimeInterval: seconds, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.close() }
+        }
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.filter { $0.owner === self && $0.userInfo?["expiry"] != nil }.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+                                       owner: self, userInfo: ["expiry": true]))
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        expiry?.invalidate()
+        expiry = nil
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        guard superview != nil else { return }
+        expire(after: Self.lingerAfterHover)
     }
 
     /// Nothing else has the keyboard: no page, field or text, and nothing floating over the window.
@@ -671,6 +706,8 @@ final class WhatsNewOffer: FloatingPanelView {
     }
 
     private func close() {
+        expiry?.invalidate()
+        expiry = nil
         frameObservers.forEach { NotificationCenter.default.removeObserver($0) }
         frameObservers = []
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
