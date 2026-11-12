@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- On macOS 27, sign-in fields show the key icon and open the Mac's AutoFill panel even when a password manager like Dashlane or 1Password does the filling instead of Zigzag, so its logins can be picked there. ([#57](https://github.com/ZigaoWang/zigzag/issues/57))
 - ⌘Z and ⇧⌘Z reach the page first, so web apps like Google Sheets undo their own changes. Zigzag's own undo for the sidebar still works when the page lets the key pass. Thanks to [Lakeland97](https://github.com/Lakeland97).
 
 ## [0.8.6] - 2026-11-12

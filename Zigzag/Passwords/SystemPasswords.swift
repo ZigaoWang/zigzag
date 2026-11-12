@@ -302,11 +302,12 @@ enum AutofillKeyIcon {
         controller.addScriptMessageHandler(Asker.shared, contentWorld: world, name: messageName)
     }
 
-    /// Answers the page script's one question: does Zigzag fill passwords in this page's profile?
+    /// Answers the page script's one question: should sign-in fields show the key? Whenever the Mac's panel can open:
+    /// it's the Mac's, not Zigzag's, and lists what you keep in Passwords and in any app you turned on in System
+    /// Settings › AutoFill & Passwords (1Password, Dashlane…), so it stays when Zigzag itself doesn't fill (#57).
     final class Asker: NSObject, WKScriptMessageHandlerWithReply {
         static let shared = Asker { webView in
-            guard let webView = webView as? BrowserWebView else { return false }
-            return Autofill.isOn(in: Profiles.shared.profile(ofPage: webView))
+            webView is BrowserWebView && SystemAutoFillPanel.isAvailable
         }
         private let isOn: (WKWebView?) -> Bool
         init(isOn: @escaping (WKWebView?) -> Bool) { self.isOn = isOn }
