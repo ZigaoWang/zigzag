@@ -609,7 +609,9 @@ enum DebugBridge {
                         webView.callAsyncJavaScript("""
                             const s = document.querySelector('style[data-zigzag-dark=""]'), p = document.querySelector('style[data-zigzag-dark=prepaint]');
                             return JSON.stringify({ ready: document.readyState, style: !!s, filter: !!s && s.textContent.includes('invert'),
-                              prepaint: !!p, state: window.__zigzagDark ? window.__zigzagDark.state().palette : null });
+                              prepaint: !!p, state: window.__zigzagDark ? window.__zigzagDark.state().palette : null,
+                              prefersDark: matchMedia('(prefers-color-scheme: dark)').matches, mode: document.documentElement && document.documentElement.getAttribute('data-color-mode'),
+                              darkened: window.__zigzagDark ? window.__zigzagDark.state().darkened : null });
                             """, arguments: [:], in: nil, in: DarkPages.world) { result in
                             debugLog("groundprobe \(i) \(native) js=\((try? result.get()).map { "\($0)" } ?? "none")")
                         }

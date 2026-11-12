@@ -20,7 +20,11 @@
 // White never shows first (#134): a page that's darkened starts so at document start (the filter, or the palette with
 // its own dark ground), and one that isn't yet, since its site was last seen dark, starts on a plain dark ground
 // (`prepaint`: a dark color-scheme and background on the root, the body clear) until it's looked at; then that goes,
-// so a site dark on its own shows its own colors, and a light one is darkened.
+// so a site dark on its own shows its own colors, and a light one is darkened. The page is looked at just before each
+// frame is drawn while it comes in, once its style sheets are there, so the switch is made before the frame its own
+// colors would first show in: a dark site seen for the first time loses the filter before its dark is drawn through
+// it (as white), and a page that turns dark as it runs (an app after a light loading screen) is let go of in the
+// frame it does.
 //
 // How: the whole page goes through one filter on the root (inverted, then its hues turned back), and pictures,
 // video and the like are turned back again, so they look as they are. A filter on the root keeps fixed headers in
@@ -182,6 +186,26 @@
   };
   const skip = /^(IMG|VIDEO|CANVAS|IFRAME|EMBED|OBJECT|PICTURE|SVG)$/i;
   const isDark = (c) => luminance(c) < 0.2;
+  // A style sheet the page is still waiting for: WebKit draws nothing of the page until they're in, and what's read
+  // before then is the page without its own style, white.
+  const failedSheets = new WeakSet();
+  addEventListener('error', (e) => { if (e.target && e.target.tagName === 'LINK') failedSheets.add(e.target); }, true);
+  const sheetPending = () => {
+    for (const link of document.querySelectorAll('link[rel~="stylesheet" i]')) {
+      // One with no address loads nothing (GitHub keeps some for later that way).
+      if (link.sheet || !link.getAttribute('href') || link.disabled || failedSheets.has(link) || /\balternate\b/i.test(link.rel)) continue;
+      if (link.media && !matchMedia(link.media).matches) continue;
+      return true;
+    }
+    return false;
+  };
+  // Whether there's a page to look at: a body with something in it, and its style.
+  const styled = () => {
+    const body = document.body;
+    if (!body) return false;
+    if (document.readyState === 'complete') return true;
+    return !!body.firstElementChild && !sheetPending();
+  };
   // True when the page draws itself dark, false when light, null when there's no page to look at yet.
   const pageIsDark = () => {
     const body = document.body;
@@ -210,9 +234,11 @@
     const sheet = darkened && style.sheet;
     const ground = prepaint.parentNode && prepaint.sheet;
     const fill = fillStyle.parentNode && fillStyle.sheet;
-    for (const s of [sheet, ground, fill]) if (s) s.disabled = true;
-    const found = pageIsDark();
-    for (const s of [sheet, ground, fill]) if (s) s.disabled = false;
+    // Nothing decided before the page has its style: unstyled, every page reads as white.
+    const ready = styled();
+    if (ready) for (const s of [sheet, ground, fill]) if (s) s.disabled = true;
+    const found = ready ? pageIsDark() : null;
+    if (ready) for (const s of [sheet, ground, fill]) if (s) s.disabled = false;
     if (found !== null) { native = found; dropPrepaint(); }
     // Until the page can be looked at, a site last seen dark stays as it is and any other is darkened, so it
     // never comes up white first.
@@ -724,15 +750,57 @@
       if (document.documentElement) { watchedRoot = document.documentElement; added.observe(watchedRoot, { childList: true }); }
     }
   };
+
+  // MARK: Before each frame
+
+  // While the page comes in, and for a moment after it has loaded, it's looked at just before each frame is drawn
+  // (`requestAnimationFrame` runs then), so what's drawn follows the page in that same frame rather than after a timer.
+  // The first look, once the page has its style, decides it; after that a quick one (its body and its middle, with
+  // nothing switched off) each frame, and a full look only when that changes: a darkened page turning dark on its own,
+  // or one let go of turning light.
+  let loadedAt = 0;
+  let decided = false;
+  let lastQuick = null;
+  const quickDark = () => {
+    const body = document.body;
+    if (!body) return null;
+    const a = backgroundOf(body);
+    let el = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+    while (el && el.parentElement && skip.test(el.tagName)) el = el.parentElement;
+    const b = el && el !== style && el !== prepaint ? backgroundOf(el) : a;
+    if (isDark(a) && isDark(b)) return true;
+    if (!isDark(a) && !isDark(b)) return false;
+    return null;
+  };
+  const beforeFrame = () => {
+    if (loadedAt && performance.now() - loadedAt > 3000) return;
+    requestAnimationFrame(beforeFrame);
+    if (!wanted || forced() || !styled()) return;
+    if (!decided || prepaint.parentNode) {
+      decided = true;
+      check();
+      lastQuick = darkened && usingPalette ? null : quickDark();
+      return;
+    }
+    // A palette draws the page's own colors dark: read with it on, every page would look dark (it's checked on its own).
+    if (darkened && usingPalette) return;
+    const quick = quickDark();
+    if (quick === null || quick === lastQuick) return;
+    lastQuick = quick;
+    if (quick === darkened) check();
+  };
+
   // Darkened from the first moment, unless the site was last seen dark: no white page first. One last seen dark
   // starts on the plain dark ground until it's looked at.
   if (wanted && darkens()) apply(true);
   else { if (wanted) { putPrepaint(); refreshFill(); } send(); }
+  if (isTop) requestAnimationFrame(beforeFrame);
   if (usingPalette) requestAnimationFrame(firstFrame);
   watch();
   if (document.documentElement) watchThemes(document.documentElement);
   document.addEventListener('DOMContentLoaded', () => { check(); checkEarly(); });
   addEventListener('load', () => {
+    loadedAt = performance.now();
     check();
     checkEarly();
     setTimeout(check, 600);
