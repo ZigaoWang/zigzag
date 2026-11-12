@@ -52,7 +52,11 @@ final class PageCardView: NSView {
     var pageColor: NSColor? { pageSize == nil ? (webView as? BrowserWebView)?.owner?.pageColor : nil }
     /// The card's color wherever the page isn't: the page's own, so a split's two cards each have theirs; the plain
     /// card's with no page, under what covers it, or around a page at a size of its own.
-    private var ground: NSColor { pageColor ?? Tokens.Color.cardBackground }
+    /// Around a page at a size of its own, the backdrop a PDF's pages lie on: the page reads as a sheet on it, as a
+    /// device's screen does in a responsive view, whatever color the page is.
+    private var ground: NSColor { pageColor ?? (pageSize != nil ? Tokens.Color.pdfBackdrop : Tokens.Color.cardBackground) }
+    /// A hairline around a page at a size of its own, so its edges show on any backdrop, light page or dark.
+    private let pageOutline = ColorView(color: Tokens.Color.cardEdge)
     /// The page's part of the card, in the superview's terms: under the band.
     var pageFrame: NSRect { NSRect(x: frame.minX, y: frame.minY + band, width: frame.width, height: max(0, frame.height - band)) }
     /// The page at a size of its own rather than filling the card: in the middle of its room, the card's plain
@@ -72,6 +76,21 @@ final class PageCardView: NSView {
         guard let size else { return content }
         let width = min(content.width, size.width + docked.width), height = min(content.height, size.height + docked.height)
         return NSRect(x: content.minX + floor((content.width - width) / 2), y: content.minY + floor((content.height - height) / 2), width: width, height: height)
+    }
+
+    /// The hairline goes round the page's holder while the page has a size of its own, under it, and is hidden
+    /// otherwise.
+    private func placeOutline() {
+        guard pageSize != nil, let holder, holder.superview === clip else {
+            if !pageOutline.isHidden { pageOutline.isHidden = true }
+            return
+        }
+        let line = Tokens.Metric.hairline
+        if pageOutline.superview !== clip || clip.subviews.firstIndex(of: pageOutline).map({ $0 + 1 }) != clip.subviews.firstIndex(of: holder) {
+            clip.addSubview(pageOutline, positioned: .below, relativeTo: holder)
+        }
+        pageOutline.frame = holder.frame.insetBy(dx: -line, dy: -line)
+        pageOutline.isHidden = false
     }
 
     /// How far down the card the page starts: under the bar's band and a split pane's header.
@@ -367,6 +386,7 @@ final class PageCardView: NSView {
                 holder.frame = Self.pageRect(content: content, size: pageSize, docked: holder.dockedRoom)
                 pageArea = NSSize(width: holder.frame.width - holder.dockedRoom.width, height: holder.frame.height - holder.dockedRoom.height)
             }
+            placeOutline()
             if !glides(document) { document?.frame = content }
             placeholder.frame = content
             overlay?.frame = content
