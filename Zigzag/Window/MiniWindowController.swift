@@ -999,6 +999,8 @@ final class MiniTitleView: InteractiveView {
     func show(_ tab: Tab) {
         let name = AddressView.name(of: tab.url)
         label.stringValue = name.isEmpty ? tab.displayTitle : name
+        // A long host loses its start, never the domain that says whose site it is (#189).
+        label.lineBreakMode = name.isEmpty ? .byTruncatingTail : AddressView.lineBreak(forName: name)
         mark.isHidden = tab.url?.scheme != "http"
         setAccessibilityLabel(mark.isHidden ? label.stringValue
                               : String(localized: "\(label.stringValue), \(SitePanel.notSecure)", comment: "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure."))

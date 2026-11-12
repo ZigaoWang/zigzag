@@ -89,6 +89,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Mute Tab | 将标签页静音 | 静音 | Safari. |
 | Change Icon… (a folder, tab, pinned tab, favorite) | 更改图标… | 更换图标… | Plain, as 更改 is everywhere in macOS. |
 | Use Site Icon | 使用网站图标 | 恢复默认图标, 还原图标 | Says which icon comes back: the site's own, 网站 as in 网站设置. |
+| Use Default Colors (a space) | 使用默认颜色 | 恢复默认配色, 重置颜色 | As Use Site Icon: 使用, then what comes back. 颜色 as the space editor's other color words. |
 | Reload | 重新载入 | 刷新 | Safari: 重新载入页面. |
 | Back / Forward | 后退 / 前进 | | Safari. |
 | Share… | 共享… | 分享… | macOS's Share menu is 共享. |

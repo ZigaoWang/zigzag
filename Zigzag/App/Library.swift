@@ -137,6 +137,9 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// The browser profile this space was made for by an import (`ImportBatch.BrowserProfile.key`), so importing that
     /// profile again adds to it instead of making another. Nil: made here.
     var importedFrom: String? = nil
+    /// The color Zigzag gave the space when it was made, which Use Default Colors puts back. Nil: not kept yet (made
+    /// before it was, and not changed since), so `Library.defaultColors` works it out.
+    var defaultColor: SpaceColor? = nil
 
     /// No hue of its own: white, a gray, or black.
     var isNeutral: Bool { (hue == nil && color.isNeutral) || (tint ?? 1) < 0.005 }
@@ -241,6 +244,42 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
             space.brightness = brightness.map { SpaceColor.depth(ofWhite: 1 - $0) }
         }
         return space
+    }
+
+    /// The space with the colors a new one gets: `color` alone, light by day and dark at night with the Mac, with no
+    /// gradient, see-through or grain. Its name, icon, pages and the rest stay.
+    func withDefaultColors(_ color: SpaceColor) -> SpaceInfo {
+        var space = self
+        space.color = color
+        space.hue = nil
+        space.intensity = nil
+        space.hue2 = nil
+        space.intensity2 = nil
+        space.angle = nil
+        space.glass = nil
+        space.brightness = nil
+        space.brightness2 = nil
+        space.tint = nil
+        space.tint2 = nil
+        space.translucency = nil
+        space.clearGlass = nil
+        space.grain = nil
+        space.appearance = nil
+        return space.upgraded
+    }
+
+    /// Whether the space looks just as `withDefaultColors(color)` does. What can't show is left out: a gradient's
+    /// direction once it's one color, and clear or frosted glass on a solid space.
+    func hasDefaultColors(_ color: SpaceColor) -> Bool {
+        func look(_ space: SpaceInfo) -> [String] {
+            let s = space.upgraded
+            let two = s.hue2 != nil
+            let values: [Any?] = [s.color.rawValue, s.hue, s.intensity, s.brightness, s.tint, s.translucency, s.grain, s.appearance,
+                                  s.hue2, two ? s.intensity2 : nil, two ? s.brightness2 : nil, two ? s.tint2 : nil, two ? s.angle : nil,
+                                  s.isSeeThrough ? s.clearGlass : nil]
+            return values.map { $0.map { "\($0)" } ?? "-" }
+        }
+        return look(self) == look(withDefaultColors(color))
     }
 
     /// Light or dark for the window: whichever text reads better on this space's own colors, judged at the
@@ -443,7 +482,7 @@ final class Library {
         profilesWereSetAside = hadProfiles && readProfiles == nil
         savedDirectory = directory
         if let stored = JSONStore.load(Stored.self, from: Paths.library), !stored.spaces.isEmpty {
-            spaces = stored.spaces.map(\.upgraded)
+            spaces = Self.keepingDefaultColors(stored.spaces.map(\.upgraded))
             favorites = stored.favorites ?? []
             favoriteSplits = stored.favoriteSplits ?? []
             searchEngine = stored.searchEngine
@@ -453,7 +492,7 @@ final class Library {
             tidyFavorites()
         } else {
             wasRead = false
-            spaces = [SpaceInfo(name: String(localized: "Personal", comment: "The name of the first space in a new Zigzag. People can rename it."), color: .sky)]
+            spaces = [SpaceInfo(name: String(localized: "Personal", comment: "The name of the first space in a new Zigzag. People can rename it."), color: .sky, defaultColor: .sky)]
             searchEngine = .google
             importedFromArc = false
             saveNow()
@@ -501,8 +540,9 @@ final class Library {
     @discardableResult
     func addSpace(name: String? = nil, color: SpaceColor? = nil, profile: UUID = Profile.defaultID) -> SpaceInfo {
         let pick = color ?? SpaceColor.next(unused: spaces.map(\.color))
-        let space = SpaceInfo(name: name ?? String(localized: "Space \(spaces.count + 1)", comment: "The name of a new space: its number. People can rename it."),
+        var space = SpaceInfo(name: name ?? String(localized: "Space \(spaces.count + 1)", comment: "The name of a new space: its number. People can rename it."),
                               color: pick)
+        space.defaultColor = pick
         spaces.append(space)
         directory.assign(space: space.id, to: profile)
         commit()
@@ -530,8 +570,56 @@ final class Library {
         commit()
     }
 
+    /// The color each space was given when it was made, in order. A space from before that was kept still has it as
+    /// its `color`, unless a white, gray or black look took its place: then it's the one a space made in its place
+    /// would get, as `addSpace` picks.
+    static func defaultColors(of spaces: [SpaceInfo]) -> [SpaceColor] {
+        var made: [SpaceColor] = []
+        for space in spaces {
+            if let kept = space.defaultColor { made.append(kept) }
+            else if space.color == .graphite, space.brightness != nil { made.append(SpaceColor.next(unused: made)) }
+            else { made.append(space.color) }
+        }
+        return made
+    }
+
+    /// Every space with the color it was made with kept, worked out once as the library opens, so moving or
+    /// deleting spaces later doesn't change it.
+    static func keepingDefaultColors(_ spaces: [SpaceInfo]) -> [SpaceInfo] {
+        zip(spaces, defaultColors(of: spaces)).map { space, color in
+            var space = space
+            space.defaultColor = space.defaultColor ?? color
+            return space
+        }
+    }
+
+    /// The color Use Default Colors gives the space.
+    func defaultColor(ofSpace id: UUID) -> SpaceColor? {
+        guard let i = index(of: id) else { return nil }
+        return spaces[i].defaultColor ?? Self.defaultColors(of: spaces)[i]
+    }
+
+    /// Whether the space still has the colors it was made with, so there's nothing for Use Default Colors to do.
+    func hasDefaultColors(_ id: UUID) -> Bool {
+        guard let space = space(id), let color = defaultColor(ofSpace: id) else { return true }
+        return space.hasDefaultColors(color)
+    }
+
+    /// The colors the space was made with, back again.
+    func useDefaultColors(forSpace id: UUID) {
+        guard let space = space(id), let color = defaultColor(ofSpace: id), !space.hasDefaultColors(color) else { return }
+        setLook(space.withDefaultColors(color))
+    }
+
+    /// Before a space's colors first change, the color it was made with is kept, so it stays the same however the
+    /// spaces are moved or changed after.
+    private func keepDefaultColor(_ i: Int) {
+        if spaces[i].defaultColor == nil { spaces[i].defaultColor = Self.defaultColors(of: spaces)[i] }
+    }
+
     func setColor(_ color: SpaceColor, for id: UUID) {
         guard let i = index(of: id) else { return }
+        keepDefaultColor(i)
         spaces[i].color = color
         spaces[i].hue = nil
         spaces[i].intensity = nil
@@ -542,6 +630,7 @@ final class Library {
     /// Everything about how a space looks, from the space editor, in one save.
     func setLook(_ look: SpaceInfo) {
         guard let i = index(of: look.id) else { return }
+        keepDefaultColor(i)
         spaces[i].color = look.color
         spaces[i].hue = look.hue
         spaces[i].intensity = look.intensity
@@ -563,6 +652,7 @@ final class Library {
     /// Nil: automatic. Otherwise the window's mode follows it: light for the lighter half, dark for the darker.
     func setBrightness(_ brightness: Double?, for id: UUID) {
         guard let i = index(of: id) else { return }
+        keepDefaultColor(i)
         spaces[i].brightness = brightness
         spaces[i].appearance = brightness.map { $0 < 0.5 ? "light" : "dark" }
         commit()
@@ -570,12 +660,14 @@ final class Library {
 
     func setGrain(_ grain: Double, for id: UUID) {
         guard let i = index(of: id) else { return }
+        keepDefaultColor(i)
         spaces[i].grain = grain > 0.01 ? min(grain, 1) : nil
         commit()
     }
 
     func setHue(_ hue: Double, intensity: Double? = nil, for id: UUID) {
         guard let i = index(of: id) else { return }
+        keepDefaultColor(i)
         spaces[i].hue = hue
         spaces[i].tint = nil
         if let intensity { spaces[i].intensity = intensity }

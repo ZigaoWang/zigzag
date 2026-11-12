@@ -193,6 +193,8 @@ final class PeekController {
     private func refreshHeader() {
         guard let tab else { return }
         header.host.stringValue = tab.url.map(HistoryStore.normalizedHost) ?? tab.displayTitle
+        // Cut from the start, so the domain that says whose site it is stays whole (#189).
+        header.host.lineBreakMode = AddressView.lineBreak(forName: header.host.stringValue)
         header.icon.image = tab.favicon
         header.icon.isLoading = tab.isLoading
     }

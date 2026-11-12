@@ -178,6 +178,8 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
 
     private func refreshStrip() {
         strip.title.stringValue = Self.stripTitle(app: app, page: tab.url)
+        // Another site's host loses its start, never its domain (#189); the app's own name its end.
+        strip.title.lineBreakMode = AddressView.lineBreak(forName: strip.title.stringValue)
         strip.notSecure = tab.url?.scheme == "http"
         strip.back.isEnabled = tab.canGoBack
         strip.forward.isEnabled = tab.canGoForward

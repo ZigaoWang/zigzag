@@ -371,6 +371,7 @@ enum SidebarMenus {
             controller.openSpaceEditor(id, anchor: anchor)
         })
         _ = space
+        menu.addItem(useDefaultColorsItem(for: id) { controller.libraryChange($0, $1) })
         if id == controller.tabManager.currentSpaceID {
             menu.addItem(Item(String(localized: "New Folder", comment: "Item in a space's context menu.")) { controller.newFolder() })
         }
@@ -386,6 +387,15 @@ enum SidebarMenus {
             SpaceEditor.confirmDelete(spaceID: id, in: controller)
         })
         return menu
+    }
+
+    /// Use Default Colors, beside Edit Space…: the colors the space was made with, back in one step that ⌘Z undoes.
+    /// Dimmed while it still has them.
+    static func useDefaultColorsItem(for id: UUID, change: @escaping (String, () -> Void) -> Void) -> NSMenuItem {
+        let title = String(localized: "Use Default Colors", comment: "Button in the space editor, and item in a space's context menu: puts back the colors the space had when it was made.")
+        return Item(title, enabled: !Library.shared.hasDefaultColors(id)) {
+            change(title) { Library.shared.useDefaultColors(forSpace: id) }
+        }
     }
 
     /// What the sidebar's own menus hold, in order, before they're made into items: the + at its bottom and the
