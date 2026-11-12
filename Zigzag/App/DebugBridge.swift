@@ -1563,7 +1563,9 @@ enum DebugBridge {
             PasswordCapture.setOffersToSave(arg == "on", in: controller.tabManager.profile)
         case "settingsbottom":
             if let root = controller.tabManager.selectedTab?.settingsView,
-               let scroll = root.subviews.compactMap({ $0 as? NSScrollView }).first, let document = scroll.documentView {
+               // settingsbottom [column]: the page, or the column of sections (the narrower of the two).
+               let scroll = root.subviews.compactMap({ $0 as? NSScrollView }).sorted(by: { $0.frame.width < $1.frame.width })[arg == "column" ? 0 : 1] as NSScrollView?,
+               let document = scroll.documentView {
                 document.scroll(NSPoint(x: 0, y: document.bounds.height - scroll.contentSize.height))
             }
         case "settingspane":

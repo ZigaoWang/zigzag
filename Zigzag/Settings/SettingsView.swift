@@ -704,6 +704,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Over each group, in the column with names: what its sections are about.
     private var groupHeadings: [SettingsPane: Label] = [:]
     private let column = FlippedView()
+    /// Scrolls the column when a short window can't fit every section in it.
+    private let columnScroll = NSScrollView()
     /// The chosen section's fill, gliding to the one you pick.
     private let sectionSelection = SelectionGlide()
     /// The wordmark and "Settings" at the top of the column, where History has its own.
@@ -952,7 +954,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         buildColumn()
         // The column of sections takes a light tint of the window's space, so Settings belongs to it.
         column.wantsLayer = true
-        addSubview(column)
+        columnScroll.drawsBackground = false
+        // The column starts at the window's top, under the traffic lights, as it did before it scrolled.
+        columnScroll.automaticallyAdjustsContentInsets = false
+        columnScroll.hasVerticalScroller = true
+        columnScroll.autohidesScrollers = true
+        columnScroll.scrollerStyle = .overlay
+        columnScroll.verticalScrollElasticity = .allowed
+        columnScroll.documentView = column
+        addSubview(columnScroll)
         addSubview(columnEdge)
         themeToken = Brand.themeChanged.observe { [weak self] in self?.needsDisplay = true }
 
@@ -1264,7 +1274,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         switch arrangement {
         case .column, .rail:
             let width = arrangement == .column ? Tokens.Page.columnWidth : Tokens.Space.x16
-            column.frame = NSRect(x: 0, y: 0, width: width, height: bounds.height)
+            columnScroll.frame = NSRect(x: 0, y: 0, width: width, height: bounds.height)
             columnEdge.frame = NSRect(x: width, y: 0, width: line, height: bounds.height)
             area = NSRect(x: width + line, y: 0, width: max(0, bounds.width - width - line), height: bounds.height)
             header.frame = NSRect(x: area.minX, y: 0, width: area.width, height: headerHeight)
@@ -1272,9 +1282,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             // The header across the top, then the sections as a row of symbols under it.
             let height = Tokens.Space.x10 + Tokens.Space.x2
             header.frame = NSRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
-            column.frame = NSRect(x: 0, y: headerHeight, width: bounds.width, height: height)
-            columnEdge.frame = NSRect(x: 0, y: column.frame.maxY, width: bounds.width, height: line)
-            area = NSRect(x: 0, y: column.frame.maxY + line, width: bounds.width, height: max(0, bounds.height - column.frame.maxY - line))
+            columnScroll.frame = NSRect(x: 0, y: headerHeight, width: bounds.width, height: height)
+            columnEdge.frame = NSRect(x: 0, y: columnScroll.frame.maxY, width: bounds.width, height: line)
+            area = NSRect(x: 0, y: columnScroll.frame.maxY + line, width: bounds.width, height: max(0, bounds.height - columnScroll.frame.maxY - line))
         }
         // The page scrolls under the header; in a row, under the sections too.
         let top = arrangement == .row ? area.minY : headerHeight
@@ -1286,7 +1296,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshTitle()
         placeProfilePicker(arrangement)
         settingSearch.tint = Brand.Theme.for(self).accent
-        layoutColumn(arrangement)
+        // The sections are laid out for the height in view; what still doesn't fit scrolls.
+        column.frame = NSRect(origin: .zero, size: columnScroll.contentSize)
+        let columnBottom = layoutColumn(arrangement)
+        column.frame.size.height = max(columnScroll.contentSize.height, ceil(columnBottom))
         // The pane's rows depend only on the width, so a change of height just stretches the page under them,
         // instead of rebuilding every row (Shortcuts has about a hundred).
         if scroll.frame.width != laidOutWidth {
@@ -1307,7 +1320,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         header.showsEdge = scroll.contentView.bounds.minY > 0
     }
 
-    private func layoutColumn(_ arrangement: Arrangement) {
+    /// Lays the sections out down `column` and returns where the last one ends.
+    @discardableResult
+    private func layoutColumn(_ arrangement: Arrangement) -> CGFloat {
         columnTitle.isHidden = arrangement != .column
         items.forEach { $0.isCompact = arrangement != .column }
         // With names beside them, the sections about one profile stand under a heading and the menu that chooses it;
@@ -1332,6 +1347,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let headings = CGFloat(groupHeadings.count) * headingRoom
             return max(Tokens.Page.controlHeight, min(tallest, floor((column.bounds.height - top - Tokens.Space.x2 - gaps * gap - headings) / count) - 2))
         }
+        var bottom: CGFloat = 0
         switch arrangement {
         case .column:
             // The title sits where History's does; the sections' text lines up under it, their fills reaching past.
@@ -1355,6 +1371,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 item.frame = NSRect(x: gutter - inset, y: y, width: column.bounds.width - (gutter - inset) * 2, height: rowHeight)
                 y += rowHeight + 2
             }
+            bottom = y + Tokens.Space.x2
         case .rail:
             let rowHeight = height(side)
             var y = top
@@ -1363,6 +1380,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 item.frame = NSRect(x: (column.bounds.width - side) / 2, y: y, width: side, height: rowHeight)
                 y += rowHeight + 2
             }
+            bottom = y + Tokens.Space.x2
         case .row:
             // Spread evenly across, but never further apart than the rail has them.
             let spacing = min(Tokens.Space.x2, max(0, (column.bounds.width - Tokens.Space.x4 * 2 - side * count - gaps * gap) / (count - 1)))
@@ -1375,6 +1393,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
         }
         moveSectionSelection(animated: false)
+        return bottom
     }
 
     private func moveSectionSelection(animated: Bool) {
@@ -1388,6 +1407,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         settingSearch.stringValue = ""
         items.forEach { $0.isSelected = $0.pane == pane }
         moveSectionSelection(animated: true)
+        // Opened from a search or a link while the column is scrolled: the chosen section comes into view.
+        if let item = items.first(where: { $0.isSelected }) { column.scrollToVisible(item.frame.insetBy(dx: 0, dy: -Tokens.Space.x2)) }
         refreshTitle()
         if showsWebsiteData { reloadPrivacy() }
         if pane == .shortcuts { reloadShortcuts() }
