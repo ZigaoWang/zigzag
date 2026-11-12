@@ -16,6 +16,11 @@
 // goes back to the filter at once if it doesn't. Later visits also check, when idle, whether the site's style changed,
 // and read it again if so.
 //
+// White never shows first (#134): a page that's darkened starts so at document start (the filter, or the palette with
+// its own dark ground), and one that isn't yet, since its site was last seen dark, starts on a plain dark ground
+// (`prepaint`: a dark color-scheme and background on the root, the body clear) until it's looked at; then that goes,
+// so a site dark on its own shows its own colors, and a light one is darkened.
+//
 // How: the whole page goes through one filter on the root (inverted, then its hues turned back), and pictures,
 // video and the like are turned back again, so they look as they are. A filter on the root keeps fixed headers in
 // place (it isn't a containing block there) and WebKit draws it on the GPU, so scrolling isn't touched. Whether a
@@ -75,6 +80,15 @@
   const css = () => (usingPalette ? config.palette.css + '\n' : config.root + (isTop ? config.canvas : '') + config.media);
   const style = document.createElement('style');
   style.setAttribute('data-zigzag-dark', '');
+  // The plain dark ground a page starts on while it's not known whether it's dark on its own (`prepaint` in the header).
+  const prepaint = document.createElement('style');
+  prepaint.setAttribute('data-zigzag-dark', 'prepaint');
+  prepaint.textContent = config.prepaint || '';
+  const putPrepaint = () => {
+    const root = document.documentElement;
+    if (isTop && config.prepaint && root && prepaint.parentNode !== root) root.appendChild(prepaint);
+  };
+  const dropPrepaint = () => { if (prepaint.parentNode) prepaint.remove(); };
 
   // MARK: Shadow roots
 
@@ -112,6 +126,7 @@
   };
   const apply = (on) => {
     const how = on && paletteFits();
+    if (on) dropPrepaint();
     if (on === darkened && how === usingPalette) { if (on) put(); return; }
     darkened = on;
     usingPalette = how;
@@ -178,14 +193,17 @@
   const check = () => {
     wanted = choice();
     // Not wanted here: said, so a bar colored after the last page's darkened look doesn't keep it.
-    if (!wanted) { apply(false); send(); return; }
+    if (!wanted) { dropPrepaint(); apply(false); send(); return; }
     // Looked at as the page draws itself: our style forces a light color-scheme, which a page drawn with
     // light-dark() would follow. Off and on again in one go, so nothing is drawn in between.
     const sheet = darkened && style.sheet;
+    const ground = prepaint.parentNode && prepaint.sheet;
     if (sheet) sheet.disabled = true;
+    if (ground) ground.disabled = true;
     const found = pageIsDark();
     if (sheet) sheet.disabled = false;
-    if (found !== null) native = found;
+    if (ground) ground.disabled = false;
+    if (found !== null) { native = found; dropPrepaint(); }
     // Until the page can be looked at, a site last seen dark stays as it is and any other is darkened, so it
     // never comes up white first.
     apply(native !== true);
@@ -572,8 +590,10 @@
       if (document.documentElement) { watchedRoot = document.documentElement; added.observe(watchedRoot, { childList: true }); }
     }
   };
-  // Darkened from the first moment, unless the site was last seen dark: no white page first.
-  if (wanted && native !== true) apply(true); else send();
+  // Darkened from the first moment, unless the site was last seen dark: no white page first. One last seen dark
+  // starts on the plain dark ground until it's looked at.
+  if (wanted && native !== true) apply(true);
+  else { if (wanted) putPrepaint(); send(); }
   if (usingPalette) requestAnimationFrame(firstFrame);
   watch();
   if (document.documentElement) watchThemes(document.documentElement);

@@ -155,6 +155,15 @@ enum DarkPages {
         return !entry.invert && !entry.css.isEmpty
     }
 
+    /// What a page last seen dark on its own starts on until it's looked at (#134): a dark color-scheme, so WebKit's
+    /// own ground under the page is dark rather than white, and the palette's dark on the root, with the body clear so
+    /// it shows. It goes as soon as the page is looked at: one that's dark keeps its own colors, a light one is
+    /// darkened. Never with the filter, which would turn it light.
+    static func prepaintCSS(black: Bool) -> String {
+        let hex = black ? "#000000" : "#121212"
+        return ":root { color-scheme: dark !important; background-color: \(hex) !important; }\nbody { background-color: transparent !important; }\n"
+    }
+
     // MARK: The style
 
     /// On a picture's own element (a background photo), and on one whose ::before or ::after shows a picture.
@@ -251,7 +260,7 @@ enum DarkPages {
         var config: [String: Any] = [
             "on": wants(mode: mode, systemIsDark: systemIsDark, site: nil), "sitesOn": sitesOn.sorted(), "sitesOff": sitesOff.sorted(),
             "native": nativeSites(in: nativeScope(of: store)).sorted(), "black": black, "strength": strength(black: black),
-            "root": rootCSS(black: black), "canvas": canvasCSS, "media": mediaCSS(black: black),
+            "root": rootCSS(black: black), "canvas": canvasCSS, "media": mediaCSS(black: black), "prepaint": prepaintCSS(black: black),
             "marks": ["image": imageMark, "before": beforeMark, "after": afterMark, "frame": frameMark],
             "learn": nativeScope(of: store) != nil, "paletteDelay": paletteDelay, "palette": NSNull()]
         if let entry = palette(for: store, url: url) {
