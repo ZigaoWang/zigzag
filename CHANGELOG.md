@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Settings' sections sit under headings: Browser, Tools, Privacy & Security and Advanced.
+
 ### Fixed
 - In Change Icon, clicking the chosen icon again or deleting the emoji puts the site's own icon back. ([#153](https://github.com/ZigaoWang/zigzag/issues/153))
 

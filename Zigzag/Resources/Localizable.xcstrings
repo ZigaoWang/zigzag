@@ -2130,6 +2130,17 @@
         }
       }
     },
+    "Advanced" : {
+      "comment" : "A heading in the column of Settings, over Extensions, Shortcuts and Automation.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高级"
+          }
+        }
+      }
+    },
     "After 12 Hours" : {
       "comment" : "A choice in Settings for when tabs you haven't used are archived.",
       "localizations" : {
@@ -3063,6 +3074,17 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Browser" : {
+      "comment" : "A heading in the column of Settings, over General, Appearance, Tabs, Spaces and Profiles.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浏览器"
           }
         }
       }
@@ -9992,6 +10014,17 @@
         }
       }
     },
+    "Privacy & Security" : {
+      "comment" : "A heading in the column of Settings, over Passwords and Privacy.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐私与安全"
+          }
+        }
+      }
+    },
     "Privacy settings" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
       "localizations" : {
@@ -14021,6 +14054,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今天夜里"
+          }
+        }
+      }
+    },
+    "Tools" : {
+      "comment" : "A heading in the column of Settings, over Search, Zigzag Mini and Translation.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工具"
           }
         }
       }

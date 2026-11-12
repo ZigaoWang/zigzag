@@ -651,6 +651,22 @@ enum SettingsPane: String, CaseIterable {
         Set(columnGroups(manyProfiles: manyProfiles).shared.dropFirst().compactMap(\.first))
     }
 
+    /// The heading over the group a section starts, in the column with names beside the symbols.
+    static func groupTitle(startingAt pane: SettingsPane) -> String? {
+        switch pane {
+        case .general: String(localized: "Browser", comment: "A heading in the column of Settings, over General, Appearance, Tabs, Spaces and Profiles.")
+        case .search: String(localized: "Tools", comment: "A heading in the column of Settings, over Search, Zigzag Mini and Translation.")
+        case .passwords: String(localized: "Privacy & Security", comment: "A heading in the column of Settings, over Passwords and Privacy.")
+        case .extensions, .shortcuts: String(localized: "Advanced", comment: "A heading in the column of Settings, over Extensions, Shortcuts and Automation.")
+        default: nil
+        }
+    }
+
+    /// The sections that have a heading over them: the first of each group.
+    static func headed(manyProfiles: Bool) -> [SettingsPane] {
+        columnGroups(manyProfiles: manyProfiles).shared.compactMap(\.first).filter { groupTitle(startingAt: $0) != nil }
+    }
+
     /// The section that's shown when this one is asked for: Website Data is part of Privacy until there's a
     /// second profile, so an address kept from when there was one still opens.
     func shown(manyProfiles: Bool) -> SettingsPane { self == .websiteData && !manyProfiles ? .privacy : self }
@@ -683,6 +699,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var columnHasProfiles = false
     /// The sections that start a group in the column, with a gap before each.
     private var groupStarts: Set<SettingsPane> = []
+    /// Over each group, in the column with names: what its sections are about.
+    private var groupHeadings: [SettingsPane: Label] = [:]
     private let column = FlippedView()
     /// The chosen section's fill, gliding to the one you pick.
     private let sectionSelection = SelectionGlide()
@@ -1292,6 +1310,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // as symbols alone they follow the others, and the menu is beside the search (`placeProfilePicker`).
         let grouped = arrangement == .column && columnHasProfiles
         profileHeading.isHidden = !grouped
+        // Each group's heading shows only with names beside the symbols; as symbols alone, the gaps say it.
+        let headed = arrangement == .column
+        groupHeadings.values.forEach { $0.isHidden = !headed }
+        let headingRoom = headed ? (groupHeadings.values.first?.lineHeight ?? 0) + Tokens.Space.x1 : 0
         // The heading and the menu take about two sections' room.
         let count = CGFloat(items.count + (grouped ? 2 : 0))
         // A small gap before each group after the first, no label: how System Settings sets its groups apart.
@@ -1303,7 +1325,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // so all of them fit under the title.
         let top = Tokens.Page.headerHeight + Tokens.Space.x1
         func height(_ tallest: CGFloat) -> CGFloat {
-            max(Tokens.Page.controlHeight, min(tallest, floor((column.bounds.height - top - Tokens.Space.x2 - gaps * gap) / count) - 2))
+            let headings = CGFloat(groupHeadings.count) * headingRoom
+            return max(Tokens.Page.controlHeight, min(tallest, floor((column.bounds.height - top - Tokens.Space.x2 - gaps * gap - headings) / count) - 2))
         }
         switch arrangement {
         case .column:
@@ -1321,6 +1344,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                     y = profilePicker.frame.maxY + Tokens.Space.x2
                 }
                 if groupStarts.contains(item.pane) { y += gap }
+                if let heading = groupHeadings[item.pane] {
+                    heading.frame = NSRect(x: gutter - Label.inset, y: y, width: column.bounds.width - gutter * 2, height: heading.lineHeight)
+                    y = heading.frame.maxY + Tokens.Space.x1
+                }
                 item.frame = NSRect(x: gutter - inset, y: y, width: column.bounds.width - (gutter - inset) * 2, height: rowHeight)
                 y += rowHeight + 2
             }
@@ -1460,6 +1487,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let sections = SettingsPane.column(manyProfiles: many)
         columnHasProfiles = many
         groupStarts = SettingsPane.groupStarts(manyProfiles: many)
+        groupHeadings.values.forEach { $0.removeFromSuperview() }
+        groupHeadings = Dictionary(uniqueKeysWithValues: SettingsPane.headed(manyProfiles: many).compactMap { pane in
+            SettingsPane.groupTitle(startingAt: pane).map { title in
+                let label = Label.groupHeading(title)
+                column.addSubview(label)
+                return (pane, label)
+            }
+        })
         items = (sections.shared + sections.profile).map { pane in
             let item = SectionItem(pane)
             item.drawsSelection = false

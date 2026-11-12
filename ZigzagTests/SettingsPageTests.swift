@@ -60,6 +60,13 @@ struct SettingsPageTests {
         #expect(SettingsPane.groupStarts(manyProfiles: true) == [.search, .passwords, .shortcuts])
     }
 
+    @Test func eachGroupHasAHeading() {
+        #expect(SettingsPane.headed(manyProfiles: false) == [.general, .search, .passwords, .extensions])
+        #expect(SettingsPane.headed(manyProfiles: true) == [.general, .search, .passwords, .shortcuts])
+        #expect(SettingsPane.groupTitle(startingAt: .extensions) == SettingsPane.groupTitle(startingAt: .shortcuts))
+        #expect(SettingsPane.groupTitle(startingAt: .tabs) == nil)
+    }
+
     @Test func withOneProfileTheColumnIsAsItWasBeforeProfiles() {
         let column = SettingsPane.column(manyProfiles: false)
         #expect(column.shared == [.general, .appearance, .tabs, .spaces, .profiles, .search, .mini, .translation, .passwords, .privacy,
