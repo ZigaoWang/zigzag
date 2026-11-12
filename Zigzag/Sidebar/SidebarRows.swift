@@ -1094,7 +1094,16 @@ final class SpaceHeaderView: InteractiveView {
         let lh = profileLabel.lineHeight
         let labelY = isFlipped ? baseline - (lh + small.ascender + small.descender) / 2 : baseline - (lh - small.ascender - small.descender) / 2
         profileLabel.frame = NSRect(x: bounds.width - SidebarRowView.inset + Label.inset - width, y: round(labelY), width: width, height: lh)
+        // Cut short, the whole name is under the pointer (#189).
+        removeAllToolTips()
+        profileTip = nil
+        if let profileName, !profileLabel.isHidden, width < ceil(profileLabel.textWidth) {
+            profileTip = profileName as NSString
+            addToolTip(profileLabel.frame, owner: profileTip!, userData: nil)
+        }
     }
+    /// What the cut profile name's tooltip says; a tooltip doesn't keep its owner.
+    private var profileTip: NSString?
 
     /// The least room worth showing a profile's name in: a few letters before it's cut short.
     static let profileRoom: CGFloat = 28
