@@ -298,6 +298,7 @@
 		E42A5504EE597C075414B18A /* WebStoreOffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 820132CF9AAE60C1C4104C7B /* WebStoreOffer.swift */; };
 		E5748A1AC50809EA8B52CB6D /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = DCC3873C4E224EBB5A75591B /* Localizable.xcstrings */; };
 		E582C6F8B7C987D3FD4AE888 /* TutorialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4000F6FD774203F8D1BFAB0 /* TutorialTests.swift */; };
+		E62EBF6B1CA9C4CB1D243E55 /* WebNotificationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 370B2D212991FF35473E4478 /* WebNotificationsTests.swift */; };
 		E6571244FE23DFDC7DEF5650 /* DarkPalettesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E0B6E4ACCE3366126E94F4A /* DarkPalettesTests.swift */; };
 		E6AA5B0A7E0A4A0D3BB43C2F /* dark-pages.js in Resources */ = {isa = PBXBuildFile; fileRef = 2968B96D6FBCB24867769B54 /* dark-pages.js */; };
 		E77131ED815A795FB7D6F9B8 /* Tutorial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D9F429D6C84167482CCFC1 /* Tutorial.swift */; };
@@ -410,6 +411,7 @@
 		34BC528B8B1F2E0DEFAD281E /* CommandBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarController.swift; sourceTree = "<group>"; };
 		3548E3EB3B0F9F4F4EBEDBA6 /* YouTubeAds.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = YouTubeAds.js; sourceTree = "<group>"; };
 		36C7F87F644076D0EBA10F87 /* ExtensionScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionScriptTests.swift; sourceTree = "<group>"; };
+		370B2D212991FF35473E4478 /* WebNotificationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebNotificationsTests.swift; sourceTree = "<group>"; };
 		3BD5AAEBB8EB9458DBC73239 /* ImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportTests.swift; sourceTree = "<group>"; };
 		3C753D7948805748B235F981 /* FreezeReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FreezeReportTests.swift; sourceTree = "<group>"; };
 		3CB299E45AC189FC47ACB508 /* custom-progress-bar.crx */ = {isa = PBXFileReference; path = "custom-progress-bar.crx"; sourceTree = "<group>"; };
@@ -1164,6 +1166,7 @@
 				4A3DD8FA3DF8FD4B034CA024 /* TopBarTests.swift */,
 				D4000F6FD774203F8D1BFAB0 /* TutorialTests.swift */,
 				2C1EF45053176602E3D8A4C1 /* UserScriptsTests.swift */,
+				370B2D212991FF35473E4478 /* WebNotificationsTests.swift */,
 				C1AFC42FCF4DA3ED1DED88E3 /* WebStoreButtonTests.swift */,
 				F0210E259AE4B1296648499E /* WhatsNewTests.swift */,
 				F570CA64BC7C0FBBC6977BC3 /* YouTubeAdsTests.swift */,
@@ -1662,6 +1665,7 @@
 				9992350EAA124066EE5A5A1E /* TopBarTests.swift in Sources */,
 				E582C6F8B7C987D3FD4AE888 /* TutorialTests.swift in Sources */,
 				0A3CE807B90BECEE35BCDB08 /* UserScriptsTests.swift in Sources */,
+				E62EBF6B1CA9C4CB1D243E55 /* WebNotificationsTests.swift in Sources */,
 				8791EB582F6B8D88F453988E /* WebStoreButtonTests.swift in Sources */,
 				5DEA33BF35DB8A21FE90DDC9 /* WhatsNewTests.swift in Sources */,
 				CA7C67143230D82C0902A457 /* YouTubeAdsTests.swift in Sources */,
