@@ -8823,6 +8823,28 @@
         }
       }
     },
+    "Open Bottom Left" : {
+      "comment" : "Shown over the bottom left quarter of the page while a tab is dragged there, to open it there in a split view.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在左下方打开"
+          }
+        }
+      }
+    },
+    "Open Bottom Right" : {
+      "comment" : "Shown over the bottom right quarter of the page while a tab is dragged there, to open it there in a split view.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在右下方打开"
+          }
+        }
+      }
+    },
     "Open Downloads Folder" : {
       "comment" : "Last row of the downloads panel: opens the folder downloads are saved to.",
       "localizations" : {
@@ -8863,6 +8885,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开文件夹"
+          }
+        }
+      }
+    },
+    "Open Here" : {
+      "comment" : "Shown over a page of a split view while a tab is dragged there: the tab opens in that page's place, and the page goes back to being a tab of its own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此处打开"
           }
         }
       }
@@ -8988,6 +9021,28 @@
         }
       }
     },
+    "Open Top Left" : {
+      "comment" : "Shown over the top left quarter of the page while a tab is dragged there, to open it there in a split view.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在左上方打开"
+          }
+        }
+      }
+    },
+    "Open Top Right" : {
+      "comment" : "Shown over the top right quarter of the page while a tab is dragged there, to open it there in a split view.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在右上方打开"
+          }
+        }
+      }
+    },
     "Open Video in New Tab" : {
       "comment" : "Item in a page's right-click menu.",
       "localizations" : {
@@ -9017,6 +9072,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开一个新标签页"
+          }
+        }
+      }
+    },
+    "Open at the Bottom" : {
+      "comment" : "Shown over the bottom half of the page while a tab is dragged there, to open it in a split view, below the page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在下方打开"
+          }
+        }
+      }
+    },
+    "Open at the Top" : {
+      "comment" : "Shown over the top half of the page while a tab is dragged there, to open it in a split view, above the page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在上方打开"
           }
         }
       }
