@@ -1087,6 +1087,22 @@ enum DebugBridge {
                 if let v = view as? InteractiveView { v.isHovered = true; DebugBridge.hovered = [v] } else { DebugBridge.hovered = [] }
             default: break
             }
+        case "sidebutton":
+            // sidebutton <back|forward> x y: a mouse's side button pressed and let go at a point (window points, top
+            // left origin), handed to the window as the press and release would arrive, inside the app only, never
+            // posted to the system. How long each took goes to the debug log (#170).
+            let f = arg.split(separator: " ").map(String.init)
+            guard f.count >= 3, let x = Double(f[1]), let y = Double(f[2]), let window = controller.window else { break }
+            let screen = window.convertPoint(toScreen: NSPoint(x: x, y: window.frame.height - y))
+            let location = CGPoint(x: screen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screen.y)
+            let button = CGMouseButton(rawValue: f[0] == "forward" ? 4 : 3) ?? .center
+            for type in [CGEventType.otherMouseDown, .otherMouseUp] {
+                guard let cg = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: location, mouseButton: button),
+                      let event = NSEvent(cgEvent: cg) else { continue }
+                let start = CACurrentMediaTime()
+                window.sendEvent(event)
+                debugLog("sidebutton \(f[0]) \(type == .otherMouseDown ? "down" : "up") button \(event.buttonNumber) took \(Int((CACurrentMediaTime() - start) * 1000)) ms")
+            }
         case "downloads": controller.showDownloads(nil)
         case "dl":
             // dl pause|resume|state: acts on the newest download.
