@@ -315,6 +315,7 @@
 		F126F510FEC04B5F7A87A1F2 /* ExtensionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 118460E2A057D11B6C1946F1 /* ExtensionStore.swift */; };
 		F139A6B43F93D0A8D0D163AF /* BrowserWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BC90DFBBFAEA51FE582EDA9 /* BrowserWindowController.swift */; };
 		F1B4DCE6ED5EAEBD6C61BA9D /* TabStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92C68F8087C6786CC457EB4B /* TabStore.swift */; };
+		F1CF78DD9C9374F3869A4FC3 /* youtube-player-response.json in Resources */ = {isa = PBXBuildFile; fileRef = 972F89371A17ECD75CE64757 /* youtube-player-response.json */; };
 		F2B2D57349048BBF7D703BD1 /* BridgeNamespaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5C531844DCB5F002266118C /* BridgeNamespaces.swift */; };
 		F33B0673811E66F305F2EC55 /* favourites.plist in Resources */ = {isa = PBXBuildFile; fileRef = FA1F3192157697E1DC3F2FA2 /* favourites.plist */; };
 		F44995777C048CCAB085C8AA /* MCPSetupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F62FA2BF2A457B8137CE704 /* MCPSetupTests.swift */; };
@@ -530,6 +531,7 @@
 		95FCFEE43D95B1A09B1F883D /* chrome-api.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "chrome-api.json"; sourceTree = "<group>"; };
 		96D4CC131CEDF843998D604C /* DarkPages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPages.swift; sourceTree = "<group>"; };
 		9703D528E793AC587C36CFED /* DarkPalettes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPalettes.swift; sourceTree = "<group>"; };
+		972F89371A17ECD75CE64757 /* youtube-player-response.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "youtube-player-response.json"; sourceTree = "<group>"; };
 		979ECE3AE8285E787E972E3E /* PageCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageCardView.swift; sourceTree = "<group>"; };
 		97B89F5BC1A42191D2C02C66 /* CommandBarRankingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarRankingTests.swift; sourceTree = "<group>"; };
 		9875E3DF61E5A98363065101 /* PasswordCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordCapture.swift; sourceTree = "<group>"; };
@@ -1083,6 +1085,7 @@
 				BD3E507FE9CD5CD3025750FE /* chrome-bookmarks-work.json */,
 				DDA8091D12FF865D4C6F3952 /* chrome-local-state.json */,
 				3CB299E45AC189FC47ACB508 /* custom-progress-bar.crx */,
+				972F89371A17ECD75CE64757 /* youtube-player-response.json */,
 				9DF2A2D01D8BD422F0F2323B /* firefox-profile */,
 				4DB46F7EBC33B0D2A4962BF7 /* orion */,
 			);
@@ -1355,6 +1358,7 @@
 				93F7D9887CC5E8E2800B8E67 /* orion-extensions.plist in Resources */,
 				4ACC19B6A01DF157CE2C9A94 /* orion-history.sql in Resources */,
 				C2C05749A76907433E6BEC4D /* reading_list.plist in Resources */,
+				F1CF78DD9C9374F3869A4FC3 /* youtube-player-response.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -30,6 +30,8 @@ struct YouTubeAdsTests {
     /// is Zigzag's, or none (then it blocks).
     private func page(_ body: String = "<p>Video</p>", before: String? = nil, answer: Bool? = nil) async throws -> WKWebView {
         let configuration = WKWebViewConfiguration()
+        // Its own storage, gone with it: what the script keeps for YouTube's site never outlives the test.
+        configuration.websiteDataStore = .nonPersistent()
         let controller = configuration.userContentController
         if let before { controller.addUserScript(WKUserScript(source: before, injectionTime: .atDocumentStart, forMainFrameOnly: true)) }
         controller.addUserScript(WKUserScript(source: try Self.source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -73,16 +75,11 @@ struct YouTubeAdsTests {
      "captions":{"playerCaptionsTracklistRenderer":{"captionTracks":[]}}}
     """#
 
-    /// What the player response should become: the ads out, the rest exactly as it was.
+    /// What the player response should become: the ads out, the rest exactly as it was, YouTube's blocker warnings
+    /// included (it signs them).
     static func withoutAds(_ value: NSObject) -> NSObject {
         guard let dictionary = (value as? NSDictionary)?.mutableCopy() as? NSMutableDictionary else { return value }
         dictionary.removeObjects(forKeys: ["playerAds", "adPlacements", "adSlots"])
-        if let ui = (dictionary["auxiliaryUi"] as? NSDictionary)?.mutableCopy() as? NSMutableDictionary,
-           let messages = (ui["messageRenderers"] as? NSDictionary)?.mutableCopy() as? NSMutableDictionary {
-            messages.removeObjects(forKeys: ["enforcementMessageViewModel", "bkaEnforcementMessageViewModel"])
-            ui["messageRenderers"] = messages
-            dictionary["auxiliaryUi"] = ui
-        }
         return dictionary
     }
 
@@ -97,6 +94,8 @@ struct YouTubeAdsTests {
         #expect(out.contains("\"adBreakHeartbeatParams\":\"Q0FBJTNE\""))
         #expect(out.contains("\"adPlacements\":\"not where ads go\""))
         #expect(out.contains("upsellDialogRenderer"))
+        #expect(out.contains(#""enforcementMessageViewModel":{"title":"Ad blockers are not allowed on YouTube"}"#))
+        #expect(out.contains(#""bkaEnforcementMessageViewModel":{"isVisible":true}"#))
     }
 
     /// get_watch answers with a list: the player response is in one of its items.
@@ -242,6 +241,129 @@ struct YouTubeAdsTests {
         #expect(try object(out) == object(Self.player))
         let shown = try await run(webView, "return getComputedStyle(document.querySelector('ytd-ad-slot-renderer')).display") as? String
         #expect(shown == "block")
+    }
+
+    // MARK: What YouTube signs
+
+    private final class FixtureMarker {}
+
+    /// A real player response (youtubei/v1/player, as a watch page builds it in), trimmed to what matters here: its
+    /// ads, the values YouTube signs (responseContext.mainAppWebResponseContext.trackingParam), and what's checked.
+    /// Its signature lists one value, trackingParams; for an account YouTube warns about blockers, the warnings'
+    /// displayType too, added below in the shape YouTube sends them.
+    private static func realPlayer(warned: Bool = false) throws -> String {
+        let url = try #require(Bundle(for: FixtureMarker.self).url(forResource: "youtube-player-response", withExtension: "json"))
+        let response = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: url), options: [.mutableContainers]) as? NSMutableDictionary)
+        if warned {
+            response["auxiliaryUi"] = ["messageRenderers": [
+                "bkaEnforcementMessageViewModel": ["displayType": "ENFORCEMENT_MESSAGE_VIEW_MODEL_DISPLAY_TYPE_POPUP", "isVisible": true],
+                "enforcementMessageViewModel": ["displayType": "ENFORCEMENT_MESSAGE_VIEW_MODEL_DISPLAY_TYPE_PLAYER"],
+            ]]
+        }
+        return String(decoding: try JSONSerialization.data(withJSONObject: response), as: UTF8.self)
+    }
+
+    /// YouTube's own check of a player response, as its page runs it before playing: each signed value, read at
+    /// its path, must match what was signed (ignoring + - / _). One that doesn't, and YouTube shows "Something went
+    /// wrong. Please try again later." in place of the video.
+    private static let youTubesCheck = """
+        const signed = [['trackingParams', 'CAAQu2kiEwis2vzn0YGYAxVRUZ0JHc0nMvHKAQRyOBbv'],
+          ['auxiliaryUi.messageRenderers.bkaEnforcementMessageViewModel.displayType', 'ENFORCEMENT_MESSAGE_VIEW_MODEL_DISPLAY_TYPE_POPUP'],
+          ['auxiliaryUi.messageRenderers.enforcementMessageViewModel.displayType', 'ENFORCEMENT_MESSAGE_VIEW_MODEL_DISPLAY_TYPE_PLAYER']];
+        const check = (response) => signed.filter(([path]) => warned || !path.startsWith('auxiliaryUi')).every(([path, value]) => {
+          const found = path.split('.').reduce((node, key) => (node == null ? undefined : node[key]), response);
+          const strip = /[+\\-\\/_]/g;
+          return String(found == null ? '' : found).replace(strip, '') === value.replace(strip, '');
+        });
+        """
+
+    /// The ads go; everything YouTube signed reaches the page as YouTube sent it, so its check passes, the blocker
+    /// warnings included. Taking those out made YouTube refuse every video for accounts it warns.
+    @Test(arguments: [false, true]) func whatYouTubeSignsReachesThePageUnchanged(warned: Bool) async throws {
+        let webView = try await page()
+        let text = try Self.realPlayer(warned: warned)
+        let out = try #require(try await run(webView, Self.youTubesCheck + """
+            const response = JSON.parse(text);
+            return JSON.stringify({ passes: check(response), ads: 'adPlacements' in response,
+                                    heartbeat: response.adBreakHeartbeatParams, status: response.playabilityStatus.status });
+            """, ["text": text, "warned": warned]) as? String)
+        let seen = try #require(try JSONSerialization.jsonObject(with: Data(out.utf8)) as? [String: Any])
+        #expect(seen["passes"] as? Bool == true)
+        #expect(seen["ads"] as? Bool == false)
+        #expect(seen["heartbeat"] as? String == "Q0FBJTNE")
+        #expect(seen["status"] as? String == "OK")
+        // The same through fetch and the data built into the page.
+        let built = try await page("<script>var ytInitialPlayerResponse = \(text);</script>")
+        let passes = try await run(built, Self.youTubesCheck + "return check(window.ytInitialPlayerResponse) && !('adPlacements' in window.ytInitialPlayerResponse)",
+                                   ["warned": warned]) as? Bool
+        #expect(passes == true)
+    }
+
+    /// YouTube's error in place of a video, as its page puts it on the player response it refused.
+    private static let refuse = """
+        response.playabilityStatus = { ...response.playabilityStatus, status: 'ERROR', errorScreen: { playerErrorMessageRenderer: {
+          reason: { runs: [{ text: 'Something went wrong. Please try again later.' }] }, subreason: { runs: [{ text: '282054944' }] } } } };
+        """
+
+    private func state(_ webView: WKWebView, _ text: String) async throws -> [String: Any] {
+        let out = try #require(try await run(webView, """
+            return JSON.stringify({ same: !!window.sameLoad, held: Number(localStorage.getItem('zigzag-youtube-ads-hold')) > Date.now(),
+                                    ads: 'adPlacements' in JSON.parse(text) });
+            """, ["text": text]) as? String)
+        return try #require(try JSONSerialization.jsonObject(with: Data(out.utf8)) as? [String: Any])
+    }
+
+    /// Should YouTube sign the ads too and refuse a video they were taken out of, the page loads again with what
+    /// YouTube sends passed on whole, and stays that way: the video plays.
+    @Test func aRefusedVideoLoadsAgainWithWhatYouTubeSent() async throws {
+        let webView = try await page()
+        let text = try Self.realPlayer()
+        _ = try await run(webView, "window.sameLoad = true; const response = JSON.parse(text); " + Self.refuse + "return 1", ["text": text])
+        try await Task.sleep(for: .milliseconds(2000))
+        var seen = try await state(webView, text)
+        #expect(seen["same"] as? Bool == false)
+        #expect(seen["held"] as? Bool == true)
+        #expect(seen["ads"] as? Bool == true)
+        // Refused again within the minute (the hold cleared by hand): the page isn't loaded again.
+        _ = try await run(webView, """
+            localStorage.removeItem('zigzag-youtube-ads-hold'); window.sameLoad = true;
+            const response = JSON.parse(text); \(Self.refuse) return 1
+            """, ["text": text])
+        try await Task.sleep(for: .milliseconds(1500))
+        seen = try await state(webView, text)
+        #expect(seen["same"] as? Bool == true)
+    }
+
+    /// YouTube's error shown on the page for a response the page read itself (as it does a fetched one).
+    @Test func aRefusalShownOnThePageIsCaughtToo() async throws {
+        let webView = try await page()
+        let text = try Self.realPlayer()
+        _ = try await run(webView, """
+            window.sameLoad = true; JSON.parse(text);
+            document.body.insertAdjacentHTML('beforeend', '<div id="error-screen"><yt-player-error-message-renderer>Something went wrong. Please try again later. 282054944 Learn more</yt-player-error-message-renderer></div>');
+            return 1
+            """, ["text": text])
+        try await Task.sleep(for: .milliseconds(2000))
+        let seen = try await state(webView, text)
+        #expect(seen["same"] as? Bool == false)
+        #expect(seen["held"] as? Bool == true)
+    }
+
+    /// Any other error (a video that's really unavailable), or none: nothing changes, the ads still go.
+    @Test func otherErrorsLeaveItAsItWas() async throws {
+        let webView = try await page()
+        let text = try Self.realPlayer()
+        _ = try await run(webView, """
+            window.sameLoad = true; const response = JSON.parse(text);
+            response.playabilityStatus = { status: 'UNPLAYABLE', reason: 'Video unavailable' };
+            document.body.insertAdjacentHTML('beforeend', '<div class="ytp-error">Video unavailable</div>');
+            return 1
+            """, ["text": text])
+        try await Task.sleep(for: .milliseconds(1500))
+        let seen = try await state(webView, text)
+        #expect(seen["same"] as? Bool == true)
+        #expect(seen["held"] as? Bool == false)
+        #expect(seen["ads"] as? Bool == false)
     }
 
     // MARK: What shows
