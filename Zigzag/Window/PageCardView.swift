@@ -148,7 +148,8 @@ final class PageCardView: NSView {
     private func setLoading(_ loading: Bool, progress value: Double) {
         if progressLine.superlayer == nil {
             progressLine.opacity = 0
-            progressLine.anchorPoint = CGPoint(x: 0, y: 1)
+            // The surface is flipped: y counts from the top, so the line hangs from its top-left corner.
+            progressLine.anchorPoint = CGPoint(x: 0, y: 0)
             // Above the page's own layer.
             progressLine.zPosition = 100
             surface.layer?.addSublayer(progressLine)
@@ -182,9 +183,10 @@ final class PageCardView: NSView {
 
     private func layoutProgress() {
         let top = contentTop
-        // On the surface, over the card's edge, in the page's place on it: a layer's y counts from the bottom.
+        // On the surface, over the card's edge, along the top of the page (under the band or header, if any). The
+        // surface is flipped, so y counts down from its top.
         progressLine.bounds = CGRect(x: 0, y: 0, width: clip.frame.width * progress, height: 2)
-        progressLine.position = CGPoint(x: 0, y: clip.frame.height - top)
+        progressLine.position = CGPoint(x: clip.frame.minX, y: clip.frame.minY + top)
     }
 
     private func paintProgress() {
