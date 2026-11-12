@@ -416,12 +416,11 @@ enum DarkPages {
         // slept, was drawn on it before the page came, and stayed on screen until the page had drawn itself, since
         // WebKit holds what's shown while a page is on its way. Clear instead, the dark of the card shows there.
         let draws = !wanted
-        if !webView.responds(to: drawsGround) || webView.value(forKey: "drawsBackground") as? Bool != draws {
-            webView.setValue(draws, forKey: "drawsBackground")
-        }
+        if webView.value(forKey: "drawsBackground") as? Bool != draws { webView.setValue(draws, forKey: "drawsBackground") }
     }
 
-    private static let drawsGround = NSSelectorFromString("_drawsBackground")
+    /// For what turns a page's own background on or off for a while (Peek): back to how dark pages want it.
+    static func restoreGround(of webView: WKWebView) { applyLook(to: webView) }
 
     /// The setting, a site's choice or the Mac's appearance changed: every open page follows at once, without
     /// reloading, and pages loaded later start the right way.
