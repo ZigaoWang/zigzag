@@ -17,7 +17,18 @@ enum MiniLinkWake {
     /// How long the windows wait for the link: it comes about a twentieth of a second after the wake.
     private static let wait: TimeInterval = 0.35
 
+    /// Until when Zigzag is bringing itself forward for a window of its own (a site installed as an app): that wake
+    /// isn't a link's, and macOS brings only that window up.
+    private static var ownWakeUntil: Date?
+
+    /// Zigzag is about to activate itself for one window: the browser windows are left as they are.
+    static func activatingForOneWindow() { ownWakeUntil = Date().addingTimeInterval(1) }
+
     static func appWillActivate() {
+        if let until = ownWakeUntil {
+            ownWakeUntil = nil
+            if Date() < until { return }
+        }
         guard MiniWindowController.opensExternalLinks, waiting.isEmpty else { return }
         let windows = WindowManager.shared.controllers.compactMap(\.window).filter { $0.isVisible && !$0.isMiniaturized }
         guard !windows.isEmpty else { return }

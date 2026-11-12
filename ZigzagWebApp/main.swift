@@ -78,7 +78,12 @@ final class Launcher: NSObject, NSApplicationDelegate {
         configuration.activates = false
         configuration.addsToRecentItems = false
         configuration.promptsUserIfNeeded = false
-        if action == "open" { NSApp.yieldActivation(toApplicationWithBundleIdentifier: hostID) }
+        // Only the app in front can step aside, so this counts once this app is active: opened from Finder, the Dock
+        // or Spotlight it becomes so a moment after launching, and asks again then (`applicationDidBecomeActive`).
+        if action == "open", NSApp.isActive {
+            if let running = running ?? runningHost { NSApp.yieldActivation(to: running) }
+            else { NSApp.yieldActivation(toApplicationWithBundleIdentifier: hostID) }
+        }
         if action == "close", runningHost == nil { return }
         NSWorkspace.shared.open([link], withApplicationAt: host, configuration: configuration) { _, error in
             guard error != nil, action == "open" else { return }

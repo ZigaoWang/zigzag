@@ -101,13 +101,17 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         strip.refreshColors()
     }
 
-    /// Only this window comes forward, not the browser windows: Zigzag Mini's way.
+    /// Only this window comes forward, not the browser windows. It's made key first, so activating brings up just it
+    /// (activation raises the key and main windows only). Since macOS 14 an app may take the front only when the app
+    /// in front lets it: the small app, just opened or clicked and so in front, steps aside for Zigzag before it asks
+    /// (`NSApp.yieldActivation`), and `NSApp.activate()` is the request that honors that.
     func bringForward() {
         guard let window else { return }
         if window.isMiniaturized { window.deminiaturize(nil) }
         showWindow(nil)
         window.makeKeyAndOrderFront(nil)
-        NSRunningApplication.current.activate(options: [])
+        if !NSApp.isActive { MiniLinkWake.activatingForOneWindow() }
+        NSApp.activate()
     }
 
     private func tabChanged(_ change: Tab.Change) {
