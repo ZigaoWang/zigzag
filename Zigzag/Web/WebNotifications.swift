@@ -283,6 +283,9 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
       } catch (e) {}
       const handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.\(messageName);
       if (!handler || !window.isSecureContext) return;
+      // A frame written with document.open() (Cloudflare's Turnstile does) gets a new document in the same window,
+      // and WebKit runs this again there: what's set up already stays, since setting it up again throws.
+      if (window.__zigzagNotification) return;
       const decisions = __DECISIONS__;
       const isPrivate = __PRIVATE__;
       const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
