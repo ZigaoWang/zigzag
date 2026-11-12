@@ -289,6 +289,11 @@ something came from, answers at once, and can be interrupted.
   the page: its edges are halves, its corners quarters, anywhere else the half of the pane under the pointer (beside a
   page alone, the left or right half, as always), and a quarter that can't split takes the tab in its place. The drop
   hint shows where it lands, in the split's one style, named for the place ("Open Top Left").
+- **Windows** (#162): every everyday window shows the same spaces and tabs, as in Arc (`TabStore`, one list; each
+  window's `TabManager` is a view with its own space and chosen tabs). A page is on screen in one window at a time: the
+  window you chose it in takes it, and another window on that tab shows its last picture under a veil of the card's
+  ground, "Shown in another window" and Show Here, centered; nothing more. A page the other window leaves comes back
+  on its own. A private window keeps its own tabs.
 - **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window. Beside the sidebar and
   meeting the window's edges it meets the frame cleanly: all four corners at the window's radius
   (`Radius.attached`), no outline, no shadow.
