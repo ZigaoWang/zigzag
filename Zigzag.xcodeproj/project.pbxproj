@@ -372,6 +372,7 @@
 		FAF549DD3B7D4C4893E5DA34 /* NativeAudioOut.swift in Sources */ = {isa = PBXBuildFile; fileRef = 289F60BB400BACFDF97EA0E6 /* NativeAudioOut.swift */; };
 		FB2AE7D5BF0E44C75BDAEBBB /* chrome-local-state.json in Resources */ = {isa = PBXBuildFile; fileRef = DDA8091D12FF865D4C6F3952 /* chrome-local-state.json */; };
 		FC7890AF73B47C398FD5A153 /* ExtensionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEBF6D0A14B73E1B6D7748A8 /* ExtensionBridge.swift */; };
+		FD3C4C3C5468FB4AB07AB0DE /* ExtensionMenuItemsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9A3CCB9D3C8B7537DC2AA25 /* ExtensionMenuItemsTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -770,6 +771,7 @@
 		F5C531844DCB5F002266118C /* BridgeNamespaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeNamespaces.swift; sourceTree = "<group>"; };
 		F75F27BD154DC2EB7A42D2DE /* ExtensionImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionImportTests.swift; sourceTree = "<group>"; };
 		F7CEDF75CC1B9CA997C2CF1C /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
+		F9A3CCB9D3C8B7537DC2AA25 /* ExtensionMenuItemsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionMenuItemsTests.swift; sourceTree = "<group>"; };
 		FA1F3192157697E1DC3F2FA2 /* favourites.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = favourites.plist; sourceTree = "<group>"; };
 		FA29F3657E11FE3895D8BAC3 /* THIRD_PARTY_NOTICES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_NOTICES.md; sourceTree = "<group>"; };
 		FA898046DCAF6AC4AC020C07 /* ContactCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactCard.swift; sourceTree = "<group>"; };
@@ -1271,6 +1273,7 @@
 				840842D8431CA3F0AD989350 /* ExtensionBridgeTests.swift */,
 				F75F27BD154DC2EB7A42D2DE /* ExtensionImportTests.swift */,
 				75AEFFC9B5B716F7E433F914 /* ExtensionInstallsTests.swift */,
+				F9A3CCB9D3C8B7537DC2AA25 /* ExtensionMenuItemsTests.swift */,
 				36C7F87F644076D0EBA10F87 /* ExtensionScriptTests.swift */,
 				5F25B6A15B8EF24B0520F26F /* ExtensionSearchTests.swift */,
 				14C20474FB5E7187A87874B1 /* ExtensionSecurityTests.swift */,
@@ -1862,6 +1865,7 @@
 				0CC1228D26EEC04E26173909 /* ExtensionBridgeTests.swift in Sources */,
 				B04713924CD34C38A4EC8FF5 /* ExtensionImportTests.swift in Sources */,
 				95DDD4B1B3AB548044721FF0 /* ExtensionInstallsTests.swift in Sources */,
+				FD3C4C3C5468FB4AB07AB0DE /* ExtensionMenuItemsTests.swift in Sources */,
 				D8AACEBA75F8D120D6AFE1D1 /* ExtensionScriptTests.swift in Sources */,
 				79B109D184AEBA99124E805F /* ExtensionSearchTests.swift in Sources */,
 				9C1698F934167B4C7F79D557 /* ExtensionSecurityTests.swift in Sources */,

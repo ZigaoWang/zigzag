@@ -115,13 +115,7 @@ final class BrowserWebView: WKWebView {
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
         // Extensions' own items ("Translate this page", "Save to Notion") go at the end.
-        if #available(macOS 15.4, *), let owner {
-            let extensionItems = owner.extensionHost?.menuItems(for: owner) ?? []
-            if !extensionItems.isEmpty {
-                menu.addItem(.separator())
-                extensionItems.forEach { menu.addItem($0) }
-            }
-        }
+        if #available(macOS 15.4, *), let owner { owner.extensionHost?.addMenuItems(for: owner, to: menu) }
         for item in menu.items {
             switch item.identifier?.rawValue {
             case "WKMenuItemIdentifierOpenLinkInNewWindow":
