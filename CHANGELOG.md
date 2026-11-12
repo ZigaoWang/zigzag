@@ -5,26 +5,24 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- In the icon choices for a space, a folder or a tab, typing a name like "cat" or "rocket" in the field under the grid finds matching emoji in the grid's place. Click one or press Return to pick it, and Esc goes back to the icons. Letters used to vanish as you typed. Thanks to [thekevinbrown](https://github.com/thekevinbrown). ([#163](https://github.com/ZigaoWang/zigzag/issues/163))
-- In Settings › Privacy, the Block ads and trackers switch stays at the right edge when you turn it on or off.
-- Cloudflare's "verify you are human" check (Turnstile) no longer logs an error each time it renews, as on linux.do.
-
 ### New
-- Open in Zigzag Mini, in a tab's right-click menu, moves the page into a Zigzag Mini window as it is, history and all; ⌘Z puts the tab back. Hold Option as you drag a tab out of the window to do the same. ([#164](https://github.com/ZigaoWang/zigzag/issues/164))
-- In Change Icon, the first choice shows the site's own icon, so it's clear that it puts the site's icon back.
 - A new window shows the same spaces and tabs as your other windows, as in Arc: open, close, move or nest a tab in one and every window shows it. Each window keeps its own space and its own tab in each space. A page is on screen in one window at a time; another window on that tab says so, with Show Here to bring it over. Closing a window closes none of its tabs, and Move Tab to New Window opens a window on that tab. Private windows keep their tabs to themselves. ([#162](https://github.com/ZigaoWang/zigzag/issues/162))
 - Split view takes up to four tabs. Drag a tab over the page: the edges place it in a half, the corners in a quarter, and a preview shows where it lands. Three tabs are a half and two quarters, four a grid; the lines between them drag, and the group is one row in the sidebar that comes back after a restart. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+- Open in Zigzag Mini, in a tab's right-click menu, moves the page into a Zigzag Mini window as it is, history and all; ⌘Z puts the tab back. Hold Option as you drag a tab out of the window to do the same. ([#164](https://github.com/ZigaoWang/zigzag/issues/164))
 - Dark pages fill in the light parts of a site that's dark on its own, like a white suggestion list under a dark search box, and leave the rest of its colors alone. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - Force dark, in a site's controls, draws a site dark even when it looks dark already, for one that leaves parts of itself light. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
+- In Change Icon, the first choice shows the site's own icon, so it's clear that it puts the site's icon back.
+- The "Zigzag updated" note goes away by itself after 15 seconds, like a notification, and stays while your pointer is on it. What's New is still in the Help menu.
 
 ### Fixed
 - YouTube videos play again instead of stopping at "Something went wrong. Please try again later." YouTube checks parts of what it sends before it plays a video, and Zigzag's ad blocking had changed one of them, the note it shows about ad blockers. That's left alone now, and should YouTube still refuse a video, the page loads again and plays it, with any ad in it sped through. ([#129](https://github.com/ZigaoWang/zigzag/issues/129))
+- In the icon choices for a space, a folder or a tab, typing a name like "cat" or "rocket" in the field under the grid finds matching emoji in the grid's place. Click one or press Return to pick it, and Esc goes back to the icons. Letters used to vanish as you typed. Thanks to [thekevinbrown](https://github.com/thekevinbrown). ([#163](https://github.com/ZigaoWang/zigzag/issues/163))
+- In Settings › Privacy, the Block ads and trackers switch stays at the right edge when you turn it on or off.
+- Cloudflare's "verify you are human" check (Turnstile) no longer logs an error each time it renews, as on linux.do.
 - The bar above a page that's dark on its own is dark too, instead of white. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - With dark pages on, sites that are dark on their own, like GitHub, no longer flash white before their dark theme shows, on the first visit or after a restart. Zigzag remembers which sites are dark for each profile, and forgets them when you clear the site's data or History. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - With dark pages on, a dark page with little on it is no longer turned light. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - Extensions know about pinned tabs and favorites as soon as they open, so 1Password's passkeys and other extension features work on them instead of failing with "Tab not found".
-- The "Zigzag updated" note goes away by itself after 15 seconds, like a notification, and stays while your pointer is on it. What's New is still in the Help menu.
 
 ## [0.8.6] - 2026-11-12
 
