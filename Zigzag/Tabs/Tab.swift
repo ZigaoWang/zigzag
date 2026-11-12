@@ -342,6 +342,17 @@ final class Tab: NSObject {
         showsExtensionPage = extensionConfiguration != nil
         openedByPage = fromWebKit
         if Self.isExtensionPage(url) { ExtensionPageErrors.attach(to: configuration) }
+        #if DEBUG
+        if DebugBridge.mutesEverything {
+            configuration.mediaTypesRequiringUserActionForPlayback = .all
+            configuration.userContentController.addUserScript(WKUserScript(source: Self.elementMuting(true), injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .defaultClient))
+        }
+        // ZIGZAG_PAGE_PROBE=<file>: a script of your own put into each page as it starts, after Zigzag's, to watch
+        // what a page does or stage what a site does in a test copy.
+        if let probe = ProcessInfo.processInfo.environment["ZIGZAG_PAGE_PROBE"], let source = try? String(contentsOfFile: probe, encoding: .utf8) {
+            configuration.userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))
+        }
+        #endif
 
         let webView = BrowserWebView(frame: NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize), configuration: configuration)
         webView.owner = self
@@ -358,6 +369,9 @@ final class Tab: NSObject {
             typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
             unsafeBitCast(webView.method(for: occlusion), to: SetBool.self)(webView, occlusion, false)
         }
+        #endif
+        #if DEBUG
+        if DebugBridge.mutesEverything { isMuted = webView.setPageAudioMuted(true) ?? true }
         #endif
         self.webView = webView
         if let pageHolder { pageHolder.hold(webView) } else { pageHolder = PageHolder(holding: webView) }

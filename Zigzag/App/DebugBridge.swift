@@ -6,6 +6,9 @@ import WebKit
 enum DebugBridge {
     #if DEBUG
     static var hovered: [NSView] = []
+    /// ZIGZAG_MUTE_ALL=1: every tab's page is muted from the moment its web view is made, and nothing plays until
+    /// asked, so a test copy can open video pages without a sound.
+    static let mutesEverything = ProcessInfo.processInfo.environment["ZIGZAG_MUTE_ALL"] == "1"
     private static var scrollLog: [String] = []
     private static var dragTimer: Timer?
 
@@ -1169,8 +1172,19 @@ enum DebugBridge {
                     group.leave()
                 }
             }
-            group.notify(queue: .main) {
+            let write = {
                 if let data = try? JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: path)) }
+            }
+            group.notify(queue: .main, execute: write)
+            // A frame that never answers doesn't hold back the others'.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                if !FileManager.default.fileExists(atPath: path) { rows.append(["frame": "unanswered", "count": frames.count]); write() }
+            }
+        case "mutestate":
+            // mutestate: each tab's mute, as Zigzag has it and as WebKit has the page.
+            for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
+                let page = tab.webView?.pageMutedState.map { WKWebView.isAudioMuted($0) ? "muted" : "sounding" } ?? "no page"
+                debugLog("mutestate \(tab.url?.absoluteString ?? "") tab=\(tab.isMuted ? "muted" : "sounding") page=\(page)")
             }
         case "slowmo":
             // slowmo <factor>: every animation in the window runs that many times slower, to film and judge it.
