@@ -37,9 +37,7 @@ enum Passkeys {
             if wanted {
                 install(in: controller)
             } else {
-                let others = controller.userScripts.filter { !isOurs($0) }
-                controller.removeAllUserScripts()
-                others.forEach(controller.addUserScript)
+                OwnScripts.remove(from: controller, where: isOurs)
             }
         }
     }

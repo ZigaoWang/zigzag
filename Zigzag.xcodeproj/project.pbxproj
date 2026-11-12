@@ -44,6 +44,7 @@
 		1A57A99E37C074DC8620FD87 /* Scripting.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE1EE7853A66CE1029968DA5 /* Scripting.swift */; };
 		1AB813A270FF9CA633D5E2F7 /* SpaceSwitcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87D85B5B031BEAE510CBFC57 /* SpaceSwitcherTests.swift */; };
 		1ACE2C2C8D34462A20FA7936 /* BridgeWebRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 445BFF7EFE1744F510AC8334 /* BridgeWebRequest.swift */; };
+		1CB8BE33E2AB5808DEC21270 /* OwnScripts.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF6A2A22DF8C77C3C203284 /* OwnScripts.swift */; };
 		1CDB552BE051BEBF9C1496B7 /* CertificateDetails.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C054793F49E04AC36C79015 /* CertificateDetails.swift */; };
 		1EA0745E8CAC4A123D48C269 /* CapitalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF2F4BA4D4D31C1518CC7B9E /* CapitalizationTests.swift */; };
 		1F06D849CF746C1FF6AEE48B /* BrowserWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06AE52E198CC8E7B86B467BA /* BrowserWindow.swift */; };
@@ -624,6 +625,7 @@
 		A9205F70718ADF73D6C096BD /* Freezes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Freezes.swift; sourceTree = "<group>"; };
 		A9C34787271E39E26E0156FC /* MainMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenu.swift; sourceTree = "<group>"; };
 		AB8EE08C53EADEDF40AA9E51 /* ExtensionHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionHost.swift; sourceTree = "<group>"; };
+		ADF6A2A22DF8C77C3C203284 /* OwnScripts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnScripts.swift; sourceTree = "<group>"; };
 		AEBF6D0A14B73E1B6D7748A8 /* ExtensionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionBridge.swift; sourceTree = "<group>"; };
 		AFA72586980E3DDF9FDA59A8 /* AddressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressTests.swift; sourceTree = "<group>"; };
 		B030A4C0601F5AE1232B9288 /* chrome-runtime.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "chrome-runtime.js"; sourceTree = "<group>"; };
@@ -1090,6 +1092,7 @@
 				9318C9D9C45049E8105EA1CE /* HistoryPage.swift */,
 				C88AED5826C66F3EF3876CA0 /* HistoryStore.swift */,
 				0124D0F7C86C266C5E8A6AC7 /* NetworkChanges.swift */,
+				ADF6A2A22DF8C77C3C203284 /* OwnScripts.swift */,
 				CD0CD79C0A1D2CDBE8C34B91 /* PageDialogs.swift */,
 				88B983CBE21557E05E6C3E28 /* PageDialogSheet.swift */,
 				1B82054C6133E2CC5F2D859E /* PageFullScreen.swift */,
@@ -1676,6 +1679,7 @@
 				529A6EE9C8FC1FAFA5D383A8 /* NumberHints.swift in Sources */,
 				A2ACCFEF365397393F528C75 /* Onboarding.swift in Sources */,
 				A4D71BE5761D2F335B0787EA /* OrionImporter.swift in Sources */,
+				1CB8BE33E2AB5808DEC21270 /* OwnScripts.swift in Sources */,
 				6492B599ABBE44450D161D18 /* PDFViewer.swift in Sources */,
 				6BD966C3F37EC0E45F62CB2A /* Page.swift in Sources */,
 				87859E87759B6523EC443388 /* PageBar.swift in Sources */,

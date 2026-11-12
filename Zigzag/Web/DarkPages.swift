@@ -282,12 +282,7 @@ enum DarkPages {
     /// loaded after it.
     private static func install(in webView: WKWebView) {
         let controller = webView.configuration.userContentController
-        let scripts = controller.userScripts
-        let others = scripts.filter { !isOurs($0) }
-        if others.count != scripts.count {
-            controller.removeAllUserScripts()
-            others.forEach(controller.addUserScript)
-        }
+        OwnScripts.remove(from: controller, where: isOurs)
         let store = webView.configuration.websiteDataStore
         let wanted = applies(to: webView.url) && wants(webView.url)
         if wanted {

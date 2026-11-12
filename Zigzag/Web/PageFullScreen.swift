@@ -173,12 +173,7 @@ enum PageFullScreen {
 
     /// Puts the script with the choices as they are now in place of the one there, for pages loaded from now on.
     private static func install(in controller: WKUserContentController) {
-        let scripts = controller.userScripts
-        let others = scripts.filter { !isOurs($0) }
-        if others.count != scripts.count {
-            controller.removeAllUserScripts()
-            others.forEach(controller.addUserScript)
-        }
+        OwnScripts.remove(from: controller, where: isOurs)
         controller.addUserScript(script())
     }
 

@@ -441,12 +441,7 @@ enum PageFilters {
     static func clear(_ controller: WKUserContentController) {
         installed.object(forKey: controller)?.hosts = []
         installed.object(forKey: controller)?.page = nil
-        let scripts = controller.userScripts
-        let others = scripts.filter { !isOurs($0) }
-        guard others.count != scripts.count else { return }
-        // Picked out before they're removed: the list WebKit hands over is its own, and empties with them.
-        controller.removeAllUserScripts()
-        others.forEach(controller.addUserScript)
+        OwnScripts.remove(from: controller, where: isOurs)
     }
 
     static func scripts(for injection: AdInjection, host: String) -> [WKUserScript] {
