@@ -692,6 +692,9 @@ final class SidebarView: NSView {
 
     /// The top row's and bottom bar's buttons: 26pt, 14pt glyphs, every glyph's ink on the traffic lights' line.
     static let toolbarButton: CGFloat = Tokens.Sidebar.button
+    /// The sidebar toggle's glyph: the panel drawn on the side the sidebar is on.
+    static func toggleSymbol(onRight: Bool) -> String { onRight ? "sidebar.right" : "sidebar.left" }
+
     static func chromeButton(_ symbol: String, toolTip: String) -> IconButton {
         let button = IconButton(symbol: symbol, size: toolbarButton, symbolSize: Tokens.Sidebar.glyph, toolTip: toolTip)
         button.isChrome = true
@@ -703,7 +706,7 @@ final class SidebarView: NSView {
     let reloadButton = SidebarView.chromeButton("arrow.clockwise", toolTip: String(localized: "Reload", comment: "Tooltip of the sidebar's reload button."))
     /// Stand-in for the traffic lights while the sidebar slides.
     private let trafficLightsPicture = NSImageView()
-    let sidebarButton = SidebarView.chromeButton("sidebar.left", toolTip: String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows."))
+    let sidebarButton = SidebarView.chromeButton(SidebarView.toggleSymbol(onRight: false), toolTip: String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows."))
     let address = AddressView()
     let favorites = FavoritesView()
     let list = SidebarListView()

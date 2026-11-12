@@ -1625,6 +1625,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // sidebar slides back in, the bar's stays where the sidebar's lands, and the sidebar's shows once it's there.
         let held = root.showsTopBar && holdsToggle
         root.topBar.showsSidebarButton = root.showsTopBar && !docked
+        root.topBar.sidebarOnRight = onRight
+        let symbol = SidebarView.toggleSymbol(onRight: onRight)
+        if sidebar.sidebarButton.symbol != symbol { sidebar.sidebarButton.symbol = symbol; sidebar.needsLayout = true }
         root.topBar.heldSidebarButtonOrigin = held && docked
             ? NSPoint(x: sidebar.sidebarButton.frame.minX, y: Tokens.Sidebar.lightsCenter + root.sidebarTopRowDrop - SidebarView.toolbarButton / 2) : nil
         sidebar.sidebarButton.alphaValue = held ? 0 : 1
