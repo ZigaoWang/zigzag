@@ -39,9 +39,12 @@
   const forced = () => (isTop ? matches(site, config.sitesForced || []) : config.topForced === true);
   let wanted = choice();
   // null until the page has been looked at; a site last seen dark starts as dark.
-  let native = isTop && matches(site, config.native) ? true : null;
+  // Not where dark pages aren't wanted: there the site's own look follows the Mac's, which may be light now.
+  let native = isTop && wanted && matches(site, config.native) ? true : null;
   let darkened = false;
   let lastSent = '';
+  // The plain script (`DarkPages.plainSource`, no Dark Reader in it) once dark pages are wanted: Dark Reader's takes over.
+  let retired = false;
 
   // MARK: Dark Reader
 
@@ -355,8 +358,10 @@
   };
 
   const check = () => {
+    if (retired) return;
     wanted = choice();
-    if (!wanted) { dropPrepaint(); releaseMark(); apply(false); send(); return; }
+    // Not wanted, it's still looked at, for the bar above it: a page dark on its own gives it its dark (#134).
+    if (!wanted) { dropPrepaint(); releaseMark(); apply(false); if (styled()) native = isDarkOnItsOwn() || !!quietDark(); send(); return; }
     if (forced()) { native = null; apply(true); return; }
     if (styled()) { native = isDarkOnItsOwn(); dropPrepaint(); }
     // Until the page can be looked at it stays on its dark ground (`prepaint`), never white: Dark Reader goes to work
@@ -383,19 +388,23 @@
     if (!c) c = darkened || native === true ? rgba(theme().darkSchemeBackgroundColor) : { r: 255, g: 255, b: 255, a: 1 };
     // A page dark on its own whose root and body paint white or nothing (a dark app laid over them): the dark at its
     // top, else its middle, which is what's seen under the bar (#134). Only a quiet dark, not a button's green.
-    if (native === true && !darkened && lightness(c) >= 0.5 && body) {
-      for (const [x, y] of [[0.5, 0.02], [0.5, 0.5]]) {
-        const el = document.elementFromPoint(innerWidth * x, innerHeight * y);
-        const under = el ? backgroundOf(el) : null;
-        if (under && lightness(under) < 0.3 && Math.max(under.r, under.g, under.b) - Math.min(under.r, under.g, under.b) <= 48) { c = under; break; }
-      }
-    }
+    if (native === true && !darkened && lightness(c) >= 0.5 && body) c = quietDark() || c;
     return hex(c);
+  };
+  // The quiet dark at the page's top, else its middle: what's seen under the bar. Not a button's green.
+  const quietDark = () => {
+    if (!document.body) return null;
+    for (const [x, y] of [[0.5, 0.02], [0.5, 0.5]]) {
+      const el = document.elementFromPoint(innerWidth * x, innerHeight * y);
+      const under = el ? backgroundOf(el) : null;
+      if (under && lightness(under) < 0.3 && Math.max(under.r, under.g, under.b) - Math.min(under.r, under.g, under.b) <= 48) return under;
+    }
+    return null;
   };
   // Only the top page tells Zigzag; a frame's look is the page's business.
   const send = () => {
-    if (!isTop) return;
-    const message = { darkened, native: native === true, color: colorOf(), site };
+    if (!isTop || retired) return;
+    const message = { darkened, native: native === true, color: colorOf(), site, wanted };
     if (native === true && !darkened) { const mark = markNow(); if (mark !== undefined) message.marker = mark; }
     const key = JSON.stringify(message);
     if (key === lastSent) return;
@@ -438,7 +447,7 @@
   else { if (wanted) { putPrepaint(); if (native === true) putMark(); } send(); }
   requestAnimationFrame(beforeFrame);
   if (document.documentElement) themes.observe(document.documentElement, { attributes: true, attributeFilter: themeAttributes });
-  document.addEventListener('DOMContentLoaded', () => { watchBody(); if (!decided && styled()) { decided = true; check(); } });
+  document.addEventListener('DOMContentLoaded', () => { watchBody(); if ((!decided || !wanted) && styled()) { decided = true; check(); } });
   addEventListener('load', () => {
     decided = true;
     // A mark the site never touched isn't one its look uses now.
@@ -461,6 +470,9 @@
       check();
     },
     check,
-    state: () => ({ wanted, darkened, native, color: colorOf(), engine: 'darkreader', forced: forced() }),
+    state: () => ({ wanted, darkened, native, color: colorOf(), engine: 'darkreader', forced: forced(), plain: DarkReader.plain === true }),
+    // The plain script, which steps aside for Dark Reader's (`retire`) once dark pages are wanted.
+    plain: DarkReader.plain === true,
+    retire() { retired = true; clearTimeout(checkTimer); themes.disconnect(); delete window.__zigzagDark; },
   };
 })();

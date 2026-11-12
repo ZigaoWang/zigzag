@@ -18,6 +18,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Peek takes the page's own color around it, as split view's pages do, so a page drawn dark no longer has a light strip across its top. ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - An extension's items in a page's right-click menu show once, not twice (Bitwarden's, for one). Thanks to [rocavence](https://github.com/rocavence). ([#186](https://github.com/ZigaoWang/zigzag/issues/186))
 - Restarting to install an update brings back everything that was open, Zigzag Mini windows included, with your windows, spaces, tabs and splits saved the moment the update restarts Zigzag.
+- A site that's dark on its own gives the bar above it, Zigzag Mini's bar and an installed app's toolbar its dark again with dark pages off, instead of white. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 
 ## [0.9.0] - 2026-11-12
 

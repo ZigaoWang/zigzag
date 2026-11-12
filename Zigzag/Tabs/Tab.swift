@@ -83,9 +83,11 @@ final class Tab: NSObject {
 
     /// The rule for `pageColor`. A page drawn dark, by Zigzag or on its own, is the dark the page script saw (#134): a
     /// dark site can keep a white theme color for its header, and WebKit's own background under it can be white too,
-    /// which painted the bar white over a dark page. Otherwise the background under the page, else the theme color.
+    /// which painted the bar white over a dark page. That holds with dark pages off too, where the page script only
+    /// looks. A dark page whose script found no dark of its own to give (all of it light at the top) gives none.
+    /// Otherwise the background under the page, else the theme color.
     static func pageColor(dark: DarkPages.State?, under: NSColor?, theme: NSColor?) -> NSColor? {
-        if let dark, dark.darkened || dark.native, let color = dark.color { return color }
+        if let dark, let color = dark.color, dark.darkened || (dark.native && DarkPages.isDark(color)) { return color }
         return under ?? theme
     }
     private(set) var isLoading = false
