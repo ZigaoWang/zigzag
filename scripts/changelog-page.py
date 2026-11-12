@@ -12,12 +12,15 @@ for raw in (root / "CHANGELOG.md").read_text(encoding="utf-8").splitlines():
     line = raw.strip()
     if line.startswith("## "):
         m = re.match(r"## \[([^\]]+)\] - (\d{4}-\d{2}-\d{2})", line)
-        current = {"version": m[1], "date": m[2], "sections": []} if m else None
+        current = {"version": m[1], "date": m[2], "summary": [], "sections": []} if m else None
         if current: versions.append(current)
     elif current and line.startswith("### "):
         current["sections"].append((line[4:], []))
     elif current and line.startswith("- ") and current["sections"]:
         current["sections"][-1][1].append(line[2:])
+    elif current and line and not current["sections"] and not line.startswith("#"):
+        # A line of prose under the version's heading, before its first section: what the version is about.
+        current["summary"].append(line)
 
 # The same footer as the rest of the site.
 FOOTER = """<footer class="end end-simple">
@@ -55,7 +58,7 @@ def inline(text):
 
 entries = []
 for v in versions:
-    sections = "".join(
+    sections = "".join(f'<p class="summary">{inline(line)}</p>' for line in v["summary"]) + "".join(
         f"<h3>{html.escape(title)}</h3><ul>" + "".join(f"<li>{inline(item)}</li>" for item in items) + "</ul>"
         for title, items in v["sections"])
     entries.append(

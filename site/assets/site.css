@@ -162,6 +162,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .rel time { display: block; margin-top: 4px; font-size: 14px; color: var(--soft); }
 .rel h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
 .rel h3:not(:first-child) { margin-top: 28px; }
+.rel .summary { margin: 0 0 28px; line-height: 1.6; text-wrap: pretty; }
 .rel ul { margin: 0; padding-left: 18px; }
 .rel > * { min-width: 0; }
 .rel li { margin: 0 0 10px; line-height: 1.6; text-wrap: pretty; overflow-wrap: anywhere; }

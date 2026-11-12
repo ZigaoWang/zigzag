@@ -121,7 +121,8 @@ write_notes() {
   python3 - "$VERSION" "$PLANNED" "$OUT" <<'PY'
 import html, sys
 version, planned, out = sys.argv[1], sys.argv[2], sys.argv[3]
-sections, inside = [], False
+# A line of prose under the version's heading, before its first section, is its summary.
+sections, summary, inside = [], [], False
 for raw in open("CHANGELOG.md", encoding="utf-8"):
     line = raw.strip()
     if line.startswith("## "):
@@ -129,12 +130,14 @@ for raw in open("CHANGELOG.md", encoding="utf-8"):
         inside = line.startswith(f"## [{planned}]")
     elif inside and line.startswith("### "): sections.append((line[4:], []))
     elif inside and line.startswith("- ") and sections: sections[-1][1].append(line[2:])
+    elif inside and line and not sections and not line.startswith("#"): summary.append(line)
 if not sections: sys.exit(f"CHANGELOG.md has no notes for {planned}")
 style = ("<style>:root{color-scheme:light dark}body{font:13px -apple-system,sans-serif;margin:0 4px}"
-         "h3{font-size:13px;margin:14px 0 6px}ul{margin:0;padding-left:18px}li{margin:4px 0;line-height:1.4}</style>")
-body = "".join(f"<h3>{html.escape(t)}</h3><ul>" + "".join(f"<li>{html.escape(i)}</li>" for i in items) + "</ul>" for t, items in sections)
+         "h3{font-size:13px;margin:14px 0 6px}ul{margin:0;padding-left:18px}li{margin:4px 0;line-height:1.4}"
+         "p{margin:10px 0 0;line-height:1.4}</style>")
+body = "".join(f"<p>{html.escape(s)}</p>" for s in summary) + "".join(f"<h3>{html.escape(t)}</h3><ul>" + "".join(f"<li>{html.escape(i)}</li>" for i in items) + "</ul>" for t, items in sections)
 open(f"{out}/updates/Zigzag-{version}.html", "w", encoding="utf-8").write(style + body)
-md = "\n\n".join(f"## {t}\n" + "\n".join(f"- {i}" for i in items) for t, items in sections)
+md = "".join(f"{s}\n\n" for s in summary) + "\n\n".join(f"## {t}\n" + "\n".join(f"- {i}" for i in items) for t, items in sections)
 md += ("\n\nDownload the DMG, open it, and drag Zigzag to Applications. Requires macOS 15.4 or later. Updates install automatically."
        "\n\nEvery version's notes: https://zigzagbrowser.com/release-notes\n")
 open(f"{out}/notes.md", "w", encoding="utf-8").write(md)
