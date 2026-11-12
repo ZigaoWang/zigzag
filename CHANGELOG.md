@@ -5,22 +5,12 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-11-12
+
 ### New
 - In split view, drag a page by its strip to move it: onto another page and the two swap places, onto the page's edges or corners and it takes that half or quarter, onto the sidebar's tabs and it leaves the split as a tab of its own, out of the window and it opens in a new one (hold Option for Zigzag Mini). The same preview as for a dragged tab shows where it lands, Esc calls it off, and ⌘Z puts it back. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - Zoom Pane enlarges one page of a split view over the others for a moment, without moving anything: ⇧-click its part of the row in the sidebar, use the button in its strip, or press ⇧⌘↩. Click beside it, press Esc or zoom it again and it goes back where it was. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - Double-clicking a split's row in the sidebar renames the page you clicked. A group of three or four shows its icons evenly in the row, and pointing at one names its page. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
-
-### Fixed
-- In a short window, the list of sections in Settings scrolls instead of running off the bottom ([#169](https://github.com/ZigaoWang/zigzag/issues/169)).
-- The strip over each page in split view reads clearly on dark pages: its address and buttons turn light, as the bar above the page does. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
-- A split's row in the sidebar no longer shifts its pages as the pointer comes and goes. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
-- The name of the place a dragged tab would open, over the page, sits on a small pill that reads on any page, out of the way of what you're dragging. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
-- Notes at the top of the page slide back up when they go, the way they came down, instead of vanishing. Notes with a button (Undo, Pin This Page) have a close button, and the note after closing a pinned tab is shorter.
-- A tab Zigzag put to sleep has a thin, even dashed ring round its icon instead of chunky dots, and its preview says why it sleeps and about how much memory that freed, like "Asleep to save memory. Freed about 180 MB." ([#140](https://github.com/ZigaoWang/zigzag/issues/140))
-
-## [0.8.7] - 2026-11-12
-
-### New
 - Split view takes up to four tabs. Drag a tab over the page: the edges place it in a half, the corners in a quarter, and a preview shows where it lands. Three tabs are a half and two quarters, four a grid; the lines between them drag, and the group is one row in the sidebar that comes back after a restart. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - Tabs move between windows as they are, without loading again: drag a tab into another window's sidebar, where a line shows where it lands, or onto its page, and it goes there. Let go outside Zigzag and it opens in a window of its own. A window left with no tabs closes, as in Chrome, and ⌘Z brings the tabs back. ([#167](https://github.com/ZigaoWang/zigzag/issues/167))
 - Open in Zigzag Mini, in a tab's right-click menu, moves the page into a Zigzag Mini window as it is, history and all; ⌘Z puts the tab back. Hold Option as you drag a tab out of the window to do the same. ([#164](https://github.com/ZigaoWang/zigzag/issues/164))
@@ -30,6 +20,12 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The "Zigzag updated" note goes away by itself after 15 seconds, like a notification, and stays while your pointer is on it. What's New is still in the Help menu.
 
 ### Fixed
+- In a short window, the list of sections in Settings scrolls instead of running off the bottom ([#169](https://github.com/ZigaoWang/zigzag/issues/169)).
+- The strip over each page in split view reads clearly on dark pages: its address and buttons turn light, as the bar above the page does. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+- A split's row in the sidebar no longer shifts its pages as the pointer comes and goes. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+- The name of the place a dragged tab would open, over the page, sits on a small pill that reads on any page, out of the way of what you're dragging. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
+- Notes at the top of the page slide back up when they go, the way they came down, instead of vanishing. Notes with a button (Undo, Pin This Page) have a close button, and the note after closing a pinned tab is shorter.
+- A tab Zigzag put to sleep has a thin, even dashed ring round its icon instead of chunky dots, and its preview says why it sleeps and about how much memory that freed, like "Asleep to save memory. Freed about 180 MB." ([#140](https://github.com/ZigaoWang/zigzag/issues/140))
 - YouTube videos play again instead of stopping at "Something went wrong. Please try again later." YouTube checks parts of what it sends before it plays a video, and Zigzag's ad blocking had changed one of them, the note it shows about ad blockers. That's left alone now, and should YouTube still refuse a video, the page loads again and plays it, with any ad in it sped through. ([#129](https://github.com/ZigaoWang/zigzag/issues/129))
 - In the icon choices for a space, a folder or a tab, typing a name like "cat" or "rocket" in the field under the grid finds matching emoji in the grid's place. Click one or press Return to pick it, and Esc goes back to the icons. Letters used to vanish as you typed. Thanks to [thekevinbrown](https://github.com/thekevinbrown). ([#163](https://github.com/ZigaoWang/zigzag/issues/163))
 - In Settings › Privacy, the Block ads and trackers switch stays at the right edge when you turn it on or off.

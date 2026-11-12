@@ -7510,6 +7510,7 @@
     },
     "Move Bottom Left" : {
       "comment" : "Shown over the bottom left quarter of the page while a page of a split view is dragged there by its strip.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7521,6 +7522,7 @@
     },
     "Move Bottom Right" : {
       "comment" : "Shown over the bottom right quarter of the page while a page of a split view is dragged there by its strip.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7653,6 +7655,7 @@
     },
     "Move Top Left" : {
       "comment" : "Shown over the top left quarter of the page while a page of a split view is dragged there by its strip.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7664,6 +7667,7 @@
     },
     "Move Top Right" : {
       "comment" : "Shown over the top right quarter of the page while a page of a split view is dragged there by its strip.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7774,6 +7778,7 @@
     },
     "Move to the Bottom" : {
       "comment" : "Shown over the bottom half of the page while a page of a split view is dragged there by its strip.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7785,6 +7790,7 @@
     },
     "Move to the Left" : {
       "comment" : "Shown over the left half of the page while a page of a split view is dragged there by its strip.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7796,6 +7802,7 @@
     },
     "Move to the Right" : {
       "comment" : "Shown over the right half of the page while a page of a split view is dragged there by its strip.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7807,6 +7814,7 @@
     },
     "Move to the Top" : {
       "comment" : "Shown over the top half of the page while a page of a split view is dragged there by its strip.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11248,6 +11256,7 @@
     },
     "Return Pane" : {
       "comment" : "Tooltip and menu item: puts the enlarged page of a split view back in its place among the others.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13086,6 +13095,7 @@
     },
     "Swap Places" : {
       "comment" : "Shown over a page of a split view while another page of it is dragged there by its strip: the two trade places.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -16139,6 +16149,7 @@
     },
     "Zoom Pane" : {
       "comment" : "Tooltip and menu item: enlarges one page of a split view over the others for a moment, without changing where it is.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
