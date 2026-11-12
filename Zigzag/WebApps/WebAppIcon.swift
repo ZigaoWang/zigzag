@@ -52,9 +52,10 @@ nonisolated enum WebAppIcon {
         return facts
     }
 
-    /// A manifest's name and icons. `base` is the manifest's own address, which its icons are relative to.
-    static func manifest(_ data: Data, base: URL) -> (name: String?, shortName: String?, icons: [Candidate]) {
-        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return (nil, nil, []) }
+    /// A manifest's name, icons and theme color ("#rrggbb", only a plain hex one). `base` is the manifest's own
+    /// address, which its icons are relative to.
+    static func manifest(_ data: Data, base: URL) -> (name: String?, shortName: String?, icons: [Candidate], themeColor: String?) {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return (nil, nil, [], nil) }
         func text(_ key: String) -> String? {
             (object[key] as? String).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
         }
@@ -67,7 +68,16 @@ nonisolated enum WebAppIcon {
             guard purposes.contains("any") || purposes.contains("maskable") else { continue }
             icons.append(Candidate(url: url, size: largestSize(icon["sizes"] as? String ?? ""), fillsSquare: purposes.contains("maskable") && !purposes.contains("any")))
         }
-        return (text("name"), text("short_name"), icons)
+        return (text("name"), text("short_name"), icons, text("theme_color").flatMap(hexColor))
+    }
+
+    /// "#0D1117" or "#fff" as "#0d1117"; nil for any other way of writing a color.
+    static func hexColor(_ text: String) -> String? {
+        guard text.hasPrefix("#") else { return nil }
+        var digits = text.dropFirst().lowercased()
+        if digits.count == 3 { digits = digits.map { "\($0)\($0)" }.joined() }
+        guard digits.count == 6, digits.allSatisfy(\.isHexDigit) else { return nil }
+        return "#" + digits
     }
 
     /// "192x192 512x512" → 512; "any" (a drawing) counts as large.
@@ -307,6 +317,8 @@ enum WebAppIconFinder {
         var name: String
         /// The site's own picture, before it's set in the rounded square; nil when none was big enough.
         var picture: CGImage?
+        /// The manifest's `theme_color`, "#rrggbb", if it gives one.
+        var themeColor: String? = nil
     }
 
     /// Asks the page, then the network; `done` hears what was found, on the main thread, within a few seconds.
@@ -333,11 +345,12 @@ enum WebAppIconFinder {
         let session = URLSession(configuration: configuration)
         defer { session.finishTasksAndInvalidate() }
         var candidates = facts.icons
-        var manifestName: String?, manifestShortName: String?
+        var manifestName: String?, manifestShortName: String?, themeColor: String?
         if let manifest = facts.manifest, let (data, _) = try? await session.data(from: manifest), data.count < 1_000_000 {
             let read = WebAppIcon.manifest(data, base: manifest)
             manifestName = read.name
             manifestShortName = read.shortName
+            themeColor = read.themeColor
             candidates = read.icons + candidates
         }
         let name = WebAppIcon.name(facts: facts, manifestName: manifestName, manifestShortName: manifestShortName, url: url)
@@ -346,8 +359,8 @@ enum WebAppIconFinder {
             guard let (data, response) = try? await session.data(from: candidate.url),
                   (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true,
                   let picture = WebAppIcon.picture(from: data), min(picture.width, picture.height) >= 64 else { continue }
-            return Found(name: name, picture: picture)
+            return Found(name: name, picture: picture, themeColor: themeColor)
         }
-        return Found(name: name, picture: nil)
+        return Found(name: name, picture: nil, themeColor: themeColor)
     }
 }

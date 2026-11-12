@@ -120,6 +120,11 @@ enum Tokens {
         static let windowDefaultSize = NSSize(width: 1280, height: 820)
         /// A site installed as an app, the first time it opens: a working window, smaller than the browser's.
         static let webAppWindowSize = NSSize(width: 1120, height: 760)
+        /// An installed app with its toolbar off: the title bar it doesn't draw, which the traffic lights center in
+        /// and which moves the window around them.
+        static let webAppTitleBarHeight: CGFloat = 28
+        /// The same, across the rest of the top: a band thin enough to leave the page's own controls under it alone.
+        static let webAppDragBand: CGFloat = Space.x2
         static let windowMinSize = NSSize(width: 560, height: 400)
         static let deskCardWidth: CGFloat = 176
         static let deskCardMaxWidth: CGFloat = 440

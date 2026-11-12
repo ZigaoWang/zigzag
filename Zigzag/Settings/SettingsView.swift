@@ -2746,7 +2746,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// Settings › General › Installed Apps: each site installed as an app, with Remove, which asks first.
+    /// Settings › General › Installed Apps: each site installed as an app, with its toolbar's switch and Remove, which
+    /// asks first.
     private func reloadWebApps() {
         webAppsGroup.removeAllRows()
         let store = WebAppStore.shared
@@ -2765,8 +2766,17 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             if hasManyProfiles, let profile = Library.shared.directory.profile(app.profileID) {
                 detail = String(localized: "\(detail) on \(profile.displayName)", comment: "Under an installed app in Settings › General with more than one profile: the site, then the profile it uses, like “github.com on Work”.")
             }
+            // Its toolbar, on or off: off, the app's window is just the page with the traffic lights over it.
+            let toolbarLabel = Label(String(localized: "Toolbar", comment: "Beside the switch on an installed app's row in Settings › General: whether its window shows back, forward, reload and its name on top."),
+                                     font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
+            let toolbar = Toggle(isOn: app.showsToolbar)
+            toolbar.setAccessibilityLabel(String(localized: "Show toolbar in “\(app.name)”", comment: "VoiceOver label of the switch on an installed app's row in Settings › General; the app's name."))
+            toolbar.onChange = { on in WebAppStore.shared.setShowsToolbar(on, for: app.id) }
+            let controls = NSStackView(views: [toolbarLabel, toolbar, remove])
+            controls.spacing = Tokens.Space.x2
+            controls.setCustomSpacing(Tokens.Space.x4, after: toolbar)
             let icon = store.bundle(of: app).map { NSWorkspace.shared.icon(forFile: $0.path) } ?? SettingsIcon.symbol("app")
-            let row = FormRow(title: app.name, detail: detail, icon: icon, control: remove)
+            let row = FormRow(title: app.name, detail: detail, icon: icon, control: controls)
             row.keywords = String(localized: "web app dock install application", comment: "Words that find Installed Apps with Find a setting in Settings. Not shown.")
             webAppsGroup.add(row)
         }

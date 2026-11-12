@@ -18,11 +18,19 @@ nonisolated struct WebApp: Codable, Equatable {
     var url: URL
     /// The profile it was installed from, whose sign-ins it uses.
     var profileID: UUID
-    /// The space it was installed from: the window wears its color. Another of the profile's spaces if it's gone.
+    /// The space it was installed from, whose profile the page uses. Another of the profile's spaces if it's gone.
     var spaceID: UUID
     /// Where the app was made. Found again by its bundle id if it was moved.
     var bundlePath: String
     var created: Date
+    /// The toolbar turned off (Show Toolbar): the window is just the page, with the traffic lights over it. Nil, as
+    /// for an app installed before there was a choice, is on.
+    var hidesToolbar: Bool? = nil
+    /// The color the site's manifest gives its app (`theme_color`, "#0d1117"), for the toolbar when the page names
+    /// none of its own.
+    var themeColor: String? = nil
+
+    var showsToolbar: Bool { hidesToolbar != true }
 }
 
 /// The links between an installed app and Zigzag: "zigzag-webapp://open/<id>" when the app is opened or chosen, and
@@ -146,6 +154,13 @@ final class WebAppStore {
     func save(_ app: WebApp) {
         if let i = apps.firstIndex(where: { $0.id == app.id }) { apps[i] = app } else { apps.append(app) }
         persist()
+    }
+
+    /// Settings › General's switch, and Show Toolbar in the app's own View menu.
+    func setShowsToolbar(_ on: Bool, for id: String) {
+        guard var app = app(id), app.showsToolbar != on else { return }
+        app.hidesToolbar = on ? nil : true
+        save(app)
     }
 
     func forget(_ id: String) {

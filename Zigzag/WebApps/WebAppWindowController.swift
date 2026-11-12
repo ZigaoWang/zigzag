@@ -1,8 +1,9 @@
 import AppKit
 import WebKit
 
-/// A site installed as an app, in a window of its own: Zigzag Mini's quiet frame in the color of the space it was
-/// installed from, a slim strip with back, forward and reload and the app's name, no sidebar. Its page is a real tab on
+/// A site installed as an app, in a window of its own, as a web app is in Chrome or Safari: a slim toolbar in the
+/// page's own color (`PageBar`) with back, forward and reload and the app's name, the page under it edge to edge, no
+/// sidebar; or, with the toolbar off, just the page with the traffic lights over it. Its page is a real tab on
 /// the app's profile, so you stay signed in and extensions, blocking and passwords work as anywhere. A link you click to
 /// another site opens in the browser window. Its frame is remembered for the next time. Opened only by the app's small
 /// app (`ZigzagWebApp`), which quits when this window closes.
@@ -81,24 +82,56 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         root.card.showLoading(of: tab)
         tab.host = self
         tokens.append(tab.changed.observe { [weak self] change in self?.tabChanged(change) })
-        tokens.append(Library.shared.changed.observe { [weak self] in
-            self?.paint(animated: true)
-        })
-        paint(animated: false)
+        // Its toolbar turned on or off, here or in Settings.
+        tokens.append(WebAppStore.shared.changed.observe { [weak self] in self?.applyToolbar() })
+        root.dragStrip.menuEntries = { [weak self] in self?.toolbarMenu() ?? [] }
+        strip.menuEntries = root.dragStrip.menuEntries
         root.card.show(tab.ensureWebView())
         root.card.hidePlaceholder()
         refreshStrip()
-        window.trafficLightOrigin = NSPoint(x: Tokens.Sidebar.lightsX, y: round((Tokens.Metric.miniStripHeight - window.trafficLightHeight) / 2))
+        refreshBar(animated: false)
         strip.trafficLightsWidth = window.trafficLightsWidth
+        applyToolbar()
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     var space: SpaceInfo { Library.shared.space(tab.spaceID) ?? Library.shared.spaces[0] }
 
-    private func paint(animated: Bool) {
-        root.paint(space, isPrivate: false, animated: animated)
-        strip.refreshColors()
+    /// The app as it's saved now: its toolbar can change while the window is open.
+    private var current: WebApp { WebAppStore.shared.app(app.id) ?? app }
+
+    /// The toolbar, or just the page with the traffic lights over it, as the app is set.
+    private func applyToolbar() {
+        guard let window = window as? BrowserWindow else { return }
+        let shows = current.showsToolbar
+        root.showsToolbar = shows
+        // Centered in the toolbar; without it, where a window's title bar would hold them.
+        let top = shows ? Tokens.Metric.miniStripHeight : Tokens.Metric.webAppTitleBarHeight
+        window.trafficLightOrigin = NSPoint(x: Tokens.Sidebar.lightsX, y: round((top - window.trafficLightHeight) / 2))
+        root.dragStrip.lightsEnd = Tokens.Sidebar.lightsX + window.trafficLightsWidth
+    }
+
+    /// The toolbar in the page's color, from the site's theme color, the manifest's, or the page's own.
+    private func refreshBar(animated: Bool) {
+        let manifest = current.themeColor.flatMap(DarkPages.color(hex:))
+        root.bar.show(bar: PageBar.color(for: tab, fallback: manifest), page: tab.pageColor, animated: animated)
+        root.color = root.bar.color
+        strip.appearance = root.bar.inkAppearance
+    }
+
+    /// The toolbar's own menu, on a right-click on it, or on the strip the traffic lights sit in while it's off.
+    private func toolbarMenu() -> [MenuPanel.Entry] {
+        [.item(.init(title: Self.toolbarTitle(showing: current.showsToolbar), symbol: "menubar.rectangle") { [weak self] in self?.toggleToolbar(nil) })]
+    }
+
+    static func toolbarTitle(showing: Bool) -> String {
+        showing ? String(localized: "Hide Toolbar", comment: "Menu item in an installed app's window (View menu, and its toolbar's right-click menu): leaves just the page with the traffic lights over it.")
+                : String(localized: "Show Toolbar", comment: "Menu item in an installed app's window (View menu, and the right-click menu of the strip at its top): brings back back, forward, reload and the app's name.")
+    }
+
+    @objc func toggleToolbar(_ sender: Any?) {
+        WebAppStore.shared.setShowsToolbar(!current.showsToolbar, for: app.id)
     }
 
     /// Only this window comes forward, not the browser windows. It's made key first, so activating brings up just it
@@ -119,6 +152,9 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         case .url, .loading, .title, .navigation, .webView:
             refreshStrip()
             if change == .webView, tab.webView != nil, !isClosing { root.card.show(tab.webView) }
+            if change == .webView || change == .loading { refreshBar(animated: false) }
+        case .themeColor, .darkPage:
+            refreshBar(animated: true)
         default: break
         }
     }
@@ -197,7 +233,8 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
          "profile": Library.shared.directory.profile(tab.profile.id)?.name ?? "", "space": space.name,
          "store": tab.webView?.configuration.websiteDataStore.identifier?.uuidString ?? "default",
          "frame": window.map { NSStringFromRect($0.frame) } ?? "", "key": window?.isKeyWindow == true,
-         "canGoBack": tab.canGoBack, "loading": tab.isLoading]
+         "canGoBack": tab.canGoBack, "loading": tab.isLoading, "showsToolbar": root.showsToolbar, "visible": window?.isVisible == true,
+         "bar": root.bar.color.flatMap { $0.usingColorSpace(.sRGB) }.map(DarkPages.hex) ?? ""]
     }
     #endif
 }
@@ -209,6 +246,9 @@ extension WebAppWindowController: NSMenuItemValidation {
         case #selector(goForward(_:)): return tab.canGoForward
         case #selector(stopLoading(_:)): return tab.isLoading
         case #selector(copyPageURL(_:)): return tab.url != nil
+        case #selector(toggleToolbar(_:)):
+            item.title = Self.toolbarTitle(showing: current.showsToolbar)
+            return true
         default: return true
         }
     }
@@ -296,58 +336,98 @@ extension WebAppWindowController: PromptHost {
         Toast.show(text, symbol: symbol, duration: duration, over: overlay, area: overlay.bounds)
     }
 }
-
 // MARK: - The window's content
 
-/// The space's frame, the strip on top, and the page as a card in a thin frame of the color, as in Zigzag Mini.
-final class WebAppRootView: SpaceFrameView {
+/// The toolbar on top in the page's color and the page under it, edge to edge; the window rounds its own corners.
+/// With the toolbar off, the page fills the window and a strip along its top, where a title bar would be, still moves
+/// it.
+final class WebAppRootView: ColorView {
+    let bar = PageBarView()
     let strip = WebAppStripView()
     let card = PageCardView()
+    let dragStrip = WebAppDragStrip()
     let overlay = PassthroughView()
     let barLayer = PassthroughView()
+    var showsToolbar = true {
+        didSet {
+            guard showsToolbar != oldValue else { return }
+            bar.isHidden = !showsToolbar
+            strip.isHidden = !showsToolbar
+            dragStrip.isHidden = showsToolbar
+            needsLayout = true
+        }
+    }
 
     init() {
-        super.init(color: SpaceColor.sky.background)
-        [strip, card, overlay, barLayer].forEach(addSubview)
+        super.init(color: Tokens.Color.cardBackground)
+        dragStrip.isHidden = true
+        [bar, strip, card, dragStrip, overlay, barLayer].forEach(addSubview)
+        card.isEdgeToEdge = true
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    override var glassFrame: NSRect {
-        guard BrowserRootView.isBorderless else { return bounds }
-        return NSRect(x: 0, y: 0, width: bounds.width, height: min(bounds.height, Tokens.Metric.miniStripHeight))
-    }
-
     override func layout() {
         super.layout()
-        let borderless = BrowserRootView.isBorderless
-        let top = Tokens.Metric.miniStripHeight
-        strip.frame = NSRect(x: 0, y: 0, width: bounds.width, height: top)
-        card.isAttached = borderless
-        card.squaresLeftCorners = (borderless, borderless)
-        card.squaresRightCorners = (borderless, borderless)
-        let inset = borderless ? 0 : Tokens.Metric.miniFrame
-        card.frame = NSRect(x: inset, y: top, width: max(0, bounds.width - inset * 2), height: max(0, bounds.height - top - inset))
+        let top = showsToolbar ? Tokens.Metric.miniStripHeight : 0
+        bar.frame = NSRect(x: 0, y: 0, width: bounds.width, height: top)
+        strip.frame = bar.frame
+        card.frame = NSRect(x: 0, y: top, width: bounds.width, height: max(0, bounds.height - top))
+        dragStrip.frame = NSRect(x: 0, y: 0, width: bounds.width, height: min(bounds.height, Tokens.Metric.webAppTitleBarHeight))
         overlay.frame = card.frame
         barLayer.frame = bounds
     }
 }
 
-/// The traffic lights, back, forward and reload after them, and the app's name in the middle, quiet. Dragging it
-/// moves the window.
+/// With the toolbar off, the top of the window still moves it, as a title bar would, without taking the page's
+/// clicks: a thin band across the whole top, and the title bar's full height around the traffic lights. A
+/// double-click zooms the window; a right-click offers the toolbar back.
+final class WebAppDragStrip: NSView {
+    /// Where the traffic lights end, from the window's leading edge.
+    var lightsEnd: CGFloat = 70 { didSet { needsLayout = true } }
+    var menuEntries: (() -> [MenuPanel.Entry])?
+
+    override var isFlipped: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { true }
+
+    /// The parts of it that take the pointer, in its own coordinates.
+    var grabAreas: [NSRect] {
+        [NSRect(x: 0, y: 0, width: bounds.width, height: min(bounds.height, Tokens.Metric.webAppDragBand)),
+         NSRect(x: 0, y: 0, width: lightsEnd + Tokens.Space.x3, height: bounds.height)]
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard !isHidden, let superview else { return nil }
+        let local = convert(point, from: superview)
+        return grabAreas.contains { $0.contains(local) } ? self : nil
+    }
+
+    override func mouseDown(with event: NSEvent) { window?.titleBarMouseDown(event) }
+
+    override func rightMouseDown(with event: NSEvent) {
+        guard let entries = menuEntries?(), !entries.isEmpty else { return }
+        MenuPanel.show(entries, from: self, placement: .at(convert(event.locationInWindow, from: nil)))
+    }
+}
+
+/// The traffic lights, back, forward and reload after them on the lights' center line, and the app's name in the
+/// middle in a window title's type. Its ink comes from the bar's color (its appearance, set by the window). Dragging
+/// it moves the window, a double-click zooms it, and a right-click offers to hide it.
 final class WebAppStripView: NSView {
     let back = WebAppStripView.button("chevron.left", toolTip: String(localized: "Back", comment: "Tooltip of a button in the strip on top of each page of a split view: goes back."))
     let forward = WebAppStripView.button("chevron.right", toolTip: String(localized: "Forward", comment: "Tooltip of a button in the strip on top of each page of a split view: goes forward."))
     let reload = WebAppStripView.button("arrow.clockwise", toolTip: String(localized: "Reload", comment: "Tooltip of a button in the strip on top of each page of a split view: reloads the page."))
-    let title = Label("", font: .systemFont(ofSize: Tokens.Pane.addressText, weight: .medium), color: Tokens.Color.textSecondary)
+    let title = Label("", font: .titleBarFont(ofSize: 0), color: .labelColor)
     private let mark = NSImageView()
     var notSecure = false { didSet { mark.isHidden = !notSecure } }
     var trafficLightsWidth: CGFloat = 52 { didSet { needsLayout = true } }
-    private var themeToken: SignalToken?
+    var menuEntries: (() -> [MenuPanel.Entry])?
+    private var keyTokens: [NSObjectProtocol] = []
 
     static func button(_ symbol: String, toolTip: String) -> IconButton {
         let button = IconButton(symbol: symbol, size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph, toolTip: toolTip)
-        button.isChrome = true
+        // On the page's color, not the frame's: the neutral fills, which show on any color.
+        button.isOnPage = true
         return button
     }
 
@@ -358,25 +438,41 @@ final class WebAppStripView: NSView {
         mark.imageScaling = .scaleNone
         mark.image = Tokens.Symbol.image(SitePanel.notSecureSymbol, size: Tokens.Symbol.inline)
         mark.toolTip = SitePanel.notSecure
+        mark.contentTintColor = .secondaryLabelColor
         mark.isHidden = true
         [back, forward, reload, mark, title].forEach(addSubview)
-        themeToken = Brand.themeChanged.observe { [weak self] in self?.refreshColors() }
+        setAccessibilityRole(.toolbar)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
+    isolated deinit { keyTokens.forEach(NotificationCenter.default.removeObserver) }
+
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { true }
+    override func mouseDown(with event: NSEvent) { window?.titleBarMouseDown(event) }
 
-    func refreshColors() {
-        let theme = Brand.Theme.for(self)
-        title.textColor = theme.rowInk
-        mark.contentTintColor = theme.quietInk
+    override func rightMouseDown(with event: NSEvent) {
+        guard let entries = menuEntries?(), !entries.isEmpty else { return }
+        MenuPanel.show(entries, from: self, placement: .at(convert(event.locationInWindow, from: nil)))
+    }
+
+    /// A window's title dims while the window isn't the one you're in, as every Mac window's does.
+    private func refreshTitle() {
+        title.textColor = window?.isKeyWindow == false ? .tertiaryLabelColor : .labelColor
     }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        refreshColors()
+        keyTokens.forEach(NotificationCenter.default.removeObserver)
+        keyTokens = []
+        guard let window else { return }
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+            keyTokens.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.refreshTitle() }
+            })
+        }
+        refreshTitle()
     }
 
     override func layout() {

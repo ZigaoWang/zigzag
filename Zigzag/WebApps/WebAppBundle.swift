@@ -167,12 +167,13 @@ enum WebAppInstaller {
 
     /// Makes the app for `url` on `space`'s profile, named `name`, with `icon` (the 1024 one). `done` hears the record,
     /// or nil if it couldn't be made.
-    static func install(name: String, url: URL, spaceID: UUID, icon: CGImage, folder: URL = WebApps.folder,
+    static func install(name: String, url: URL, spaceID: UUID, icon: CGImage, themeColor: String? = nil, folder: URL = WebApps.folder,
                         done: @escaping (WebApp?) -> Void) {
         let profileID = Library.shared.profileID(ofSpace: spaceID)
         let id = WebApps.makeID(url: url, profileID: profileID)
         let host = Bundle.main.bundleIdentifier ?? "wang.zigao.zigzag"
-        let old = WebAppStore.shared.app(id).flatMap { WebAppStore.shared.bundle(of: $0) }
+        let previous = WebAppStore.shared.app(id)
+        let old = previous.flatMap { WebAppStore.shared.bundle(of: $0) }
         guard let icns = WebAppIcon.icns(from: icon) else { done(nil); return }
         let spec = WebAppBundle.Spec(id: id, name: name, url: url, host: host, hostPath: Bundle.main.bundlePath,
                                      launcher: launcher, icns: icns, missingHostMessage: missingHostMessage)
@@ -183,7 +184,9 @@ enum WebAppInstaller {
             let result = await Task.detached(priority: .userInitiated) { Result { try WebAppBundle.install(spec, in: folder, replacing: old) } }.value
             switch result {
             case .success(let bundle):
-                let app = WebApp(id: id, name: name, url: url, profileID: profileID, spaceID: spaceID, bundlePath: bundle.path, created: Date())
+                // Installed again, it keeps the toolbar as you had it.
+                let app = WebApp(id: id, name: name, url: url, profileID: profileID, spaceID: spaceID, bundlePath: bundle.path, created: Date(),
+                                 hidesToolbar: previous?.hidesToolbar, themeColor: themeColor)
                 WebAppStore.shared.save(app)
                 Diagnostics.note("Installed as app", site: url.host())
                 done(app)

@@ -26,6 +26,7 @@ enum WebAppInstallSheet {
         name.stringValue = guess
         let well = WebAppIconWell()
         var picture: CGImage? = tab.favicon.flatMap { $0.cgImage(forProposedRect: nil, context: nil, hints: nil) }
+        var themeColor: String?
         // The icon is in: shown, and Install can be pressed.
         var ready = false
         let rows = [
@@ -39,7 +40,7 @@ enum WebAppInstallSheet {
             guard confirmed else { return }
             let chosen = name.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let icon = WebAppIcon.render(picture, name: chosen) else { return }
-            WebAppInstaller.install(name: chosen, url: url, spaceID: spaceID, icon: icon) { app in
+            WebAppInstaller.install(name: chosen, url: url, spaceID: spaceID, icon: icon, themeColor: themeColor) { app in
                 guard let controller else { return }
                 guard let app else {
                     Toast.show(String(localized: "Couldn’t install \(chosen)", comment: "Toast when Install as App fails. The placeholder is the app's name."),
@@ -69,6 +70,7 @@ enum WebAppInstallSheet {
         DispatchQueue.main.asyncAfter(deadline: .now() + WebAppIconWell.patience) { settle() }
         WebAppIconFinder.find(for: tab) { found in
             if let large = found.picture { picture = large }
+            themeColor = found.themeColor
             if name.stringValue == guess, !found.name.isEmpty { name.stringValue = found.name }
             if ready { redraw() } else { settle() }
         }
