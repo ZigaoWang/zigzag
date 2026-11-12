@@ -49,6 +49,66 @@ nonisolated struct SessionState: Codable, Sendable {
         for node in nodes where !kept.contains(node.id) { tree = TabTree.removing(node.id, from: tree) }
         return Dictionary(tree.compactMap { node in node.parent.map { (node.id, $0) } }, uniquingKeysWith: { a, _ in a })
     }
+
+    /// Zigzag 0.8.7 beta 1 showed every window the same tabs (#162) and saved them that way: the first window with the
+    /// whole list, each other window with only its place, space and the tab it had chosen in each space. Windows have
+    /// tabs of their own again (#167), so read back, the list stays with the first window and each other window takes
+    /// the tab it was on in the space it was showing (with the pages beside it in a split), so every tab and every
+    /// window comes back, each tab once. A tab the first window was on stays there. Any other session is as it was.
+    @MainActor func givingWindowsTheirOwnTabs() -> SessionState {
+        var windows = self.windows
+        for w in windows.indices where windows[w].hasNoTabs {
+            let space = windows[w].currentSpaceID
+            let wanted = windows[w].spaces.first { $0.spaceID == space }?.selectedTabID
+            // What it chose in other spaces are tabs it no longer has.
+            for i in windows[w].spaces.indices { windows[w].spaces[i].selectedTabID = nil }
+            guard let wanted, let from = windows.indices.first(where: { $0 != w && windows[$0].holds(wanted) }) else { continue }
+            let chosenThere = windows[from].spaces.first { $0.spaceID == space }?.selectedTabID
+            if let list = windows[from].spaces.firstIndex(where: { $0.spaceID == space && $0.tabs.contains { $0.id == wanted } }) {
+                let ids = Set(windows[from].spaces[list].tabs.map(\.id))
+                // A split or tile group of tabs goes along whole; one with a pinned page stays, and the tab leaves it.
+                let pair = windows[from].splits?.first { $0.ids.contains(wanted) }
+                let whole = pair.map { $0.ids.allSatisfy(ids.contains) } ?? false
+                let moving = Set(whole ? pair?.ids ?? [wanted] : [wanted])
+                guard chosenThere.map({ !moving.contains($0) }) ?? true else { continue }
+                var kept: [TabState] = [], taken: [TabState] = []
+                let lifted = Dictionary(windows[from].spaces[list].tabs.filter { moving.contains($0.id) }.map { ($0.id, $0.parentID) },
+                                        uniquingKeysWith: { a, _ in a })
+                for var tab in windows[from].spaces[list].tabs {
+                    if moving.contains(tab.id) {
+                        // Under a tab that stays behind: at the top level here.
+                        if let parent = tab.parentID, !moving.contains(parent) { tab.parentID = nil }
+                        taken.append(tab)
+                    } else {
+                        // Under a tab that left: a level up, under that one's own parent.
+                        while let parent = tab.parentID, moving.contains(parent) { tab.parentID = lifted[parent] ?? nil }
+                        kept.append(tab)
+                    }
+                }
+                windows[from].spaces[list].tabs = kept
+                windows[from].splits?.removeAll { !$0.ids.allSatisfy { !moving.contains($0) } }
+                if whole, let pair { windows[w].splits = (windows[w].splits ?? []) + [pair] }
+                if let mine = windows[w].spaces.firstIndex(where: { $0.spaceID == space }) {
+                    windows[w].spaces[mine].tabs = taken
+                    windows[w].spaces[mine].selectedTabID = wanted
+                }
+            } else if chosenThere != wanted, let page = windows[from].bookmarkTabs.firstIndex(where: { $0.tab.id == wanted }),
+                      !(windows[from].splits ?? []).contains(where: { $0.ids.contains(wanted) }),
+                      let mine = windows[w].spaces.firstIndex(where: { $0.spaceID == space }) {
+                // A pinned page or favorite it was on: its open page comes with it.
+                windows[w].bookmarkTabs.append(windows[from].bookmarkTabs.remove(at: page))
+                windows[w].spaces[mine].selectedTabID = wanted
+            }
+        }
+        return SessionState(windows: windows)
+    }
+}
+
+private extension SessionState.WindowState {
+    nonisolated var hasNoTabs: Bool { spaces.allSatisfy(\.tabs.isEmpty) && bookmarkTabs.isEmpty }
+    nonisolated func holds(_ id: UUID) -> Bool {
+        spaces.contains { $0.tabs.contains { $0.id == id } } || bookmarkTabs.contains { $0.tab.id == id }
+    }
 }
 
 /// Writes the session file, on the queue it's given to: only what differs from what it last wrote, so a page that
@@ -342,7 +402,7 @@ final class WindowManager {
     func restoreSession() -> Bool {
         sessionWaiting = false
         finishSaving()
-        guard let state = JSONStore.load(SessionState.self, from: Paths.session), !state.windows.isEmpty else { return false }
+        guard let state = JSONStore.load(SessionState.self, from: Paths.session)?.givingWindowsTheirOwnTabs(), !state.windows.isEmpty else { return false }
         var allIDs = Set<UUID>()
         for windowState in state.windows {
             allIDs.formUnion(restoreWindow(windowState))
