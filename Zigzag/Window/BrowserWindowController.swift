@@ -95,6 +95,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) || GuidedTour.holdsSidebar(in: self?.window)
                 || self?.popupHoldsSidebar == true
         }
+        // A click beside a zoomed pane puts it back, as one beside Peek puts it away.
+        root.zoomScrim.onClick = { [weak self] in self?.unzoomPane() }
         root.onTilesChange = { [weak self] shape, final in
             guard let self, final, let tab = self.tabManager.selectedTab else { return }
             self.tabManager.setTileRatios(column: shape.column, row: shape.row, for: tab)
@@ -805,6 +807,42 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private weak var nowPlayingTab: Tab?
 
+    /// The pane enlarged over the others for a moment, if any (#160).
+    private(set) var paneZoom = PaneZoom()
+    private var zoomEscMonitor: Any?
+
+    /// Zooms `tab`'s pane over the rest of its split or group, or puts it back if it's the one zoomed. Zoomed, it's
+    /// the pane you're in.
+    func toggleZoom(_ tab: Tab) {
+        guard let pair = tabManager.split(for: tab) else { return }
+        paneZoom.toggle(tab.id, in: pair.ids)
+        if paneZoom.isZoomed, tabManager.selectedTab !== tab { tabManager.select(tab) } else { showPages() }
+        if paneZoom.isZoomed, let webView = tab.webView { window?.makeFirstResponder(webView) }
+    }
+
+    /// Puts the zoomed pane back, if one is.
+    func unzoomPane() {
+        guard paneZoom.isZoomed else { return }
+        paneZoom.clear()
+        showPages()
+    }
+
+    /// While a pane is zoomed, Esc puts it back, as it puts Peek away; other keys go to the page as usual.
+    private func refreshZoomEsc() {
+        if paneZoom.isZoomed, zoomEscMonitor == nil {
+            zoomEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, self.paneZoom.isZoomed, event.keyCode == 53, event.window === self.window,
+                      event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty,
+                      !(self.window?.firstResponder is NSText), self.peekController?.isVisible != true else { return event }
+                self.unzoomPane()
+                return nil
+            }
+        } else if !paneZoom.isZoomed, let monitor = zoomEscMonitor {
+            NSEvent.removeMonitor(monitor)
+            zoomEscMonitor = nil
+        }
+    }
+
     /// Puts the selected tab in the page card, or the pages of its split or tile group side by side, each in a card.
     private func showPages() {
         // A link address belongs to the page it was pointed at in: a different page, a different space, it goes.
@@ -813,8 +851,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let pair = tab.flatMap { tabManager.split(for: $0) }
         let pages = pair.map { $0.ids.compactMap { tabManager.tab(with: $0) } } ?? []
         let cards = root.paneCards
+        // The zoom lasts while its group is on screen as it was; anything else puts the pane back.
+        // Going to another pane of it (a click on its part of the row) puts the zoomed one back too.
+        if paneZoom.isZoomed, paneZoom.tabID != tab?.id { paneZoom.clear() }
+        let zoomed = paneZoom.index(in: pages.count == pair?.count ? pair?.ids : nil)
+        defer {
+            refreshZoomEsc()
+            sidebar.list.zoomedTabID = paneZoom.tabID
+        }
         if let tab, let pair, pages.count == pair.count {
             root.setTiles(pair.shape, animated: true)
+            root.setZoomedPane(zoomed, animated: true)
             root.isEmpty = false
             let first = pages[0]
             for (i, card) in cards.enumerated() {
@@ -838,6 +885,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 let keep = pair.isGroup ? page : pages[i == 0 ? 1 : 0]
                 card.header.close.onClick = { [weak self] _ in self?.unsplitWithUndo(page, keep: keep) }
                 card.header.closeTab.onClick = { [weak self] _ in self?.closeWithUndo(page) }
+                card.header.isZoomed = i == zoomed
+                card.header.zoom.onClick = { [weak self] _ in self?.toggleZoom(page) }
                 // Pressed and dragged, the strip carries its pane somewhere else (#160).
                 card.header.onDrag = { [weak self] tab, press, moved in self?.dragPane(tab, press: press, moved: moved) }
                 card.header.onEditAddress = { [weak self, weak card] tab in
@@ -846,6 +895,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 }
             }
         } else {
+            root.setZoomedPane(nil, animated: false)
             root.setTiles(nil, animated: true)
             root.isEmpty = tab == nil
             root.card.show(tab?.ensureWebView())
@@ -969,6 +1019,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// In split view, clicking a pane makes its tab the one you're working in.
     func focusPane(at windowPoint: NSPoint) {
         guard let tab = tabManager.selectedTab, let pair = tabManager.split(for: tab) else { return }
+        // A pane zoomed over the rest is the one you're in; a click beside it puts it back (the scrim's).
+        guard !paneZoom.isZoomed else { return }
         // A pane's strip up in the bar above the page is that pane's too.
         let panes = root.tileTargets
         let point = root.convert(windowPoint, from: nil)
@@ -2259,6 +2311,7 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
+    func listZoomPane(_ tab: Tab) { toggleZoom(tab) }
 
     func listDragOverPage(at windowPoint: NSPoint?, item: SidebarItem) {
         guard let windowPoint, canDropBeside(item), let current = shownTab ?? tabManager.selectedTab else { root.splitDropHint.show(nil); return }

@@ -319,6 +319,11 @@ extension BrowserWindowController: NSMenuItemValidation {
         }
     }
 
+    /// Zoom Pane (⇧⌘↩): the pane you're in, enlarged over the rest of its split or group, or put back (#160).
+    @objc func zoomPane(_ sender: Any?) {
+        if let tab = selectedTab { toggleZoom(tab) }
+    }
+
     @objc func closeSplitView(_ sender: Any?) {
         if let tab = selectedTab { unsplitWithUndo(tab) }
     }
@@ -511,6 +516,9 @@ extension BrowserWindowController: NSMenuItemValidation {
             return tab != nil && findBar.hasQuery
         case #selector(stopLoading(_:)): return tab?.isLoading ?? false
         case #selector(closeSplitView(_:)): return tab.map { tabManager.split(for: $0) != nil } ?? false
+        case #selector(zoomPane(_:)):
+            item.title = PaneHeaderView.zoomTitle(paneZoom.isZoomed)
+            return tab.map { tabManager.split(for: $0) != nil } ?? false
         case #selector(toggleSplitOrientation(_:)):
             // Named for what it does, as the pane's own button is.
             let split = tab.flatMap { tabManager.split(for: $0) }

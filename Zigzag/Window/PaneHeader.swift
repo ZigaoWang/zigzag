@@ -12,6 +12,22 @@ final class PaneHeaderView: NSView {
     let reload = PaneHeaderView.button("arrow.clockwise", toolTip: String(localized: "Reload", comment: "Tooltip of a button in the strip on top of each page of a split view: reloads the page."))
     let orientation = PaneHeaderView.button("rectangle.split.1x2", toolTip: String(localized: "Stack Vertically", comment: "Tooltip of a button in the strip on top of each page of a split view: stacks the two pages one above the other."))
     let swap = PaneHeaderView.button("arrow.left.arrow.right", toolTip: String(localized: "Swap Sides", comment: "Tooltip of a button in the strip on top of each page of a split view: swaps the two pages."))
+    /// Enlarges this pane over the others for a moment, and puts it back (#160).
+    let zoom = PaneHeaderView.button("arrow.up.left.and.arrow.down.right", toolTip: PaneHeaderView.zoomTitle(false))
+    /// This pane is the one enlarged over the others: its zoom button puts it back.
+    var isZoomed = false {
+        didSet {
+            guard isZoomed != oldValue else { return }
+            zoom.symbol = isZoomed ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right"
+            zoom.toolTip = Self.zoomTitle(isZoomed)
+        }
+    }
+
+    /// Zoom Pane, or Return Pane while it's zoomed: the button's, the menu bar's and ⋯'s name for it.
+    static func zoomTitle(_ zoomed: Bool) -> String {
+        zoomed ? String(localized: "Return Pane", comment: "Tooltip and menu item: puts the enlarged page of a split view back in its place among the others.")
+               : String(localized: "Zoom Pane", comment: "Tooltip and menu item: enlarges one page of a split view over the others for a moment, without changing where it is.")
+    }
     let close = PaneHeaderView.button("rectangle.split.2x1.slash", toolTip: String(localized: "Separate Tabs", comment: "Tooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs."))
     /// Closes this pane's page; the other one fills the window, as closing either half from the sidebar does.
     let closeTab = PaneHeaderView.button("xmark", toolTip: String(localized: "Close Tab", comment: "Tooltip of a button in the strip on top of each page of a split view: closes that page's tab, leaving the other page."))
@@ -47,7 +63,7 @@ final class PaneHeaderView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [back, forward, reload, address, swap, orientation, close, more, closeTab, line].forEach { addSubview($0) }
+        [back, forward, reload, address, zoom, swap, orientation, close, more, closeTab, line].forEach { addSubview($0) }
         more.onClick = { [weak self] _ in self?.showMore() }
         back.onClick = { [weak self] _ in self?.tab?.goBack() }
         forward.onClick = { [weak self] _ in self?.tab?.goForward() }
@@ -110,7 +126,7 @@ final class PaneHeaderView: NSView {
         // Up in the bar, the bar's own appearance is the strip's.
         appearance = isInBar ? nil : Self.inkAppearance(on: ground).flatMap(NSAppearance.init(named:))
         let onPage = !isInBar && ground != nil
-        [back, forward, reload, swap, orientation, close, more, closeTab].forEach { $0.isOnPage = onPage }
+        [back, forward, reload, zoom, swap, orientation, close, more, closeTab].forEach { $0.isOnPage = onPage }
     }
 
     func setVertical(_ vertical: Bool) {
@@ -160,17 +176,17 @@ final class PaneHeaderView: NSView {
         var showsMore: Bool { self > .all }
         /// Buttons at the leading end, and at the trailing end before the close button.
         var leading: Int { 1 + (showsForward ? 1 : 0) + (showsReload ? 1 : 0) }
-        var trailing: Int { (showsSplitButtons ? 2 : 0) + (showsSeparate ? 1 : 0) + (showsMore ? 1 : 0) }
+        /// Zoom, swap and the layout go together.
+        var trailing: Int { (showsSplitButtons ? 3 : 0) + (showsSeparate ? 1 : 0) + (showsMore ? 1 : 0) }
     }
 
-    /// The first fit, most buttons first, that leaves the address its room. Swap and the layout stay out only while
-    /// the address shows whole, up to twice `Pane.addressMinWidth`; the rest give way only to keep it that minimum.
-    /// Too narrow for any, the fewest buttons.
-    /// Without swap and the layout (`arrangesSplit` off), they take no room in any fit.
+    /// The first fit, most buttons first, that leaves the address its room. Zoom, swap and the layout stay out only
+    /// while the address shows whole, up to twice `Pane.addressMinWidth`; the rest give way only to keep it that
+    /// minimum. Too narrow for any, the fewest buttons.
+    /// Without swap and the layout (`arrangesSplit` off), they take no room in any fit; zoom does.
     static func fit(width: CGFloat, edge: CGFloat, address: CGFloat, splitButtons: Bool = true) -> Fit {
         let b = Tokens.Pane.button, gap = Tokens.Space.x2
-        // Without them, ⋯ would hold nothing until Separate goes in it.
-        for fit in Fit.allCases where splitButtons || fit != .splitInMore {
+        for fit in Fit.allCases {
             let need = min(address, Tokens.Pane.addressMinWidth * (fit == .all ? 2 : 1))
             let lo = edge + CGFloat(fit.leading) * b + gap
             let trailing = fit.trailing - (!splitButtons && fit.showsSplitButtons ? 2 : 0)
@@ -194,6 +210,7 @@ final class PaneHeaderView: NSView {
         if !currentFit.showsForward { entries.append(item(forward)) }
         if !currentFit.showsReload { entries.append(item(reload)) }
         if !entries.isEmpty { entries.append(.separator) }
+        entries.append(item(zoom))
         if arrangesSplit { entries += [item(swap), item(orientation)] }
         if !currentFit.showsSeparate {
             entries.append(item(close, title: String(localized: "Separate Tabs", comment: "Tooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs.")))
@@ -215,6 +232,7 @@ final class PaneHeaderView: NSView {
         reload.isHidden = !fit.showsReload
         swap.isHidden = !fit.showsSplitButtons || !arrangesSplit
         orientation.isHidden = !fit.showsSplitButtons || !arrangesSplit
+        zoom.isHidden = !fit.showsSplitButtons
         close.isHidden = !fit.showsSeparate
         more.isHidden = !fit.showsMore
         var x = edge
@@ -225,11 +243,11 @@ final class PaneHeaderView: NSView {
         closeTab.frame = NSRect(x: bounds.width - edge - b, y: y, width: b, height: b)
         // A little room between the split's own buttons and the one that closes the page, so it isn't hit by mistake.
         var trailing = closeTab.frame.minX - Tokens.Space.x2
-        for button in [more, close, orientation, swap] where !button.isHidden {
+        for button in [more, close, orientation, swap, zoom] where !button.isHidden {
             button.frame = NSRect(x: trailing - b, y: y, width: b, height: b)
             trailing -= b
         }
-        [back, forward, reload, swap, orientation, close, more, closeTab].forEach { $0.radius = Tokens.Radius.control }
+        [back, forward, reload, zoom, swap, orientation, close, more, closeTab].forEach { $0.radius = Tokens.Radius.control }
         // The address pill is centered over its pane, as wide as its text, within the room the buttons leave, and
         // nudged clear of them where centering would cut it.
         let h = Tokens.Pane.addressHeight

@@ -53,6 +53,8 @@ protocol SidebarListDelegate: AnyObject {
     func listDragOverFavorites(at windowPoint: NSPoint?, carrying: TabManager.SplitSide?) -> Bool
     /// A tab dropped on another tab's middle: the two open side by side.
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool)
+    /// ⇧-clicked a part of the row of the pages on screen: that pane zooms over the rest, or goes back (#160).
+    func listZoomPane(_ tab: Tab)
     /// A tab dropped on a pinned page's middle: a pinned split.
     func listPinSplit(_ tab: Tab, onto bookmarkID: UUID, tabOnRight: Bool)
     /// A pinned page dropped on a tab's middle: a split of tabs.
@@ -146,6 +148,8 @@ final class SidebarListView: NSView {
     }
     /// The numbers ⌘ shows, for rows made while it's held.
     private var numbers: [SidebarItem: Int] = [:]
+    /// The page zoomed over the rest of its split or group (#160): its part of the row is lit.
+    var zoomedTabID: UUID? { didSet { if zoomedTabID != oldValue { refreshRows() } } }
 
     private var items: [SidebarItem] = []
     private var rows: [SidebarItem: NSView] = [:]
@@ -850,6 +854,14 @@ final class SidebarListView: NSView {
             let row = TabRowView()
             row.onClick = { [weak self, weak row] event in
                 guard let self, let row, let tab = row.tab else { return }
+                // ⇧-click a part of the row of the pages on screen: that pane zooms over the rest, or goes back (#160).
+                // Anywhere else ⇧ picks rows, as always.
+                let point = row.convert(event.locationInWindow, from: nil)
+                if event.modifierFlags.intersection([.shift, .command, .option, .control]) == .shift, row.pages.count > 1,
+                   let selected = self.manager?.selectedTab, row.pages.contains(where: { $0 === selected }), let page = row.page(at: point) {
+                    self.delegate?.listZoomPane(page)
+                    return
+                }
                 if self.mark(item, with: event) { return }
                 // A split row: each half selects its own page, and each part of a tile group's.
                 self.delegate?.listSelect(row.page(at: row.convert(event.locationInWindow, from: nil)) ?? tab)
@@ -969,6 +981,8 @@ final class SidebarListView: NSView {
             row.partnerLeads = partners.count == 1 && manager.split(for: tab)?.left == partner?.id
             row.isSelected = tab === selected || partners.contains { $0 === selected }
             row.focusedHalf = partners.firstIndex { $0 === selected }.map { $0 + 1 } ?? 0
+            // The pane zoomed over the rest: its part of the row is lit (#160).
+            row.zoomedPart = zoomedTabID.flatMap { zoomed in row.pages.firstIndex { $0.id == zoomed } }
             row.freshness = SiteTint.freshness(lastActivated: tab.lastActivated)
             row.isMarked = marked.contains(item)
             // A tab with tabs nested under it carries the folder's chevron, to fold them away.

@@ -126,6 +126,7 @@ enum MainMenu {
             item(String(localized: "Show All Tabs", comment: "View menu item."), #selector(C.toggleDeskView(_:)), "\\", [.command, .shift]),
             item(String(localized: "Stack Vertically", comment: "View menu item."), #selector(C.toggleSplitOrientation(_:)), ""),
             item(String(localized: "Separate Tabs", comment: "View menu item."), #selector(C.closeSplitView(_:)), "\\", [.command, .option]),
+            item(PaneHeaderView.zoomTitle(false), #selector(C.zoomPane(_:)), "\r", [.command, .shift]),
             .separator(),
             item(String(localized: "Back", comment: "View menu item."), #selector(C.goBack(_:)), "["),
             item(String(localized: "Forward", comment: "View menu item."), #selector(C.goForward(_:)), "]"),

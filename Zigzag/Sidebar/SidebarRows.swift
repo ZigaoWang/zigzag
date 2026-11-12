@@ -300,6 +300,35 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     var isSplit: Bool { partner != nil || pinnedPartner != nil }
     /// Which page you're working in, when split (0 = this row's own, 1 = its partner).
     var focusedHalf = 0 { didSet { if oldValue != focusedHalf { refreshTitleColor() } } }
+    /// The part whose page is zoomed over the rest of its split or group (`half(at:)`'s numbering), lit; nil for none.
+    var zoomedPart: Int? { didSet { if oldValue != zoomedPart { needsLayout = true } } }
+    /// The light under the zoomed part: the row's own pressed fill, inset as the split drop's half is.
+    /// Made the first time a part of this row is zoomed.
+    private var zoomMarkView: ColorView?
+
+    private func layoutZoomMark() {
+        guard let part = zoomedPart, isSplit else {
+            zoomMarkView?.isHidden = true
+            return
+        }
+        let zoomMark = zoomMarkView ?? {
+            let mark = ColorView(color: Tokens.Color.pressedFill)
+            mark.layer?.cornerRadius = Tokens.Sidebar.rowRadius - Tokens.Metric.dropInset
+            mark.layer?.cornerCurve = .continuous
+            addSubview(mark, positioned: .below, relativeTo: icon)
+            zoomMarkView = mark
+            return mark
+        }()
+        // The part as laid out, left to right: in a split of two the partner's half can lead.
+        let spatial = extraPartners.isEmpty && partnerLeads ? 1 - part : part
+        let spans = partSpans
+        guard spans.indices.contains(spatial) else { zoomMark.isHidden = true; return }
+        let inset = Tokens.Metric.dropInset
+        let span = spans[spatial]
+        // The row's own ends keep the row's inset; between parts, the middle of the gap.
+        zoomMark.frame = NSRect(x: span.start + inset, y: inset, width: max(0, span.end - span.start - inset * 2), height: bounds.height - inset * 2)
+        zoomMark.isHidden = false
+    }
     /// The partner is on the left of the page, so it's on the left of the row too (a pinned page beside a tab).
     var partnerLeads = false { didSet { if oldValue != partnerLeads { needsLayout = true } } }
     private var partnerToken: SignalToken?
@@ -729,7 +758,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             end = nestedButton.frame.minX - Self.buttonGap
         }
         layoutDropHalf()
-        defer { refreshPartTips() }
+        defer {
+            refreshPartTips()
+            layoutZoomMark()
+        }
 
         guard isSplit else {
             partEdges = []

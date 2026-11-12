@@ -431,3 +431,35 @@ extension TabManager.SplitPair {
         return Self(ids: [page, new], shape: TileShape(regions: regions + [region]))
     }
 }
+
+/// One pane of a split or tile group enlarged over the others for a moment (#160), as a terminal or an editor zooms a
+/// pane: nothing in the layout changes, and the zoom ends as soon as the group isn't the one it was zoomed in.
+nonisolated struct PaneZoom: Equatable, Sendable {
+    /// The page enlarged; nil while none is.
+    private(set) var tabID: UUID?
+    /// The pages of the group it was zoomed in.
+    private var group: Set<UUID> = []
+
+    var isZoomed: Bool { tabID != nil }
+
+    /// Zooms page `id` of the group `ids`; zoomed already, it goes back. Not a page of a group of two or more: nothing.
+    mutating func toggle(_ id: UUID, in ids: [UUID]) {
+        if tabID == id { self = PaneZoom(); return }
+        guard ids.count > 1, ids.contains(id) else { return }
+        tabID = id
+        group = Set(ids)
+    }
+
+    mutating func clear() { self = PaneZoom() }
+
+    /// The enlarged page's place in the group now on screen (`ids`, nil with no split). A page that came or went, the
+    /// group ending or leaving the window: the zoom is over. Places swapped keep it, on the same page.
+    mutating func index(in ids: [UUID]?) -> Int? {
+        guard let tabID else { return nil }
+        guard let ids, Set(ids) == group, let index = ids.firstIndex(of: tabID) else {
+            self = PaneZoom()
+            return nil
+        }
+        return index
+    }
+}

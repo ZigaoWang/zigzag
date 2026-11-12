@@ -366,6 +366,86 @@ final class BrowserRootView: SpaceFrameView {
     }
     /// While closed panes fade, layout leaves them showing where they were.
     private var leavingCards: Set<ObjectIdentifier> = []
+
+    // MARK: Zoom (#160)
+
+    /// The pane enlarged over the others for a moment (its index in the group), nil for none. Nothing in the layout
+    /// changes: the others stay where they are, live, under Peek's dimming, and the pane goes back to its place.
+    private(set) var zoomedPane: Int?
+    /// Over the other panes, under the enlarged one, dimmed as under Peek; a click on it puts the pane back.
+    let zoomScrim = ScrimView()
+
+    /// The enlarged pane's frame: the page area inset as Peek's card is, so it reads as the same layer over the page.
+    var zoomFrame: NSRect {
+        let area = cardFrame
+        let dx = max(Tokens.Space.x8, Tokens.Space.snap(area.width * Tokens.Metric.peekInsetRatio))
+        let dy = max(Tokens.Space.x6, Tokens.Space.snap(area.height * Tokens.Metric.peekInsetRatio * 0.6))
+        return area.insetBy(dx: dx, dy: dy)
+    }
+
+    /// Enlarges the pane at `index` over the rest (nil: puts it back), growing out of its place and settling back
+    /// into it; with Reduce Motion, a crossfade.
+    func setZoomedPane(_ index: Int?, animated: Bool) {
+        let index = index.flatMap { paneCards.indices.contains($0) && tiles != nil ? $0 : nil }
+        guard index != zoomedPane else { return }
+        let old = zoomedPane
+        zoomedPane = index
+        let cards = paneCards
+        if let index {
+            if zoomScrim.superview !== self { addSubview(zoomScrim) }
+            zoomScrim.color = Tokens.Color.peekScrim
+            zoomScrim.frame = cardFrame
+            orderForZoom(cards[index])
+            if animated { zoomScrim.show() } else { zoomScrim.alphaValue = 1 }
+        } else if zoomScrim.superview != nil {
+            if animated { zoomScrim.hide(evenFromKeyboard: true) } else { zoomScrim.removeFromSuperview() }
+        }
+        let frames = tileFrames
+        // The pane that leaves the zoom goes back to its place; the one that comes in grows out of it.
+        let moving = [old, index].compactMap { $0 }.filter { cards.indices.contains($0) && frames.indices.contains($0) }
+        let target = { (i: Int) -> NSRect in i == index ? self.zoomFrame : (i == 0 ? self.cardViewFrame(frames[0]) : frames[i]) }
+        guard animated, window != nil else {
+            moving.forEach { cards[$0].frame = target($0) }
+            needsLayout = true
+            return
+        }
+        if Tokens.Motion.reduceMotion {
+            for i in moving {
+                cards[i].alphaValue = 0
+                cards[i].frame = target(i)
+            }
+            Tokens.Motion.animate(Tokens.Motion.feedback, evenFromKeyboard: true) { moving.forEach { cards[$0].animator().alphaValue = 1 } }
+            needsLayout = true
+            return
+        }
+        Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, moves: true, {
+            moving.forEach { cards[$0].animator().frame = target($0) }
+        }, completion: { self.needsLayout = true })
+    }
+
+    /// The scrim and then the enlarged pane just above the panes, under everything else (the sidebar floating in, the
+    /// bar, what floats over the page), without taking any page out of the window to do it.
+    private func orderForZoom(_ zoomed: PageCardView) {
+        let original = subviews
+        guard let last = original.lastIndex(where: { view in paneCards.contains { $0 === view } }) else { return }
+        var ranks: [ObjectIdentifier: Double] = [:]
+        for (i, view) in original.enumerated() { ranks[ObjectIdentifier(view)] = Double(i) }
+        ranks[ObjectIdentifier(zoomScrim)] = Double(last) + 0.5
+        ranks[ObjectIdentifier(zoomed)] = Double(last) + 0.7
+        let box = Unmanaged.passRetained(RankBox(ranks))
+        defer { box.release() }
+        sortSubviews({ a, b, context in
+            guard let context else { return .orderedSame }
+            let ranks = Unmanaged<RankBox>.fromOpaque(context).takeUnretainedValue().ranks
+            let x = ranks[ObjectIdentifier(a)] ?? 0, y = ranks[ObjectIdentifier(b)] ?? 0
+            return x < y ? .orderedAscending : x > y ? .orderedDescending : .orderedSame
+        }, context: box.toOpaque())
+    }
+
+    private final class RankBox {
+        let ranks: [ObjectIdentifier: Double]
+        init(_ ranks: [ObjectIdentifier: Double]) { self.ranks = ranks }
+    }
     /// The panes' lines moved: the new shape, and whether the drag is done.
     var onTilesChange: ((TileShape, Bool) -> Void)?
     /// Back, forward, reload and the address above the page, when they're there (`addressAbovePage`).
@@ -728,11 +808,17 @@ final class BrowserRootView: SpaceFrameView {
             }
         }
         let lines = tiles?.dividers(in: cardFrame, gap: paneGap, slop: 2)
-        columnHandle.isHidden = lines?.column == nil
-        rowHandle.isHidden = lines?.row == nil
+        // While a pane is enlarged the lines between the panes rest under the dimming.
+        columnHandle.isHidden = lines?.column == nil || zoomedPane != nil
+        rowHandle.isHidden = lines?.row == nil || zoomedPane != nil
         if let column = lines?.column { columnHandle.frame = column }
         if let row = lines?.row { rowHandle.frame = row }
         splitDropHint.frame = cardFrame
+        if let zoomed = zoomedPane, tiles != nil, paneCards.indices.contains(zoomed) {
+            if zoomed == 0 { card.band = 0 }
+            paneCards[zoomed].frame = zoomFrame
+            zoomScrim.frame = cardFrame
+        }
         if showsSidePanel {
             let frame = sidePanelFrame
             sidePanel.frame = frame
