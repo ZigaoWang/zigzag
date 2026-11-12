@@ -29,6 +29,8 @@ final class FormGroup: NSView {
         }
         rows.append(row)
         addSubview(row)
+        // A row added to a group already on the page takes the group's width at its next layout.
+        needsLayout = true
     }
 
     func removeAllRows() {
@@ -1173,7 +1175,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Privacy
         blockingToggle.onChange = { [weak self] on in
             ContentBlocker.isEnabled = on
+            // The row is made again: it's laid out to the page's width at once, or its switch sits where a new row starts.
             self?.reloadBlocking()
+            self?.layoutDocument()
         }
         reloadBlocking()
 
@@ -1779,6 +1783,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// When a password-manager extension is on, Zigzag's own saving and filling start off, and say why.
     /// Block ads, and, while an ad blocker extension in the profile shown handles YouTube in Zigzag's place, which.
+    #if DEBUG
+    /// For the debug bridge: Block ads and trackers flipped, as a click on its switch does.
+    func debugFlipBlocking() {
+        blockingToggle.isOn.toggle()
+        blockingToggle.onChange?(blockingToggle.isOn)
+    }
+    #endif
+
     private func reloadBlocking() {
         blockingGroup.removeAllRows()
         // EasyList's licence asks for credit; this is where people look for what does the blocking.

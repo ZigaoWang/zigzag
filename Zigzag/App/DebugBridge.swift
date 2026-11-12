@@ -1358,6 +1358,9 @@ enum DebugBridge {
         case "zoomout": controller.zoomOut(nil)
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "settings": SettingsPage.open(in: controller)
+        // settingsprivacy: Settings › Privacy. flipblocking: its Block ads and trackers switch, as a click does.
+        case "settingsprivacy": SettingsPage.open(.privacy, in: controller)
+        case "flipblocking": controller.tabManager.selectedTab?.settingsView?.debugFlipBlocking()
         case "shortcutrecord":
             // shortcutrecord <command name>: starts recording keys on that row of Settings › Shortcuts.
             func rows(in view: NSView) -> [ShortcutRow] { view.subviews.flatMap { ($0 as? ShortcutRow).map { [$0] } ?? rows(in: $0) } }

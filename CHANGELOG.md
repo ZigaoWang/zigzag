@@ -5,6 +5,10 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- In Settings › Privacy, the Block ads and trackers switch stays at the right edge when you turn it on or off.
+- Cloudflare's "verify you are human" check (Turnstile) no longer logs an error each time it renews, as on linux.do.
+
 ### New
 - In Change Icon, the first choice shows the site's own icon, so it's clear that it puts the site's icon back.
 - Split view takes up to four tabs. Drag a tab over the page: the edges place it in a half, the corners in a quarter, and a preview shows where it lands. Three tabs are a half and two quarters, four a grid; the lines between them drag, and the group is one row in the sidebar that comes back after a restart. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
