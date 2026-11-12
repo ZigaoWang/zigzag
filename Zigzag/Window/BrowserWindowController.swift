@@ -1753,10 +1753,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Beside a docked sidebar on the right without the bar, the strip above the page that holds the lights holds
         // back, forward and reload after them too, out of the sidebar's row (#181); anywhere else, the sidebar has them.
         let stripHolds = root.lightsRoom > 0
-        if stripHolds, sidebar.holdsButtons, sidebar.holdsAddress {
-            sidebar.holdsButtons = false
-            root.lightsStrip.hold(sidebar.addressButtons)
-        } else if !stripHolds, !sidebar.holdsButtons {
+        // The bar above the page there for a development tab's tools alone (#141) takes the strip's place, and holds
+        // them where the strip did.
+        let barHolds = !stripHolds && onRight && docked && !fullScreen && root.showsTopBar && !root.barHoldsAddress
+        if stripHolds || barHolds, sidebar.holdsAddress {
+            if sidebar.holdsButtons { sidebar.holdsButtons = false }
+            let held = sidebar.addressButtons
+            if stripHolds, held.first?.superview !== root.lightsStrip { root.lightsStrip.hold(held) }
+            if barHolds, held.first?.superview !== root.topBar { root.topBar.hold(buttons: held) }
+        } else if !sidebar.holdsButtons {
             sidebar.holdsButtons = true
         }
         root.lightsStrip.trafficLightsWidth = window.trafficLightsWidth

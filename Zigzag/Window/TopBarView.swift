@@ -99,6 +99,16 @@ final class TopBarView: NSView {
     override func mouseDown(with event: NSEvent) { window?.titleBarMouseDown(event) }
 
     /// Takes the sidebar's buttons and address, in order.
+    /// Back, forward and reload alone, after the traffic lights, while the bar is there for a page's tools and the
+    /// address stays in the sidebar on the right: they're where the strip above the page has them there (#181), so
+    /// nothing moves as you go between a development tab and any other.
+    func hold(buttons: [NSView]) {
+        self.buttons = buttons
+        buttons.forEach(addSubview)
+        refreshOnPage()
+        needsLayout = true
+    }
+
     func hold(buttons: [NSView], address: NSView) {
         self.buttons = buttons
         self.address = address
