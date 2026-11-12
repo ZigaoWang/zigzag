@@ -165,7 +165,7 @@ extension BrowserWindowController {
     /// A pane dragged by its strip out of every window: it leaves its group, which closes up here, into a new window
     /// where it was let go.
     func movePaneToNewWindow(_ tab: Tab, at screenPoint: NSPoint) {
-        guard !tabManager.isPrivate, tabManager.split(for: tab) != nil else { return }
+        guard canMovePaneOut(tab) else { return }
         let target = WindowManager.shared.newWindow(spaceID: tab.spaceID, showCommandBar: false)
         if let window = target.window {
             var frame = window.frame

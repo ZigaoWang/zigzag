@@ -91,7 +91,7 @@ final class PaneDrag {
             move = controller.root.splitDropHint.move(moving: index, at: window.convertPoint(fromScreen: screenPoint),
                                                       shape: pair.shape, gap: controller.root.paneGap)
             next = move.map { .move($0.kind) } ?? .none
-        } else if Self.window(at: screenPoint) == nil {
+        } else if Self.window(at: screenPoint) == nil, controller.canMovePaneOut(tab) {
             next = .outside
         }
         if over !== list { list?.externalHover(at: nil) }
@@ -162,5 +162,11 @@ extension BrowserWindowController {
     func canMovePane(_ tab: Tab, toListOf owner: BrowserWindowController) -> Bool {
         guard tab.bookmarkID == nil, tabManager.split(for: tab) != nil else { return false }
         return owner === self || (!tabManager.isPrivate && !owner.tabManager.isPrivate)
+    }
+
+    /// Whether a pane can leave its group for a window of its own, out of every window: an ordinary tab, as one
+    /// dragged out of the sidebar, never a pinned page (pinned pages are every window's) or a private window's.
+    func canMovePaneOut(_ tab: Tab) -> Bool {
+        tab.bookmarkID == nil && !tabManager.isPrivate && tabManager.split(for: tab) != nil
     }
 }
