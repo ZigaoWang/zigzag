@@ -250,7 +250,12 @@ enum DownloadsPanel {
     }
 
     static func show(from anchor: NSView, in controller: BrowserWindowController, arrival: FloatingPanelView.Arrival = .pop) {
-        if let current { current.close(); return }
+        // Open here: the click closes it. Left open in another window, it goes, and this window's opens.
+        if let current {
+            let here = current.window === controller.window
+            current.close()
+            if here { return }
+        }
         controller.closeFloatingPanels()
         let panel = DownloadsPanelView(controller: controller)
         current = panel

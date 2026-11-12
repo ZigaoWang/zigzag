@@ -1906,7 +1906,7 @@ extension BrowserWindowController: TabHost {
     /// One floating thing at a time: the command bar, site panel, downloads and space editor each close the
     /// others when they open, and previews and the link bubble stay away while any of them is up.
     var hasFloatingPanel: Bool {
-        commandBar.isVisible || SitePanel.isOpen || DownloadsPanel.isOpen || SpaceEditorPanel.current != nil || desk.isVisible || iconPicker != nil
+        commandBar.isVisible || SitePanel.isOpen(in: window) || DownloadsPanel.isOpen(in: window) || SpaceEditorPanel.current != nil || desk.isVisible || iconPicker != nil
     }
 
     /// A folder's icon picker, when it's open in this window.

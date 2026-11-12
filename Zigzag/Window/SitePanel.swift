@@ -177,7 +177,12 @@ final class SitePanel: FloatingPanelView {
     /// Opens the panel under `anchor`, or closes the one open. `tab` is the page it's about: a split pane's, from
     /// its strip (#160); nil is the tab you're in, which in a split is the pane you're in.
     static func toggle(in controller: BrowserWindowController, from anchor: NSView, tab: Tab? = nil) {
-        if let current, current.superview != nil { current.close(); return }
+        // Open here: the click closes it. Left open in another window, it goes, and this window's opens.
+        if let current, current.superview != nil {
+            let here = current.window === controller.window
+            current.close()
+            if here { return }
+        }
         guard let panel = SitePanel(controller: controller, tab: tab) else { return }
         controller.closeFloatingPanels()
         panel.anchor = anchor
