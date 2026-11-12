@@ -243,8 +243,8 @@ final class SidebarListView: NSView {
         let tabs = manager.tabs(in: spaceID)
         if hasPinnedRows || !tabs.isEmpty { result.append(.separator) }
         result.append(.newTab)
-        let rightHalves = Self.ridingTabs(tabs: tabs.map(\.id), splits: manager.splits.map { ($0.left, $0.right) },
-                                          pinned: Set(manager.splits.flatMap { [$0.left, $0.right] }.filter { manager.tab(with: $0)?.bookmarkID != nil }))
+        let rightHalves = Self.ridingTabs(tabs: tabs.map(\.id), groups: manager.splits.map(\.ids),
+                                          pinned: Set(manager.splits.flatMap(\.ids).filter { manager.tab(with: $0)?.bookmarkID != nil }))
         // Nested tabs are set in under the tab they're under, up to two levels. A folded tab hides the tabs under it but
         // the one you're on, as a shut folder does.
         let levels = TabTree.levels(manager.treeNodes(in: spaceID))
@@ -259,7 +259,7 @@ final class SidebarListView: NSView {
                 if up.isCollapsed { hidden = true; break }
                 parent = up.parentID.flatMap { byID[$0] }
             }
-            if hidden, tab !== selected, manager.partner(of: tab).map({ $0 !== selected }) ?? true { continue }
+            if hidden, tab !== selected, !manager.partners(of: tab).contains(where: { $0 === selected }) { continue }
             result.append(.tab(tab.id))
             if let level = levels[tab.id], level > 0 { rowDepth[.tab(tab.id)] = TabTree.shownLevel(level) }
         }
@@ -270,12 +270,17 @@ final class SidebarListView: NSView {
     /// row here, and a tab split beside a pinned page, which shows in that page's row, as in Arc, so the page shows
     /// once and one row is lit. `pinned` are the pinned pages' tabs.
     nonisolated static func ridingTabs(tabs: [UUID], splits: [(left: UUID, right: UUID)], pinned: Set<UUID>) -> Set<UUID> {
+        ridingTabs(tabs: tabs, groups: splits.map { [$0.left, $0.right] }, pinned: pinned)
+    }
+
+    /// The same for splits and tile groups (#160), each its pages in order: a group's first page with a row here
+    /// carries the rest.
+    nonisolated static func ridingTabs(tabs: [UUID], groups: [[UUID]], pinned: Set<UUID>) -> Set<UUID> {
         let rows = Set(tabs)
         var riding: Set<UUID> = []
-        for pair in splits {
-            if pinned.contains(pair.left) { riding.insert(pair.right) }
-            else if pinned.contains(pair.right) { riding.insert(pair.left) }
-            else if rows.contains(pair.left) { riding.insert(pair.right) }
+        for ids in groups {
+            let lead = ids.first(where: pinned.contains) ?? ids.first(where: rows.contains)
+            if let lead { riding.formUnion(ids.filter { $0 != lead }) }
         }
         return riding.intersection(rows)
     }
@@ -735,7 +740,8 @@ final class SidebarListView: NSView {
         let closing = on ? manager.tabsToClear(in: shownSpaceID ?? manager.currentSpaceID).tabs : []
         for view in rows.values {
             guard let row = view as? TabRowView, !row.isBookmark else { continue }
-            row.isAboutToClear = closing.contains { $0 === row.tab || (row.partner != nil && $0 === row.partner) }
+            let pages = row.pages
+            row.isAboutToClear = closing.contains { page in pages.contains { $0 === page } }
         }
     }
 
@@ -844,12 +850,8 @@ final class SidebarListView: NSView {
             row.onClick = { [weak self, weak row] event in
                 guard let self, let row, let tab = row.tab else { return }
                 if self.mark(item, with: event) { return }
-                // A split row: each half selects its own page.
-                if row.half(at: row.convert(event.locationInWindow, from: nil)) == 1, let partner = row.partner {
-                    self.delegate?.listSelect(partner)
-                } else {
-                    self.delegate?.listSelect(tab)
-                }
+                // A split row: each half selects its own page, and each part of a tile group's.
+                self.delegate?.listSelect(row.page(at: row.convert(event.locationInWindow, from: nil)) ?? tab)
                 _ = id
             }
             row.onDoubleClick = { [weak row] in row?.beginRename() }
@@ -857,7 +859,8 @@ final class SidebarListView: NSView {
             row.onClose = { [weak self, weak row] in
                 guard let tab = row?.tab else { return }
                 // A split row closes both its pages, as the desk's card does.
-                if let partner = row?.partner { self?.delegate?.listClose([tab, partner]) } else { self?.delegate?.listClose(tab) }
+                let pages = row?.pages ?? [tab]
+                if pages.count > 1 { self?.delegate?.listClose(pages) } else { self?.delegate?.listClose(tab) }
             }
             row.onMiddleClick = row.onClose
             row.onToggleNested = { [weak self, weak row] in
@@ -952,12 +955,13 @@ final class SidebarListView: NSView {
         case .tab(let id):
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }
             row.configure(tab: tab)
-            // Both halves of a split show as open.
-            let partner = manager.partner(of: tab)
-            row.configure(partner: partner)
-            row.partnerLeads = partner != nil && manager.split(for: tab)?.left == partner?.id
-            row.isSelected = tab === selected || (partner != nil && partner === selected)
-            row.focusedHalf = partner != nil && partner === selected ? 1 : 0
+            // Both halves of a split show as open, and every page of a tile group.
+            let partners = manager.partners(of: tab)
+            let partner = partners.first
+            row.configure(partners: partners)
+            row.partnerLeads = partners.count == 1 && manager.split(for: tab)?.left == partner?.id
+            row.isSelected = tab === selected || partners.contains { $0 === selected }
+            row.focusedHalf = partners.firstIndex { $0 === selected }.map { $0 + 1 } ?? 0
             row.freshness = SiteTint.freshness(lastActivated: tab.lastActivated)
             row.isMarked = marked.contains(item)
             // A tab with tabs nested under it carries the folder's chevron, to fold them away.
@@ -1053,7 +1057,9 @@ final class SidebarListView: NSView {
     private func rowItem(for tab: Tab) -> SidebarItem? {
         if let id = tab.bookmarkID { return .bookmark(Self.rowID(id)) }
         if items.contains(.tab(tab.id)) { return .tab(tab.id) }
-        return manager?.partner(of: tab).map { partner in partner.bookmarkID.map { .bookmark(Self.rowID($0)) } ?? .tab(partner.id) }
+        if let partner = manager?.partner(of: tab) { return partner.bookmarkID.map { .bookmark(Self.rowID($0)) } ?? .tab(partner.id) }
+        // A page of a tile group rides in the row of the group's page that has one.
+        return manager?.partners(of: tab).first { items.contains(.tab($0.id)) }.map { .tab($0.id) }
     }
 
     /// After the list changes, picked rows stay picked: one that became the other kind (a tab pinned, a pinned page
@@ -1242,7 +1248,7 @@ final class SidebarListView: NSView {
         switch item {
         case .tab(let id):
             let tab = manager?.tab(with: id)
-            urls = [tab?.url, tab.flatMap { manager?.partner(of: $0) }?.url]
+            urls = [tab?.url] + (tab.flatMap { manager?.partners(of: $0) } ?? []).map(\.url)
         case .bookmark(let id):
             let tab = manager?.bookmarkTab(for: id)
             urls = [Library.shared.bookmark(id)?.url, tab?.url, tab.flatMap { manager?.partner(of: $0) }?.url]
@@ -1271,7 +1277,7 @@ final class SidebarListView: NSView {
             guard view.superview === self, !view.isHidden, let window else { return nil }
             let name: String
             switch item {
-            case .tab(let id): name = "tab:" + (manager.tab(with: id).map { tab in [tab] + (manager.partner(of: tab).map { [$0] } ?? []) }?.map(\.displayTitle).joined(separator: "|") ?? "")
+            case .tab(let id): name = "tab:" + (manager.tab(with: id).map { tab in manager.panes(of: tab) }?.map(\.displayTitle).joined(separator: "|") ?? "")
             case .bookmark(let id):
                 let ids = Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id]
                 var titles: [String] = ids.compactMap { Library.shared.bookmark($0)?.title }
@@ -1346,9 +1352,12 @@ final class SidebarListView: NSView {
     /// The row showing a tab: its own, its pinned page's, or for the right half of a split, the row of the pair.
     func row(for tab: Tab) -> NSView? {
         if let bookmarkID = tab.bookmarkID { return madeRow(.bookmark(Self.rowID(bookmarkID))) }
-        return madeRow(.tab(tab.id)) ?? manager?.partner(of: tab).flatMap { partner in
-            partner.bookmarkID.map { madeRow(.bookmark(Self.rowID($0))) } ?? madeRow(.tab(partner.id))
+        if let row = madeRow(.tab(tab.id)) { return row }
+        if let partner = manager?.partner(of: tab) {
+            return partner.bookmarkID.map { madeRow(.bookmark(Self.rowID($0))) } ?? madeRow(.tab(partner.id))
         }
+        // A page of a tile group: the group's row.
+        return manager?.partners(of: tab).lazy.compactMap { self.madeRow(.tab($0.id)) }.first
     }
 
     /// The row showing a pinned page (a pinned split's row for either of its pages).
@@ -1477,7 +1486,7 @@ final class SidebarListView: NSView {
         guard let manager else { return row }
         let rows: [[UUID]] = items.filter { !carried.contains($0) }.compactMap { item in
             guard case .tab(let id) = item else { return nil }
-            return [id] + (manager.tab(with: id).flatMap { manager.partner(of: $0) }.map { [$0.id] } ?? [])
+            return [id] + (manager.tab(with: id).map { manager.partners(of: $0).map(\.id) } ?? [])
         }
         let list = manager.tabs(in: shownSpaceID ?? manager.currentSpaceID).map(\.id).filter { !moving.contains($0) }
         return Self.listIndex(forRow: row, rows: rows, in: list)

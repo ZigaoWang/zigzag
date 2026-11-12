@@ -25,6 +25,8 @@ final class PaneHeaderView: NSView {
     static let height = Tokens.Pane.height
     /// Clicked the address: edit this pane's page's address (the window focuses the pane first).
     var onEditAddress: ((Tab) -> Void)?
+    /// A split of two has swap and the layout; a tile group's pages keep the places they were dropped in (#160).
+    var arrangesSplit = true { didSet { if arrangesSplit != oldValue { needsLayout = true } } }
     /// Up in the bar above the page (`TopBarView.strips`) instead of on the pane's card: the bar's height, on the
     /// window's frame, no hairline, and like the bar it moves the window and zooms it on a double-click.
     var isInBar = false {
@@ -119,12 +121,15 @@ final class PaneHeaderView: NSView {
     /// The first fit, most buttons first, that leaves the address its room. Swap and the layout stay out only while
     /// the address shows whole, up to twice `Pane.addressMinWidth`; the rest give way only to keep it that minimum.
     /// Too narrow for any, the fewest buttons.
-    static func fit(width: CGFloat, edge: CGFloat, address: CGFloat) -> Fit {
+    /// Without swap and the layout (`arrangesSplit` off), they take no room in any fit.
+    static func fit(width: CGFloat, edge: CGFloat, address: CGFloat, splitButtons: Bool = true) -> Fit {
         let b = Tokens.Pane.button, gap = Tokens.Space.x2
-        for fit in Fit.allCases {
+        // Without them, ⋯ would hold nothing until Separate goes in it.
+        for fit in Fit.allCases where splitButtons || fit != .splitInMore {
             let need = min(address, Tokens.Pane.addressMinWidth * (fit == .all ? 2 : 1))
             let lo = edge + CGFloat(fit.leading) * b + gap
-            let hi = width - edge - b - gap - CGFloat(fit.trailing) * b - gap
+            let trailing = fit.trailing - (!splitButtons && fit.showsSplitButtons ? 2 : 0)
+            let hi = width - edge - b - gap - CGFloat(trailing) * b - gap
             if hi - lo >= need { return fit }
         }
         return .noReload
@@ -144,7 +149,7 @@ final class PaneHeaderView: NSView {
         if !currentFit.showsForward { entries.append(item(forward)) }
         if !currentFit.showsReload { entries.append(item(reload)) }
         if !entries.isEmpty { entries.append(.separator) }
-        entries += [item(swap), item(orientation)]
+        if arrangesSplit { entries += [item(swap), item(orientation)] }
         if !currentFit.showsSeparate {
             entries.append(item(close, title: String(localized: "Separate Tabs", comment: "Tooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs.")))
         }
@@ -159,12 +164,12 @@ final class PaneHeaderView: NSView {
         // middle line, the traffic lights' line.
         let edge = isInBar ? 0 : floor((bounds.height - Tokens.Metric.hairline - b) / 2)
         let y = isInBar ? round((bounds.height - b) / 2) : edge
-        let fit = Self.fit(width: bounds.width, edge: edge, address: address.text.isEmpty ? 0 : address.fittingWidth)
+        let fit = Self.fit(width: bounds.width, edge: edge, address: address.text.isEmpty ? 0 : address.fittingWidth, splitButtons: arrangesSplit)
         currentFit = fit
         forward.isHidden = !fit.showsForward
         reload.isHidden = !fit.showsReload
-        swap.isHidden = !fit.showsSplitButtons
-        orientation.isHidden = !fit.showsSplitButtons
+        swap.isHidden = !fit.showsSplitButtons || !arrangesSplit
+        orientation.isHidden = !fit.showsSplitButtons || !arrangesSplit
         close.isHidden = !fit.showsSeparate
         more.isHidden = !fit.showsMore
         var x = edge

@@ -54,7 +54,7 @@ extension BrowserWindowController: PromptHost {
     func promptHolds(_ tab: Tab) -> Bool { tabManager.allTabs.contains { $0 === tab } }
     func promptShows(_ tab: Tab) -> Bool {
         let front = tabManager.selectedTab
-        return front === tab || front.map { tabManager.partner(of: $0) === tab } == true
+        return front.map { tabManager.panes(of: $0).contains { $0 === tab } } == true
     }
     var promptIsPrivate: Bool { tabManager.isPrivate }
     var promptAccent: NSColor { Brand.Theme.of(tabManager.currentSpace).accent }
@@ -63,7 +63,7 @@ extension BrowserWindowController: PromptHost {
             if change == .selection || change == .structure || change == .space { body() }
         }
     }
-    var promptPageViews: [NSView] { [root.card, root.secondCard] }
+    var promptPageViews: [NSView] { root.paneCards }
     func clearForPrompt() {
         closeFloatingPanels()
         Toast.hide(in: self)

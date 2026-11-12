@@ -86,9 +86,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) || GuidedTour.holdsSidebar(in: self?.window)
                 || self?.popupHoldsSidebar == true
         }
-        root.onSplitRatioChange = { [weak self] ratio, final in
+        root.onTilesChange = { [weak self] shape, final in
             guard let self, final, let tab = self.tabManager.selectedTab else { return }
-            self.tabManager.setSplitRatio(Double(ratio), for: tab)
+            self.tabManager.setTileRatios(column: shape.column, row: shape.row, for: tab)
             self.onStateChange?()
         }
 
@@ -534,11 +534,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // A peek is a look from the page you were on: going to another tab or space puts it away.
             peek.close()
             // Reader stays over its pane when you click into the other half of the split; anywhere else, it goes.
-            let readerStillShown = readerTab != nil && tab.flatMap { tabManager.partner(of: $0) } === readerTab
+            let readerStillShown = readerTab != nil && (tab.map { tabManager.partners(of: $0) } ?? []).contains { $0 === readerTab }
             if !readerStillShown { closeReader() }
             // A video playing in a page you're leaving follows you in the mini player; coming back puts it in its page.
-            let before = [root.card.webView, root.secondCard.isHidden ? nil : root.secondCard.webView].compactMap { ($0 as? BrowserWebView)?.owner }
-            miniPlayer.switched(from: before, to: [tab, tab.flatMap(tabManager.partner(of:))].compactMap { $0 })
+            let before = root.paneCards.enumerated().compactMap { i, card in i == 0 || !card.isHidden ? card.webView : nil }
+                .compactMap { ($0 as? BrowserWebView)?.owner }
+            miniPlayer.switched(from: before, to: tab.map { tabManager.panes(of: $0) } ?? [])
             shownTab = tab
             selectedTabToken = tab?.changed.observe { [weak self] change in self?.selectedTabChanged(change) }
             if let webView = tab?.ensureWebView(), window?.isKeyWindow == true, !commandBar.isVisible {
@@ -795,61 +796,62 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private weak var nowPlayingTab: Tab?
 
-    /// Puts the selected tab in the page card, or both halves of its split side by side.
+    /// Puts the selected tab in the page card, or the pages of its split or tile group side by side, each in a card.
     private func showPages() {
         // A link address belongs to the page it was pointed at in: a different page, a different space, it goes.
         linkStatus.show(nil, in: root.cardFrame)
         let tab = tabManager.selectedTab
-        if let tab, let pair = tabManager.split(for: tab),
-           let left = tabManager.tab(with: pair.left), let right = tabManager.tab(with: pair.right) {
-            root.setSplit(ratio: CGFloat(pair.ratio), vertical: pair.vertical, animated: true)
+        let pair = tab.flatMap { tabManager.split(for: $0) }
+        let pages = pair.map { $0.ids.compactMap { tabManager.tab(with: $0) } } ?? []
+        let cards = root.paneCards
+        if let tab, let pair, pages.count == pair.count {
+            root.setTiles(pair.shape, animated: true)
             root.isEmpty = false
-            for card in [root.card, root.secondCard] {
+            let first = pages[0]
+            for (i, card) in cards.enumerated() {
+                guard pages.indices.contains(i) else { clear(card); continue }
+                let page = pages[i]
+                // Swap and the layout are a split of two's; a tile group's pages keep the places they were dropped in.
+                card.header.arrangesSplit = !pair.isGroup
                 card.header.setVertical(pair.vertical)
-                card.header.orientation.onClick = { [weak self] _ in self?.tabManager.toggleSplitOrientation(for: left) }
-                card.header.swap.onClick = { [weak self] _ in self?.tabManager.swapSplit(for: left) }
-            }
-            root.card.show(left.ensureWebView())
-            root.secondCard.show(right.ensureWebView())
-            // Either half may have crashed while out of sight (a space switch brings it back, not only selecting it).
-            left.reloadIfItStopped()
-            right.reloadIfItStopped()
-            root.card.isFocusedPane = left === tab
-            root.secondCard.isFocusedPane = right === tab
-            root.card.isUnfocusedPane = left !== tab
-            root.secondCard.isUnfocusedPane = right !== tab
-            root.card.showsHeader = true
-            root.secondCard.showsHeader = true
-            // Each pane's header, line and address are its own page's, whichever of the two you're in.
-            root.card.header.show(left)
-            root.secondCard.header.show(right)
-            root.card.showLoading(of: left)
-            root.secondCard.showLoading(of: right)
-            root.card.header.close.onClick = { [weak self] _ in self?.unsplitWithUndo(left, keep: right) }
-            root.secondCard.header.close.onClick = { [weak self] _ in self?.unsplitWithUndo(right, keep: left) }
-            root.card.header.closeTab.onClick = { [weak self] _ in self?.closeWithUndo(left) }
-            root.secondCard.header.closeTab.onClick = { [weak self] _ in self?.closeWithUndo(right) }
-            for card in [root.card, root.secondCard] {
+                card.header.orientation.onClick = { [weak self] _ in self?.tabManager.toggleSplitOrientation(for: first) }
+                card.header.swap.onClick = { [weak self] _ in self?.tabManager.swapSplit(for: first) }
+                card.show(page.ensureWebView())
+                // Any page may have crashed while out of sight (a space switch brings it back, not only selecting it).
+                page.reloadIfItStopped()
+                card.isFocusedPane = page === tab
+                card.isUnfocusedPane = page !== tab
+                card.showsHeader = true
+                // Each pane's header, line and address are its own page's, whichever of them you're in.
+                card.header.show(page)
+                card.showLoading(of: page)
+                // A split of two ends showing the other page; a tile group's pages part, this one shown.
+                let keep = pair.isGroup ? page : pages[i == 0 ? 1 : 0]
+                card.header.close.onClick = { [weak self] _ in self?.unsplitWithUndo(page, keep: keep) }
+                card.header.closeTab.onClick = { [weak self] _ in self?.closeWithUndo(page) }
                 card.header.onEditAddress = { [weak self, weak card] tab in
                     guard let self, let card else { return }
                     self.editAddress(of: tab, from: card.header.address)
                 }
             }
         } else {
-            root.setSplit(ratio: nil, vertical: false, animated: true)
+            root.setTiles(nil, animated: true)
             root.isEmpty = tab == nil
             root.card.show(tab?.ensureWebView())
             tab?.reloadIfItStopped()
-            root.secondCard.show(nil)
             root.card.showLoading(of: tab)
-            root.secondCard.showLoading(of: nil)
-            root.secondCard.header.show(nil)
             root.card.isFocusedPane = false
-            root.secondCard.isFocusedPane = false
             root.card.isUnfocusedPane = false
-            root.secondCard.isUnfocusedPane = false
             root.card.showsHeader = false
-            root.secondCard.showsHeader = false
+            cards.dropFirst().forEach(clear)
+        }
+        func clear(_ card: PageCardView) {
+            card.show(nil)
+            card.showLoading(of: nil)
+            card.header.show(nil)
+            card.isFocusedPane = false
+            card.isUnfocusedPane = false
+            card.showsHeader = false
         }
     }
 
@@ -936,13 +938,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// The address in the strip of the split pane you're in.
-    var focusedPaneAddress: NSView { (root.secondCard.isFocusedPane ? root.secondCard : root.card).header.address }
+    var focusedPaneAddress: NSView { (root.paneCards.first { $0.isFocusedPane } ?? root.card).header.address }
 
     /// The page you're working in: the whole page area, or in split view the focused pane.
     var focusedPaneFrame: NSRect {
-        guard let tab = tabManager.selectedTab, let pair = tabManager.split(for: tab), root.splitRatio != nil else { return root.cardFrame }
-        let panes = root.paneFrames
-        return pair.left == tab.id ? panes.left : (panes.right ?? panes.left)
+        guard let tab = tabManager.selectedTab, let pair = tabManager.split(for: tab), root.tiles != nil,
+              let index = pair.ids.firstIndex(of: tab.id) else { return root.cardFrame }
+        let frames = root.tileFrames
+        return frames.indices.contains(index) ? frames[index] : frames[0]
     }
 
     /// A split pane's address clicked: that pane becomes the one you're in, and its address opens for editing right
@@ -954,17 +957,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// In split view, clicking a pane makes its tab the one you're working in.
     func focusPane(at windowPoint: NSPoint) {
-        guard let tab = tabManager.selectedTab, let partner = tabManager.partner(of: tab), let pair = tabManager.split(for: tab) else { return }
+        guard let tab = tabManager.selectedTab, let pair = tabManager.split(for: tab) else { return }
         // A pane's strip up in the bar above the page is that pane's too.
-        let panes = root.paneTargets
+        let panes = root.tileTargets
         let point = root.convert(windowPoint, from: nil)
         // Clicks on what floats over the page (find, the command bar, a prompt) are for it, not the pane below.
         if let base = root.overlay.superview, root.overlay.hitTest(base.convert(windowPoint, from: nil)) != nil { return }
-        let clickedLeft = panes.left.contains(point)
-        let clickedRight = panes.right?.contains(point) ?? false
-        guard clickedLeft || clickedRight else { return }
-        let clickedID = clickedLeft ? pair.left : pair.right
-        if clickedID == partner.id { tabManager.select(partner) }
+        guard let index = panes.firstIndex(where: { $0.contains(point) }), pair.ids.indices.contains(index) else { return }
+        let clickedID = pair.ids[index]
+        if clickedID != tab.id, let clicked = tabManager.tab(with: clickedID) { tabManager.select(clicked) }
     }
 
     /// The control shows the most recent tab making sound (or paused by it) that you aren't looking at.
@@ -1274,7 +1275,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.reader = view
             self.readerTab = tab
             self.readerURL = url
-            let card = self.tabManager.split(for: tab)?.right == tab.id ? self.root.secondCard : self.root.card
+            let index = self.tabManager.split(for: tab)?.ids.firstIndex(of: tab.id) ?? 0
+            let card = self.root.paneCards[min(index, self.root.paneCards.count - 1)]
             self.readerCard = card
             card.setOverlay(view)
             // Visible from the start (WebKit doesn't paint into a hidden view); the article is local and draws
@@ -1654,7 +1656,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             if event.type == .otherMouseUp { event.buttonNumber == 3 ? goBack(nil) : goForward(nil) }
             return true
         }
-        if event.type == .leftMouseDown, root.splitRatio != nil { focusPane(at: event.locationInWindow) }
+        if event.type == .leftMouseDown, root.tiles != nil { focusPane(at: event.locationInWindow) }
         // A click anywhere else finishes a name being typed into a sidebar row, as in Finder: rows don't take focus,
         // so without this the name stays open through drags and ⌘Z keeps going to it.
         if event.type == .leftMouseDown, let editor = window?.firstResponder as? NSTextView, editor.isFieldEditor,
@@ -1838,7 +1840,7 @@ extension BrowserWindowController: SidebarDelegate {
     func moveWithUndo(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting = .fit, then done: (() -> Void)? = nil) {
         // To a space on another profile, an open page reloads there: that's asked first, wherever the move began (a
         // menu, a drag, the command bar).
-        confirmProfileCrossing([tab] + (tabManager.partner(of: tab).map { [$0] } ?? []), to: spaceID) { [weak self] in
+        confirmProfileCrossing(tabManager.panes(of: tab), to: spaceID) { [weak self] in
             self?.moveNow(tab, to: index, in: spaceID, nesting: nesting)
             done?()
         }
@@ -2054,20 +2056,20 @@ extension BrowserWindowController: SidebarDelegate {
         }
     }
 
-    /// A tab into another window's list. Half of a split of two tabs brings the other half: they arrive as one,
-    /// still side by side.
+    /// A tab into another window's list. Half of a split of two tabs brings the other half, and a page of a tile group
+    /// the rest of it: they arrive as one, still side by side.
     private func transfer(_ tab: Tab, to target: BrowserWindowController, at index: Int) {
         let pair = tabManager.split(for: tab)
-        let other = tabManager.partner(of: tab).flatMap { $0.bookmarkID == nil ? $0 : nil }
-        tabManager.detach(tab)
-        if let other { tabManager.detach(other) }
-        guard let pair, let other else {
+        let panes = tabManager.panes(of: tab)
+        let together = pair != nil && panes.count == pair?.count && panes.allSatisfy { $0.bookmarkID == nil }
+        guard let pair, together else {
+            tabManager.detach(tab)
             target.tabManager.insert(tab, at: index)
             return
         }
-        let (left, right) = pair.left == tab.id ? (tab, other) : (other, tab)
-        target.tabManager.insert(right, at: index)
-        target.tabManager.insert(left, at: index)
+        panes.forEach { tabManager.detach($0) }
+        // Each in at the same place, last first, so they keep their order.
+        for page in panes.reversed() { target.tabManager.insert(page, at: index) }
         target.tabManager.restoreSplit(pair)
     }
 
@@ -2187,17 +2189,23 @@ extension BrowserWindowController: SidebarDelegate {
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
 
     func listDragOverPage(at windowPoint: NSPoint?, item: SidebarItem) {
-        guard let windowPoint, canDropBeside(item) else { root.splitDropHint.show(nil); return }
-        let side = root.splitDropHint.side(at: windowPoint)
-        if let side, side != root.splitDropHint.side { Haptics.snap() }
-        root.splitDropHint.show(side)
+        guard let windowPoint, canDropBeside(item), let current = shownTab ?? tabManager.selectedTab else { root.splitDropHint.show(nil); return }
+        showDropHint(at: windowPoint, beside: current)
+    }
+
+    /// Where a tab let go at a window point would open beside `current` and the pages with it (#160): the hint over
+    /// that half or quarter, with a tick as it moves to another.
+    func showDropHint(at windowPoint: NSPoint, beside current: Tab) {
+        let drop = root.splitDropHint.drop(at: windowPoint, shape: tabManager.split(for: current)?.shape, gap: root.paneGap)
+        if let drop, drop.kind != root.splitDropHint.drop?.kind { Haptics.snap() }
+        root.splitDropHint.show(drop)
     }
 
     func listDropOnPage(_ item: SidebarItem) -> Bool {
-        let side = root.splitDropHint.side
+        let drop = root.splitDropHint.drop
         root.splitDropHint.show(nil)
         // The page showing, which after a space flip mid-drag isn't that space's selected tab.
-        guard let side, canDropBeside(item), let current = shownTab ?? tabManager.selectedTab else { return false }
+        guard let drop, canDropBeside(item), let current = shownTab ?? tabManager.selectedTab else { return false }
         // A pinned page not loaded yet opens as part of the change, so ⌘Z puts it back unloaded.
         pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [weak self] in
             guard let self else { return }
@@ -2206,19 +2214,25 @@ extension BrowserWindowController: SidebarDelegate {
             case .bookmark(let id): Library.shared.bookmark(id).map(tabManager.pageTab(for:))
             default: nil
             }
-            if let tab { splitWithUndo(current, with: tab, otherOnRight: side == .right) }
+            guard let tab else { return }
+            // Beside a page alone the two make a split, as they always did; into a split or a group, it's tiled in.
+            if tabManager.split(for: current) == nil, case .place(let region, _) = drop.kind {
+                splitWithUndo(current, with: tab, otherOnRight: region == .right || region == .bottom, vertical: !region.isColumn)
+            } else {
+                tabManager.tile(tab, beside: current, drop.kind)
+            }
         }
         return true
     }
 
-    /// Only another tab, or a pinned page beside a tab, opens beside the page you're on, and neither may already be
-    /// half of a split.
+    /// Another tab, or a pinned page beside a tab, opens beside the page you're on; neither may already be half of a
+    /// split. Into a split of two tabs or a tile group of three, another tab of its own (`TabManager.canTile`).
     private func canDropBeside(_ item: SidebarItem) -> Bool {
         guard let current = shownTab ?? tabManager.selectedTab else { return false }
         switch item {
         case .tab(let id):
-            guard let tab = tabManager.tab(with: id), tabManager.canSplit(current, with: tab) else { return false }
-            return TabManager.canSplit(tabManager.splitSide(of: tab), onto: tabManager.splitSide(of: current))
+            guard let tab = tabManager.tab(with: id) else { return false }
+            return tabManager.canTile(tab, beside: current)
         case .bookmark(let id):
             // Not loaded yet, it opens at its pinned address.
             guard current.bookmarkID == nil else { return false }

@@ -280,57 +280,94 @@ final class BrowserRootView: SpaceFrameView {
             guard oldValue != pagesHidden else { return }
             Tokens.Motion.withoutAnimation {
                 card.alphaValue = isEmpty || pagesHidden ? 0 : 1
-                secondCard.alphaValue = pagesHidden ? 0 : 1
+                extraCards.forEach { $0.alphaValue = pagesHidden ? 0 : 1 }
             }
             refreshGlassOcclusion()
         }
     }
     /// The second page in split view.
     let secondCard = PageCardView()
-    private let splitHandle = ResizeHandle()
-    /// Share of the page area the left pane takes; nil when not split.
-    var splitRatio: CGFloat? { didSet { needsLayout = true } }
-    var splitVertical = false { didSet { needsLayout = true; splitHandle.isVertical = splitVertical } }
+    /// A tile group's third and fourth pages (#160).
+    let thirdCard = PageCardView()
+    let fourthCard = PageCardView()
+    /// Every pane's card, in the group's order: the first is `card`.
+    var paneCards: [PageCardView] { [card, secondCard, thirdCard, fourthCard] }
+    /// The cards beside the first, there only in split view.
+    private var extraCards: [PageCardView] { [secondCard, thirdCard, fourthCard] }
+    /// The strips between panes you drag to resize them: the line between the columns, and between the rows.
+    private let columnHandle = ResizeHandle()
+    private let rowHandle = ResizeHandle()
+    /// How the panes share the page area, a split's two or a tile group's three or four; nil with one page.
+    private(set) var tiles: TileShape? { didSet { if tiles != oldValue { needsLayout = true } } }
+    /// Share of the page area the left (or top) pane takes; nil when not split. Set alone, it makes a split of two.
+    var splitRatio: CGFloat? {
+        get { tiles.map { $0.isStacked ? $0.row : $0.column } }
+        set {
+            guard let newValue else { tiles = nil; return }
+            var shape = tiles ?? TileShape(regions: [.left, .right])
+            if shape.isStacked { shape.row = newValue } else { shape.column = newValue }
+            tiles = shape
+        }
+    }
+    /// A split of two stacked; set, it turns a split of two the other way at the same share.
+    var splitVertical: Bool {
+        get { tiles?.isStacked ?? false }
+        set {
+            guard let ratio = splitRatio, tiles?.regions.count == 2, newValue != splitVertical else { return }
+            tiles = TileShape.pair(ratio: ratio, vertical: newValue)
+        }
+    }
 
     /// Opens, closes or rotates the split. The pages slide to their new places; the new pane fades in beside.
     func setSplit(ratio: CGFloat?, vertical: Bool, animated: Bool) {
-        let wasSplit = splitRatio != nil
-        guard ratio != splitRatio || vertical != splitVertical else { return }
-        let oldLeft = card.frame
-        splitRatio = ratio
-        splitVertical = vertical
+        setTiles(ratio.map { TileShape.pair(ratio: $0, vertical: vertical) }, animated: animated)
+    }
+
+    /// Lays the panes out as `shape` (nil: one page). Panes that stay slide to their new places, new ones fade in
+    /// beside, and ones that go stay where they are and fade while the rest grow over their place.
+    func setTiles(_ shape: TileShape?, animated: Bool) {
+        guard shape != tiles else { return }
+        let before = tiles?.regions.count ?? 1, after = shape?.regions.count ?? 1
+        let old = paneCards.map(\.frame)
+        tiles = shape
         // Like the sidebar, a split moves the window's layout: it animates from the keyboard too.
         guard animated, !Tokens.Motion.reduceMotion, window != nil else { needsLayout = true; return }
         placeStrips(animated: true)
-        // Closing: the pane that goes stays where it is and fades while the other grows over its place.
-        let closingFrame = wasSplit && ratio == nil ? secondCard.frame : nil
-        if closingFrame != nil { secondCardLeaving = true }
+        let cards = paneCards
+        let leaving = after < before ? Array(cards[after..<before]) : []
+        leavingCards.formUnion(leaving.map(ObjectIdentifier.init))
         layoutSubtreeIfNeeded()
-        let panes = paneFrames
-        card.frame = oldLeft
-        if let right = panes.right, !wasSplit {
-            secondCard.alphaValue = 0
-            secondCard.frame = vertical ? right.offsetBy(dx: 0, dy: Tokens.Space.x6) : right.offsetBy(dx: Tokens.Space.x6, dy: 0)
+        let frames = tileFrames
+        for i in 0..<min(before, after) { cards[i].frame = old[i] }
+        for i in before..<max(before, after) {
+            let target = frames[i], region = shape?.regions[i]
+            cards[i].alphaValue = 0
+            // From a little way off on its own side.
+            let dx: CGFloat = region.map { $0.columns == 1...1 ? Tokens.Space.x6 : $0.columns == 0...0 ? -Tokens.Space.x6 : 0 } ?? 0
+            let dy: CGFloat = region.map { $0.rows == 1...1 ? Tokens.Space.x6 : $0.rows == 0...0 ? -Tokens.Space.x6 : 0 } ?? 0
+            cards[i].frame = target.offsetBy(dx: dx == 0 && dy == 0 ? Tokens.Space.x6 : dx, dy: dy)
         }
+        for (i, card) in leaving.enumerated() { card.frame = old[after + i] }
         // At the standard pace, like the sidebar: a split is a change of layout you watch, not a show.
         Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, moves: true, {
-            self.card.animator().frame = panes.left
-            if let right = panes.right {
-                self.secondCard.animator().frame = right
-                self.secondCard.animator().alphaValue = self.pagesHidden ? 0 : 1
-            } else if closingFrame != nil {
-                self.secondCard.animator().alphaValue = 0
+            for i in 0..<after {
+                cards[i].animator().frame = frames[i]
+                if i >= before { cards[i].animator().alphaValue = self.pagesHidden ? 0 : 1 }
             }
+            leaving.forEach { $0.animator().alphaValue = 0 }
         }, completion: {
-            guard closingFrame != nil, self.splitRatio == nil else { return }
-            self.secondCardLeaving = false
-            self.secondCard.alphaValue = 1
+            let count = self.tiles?.regions.count ?? 1
+            for (i, card) in leaving.enumerated() where after + i >= count {
+                self.leavingCards.remove(ObjectIdentifier(card))
+                card.alphaValue = self.pagesHidden ? 0 : 1
+            }
             self.needsLayout = true
         })
     }
-    /// While the closed pane fades, layout leaves it showing where it was.
-    private var secondCardLeaving = false
-    var onSplitRatioChange: ((CGFloat, Bool) -> Void)?
+    /// While closed panes fade, layout leaves them showing where they were.
+    private var leavingCards: Set<ObjectIdentifier> = []
+    /// The panes' lines moved: the new shape, and whether the drag is done.
+    var onTilesChange: ((TileShape, Bool) -> Void)?
     /// Back, forward, reload and the address above the page, when they're there (`addressAbovePage`).
     let topBar = TopBarView()
     var showsTopBar = false {
@@ -385,39 +422,54 @@ final class BrowserRootView: SpaceFrameView {
         addSubview(sidePanel)
         emptyHint.alphaValue = 0
         addSubview(emptyHint)
-        secondCard.isHidden = true
-        addSubview(secondCard)
-        splitHandle.isHidden = true
-        addSubview(splitHandle)
+        for extra in extraCards {
+            extra.isHidden = true
+            addSubview(extra)
+        }
+        rowHandle.isVertical = true
+        for handle in [columnHandle, rowHandle] {
+            handle.isHidden = true
+            addSubview(handle)
+        }
         topBar.isHidden = true
         addSubview(topBar)
-        splitHandle.onDrag = { [weak self] value in
-            guard let self else { return }
+        // Never so narrow (or short) that a pane's header loses its buttons: a share of the window, and points too.
+        columnHandle.onDrag = { [weak self] x in
+            guard let self, var shape = self.tiles else { return }
             let area = self.cardFrame
-            // Never so narrow (or short) that a pane's header loses its buttons: a share of the window, and points too.
-            func clamp(_ ratio: CGFloat, length: CGFloat, minimum: CGFloat) -> CGFloat {
-                let floor = max(0.2, minimum / max(length, 1)), ceiling = min(0.8, 1 - floor)
-                return floor < ceiling ? min(max(ratio, floor), ceiling) : 0.5
-            }
-            if self.splitVertical {
-                // Window y runs bottom-up; this view is flipped.
-                let y = self.convert(NSPoint(x: 0, y: value), from: nil).y
-                self.splitRatio = clamp((y - area.minY) / area.height, length: area.height, minimum: Self.minimumPaneHeight)
-            } else {
-                self.splitRatio = clamp((value - area.minX) / area.width, length: area.width, minimum: Self.minimumPaneWidth)
-            }
+            shape.column = TileShape.clamped((x - area.minX) / area.width, length: area.width, minimum: Self.minimumPaneWidth)
+            self.tiles = shape
             self.layoutSubtreeIfNeeded()
-            self.onSplitRatioChange?(self.splitRatio ?? 0.5, false)
+            self.onTilesChange?(shape, false)
         }
-        splitHandle.onEnd = { [weak self] in
-            guard let self, let ratio = self.splitRatio else { return }
-            self.onSplitRatioChange?(ratio, true)
+        rowHandle.onDrag = { [weak self] value in
+            guard let self, var shape = self.tiles else { return }
+            let area = self.cardFrame
+            // Window y runs bottom-up; this view is flipped.
+            let y = self.convert(NSPoint(x: 0, y: value), from: nil).y
+            shape.row = TileShape.clamped((y - area.minY) / area.height, length: area.height, minimum: Self.minimumPaneHeight)
+            self.tiles = shape
+            self.layoutSubtreeIfNeeded()
+            self.onTilesChange?(shape, false)
         }
-        splitHandle.onDoubleClick = { [weak self] in
-            guard let self else { return }
-            // Even again: the two panes glide to halves rather than jumping.
-            self.setSplit(ratio: 0.5, vertical: self.splitVertical, animated: true)
-            self.onSplitRatioChange?(0.5, true)
+        for handle in [columnHandle, rowHandle] {
+            handle.onEnd = { [weak self] in
+                guard let self, let shape = self.tiles else { return }
+                self.onTilesChange?(shape, true)
+            }
+        }
+        // Even again: the panes glide to halves rather than jumping.
+        columnHandle.onDoubleClick = { [weak self] in
+            guard let self, var shape = self.tiles else { return }
+            shape.column = 0.5
+            self.setTiles(shape, animated: true)
+            self.onTilesChange?(shape, true)
+        }
+        rowHandle.onDoubleClick = { [weak self] in
+            guard let self, var shape = self.tiles else { return }
+            shape.row = 0.5
+            self.setTiles(shape, animated: true)
+            self.onTilesChange?(shape, true)
         }
         addSubview(resizeHandle)
         addSubview(sidebarContainer)
@@ -583,10 +635,19 @@ final class BrowserRootView: SpaceFrameView {
         return area
     }
 
-    /// The left (or only) pane and the right pane, inside the page area.
+    /// The left (or only) pane and the right pane, inside the page area: the first two of `tileFrames`.
     var paneFrames: (left: NSRect, right: NSRect?) {
-        // Borderless, the two pages meet at a hairline instead of floating apart.
-        Self.paneFrames(in: cardFrame, ratio: splitRatio, vertical: splitVertical, gap: isEdgeToEdge ? 1 : Tokens.Metric.cardInset)
+        let frames = tileFrames
+        return (frames[0], frames.count > 1 ? frames[1] : nil)
+    }
+
+    /// The gap between panes. Borderless, the pages meet at a hairline instead of floating apart.
+    var paneGap: CGFloat { isEdgeToEdge ? 1 : Tokens.Metric.cardInset }
+
+    /// Every pane's frame inside the page area, in the group's order; the whole of it with one page.
+    var tileFrames: [NSRect] {
+        guard let tiles else { return [cardFrame] }
+        return tiles.frames(in: cardFrame, gap: paneGap)
     }
 
     /// Splits `area` (top-down) into a split's two panes, `gap` apart; the whole of it when there's no split. Desk
@@ -635,7 +696,7 @@ final class BrowserRootView: SpaceFrameView {
         refreshGlassOcclusion()
     }
 
-    private var paintsTopBar: Bool { showsTopBar && pageColor != nil && splitRatio == nil && !isEmpty }
+    private var paintsTopBar: Bool { showsTopBar && pageColor != nil && tiles == nil && !isEmpty }
 
     /// The page card's own frame for `pane`: under a bar in the page's color, it reaches up to the bar's top.
     private func cardViewFrame(_ pane: NSRect) -> NSRect {
@@ -645,30 +706,32 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     private func layoutCards() {
-        let panes = paneFrames
-        emptyHint.frame = Self.markFrame(in: panes.left)
-        card.isEdgeToEdge = isEdgeToEdge
-        secondCard.isEdgeToEdge = isEdgeToEdge
-        let left = cardViewFrame(panes.left)
+        let frames = tileFrames
+        emptyHint.frame = Self.markFrame(in: frames[0])
+        paneCards.forEach { $0.isEdgeToEdge = isEdgeToEdge }
+        let left = cardViewFrame(frames[0])
         card.frame = left
-        card.band = left.height - panes.left.height
+        card.band = left.height - frames[0].height
         topBar.pageColor = paintsTopBar ? pageColor : nil
         let attached = sidebarVisible && Self.isBorderless
         card.squaresRightCorners = windowCorners(of: left, attached: attached)
-        secondCard.squaresRightCorners = panes.right.map { windowCorners(of: $0, attached: attached) } ?? (false, false)
         card.isAttached = attached
-        secondCard.isAttached = attached
-        if let right = panes.right {
-            secondCard.isHidden = false
-            secondCard.frame = right
-            splitHandle.isHidden = false
-            splitHandle.frame = splitVertical
-                ? NSRect(x: right.minX, y: panes.left.maxY - 2, width: right.width, height: right.minY - panes.left.maxY + 4)
-                : NSRect(x: panes.left.maxX - 2, y: right.minY, width: right.minX - panes.left.maxX + 4, height: right.height)
-        } else {
-            secondCard.isHidden = !secondCardLeaving
-            splitHandle.isHidden = true
+        for (i, extra) in extraCards.enumerated() {
+            let pane = frames.count > i + 1 ? frames[i + 1] : nil
+            extra.squaresRightCorners = pane.map { windowCorners(of: $0, attached: attached) } ?? (false, false)
+            extra.isAttached = attached
+            if let pane {
+                extra.isHidden = false
+                extra.frame = pane
+            } else {
+                extra.isHidden = !leavingCards.contains(ObjectIdentifier(extra))
+            }
         }
+        let lines = tiles?.dividers(in: cardFrame, gap: paneGap, slop: 2)
+        columnHandle.isHidden = lines?.column == nil
+        rowHandle.isHidden = lines?.row == nil
+        if let column = lines?.column { columnHandle.frame = column }
+        if let row = lines?.row { rowHandle.frame = row }
         splitDropHint.frame = cardFrame
         if showsSidePanel {
             let frame = sidePanelFrame
@@ -703,7 +766,7 @@ final class BrowserRootView: SpaceFrameView {
         if showsTopBar { return bounds }
         // An empty space shows the frame where the page would be: glass under all of it.
         // A split view's seam between its two pages shows the frame too: glass under all of it then.
-        guard sidebarVisible, card.isAttached, !card.isHidden, !isEmpty, secondCard.isHidden || secondCard.alphaValue == 0 else { return bounds }
+        guard sidebarVisible, card.isAttached, !card.isHidden, !isEmpty, extraCards.allSatisfy({ $0.isHidden || $0.alphaValue == 0 }) else { return bounds }
         return NSRect(x: 0, y: 0, width: min(bounds.width, sidebarWidth + Tokens.Radius.attached * 2), height: bounds.height)
     }
 
@@ -712,8 +775,7 @@ final class BrowserRootView: SpaceFrameView {
     var glassCovered = false {
         didSet {
             guard oldValue != glassCovered else { return }
-            card.isCoveredOver = glassCovered
-            secondCard.isCoveredOver = glassCovered
+            paneCards.forEach { $0.isCoveredOver = glassCovered }
             refreshGlassOcclusion()
         }
     }
@@ -767,8 +829,8 @@ final class BrowserRootView: SpaceFrameView {
         topBar.frame = bar
         topBar.rowTop = topBarFrame.minY - bar.minY
         (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: pageAreaFrame, window: bounds, onCard: addressEndsOnCard)
-        let panes = paneFrames
-        let over = liftedCards.map { $0 === card ? panes.left : panes.right ?? panes.left }
+        let frames = tileFrames
+        let over = liftedCards.map { lifted in paneCards.firstIndex { $0 === lifted }.flatMap { frames.indices.contains($0) ? frames[$0] : nil } ?? frames[0] }
         topBar.setStrips(liftedCards.map(\.header), panes: over.map { ($0.minX - bar.minX)...max($0.minX, $0.maxX) - bar.minX })
         topBar.stripInset = TopBarView.edgeInset(page: cardFrame, window: bounds)
     }
@@ -781,10 +843,12 @@ final class BrowserRootView: SpaceFrameView {
 
     /// Under the bar above the page, a split's strips are the bar: each pane's moves up into the bar's row, over its
     /// pane, and the bar's own back, forward, reload and address, which would belong to neither page, step aside.
-    /// Stacked, the top pane's goes up; the bottom one keeps its own on its card.
+    /// Stacked, the top pane's goes up; the bottom one keeps its own on its card. In a tile group, the panes along
+    /// the top, left to right.
     private var cardsForBar: [PageCardView] {
-        guard showsTopBar, splitRatio != nil else { return [] }
-        return splitVertical ? [card] : [card, secondCard]
+        guard showsTopBar, tiles != nil else { return [] }
+        let frames = tileFrames, top = cardFrame.minY
+        return frames.indices.filter { frames[$0].minY <= top + 0.5 }.sorted { frames[$0].minX < frames[$1].minX }.map { paneCards[$0] }
     }
 
     /// Whether the panes' strips are in the bar's row.
@@ -802,7 +866,7 @@ final class BrowserRootView: SpaceFrameView {
         let fade = stripFades
         for card in cards { card.liftsHeader = true }
         placeTopBar()
-        let given = [card, secondCard].filter { $0.liftsHeader && !cards.contains($0) }
+        let given = paneCards.filter { $0.liftsHeader && !cards.contains($0) }
         let own = topBar.ownControls
         guard animated, entering || leaving, window != nil, !Tokens.Motion.reduceMotion else {
             Tokens.Motion.withoutAnimation {
@@ -830,13 +894,20 @@ final class BrowserRootView: SpaceFrameView {
 
     /// Where a click picks a pane in split view: the pane, and its strip up in the bar.
     var paneTargets: (left: NSRect, right: NSRect?) {
-        var panes = paneFrames
-        guard stripsInBar else { return panes }
+        let targets = tileTargets
+        return (targets[0], targets.count > 1 ? targets[1] : nil)
+    }
+
+    /// The same for every pane, in the group's order.
+    var tileTargets: [NSRect] {
+        let frames = tileFrames
+        guard stripsInBar else { return frames }
         let top = topBarFrame.minY
-        func lifted(_ pane: NSRect) -> NSRect { NSRect(x: pane.minX, y: top, width: pane.width, height: pane.maxY - top) }
-        panes.left = lifted(panes.left)
-        if !splitVertical, let right = panes.right { panes.right = lifted(right) }
-        return panes
+        return frames.indices.map { i in
+            let pane = frames[i]
+            guard liftedCards.contains(where: { $0 === paneCards[i] }) else { return pane }
+            return NSRect(x: pane.minX, y: top, width: pane.width, height: pane.maxY - top)
+        }
     }
 
     /// While the sidebar slides, the bar holds still over both where it was and where it's going, and only its
@@ -876,21 +947,23 @@ final class BrowserRootView: SpaceFrameView {
         onSlide?(duration)
         // Borderless: the corners square off as the page grows to the window's edges, and round again as it shrinks.
         // Beside the sidebar, borderless, the page rounds like the window's corner; floating, like a card.
-        let panes = paneFrames
-        card.squaresRightCorners = windowCorners(of: cardViewFrame(panes.left), attached: visible && Self.isBorderless)
-        secondCard.squaresRightCorners = panes.right.map { windowCorners(of: $0, attached: visible && Self.isBorderless) } ?? (false, false)
-        card.isAttached = visible && Self.isBorderless
-        secondCard.isAttached = visible && Self.isBorderless
-        card.setEdgeToEdge(isEdgeToEdge, duration: duration)
-        secondCard.setEdgeToEdge(isEdgeToEdge, duration: duration)
+        let frames = tileFrames
+        let cards = paneCards
+        for (i, pageCard) in cards.enumerated() {
+            let pane = frames.indices.contains(i) ? (i == 0 ? cardViewFrame(frames[0]) : frames[i]) : nil
+            pageCard.squaresRightCorners = pane.map { windowCorners(of: $0, attached: visible && Self.isBorderless) } ?? (false, false)
+            pageCard.isAttached = visible && Self.isBorderless
+            pageCard.setEdgeToEdge(isEdgeToEdge, duration: duration)
+        }
         refreshGlassOcclusion()
         // The bar's controls and the page move as one: nothing in the bar jumps to its new place.
         if topBarSlideFrame != nil { topBar.slideControls(from: oldControls, curve: Tokens.Motion.slide) }
         Tokens.Motion.animate(Tokens.Motion.slide, evenFromKeyboard: true, moves: true, {
             if self.topBarSlideFrame == nil, self.showsTopBar { self.topBar.animator().frame = self.topBarFrame }
-            self.card.animator().frame = self.cardViewFrame(self.paneFrames.left)
-            self.emptyHint.animator().frame = Self.markFrame(in: self.paneFrames.left)
-            if let right = self.paneFrames.right { self.secondCard.animator().frame = right }
+            let frames = self.tileFrames
+            self.card.animator().frame = self.cardViewFrame(frames[0])
+            self.emptyHint.animator().frame = Self.markFrame(in: frames[0])
+            for i in frames.indices.dropFirst() { cards[i].animator().frame = frames[i] }
         }, completion: {
             self.leavesDocked = false
             // Not if another slide took over meanwhile: that one ends it.
@@ -1061,12 +1134,13 @@ final class PassthroughView: NSView {
     }
 }
 
-/// Shown while a tab is dragged over the page: which half it would open in, beside what's there.
+/// Shown while a tab is dragged over the page: where it would open, beside what's there (`TileDrop`): a half or a
+/// quarter of the page, or in place of a page that can't split again.
 final class SplitDropHint: NSView {
-    enum Side { case left, right }
     private let zone = ColorView()
     private let label = Label("", font: Tokens.Font.body(.semibold), color: .white)
-    private(set) var side: Side?
+    /// Where a drop now would go, in this view's terms (it covers the page area); nil while it's not over the page.
+    private(set) var drop: TileDrop?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -1085,17 +1159,15 @@ final class SplitDropHint: NSView {
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-    func show(_ side: Side?) {
-        guard side != self.side else { return }
-        self.side = side
-        isHidden = side == nil
-        guard let side else { return }
-        let half = bounds.width / 2
-        let target = NSRect(x: side == .left ? 0 : half, y: 0, width: half, height: bounds.height).insetBy(dx: Tokens.Space.x2, dy: Tokens.Space.x2)
+    func show(_ drop: TileDrop?) {
+        guard drop != self.drop else { return }
+        self.drop = drop
+        isHidden = drop == nil
+        guard let drop else { return }
+        let target = drop.frame.insetBy(dx: Tokens.Space.x2, dy: Tokens.Space.x2)
         zone.color = Tokens.Color.accent.withAlphaComponent(0.16)
         zone.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.6))
-        label.stringValue = side == .left ? String(localized: "Open on the Left", comment: "Shown over the left half of the page while a link or tab is dragged there, to open it in a split view.")
-                                           : String(localized: "Open on the Right", comment: "Shown over the right half of the page while a link or tab is dragged there, to open it in a split view.")
+        label.stringValue = Self.title(for: drop.kind)
         label.textColor = Tokens.Color.accent
         Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) { self.zone.animator().frame = target }
         if zone.frame.isEmpty { zone.frame = target }
@@ -1103,13 +1175,29 @@ final class SplitDropHint: NSView {
         label.frame = NSRect(x: 0, y: (target.height - h) / 2, width: target.width, height: h)
     }
 
-    /// Which half of the page a window point is over, or nil if it isn't over the page.
-    func side(at windowPoint: NSPoint) -> Side? {
-        guard let superview else { return nil }
+    /// What the hint says over where the page would open.
+    static func title(for kind: TileDrop.Kind) -> String {
+        guard case .place(let region, _) = kind else {
+            return String(localized: "Open Here", comment: "Shown over a page of a split view while a tab is dragged there: the tab opens in that page's place, and the page goes back to being a tab of its own.")
+        }
+        return switch region {
+        case .left: String(localized: "Open on the Left", comment: "Shown over the left half of the page while a link or tab is dragged there, to open it in a split view.")
+        case .right: String(localized: "Open on the Right", comment: "Shown over the right half of the page while a link or tab is dragged there, to open it in a split view.")
+        case .top: String(localized: "Open at the Top", comment: "Shown over the top half of the page while a tab is dragged there, to open it in a split view, above the page.")
+        case .bottom: String(localized: "Open at the Bottom", comment: "Shown over the bottom half of the page while a tab is dragged there, to open it in a split view, below the page.")
+        case .topLeft: String(localized: "Open Top Left", comment: "Shown over the top left quarter of the page while a tab is dragged there, to open it there in a split view.")
+        case .topRight: String(localized: "Open Top Right", comment: "Shown over the top right quarter of the page while a tab is dragged there, to open it there in a split view.")
+        case .bottomLeft: String(localized: "Open Bottom Left", comment: "Shown over the bottom left quarter of the page while a tab is dragged there, to open it there in a split view.")
+        case .bottomRight: String(localized: "Open Bottom Right", comment: "Shown over the bottom right quarter of the page while a tab is dragged there, to open it there in a split view.")
+        }
+    }
+
+    /// Where a drop at a window point would go beside the panes on screen (`shape`, nil for a page alone, `gap`
+    /// apart), or nil if it isn't over the page.
+    func drop(at windowPoint: NSPoint, shape: TileShape?, gap: CGFloat) -> TileDrop? {
         let p = convert(windowPoint, from: nil)
-        _ = superview
-        guard bounds.contains(p) else { return nil }
-        return p.x < bounds.midX ? .left : .right
+        // Beside a page alone, the halves meet in the middle, as they always did.
+        return TileDrop.target(at: p, in: bounds, shape: shape, gap: shape == nil ? 0 : gap)
     }
 }
 

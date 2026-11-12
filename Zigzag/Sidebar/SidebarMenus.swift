@@ -168,11 +168,11 @@ enum SidebarMenus {
         menu.addItem(Item(String(localized: "Close Tab", comment: "Item in a tab's context menu in the sidebar.")) { controller.closeWithUndo(tab) })
         // As in the menu bar: the tab's split partner is part of it, so neither closes it.
         let tabs = manager.tabs(in: tab.spaceID)
-        let partner = manager.partner(of: tab)
-        if let last = tabs.lastIndex(where: { $0 === tab || $0 === partner }) {
+        let panes = manager.panes(of: tab)
+        if let last = tabs.lastIndex(where: { page in panes.contains { $0 === page } }) {
             let below = Array(tabs.dropFirst(last + 1))
             menu.addItem(Item(String(localized: "Close Tabs Below", comment: "Item in a tab's context menu in the sidebar."), enabled: !below.isEmpty) { controller.closeManyWithUndoToast(below) })
-            let others = tabs.filter { $0 !== tab && $0 !== partner }
+            let others = tabs.filter { page in !panes.contains { $0 === page } }
             menu.addItem(Item(String(localized: "Close Other Tabs", comment: "Item in a tab's context menu in the sidebar."), enabled: !others.isEmpty) { controller.closeManyWithUndoToast(others) })
         }
         return menu
@@ -578,7 +578,7 @@ extension BrowserWindowController {
 
     /// The tabs of the picked tab rows, both halves of a split, as closing its row closes both.
     func markedTabs(_ items: [SidebarItem]) -> [Tab] {
-        markedTabRows(items).flatMap { tab in [tab] + (tabManager.partner(of: tab).map { [$0] } ?? []) }
+        markedTabRows(items).flatMap { tab in tabManager.panes(of: tab) }
     }
 
     /// The pinned page of each picked pinned row, the left one for a pinned split.

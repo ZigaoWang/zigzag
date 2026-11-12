@@ -445,7 +445,7 @@ final class DeskController {
         var waiting = pages.count
         for page in pages {
             page.captureSnapshotOutOfSight(in: host, size: size) { [weak self, weak host] in
-                if let self, self.isVisible { self.cards.values.filter { $0.tab === page || $0.partner === page }.forEach { $0.refreshImage() } }
+                if let self, self.isVisible { self.cards.values.filter { $0.pages.contains { $0 === page } }.forEach { $0.refreshImage() } }
                 waiting -= 1
                 if waiting == 0 { host?.removeFromSuperview() }
             }
@@ -455,7 +455,7 @@ final class DeskController {
     /// Takes new pictures of the page on screen, both pages with a split, then calls `completion` once.
     private func capturePages(_ completion: @escaping () -> Void) {
         guard let manager, let tab = manager.selectedTab else { completion(); return }
-        let pages = [tab] + (manager.partner(of: tab).map { [$0] } ?? [])
+        let pages = manager.panes(of: tab)
         var waiting = pages.count
         for page in pages {
             page.captureSnapshot {
@@ -480,7 +480,7 @@ final class DeskController {
         let flight = self.flight ?? makeFlight(at: flightView.convert(controller.root.cardFrame, from: controller.root), radius: pageRadius)
         // Only its picture flies; the title arrives with the other cards.
         Tokens.Motion.withoutAnimation { current.imageClip.alphaValue = 0 }
-        flight.show(Self.picture(of: tab), current.partner?.snapshot, split: current.split)
+        flight.show([Self.picture(of: tab)] + current.partners.map(\.snapshot), shape: current.shape)
         fly(flight, to: target, radius: Tokens.Radius.thumbnail) { [weak self] in
             guard let self, self.transition == id else { return }
             // Landed: the card takes over in the same frame, so nothing moves.
@@ -504,7 +504,7 @@ final class DeskController {
         layer.cornerCurve = .continuous
         Tokens.Motion.withoutAnimation {
             layer.backgroundColor = flightView.cgColor(Tokens.Color.cardBackground)
-            picture.divider.backgroundColor = flightView.cgColor(Tokens.Color.cardEdge)
+            picture.dividerColor = flightView.cgColor(Tokens.Color.cardEdge)
             picture.layout(size: page)
             layer.position = frame.origin
             layer.transform = CATransform3DMakeScale(scale.x, scale.y, 1)
@@ -641,7 +641,7 @@ final class DeskController {
         let flight = self.flight ?? makeFlight(at: card.imageClip.convert(card.imageClip.bounds, to: flightView), radius: Tokens.Radius.thumbnail)
         root.pagesHidden = true
         Tokens.Motion.withoutAnimation { card.imageClip.alphaValue = 0 }
-        flight.show(Self.picture(of: page), card.partner?.snapshot, split: card.split)
+        flight.show([Self.picture(of: page)] + card.partners.map(\.snapshot), shape: card.shape)
         // The desk is gone, and out of the way of clicks, a moment before the page lands.
         fade(backdrop, to: 0, duration: Tokens.Motion.standard, completion: finish)
         fly(flight, to: flightView.convert(root.cardFrame, from: root), radius: pageRadius) { [weak self] in
@@ -746,11 +746,12 @@ final class DeskController {
         guard let manager else { return [] }
         let tabs = manager.tabs(in: space)
         let cards = tabs.filter { tab in
-            guard let pair = manager.split(for: tab), pair.right == tab.id else { return true }
-            return !tabs.contains { $0.id == pair.left }
+            // The first page of a split or tile group in this list has the card.
+            guard let pair = manager.split(for: tab) else { return true }
+            return pair.ids.first { id in tabs.contains { $0.id == id } } == tab.id
         }
         guard !query.isEmpty else { return cards }
-        return cards.filter { matches($0) || partner(of: $0).map(matches) == true }
+        return cards.filter { matches($0) || partners(of: $0).contains(where: matches) }
     }
 
     private func matches(_ tab: Tab) -> Bool {
@@ -789,15 +790,15 @@ final class DeskController {
         scrollView.frame = NSRect(x: 0, y: backdrop.isFlipped ? Self.searchArea : 0, width: b.width, height: b.height - Self.searchArea)
     }
 
-    private func partner(of tab: Tab) -> Tab? {
-        guard let manager, let pair = manager.split(for: tab), pair.left == tab.id else { return nil }
-        return manager.tab(with: pair.right)
+    /// The pages sharing a split's or tile group's card with its first one; none for any other.
+    private func partners(of tab: Tab) -> [Tab] {
+        guard let manager, let pair = manager.split(for: tab), pair.left == tab.id else { return [] }
+        return manager.partners(of: tab)
     }
 
-    /// How a split card's two pages share it, as they share the page area.
-    private func splitShape(of tab: Tab) -> (ratio: CGFloat, vertical: Bool)? {
-        guard let pair = manager?.split(for: tab) else { return nil }
-        return (CGFloat(pair.ratio), pair.vertical)
+    /// How a split card's pages share it, as they share the page area.
+    private func shape(of tab: Tab) -> TileShape? {
+        manager?.split(for: tab)?.shape
     }
 
     /// The card for the tab you're on, which with a split is the one both pages share.
@@ -835,12 +836,12 @@ final class DeskController {
         var fresh: [TabThumbnailView] = []
         selection = selection.intersection(ids)
         // Cards kept from last time show what each tab is now.
-        for tab in allTabs { cards[tab.id]?.configure(tab, partner: partner(of: tab), split: splitShape(of: tab)) }
+        for tab in allTabs { cards[tab.id]?.configure(tab, partners: partners(of: tab), shape: shape(of: tab)) }
         for tab in allTabs where cards[tab.id] == nil {
             let card = TabThumbnailView()
             card.inset = cardInset
             card.showsRing = true
-            card.configure(tab, partner: partner(of: tab), split: splitShape(of: tab))
+            card.configure(tab, partners: partners(of: tab), shape: shape(of: tab))
             card.onClick = { [weak self, weak tab, weak card] event in
                 guard let self, let tab else { return }
                 self.cardClicked(card?.tab(at: event) ?? tab, event: event)
@@ -911,7 +912,7 @@ final class DeskController {
             header.name = space.name
             let count = manager?.tabs(in: id).count ?? 0
             // While searching, how many of them match: a split that matches is both its tabs.
-            let shown = query.isEmpty ? count : cardTabs(in: id).reduce(0) { $0 + (partner(of: $1) == nil ? 1 : 2) }
+            let shown = query.isEmpty ? count : cardTabs(in: id).reduce(0) { $0 + 1 + partners(of: $1).count }
             let tabs = String(localized: "\(count) tabs", comment: "In the tab overview (all spaces' tabs as cards), beside a space's name: how many tabs it has.")
             header.count.stringValue = count == 0 ? "" : shown == count ? tabs
                 : String(localized: "\(shown) of \(tabs)", comment: "In the tab overview (all spaces' tabs as cards), beside a space's name while searching: how many of its tabs match, then how many it has, like “2 of 5 tabs”.")
@@ -1022,7 +1023,7 @@ final class DeskController {
 
     private func cardClicked(_ tab: Tab, event: NSEvent) {
         let anchor = focused
-        if let id = cards.first(where: { $0.value.tab === tab || $0.value.partner === tab })?.key { setFocus(id, scroll: false) }
+        if let id = cards.first(where: { $0.value.pages.contains { $0 === tab } })?.key { setFocus(id, scroll: false) }
         // ⇧-click picks every card from the one you were on to here, as in the sidebar and Finder; ⌘-click one.
         let order = orderedCardIDs
         if event.modifierFlags.contains(.shift), let anchor, let a = order.firstIndex(of: anchor), let b = order.firstIndex(of: tab.id) {
@@ -1120,7 +1121,7 @@ final class DeskController {
     private func close(_ ids: Set<UUID>) {
         guard let manager else { return }
         let tabs = ids.compactMap { id in cards[id]?.tab ?? manager.tab(with: id) }
-        let pages = tabs + tabs.compactMap { partner(of: $0) }
+        let pages = tabs + tabs.flatMap { partners(of: $0) }
         guard !pages.isEmpty else { return }
         if let focused, ids.contains(focused) {
             let order = orderedCardIDs

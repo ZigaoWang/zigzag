@@ -418,16 +418,16 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// The space's tabs but the one you're on and its split partner. Pinned pages never count: on one, it's every tab.
     var otherTabs: [Tab] {
         guard let tab = selectedTab else { return [] }
-        let partner = tabManager.partner(of: tab)
-        return tabManager.currentTabs.filter { $0 !== tab && $0 !== partner }
+        let panes = tabManager.panes(of: tab)
+        return tabManager.currentTabs.filter { page in !panes.contains { $0 === page } }
     }
 
     /// The tabs under the one you're on. Every tab is under a pinned page or favorite.
     var tabsBelow: [Tab] {
         guard let tab = selectedTab else { return [] }
         let tabs = tabManager.currentTabs
-        let partner = tabManager.partner(of: tab)
-        let last = tabs.lastIndex { $0 === tab || $0 === partner }
+        let panes = tabManager.panes(of: tab)
+        let last = tabs.lastIndex { page in panes.contains { $0 === page } }
         return Array(tabs.dropFirst(last.map { $0 + 1 } ?? 0))
     }
 
@@ -516,7 +516,8 @@ extension BrowserWindowController: NSMenuItemValidation {
             let split = tab.flatMap { tabManager.split(for: $0) }
             item.title = split?.vertical == true ? String(localized: "Side by Side", comment: "Menu bar item: lays the split view's two pages side by side.")
                                                  : String(localized: "Stack Vertically", comment: "Menu bar item: stacks the split view's two pages one above the other.")
-            return split != nil
+            // A tile group's pages keep the places they were dropped in.
+            return split != nil && split?.isGroup == false
         case #selector(closeTab(_:)):
             // Says how many when ⌘W would close several picked rows.
             let count = sidebar.list.marksHaveFocus ? closingCount(sidebar.list.marked) : 1

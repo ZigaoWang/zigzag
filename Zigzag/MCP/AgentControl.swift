@@ -91,14 +91,16 @@ final class AgentControl {
     /// Of the window's tabs on screen (one, or two side by side), the one an app is using.
     private func usedTab(in controller: BrowserWindowController) -> Tab? {
         guard let selected = controller.tabManager.selectedTab else { return nil }
-        let shown = [selected] + [controller.tabManager.partner(of: selected)].compactMap { $0 }
+        let shown = controller.tabManager.panes(of: selected)
         return shown.first { inUse[$0.id] != nil }
     }
 
-    /// Its pane: the page, or its half of a split.
+    /// Its pane: the page, or its part of a split or tile group.
     private func area(of tab: Tab, in controller: BrowserWindowController) -> NSRect {
-        let panes = controller.root.paneFrames
-        if let right = panes.right, let pair = controller.tabManager.split(for: tab) { return pair.left == tab.id ? panes.left : right }
+        let frames = controller.root.tileFrames
+        if frames.count > 1, let index = controller.tabManager.split(for: tab)?.ids.firstIndex(of: tab.id), frames.indices.contains(index) {
+            return frames[index]
+        }
         return controller.root.cardFrame
     }
 

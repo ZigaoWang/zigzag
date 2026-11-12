@@ -294,9 +294,9 @@ enum CommandRanker {
         c.canMove = tab.bookmarkID == nil && tab.url != nil
         // On a pinned page or favorite, every tab is another tab, and all of them are below it.
         // Its split partner is part of it, as Close Other Tabs and Close Tabs Below count it.
-        let partner = manager.partner(of: tab)
-        let last = tabs.lastIndex { $0 === tab || $0 === partner }
-        c.hasOtherTabs = tabs.contains { $0 !== tab && $0 !== partner }
+        let panes = manager.panes(of: tab)
+        let last = tabs.lastIndex { page in panes.contains { $0 === page } }
+        c.hasOtherTabs = tabs.contains { page in !panes.contains { $0 === page } }
         c.hasTabsBelow = tabs.count > (last.map { $0 + 1 } ?? 0)
         return c
     }

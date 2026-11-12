@@ -107,7 +107,7 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         guard !AppDelegate.isHostingTests else { return false }
         // The tab you're looking at already shows what it would say, as in Safari.
         if NSApp.isActive, let controller = WindowManager.shared.keyController, controller.window?.isKeyWindow == true,
-           let shown = controller.tabManager.selectedTab, shown === tab || controller.tabManager.partner(of: shown) === tab {
+           let shown = controller.tabManager.selectedTab, controller.tabManager.panes(of: shown).contains(where: { $0 === tab }) {
             return true
         }
         guard await authorize() else { return false }

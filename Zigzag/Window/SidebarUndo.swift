@@ -99,9 +99,11 @@ extension BrowserWindowController {
 
     // MARK: Split view
 
-    func splitWithUndo(_ tab: Tab, with other: Tab, otherOnRight: Bool = true) {
+    func splitWithUndo(_ tab: Tab, with other: Tab, otherOnRight: Bool = true, vertical: Bool = false) {
         guard tabManager.canSplit(tab, with: other) else { return }
-        pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [tabManager] in tabManager.makeSplit(tab, with: other, otherOnRight: otherOnRight) }
+        pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [tabManager] in
+            tabManager.makeSplit(tab, with: other, otherOnRight: otherOnRight, vertical: vertical)
+        }
     }
 
     /// Ends a split, showing `keep` (or the tab itself) on its own. A pinned split ends too: both pages stay pinned,

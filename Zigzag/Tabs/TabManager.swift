@@ -234,8 +234,8 @@ final class TabManager {
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
         // Opened in front from a page in split view: it takes that page's pane, so the split stays on screen and
         // the page it came from waits in the list. A pinned split keeps its pages; the new tab shows on its own.
-        if select, let opener, opener.bookmarkID == nil, opener.spaceID == space, let index = splits.firstIndex(where: { $0.left == opener.id || $0.right == opener.id }) {
-            if splits[index].left == opener.id { splits[index].left = tab.id } else { splits[index].right = tab.id }
+        if select, let opener, opener.bookmarkID == nil, opener.spaceID == space, let index = splits.firstIndex(where: { $0.contains(opener.id) }) {
+            splits[index].replace(opener.id, with: tab.id)
             // Half of the split now, it's a row of its own, not one nested under the page it came from.
             liftToTopLevel(tab)
         }
@@ -253,7 +253,7 @@ final class TabManager {
     /// Takes a tab out of this window without closing its page, so another window can adopt it.
     func detach(_ tab: Tab) {
         guard tab.bookmarkID == nil, let index = tabs(in: tab.spaceID).firstIndex(where: { $0 === tab }) else { return }
-        splits.removeAll { $0.left == tab.id || $0.right == tab.id }
+        leaveGroup(tab, notify: false)
         let wasSelected = selectedTab === tab
         liftChildren(of: tab)
         tabsBySpace[tab.spaceID]?.remove(at: index)
@@ -267,7 +267,7 @@ final class TabManager {
     /// A pinned page's or favorite's open page out of this window, still loaded, so another window can adopt it.
     func detachBookmarkTab(_ bookmarkID: UUID) -> Tab? {
         guard let tab = bookmarkTabs[bookmarkID] else { return nil }
-        splits.removeAll { $0.left == tab.id || $0.right == tab.id }
+        splits.removeAll { $0.contains(tab.id) }
         let wasSelected = selectedTab === tab
         bookmarkTabs[bookmarkID] = nil
         recentTabIDs.removeAll { $0 == tab.id }
@@ -432,7 +432,10 @@ final class TabManager {
         guard let url = address(of: tab) else { return }
         // Half of a split brings the other half: the two become one favorite, side by side. A half with no page to
         // keep can't come along, so the split ends and the tab goes on its own.
-        if let pair = split(for: tab) {
+        // A page of a tile group of more goes on its own, and the group closes up around its place.
+        if let pair = split(for: tab), pair.isGroup {
+            leaveGroup(tab, notify: false)
+        } else if let pair = split(for: tab) {
             if favoriteSplit(pair, at: index) { return }
             unsplit(tab, notify: false)
         }
@@ -550,17 +553,23 @@ final class TabManager {
     func tabsToClear(in spaceID: UUID, now: Date = Date()) -> (tabs: [Tab], kind: ClearKind) {
         let tabs = self.tabs(in: spaceID)
         let current = selectedTab(in: spaceID)
-        let partner = current.flatMap { self.partner(of: $0) }
+        let partners = current.map { self.partners(of: $0).map(\.id) } ?? []
         let busy = Set(tabs.filter { $0.isPlayingAudio || $0.isInUse }.map(\.id))
         let ages = Dictionary(uniqueKeysWithValues: tabs.map { ($0.id, now.timeIntervalSince($0.lastActivated)) })
-        let (ids, kind) = Self.clearing(tabs.map(\.id), current: current?.id, partner: partner?.id, busy: busy, ages: ages)
+        let (ids, kind) = Self.clearing(tabs.map(\.id), current: current?.id, partners: partners, busy: busy, ages: ages)
         return (tabs.filter { ids.contains($0.id) }, kind)
     }
 
     /// Clear's choice, by id. While other tabs are left, even only busy ones, yours stay.
     nonisolated static func clearing(_ tabs: [UUID], current: UUID?, partner: UUID?, busy: Set<UUID>,
                                      ages: [UUID: TimeInterval]) -> (ids: Set<UUID>, kind: ClearKind) {
-        let others = tabs.filter { $0 != current && $0 != partner }
+        clearing(tabs, current: current, partners: partner.map { [$0] } ?? [], busy: busy, ages: ages)
+    }
+
+    /// The same, with every page beside yours in a split or tile group (`partners`) kept as yours.
+    nonisolated static func clearing(_ tabs: [UUID], current: UUID?, partners: [UUID], busy: Set<UUID>,
+                                     ages: [UUID: TimeInterval]) -> (ids: Set<UUID>, kind: ClearKind) {
+        let others = tabs.filter { $0 != current && !partners.contains($0) }
         guard !others.isEmpty else { return (Set(tabs.filter { !busy.contains($0) }), .last) }
         let closable = others.filter { !busy.contains($0) }
         let newestFirst = closable.sorted { ages[$0, default: 0] < ages[$1, default: 0] }
@@ -649,8 +658,13 @@ final class TabManager {
         // Pinned pages stop being a pinned split (separated, one made a favorite, undo, another window): the split on
         // screen ends with it.
         let splitCount = splits.count
+        // A tile group of more is ordinary tabs of one space, or it ends too.
         splits.removeAll { pair in
             guard let left = tab(with: pair.left), let right = tab(with: pair.right) else { return false }
+            if pair.isGroup {
+                let pages = pair.ids.compactMap { tab(with: $0) }
+                return pages.contains { $0.bookmarkID != nil || $0.spaceID != left.spaceID }
+            }
             return !canSplit(left, with: right) || left.spaceID != right.spaceID
         }
         if !spaceIDs.contains(currentSpaceID) {
@@ -732,7 +746,8 @@ final class TabManager {
             Library.shared.addPinnedSplit(marks[0], marks[1], to: space, at: index, ratio: pair.ratio, vertical: pair.vertical)
             return
         }
-        unsplit(tab)
+        // A page of a tile group of more is pinned on its own; the group closes up around its place.
+        leaveGroup(tab)
         removeFromList(tab)
         let bookmarkID = UUID()
         tab.bookmarkID = bookmarkID
@@ -899,10 +914,10 @@ final class TabManager {
         if selectedTab === tab, let opener = tab.opener, !opener.isClosed, self.tab(with: opener.id) === opener {
             returnPane(of: tab, to: opener)
         }
-        let partnerTab = partner(of: tab)
         let pair = split(for: tab)
-        splits.removeAll { $0.left == tab.id || $0.right == tab.id }
-        // Closing one half of a split shows the other half.
+        // Closing one half of a split shows the other half; one page of a tile group of more, the rest, closed up
+        // around its place, and you're in the page that took its room.
+        let partnerTab = leaveGroup(tab, notify: false)
         if selectedTab === tab, let partnerTab {
             if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
             closeKeepingSelection(tab, split: pair)
@@ -1037,7 +1052,21 @@ final class TabManager {
         reopenedAs[closed.id] = tab.id
         if reopenedAs.count > 500 { reopenedAs = [closed.id: tab.id] }
         // Half of a split: back beside its partner, on the same side and at the same size, if that's still free.
-        let otherID = closed.split.map { $0.left == closed.id ? $0.right : $0.left }
+        // A page of a tile group of more: back in its place, if the rest are still together as it left them.
+        if let pair = closed.split, pair.isGroup {
+            let others = pair.ids.filter { $0 != closed.id }
+            let now = others.map { reopenedAs[$0] ?? $0 }
+            let pages = now.compactMap { self.tab(with: $0) }
+            if pages.count == now.count, pages.allSatisfy({ $0.spaceID == space && $0.bookmarkID == nil }),
+               let current = split(for: pages[0]), Set(current.ids) == Set(now) {
+                var restored = pair
+                restored.replace(closed.id, with: tab.id)
+                for (old, new) in zip(others, now) { restored.replace(old, with: new) }
+                splits.removeAll { $0.contains(pages[0].id) }
+                splits.append(restored)
+            }
+        }
+        let otherID = closed.split.flatMap { $0.isGroup ? nil : $0.left == closed.id ? $0.right : $0.left }
         if let pair = closed.split, let otherID, let other = self.tab(with: reopenedAs[otherID] ?? otherID),
            other.spaceID == space, split(for: other) == nil, canSplit(tab, with: other) {
             var restored = pair
@@ -1080,9 +1109,10 @@ final class TabManager {
     func move(_ tab: Tab, to index: Int, in spaceID: UUID? = nil, nesting: Nesting = .fit) {
         guard tab.bookmarkID == nil else { return }
         let target = spaceID ?? tab.spaceID
-        // A split of two tabs goes to another space as one, still side by side.
-        if target != tab.spaceID, let pair = split(for: tab), let other = partner(of: tab), other.bookmarkID == nil {
-            let halves = pair.left == tab.id ? [tab, other] : [other, tab]
+        // A split of two tabs (or a tile group of more) goes to another space as one, still side by side.
+        let panes = self.panes(of: tab)
+        if target != tab.spaceID, panes.count > 1, panes.count == split(for: tab)?.count, panes.allSatisfy({ $0.bookmarkID == nil }) {
+            let halves = panes
             halves.forEach { removeFromList($0) }
             for half in halves {
                 half.setSpace(target)
@@ -1099,7 +1129,7 @@ final class TabManager {
         }
         if target != tab.spaceID {
             // A split with a pinned page can't span two spaces: moving the tab out ends it.
-            splits.removeAll { $0.left == tab.id || $0.right == tab.id }
+            splits.removeAll { $0.contains(tab.id) }
             removeFromList(tab)
             tab.setSpace(target)
             var list = tabsBySpace[target] ?? []
@@ -1125,7 +1155,7 @@ final class TabManager {
     /// Into another space: at `index` where it was dropped, else at the top.
     func moveTabToSpace(_ tab: Tab, spaceID: UUID, at index: Int = 0) {
         // Either half of a split moving together counts: the page you were on leaves with it.
-        let wasSelected = selectedTab === tab || (partner(of: tab).map { selectedTab === $0 } ?? false)
+        let wasSelected = panes(of: tab).contains { selectedTab === $0 }
         let oldIndex = tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0
         move(tab, to: index, in: spaceID)
         if wasSelected { selectAfterClosing(Tab(url: nil, spaceID: currentSpaceID), index: oldIndex) }
@@ -1154,13 +1184,24 @@ final class TabManager {
 
     // MARK: Split view
 
+    /// Pages side by side: a split of two, or a tile group of up to four (#160, see `TileShape`). The first two are
+    /// `left` and `right` (top and bottom, stacked), as a split always had them, so a session saved with a group
+    /// opens in an older Zigzag as a split of its first two pages.
     nonisolated struct SplitPair: Codable, Equatable, Sendable {
         var left: UUID
         var right: UUID
-        /// Share of the width (or height, when vertical) the first pane gets.
+        /// Share of the width (or height, when vertical) the first pane gets. In a group of more, the share of the
+        /// width left of the line between the columns.
         var ratio: Double = 0.5
         /// Stacked top and bottom instead of side by side.
         var vertical = false
+        /// A tile group's third and fourth pages.
+        var more: [UUID] = []
+        /// Where each page of a group of more than two sits, in `ids` order; nil for two, whose halves `vertical` says.
+        var regions: [TileRegion]? = nil
+        /// The other line's share: in a group of more, of the height above the line between the rows; with two,
+        /// kept for when a third comes.
+        var otherRatio: Double = 0.5
 
         init(left: UUID, right: UUID) {
             self.left = left
@@ -1173,18 +1214,111 @@ final class TabManager {
             right = try c.decode(UUID.self, forKey: .right)
             ratio = try c.decodeIfPresent(Double.self, forKey: .ratio) ?? 0.5
             vertical = try c.decodeIfPresent(Bool.self, forKey: .vertical) ?? false
+            otherRatio = (try? c.decodeIfPresent(Double.self, forKey: .otherRatio)) ?? 0.5
+            // A group whose pages or places don't add up opens as the split of its first two.
+            let more = ((try? c.decodeIfPresent([UUID].self, forKey: .more)) ?? nil) ?? []
+            let regions = (try? c.decodeIfPresent([TileRegion].self, forKey: .regions)) ?? nil
+            if !more.isEmpty, let regions, regions.count == more.count + 2, TileShape.isValid(regions),
+               Set([left, right] + more).count == more.count + 2 {
+                self.more = more
+                self.regions = regions
+            }
         }
     }
 
     private(set) var splits: [SplitPair] = []
 
     func split(for tab: Tab) -> SplitPair? {
-        splits.first { $0.left == tab.id || $0.right == tab.id }
+        splits.first { $0.contains(tab.id) }
     }
 
+    /// The other page of a split of two. Nil in a tile group of more, whose pages are `partners(of:)`: what goes for
+    /// a pair (pinning both, a pinned page beside a tab) doesn't for those.
     func partner(of tab: Tab) -> Tab? {
-        guard let pair = split(for: tab) else { return nil }
+        guard let pair = split(for: tab), !pair.isGroup else { return nil }
         return self.tab(with: pair.left == tab.id ? pair.right : pair.left)
+    }
+
+    /// The other pages on screen with this one: a split's other half, or the rest of a tile group, in order.
+    func partners(of tab: Tab) -> [Tab] {
+        guard let pair = split(for: tab) else { return [] }
+        return pair.ids.filter { $0 != tab.id }.compactMap { self.tab(with: $0) }
+    }
+
+    /// This page and the ones beside it, in the group's order; only this one when it's alone.
+    func panes(of tab: Tab) -> [Tab] {
+        guard let pair = split(for: tab) else { return [tab] }
+        let panes = pair.ids.compactMap { self.tab(with: $0) }
+        return panes.contains { $0 === tab } ? panes : [tab]
+    }
+
+    /// Whether `tab` may come into the group `current` is in (or beside `current` alone) by a drop on the page: a tab
+    /// of its own with a page; into a group of three or four, only among ordinary tabs of one space. A pinned page's
+    /// pair stays a pair.
+    func canTile(_ tab: Tab, beside current: Tab) -> Bool {
+        guard tab !== current, split(for: tab) == nil, tab.url != nil else { return false }
+        guard let pair = split(for: current) else {
+            return canSplit(tab, with: current) && Self.canSplit(splitSide(of: tab), onto: splitSide(of: current))
+        }
+        let panes = pair.ids.compactMap { self.tab(with: $0) }
+        return tab.bookmarkID == nil && panes.count == pair.count && panes.allSatisfy { $0.bookmarkID == nil && $0.spaceID == current.spaceID }
+    }
+
+    /// `tab` into the group on screen with `current`, where `drop` puts it (`TileDrop`): beside a page alone, the two
+    /// make a split. A page it takes the place of goes back to being a tab of its own, where it is in the list.
+    func tile(_ tab: Tab, beside current: Tab, _ drop: TileDrop.Kind) {
+        guard canTile(tab, beside: current) else { return }
+        guard let index = splits.firstIndex(where: { $0.contains(current.id) }) else {
+            guard let pair = SplitPair.pair(current.id, tab.id, drop) else { return }
+            makeSplit(current, with: tab, otherOnRight: pair.right == tab.id, vertical: pair.vertical)
+            return
+        }
+        guard let grown = splits[index].adding(tab.id, drop) else { return }
+        if tab.spaceID != current.spaceID {
+            removeFromList(tab)
+            tab.setSpace(current.spaceID)
+            tabsBySpace[current.spaceID, default: []].insert(tab, at: 0)
+        }
+        liftToTopLevel(tab)
+        splits[index] = grown
+        tab.ensureWebView()
+        changed.send(.structure)
+        select(tab)
+    }
+
+    /// Takes one page out of its tile group, which closes up around the gap; out of a split of two, the split ends.
+    /// The page that takes its room is returned (nil if none).
+    @discardableResult
+    func leaveGroup(_ tab: Tab, notify: Bool = true) -> Tab? {
+        guard let index = splits.firstIndex(where: { $0.contains(tab.id) }) else { return nil }
+        let pair = splits[index]
+        guard pair.isGroup, let rest = pair.removing(tab.id) else {
+            unsplit(tab, notify: notify)
+            return pair.ids.first { $0 != tab.id }.flatMap { self.tab(with: $0) }
+        }
+        splits[index] = rest
+        if notify {
+            changed.send(.structure)
+            changed.send(.selection)
+        }
+        // The page that grew over its room: the one whose place now covers part of where it was.
+        let gone = pair.shape.regions[pair.ids.firstIndex(of: tab.id) ?? 0].cells
+        let shape = rest.shape
+        let taker = rest.ids.indices.first { shape.regions[$0].cells & gone != 0 } ?? 0
+        return self.tab(with: rest.ids[taker])
+    }
+
+    /// Two to four tabs of one space side by side as a tile group laid out as `shape`, ending any splits they were in
+    /// (the debug bridge's way to make one; a drop builds one a page at a time).
+    func makeGroup(_ tabs: [Tab], shape: TileShape) {
+        guard tabs.count >= 2, tabs.allSatisfy({ $0.bookmarkID == nil && $0.spaceID == tabs[0].spaceID }),
+              let pair = SplitPair(ids: tabs.map(\.id), shape: shape) else { return }
+        tabs.forEach { unsplit($0, notify: false) }
+        tabs.forEach { liftToTopLevel($0) }
+        splits.append(pair)
+        tabs.forEach { $0.ensureWebView() }
+        changed.send(.structure)
+        select(tabs[tabs.count - 1])
     }
 
     /// Ordinary tabs split, the two pinned pages of a pinned split, and a pinned page with a tab: the pinned page's
@@ -1231,8 +1365,8 @@ final class TabManager {
                          inSplit: open || Library.shared.pinnedSplit(containing: id) != nil)
     }
 
-    /// Puts `other` beside `tab` (on the right or left), ending any splits either was in.
-    func makeSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool = true) {
+    /// Puts `other` beside `tab` (on the right or left, or below or above, stacked), ending any splits either was in.
+    func makeSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool = true, vertical: Bool = false) {
         // A pinned page stays in its space; only a tab moves to join the other.
         guard canSplit(tab, with: other), other.spaceID == tab.spaceID || other.bookmarkID == nil else { return }
         unsplit(tab, notify: false)
@@ -1246,7 +1380,9 @@ final class TabManager {
         // they do when their page is pinned or leaves for another space.
         liftToTopLevel(tab)
         liftToTopLevel(other)
-        splits.append(otherOnRight ? SplitPair(left: tab.id, right: other.id) : SplitPair(left: other.id, right: tab.id))
+        var pair = otherOnRight ? SplitPair(left: tab.id, right: other.id) : SplitPair(left: other.id, right: tab.id)
+        pair.vertical = vertical
+        splits.append(pair)
         Tutorial.complete("split")
         other.ensureWebView()
         changed.send(.structure)
@@ -1255,15 +1391,16 @@ final class TabManager {
 
     /// A tab a link opened in a split took its opener's pane; going back from it puts the opener back there.
     func returnPane(of tab: Tab, to opener: Tab) {
-        guard let index = splits.firstIndex(where: { $0.left == tab.id || $0.right == tab.id }), split(for: opener) == nil,
+        guard let index = splits.firstIndex(where: { $0.contains(tab.id) }), split(for: opener) == nil,
               canSplit(tab, with: opener), opener.spaceID == tab.spaceID else { return }
-        if splits[index].left == tab.id { splits[index].left = opener.id } else { splits[index].right = opener.id }
+        splits[index].replace(tab.id, with: opener.id)
         opener.ensureWebView()
     }
 
+    /// Ends the split or tile group the tab is in: its pages each a tab of its own again.
     func unsplit(_ tab: Tab, notify: Bool = true) {
         let before = splits.count
-        splits.removeAll { $0.left == tab.id || $0.right == tab.id }
+        splits.removeAll { $0.contains(tab.id) }
         if notify, splits.count != before {
             changed.send(.structure)
             changed.send(.selection)
@@ -1277,8 +1414,9 @@ final class TabManager {
         select(other)
     }
 
+    /// A split of two only: a tile group's pages keep their places.
     func toggleSplitOrientation(for tab: Tab) {
-        guard let index = splits.firstIndex(where: { $0.left == tab.id || $0.right == tab.id }) else { return }
+        guard let index = splits.firstIndex(where: { $0.contains(tab.id) }), !splits[index].isGroup else { return }
         splits[index].vertical.toggle()
         rememberPinnedLayout(splits[index])
         changed.send(.selection)
@@ -1286,7 +1424,7 @@ final class TabManager {
 
     /// The two pages trade places; each keeps the size it had.
     func swapSplit(for tab: Tab) {
-        guard let index = splits.firstIndex(where: { $0.left == tab.id || $0.right == tab.id }) else { return }
+        guard let index = splits.firstIndex(where: { $0.contains(tab.id) }), !splits[index].isGroup else { return }
         let pair = splits[index]
         splits[index].left = pair.right
         splits[index].right = pair.left
@@ -1296,14 +1434,22 @@ final class TabManager {
     }
 
     func setSplitRatio(_ ratio: Double, for tab: Tab) {
-        guard let index = splits.firstIndex(where: { $0.left == tab.id || $0.right == tab.id }) else { return }
+        guard let index = splits.firstIndex(where: { $0.contains(tab.id) }), !splits[index].isGroup else { return }
         splits[index].ratio = min(max(ratio, 0.2), 0.8)
+        rememberPinnedLayout(splits[index])
+    }
+
+    /// Where the lines between a tile group's pages are (shares of the width and height); a split of two takes the
+    /// one it has.
+    func setTileRatios(column: CGFloat, row: CGFloat, for tab: Tab) {
+        guard let index = splits.firstIndex(where: { $0.contains(tab.id) }) else { return }
+        splits[index].setRatios(column: min(max(column, 0.2), 0.8), row: min(max(row, 0.2), 0.8))
         rememberPinnedLayout(splits[index])
     }
 
     /// A pinned split keeps how it was last laid out, so it opens that way again.
     private func rememberPinnedLayout(_ pair: SplitPair) {
-        guard let left = tab(with: pair.left)?.bookmarkID, let right = tab(with: pair.right)?.bookmarkID else { return }
+        guard !pair.isGroup, let left = tab(with: pair.left)?.bookmarkID, let right = tab(with: pair.right)?.bookmarkID else { return }
         var layout = PinnedSplit(left: left, right: right)
         layout.ratio = pair.ratio
         layout.vertical = pair.vertical
@@ -1312,18 +1458,23 @@ final class TabManager {
 
     /// Puts back a split exactly as it was (undo).
     func restoreSplit(_ pair: SplitPair) {
-        guard let left = tab(with: pair.left), let right = tab(with: pair.right) else { return }
-        unsplit(left, notify: false)
-        unsplit(right, notify: false)
+        let pages = pair.ids.compactMap { tab(with: $0) }
+        guard pages.count == pair.count else { return }
+        pages.forEach { unsplit($0, notify: false) }
         splits.append(pair)
         changed.send(.structure)
         changed.send(.selection)
     }
 
+    /// The splits and groups a session saved, those whose pages all came back and may still be side by side.
     func restoreSplits(_ pairs: [SplitPair]) {
+        var placed: Set<UUID> = []
         splits = pairs.filter { pair in
-            guard let left = tab(with: pair.left), let right = tab(with: pair.right) else { return false }
-            return canSplit(left, with: right)
+            let pages = pair.ids.compactMap { tab(with: $0) }
+            guard pages.count == pair.count, placed.isDisjoint(with: pair.ids) else { return false }
+            let fits = pair.isGroup ? pages.allSatisfy { $0.bookmarkID == nil && $0.spaceID == pages[0].spaceID } : canSplit(pages[0], with: pages[1])
+            if fits { placed.formUnion(pair.ids) }
+            return fits
         }
     }
 
@@ -1359,7 +1510,7 @@ final class TabManager {
     var arrangement: Arrangement {
         let tabs = allTabs
         return Arrangement(lists: tabsBySpace.mapValues { $0.map(\.id) }, pinned: bookmarkTabs.mapValues(\.id),
-                           pairs: splits.map { [$0.left, $0.right] }, splits: splits,
+                           pairs: splits.map(\.ids), splits: splits,
                            tabs: Dictionary(tabs.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }),
                            spaces: Dictionary(tabs.map { ($0.id, $0.spaceID) }, uniquingKeysWith: { a, _ in a }), selected: selectedBySpace,
                            parents: Dictionary(tabs.compactMap { tab in tab.parentID.map { (tab.id, $0) } }, uniquingKeysWith: { a, _ in a }))
@@ -1392,8 +1543,8 @@ final class TabManager {
             tab.parentID = tab.bookmarkID == nil ? target.parents[id] : nil
         }
         for space in Array(tabsBySpace.keys) { repairTree(in: space) }
-        splits = target.splits.filter { alive[$0.left] != nil && alive[$0.right] != nil }
-            + now.splits.filter { since[$0.left] != nil || since[$0.right] != nil }
+        splits = target.splits.filter { $0.ids.allSatisfy { alive[$0] != nil } }
+            + now.splits.filter { $0.ids.contains { since[$0] != nil } }
         for (space, id) in target.selected where alive[id] != nil { selectedBySpace[space] = id }
         selectedBySpace = selectedBySpace.filter { tab(with: $0.value) != nil }
         changed.send(.structure)
@@ -1488,7 +1639,7 @@ final class TabManager {
         // Favorites and sites kept awake too, unless memory is critically short (TabSleep). Other spaces' pages sleep
         // like any tab once idle; their snapshots still show while you swipe to them.
         var selectedIDs = Set([selectedTab?.id].compactMap { $0 })
-        for id in Array(selectedIDs) { if let tab = tab(with: id), let other = partner(of: tab) { selectedIDs.insert(other.id) } }
+        for id in Array(selectedIDs) { if let tab = tab(with: id) { selectedIDs.formUnion(partners(of: tab).map(\.id)) } }
         let live = allTabs.filter { !$0.isSuspended }
         let now = Date()
         let memory = MemoryPressure.shared.level
@@ -1522,7 +1673,7 @@ final class TabManager {
         guard !tab.isClosed, !tab.isSuspended else { return false }
         return !WindowManager.shared.controllers.contains { controller in
             guard let selected = controller.tabManager.selectedTab else { return false }
-            return selected === tab || controller.tabManager.partner(of: selected) === tab
+            return selected === tab || controller.tabManager.partners(of: selected).contains { $0 === tab }
         }
     }
 
@@ -1534,7 +1685,7 @@ final class TabManager {
         guard !isPrivate, let limit = TabArchive.after.interval else { return }
         let now = Date()
         let stale = tabsBySpace.values.flatMap { $0 }.filter {
-            $0.bookmarkID == nil && !onScreen.contains($0.id) && partner(of: $0) == nil && !$0.isPlayingAudio && !$0.isInUse && !$0.notifiesUser
+            $0.bookmarkID == nil && !onScreen.contains($0.id) && split(for: $0) == nil && !$0.isPlayingAudio && !$0.isInUse && !$0.notifiesUser
                 && $0.pageState?.hasTypedText != true && now.timeIntervalSince($0.lastActivated) > limit && $0.url != nil
         }
         guard !stale.isEmpty else { return }

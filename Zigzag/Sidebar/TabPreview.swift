@@ -12,8 +12,8 @@ final class TabPreviewView: FloatingPanelView {
     private let title2 = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let detail2 = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
     private let imageClip = NSView()
-    /// How a split's two pages share the picture; nil for one page.
-    private var split: (ratio: CGFloat, vertical: Bool)?
+    /// How a split's or tile group's pages share the picture; nil for one page.
+    private var shape: TileShape?
     static let footerHeight = Tokens.Metric.previewCaptionHeight
     /// From the panel's edge to the picture; the picture's corners are the panel's less this, so the two run together.
     private static let inset = Tokens.Space.x1
@@ -33,9 +33,11 @@ final class TabPreviewView: FloatingPanelView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// A page, or with `partner`, a split's two pages, sharing the picture as `split` says.
-    func show(tab: Tab?, bookmark: Bookmark?, partner: Tab? = nil, split: (ratio: CGFloat, vertical: Bool)? = nil) {
-        self.split = partner == nil ? nil : split ?? (0.5, false)
+    /// A page, or with `partners`, a split's or tile group's pages, sharing the picture as `shape` says. A split's
+    /// two each have their title under their side; a group's first page names the card.
+    func show(tab: Tab?, bookmark: Bookmark?, partners: [Tab] = [], shape: TileShape? = nil) {
+        self.shape = partners.isEmpty ? nil : shape.flatMap { $0.regions.count == partners.count + 1 ? $0 : nil }
+        let partner = partners.count == 1 && self.shape != nil ? partners[0] : nil
         title.stringValue = bookmark?.title ?? tab?.displayTitle ?? ""
         let url = tab?.url ?? bookmark?.url
         detail.stringValue = url.map(CommandRanker.displayURL) ?? ""
@@ -44,15 +46,16 @@ final class TabPreviewView: FloatingPanelView {
         title2.isHidden = partner == nil
         detail2.isHidden = partner == nil
         placeholder.image = tab?.displayIcon ?? bookmark?.displayIcon
-        setImages(tab?.snapshot, partner?.snapshot)
+        setImages([tab?.snapshot] + partners.map(\.snapshot))
         needsLayout = true
     }
 
-    /// The first page's picture, and with a split, the second's.
-    func setImages(_ first: NSImage?, _ second: NSImage?) {
-        let second = split == nil ? nil : second
-        picture.show(first, second, split: split)
-        let empty = first == nil && second == nil
+    /// Each page's picture, in order.
+    func setImages(_ pictures: [NSImage?]) {
+        let count = shape?.regions.count ?? 1
+        let shown = Array(pictures.prefix(count))
+        picture.show(shown, shape: shape)
+        let empty = shown.allSatisfy { $0 == nil }
         placeholder.isHidden = !empty
         Tokens.Motion.withoutAnimation { picture.layer.isHidden = empty }
         refreshColors()
@@ -62,7 +65,7 @@ final class TabPreviewView: FloatingPanelView {
     /// switcher's cards have.
     private func refreshColors() {
         Tokens.Motion.withoutAnimation {
-            picture.divider.backgroundColor = cgColor(Tokens.Color.cardEdge)
+            picture.dividerColor = cgColor(Tokens.Color.cardEdge)
             imageClip.layer?.backgroundColor = cgColor(placeholder.isHidden ? Tokens.Color.cardBackground : Brand.Theme.for(self).wash)
         }
     }
@@ -89,8 +92,9 @@ final class TabPreviewView: FloatingPanelView {
         let titleH = title.lineHeight, detailH = detail.lineHeight
         let top = imageClip.frame.maxY + (footer - titleH - detailH) / 2
         // One title, or with a split, each page's under its own side; stacked pages share the row half and half.
-        let share = split.map { $0.vertical ? 0.5 : $0.ratio } ?? 1
-        let firstWidth = split == nil ? bounds.width : round(imageClip.frame.minX + imageClip.frame.width * share)
+        let pair = title2.isHidden ? nil : shape
+        let share = pair.map { $0.isStacked ? 0.5 : $0.column } ?? 1
+        let firstWidth = pair == nil ? bounds.width : round(imageClip.frame.minX + imageClip.frame.width * share)
         title.frame = NSRect(x: textX, y: top, width: firstWidth - textX * 2, height: titleH)
         detail.frame = NSRect(x: textX, y: title.frame.maxY, width: firstWidth - textX * 2, height: detailH)
         let secondX = firstWidth + textX, secondWidth = max(0, bounds.width - firstWidth - textX * 2)
@@ -109,6 +113,7 @@ final class TabPreviewController {
     private weak var tab: Tab?
     private weak var row: NSView?
     private var snapshotTokens: [SignalToken] = []
+    private struct WeakPage { weak var tab: Tab? }
     /// Hover can end without a word: the row closes under the pointer, or you switch apps. This checks while a
     /// preview is up and takes it away once the pointer has really left.
     private var watchTimer: Timer?
@@ -131,7 +136,7 @@ final class TabPreviewController {
         hideWork?.cancel()
         // No preview for the page you're already looking at, or the split it's in.
         if let tab, let selected = controller?.tabManager.selectedTab,
-           tab === selected || controller?.tabManager.partner(of: tab) === selected {
+           controller?.tabManager.panes(of: tab).contains(where: { $0 === selected }) == true {
             scheduleHide(immediately: true)
             return
         }
@@ -162,11 +167,13 @@ final class TabPreviewController {
         // A split's row is one card: its first page, then the other, laid out as they share the window.
         let manager = controller.tabManager
         let pair = tab.flatMap { manager.split(for: $0) }
-        let first = pair.flatMap { manager.tab(with: $0.left) } ?? tab
-        let partner = pair.flatMap { manager.tab(with: $0.right) }
-        let pages = [first, partner].compactMap { $0 }
+        let grouped = tab.map { manager.panes(of: $0) } ?? []
+        let pages = pair != nil && grouped.count == pair?.count ? grouped : [tab].compactMap { $0 }
+        let first = pages.first ?? tab
+        let partners = Array(pages.dropFirst())
+        let refs = pages.map { WeakPage(tab: $0) }
         self.tab = first
-        panel.show(tab: first, bookmark: bookmark, partner: partner, split: pair.map { (CGFloat($0.ratio), $0.vertical) })
+        panel.show(tab: first, bookmark: bookmark, partners: partners, shape: pages.count > 1 ? pair?.shape : nil)
         if watchTimer == nil {
             watchTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.checkStillHovering() }
@@ -174,9 +181,9 @@ final class TabPreviewController {
             watchTimer?.tolerance = 0.1
         }
         snapshotTokens = pages.map { page in
-            page.changed.observe { [weak self, weak first, weak partner] change in
+            page.changed.observe { [weak self, weak first] change in
                 guard change == .snapshot, let self, let first, first === self.tab else { return }
-                self.panel?.setImages(first.snapshot, partner?.snapshot)
+                self.panel?.setImages(refs.map { $0.tab?.snapshot })
             }
         }
 
@@ -205,9 +212,9 @@ final class TabPreviewController {
         if !live.isEmpty {
             // In memory while you watch; written to disk once, when the preview goes.
             live.forEach { $0.captureSnapshot(keep: false) }
-            refreshTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak first, weak partner] _ in
+            refreshTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
                 MainActor.assumeIsolated {
-                    [first, partner].forEach { if let page = $0, !page.isSuspended { page.captureSnapshot(keep: false) } }
+                    refs.forEach { if let page = $0.tab, !page.isSuspended { page.captureSnapshot(keep: false) } }
                 }
             }
             // Roughly once a second is plenty; slack lets the system batch the wake-ups.

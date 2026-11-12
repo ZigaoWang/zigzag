@@ -415,7 +415,7 @@ enum DebugBridge {
         }
         if name == "relayout" {
             // relayout: every browser window lays its pages out again, as a resize would, without coming forward.
-            WindowManager.shared.controllers.forEach { $0.root.needsLayout = true; $0.root.card.needsLayout = true; $0.root.secondCard.needsLayout = true }
+            WindowManager.shared.controllers.forEach { $0.root.needsLayout = true; $0.root.paneCards.forEach { $0.needsLayout = true } }
             return
         }
         guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
@@ -732,6 +732,27 @@ enum DebugBridge {
             if let tab = controller.tabManager.selectedTab, let n = Int(arg), list.indices.contains(n), list[n] !== tab {
                 controller.tabManager.makeSplit(tab, with: list[n])
             }
+        case "tile":
+            // tile <n> <region>: the tab at this sidebar position into the shown page's split or tile group, where a
+            // drop on that region of the page puts it (#160): left, right, top, bottom, topLeft, topRight, bottomLeft, bottomRight.
+            let parts = arg.split(separator: " ").map(String.init)
+            let list = controller.tabManager.navigableTabs
+            if parts.count == 2, let n = Int(parts[0]), list.indices.contains(n), let region = TileRegion(rawValue: parts[1]),
+               let current = controller.tabManager.selectedTab, list[n] !== current,
+               let placed = TileShape.placing(region, beside: controller.tabManager.split(for: current)?.shape.regions ?? []) {
+                controller.tabManager.tile(list[n], beside: current, .place(region: region, regions: placed))
+            }
+        case "tilehint":
+            // tilehint <x> <y>: the hint a tab dragged to that point of the page (shares of its width and height) shows;
+            // tilehint alone puts it away.
+            let parts = arg.split(separator: " ").compactMap { Double($0) }
+            if parts.count == 2, let current = controller.tabManager.selectedTab {
+                let area = controller.root.cardFrame
+                let point = NSPoint(x: area.minX + area.width * parts[0], y: area.minY + area.height * parts[1])
+                controller.showDropHint(at: controller.root.convert(point, to: nil), beside: current)
+            } else {
+                controller.root.splitDropHint.show(nil)
+            }
         case "unsplit": controller.closeSplitView(nil)
         // splitorient: side by side to stacked or back, as the split's own button does.
         case "splitorient": controller.toggleSplitOrientation(nil)
@@ -822,7 +843,7 @@ enum DebugBridge {
         case "state":
             // state <path>: each space's tabs and pinned tabs, the favorites, splits shown as "A|B".
             let m = controller.tabManager
-            func pair(_ tab: Tab) -> String { ([tab] + (m.partner(of: tab).map { [$0] } ?? [])).map(\.displayTitle).joined(separator: "|") }
+            func pair(_ tab: Tab) -> String { m.panes(of: tab).map(\.displayTitle).joined(separator: "|") }
             func pinned(_ ids: [UUID]) -> [String] {
                 var out: [String] = [], seen = Set<UUID>()
                 for id in ids where !seen.contains(id) {
@@ -836,7 +857,7 @@ enum DebugBridge {
                 var seen = Set<UUID>()
                 let tabs = m.tabs(in: space.id).compactMap { tab -> String? in
                     if seen.contains(tab.id) { return nil }
-                    seen.insert(tab.id); if let p = m.partner(of: tab) { seen.insert(p.id) }
+                    seen.insert(tab.id); m.partners(of: tab).forEach { seen.insert($0.id) }
                     return pair(tab)
                 }
                 return ["name": space.name, "tabs": tabs, "pinned": pinned(space.bookmarks.map(\.id)),
@@ -1727,7 +1748,7 @@ enum DebugBridge {
         case "favorite":
             if let tab = controller.tabManager.selectedTab { controller.tabManager.favoriteTab(tab) }
         case "pagecorner":
-            if let r = Double(arg) { PageCardView.attachedRadius = r; controller.root.card.needsLayout = true; controller.root.secondCard.needsLayout = true }
+            if let r = Double(arg) { PageCardView.attachedRadius = r; controller.root.paneCards.forEach { $0.needsLayout = true } }
         case "spacedepth":
             // spacedepth <0-1>: the current space's shade, the window's mode following it.
             if let depth = Double(arg) { Library.shared.setBrightness(depth, for: controller.tabManager.currentSpaceID) }

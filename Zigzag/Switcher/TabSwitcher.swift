@@ -2,15 +2,16 @@ import AppKit
 
 /// A page as a picture: its snapshot filling the frame, scaled to cover it and pinned to its top left, as a page is
 /// read, never letterboxed. A split shows both pages where they sit on screen, side by side or stacked, at the
-/// split's own ratio. Cards draw one, and so does the page flying into or out of its card in desk view.
+/// split's own ratio, and a tile group its three or four (#160). Cards draw one, and so does the page flying into or
+/// out of its card in desk view.
 final class PagePicture {
     /// What goes on screen. Its owner places it and sizes it with `layout(size:)`.
     let layer = CALayer()
-    private let panes = [CALayer(), CALayer()]
-    private let images = [CALayer(), CALayer()]
-    /// The hairline between a split's pages.
-    let divider = CALayer()
-    private var split: (ratio: CGFloat, vertical: Bool)?
+    private let panes = (0..<TileShape.maxPanes).map { _ in CALayer() }
+    private let images = (0..<TileShape.maxPanes).map { _ in CALayer() }
+    /// The hairlines between the pages: between the columns, and between the rows.
+    private let dividers = [CALayer(), CALayer()]
+    private var shape: TileShape?
 
     init() {
         for (pane, image) in zip(panes, images) {
@@ -18,15 +19,26 @@ final class PagePicture {
             pane.addSublayer(image)
             layer.addSublayer(pane)
         }
-        layer.addSublayer(divider)
+        dividers.forEach { layer.addSublayer($0) }
+    }
+
+    /// The hairlines' color.
+    var dividerColor: CGColor? {
+        get { dividers[0].backgroundColor }
+        set { dividers.forEach { $0.backgroundColor = newValue } }
     }
 
     /// The first page's picture, and with a split, the second's and how the two share the frame.
     func show(_ first: NSImage?, _ second: NSImage?, split: (ratio: CGFloat, vertical: Bool)?) {
-        self.split = split
+        show([first, second], shape: split.map { TileShape.pair(ratio: $0.ratio, vertical: $0.vertical) })
+    }
+
+    /// Each page's picture, in order, laid out as `shape` (nil: the first one alone).
+    func show(_ pictures: [NSImage?], shape: TileShape?) {
+        self.shape = shape
+        let count = shape?.regions.count ?? 1
         Tokens.Motion.withoutAnimation {
-            images[0].contents = first
-            images[1].contents = split == nil ? nil : second
+            for (i, image) in images.enumerated() { image.contents = i < count && i < pictures.count ? pictures[i] : nil }
         }
         layout(size: layer.bounds.size)
     }
@@ -36,18 +48,18 @@ final class PagePicture {
         Tokens.Motion.withoutAnimation {
             layer.bounds.size = size
             let b = layer.bounds
-            let panes = BrowserRootView.paneFrames(in: b, ratio: split?.ratio, vertical: split?.vertical ?? false, gap: 1)
+            let frames = shape?.frames(in: b, gap: 1) ?? [b]
             // Worked out top-down, as the window lays its panes out; a layer's y runs up.
             func up(_ r: CGRect) -> CGRect { CGRect(x: r.minX, y: b.height - r.maxY, width: r.width, height: r.height) }
-            fill(0, in: up(panes.left))
-            if let right = panes.right {
-                fill(1, in: up(right))
-                divider.frame = up(split?.vertical == true
-                    ? CGRect(x: b.minX, y: panes.left.maxY, width: b.width, height: right.minY - panes.left.maxY)
-                    : CGRect(x: panes.left.maxX, y: b.minY, width: right.minX - panes.left.maxX, height: b.height))
+            for i in panes.indices {
+                panes[i].isHidden = i >= frames.count
+                if i < frames.count { fill(i, in: up(frames[i])) }
             }
-            self.panes[1].isHidden = panes.right == nil
-            divider.isHidden = panes.right == nil
+            let lines = shape?.dividers(in: b, gap: 1, slop: 0)
+            for (line, frame) in zip(dividers, [lines?.column, lines?.row]) {
+                line.isHidden = frame == nil
+                if let frame { line.frame = up(frame) }
+            }
         }
     }
 
@@ -91,10 +103,16 @@ final class TabThumbnailView: InteractiveView {
     private let siteName = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     static let titleHeight = Tokens.Space.x8
     private(set) weak var tab: Tab?
-    /// The page beside it in split view, if any.
-    private(set) weak var partner: Tab?
-    /// How a split shares the page area: the first page's share, and whether the two are stacked.
-    private(set) var split: (ratio: CGFloat, vertical: Bool)?
+    /// The pages beside it in split view or a tile group, in order.
+    private var partnerRefs: [WeakTab] = []
+    var partners: [Tab] { partnerRefs.compactMap(\.tab) }
+    /// The other page of a split of two, whose icon and title go under its half; nil alone or in a tile group.
+    var partner: Tab? { partnerRefs.count == 1 ? partnerRefs[0].tab : nil }
+    /// Every page on the card: its own first.
+    var pages: [Tab] { ([tab] + partnerRefs.map(\.tab)).compactMap { $0 } }
+    /// How the pages share the page area; nil for one page.
+    private(set) var shape: TileShape?
+    private struct WeakTab { weak var tab: Tab? }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -137,9 +155,22 @@ final class TabThumbnailView: InteractiveView {
     required init?(coder: NSCoder) { fatalError() }
 
     func configure(_ tab: Tab, partner: Tab? = nil, split: (ratio: CGFloat, vertical: Bool)? = nil) {
+        configure(tab, partners: partner.map { [$0] } ?? [], shape: split.map { TileShape.pair(ratio: $0.ratio, vertical: $0.vertical) })
+    }
+
+    /// A page, or the pages of its split or tile group (its own first), sharing the picture as `shape` says.
+    func configure(_ tab: Tab, partners: [Tab], shape: TileShape?) {
         self.tab = tab
-        self.partner = partner
-        self.split = partner == nil ? nil : split ?? (0.5, false)
+        // A shape for as many pages as there are, or the page alone.
+        let shape = shape ?? (partners.count == 1 ? TileShape(regions: [.left, .right]) : nil)
+        if let shape, shape.regions.count == partners.count + 1 {
+            self.shape = shape
+            partnerRefs = partners.map { WeakTab(tab: $0) }
+        } else {
+            self.shape = nil
+            partnerRefs = []
+        }
+        let partner = self.partner
         placeholder.image = tab.displayIcon
         // A web page by its site; Zigzag's own pages (History) and files by their title, never a bare "history".
         if let url = tab.url, ["http", "https"].contains(url.scheme), let host = url.host() {
@@ -151,7 +182,7 @@ final class TabThumbnailView: InteractiveView {
         title.stringValue = tab.displayTitle
         icon2.image = partner?.displayIcon
         title2.stringValue = partner?.displayTitle ?? ""
-        setAccessibilityLabel(partner.map { Words.list([tab.displayTitle, $0.displayTitle]) } ?? tab.displayTitle)
+        setAccessibilityLabel(pages.count > 1 ? Words.list(pages.map(\.displayTitle)) : tab.displayTitle)
         refreshImage()
         refreshAudio()
         needsLayout = true
@@ -159,7 +190,7 @@ final class TabThumbnailView: InteractiveView {
 
     /// The page with sound on (or muted), the first one's before its split partner's.
     private var audioTab: Tab? {
-        [tab, partner].compactMap { $0 }.first { $0.isPlayingAudio || $0.isMuted }
+        pages.first { $0.isPlayingAudio || $0.isMuted }
     }
 
     private func refreshAudio() {
@@ -171,8 +202,8 @@ final class TabThumbnailView: InteractiveView {
 
     func refreshImage() {
         guard let tab else { return }
-        picture.show(Self.isBlank(tab.snapshot) ? nil : tab.snapshot, partner?.snapshot, split: split)
-        let showsPage = !Self.isBlank(tab.snapshot) || partner != nil
+        picture.show([Self.isBlank(tab.snapshot) ? nil : tab.snapshot] + partners.map(\.snapshot), shape: shape)
+        let showsPage = !Self.isBlank(tab.snapshot) || shape != nil
         placeholder.isHidden = showsPage
         siteName.isHidden = showsPage
         refreshColors()
@@ -221,11 +252,15 @@ final class TabThumbnailView: InteractiveView {
 
     /// Which page a click landed on: with a split, the pane under the pointer.
     func tab(at event: NSEvent) -> Tab? {
-        guard let partner, let split else { return tab }
+        guard let shape else { return tab }
         let point = imageClip.convert(event.locationInWindow, from: nil)
-        // The clip isn't flipped: the top pane is the higher one.
-        let second = split.vertical ? point.y < imageClip.bounds.height * (1 - split.ratio) : point.x > imageClip.bounds.width * split.ratio
-        return second ? partner : tab
+        // The clip isn't flipped: the panes are worked out top-down.
+        let b = imageClip.bounds
+        let down = CGPoint(x: point.x, y: b.height - point.y)
+        let frames = shape.frames(in: b, gap: 1)
+        let pages = self.pages
+        guard let index = frames.firstIndex(where: { $0.insetBy(dx: -1, dy: -1).contains(down) }), pages.indices.contains(index) else { return tab }
+        return pages[index]
     }
 
     /// Space around the picture, so the card can surround it like Command+Tab. The card's corners are the
@@ -259,7 +294,7 @@ final class TabThumbnailView: InteractiveView {
         let audio = showsTitle ? audioTab : nil
         audioButton.isHidden = audio == nil
         if partner != nil {
-            let share = split?.vertical == false ? split?.ratio ?? 0.5 : 0.5
+            let share = shape.map { $0.isStacked ? 0.5 : $0.column } ?? 0.5
             let first = round(imageClip.frame.width * share)
             place(icon, title, in: NSRect(x: imageClip.frame.minX, y: imageClip.frame.maxY, width: first, height: titleArea), audio: audio === tab)
             place(icon2, title2, in: NSRect(x: imageClip.frame.minX + first, y: imageClip.frame.maxY, width: imageClip.frame.width - first, height: titleArea),
@@ -303,7 +338,7 @@ final class TabThumbnailView: InteractiveView {
             let empty = !placeholder.isHidden
             imageClip.layer?.backgroundColor = cgColor(empty ? Brand.Theme.for(self).wash : Tokens.Color.cardBackground)
             imageClip.layer?.borderColor = cgColor(Tokens.Color.cardEdge)
-            picture.divider.backgroundColor = cgColor(Tokens.Color.cardEdge)
+            picture.dividerColor = cgColor(Tokens.Color.cardEdge)
             let selected = isSelected && showsRing
             ring.borderColor = cgColor(selected ? Tokens.Color.accent : Tokens.Color.accent.withAlphaComponent(0.6))
             ring.borderWidth = selected ? 2.5 : 2
@@ -413,7 +448,7 @@ final class TabSwitcher {
         var seen: Set<UUID> = []
         tabs = Array(manager.recentTabs.filter { tab in
             defer { seen.insert(tab.id) }
-            return manager.partner(of: tab).map { !seen.contains($0.id) } ?? true
+            return !manager.partners(of: tab).contains { seen.contains($0.id) }
         }.prefix(9))
         guard tabs.count > 1 else { return }
         controller.tabManager.selectedTab?.captureSnapshot()
@@ -447,9 +482,9 @@ final class TabSwitcher {
         let width = pad * 2 + CGFloat(across) * thumbWidth + CGFloat(across - 1) * gap
         thumbs = tabs.enumerated().map { i, tab in
             let thumb = TabThumbnailView()
-            if let pair = controller.tabManager.split(for: tab), let left = controller.tabManager.tab(with: pair.left),
-               let right = controller.tabManager.tab(with: pair.right) {
-                thumb.configure(left, partner: right, split: (CGFloat(pair.ratio), pair.vertical))
+            let pages = controller.tabManager.panes(of: tab)
+            if let pair = controller.tabManager.split(for: tab), pages.count == pair.count {
+                thumb.configure(pages[0], partners: Array(pages.dropFirst()), shape: pair.shape)
             } else {
                 thumb.configure(tab)
             }

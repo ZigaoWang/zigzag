@@ -244,6 +244,7 @@
 		B717C1AE92C7BF70BEBD1317 /* avoidxray.png in Resources */ = {isa = PBXBuildFile; fileRef = EE467D41C2D9D9428EE46A32 /* avoidxray.png */; };
 		B739E540C2AEA048EEC341DE /* LinkStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672B7AF38828D9E9738B29FD /* LinkStatus.swift */; };
 		B7FC60AE25ED52099E5FDF43 /* WebSocketBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0737418196BB38BD7D36DDC5 /* WebSocketBridge.swift */; };
+		B8333FBBDA3A6AD9632258A0 /* TileLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3D2DE7666043EE722FAEF2 /* TileLayout.swift */; };
 		B9BAF8A4CC1907F52C65274B /* Readability-LICENSE.md in Resources */ = {isa = PBXBuildFile; fileRef = 76DB536661E9E732536910C2 /* Readability-LICENSE.md */; };
 		BEC7556625226B96D886206F /* SafariImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CBCCC0F5050F641CEAB31 /* SafariImporter.swift */; };
 		C0B6755DFC601C9C358E67DA /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F70CA73E1EF5C8460E9286 /* TabManager.swift */; };
@@ -467,6 +468,7 @@
 		6CE05E70848504F5FE346B61 /* ZigzagRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ZigzagRelease.entitlements; sourceTree = "<group>"; };
 		6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
 		6E9E28B1061F9D52B96C814E /* ZigzagTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZigzagTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6F3D2DE7666043EE722FAEF2 /* TileLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileLayout.swift; sourceTree = "<group>"; };
 		7069B71082962459B24D179F /* ChromiumExtensionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromiumExtensionsTests.swift; sourceTree = "<group>"; };
 		71C449E3F3ECA4A28D2BCAA7 /* bridge.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = bridge.js; sourceTree = "<group>"; };
 		7520635385AA4E5E5C5AC9FB /* OrionImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrionImporter.swift; sourceTree = "<group>"; };
@@ -1029,6 +1031,7 @@
 				79F70CA73E1EF5C8460E9286 /* TabManager.swift */,
 				7C84C04C118E8E4CC241C3B6 /* TabSleep.swift */,
 				EFF4F53349180E96D4253BD3 /* TabTree.swift */,
+				6F3D2DE7666043EE722FAEF2 /* TileLayout.swift */,
 			);
 			path = Tabs;
 			sourceTree = "<group>";
@@ -1543,6 +1546,7 @@
 				9FEEA537DE55BC1099D8DB0D /* TabStateCache.swift in Sources */,
 				C6692ED12FCC1152B3774192 /* TabSwitcher.swift in Sources */,
 				CCC088113C422B3314562B78 /* TabTree.swift in Sources */,
+				B8333FBBDA3A6AD9632258A0 /* TileLayout.swift in Sources */,
 				66E5020894B420AEB3943EAC /* Tokens.swift in Sources */,
 				E3CB22F1889EA1CC95A8B978 /* TopBarView.swift in Sources */,
 				51BD0DD0DD4AB16FB1D97CA8 /* TourDemo.swift in Sources */,

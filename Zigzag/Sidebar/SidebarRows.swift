@@ -284,6 +284,36 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private let partnerIcon = FaviconView()
     private let partnerTitle = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
     private let divider = ColorView(color: Tokens.Color.separator)
+    /// A tile group's third and fourth pages, after the partner (#160): each its own part of the row, as the
+    /// partner's half is, with its icon, its title while there's room for it, and its speaker.
+    private(set) var extraPartners: [Tab] = []
+    private var extraTokens: [SignalToken] = []
+    private typealias ExtraViews = (icon: FaviconView, title: Label, divider: ColorView, audio: IconButton)
+    /// Made the first time the row shows a group of more than two.
+    private var extraViews: [ExtraViews]?
+    private var extras: [ExtraViews] {
+        if let extraViews { return extraViews }
+        let made: [ExtraViews] = (0..<2).map { i in
+            let icon = FaviconView(), title = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
+            let divider = ColorView(color: Tokens.Color.separator)
+            let audio = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
+            audio.onClick = { [weak self] _ in
+                guard let self, self.extraPartners.indices.contains(i) else { return }
+                let page = self.extraPartners[i]
+                page.setMuted(!page.isMuted)
+            }
+            [icon, title, divider].forEach { $0.isHidden = true; addSubview($0, positioned: .below, relativeTo: closeButton) }
+            audio.isHidden = true
+            addSubview(audio, positioned: .below, relativeTo: closeButton)
+            return (icon, title, divider, audio)
+        }
+        extraViews = made
+        return made
+    }
+    /// Every page the row shows, its own first, in the group's order.
+    var pages: [Tab] { ([tab, partner] + extraPartners).compactMap { $0 } }
+    /// How many parts the row is split into: one, two halves, or a tile group's three or four.
+    private var segmentCount: Int { isSplit ? 2 + extraPartners.count : 1 }
     /// While another tab is dragged over this row's right half: where it would open.
     private let dropHalf = ColorView()
     /// 0 = would open on the left, 1 = on the right, nil = not a drop target.
@@ -343,6 +373,39 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         refreshPartner()
     }
 
+    /// A split's other page or a tile group's other pages, in order: the first is the partner, any more follow it.
+    func configure(partners: [Tab]) {
+        configure(partner: partners.first)
+        let more = Array(partners.dropFirst().prefix(2))
+        guard more.count != extraPartners.count || zip(more, extraPartners).contains(where: { $0 !== $1 }) else { return }
+        extraPartners = more
+        extraTokens = more.map { page in
+            page.changed.observe { [weak self] change in
+                if change == .title || change == .favicon || change == .loading || change == .url || change == .audio { self?.refreshExtras() }
+            }
+        }
+        refreshExtras()
+    }
+
+    private func refreshExtras() {
+        guard !extraPartners.isEmpty || extraViews != nil else { return }
+        for (i, views) in extras.enumerated() {
+            let page = extraPartners.indices.contains(i) ? extraPartners[i] : nil
+            views.icon.image = page?.displayIcon
+            views.icon.isLoading = (page?.isLoading ?? false) && !(page?.isSuspended ?? true)
+            views.icon.isAsleep = page?.isAsleep == true
+            views.title.stringValue = page?.displayTitle ?? ""
+            let sound = page?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
+            if views.audio.symbol != sound { views.audio.symbol = sound }
+            views.audio.toolTip = page?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.") : String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
+            [views.icon, views.title, views.divider].forEach { $0.isHidden = page == nil }
+        }
+        refreshAccessories()
+        refreshAccessibilityLabel()
+        refreshTitleColor()
+        needsLayout = true
+    }
+
     func configure(pinnedPartner title: String?, icon: NSImage?, unloaded: Bool) {
         // Not a pinned split, and wasn't: nothing to redo.
         guard title != nil || pinnedPartner != nil else { return }
@@ -368,7 +431,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     /// A split row reads out both of its pages.
     private func refreshAccessibilityLabel() {
-        setAccessibilityLabel(!isSplit ? title.stringValue : String(localized: "\(title.stringValue), split with \(partnerTitle.stringValue)", comment: "Accessibility label of a split view's row in the sidebar: the two pages' titles."))
+        let others = extraPartners.isEmpty ? partnerTitle.stringValue : Words.list([partnerTitle.stringValue] + extraPartners.map(\.displayTitle))
+        setAccessibilityLabel(!isSplit ? title.stringValue : String(localized: "\(title.stringValue), split with \(others)", comment: "Accessibility label of a split view's row in the sidebar: the two pages' titles."))
         // What VoiceOver says after the name: the tab you're on, and whether either page is playing or muted.
         func sound(_ tab: Tab?, _ name: String?) -> String? {
             if tab?.isMuted == true {
@@ -380,17 +444,43 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
                 ?? String(localized: "playing audio", comment: "Spoken by VoiceOver after a tab row's name: the tab plays sound.")
         }
         let split = partner != nil
-        let state = [isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
+        let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
+            + extraPartners.map { sound($0, $0.displayTitle) })
             .compactMap { $0 }.joined(separator: String(localized: "accessibility.state-separator", defaultValue: ", ", comment: "Separates the states VoiceOver reads after a tab row's name, like “current tab, playing audio”."))
         setAccessibilityValue(state.isEmpty ? nil : state)
         setAccessibilitySelected(isSelected)
     }
 
-    /// Which half of a split row a point (in this view) falls in.
-    /// Which page the point is over: 0 for this row's own, 1 for its partner.
+    /// Which page the point is over: 0 for this row's own, 1 for its partner, 2 and 3 for a tile group's others.
     func half(at point: NSPoint) -> Int {
-        isSplit && (point.x > bounds.midX) != partnerLeads ? 1 : 0
+        guard extraPartners.isEmpty else {
+            let count = segmentCount
+            return min(count - 1, max(0, Int(point.x / max(1, bounds.width / CGFloat(count)))))
+        }
+        return isSplit && (point.x > bounds.midX) != partnerLeads ? 1 : 0
     }
+
+    /// The page the point is over.
+    func page(at point: NSPoint) -> Tab? {
+        let pages = [tab, partner] + extraPartners.map { Optional($0) }
+        let index = half(at: point)
+        return pages.indices.contains(index) ? pages[index] ?? tab : tab
+    }
+
+    /// A row split into `count` parts from `start` to `end`, each `gap` short of the next; with two, the halves meet in
+    /// the middle of the whole row (`mid`), as a split's always have.
+    static func segments(count: Int, start: CGFloat, end: CGFloat, mid: CGFloat, gap: CGFloat) -> [(start: CGFloat, end: CGFloat)] {
+        guard count > 1 else { return [(start, end)] }
+        if count == 2 { return [(start, mid - gap), (mid, end)] }
+        let width = (end - start) / CGFloat(count)
+        return (0..<count).map { i in
+            let from = start + CGFloat(i) * width
+            return (round(from), round(i == count - 1 ? end : from + width - gap))
+        }
+    }
+
+    /// Whether a part this wide has room for its title beside its icon, or shows the icon alone.
+    static func segmentShowsTitle(width: CGFloat) -> Bool { width >= 58 }
 
     required init?(coder: NSCoder) { fatalError() }
 
@@ -474,6 +564,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         title.textColor = ink
         // One weight always: selection shows in the fill, never by text getting wider and shifting.
         partnerTitle.textColor = ink
+        extraViews?.forEach { $0.title.textColor = ink }
         dropHalf.color = Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha)
         dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
     }
@@ -487,6 +578,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             : isBookmark ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.") : String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         audioButton.isHidden = !showsAudio || renameField != nil
         partnerAudioButton.isHidden = !isSplit || !partnerShowsAudio || renameField != nil
+        for (i, views) in (extraViews ?? []).enumerated() {
+            let page = extraPartners.indices.contains(i) ? extraPartners[i] : nil
+            views.audio.isHidden = page.map { !($0.isPlayingAudio || $0.isMuted) } ?? true || renameField != nil
+        }
         if nestedTabs != nil || renameField != nil { nestedButton.isHidden = !showsNested }
         // Quiet at rest as a folder's is, clear under the pointer or while the tabs are folded away.
         if nestedTabs != nil { nestedButton.alphaValue = isHovered || nestedTabs == .collapsed ? 1 : 0.6 }
@@ -582,6 +677,22 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             title.frame = NSRect(x: x, y: titleY, width: max(0, textEnd + Label.inset - x), height: titleH)
         }
         let leadEnd = mid - edge, trailEnd = end
+        if !extraPartners.isEmpty, let views = extraViews {
+            // A tile group: a part for each page, in its order, a hairline between; a title only where it has room.
+            let parts = Self.segments(count: segmentCount, start: 0, end: trailEnd, mid: mid, gap: edge)
+            let lines = [divider] + views.map(\.divider)
+            let pieces: [(NSView, NSView, IconButton)] = [(icon, title, audioButton), (partnerIcon, partnerTitle, partnerAudioButton)]
+                + views.map { ($0.icon, $0.title, $0.audio) }
+            // Every part the same: titles in all of them or in none.
+            let titles = parts.first.map { Self.segmentShowsTitle(width: $0.end - $0.start) } ?? false
+            for (i, part) in parts.enumerated() where i < pieces.count {
+                let (icon, title, audio) = pieces[i]
+                place(icon: icon, title: title, audio: audio, from: part.start, to: part.end)
+                if !titles { title.frame.size.width = 0 }
+                if i > 0 { lines[i - 1].frame = NSRect(x: part.start, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4) }
+            }
+            return
+        }
         if partnerLeads {
             place(icon: partnerIcon, title: partnerTitle, audio: partnerAudioButton, from: 0, to: leadEnd)
             place(icon: icon, title: title, audio: audioButton, from: mid, to: trailEnd)

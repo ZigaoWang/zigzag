@@ -112,7 +112,7 @@ final class EnergyWatch {
         guard controller.window?.isVisible == true, controller.window?.occlusionState.contains(.visible) == true else { return false }
         let manager = controller.tabManager
         guard let front = manager.selectedTab else { return false }
-        return front === tab || manager.partner(of: front) === tab
+        return manager.panes(of: front).contains { $0 === tab }
     }
 
     /// The page's process, if WebKit still says (it's not public API, so asked carefully).
@@ -142,7 +142,7 @@ final class EnergyWatch {
             // Each window's own page (and its split partner) never sleeps here, even in a covered or minimized window:
             // it would only load again at once, losing what it was doing.
             let selected = owner.tabManager.selectedTab
-            let kept = [selected, selected.flatMap(owner.tabManager.partner(of:))].compactMap { $0 }
+            let kept = selected.map { owner.tabManager.panes(of: $0) } ?? []
             for tab in owner.tabManager.allTabs where tab.webView.flatMap(Self.processID) == pid && !Self.isOnScreen(tab, in: owner)
                 && !kept.contains(where: { $0 === tab }) {
                 let mustStay = spared.contains(tab.id)
