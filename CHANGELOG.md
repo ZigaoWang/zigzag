@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Settings › Developer lists the sites you develop on, `localhost` and `127.0.0.1` to begin with, and Add Site… adds your own. A tab on one of them has a small hammer on its row in the sidebar, so the site you're building is told from the live one at a glance. Turn Developer tools off there and nothing of it shows. ([#141](https://github.com/ZigaoWang/zigzag/issues/141))
+
 ### Fixed
 - A zoomed page of a split goes back in its place when the pages swap, move or change layout, as it does when one comes or goes. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
 - With the address bar above the page and a split stacked, zooming the top page no longer brings back the bar's own buttons and address beside it. ([#160](https://github.com/ZigaoWang/zigzag/issues/160))
