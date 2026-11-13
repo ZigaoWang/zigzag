@@ -224,7 +224,7 @@ final class SpaceSwitcher {
         rows.forEach { $0.removeFromSuperview() }
         rows = all.enumerated().map { i, space in
             let row = SpaceChoiceRow()
-            row.configure(space, position: i + 1, profileName: Library.shared.directory.shownName(ofSpace: space.id))
+            row.configure(space, position: i + 1, profileName: Library.shared.directory.shownName(ofSpace: space.id, spaceName: space.name))
             row.isCurrent = i == current
             row.onClick = { [weak self] _ in
                 guard let self else { return }

@@ -457,7 +457,8 @@ something came from, answers at once, and can be interrupted.
   sheet), and one `detail` line under it: spaces on the same profile share sign-ins, history and extensions. The
   same editor opens for a new space, wherever it's made (the sidebar, the menus, the command bar, Settings ›
   Spaces), so the choice is there from the start. With one profile nothing else names profiles; with more, the
-  space's header, the space switcher's rows and the top of a space's menu show its profile's name, quiet.
+  space's header, the space switcher's rows and the top of a space's menu show its profile's name, quiet, unless
+  it's the space's own name.
 - **Menu** (`MenuPanel`): Zigzag draws its own; only right-click menus are the system's, except the sidebar's empty
   space, whose menu is the +'s. The floating panel's
   surface and its one shadow, `Radius.panel`, a hairline `panelEdge`. `body` items

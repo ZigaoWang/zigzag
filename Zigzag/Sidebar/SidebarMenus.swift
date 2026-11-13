@@ -367,7 +367,7 @@ enum SidebarMenus {
         // A private window borrows a space's look but keeps nothing: it can't change the spaces you keep.
         guard let space = Library.shared.space(id), !controller.tabManager.isPrivate else { return menu }
         // Its profile on top once there's more than one, as the Move to Space menus head each profile's spaces.
-        if let profile = Library.shared.directory.shownName(ofSpace: id) { menu.addItem(.sectionHeader(title: profile)) }
+        if let profile = Library.shared.directory.shownName(ofSpace: id, spaceName: space.name) { menu.addItem(.sectionHeader(title: profile)) }
         menu.addItem(Item(String(localized: "Edit Space…", comment: "Item in a space's context menu.")) {
             let anchor = controller.sidebar.dot(for: id) ?? controller.sidebar.list.headerView
             controller.openSpaceEditor(id, anchor: anchor)

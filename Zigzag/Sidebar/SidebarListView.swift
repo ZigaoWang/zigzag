@@ -964,7 +964,7 @@ final class SidebarListView: NSView {
             (view as? SpaceHeaderView)?.refreshInk()
             (view as? SpaceHeaderView)?.icon = privateLabel ? nil : Library.shared.space(spaceID)?.icon
             // Which profile, only once there's more than one; a private window is on none.
-            (view as? SpaceHeaderView)?.profileName = privateLabel ? nil : Library.shared.directory.shownName(ofSpace: spaceID)
+            (view as? SpaceHeaderView)?.profileName = privateLabel ? nil : Library.shared.directory.shownName(ofSpace: spaceID, spaceName: spaceName)
             view.needsLayout = true
 
         case .separator:

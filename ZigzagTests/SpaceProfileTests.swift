@@ -31,13 +31,24 @@ struct SpaceProfileTests {
 
     @Test func withOneProfileNothingNamesIt() {
         var directory = ProfileDirectory()
-        #expect(directory.shownName(ofSpace: work) == nil)
+        #expect(directory.shownName(ofSpace: work, spaceName: "Office") == nil)
         let made = directory.addOwn(for: work, named: "Work", taken: ["Default"])
         // Once there are two, every space says which it's on, the first profile's spaces too.
-        #expect(directory.shownName(ofSpace: work) == "Work")
-        #expect(directory.shownName(ofSpace: play) == directory.all[0].displayName)
+        #expect(directory.shownName(ofSpace: work, spaceName: "Office") == "Work")
+        #expect(directory.shownName(ofSpace: play, spaceName: "Play") == directory.all[0].displayName)
         _ = directory.remove(made.id)
-        #expect(directory.shownName(ofSpace: work) == nil)
+        #expect(directory.shownName(ofSpace: work, spaceName: "Office") == nil)
+    }
+
+    @Test func aProfileCalledWhatItsSpaceIsIsntNamedTwice() {
+        var directory = ProfileDirectory()
+        directory.addOwn(for: work, named: "Work", taken: ["Default"])
+        #expect(directory.shownName(ofSpace: work, spaceName: "Work") == nil)
+        // Case and spaces at the ends don't make it another name.
+        #expect(directory.shownName(ofSpace: work, spaceName: " work ") == nil)
+        #expect(directory.shownName(ofSpace: work, spaceName: "Work 2") == "Work")
+        // The other spaces still say theirs.
+        #expect(directory.shownName(ofSpace: play, spaceName: "Play") == directory.all[0].displayName)
     }
 
     @Test func theEditorSaysWhatAProfileKeepsApart() {

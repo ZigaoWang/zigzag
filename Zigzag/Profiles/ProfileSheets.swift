@@ -95,9 +95,12 @@ enum ProfileChoice {
 
 extension ProfileDirectory {
     /// The profile's name beside a space where spaces are listed (the sidebar's header, the space switcher, a
-    /// space's menu): only once there's more than one profile. With one, nothing speaks of profiles.
-    func shownName(ofSpace id: UUID) -> String? {
-        all.count > 1 ? profile(profileID(ofSpace: id))?.displayName : nil
+    /// space's menu): only once there's more than one profile. With one, nothing speaks of profiles. Nor when it's
+    /// called what the space is (`spaceName`), as one New Profile made for it is: "Work … Work" says nothing more.
+    func shownName(ofSpace id: UUID, spaceName: String) -> String? {
+        guard all.count > 1, let name = profile(profileID(ofSpace: id))?.displayName else { return nil }
+        let trimmed = { (s: String) in s.trimmingCharacters(in: .whitespacesAndNewlines) }
+        return trimmed(name).caseInsensitiveCompare(trimmed(spaceName)) == .orderedSame ? nil : name
     }
 }
 
