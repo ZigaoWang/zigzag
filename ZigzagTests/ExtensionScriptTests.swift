@@ -232,7 +232,7 @@ struct ExtensionScriptTests {
             mail.queue.append((frame, "__page.onMessage.fire(JSON.parse(\(Self.quoted(json))))"))
         }
         let connect: @convention(block) (String) -> Void = { name in
-            mail.queue.append((background, "__backgroundPort = __port(\(Self.quoted(name)), { tab: { id: 7 }, frameId: 3 }, __toFrame); chrome.runtime.onConnect.fire(__backgroundPort)"))
+            mail.queue.append((background, "__backgroundPort = __port(\(Self.quoted(name)), { tab: { id: 7 }, frameId: 3, url: 'webkit-extension://x/frame.html' }, __toFrame); chrome.runtime.onConnect.fire(__backgroundPort)"))
         }
         frame.setObject(toBackground, forKeyedSubscript: "__toBackground" as NSString)
         frame.setObject(connect, forKeyedSubscript: "__connectToBackground" as NSString)
@@ -620,6 +620,31 @@ struct ExtensionScriptTests {
       this.port1 = a; this.port2 = b;
     } };
     """
+
+    @Test func onlyTheExtensionsOwnPagesReachItsWorkerAsAPage() {
+        // A content script runs on a site, and its port says so: it can't stand for one of the extension's pages and
+        // post to the worker as if it were one.
+        let worker = Self.workerWorld(worker: true)
+        worker.evaluateScript("""
+        var __script = __port('__zigzagWorkerClient', { url: 'https://evil.example/', tab: { id: 3 }, frameId: 0 });
+        __script.disconnect = () => { __script.dropped = true; };
+        chrome.runtime.onConnect.fire(__script);
+        __script.onMessage.fire({ kind: 'message', data: { cmd: 'GetData' }, ports: [] });
+        var __lookalike = __port('__zigzagWorkerClient', { url: 'webkit-extension://xy/popup.html', origin: 'webkit-extension://xy' });
+        __lookalike.disconnect = () => { __lookalike.dropped = true; };
+        chrome.runtime.onConnect.fire(__lookalike);
+        __lookalike.onMessage.fire({ kind: 'message', data: { cmd: 'GetData' }, ports: [] });
+        """)
+        #expect(worker.evaluateScript("__heard.length").toInt32() == 0)
+        #expect(worker.evaluateScript("__script.dropped === true && __lookalike.dropped === true").toBool())
+        // Its own page, in a tab or a frame on a site, still does.
+        worker.evaluateScript("""
+        var __own = __port('__zigzagWorkerClient', { url: 'webkit-extension://x/options.html', origin: 'webkit-extension://x', tab: { id: 3 } });
+        chrome.runtime.onConnect.fire(__own);
+        __own.onMessage.fire({ kind: 'message', data: { cmd: 'GetData' }, ports: [] });
+        """)
+        #expect(worker.evaluateScript("__heard.length === 1 && __heard[0].cmd").toString() == "GetData")
+    }
 
     @Test func aPortHandedToTheWorkerIsRelayedBothWays() {
         // Kondo's site hands its extension a MessageChannel port, which the extension's frame passes on to its worker

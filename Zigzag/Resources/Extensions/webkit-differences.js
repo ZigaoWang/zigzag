@@ -488,6 +488,11 @@
       return text && text.includes('\\u0000') ? { [NUL_KEY]: text } : value;
     };
     const unwrapNul = (value) => (value && typeof value === 'object' && typeof value[NUL_KEY] === 'string' ? JSON.parse(value[NUL_KEY]) : value);
+    // Whether a port or message comes from one of the extension's own pages, by the address WebKit gives its sender:
+    // a content script's is the site it runs on. The ways in below that stand for the extension's pages (to its worker,
+    // and its pages in tabs) are only for those, so a content script, whatever a site has it say, can't pose as one.
+    const fromOwnPage = (sender) => !!ownPages && !!sender && typeof sender.url === 'string' && sender.url.startsWith(ownPages)
+      && (typeof sender.origin !== 'string' || sender.origin === 'null' || ownPages.startsWith(sender.origin + '/'));
     const onMessage = api.runtime.onMessage;
     // The extension's own runtime.onMessage listeners on this page, for messages sent to its tab (below).
     const heard = new Set();
@@ -744,6 +749,7 @@
         };
         add((port) => {
           if (!port || port.name !== WORKER_PORT) return;
+          if (!fromOwnPage(port.sender)) { try { port.disconnect(); } catch (e) {} return; }
           rely();
           const url = (port.sender && port.sender.url) || '';
           const client = {
@@ -802,6 +808,7 @@
         add((port) => {
           if (!port || port.name !== TAB_PORT) return;
           const sender = port.sender || {};
+          if (!fromOwnPage(sender)) { try { port.disconnect(); } catch (e) {} return; }
           if (!sender.tab || typeof sender.tab.id !== 'number') {
             try { port.postMessage({ kind: 'no-tab' }); port.disconnect(); } catch (e) {}
             return;
