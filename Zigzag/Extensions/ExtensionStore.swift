@@ -494,32 +494,26 @@ enum ExtensionStore {
     nonisolated private static func unpack(_ data: Data, id: String) -> Result<(folder: URL, version: String), InstallError> {
         guard let package = try? CRXPackage(data, expectedID: id) else { return .failure(.verification) }
         let staging = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-ext-\(UUID().uuidString)")
-        let zipFile = staging.appendingPathExtension("zip")
-        defer { try? FileManager.default.removeItem(at: zipFile) }
-        do {
-            try package.zip.write(to: zipFile)
-            guard extract(zipFile, into: staging), let version = manifestVersion(in: staging) else {
-                try? FileManager.default.removeItem(at: staging)
-                return .failure(.unpack)
-            }
-            return .success((staging, version))
-        } catch {
+        guard extract(package.zip, into: staging), let version = manifestVersion(in: staging) else {
             try? FileManager.default.removeItem(at: staging)
             return .failure(.unpack)
         }
+        return .success((staging, version))
     }
 
     /// Unzips a package into a new folder, and keeps it only if every entry is a plain file or folder inside it: a
-    /// link in the package (to a file elsewhere on the Mac) would let the extension read that file as its own.
+    /// link in the package (to a file elsewhere on the Mac) would let the extension read that file as its own, and a
+    /// name climbing out of the folder would write somewhere else entirely. PackageZip checks every entry before it
+    /// writes anything; the folder is looked over once more after.
     nonisolated static func extract(_ zipFile: URL, into folder: URL) -> Bool {
+        guard let data = try? Data(contentsOf: zipFile) else { return false }
+        return extract(data, into: folder)
+    }
+
+    nonisolated static func extract(_ zip: Data, into folder: URL) -> Bool {
         do {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let unzip = Process()
-            unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-            unzip.arguments = ["-x", "-k", zipFile.path, folder.path]
-            try unzip.run()
-            unzip.waitUntilExit()
-            guard unzip.terminationStatus == 0, holdsOnlyItsOwnFiles(folder) else {
+            try PackageZip.unpack(zip, into: folder)
+            guard holdsOnlyItsOwnFiles(folder) else {
                 try? FileManager.default.removeItem(at: folder)
                 return false
             }

@@ -1,3 +1,4 @@
+import Compression
 import CryptoKit
 import Foundation
 import Security
@@ -138,5 +139,183 @@ nonisolated private struct DER {
         let value = Array(bytes[index..<(index + length)])
         bytes = bytes[(index + length)...]
         return value
+    }
+}
+
+/// The zip inside a package, unpacked by Zigzag itself rather than by a tool that writes first and is checked after.
+/// Every entry is read from the archive's own index and checked before anything is written: a name that is absolute,
+/// climbs out with `..` or has a backslash in it; a symbolic link, or any other entry that isn't a plain file or folder;
+/// two entries for the same file; encryption, or a way of packing other than none and deflate; sizes that don't add
+/// up. Any of these and nothing is unpacked at all. Files are then written only into the new folder, never over one
+/// already there, and each one's bytes must match the size and checksum the index gives them.
+nonisolated enum PackageZip {
+    struct Entry: Equatable {
+        /// The path inside the package, its parts checked.
+        var path: [String]
+        var isDirectory: Bool
+        var method: UInt16
+        var compressedSize: Int
+        var size: Int
+        var crc: UInt32
+        var localHeader: Int
+    }
+
+    enum Failure: Error, Equatable {
+        case malformed
+        /// Packed in a way Zigzag doesn't read (encrypted, zip64, a method other than stored or deflate).
+        case unsupported
+        /// A name that would land outside the folder, or isn't a plain one.
+        case unsafeName(String)
+        /// A link, a device, or anything else that isn't a plain file or folder.
+        case notAFile(String)
+        case duplicate(String)
+        case tooLarge
+        /// Bytes that don't match what the index says of them.
+        case damaged(String)
+    }
+
+    /// Far more than any extension: the largest in the store unpack to a few hundred megabytes.
+    static let maxTotalSize = 2 << 30
+    static let maxEntries = 65_000
+
+    /// The entries, from the archive's index, each checked.
+    static func entries(_ data: Data) throws -> [Entry] {
+        let bytes = [UInt8](data)
+        // The end-of-index record: 22 bytes and a comment of up to 64 KB, at the very end.
+        guard bytes.count >= 22 else { throw Failure.malformed }
+        var end = -1
+        var at = bytes.count - 22
+        let earliest = max(0, bytes.count - 22 - 0xFFFF)
+        while at >= earliest {
+            if uint32(bytes, at) == 0x0605_4B50, at + 22 + Int(uint16(bytes, at + 20)) == bytes.count { end = at; break }
+            at -= 1
+        }
+        guard end >= 0 else { throw Failure.malformed }
+        let count = Int(uint16(bytes, end + 10)), size = Int(uint32(bytes, end + 12)), offset = Int(uint32(bytes, end + 16))
+        // One disk only, and no zip64, whose markers are these largest values.
+        guard uint16(bytes, end + 4) == 0, uint16(bytes, end + 6) == 0, Int(uint16(bytes, end + 8)) == count else { throw Failure.unsupported }
+        guard count != 0xFFFF, size != 0xFFFF_FFFF, offset != 0xFFFF_FFFF else { throw Failure.unsupported }
+        guard count <= maxEntries else { throw Failure.tooLarge }
+        guard offset <= end, size <= end - offset else { throw Failure.malformed }
+
+        var entries: [Entry] = []
+        var seen = Set<String>()
+        var total = 0
+        var index = offset
+        for _ in 0..<count {
+            guard index + 46 <= offset + size, uint32(bytes, index) == 0x0201_4B50 else { throw Failure.malformed }
+            let madeBy = uint16(bytes, index + 4) >> 8
+            let flags = uint16(bytes, index + 8), method = uint16(bytes, index + 10)
+            let crc = uint32(bytes, index + 16)
+            let compressedSize = Int(uint32(bytes, index + 20)), entrySize = Int(uint32(bytes, index + 24))
+            let nameLength = Int(uint16(bytes, index + 28)), extraLength = Int(uint16(bytes, index + 30))
+            let commentLength = Int(uint16(bytes, index + 32))
+            let external = uint32(bytes, index + 38), localHeader = Int(uint32(bytes, index + 42))
+            let next = index + 46 + nameLength + extraLength + commentLength
+            guard next <= offset + size else { throw Failure.malformed }
+            let raw = Array(bytes[(index + 46)..<(index + 46 + nameLength)])
+            let name = String(bytes: raw, encoding: .utf8) ?? String(bytes: raw, encoding: .isoLatin1) ?? ""
+            index = next
+
+            // Encrypted, or strongly encrypted.
+            guard flags & 0x1 == 0, flags & 0x40 == 0 else { throw Failure.unsupported }
+            guard method == 0 || method == 8 else { throw Failure.unsupported }
+            guard compressedSize != 0xFFFF_FFFF, entrySize != 0xFFFF_FFFF, localHeader != 0xFFFF_FFFF else { throw Failure.unsupported }
+            guard let path = safePath(name) else { throw Failure.unsafeName(name) }
+            let isDirectory = name.hasSuffix("/")
+            // Made on a Unix system, an entry says what it is: only plain files and folders are taken.
+            if madeBy == 3 {
+                let type = (external >> 16) & 0o170000
+                if type != 0, type != (isDirectory ? 0o040000 : 0o100000) { throw Failure.notAFile(name) }
+            }
+            if isDirectory, entrySize != 0 { throw Failure.malformed }
+            // The Mac's file system ignores case: two names that differ only in it are the same file.
+            guard seen.insert(path.joined(separator: "/").lowercased()).inserted else { throw Failure.duplicate(name) }
+            guard localHeader < offset, compressedSize <= offset - localHeader else { throw Failure.malformed }
+            if method == 0, compressedSize != entrySize { throw Failure.damaged(name) }
+            total += entrySize
+            guard total <= maxTotalSize else { throw Failure.tooLarge }
+            entries.append(Entry(path: path, isDirectory: isDirectory, method: method, compressedSize: compressedSize,
+                                 size: entrySize, crc: crc, localHeader: localHeader))
+        }
+        // No file is also the folder of another entry.
+        let files = Set(entries.filter { !$0.isDirectory }.map { $0.path.joined(separator: "/").lowercased() })
+        for entry in entries where entry.path.count > 1 {
+            for depth in 1..<entry.path.count where files.contains(entry.path.prefix(depth).joined(separator: "/").lowercased()) {
+                throw Failure.duplicate(entry.path.joined(separator: "/"))
+            }
+        }
+        return entries
+    }
+
+    /// The parts of a name that stays inside the folder, or nil: no absolute name, no `.`, `..` or empty part, no
+    /// backslash (a separator elsewhere), no control characters.
+    static func safePath(_ name: String) -> [String]? {
+        guard !name.isEmpty, !name.hasPrefix("/"), !name.contains("\\"),
+              !name.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else { return nil }
+        var parts = name.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        if name.hasSuffix("/") { parts.removeLast() }
+        guard !parts.isEmpty, !parts.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." }) else { return nil }
+        return parts
+    }
+
+    /// Unpacks every entry into `folder`, which must be new or empty. Throws at the first entry that isn't right, with
+    /// nothing written if the index itself isn't; the caller removes the folder.
+    static func unpack(_ data: Data, into folder: URL) throws {
+        let entries = try entries(data)
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        guard try fileManager.contentsOfDirectory(atPath: folder.path).isEmpty else { throw Failure.malformed }
+        let bytes = [UInt8](data)
+        for entry in entries {
+            let name = entry.path.joined(separator: "/")
+            let url = entry.path.reduce(folder) { $0.appendingPathComponent($1, isDirectory: false) }
+            if entry.isDirectory {
+                try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
+                continue
+            }
+            try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let content = try self.content(of: entry, in: bytes)
+            guard crc32(content) == entry.crc else { throw Failure.damaged(name) }
+            // Never over something already there, so nothing written can be made to land through another entry.
+            try Data(content).write(to: url, options: .withoutOverwriting)
+        }
+    }
+
+    private static func content(of entry: Entry, in bytes: [UInt8]) throws -> [UInt8] {
+        let name = entry.path.joined(separator: "/")
+        let header = entry.localHeader
+        guard header + 30 <= bytes.count, uint32(bytes, header) == 0x0403_4B50 else { throw Failure.malformed }
+        let start = header + 30 + Int(uint16(bytes, header + 26)) + Int(uint16(bytes, header + 28))
+        guard start <= bytes.count, entry.compressedSize <= bytes.count - start else { throw Failure.malformed }
+        let packed = Array(bytes[start..<(start + entry.compressedSize)])
+        if entry.method == 0 { return packed }
+        guard entry.size > 0 else { return [] }
+        guard !packed.isEmpty else { throw Failure.damaged(name) }
+        var output = [UInt8](repeating: 0, count: entry.size)
+        let written = packed.withUnsafeBufferPointer { source in
+            output.withUnsafeMutableBufferPointer { target in
+                compression_decode_buffer(target.baseAddress!, entry.size, source.baseAddress!, entry.compressedSize, nil, COMPRESSION_ZLIB)
+            }
+        }
+        guard written == entry.size else { throw Failure.damaged(name) }
+        return output
+    }
+
+    private static let crcTable: [UInt32] = (0..<256).map { value -> UInt32 in
+        var crc = UInt32(value)
+        for _ in 0..<8 { crc = crc & 1 == 1 ? 0xEDB8_8320 ^ (crc >> 1) : crc >> 1 }
+        return crc
+    }
+
+    static func crc32(_ bytes: [UInt8]) -> UInt32 {
+        var crc: UInt32 = 0xFFFF_FFFF
+        for byte in bytes { crc = crcTable[Int((crc ^ UInt32(byte)) & 0xFF)] ^ (crc >> 8) }
+        return crc ^ 0xFFFF_FFFF
+    }
+
+    private static func uint16(_ bytes: [UInt8], _ at: Int) -> UInt16 { UInt16(bytes[at]) | UInt16(bytes[at + 1]) << 8 }
+    private static func uint32(_ bytes: [UInt8], _ at: Int) -> UInt32 {
+        UInt32(bytes[at]) | UInt32(bytes[at + 1]) << 8 | UInt32(bytes[at + 2]) << 16 | UInt32(bytes[at + 3]) << 24
     }
 }

@@ -78,6 +78,110 @@ struct ExtensionSecurityTests {
         #expect(!FileManager.default.fileExists(atPath: out.path))
     }
 
+    /// A zip made byte by byte, as an attacker would: names, kinds and flags exactly as given, stored, no compression.
+    private struct CraftedZip {
+        struct Item { var name: String; var data = Data(); var mode: UInt32 = 0o100644; var flags: UInt16 = 0; var method: UInt16 = 0 }
+        var items: [Item]
+
+        var data: Data {
+            var out = Data(), index = Data()
+            func u16(_ value: UInt16, _ into: inout Data) { withUnsafeBytes(of: value.littleEndian) { into.append(contentsOf: $0) } }
+            func u32(_ value: UInt32, _ into: inout Data) { withUnsafeBytes(of: value.littleEndian) { into.append(contentsOf: $0) } }
+            for item in items {
+                let name = Data(item.name.utf8), crc = PackageZip.crc32([UInt8](item.data)), offset = UInt32(out.count)
+                u32(0x0403_4B50, &out); u16(20, &out); u16(item.flags, &out); u16(item.method, &out); u16(0, &out); u16(0, &out)
+                u32(crc, &out); u32(UInt32(item.data.count), &out); u32(UInt32(item.data.count), &out)
+                u16(UInt16(name.count), &out); u16(0, &out); out.append(name); out.append(item.data)
+                u32(0x0201_4B50, &index); u16(0x0314, &index); u16(20, &index); u16(item.flags, &index); u16(item.method, &index)
+                u16(0, &index); u16(0, &index); u32(crc, &index); u32(UInt32(item.data.count), &index); u32(UInt32(item.data.count), &index)
+                u16(UInt16(name.count), &index); u16(0, &index); u16(0, &index); u16(0, &index); u16(0, &index)
+                u32(item.mode << 16, &index); u32(offset, &index); index.append(name)
+            }
+            let start = UInt32(out.count)
+            out.append(index)
+            u32(0x0605_4B50, &out); u16(0, &out); u16(0, &out); u16(UInt16(items.count), &out); u16(UInt16(items.count), &out)
+            u32(UInt32(index.count), &out); u32(start, &out); u16(0, &out)
+            return out
+        }
+    }
+
+    @Test func craftedPackagesThatReachOutsideAreRefusedBeforeAnythingIsWritten() throws {
+        let work = try Self.temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: work) }
+        let manifest = CraftedZip.Item(name: "manifest.json", data: Data(#"{"version": "1.0"}"#.utf8))
+        let escapes: [(String, [CraftedZip.Item])] = [
+            ("climbs out", [manifest, .init(name: "../escaped.txt", data: Data("x".utf8))]),
+            ("climbs out deeper in", [manifest, .init(name: "js/../../escaped.txt", data: Data("x".utf8))]),
+            ("absolute", [manifest, .init(name: work.appendingPathComponent("escaped.txt").path, data: Data("x".utf8))]),
+            ("backslashes", [manifest, .init(name: "..\\escaped.txt", data: Data("x".utf8))]),
+            // A link, then a file written through it: the classic way out of a folder.
+            ("link", [manifest, .init(name: "out", data: Data(work.path.utf8), mode: 0o120755), .init(name: "out/escaped.txt", data: Data("x".utf8))]),
+            ("link to a file", [manifest, .init(name: "hosts.txt", data: Data("/etc/hosts".utf8), mode: 0o120644)]),
+            ("device", [manifest, .init(name: "dev", mode: 0o020644)]),
+            ("the same file twice", [manifest, .init(name: "a.js", data: Data("1".utf8)), .init(name: "A.js", data: Data("2".utf8))]),
+            ("a file that is also a folder", [manifest, .init(name: "a", data: Data("1".utf8)), .init(name: "a/b.js", data: Data("2".utf8))]),
+            ("encrypted", [manifest, .init(name: "a.js", data: Data("1".utf8), flags: 1)]),
+            ("an unknown packing", [manifest, .init(name: "a.js", data: Data("1".utf8), method: 12)]),
+            ("a dot part", [manifest, .init(name: "./a.js", data: Data("1".utf8))]),
+            ("an empty part", [manifest, .init(name: "a//b.js", data: Data("1".utf8))]),
+        ]
+        for (what, items) in escapes {
+            let out = work.appendingPathComponent("out-\(UUID().uuidString)")
+            #expect(!ExtensionStore.extract(CraftedZip(items: items).data, into: out), "\(what)")
+            #expect(!FileManager.default.fileExists(atPath: out.path), "\(what)")
+            #expect(!FileManager.default.fileExists(atPath: work.appendingPathComponent("escaped.txt").path), "\(what)")
+        }
+        // Bytes that don't match their checksum.
+        var damaged = CraftedZip(items: [manifest, .init(name: "a.js", data: Data("hello".utf8))]).data
+        let hello = try #require(damaged.range(of: Data("hello".utf8)))
+        damaged[hello.lowerBound] ^= 0x20
+        #expect(throws: PackageZip.Failure.damaged("a.js")) { try PackageZip.unpack(damaged, into: work.appendingPathComponent("damaged")) }
+
+        // The same packages made plainly unpack as they are.
+        let plain = CraftedZip(items: [manifest, .init(name: "js/", mode: 0o040755), .init(name: "js/a.js", data: Data("let a = 1;".utf8))])
+        let out = work.appendingPathComponent("plain")
+        #expect(ExtensionStore.extract(plain.data, into: out))
+        #expect(try String(contentsOf: out.appendingPathComponent("js/a.js"), encoding: .utf8) == "let a = 1;")
+        // Never into a folder that already holds something.
+        #expect(throws: PackageZip.Failure.malformed) { try PackageZip.unpack(plain.data, into: out) }
+    }
+
+    @Test func namesStayInsideTheFolder() {
+        #expect(PackageZip.safePath("js/a.js") == ["js", "a.js"])
+        #expect(PackageZip.safePath("icons/") == ["icons"])
+        #expect(PackageZip.safePath("..a/b..c") == ["..a", "b..c"])
+        for name in ["", "/etc/hosts", "../a", "a/../b", "a/./b", "a//b", "a\\b", "a\u{0}b", "a\nb", "..", "."] {
+            #expect(PackageZip.safePath(name) == nil, "\(name)")
+        }
+    }
+
+    @Test(.enabled(if: CRXPackageTests.hasFixture)) func theRealPackageUnpacksAsDittoWould() throws {
+        let work = try Self.temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: work) }
+        let package = try CRXPackage(try CRXPackageTests.fixture, expectedID: CRXPackageTests.id)
+        let ours = work.appendingPathComponent("ours"), theirs = work.appendingPathComponent("ditto")
+        #expect(ExtensionStore.extract(package.zip, into: ours))
+        let file = work.appendingPathComponent("package.zip")
+        try package.zip.write(to: file)
+        try FileManager.default.createDirectory(at: theirs, withIntermediateDirectories: true)
+        let ditto = Process()
+        ditto.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        ditto.arguments = ["-x", "-k", file.path, theirs.path]
+        try ditto.run()
+        ditto.waitUntilExit()
+        func files(_ folder: URL) -> [String: Data] {
+            let all = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil)?.compactMap { $0 as? URL } ?? []
+            // ditto reads macOS's own extras (__MACOSX, ._ files) as attributes rather than files.
+            let plain = all.filter { !$0.hasDirectoryPath && !$0.path.contains("__MACOSX") && !$0.lastPathComponent.hasPrefix("._") }
+            return Dictionary(uniqueKeysWithValues: plain.compactMap { url in
+                (try? Data(contentsOf: url)).map { (url.path.replacingOccurrences(of: folder.path, with: ""), $0) }
+            })
+        }
+        let unpacked = files(ours)
+        #expect(!unpacked.isEmpty)
+        #expect(unpacked == files(theirs))
+    }
+
     @Test func folderWithALinkedFolderOrHardLinkIsRefused() throws {
         let work = try Self.temporaryFolder()
         defer { try? FileManager.default.removeItem(at: work) }
