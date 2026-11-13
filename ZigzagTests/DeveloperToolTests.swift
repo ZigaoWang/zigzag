@@ -122,8 +122,10 @@ struct DeveloperToolTests {
             defer { tab.close(); manager.invalidate() }
             #expect(tab.isDevelopment)
             #expect(!CommandRanker.context(for: manager).developerTools.contains(.rotate))
+            #expect(!CommandRanker.context(for: manager).developerTools.contains(.pixelRatio2))
             tab.developer.size = CGSize(width: 393, height: 852)
             #expect(CommandRanker.context(for: manager).developerTools.contains(.rotate))
+            #expect(CommandRanker.context(for: manager).developerTools.contains(.pixelRatio2))
         }
     }
 
@@ -147,6 +149,11 @@ struct DeveloperToolTests {
             let fill = try #require(submenu.items.firstIndex { $0.action == DeveloperTool.sizeFill.action })
             #expect(submenu.items[fill + 1] === listed.first)
             #expect(listed.allSatisfy { Shortcuts.id($0) == nil })
+            // The pixel ratio's choices under their own heading, last, a line before it.
+            let header = try #require(submenu.items.firstIndex { $0.isSectionHeader })
+            #expect(submenu.items[header].title == DeveloperTool.Choice.pixelRatio.heading && submenu.items[header - 1].isSeparatorItem)
+            #expect(submenu.items[(header + 1)...].compactMap(\.action) == [DeveloperTool.pixelRatioDevice, .pixelRatio1, .pixelRatio2, .pixelRatio3].map(\.action))
+            #expect(Shortcuts.id(submenu.items[header]) == nil)
             let toggle = items(menu).first { $0.action == DeveloperTool.sizeToggle.action }
             #expect(toggle?.keyEquivalent == "m" && toggle?.keyEquivalentModifierMask == [.command, .option, .shift])
             // A size added or removed in Settings shows here.

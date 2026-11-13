@@ -102,6 +102,29 @@ final class PageCardView: NSView {
     static let setViewScale = NSSelectorFromString("_setViewScale:")
     static func canScale(_ webView: WKWebView?) -> Bool { webView?.responds(to: setViewScale) == true }
 
+    /// The pixel ratio of a page at a size of its own (`DeveloperState.pixelRatio(device:)`): how many of the screen's
+    /// pixels it draws each of its own with, as the device it's sized as does; nil for the Mac's own. Only while the
+    /// page has a size, so a split's pages, which never do, keep the Mac's.
+    var pixelRatio: CGFloat? {
+        didSet {
+            guard pixelRatio != oldValue else { return }
+            needsLayout = true
+            onPageArea?(pageArea)
+        }
+    }
+
+    /// The pixel ratio the shown page has now, for what says it: the chosen one, while the page has a size of its own
+    /// and this WebKit can give it one; nil otherwise.
+    var pagePixelRatio: CGFloat? { pageSize != nil && Self.canSetPixelRatio ? pixelRatio : nil }
+
+    /// WebKit's device scale factor (`_setOverrideDeviceScaleFactor:`, private): what the page reads as its
+    /// `devicePixelRatio` and its resolution media queries, and draws at; 0 is the screen's own. Asked before use, so a
+    /// WebKit without it leaves the Pixel Ratio choices out (`DeveloperTool.isAvailable`). While the page is also shown
+    /// smaller to fit, WebKit gives the page's `devicePixelRatio` that much smaller with it; its media queries keep
+    /// the ratio.
+    static let setPixelRatio = NSSelectorFromString("_setOverrideDeviceScaleFactor:")
+    static var canSetPixelRatio: Bool { WKWebView.instancesRespond(to: setPixelRatio) }
+
     /// The grips beside a page at a size of its own, to drag it to another (`PageSizeHandle`).
     private lazy var sizeHandles: [PageSizeHandle] = PageSizeHandle.Edge.allCases.map { edge in
         let handle = PageSizeHandle(edge: edge)
@@ -139,11 +162,19 @@ final class PageCardView: NSView {
     /// The scale the shown page is drawn at (`pageFit`), 1 at its own size.
     private(set) var pageScale: CGFloat = 1 { didSet { if pageScale != oldValue { onPageArea?(pageArea) } } }
 
-    /// Gives a page the view scale, or takes it back to 1, only when it changes.
-    private static func apply(scale: CGFloat, to webView: WKWebView?) {
-        guard let webView, canScale(webView) else { return }
-        let now = webView.value(forKey: "viewScale") as? CGFloat ?? 1
-        if abs(now - scale) > 0.0001 { webView.setValue(scale, forKey: "viewScale") }
+    /// Gives a page the view scale and the pixel ratio (nil: the screen's), or takes them back, each only when it
+    /// changes, read from the page itself, which may have been shown by another card since.
+    private static func apply(scale: CGFloat, pixelRatio: CGFloat?, to webView: WKWebView?) {
+        guard let webView else { return }
+        if canScale(webView) {
+            let now = webView.value(forKey: "viewScale") as? CGFloat ?? 1
+            if abs(now - scale) > 0.0001 { webView.setValue(scale, forKey: "viewScale") }
+        }
+        if canSetPixelRatio {
+            let wanted = pixelRatio ?? 0
+            let now = webView.responds(to: NSSelectorFromString("_overrideDeviceScaleFactor")) ? webView.value(forKey: "overrideDeviceScaleFactor") as? CGFloat : nil
+            if now.map({ abs($0 - wanted) > 0.0001 }) ?? true { webView.setValue(wanted, forKey: "overrideDeviceScaleFactor") }
+        }
     }
 
     /// Places the shown page's holder for its size, the view scale with it, and says the page's area.
@@ -152,7 +183,7 @@ final class PageCardView: NSView {
         holder.autoresizingMask = pageSize == nil ? [.width, .height] : []
         let fit = Self.pageFit(content: content, size: pageSize, docked: holder.dockedRoom, scales: Self.canScale(webView))
         holder.frame = fit.frame
-        Self.apply(scale: fit.scale, to: webView)
+        Self.apply(scale: fit.scale, pixelRatio: pageSize == nil ? nil : pixelRatio, to: webView)
         pageScale = fit.scale
         // The page's own area, as its styles see it: its size when shown smaller, else what the holder leaves it.
         let shown = NSSize(width: holder.frame.width - holder.dockedRoom.width, height: holder.frame.height - holder.dockedRoom.height)
@@ -680,7 +711,7 @@ final class PageCardView: NSView {
             let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
             let fit = Self.pageFit(content: content, size: pageSize, docked: newHolder.dockedRoom, scales: Self.canScale(newWebView))
             newHolder.frame = fit.frame
-            Self.apply(scale: fit.scale, to: newWebView)
+            Self.apply(scale: fit.scale, pixelRatio: pageSize == nil ? nil : pixelRatio, to: newWebView)
             newHolder.autoresizingMask = pageSize == nil ? [.width, .height] : []
             // The Web Inspector docking beside a page with a size of its own makes room for itself.
             newHolder.onDockedRoomChange = { [weak self] in self?.needsLayout = true }
@@ -695,8 +726,9 @@ final class PageCardView: NSView {
         if let oldHolder, oldHolder !== newHolder {
             oldHolder.onDockedRoomChange = nil
             oldHolder.autoresizingMask = [.width, .height]
-            // At its own scale again wherever it's shown next (the mini player, another window).
-            if old !== newWebView { Self.apply(scale: 1, to: old) }
+            // At its own scale and the screen's pixel ratio again wherever it's shown next (the mini player, another
+            // window, Peek).
+            if old !== newWebView { Self.apply(scale: 1, pixelRatio: nil, to: old) }
         }
         if let oldHolder, oldHolder !== newHolder, oldHolder.superview === clip {
             if let old, old.fullscreenState != .notInFullscreen {

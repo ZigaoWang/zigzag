@@ -968,9 +968,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // It says the size the page really is, which the card knows.
         root.card.onPageArea = { [weak tools, weak card = root.card] area in
             tools?.pageScale = card?.pageScale ?? 1
+            tools?.pagePixelRatio = card?.pagePixelRatio
             tools?.pageRoom = area
         }
         tools.pageScale = root.card.pageScale
+        tools.pagePixelRatio = root.card.pagePixelRatio
         tools.pageRoom = root.card.pageArea
         return tools
     }()
@@ -985,6 +987,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let had = root.topBar.accessory != nil
         guard shows || had else { return }
         root.topBar.accessory = shows ? developerBarTools : nil
+        developerBarTools.pageListed = shows ? shownListedSize : nil
         developerBarTools.show(shows ? tab : nil, in: self)
         if shows != had { showTopBar() }
     }
@@ -1000,13 +1003,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         paintTopBar()
     }
 
-    /// Gives the page you're on the size chosen for it with the developer tools, or its room back. A page's own
-    /// size is for a page shown on its own: a split's panes share the window as they are.
+    /// Gives the page you're on the size chosen for it with the developer tools, and its pixel ratio, or its room
+    /// back. A page's own size is for a page shown on its own: a split's panes share the window as they are.
+    /// The listed size the page you're on has, as `showPageSize` found it, for the bar to name.
+    private var shownListedSize: PageSizes.Size?
+
     private func showPageSize() {
         let tab = tabManager.selectedTab
-        let size = tab.flatMap { tabManager.split(for: $0) } == nil ? tab?.developerInEffect.size : nil
+        let state = tab.flatMap { tabManager.split(for: $0) } == nil ? tab?.developerInEffect : nil
+        let size = state?.size
+        // The list is read once for each change, not for each frame the bar says the size in.
+        shownListedSize = PageSizes.named(size)
+        let ratio = state?.pixelRatio(device: shownListedSize?.pixelRatio).map { CGFloat($0) }
         // Dragging a grip beside the page gives it that size, as choosing one does.
         if size != nil, root.card.onResizePage == nil { root.card.onResizePage = { [weak self] size in self?.setPageSize(size) } }
+        root.card.pixelRatio = ratio
         guard root.card.pageSize != size else { return }
         root.card.pageSize = size
         paintTopBar()

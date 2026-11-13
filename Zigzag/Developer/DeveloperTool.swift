@@ -33,6 +33,11 @@ enum DeveloperTool: String, CaseIterable {
     case phone = "open-on-phone"
     /// The page's size and filling the window, one after the other: the last size it had, or a phone's.
     case sizeToggle = "size-toggle"
+    /// A sized page's pixel ratio: its device's, or one of these whatever the size.
+    case pixelRatioDevice = "pixel-ratio-device"
+    case pixelRatio1 = "pixel-ratio-1"
+    case pixelRatio2 = "pixel-ratio-2"
+    case pixelRatio3 = "pixel-ratio-3"
 
     var title: String {
         switch self {
@@ -62,6 +67,9 @@ enum DeveloperTool: String, CaseIterable {
         case .userAgentChrome: String(localized: "User Agent: Chrome", comment: "View › Developer menu item and command, on a development site: the page is told it's in Chrome on a Mac.")
         case .userAgentFirefox: String(localized: "User Agent: Firefox", comment: "View › Developer menu item and command, on a development site: the page is told it's in Firefox on a Mac.")
         case .sizeToggle: String(localized: "Toggle Page Size", comment: "View › Developer menu item and command, on a development site: gives the page the last size it had (a phone's at first), or takes it back to filling the window.")
+        case .pixelRatioDevice: String(localized: "Pixel Ratio: As the Device", comment: "View › Developer › Page Size menu item and command, on a development site whose page has a size of its own, checked while so: the page is shown with the pixel ratio of the device it's sized as, like 3× for an iPhone.")
+        case .pixelRatio1, .pixelRatio2, .pixelRatio3:
+            String(localized: "Pixel Ratio: \(PageSizes.pixelRatioText(pixelRatio?.value ?? 1))", comment: "View › Developer › Page Size menu item and command, on a development site whose page has a size of its own, checked while so: the page is shown with this pixel ratio whatever its size, like “Pixel Ratio: 2×”.")
         case .phone: String(localized: "Open on Your Phone…", comment: "View › Developer menu item, command and item in the ⋯ menu of the developer tools above the page, on a development site: shows a QR code of the page's address for a phone on the same network.")
         }
     }
@@ -73,6 +81,8 @@ enum DeveloperTool: String, CaseIterable {
         case .appearanceLight: String(localized: "Light", comment: "Choice in the Page Appearance menu of the developer tools above the page: the page is asked for its light look.")
         case .appearanceDark: String(localized: "Dark", comment: "Choice in the Page Appearance menu of the developer tools above the page: the page is asked for its dark look.")
         case .sizeFill: String(localized: "Fill the Window", comment: "Choice in the Page Size menu of the developer tools above the page: the page takes all its room in the window, as any page.")
+        case .pixelRatioDevice: String(localized: "As the Device", comment: "Choice under Pixel Ratio in the Page Size menus: the page is shown with the pixel ratio of the device it's sized as.")
+        case .pixelRatio1, .pixelRatio2, .pixelRatio3: PageSizes.pixelRatioText(pixelRatio?.value ?? 1)
         case .userAgentZigzag: "Zigzag"
         case .userAgentPhone: String(localized: "Safari on iPhone", comment: "Choice under User Agent in the developer tools' menus: the page is told it's in Safari on an iPhone.")
         case .userAgentTablet: String(localized: "Safari on iPad", comment: "Choice under User Agent in the developer tools' menus: the page is told it's in Safari on an iPad.")
@@ -104,6 +114,17 @@ enum DeveloperTool: String, CaseIterable {
         }
     }
 
+    /// The pixel ratio this tool chooses, for the four that choose one.
+    var pixelRatio: DeveloperState.PixelRatio? {
+        switch self {
+        case .pixelRatioDevice: .device
+        case .pixelRatio1: .one
+        case .pixelRatio2: .two
+        case .pixelRatio3: .three
+        default: nil
+        }
+    }
+
     /// The thing a tool is a choice or a part of, which its menus put under one name: a submenu of View ›
     /// Developer, a heading in the menus above the page.
     enum Group: CaseIterable {
@@ -121,40 +142,52 @@ enum DeveloperTool: String, CaseIterable {
     var group: Group? {
         switch self {
         case .appearanceFollowsMac, .appearanceLight, .appearanceDark, .printStyles: .appearance
-        case .sizeFill, .sizeCustom, .rotate, .sizeToggle: .size
+        case .sizeFill, .sizeCustom, .rotate, .sizeToggle, .pixelRatioDevice, .pixelRatio1, .pixelRatio2, .pixelRatio3: .size
         case .userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox: .userAgent
         default: nil
         }
     }
 
-    /// A set of choices, of which exactly one is in effect: a look, a size, a browser.
+    /// A set of choices, of which exactly one is in effect: a look, a size, a browser, a pixel ratio.
     enum Choice: Equatable {
-        case appearance, size, userAgent
+        case appearance, size, userAgent, pixelRatio
+
+        /// Its name where it shares a menu with the thing the menu is named for: the pixel ratio in Page Size's.
+        var heading: String? {
+            switch self {
+            case .pixelRatio: String(localized: "Pixel Ratio", comment: "Heading in the Page Size menus of the developer tools: how many of the screen's pixels the page draws each of its own with, its device's or 1×, 2× or 3×.")
+            default: nil
+            }
+        }
     }
 
     /// The set of choices the tool is one of; nil for something on or off, or something to do.
     var choice: Choice? {
         if appearance != nil { return .appearance }
         if userAgent != nil { return .userAgent }
+        if pixelRatio != nil { return .pixelRatio }
         return self == .sizeFill ? .size : nil
     }
 
     var isChoice: Bool { choice != nil }
 
     /// The choice of its kind that leaves the page as any page: following the Mac, Zigzag's own user agent, filling
-    /// the window.
-    var isDefaultChoice: Bool { self == .appearanceFollowsMac || self == .userAgentZigzag || self == .sizeFill }
+    /// the window, the device's own pixel ratio.
+    var isDefaultChoice: Bool { self == .appearanceFollowsMac || self == .userAgentZigzag || self == .sizeFill || self == .pixelRatioDevice }
 
     /// Whether something among `tools` is in effect for a page with these choices: a choice other than the one any
-    /// page has, or something turned on.
+    /// page has, or something turned on, where it has something to do (a pixel ratio, with a size).
     static func hasChoiceInEffect(among tools: [DeveloperTool], in state: DeveloperState) -> Bool {
-        tools.contains { $0.isDefaultChoice ? !$0.isChecked(in: state) : !$0.isChoice && $0.isChecked(in: state) }
+        tools.contains { tool in
+            tool.applies(in: state) && (tool.isDefaultChoice ? !tool.isChecked(in: state) : !tool.isChoice && tool.isChecked(in: state))
+        }
     }
 
     /// Whether the tool is one that's on or chosen now, for the check beside it.
     func isChecked(in state: DeveloperState) -> Bool {
         if let appearance { return state.appearance == appearance }
         if let userAgent { return state.userAgent == userAgent }
+        if let pixelRatio { return state.pixelRatio == pixelRatio }
         switch self {
         case .sizeFill: return state.size == nil
         case .printStyles: return state.printStyles
@@ -170,7 +203,7 @@ enum DeveloperTool: String, CaseIterable {
     /// and a page drawn without its styles has none for print and keeps none of the outlines' style.
     func applies(in state: DeveloperState) -> Bool {
         switch self {
-        case .rotate: state.size != nil
+        case .rotate, .pixelRatioDevice, .pixelRatio1, .pixelRatio2, .pixelRatio3: state.size != nil
         case .printStyles, .outlines: !state.stylesOff
         default: true
         }
@@ -181,6 +214,7 @@ enum DeveloperTool: String, CaseIterable {
     var isAvailable: Bool {
         switch self {
         case .styles: PageStyles.isAvailable
+        case .pixelRatioDevice, .pixelRatio1, .pixelRatio2, .pixelRatio3: PageCardView.canSetPixelRatio
         default: true
         }
     }
@@ -193,6 +227,13 @@ enum DeveloperTool: String, CaseIterable {
         case .reloadIgnoringCache: String(localized: "Reload", comment: "Under a tile in the site panel's Developer group: reloads the page ignoring the cache.")
         default: title
         }
+    }
+
+    /// As the Device, with the ratio it is for a page of `size` when that's a listed device's: "As the Device (3×)".
+    static func pixelRatioDeviceTitle(for size: CGSize?, short: Bool) -> String {
+        let plain = short ? DeveloperTool.pixelRatioDevice.shortTitle : DeveloperTool.pixelRatioDevice.title
+        guard let ratio = PageSizes.named(size)?.pixelRatio else { return plain }
+        return String(localized: "\(plain) (\(PageSizes.pixelRatioText(ratio)))", comment: "The pixel ratio choice that follows the device a page is sized as, with that device's ratio after it, like “As the Device (3×)”.")
     }
 
     /// Developer Mode for the site is named for what it will do, as Pin Tab and Unpin Tab are. In the menu bar it
@@ -242,6 +283,10 @@ enum DeveloperTool: String, CaseIterable {
         case .userAgentChrome, .userAgentFirefox: "macwindow"
         case .phone: "qrcode"
         case .sizeToggle: "arrow.left.and.right.square"
+        case .pixelRatioDevice: "iphone"
+        case .pixelRatio1: "1.square"
+        case .pixelRatio2: "2.square"
+        case .pixelRatio3: "3.square"
         }
     }
 
@@ -273,6 +318,10 @@ enum DeveloperTool: String, CaseIterable {
         case .userAgentFirefox: #selector(BrowserWindowController.userAgentFirefox(_:))
         case .phone: #selector(BrowserWindowController.openOnPhone(_:))
         case .sizeToggle: #selector(BrowserWindowController.togglePageSize(_:))
+        case .pixelRatioDevice: #selector(BrowserWindowController.pixelRatioDevice(_:))
+        case .pixelRatio1: #selector(BrowserWindowController.pixelRatio1(_:))
+        case .pixelRatio2: #selector(BrowserWindowController.pixelRatio2(_:))
+        case .pixelRatio3: #selector(BrowserWindowController.pixelRatio3(_:))
         }
     }
 
@@ -314,6 +363,9 @@ enum DeveloperTool: String, CaseIterable {
         case .userAgentFirefox: ["user", "agent", "firefox", "developer"]
         case .sizeToggle: ["toggle", "page", "size", "device", "responsive", "mobile", "fill", "developer"]
         case .phone: ["open", "phone", "mobile", "qr", "code", "device", "network", "lan", "wifi", "developer"]
+        case .pixelRatioDevice: ["pixel", "ratio", "dpr", "device", "retina", "density", "developer"]
+        case .pixelRatio1, .pixelRatio2, .pixelRatio3:
+            ["pixel", "ratio", "dpr", "retina", "density", "developer", String(pixelRatio?.rawValue ?? 1), "\(pixelRatio?.rawValue ?? 1)x"]
         }
     }
 
@@ -344,7 +396,7 @@ enum DeveloperTool: String, CaseIterable {
     /// The tools Developer tools adds to View › Developer, those this Mac's WebKit has. The others have had their
     /// items there all along.
     static let menuItems: [DeveloperTool] = [.site, .clearCache, .clearCookies, .appearanceFollowsMac, .appearanceLight, .appearanceDark, .printStyles,
-                                           .sizeFill, .sizeCustom, .rotate, .sizeToggle,
+                                           .sizeFill, .sizeCustom, .rotate, .sizeToggle, .pixelRatioDevice, .pixelRatio1, .pixelRatio2, .pixelRatio3,
                                            .userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox,
                                            .javaScript, .images, .styles, .outlines, .phone].filter(\.isAvailable)
 
@@ -366,7 +418,7 @@ enum DeveloperTool: String, CaseIterable {
         return switch tool {
         case .site: isOn && DevelopmentSites.isOffered(for: url, isPrivate: isPrivate)
         case .clearCache, .clearCookies: isDevelopment && !isPrivate
-        case .sizeFill, .sizeCustom, .rotate, .sizeToggle: isDevelopment && !inSplit
+        case .sizeFill, .sizeCustom, .rotate, .sizeToggle, .pixelRatioDevice, .pixelRatio1, .pixelRatio2, .pixelRatio3: isDevelopment && !inSplit
         case .console, .inspect, .reloadIgnoringCache, .viewSource, .settings,
              .appearanceFollowsMac, .appearanceLight, .appearanceDark, .printStyles, .javaScript, .images, .styles, .outlines,
              .userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox, .phone: isDevelopment

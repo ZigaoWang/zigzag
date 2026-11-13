@@ -27,7 +27,8 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         Part(symbol: DeveloperTool.inspect.symbol, tools: [.inspect], group: 1),
         Part(symbol: DeveloperTool.appearanceFollowsMac.symbol, tools: [.appearanceFollowsMac, .appearanceLight, .appearanceDark, .printStyles],
              title: DeveloperTool.Group.appearance.title, group: 2),
-        Part(symbol: DeveloperTool.sizeFill.symbol, tools: [.sizeFill, .sizeCustom, .rotate, .sizeToggle],
+        Part(symbol: DeveloperTool.sizeFill.symbol, tools: [.sizeFill, .sizeCustom, .rotate, .sizeToggle,
+                                                            .pixelRatioDevice, .pixelRatio1, .pixelRatio2, .pixelRatio3].filter(\.isAvailable),
              title: DeveloperTool.Group.size.title, group: 2),
         Part(symbol: "arrow.clockwise", tools: [.reloadIgnoringCache, .clearCache, .clearCookies],
              title: String(localized: "Reload Options", comment: "Tooltip of a button among the developer tools above a development site's page: opens a menu to reload ignoring the cache, or clear this site's cache or cookies."), group: 3),
@@ -242,14 +243,23 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
     var pageRoom = NSSize.zero { didSet { if pageRoom != oldValue { refreshChoices() } } }
     /// How much smaller than its size the page is shown, to fit the window (`PageCardView.pageFit`); 1 at its size.
     var pageScale: CGFloat = 1 { didSet { if pageScale != oldValue { refreshChoices() } } }
+    /// The page's pixel ratio as the card gave it (`PageCardView.pagePixelRatio`); nil for the Mac's.
+    var pagePixelRatio: CGFloat? { didSet { if pagePixelRatio != oldValue { refreshChoices() } } }
+    /// The listed size the page has, which the controller looked up as it gave the page its size; nil for one of
+    /// your own or none.
+    var pageListed: PageSizes.Size? { didSet { if pageListed != oldValue { refreshChoices() } } }
 
-    /// What's said beside Page Size: the page's size, and how large it's shown when that's smaller.
-    static func sizeText(_ size: CGSize?, scale: CGFloat) -> String {
+    /// What's said beside Page Size: the page's size, its pixel ratio while it has one, and how large it's shown when
+    /// that's smaller.
+    static func sizeText(_ size: CGSize?, scale: CGFloat, pixelRatio: CGFloat? = nil) -> String {
         guard let size else { return "" }
-        let dimensions = PageSizes.dimensions(size)
-        guard scale < 0.995 else { return dimensions }
+        var said = PageSizes.dimensions(size)
+        if let pixelRatio {
+            said = String(localized: "\(said), \(PageSizes.pixelRatioText(Double(pixelRatio)))", comment: "Spoken by VoiceOver for Page Size among the developer tools above the page: the page's size, then its pixel ratio, like “393 × 852, 3×”.")
+        }
+        guard scale < 0.995 else { return said }
         let percent = Int((scale * 100).rounded())
-        return String(localized: "\(dimensions) at \(percent)%", comment: "Beside Page Size among the developer tools above the page, while a page larger than the window is shown smaller to fit: its size, then how large it's shown, like “1440 × 900 at 72%”.")
+        return String(localized: "\(said) at \(percent)%", comment: "Beside Page Size among the developer tools above the page, while a page larger than the window is shown smaller to fit: its size, then how large it's shown, like “1440 × 900 at 72%”.")
     }
 
     /// The size to say for a page of `chosen` size in `room`: the size it really is, which a small window cuts.
@@ -298,8 +308,10 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
 
     /// `short`: under a heading that already says what it's about.
     private func entry(_ tool: DeveloperTool, short: Bool = false) -> MenuPanel.Entry {
-        let title = tool == .site ? DeveloperTool.siteShortTitle(listed: DevelopmentSites.covers(tab?.url)) : short ? tool.shortTitle : tool.title
         let state = tab?.developerInEffect ?? DeveloperState()
+        let title = tool == .site ? DeveloperTool.siteShortTitle(listed: DevelopmentSites.covers(tab?.url))
+            : tool == .pixelRatioDevice ? DeveloperTool.pixelRatioDeviceTitle(for: state.size, short: short)
+            : short ? tool.shortTitle : tool.title
         return .item(.init(title: title, symbol: tool.symbol, isChecked: tab?.isDevelopment == true && tool.isChecked(in: state),
                            isEnabled: tool.isOffered(for: tab, isPrivate: isPrivate) && tool.applies(in: state),
                            shortcut: Shortcuts.keys(for: tool.action)) { [weak self] in self?.run(tool) })
@@ -325,7 +337,9 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
     /// page has checked either way up.
     private func entries(of part: Part) -> [MenuPanel.Entry] {
         let sets = Self.grouped(part.tools)
-        var groups = sets.map { $0.map { entry($0, short: part.title != nil) } }
+        var groups = sets.map { set in
+            (set.first?.choice?.heading.map { [MenuPanel.Entry.header($0)] } ?? []) + set.map { entry($0, short: part.title != nil) }
+        }
         // The listed sizes are choices of the page's size, with Fill the Window.
         if let sizes = sets.firstIndex(where: { $0.first?.choice == .size }) {
             let state = tab?.developerInEffect ?? DeveloperState()
@@ -350,13 +364,15 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
     }
 
     /// A button's tools as its menu has them: each set of choices together, in the order the tools have them, then
-    /// what stands apart, a line between each.
+    /// what stands apart, then the sets under a heading of their own (the pixel ratio in Page Size's), a line between
+    /// each.
     static func grouped(_ tools: [DeveloperTool]) -> [[DeveloperTool]] {
         var sets: [[DeveloperTool]] = []
         for tool in tools where tool.isChoice {
             if let i = sets.firstIndex(where: { $0.first?.choice == tool.choice }) { sets[i].append(tool) } else { sets.append([tool]) }
         }
-        return (sets + [tools.filter { !$0.isChoice }]).filter { !$0.isEmpty }
+        let headed = sets.filter { $0.first?.choice?.heading != nil }
+        return (sets.filter { $0.first?.choice?.heading == nil } + [tools.filter { !$0.isChoice }] + headed).filter { !$0.isEmpty }
     }
 
     /// The device a size is nearest, either way up: a phone by its short side; then a tablet, squarer than a
@@ -384,11 +400,13 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         for (part, button) in zip(Self.parts, buttons) {
             let symbol = Self.symbol(of: part, in: state)
             if button.symbol != symbol { button.symbol = symbol }
-            if part.tools.contains(.sizeFill) { button.setAccessibilityValue(state.size == nil ? nil : Self.sizeText(Self.shownSize(chosen: state.size, room: pageRoom), scale: pageScale)) }
+            if part.tools.contains(.sizeFill) {
+                button.setAccessibilityValue(state.size == nil ? nil : Self.sizeText(Self.shownSize(chosen: state.size, room: pageRoom), scale: pageScale, pixelRatio: pagePixelRatio))
+            }
         }
         refreshMore()
         let before = sizeReadout.width(withName: true)
-        sizeReadout.show(size: Self.shownSize(chosen: state.size, room: pageRoom), name: PageSizes.named(state.size)?.name, scale: pageScale)
+        sizeReadout.show(size: Self.shownSize(chosen: state.size, room: pageRoom), name: pageListed?.name, scale: pageScale, pixelRatio: pagePixelRatio)
         if sizeReadout.width(withName: true) != before {
             needsLayout = true
             // The bar gives the tools the width they ask for: asked again.

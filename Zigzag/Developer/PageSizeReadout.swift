@@ -25,8 +25,8 @@ enum PageSizeInput {
 
 /// The page's size beside Page Size above the page, while it has one (#141), as Chrome's device toolbar has it: the
 /// listed size's name when it's one ("iPhone 16"), then its width and height, each a field you click to type into
-/// (Return sets it, Esc leaves it, ↑ and ↓ step it, Tab goes from the width to the height), and how large it's shown
-/// when that's smaller ("at 86%"). Anywhere else on it opens Page Size's menu. Under the pointer it has the fill the
+/// (Return sets it, Esc leaves it, ↑ and ↓ step it, Tab goes from the width to the height), its pixel ratio while it
+/// has one ("3×"), and how large it's shown when that's smaller ("at 86%"). Anywhere else on it opens Page Size's menu. Under the pointer it has the fill the
 /// bar's buttons have.
 final class PageSizeReadout: InteractiveView, NSTextFieldDelegate {
     /// A size typed or stepped to.
@@ -38,6 +38,7 @@ final class PageSizeReadout: InteractiveView, NSTextFieldDelegate {
     private let widthField = PageSideField()
     private let heightField = PageSideField()
     private let times = Label("×", font: Tokens.Font.figures(Tokens.TypeSize.label), color: Tokens.Color.textTertiary)
+    private let ratioLabel = Label("", font: Tokens.Font.figures(Tokens.TypeSize.label), color: Tokens.Color.textTertiary)
     private let scaleLabel = Label("", font: Tokens.Font.figures(Tokens.TypeSize.label), color: Tokens.Color.textTertiary)
     private(set) var size: CGSize?
     /// Whether the size's name shows: it gives way first where the bar is short of room.
@@ -58,7 +59,7 @@ final class PageSizeReadout: InteractiveView, NSTextFieldDelegate {
         widthField.setAccessibilityLabel(String(localized: "Page width", comment: "VoiceOver name of the field beside Page Size above the page that holds the page's width in points; type into it to change it."))
         heightField.setAccessibilityLabel(String(localized: "Page height", comment: "VoiceOver name of the field beside Page Size above the page that holds the page's height in points; type into it to change it."))
         widthField.nextKeyView = heightField
-        [nameLabel, times, scaleLabel].forEach { $0.setAccessibilityElement(false); addSubview($0) }
+        [nameLabel, times, ratioLabel, scaleLabel].forEach { $0.setAccessibilityElement(false); addSubview($0) }
         onClick = { [weak self] _ in self?.onMenu?() }
         toolTip = DeveloperTool.Group.size.title
     }
@@ -80,15 +81,16 @@ final class PageSizeReadout: InteractiveView, NSTextFieldDelegate {
         return String(localized: "at \(percent)%", comment: "After the page's width and height above the page, while a page larger than the window is shown smaller to fit: how large it's shown, like “at 72%”.")
     }
 
-    /// Shows `size` (nil: none, and the readout is hidden by its bar), named if it's a listed one. A field you're
-    /// typing in keeps what you typed.
-    func show(size: CGSize?, name: String?, scale: CGFloat) {
+    /// Shows `size` (nil: none, and the readout is hidden by its bar), named if it's a listed one, with its pixel
+    /// ratio (nil: the Mac's, not said). A field you're typing in keeps what you typed.
+    func show(size: CGSize?, name: String?, scale: CGFloat, pixelRatio: CGFloat? = nil) {
         self.size = size
         nameLabel.stringValue = name ?? ""
         if let size {
             if !widthField.isEditing { widthField.stringValue = String(Int(size.width)) }
             if !heightField.isEditing { heightField.stringValue = String(Int(size.height)) }
         }
+        ratioLabel.stringValue = pixelRatio.map { PageSizes.pixelRatioText(Double($0)) } ?? ""
         scaleLabel.stringValue = Self.scaleText(scale) ?? ""
         setAccessibilityElement(false)
         needsLayout = true
@@ -107,6 +109,7 @@ final class PageSizeReadout: InteractiveView, NSTextFieldDelegate {
         guard size != nil else { return 0 }
         var w = Self.pad * 2 + fieldWidth * 2 + times.inkWidth + Self.gap * 2
         if withName, !nameLabel.stringValue.isEmpty { w += nameLabel.inkWidth + Tokens.Space.x2 }
+        if !ratioLabel.stringValue.isEmpty { w += ratioLabel.inkWidth + Tokens.Space.x2 }
         if !scaleLabel.stringValue.isEmpty { w += scaleLabel.inkWidth + Tokens.Space.x2 }
         return ceil(w)
     }
@@ -129,6 +132,8 @@ final class PageSizeReadout: InteractiveView, NSTextFieldDelegate {
         x = place(times, at: x) + Self.gap
         heightField.frame = NSRect(x: x, y: widthField.frame.minY, width: fieldWidth, height: fieldHeight)
         x = heightField.frame.maxX
+        ratioLabel.isHidden = ratioLabel.stringValue.isEmpty
+        if !ratioLabel.isHidden { x = place(ratioLabel, at: x + Tokens.Space.x2) }
         scaleLabel.isHidden = scaleLabel.stringValue.isEmpty
         if !scaleLabel.isHidden { _ = place(scaleLabel, at: x + Tokens.Space.x2) }
     }

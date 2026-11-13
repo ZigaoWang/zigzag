@@ -121,6 +121,92 @@ struct PageSizeTests {
         tab.close()
     }
 
+    @Test func webKitHasThePixelRatioOverride() {
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 720, height: 450))
+        #expect(PageCardView.canSetPixelRatio)
+        webView.setValue(3.0, forKey: "overrideDeviceScaleFactor")
+        #expect(webView.value(forKey: "overrideDeviceScaleFactor") as? CGFloat == 3)
+    }
+
+    @Test func theCardGivesASizedPageItsPixelRatioAndTakesItBackAsThePageLeaves() {
+        let card = PageCardView(frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        let tab = Tab(url: nil, spaceID: UUID()), other = Tab(url: nil, spaceID: UUID())
+        let page = tab.ensureWebView()
+        func ratio(_ webView: WKWebView) -> CGFloat? { webView.value(forKey: "overrideDeviceScaleFactor") as? CGFloat }
+        card.show(page)
+        // Without a size of its own, a ratio chosen does nothing: the page has the screen's.
+        card.pixelRatio = 3
+        card.layoutSubtreeIfNeeded()
+        #expect(ratio(page) == 0 && card.pagePixelRatio == nil)
+        card.pageSize = CGSize(width: 393, height: 600)
+        card.layoutSubtreeIfNeeded()
+        #expect(ratio(page) == 3 && card.pagePixelRatio == 3)
+        // Another ratio with the size as it was.
+        card.pixelRatio = 2
+        card.layoutSubtreeIfNeeded()
+        #expect(ratio(page) == 2)
+        // Another page in the card: the one that left has the screen's again, wherever it's shown next.
+        card.show(other.ensureWebView())
+        card.layoutSubtreeIfNeeded()
+        #expect(ratio(page) == 0)
+        #expect(other.webView.map(ratio) == 2)
+        card.pageSize = nil
+        card.layoutSubtreeIfNeeded()
+        #expect(other.webView.map(ratio) == 0)
+        tab.close()
+        other.close()
+    }
+
+    @Test func aSizedPagesPixelRatioIsItsDevicesOrTheOneChosen() {
+        withDefaults {
+            var state = DeveloperState()
+            #expect(state.pixelRatio(device: 3) == nil)
+            state.size = CGSize(width: 393, height: 852)
+            #expect(state.pixelRatio(device: 3) == 3)
+            #expect(state.pixelRatio(device: nil) == nil)
+            state.pixelRatio = .two
+            #expect(state.pixelRatio(device: 3) == 2 && state.pixelRatio(device: nil) == 2)
+            // A listed device's, either way up.
+            #expect(PageSizes.named(CGSize(width: 852, height: 393))?.pixelRatio == 3)
+            #expect(PageSizes.named(CGSize(width: 400, height: 852))?.pixelRatio == nil)
+            // Its choices need a size, and say the device's ratio when there's one.
+            #expect(DeveloperTool.pixelRatio2.isChecked(in: state) && DeveloperTool.pixelRatio2.applies(in: state))
+            #expect(!DeveloperTool.pixelRatio2.applies(in: DeveloperState()))
+            #expect(DeveloperTool.pixelRatioDeviceTitle(for: state.size, short: true) == "As the Device (3×)")
+            #expect(DeveloperTool.pixelRatioDeviceTitle(for: CGSize(width: 400, height: 852), short: true) == "As the Device")
+            // Under ⋯ (Page Size folded into it), a ratio other than the device's is something in effect; without a
+            // size it does nothing, so it isn't.
+            let sizeTools = DeveloperBarTools.parts.first { $0.tools.contains(.sizeFill) }?.tools ?? []
+            #expect(!DeveloperTool.hasChoiceInEffect(among: sizeTools.filter { $0.choice == .pixelRatio }, in: { var s = DeveloperState(); s.pixelRatio = .two; return s }()))
+            #expect(DeveloperTool.hasChoiceInEffect(among: sizeTools.filter { $0.choice == .pixelRatio }, in: state))
+        }
+    }
+
+    @Test func aPixelRatioGoesWithItsSize() {
+        var state = DeveloperState()
+        state.size = CGSize(width: 393, height: 852)
+        state.pixelRatio = .two
+        // Another size: the ratio chosen stays.
+        state.size = CGSize(width: 412, height: 915)
+        #expect(state.pixelRatio == .two)
+        // The page fills its room again (Fill the Window, Toggle Page Size): nothing is left chosen.
+        state.size = nil
+        #expect(state.pixelRatio == .device && state.isUnchanged)
+        // Sized again, it's the device's.
+        state.size = CGSize(width: 393, height: 852)
+        #expect(state.pixelRatio == .device)
+    }
+
+    @Test func theReadoutSaysThePixelRatioAndMakesRoomForIt() {
+        let readout = PageSizeReadout(frame: NSRect(x: 0, y: 0, width: 300, height: 28))
+        readout.show(size: CGSize(width: 393, height: 852), name: "iPhone 16", scale: 1)
+        let plain = readout.width(withName: true)
+        readout.show(size: CGSize(width: 393, height: 852), name: "iPhone 16", scale: 1, pixelRatio: 3)
+        #expect(readout.width(withName: true) > plain && readout.width(withName: false) < readout.width(withName: true))
+        #expect(DeveloperBarTools.sizeText(CGSize(width: 393, height: 852), scale: 1, pixelRatio: 3) == "393 × 852, 3×")
+        #expect(DeveloperBarTools.sizeText(CGSize(width: 1920, height: 1080), scale: 0.5, pixelRatio: 1) == "1920 × 1080, 1× at 50%")
+    }
+
     @Test func aSizedPageStandsOnPlainGround() {
         let card = PageCardView(frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
         let tab = Tab(url: nil, spaceID: UUID())
@@ -287,6 +373,6 @@ struct PageSizeTests {
         #expect(PageSizes.seed.allSatisfy { $0.height > $0.width || $0.width >= 1280 })
         #expect(PageSizes.seed.allSatisfy { PageSizes.limits.contains($0.width) && PageSizes.limits.contains($0.height) })
         #expect(Set(PageSizes.seed.map(\.name)).count == PageSizes.seed.count)
-        #expect(DeveloperBarTools.grouped(part.tools) == [[.sizeFill], [.sizeCustom, .rotate, .sizeToggle]])
+        #expect(DeveloperBarTools.grouped(part.tools) == [[.sizeFill], [.sizeCustom, .rotate, .sizeToggle], [.pixelRatioDevice, .pixelRatio1, .pixelRatio2, .pixelRatio3]])
     }
 }

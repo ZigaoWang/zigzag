@@ -5,6 +5,8 @@ import WebKit
 /// comes. The tab's alone: never saved, never another tab's, gone when the tab closes. In effect only while the tab
 /// is a development tab (`Tab.developerInEffect`): on any other site its page is as it would be without them, and
 /// they apply again when the tab comes back.
+/// The page's size and pixel ratio are how it's shown, so the card showing it applies them (`PageCardView`), and
+/// only to a page shown on its own; everything else is the page's web view's (`Tab.applyDeveloperState`).
 nonisolated struct DeveloperState: Equatable {
     /// The look the page is asked for: the Mac's, as any page, or one of the two whatever the Mac's is.
     enum Appearance: Int, CaseIterable {
@@ -23,11 +25,30 @@ nonisolated struct DeveloperState: Equatable {
     var appearance = Appearance.followsMac
     /// The page is laid out with its styles for print, as it would be on paper.
     var printStyles = false
-    /// The page's own size, in points; nil fills the room it has, as any page.
-    var size: CGSize?
+    /// The page's own size, in points; nil fills the room it has, as any page. A pixel ratio is chosen for the size
+    /// in front of you, so it goes with it: back to the device's when the page fills the room again.
+    var size: CGSize? { didSet { if size == nil { pixelRatio = .device } } }
 
     /// The size the other way up.
     var rotatedSize: CGSize? { size.map { CGSize(width: $0.height, height: $0.width) } }
+
+    /// How many of the screen's pixels a page at a size of its own draws each of its own with, as the device it's
+    /// sized as does: the listed device's (`PageSizes.Size.pixelRatio`), or one chosen whatever the size.
+    enum PixelRatio: Int, CaseIterable {
+        case device = 0, one, two, three
+
+        /// The ratio chosen; nil for the device's.
+        var value: Double? { self == .device ? nil : Double(rawValue) }
+    }
+
+    var pixelRatio = PixelRatio.device
+
+    /// The pixel ratio a page at this size is shown with, given the listed device's (`device`): nil for the Mac's
+    /// own, as any page, and always without a size of its own.
+    func pixelRatio(device: Double?) -> Double? {
+        guard size != nil else { return nil }
+        return pixelRatio.value ?? device
+    }
 
     /// The browser the page is told it's in: Zigzag's own, as any page, or another's, for a site that serves each
     /// its own page.

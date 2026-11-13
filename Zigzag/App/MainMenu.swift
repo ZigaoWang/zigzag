@@ -63,9 +63,12 @@ enum MainMenu {
                 inside = top.submenu ?? NSMenu()
                 submenus[group] = inside
             }
-            // A line between one set of choices and the next, and before what stands apart.
-            if let last = inside.items.last, !last.isSeparatorItem,
-               DeveloperTool(action: last.action)?.choice != tool.choice { inside.addItem(.separator()) }
+            // A line between one set of choices and the next, and before what stands apart; a set that shares the
+            // menu with the thing it's named for has its own heading.
+            if let last = inside.items.last, !last.isSeparatorItem, DeveloperTool(action: last.action)?.choice != tool.choice {
+                inside.addItem(.separator())
+                if let heading = tool.choice?.heading { inside.addItem(.sectionHeader(title: heading)) }
+            }
             inside.addItem(item(tool.shortTitle, tool.action, tool.key?.0 ?? "", tool.key?.1 ?? [.command]))
         }
         refreshPageSizes(in: main)

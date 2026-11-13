@@ -348,6 +348,11 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func pageSizeFill(_ sender: Any?) { if !selectedIsInSplit { chooseForDevelopment { $0.size = nil } } }
+    @objc func pixelRatioDevice(_ sender: Any?) { choosePixelRatio(.device) }
+    @objc func pixelRatio1(_ sender: Any?) { choosePixelRatio(.one) }
+    @objc func pixelRatio2(_ sender: Any?) { choosePixelRatio(.two) }
+    @objc func pixelRatio3(_ sender: Any?) { choosePixelRatio(.three) }
+    private func choosePixelRatio(_ ratio: DeveloperState.PixelRatio) { if !selectedIsInSplit { chooseForDevelopment { $0.pixelRatio = ratio } } }
     @objc func rotatePage(_ sender: Any?) { if !selectedIsInSplit { chooseForDevelopment { $0.size = $0.rotatedSize } } }
     @objc func pageSizeCustom(_ sender: Any?) {
         guard let tab = selectedTab, tab.isDevelopment, !selectedIsInSplit else { return }
@@ -669,11 +674,13 @@ extension BrowserWindowController: NSMenuItemValidation {
             return DeveloperTool.site.isOffered(for: tab, isPrivate: tabManager.isPrivate)
         case #selector(pageAppearanceFollowsMac(_:)), #selector(pageAppearanceLight(_:)), #selector(pageAppearanceDark(_:)), #selector(togglePrintStyles(_:)),
              #selector(pageSizeFill(_:)), #selector(pageSizeCustom(_:)), #selector(rotatePage(_:)), #selector(togglePageSize(_:)),
+             #selector(pixelRatioDevice(_:)), #selector(pixelRatio1(_:)), #selector(pixelRatio2(_:)), #selector(pixelRatio3(_:)),
              #selector(toggleJavaScript(_:)), #selector(toggleImages(_:)), #selector(toggleStyles(_:)), #selector(toggleOutlines(_:)),
              #selector(userAgentZigzag(_:)), #selector(userAgentPhone(_:)),
              #selector(userAgentTablet(_:)), #selector(userAgentChrome(_:)), #selector(userAgentFirefox(_:)):
             guard let tool = DeveloperTool(action: item.action) else { return false }
             let state = tab?.developerInEffect ?? DeveloperState()
+            if tool == .pixelRatioDevice { item.title = DeveloperTool.pixelRatioDeviceTitle(for: state.size, short: true) }
             item.state = tab != nil && tab?.isDevelopment == true && tool.isChecked(in: state) ? .on : .off
             return tool.isOffered(for: tab, isPrivate: tabManager.isPrivate, inSplit: selectedIsInSplit) && tool.applies(in: state)
         case #selector(pageSizeListed(_:)):
