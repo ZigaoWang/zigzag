@@ -79,6 +79,8 @@ final class TopBarView: NSView {
 
     private var buttons: [NSView] = []
     private weak var address: NSView?
+    /// The address is here (Settings › Appearance › Address bar above the page), not in the sidebar.
+    var holdsAddress: Bool { address?.superview === self }
 
     override init(frame: NSRect) {
         super.init(frame: frame)

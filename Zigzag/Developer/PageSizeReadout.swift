@@ -206,8 +206,26 @@ final class PageSideField: NSTextField {
     var isEditing = false { didSet { if isEditing != oldValue { refresh() } } }
     private var isHovered = false { didSet { if isHovered != oldValue { refresh() } } }
 
+    /// The figures in the middle of the field, on the line the words beside them sit on, typing included.
+    private final class CenteredCell: NSTextFieldCell {
+        private func centered(_ rect: NSRect) -> NSRect {
+            let height = ceil(cellSize(forBounds: rect).height)
+            return NSRect(x: rect.minX, y: rect.minY + floor((rect.height - height) / 2), width: rect.width, height: height)
+        }
+        override func drawingRect(forBounds rect: NSRect) -> NSRect { centered(super.drawingRect(forBounds: rect)) }
+        override func edit(withFrame rect: NSRect, in controlView: NSView, editor textObj: NSText, delegate: Any?, event: NSEvent?) {
+            super.edit(withFrame: centered(rect), in: controlView, editor: textObj, delegate: delegate, event: event)
+        }
+        override func select(withFrame rect: NSRect, in controlView: NSView, editor textObj: NSText, delegate: Any?, start selStart: Int, length selLength: Int) {
+            super.select(withFrame: centered(rect), in: controlView, editor: textObj, delegate: delegate, start: selStart, length: selLength)
+        }
+    }
+
     init() {
         super.init(frame: .zero)
+        cell = CenteredCell(textCell: "")
+        isEditable = true
+        isSelectable = true
         isBordered = false
         drawsBackground = false
         isBezeled = false

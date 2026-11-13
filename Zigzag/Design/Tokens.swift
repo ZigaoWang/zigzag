@@ -488,6 +488,8 @@ enum Tokens {
         static func spaceName() -> NSFont { voice() }
         /// Numbers that count something on a control (a space key): tabular figures, so they sit like dial markings.
         static func figures(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont { .monospacedDigitSystemFont(ofSize: size, weight: weight) }
+        /// An address as a developer reads it, every character the same width (SF Mono): the developer tools' bar.
+        static func code(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont { .monospacedSystemFont(ofSize: size, weight: weight) }
     }
 
     // MARK: - Symbols (one weight everywhere)
