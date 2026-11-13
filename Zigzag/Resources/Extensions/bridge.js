@@ -856,7 +856,9 @@
 
     // tabs.sendMessage: Chrome hands it to the tab's user scripts too, when their world listens (Tampermonkey runs
     // its scripts and reloads its pages so). Zigzag sends it to those worlds while WebKit sends it to the content
-    // scripts; an answer from either is the answer, the content scripts' first.
+    // scripts. As in Chrome, the first answer from any of them is the answer, without waiting on the rest: a user
+    // script that keeps the channel open and never answers can't hold up a content script's answer. With no answer
+    // once all are done, it's undefined, or WebKit's "Receiving end does not exist" only when nothing at all heard it.
     const tabs = api.tabs;
     if (tabs && typeof tabs.sendMessage === 'function') {
       const sendToTab = tabs.sendMessage.bind(tabs);
@@ -871,13 +873,20 @@
         tabs.sendMessage = (tabId, message, ...rest) => {
           const callback = typeof rest[rest.length - 1] === 'function' ? rest.pop() : null;
           const options = rest[0] && typeof rest[0] === 'object' ? rest[0] : {};
-          const scripts = Promise.resolve().then(() => sendToTab(tabId, message, ...rest)).then((value) => ({ value }), (error) => ({ error }));
-          const worlds = send('userScripts', 'tabMessage', [{ tabId, frameId: options.frameId, documentId: options.documentId }, message, from]).catch(() => ({ reached: 0 }));
-          const answer = Promise.all([scripts, worlds]).then(([script, world]) => {
-            if (!script.error && script.value !== undefined) return script.value;
-            if (world && world.answered) return world.value;
-            if (!script.error || (world && world.reached)) return undefined;
-            throw script.error;
+          const answer = new Promise((resolve, reject) => {
+            let script = null, world = null, done = false;
+            const finish = (settle, value) => { if (!done) { done = true; settle(value); } };
+            // Both sides done and neither answered.
+            const unanswered = () => {
+              if (done || !script || !world) return;
+              if (script.error && !world.reached) finish(reject, script.error); else finish(resolve, undefined);
+            };
+            Promise.resolve().then(() => sendToTab(tabId, message, ...rest)).then(
+              (value) => { if (value !== undefined) finish(resolve, value); else { script = {}; unanswered(); } },
+              (error) => { script = { error }; unanswered(); });
+            send('userScripts', 'tabMessage', [{ tabId, frameId: options.frameId, documentId: options.documentId }, message, from])
+              .then((reply) => reply || { reached: 0 }, () => ({ reached: 0 }))
+              .then((reply) => { if (reply.answered) finish(resolve, reply.value); else { world = reply; unanswered(); } });
           });
           if (!callback) return answer;
           answer.then((value) => callback(value), (error) => callWithError(callback, error));

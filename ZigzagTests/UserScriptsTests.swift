@@ -287,7 +287,8 @@ struct UserScriptsTests {
         var __native = [], __tabMessages = [];
         var chrome = {
           runtime: { id: 'x', getManifest: () => ({ permissions: ['userScripts', 'scripting'] }), onMessage: event(), onConnect: event(),
-                     sendNativeMessage: (host, m) => { __native.push(m); return Promise.resolve({ value: m.fn === 'tabMessage' ? globalThis.__worlds : null }); },
+                     // A world whose listener kept the channel open and never answered: Zigzag never replies.
+                     sendNativeMessage: (host, m) => { __native.push(m); return m.fn === 'tabMessage' && globalThis.__worlds === 'waiting' ? new Promise(() => {}) : Promise.resolve({ value: m.fn === 'tabMessage' ? globalThis.__worlds : null }); },
                      connectNative: () => ({ onMessage: event(), onDisconnect: event(), postMessage: () => {} }) },
           tabs: { sendMessage: (...a) => { __tabMessages.push(a); return globalThis.__scripts(); } },
           scripting: { getRegisteredContentScripts: () => Promise.resolve([]), unregisterContentScripts: () => Promise.resolve() },
@@ -378,13 +379,69 @@ struct UserScriptsTests {
         """)
         try await Task.sleep(for: .milliseconds(100))
         #expect(context.evaluateScript("__two").toString() == "Could not establish connection. Receiving end does not exist.")
-        // A content script's answer stands.
+        // Both answer: one of them is the answer, once.
         context.evaluateScript("""
         globalThis.__scripts = () => Promise.resolve('script');
         globalThis.__worlds = { reached: 1, answered: true, value: 'world' };
-        chrome.tabs.sendMessage(3, {}).then((v) => { globalThis.__three = v; });
+        globalThis.__three = [];
+        chrome.tabs.sendMessage(3, {}, (v) => { globalThis.__three.push(v); });
         """)
         try await Task.sleep(for: .milliseconds(100))
-        #expect(context.evaluateScript("__three").toString() == "script")
+        #expect(["script", "world"].contains(context.evaluateScript("__three.join()").toString()))
+    }
+
+    /// As in Chrome, the first answer from anywhere in the tab is the answer: a user script that keeps the channel
+    /// open and never answers doesn't hold up a content script's answer, nor one that never answers a world's.
+    @Test func aTabsMessageTakesTheFirstAnswer() async throws {
+        let context = background()
+        context.evaluateScript("""
+        globalThis.__scripts = () => Promise.resolve('script');
+        globalThis.__worlds = 'waiting';
+        chrome.tabs.sendMessage(3, {}).then((v) => { globalThis.__one = v; });
+        chrome.tabs.sendMessage(3, {}, (v) => { globalThis.__oneCallback = v; });
+        """)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(context.evaluateScript("__one").toString() == "script")
+        #expect(context.evaluateScript("__oneCallback").toString() == "script")
+        // A content script that keeps its channel open; a user script answers.
+        context.evaluateScript("""
+        globalThis.__scripts = () => new Promise(() => {});
+        globalThis.__worlds = { reached: 1, answered: true, value: 'world' };
+        chrome.tabs.sendMessage(3, {}).then((v) => { globalThis.__two = v; });
+        """)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(context.evaluateScript("__two").toString() == "world")
+        // Heard everywhere, answered nowhere: undefined, not an error.
+        context.evaluateScript("""
+        globalThis.__scripts = () => Promise.resolve(undefined);
+        globalThis.__worlds = { reached: 1 };
+        chrome.tabs.sendMessage(3, {}).then((v) => { globalThis.__three = v === undefined ? 'undefined' : v; }, (e) => { globalThis.__three = e.message; });
+        """)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(context.evaluateScript("__three").toString() == "undefined")
+        // No content script, but a user-script world heard it and didn't answer: undefined too.
+        context.evaluateScript("""
+        globalThis.__scripts = () => Promise.reject(new Error('Could not establish connection. Receiving end does not exist.'));
+        globalThis.__worlds = { reached: 1 };
+        chrome.tabs.sendMessage(3, {}).then((v) => { globalThis.__four = v === undefined ? 'undefined' : v; }, (e) => { globalThis.__four = e.message; });
+        """)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(context.evaluateScript("__four").toString() == "undefined")
+        // Nothing listens anywhere: the error, on lastError for a callback.
+        context.evaluateScript("""
+        globalThis.__worlds = { reached: 0 };
+        chrome.tabs.sendMessage(3, {}, (v) => { globalThis.__five = chrome.runtime.lastError ? chrome.runtime.lastError.message : 'none'; });
+        """)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(context.evaluateScript("__five").toString() == "Could not establish connection. Receiving end does not exist.")
+        // A user-script world in the tab, still listening, while no content script is: the call waits on it, as
+        // Chrome's does, rather than failing.
+        context.evaluateScript("""
+        globalThis.__worlds = 'waiting';
+        globalThis.__six = 'pending';
+        chrome.tabs.sendMessage(3, {}).then(() => { globalThis.__six = 'settled'; }, () => { globalThis.__six = 'settled'; });
+        """)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(context.evaluateScript("__six").toString() == "pending")
     }
 }
