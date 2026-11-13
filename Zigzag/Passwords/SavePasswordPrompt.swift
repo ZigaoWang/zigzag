@@ -218,7 +218,7 @@ final class SavePasswordPrompt: FloatingPanelView {
     #if DEBUG
     /// A look at the prompt that saves nothing: every button only closes it.
     static func debugPreview(in controller: BrowserWindowController) {
-        guard let origin = Origin(URL(string: "https://powerschool.ykpaoschool.cn")) else { return }
+        guard let origin = Origin(URL(string: "https://example.com")) else { return }
         current?.close(saved: false)
         let prompt = SavePasswordPrompt(kind: .save(username: "student"), origin: origin)
         [prompt.neverButton, prompt.notNowButton, prompt.saveButton].forEach { $0.onClick = { [weak prompt] _ in prompt?.close(saved: false) } }
