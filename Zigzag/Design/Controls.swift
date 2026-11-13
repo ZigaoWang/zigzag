@@ -1915,6 +1915,11 @@ final class MenuPanel: FloatingPanelView {
     /// Its items' titles, in order.
     var itemTitles: [String] { rows.map(\.item.title) }
 
+    #if DEBUG
+    /// Where the item with this title is, in its window's terms, for a scripted click where a pointer would click.
+    func debugWindowFrame(of title: String) -> NSRect? { rows.first { $0.item.title == title }.map { $0.convert($0.bounds, to: nil) } }
+    #endif
+
     /// True when the key was the menu's.
     func handleKey(_ event: NSEvent) -> Bool {
         let mods = event.modifierFlags.intersection([.command, .control, .option])

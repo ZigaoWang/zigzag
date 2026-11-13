@@ -2059,6 +2059,13 @@ enum DebugBridge {
         case "sidebarsize": if let size = Tokens.Sidebar.Size(rawValue: arg) { Tokens.Sidebar.size = size }
         case "newtabplace": if let place = TabManager.NewTabPlace(rawValue: arg) { TabManager.newTabPlace = place }
         case "sitepanel": SitePanel.toggle(in: controller, from: controller.sidebar.address)
+        // menuopen: whether a menu is open, and from what, in the debug log.
+        case "menuopen": debugLog("menuopen => \(MenuPanel.current.map { "\(type(of: $0.anchor.map { $0 as NSView } ?? NSView())) \($0.itemTitles.count) items" } ?? "none")")
+        // menuitem <title>: where the open menu's item with that title is, as the mouse verb takes a point (window
+        // points from the top left), in the debug log, so a script clicks it as a pointer would.
+        case "menuitem":
+            guard let window = controller.window, let frame = MenuPanel.current?.debugWindowFrame(of: arg) else { debugLog("menuitem => none"); break }
+            debugLog("menuitem => \(Int(frame.midX)) \(Int(window.frame.height - frame.midY))")
         case "panesite", "panemore":
             // panesite <pane>: that split pane's Site Controls button, as a click on it (#160). panemore <pane>: its ⋯.
             let cards = controller.root.paneCards
@@ -2066,6 +2073,9 @@ enum DebugBridge {
             let header = cards[n].header
             (name == "panemore" ? header.more : header.address.siteControls).onClick?(click)
             debugLog("\(name) \(n): site controls \(header.address.showsSiteControls ? "in the address" : "in ⋯"), panel for \(SitePanel.shown.map { $0.describes(header.tab) } == true ? "this pane" : "another page")")
+            if name == "panemore" {
+                debugLog("panemore \(n) => shown=\(!header.more.isHidden) symbol=\(header.more.symbol) items=\(MenuPanel.current?.itemTitles ?? [])")
+            }
         // sitepage <main|connection|permissions>: the open site panel's page, as its rows and back button go.
         // sitezoom in|out|reset: its Zoom row. sitepermrow <row> <ask|allow|block> | reset: a permission row's
         // dropdown, or Reset Permissions. sitepanelstate <path>: what it shows (JSON). sitext open|fold: its
