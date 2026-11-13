@@ -267,7 +267,10 @@ something came from, answers at once, and can be interrupted.
   (200ms) on `Motion.drawer` (0.32, 0.72, 0, 1): eased out, but it starts at about twice its average speed, not four
   times, so it travels its whole width in even steps. The card moves whole, glass, color, shadow and rows, as one
   layer on the render server, with nothing laid out on the way. With Reduce Motion it fades where it lands, or where
-  it was.
+  it was. Whether the pointer meant it is decided once, 100ms after it meets the edge (`SidebarEdgeReveal`): a quick
+  move counts, even one that runs on past the edge and comes back within 400ms or bounces back off the screen's
+  edge, and then it slides all the way out before leaving can send it back, so a quick move and a slow one look
+  the same.
 - The one movement past `large`: a download thrown into its button, `Motion.flight` (0.45s), eased out along its arc.
 - Moves whose completion must land on time (the Desk's zoom) use `Motion.easeAnimation`, not a spring, which settles
   well after it looks done.
