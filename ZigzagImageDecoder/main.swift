@@ -78,16 +78,25 @@ enum PictureReader {
 }
 
 final class Decoder: NSObject, PictureDecoding {
-    /// How long one picture may take. A decoder stuck past it (a picture made to hang it) ends the helper; Zigzag
-    /// starts it again for the next one.
+    /// How long one picture may take once it's being read. A decoder stuck past it (a picture made to hang it) ends
+    /// the helper; Zigzag starts it again and asks again for the others that were in it.
     static let limit: TimeInterval = 5
 
+    /// A few pictures read at a time, the rest waiting their turn: the clock for each starts when it's read, so a
+    /// burst of them (every tab's icon at launch) never ends the helper by waiting alone.
+    static let queue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.maxConcurrentOperationCount = 4
+        queue.qualityOfService = .utility
+        return queue
+    }()
+
     func decode(_ data: Data, maxSide: Int, reply: @escaping @Sendable (DecodedPicture?) -> Void) {
-        let done = Flag()
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + Self.limit) {
-            if !done.isSet { exit(0) }
-        }
-        DispatchQueue.global(qos: .utility).async {
+        Self.queue.addOperation {
+            let done = Flag()
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + Self.limit) {
+                if !done.isSet { exit(0) }
+            }
             let picture = autoreleasepool { PictureReader.read(data, maxSide: maxSide) }
             done.set()
             reply(picture)

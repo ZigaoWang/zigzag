@@ -143,6 +143,181 @@ struct SafePicturesTests {
         #expect(await WebAppIcon.picture(from: Self.png(width: 128), using: missing) == nil)
     }
 
+    // MARK: A launch's burst of icons
+
+    /// Every tab's icon at once, each a different picture, through the real helper: all of them come back.
+    @Test func twoHundredDifferentPicturesAtOnce() async {
+        let pictures = SafePictures(serviceName: PictureService.name)
+        let inputs = (0..<200).map { i in
+            Self.png(width: 16 + i % 32, CGColor(srgbRed: CGFloat(i % 256) / 255, green: CGFloat((i * 7) % 256) / 255, blue: 0.5, alpha: 1))
+        }
+        let widths = await withTaskGroup(of: (Int, Int?).self) { group in
+            for (i, data) in inputs.enumerated() { group.addTask { (i, await pictures.decode(data, maxSide: 64)?.image.width) } }
+            var all: [Int: Int?] = [:]
+            for await (i, width) in group { all[i] = width }
+            return all
+        }
+        #expect(widths.count == 200)
+        #expect((0..<200).allSatisfy { widths[$0] == 16 + $0 % 32 }, "\(widths.filter { $0.value == nil }.count) failed")
+    }
+
+    /// A picture helper as the tests run it: one process every connection shares, which answers each picture a
+    /// moment later, except a poisoned one. "hang" never answers, and the helper ends itself a while after;
+    /// "crash" brings it down at once. Either way every picture in it then hears its connection broke.
+    nonisolated final class FakeHelper: @unchecked Sendable {
+        static let hang = Data("<svg hang/>".utf8), crash = Data("<svg crash/>".utf8)
+
+        private let lock = NSLock()
+        private var pending: [Int: @Sendable () -> Void] = [:]
+        private var next = 0
+        private var active = 0
+        private(set) var peak = 0
+        private(set) var links = 0
+        private(set) var asked: [Data] = []
+        var hangExit: TimeInterval = 0.3
+        /// Ends the helper once, as soon as this many pictures are in it.
+        var exitWhenActive: Int?
+
+        func makeLink() -> PictureLink { lock.withLock { links += 1 }; return Link(helper: self) }
+
+        final class Link: PictureLink, @unchecked Sendable {
+            let helper: FakeHelper
+            init(helper: FakeHelper) { self.helper = helper }
+            func decode(_ data: Data, maxSide: Int, reply: @escaping @Sendable (DecodedPicture?) -> Void, failed: @escaping @Sendable () -> Void) {
+                helper.decode(data, reply: reply, failed: failed)
+            }
+            func invalidate() {}
+        }
+
+        private func decode(_ data: Data, reply: @escaping @Sendable (DecodedPicture?) -> Void, failed: @escaping @Sendable () -> Void) {
+            let (id, exitNow) = lock.withLock { () -> (Int, Bool) in
+                next += 1
+                pending[next] = failed
+                active += 1
+                peak = max(peak, active)
+                asked.append(data)
+                let exitNow = exitWhenActive.map { active >= $0 } ?? false
+                if exitNow { exitWhenActive = nil }
+                return (next, exitNow)
+            }
+            if exitNow || data == Self.crash { DispatchQueue.global().async { self.exit() }; return }
+            if data == Self.hang { DispatchQueue.global().asyncAfter(deadline: .now() + hangExit) { self.exit() }; return }
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.02) {
+                guard self.lock.withLock({ () -> Bool in
+                    guard self.pending.removeValue(forKey: id) != nil else { return false }
+                    self.active -= 1
+                    return true
+                }) else { return }
+                reply(DecodedPicture(pixels: Data(count: 4), width: 1, height: 1, pointWidth: 1, pointHeight: 1, isVector: false))
+            }
+        }
+
+        /// The helper process goes: every picture in it fails.
+        func exit() {
+            let failing = lock.withLock { () -> [@Sendable () -> Void] in
+                defer { pending = [:]; active = 0 }
+                return Array(pending.values)
+            }
+            failing.forEach { $0() }
+        }
+
+        func count(_ data: Data) -> Int { lock.withLock { asked.filter { $0 == data }.count } }
+    }
+
+    /// Distinct bytes the fake answers: each its own picture as far as the cache can tell.
+    private static func icon(_ i: Int) -> Data { Data("<svg id='\(i)'/>".utf8) }
+
+    @Test func noMoreThanFourAtATimeGoToTheHelper() async {
+        let helper = FakeHelper()
+        let pictures = SafePictures(timeout: 4, makeLink: helper.makeLink)
+        let results = await withTaskGroup(of: Bool.self) { group in
+            for i in 0..<200 { group.addTask { await pictures.decode(Self.icon(i), maxSide: 16) != nil } }
+            var all: [Bool] = []
+            for await result in group { all.append(result) }
+            return all
+        }
+        #expect(results.count == 200 && results.allSatisfy { $0 })
+        #expect(helper.peak <= 4)
+        #expect(helper.links == 1)
+    }
+
+    /// A picture that hangs the helper runs out of time alone; the helper ending itself over it fails the others in
+    /// it then, and each is asked again on a fresh connection and comes back.
+    @Test func aPictureThatHangsTheHelperFailsAlone() async {
+        let helper = FakeHelper()
+        let pictures = SafePictures(timeout: 0.2, makeLink: helper.makeLink)
+        async let poisoned = pictures.decode(FakeHelper.hang, maxSide: 16)
+        let others = await withTaskGroup(of: Bool.self) { group in
+            for i in 0..<30 { group.addTask { await pictures.decode(Self.icon(i), maxSide: 16) != nil } }
+            var all: [Bool] = []
+            for await result in group { all.append(result) }
+            return all
+        }
+        let poison = await poisoned
+        #expect(poison == nil)
+        #expect(others.count == 30 && others.allSatisfy { $0 })
+        // Ran out of time, so it isn't asked again.
+        #expect(helper.count(FakeHelper.hang) == 1)
+    }
+
+    /// A picture that crashes the helper: everything in it then is asked again, once, alone, so the poisoned one
+    /// crashes only itself the second time.
+    @Test func aPictureThatCrashesTheHelperFailsAlone() async {
+        let helper = FakeHelper()
+        let pictures = SafePictures(timeout: 4, makeLink: helper.makeLink)
+        let results = await withTaskGroup(of: (Int, Bool).self) { group in
+            for i in 0..<12 { group.addTask { (i, await pictures.decode(Self.icon(i), maxSide: 16) != nil) } }
+            group.addTask { (-1, await pictures.decode(FakeHelper.crash, maxSide: 16) != nil) }
+            var all: [Int: Bool] = [:]
+            for await (i, ok) in group { all[i] = ok }
+            return all
+        }
+        #expect(results[-1] == false)
+        #expect((0..<12).allSatisfy { results[$0] == true })
+        #expect(helper.count(FakeHelper.crash) == 2)
+    }
+
+    /// The helper going while pictures are in it (it crashed, or ended itself): they're asked again on a fresh
+    /// connection rather than all failing.
+    @Test func anInterruptedHelperIsAskedAgain() async {
+        let helper = FakeHelper()
+        helper.exitWhenActive = 4
+        let pictures = SafePictures(timeout: 4, makeLink: helper.makeLink)
+        let results = await withTaskGroup(of: Bool.self) { group in
+            for i in 0..<20 { group.addTask { await pictures.decode(Self.icon(i), maxSide: 16) != nil } }
+            var all: [Bool] = []
+            for await result in group { all.append(result) }
+            return all
+        }
+        #expect(results.allSatisfy { $0 })
+        #expect(helper.links == 2)
+    }
+
+    /// What the helper read is kept by the bytes and size, and the same bytes asked twice at once go once. What
+    /// failed isn't kept: the next ask tries again.
+    @Test func whatWasReadIsKeptAndFailuresAreNot() async {
+        let helper = FakeHelper()
+        let pictures = SafePictures(timeout: 4, makeLink: helper.makeLink)
+        let icon = Self.icon(1)
+        async let a = pictures.decode(icon, maxSide: 16)
+        async let b = pictures.decode(icon, maxSide: 16)
+        let (first, second) = await (a, b)
+        #expect(first != nil && second != nil)
+        #expect(await pictures.decode(icon, maxSide: 16) != nil)
+        #expect(helper.count(icon) == 1)
+        // Another size is another picture.
+        #expect(await pictures.decode(icon, maxSide: 32) != nil)
+        #expect(helper.count(icon) == 2)
+
+        let missing = SafePictures(serviceName: "wang.zigao.zigzag.no-such-helper", timeout: 2)
+        if case .unavailable = await missing.read(Self.png(width: 16), maxSide: 16) {} else { Issue.record("not unavailable") }
+        // An icon the helper didn't answer for is unavailable, not "no icon", so it's asked for again later.
+        let read = await FaviconStore.read(Self.png(width: 16), side: 16, using: missing)
+        #expect(read.decoded == nil && read.unavailable)
+        // Bytes that aren't a picture at all are a definite no.
+        if case .notAPicture = await missing.read(Self.pdf(), maxSide: 16) {} else { Issue.record("not notAPicture") }
+    }
+
     @Test func badPixelsFromTheHelperAreNotTaken() {
         let short = DecodedPicture(pixels: Data(count: 10), width: 4, height: 4, pointWidth: 4, pointHeight: 4, isVector: false)
         #expect(SafePictures.picture(from: short) == nil)

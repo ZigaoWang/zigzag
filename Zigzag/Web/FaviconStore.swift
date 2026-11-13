@@ -75,6 +75,8 @@ final class FaviconStore {
         guard let key = key(for: url) else { return nil }
         if let image = memory[key] { return image }
         guard !missing.contains(key) else { return nil }
+        // Only PNGs Zigzag drew and wrote itself (`store`), never a site's bytes: read here as they are, not sent to
+        // the picture helper again.
         if let image = NSImage(contentsOf: file(for: key)) {
             keep(image, for: key)
             return image
@@ -120,6 +122,11 @@ final class FaviconStore {
         min(max((previous ?? 30) * 2, 60), 24 * 3600)
     }
 
+    /// Sites whose icon came but the picture helper didn't answer for (too slow, or gone twice): asked again after
+    /// `unreadWait`, without counting as a site that has none.
+    private var unread: Set<String> = []
+    nonisolated static let unreadWait: TimeInterval = 15
+
     /// Loads an icon for a URL we have never visited (bookmarks, imports, history): the site's usual addresses
     /// first, then the icons its page lists, then the ones its front page lists. One fetch per site at a time.
     func prefetch(for url: URL) {
@@ -130,8 +137,13 @@ final class FaviconStore {
         let done: (Bool) -> Void = { [weak self] found in
             guard let self else { return }
             self.inFlight.remove(key)
+            let helperFailed = self.unread.remove(key) != nil
             if found {
                 self.failures[key] = nil
+            } else if helperFailed {
+                // The picture helper didn't answer for an icon the site did send: that's not the site having
+                // none, so it's asked again soon, its wait as it was.
+                self.failures[key] = (Date().addingTimeInterval(Self.unreadWait), self.failures[key]?.wait ?? 0)
             } else {
                 let wait = Self.retryWait(after: self.failures[key]?.wait)
                 self.failures[key] = (Date().addingTimeInterval(wait), wait)
@@ -297,10 +309,11 @@ final class FaviconStore {
             }
             // Read by the picture helper, then drawn to its square and looked at off the main thread: many tabs
             // loading at once each fetch one.
-            let read: Decoded? = if let data { await Self.decode(data, side: side) } else { nil }
+            let (read, unavailable) = if let data { await Self.read(data, side: side) } else { (nil, false) }
             if let read {
                 found(read.image, rest: rest, read: read)
             } else {
+                if unavailable { unread.insert(key) }
                 fetchFirst(rest, touch: touch, key: key, save: save, small: small, completion: completion)
             }
         }
@@ -319,12 +332,24 @@ final class FaviconStore {
     /// What a site sent, read by the sandboxed picture helper (never here: a site picks these bytes), then squared.
     /// Nil for what isn't an allowed picture, or when the helper can't read it: the site has no icon then.
     nonisolated static func decode(_ data: Data, side: CGFloat, using pictures: SafePictures = .shared) async -> Decoded? {
-        guard let picture = await pictures.decode(data, maxSide: maxPixels) else { return nil }
-        return await Task.detached(priority: .utility) {
+        await read(data, side: side, using: pictures).decoded
+    }
+
+    /// As `decode`, and whether it failed for the helper not answering rather than for the bytes: the icon is asked
+    /// for again later then.
+    nonisolated static func read(_ data: Data, side: CGFloat, using pictures: SafePictures = .shared) async -> (decoded: Decoded?, unavailable: Bool) {
+        let picture: SafePictures.Picture
+        switch await pictures.read(data, maxSide: maxPixels) {
+        case .picture(let read): picture = read
+        case .notAPicture: return (nil, false)
+        case .unavailable: return (nil, true)
+        }
+        let decoded = await Task.detached(priority: .utility) {
             let image = picture.nsImage
             let normalized = normalize(image, side: side)
             return Decoded(image: image, normalized: normalized, blank: isBlankSquare(normalized))
         }.value
+        return (decoded, false)
     }
 
 
@@ -369,6 +394,7 @@ final class FaviconStore {
         let normalized = normalized ?? Self.normalize(image)
         keep(normalized, for: key)
         missing.remove(key)
+        unread.remove(key)
         failures[key] = nil
         // Encoded and written off the main thread, in order; clearing history waits for what's still being written.
         let url = file(for: key)
