@@ -24,6 +24,14 @@ import WebKit
 /// no release. Only what the engine takes reaches pages: scriptlets, exceptions and hiding for a named site. Letting
 /// a blocked request through instead belongs in the content blocker's lists (scripts/update_blocklists.sh), which come
 /// with releases.
+///
+/// What a list can do, then, whoever writes it (Zigzag's own included): name one of the scriptlets and hand it strings,
+/// and hide elements with a style sheet. It brings no code of its own: a filter's arguments only ever reach a scriptlet
+/// as strings (ad-engine.js, scriptFor), and a style sheet runs nothing. The code that runs in pages is the scriptlets',
+/// and only a revision whose SHA-256 this release was built with is taken (`pinnedScriptletRevisions`): a download that
+/// is anything else, the CDN's or someone's in between, is never used. Without a pinned copy the lists still hide what
+/// they name and no scriptlet runs. scripts/pin-scriptlets.sh moves the pin to Ghostery's newest revision before a
+/// release; release.sh warns when it isn't.
 nonisolated enum AdFilterSources {
     struct List: Sendable {
         let id: String
@@ -62,9 +70,8 @@ nonisolated enum AdFilterSources {
     static let zigzagFixes = List(id: "zigzag-fixes", urls: urls("https://zigzagbrowser.com/filters/zigzag-fixes.txt"),
                                   bundled: "zigzag-fixes", minimumSize: 100)
 
-    /// uBlock Origin's scriptlets, as Ghostery publishes them for its engine: an index naming each version by its
-    /// SHA-256, and the versions themselves, which never change.
-    static let scriptletsIndex = URL(string: "https://cdn.ghostery.com/adblocker/resources/ublock-resources-json/metadata.json")!
+    /// uBlock Origin's scriptlets, as Ghostery publishes them for its engine: each version at an address named for its
+    /// SHA-256, never changed once published.
     static func scriptlets(revision: String) -> URL {
         URL(string: "https://cdn.ghostery.com/adblocker/resources/ublock-resources-json/\(revision)/list.txt")!
     }
@@ -87,17 +94,18 @@ nonisolated enum AdFilterSources {
         return min(max(seconds, 6 * 3_600), day)
     }
 
-    /// The newest revision in the scriptlets' index, if it reads as one.
-    static func latestRevision(in data: Data) -> String? {
-        guard let index = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let revision = (index["revisions"] as? [String])?.last,
-              revision.count == 64, revision.allSatisfy(\.isHexDigit) else { return nil }
-        return revision.lowercased()
-    }
+    /// The scriptlet revisions this release runs, newest first, by SHA-256: the code that runs in pages, so it's taken
+    /// only as reviewed and released, never as whatever the CDN serves now. Set by scripts/pin-scriptlets.sh, which
+    /// keeps the one before so a Mac with the last release's copy keeps using it until the new one has downloaded.
+    static let pinnedScriptletRevisions: [String] = [
+        "0b0a50a9dbf263c650e7a901a9f66523c1ee96b73f9d026791b9ea03cfc7a43d",
+    ]
+
+    static func sha256(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
 
     /// Scriptlets whose SHA-256 is the revision they were asked for, and that read as the engine's resources.
     static func isScriptlets(_ data: Data, revision: String) -> Bool {
-        guard SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == revision,
+        guard sha256(data) == revision,
               let resources = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let scriptlets = resources["scriptlets"] as? [[String: Any]] else { return false }
         return scriptlets.count >= 50
@@ -119,6 +127,8 @@ nonisolated final class AdEngine: @unchecked Sendable {
     static let shared = AdEngine(directory: Paths.directory("Ad Filters"))
 
     let directory: URL
+    /// The scriptlet revisions taken, newest first (AdFilterSources.pinnedScriptletRevisions).
+    let pinnedRevisions: [String]
     private let session: URLSession
     private let queue = DispatchQueue(label: "app.zigzag.ad-engine", qos: .userInitiated)
     private let building = DispatchQueue(label: "app.zigzag.ad-engine.build", qos: .utility)
@@ -143,8 +153,9 @@ nonisolated final class AdEngine: @unchecked Sendable {
     /// Called on the main thread when a new set of lists is in use.
     var onChange: (@Sendable () -> Void)?
 
-    init(directory: URL, session: URLSession? = nil) {
+    init(directory: URL, session: URLSession? = nil, pinnedRevisions: [String] = AdFilterSources.pinnedScriptletRevisions) {
         self.directory = directory
+        self.pinnedRevisions = pinnedRevisions
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         self.session = session ?? {
             let configuration = URLSessionConfiguration.ephemeral
@@ -183,8 +194,17 @@ nonisolated final class AdEngine: @unchecked Sendable {
         if let data = try? JSONEncoder().encode(fetched) { try? data.write(to: stateFile, options: .atomic) }
     }
 
+    /// The engine's resources with no scriptlets, for while no pinned copy is here.
+    static let noScriptlets = #"{"scriptlets":[],"redirects":[]}"#
+
+    /// The kept scriptlets, if they're a pinned revision: a copy left from before pinning, or changed on disk, is not.
+    private func pinnedScriptlets() -> Data? {
+        guard let data = try? Data(contentsOf: scriptletsFile), pinnedRevisions.contains(AdFilterSources.sha256(data)) else { return nil }
+        return data
+    }
+
     /// The downloaded lists and scriptlets as they are now (Zigzag's own list from the app until it's downloaded), or
-    /// nil while one is missing.
+    /// nil while a list is missing. Without pinned scriptlets the lists are used with none.
     private func inputs() -> (lists: [String], scriptlets: String, checksum: String)? {
         var lists: [String] = []
         var hash = SHA256()
@@ -193,7 +213,8 @@ nonisolated final class AdEngine: @unchecked Sendable {
             lists.append(text)
             hash.update(data: data)
         }
-        guard let data = try? Data(contentsOf: scriptletsFile), let scriptlets = String(data: data, encoding: .utf8) else { return nil }
+        let data = pinnedScriptlets() ?? Data(Self.noScriptlets.utf8)
+        guard let scriptlets = String(data: data, encoding: .utf8) else { return nil }
         hash.update(data: data)
         return (lists, scriptlets, hash.finalize().map { String(format: "%02x", $0) }.joined())
     }
@@ -375,26 +396,16 @@ nonisolated final class AdEngine: @unchecked Sendable {
                 break
             }
         }
-        if due("scriptlets", scriptletsFile) {
-            let known = fetched["scriptlets"]
-            if let (index, response) = await get(AdFilterSources.scriptletsIndex, etag: known?.etag, lastModified: known?.lastModified) {
-                let hasFile = FileManager.default.fileExists(atPath: scriptletsFile.path)
-                if response.statusCode == 304, known != nil, hasFile {
-                    fetched["scriptlets"]?.checked = now
-                } else if response.statusCode == 200, let revision = AdFilterSources.latestRevision(in: index) {
-                    var stored = hasFile && known?.revision == revision
-                    if !stored, let (data, answer) = await get(AdFilterSources.scriptlets(revision: revision), etag: nil, lastModified: nil),
-                       answer.statusCode == 200, AdFilterSources.isScriptlets(data, revision: revision),
-                       (try? data.write(to: scriptletsFile, options: .atomic)) != nil {
-                        stored = true
-                        changed = true
-                    }
-                    if stored {
-                        fetched["scriptlets"] = Fetched(url: AdFilterSources.scriptletsIndex.absoluteString, etag: response.value(forHTTPHeaderField: "ETag"),
-                                                        lastModified: response.value(forHTTPHeaderField: "Last-Modified"), checked: now,
-                                                        lifetime: 86_400, revision: revision)
-                    }
-                }
+        // The newest pinned revision, unless it's here already. Each one never changes, so there's nothing to look up:
+        // it's downloaded once, and only if it hashes to its pin. Failing that, an older pinned copy stays in use.
+        let have = pinnedScriptlets().map(AdFilterSources.sha256)
+        if let newest = pinnedRevisions.first, have != newest {
+            // Only those newer than the one here.
+            for revision in pinnedRevisions.prefix(while: { $0 != have }) {
+                guard let (data, answer) = await get(AdFilterSources.scriptlets(revision: revision), etag: nil, lastModified: nil),
+                      answer.statusCode == 200, AdFilterSources.isScriptlets(data, revision: revision) else { continue }
+                if (try? data.write(to: scriptletsFile, options: .atomic)) != nil { changed = true }
+                break
             }
         }
         writeFetched(fetched)

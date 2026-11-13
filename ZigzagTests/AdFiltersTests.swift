@@ -1,5 +1,6 @@
 import AppKit
 import CryptoKit
+import JavaScriptCore
 import Testing
 import WebKit
 @testable import Zigzag
@@ -67,15 +68,18 @@ struct AdFiltersTests {
         override func stopLoading() {}
     }
 
-    private static func serveEverything(scriptlets: Data = scriptlets) {
+    /// The scriptlet revisions the engines here take, as a release pins its own.
+    nonisolated(unsafe) static var pinned: [String] = []
+
+    private static func serveEverything(scriptlets: Data = scriptlets, filters: Data = filters) {
         let revision = sha256(scriptlets)
+        pinned = [revision]
         Server.asked = []
         Server.answers = [
             AdFilterSources.zigzagFixes.urls[0].absoluteString: .init(status: 200, body: zigzagFixes, headers: ["ETag": "\"z1\""]),
             AdFilterSources.lists[0].urls[0].absoluteString: .init(status: 200, body: filters, headers: ["ETag": "\"f1\""]),
             AdFilterSources.lists[1].urls[0].absoluteString: .init(status: 200, body: quickFixes, headers: ["ETag": "\"q1\""]),
             AdFilterSources.lists[2].urls[0].absoluteString: .init(status: 200, body: unbreak, headers: ["Last-Modified": "Wed, 11 Nov 2026 12:00:00 GMT"]),
-            AdFilterSources.scriptletsIndex.absoluteString: .init(status: 200, body: Data(#"{"name":"test","revisions":["\#(revision)"]}"#.utf8), headers: ["ETag": "\"i1\""]),
             AdFilterSources.scriptlets(revision: revision).absoluteString: .init(status: 200, body: scriptlets),
         ]
     }
@@ -84,7 +88,7 @@ struct AdFiltersTests {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("AdFiltersTests-\(UUID().uuidString)", isDirectory: true)
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [Server.self]
-        return (AdEngine(directory: directory, session: URLSession(configuration: configuration)), directory)
+        return (AdEngine(directory: directory, session: URLSession(configuration: configuration), pinnedRevisions: Self.pinned), directory)
     }
 
     private func waitUntilReady(_ engine: AdEngine, generation: Int = 1) async throws {
@@ -111,8 +115,6 @@ struct AdFiltersTests {
 
     @Test func scriptletsMustBeTheRevisionAskedFor() throws {
         let revision = Self.sha256(Self.scriptlets)
-        #expect(AdFilterSources.latestRevision(in: Data(#"{"revisions":["\#(String(repeating: "0", count: 64))","\#(revision)"]}"#.utf8)) == revision)
-        #expect(AdFilterSources.latestRevision(in: Data(#"{"revisions":["../../etc"]}"#.utf8)) == nil)
         #expect(AdFilterSources.isScriptlets(Self.scriptlets, revision: revision))
         var changed = Self.scriptlets
         changed.append(contentsOf: Data(" ".utf8))
@@ -141,7 +143,7 @@ struct AdFiltersTests {
         #expect(await engine.injection(for: URL(string: "https://example.com/")!).isEmpty)
 
         // Built once: the next launch takes the saved engine, without building again.
-        let again = AdEngine(directory: directory, session: URLSession(configuration: { let c = URLSessionConfiguration.ephemeral; c.protocolClasses = [Server.self]; return c }()))
+        let again = AdEngine(directory: directory, session: URLSession(configuration: { let c = URLSessionConfiguration.ephemeral; c.protocolClasses = [Server.self]; return c }()), pinnedRevisions: Self.pinned)
         again.start()
         try await waitUntilReady(again)
         #expect(again.status.builtIn == 0)
@@ -160,7 +162,7 @@ struct AdFiltersTests {
         #expect(first.value(forHTTPHeaderField: "If-None-Match") == "\"f1\"")
         let unbreak = try #require(Server.asked.first { $0.url == AdFilterSources.lists[2].urls[0] })
         #expect(unbreak.value(forHTTPHeaderField: "If-Modified-Since") == "Wed, 11 Nov 2026 12:00:00 GMT")
-        // The scriptlets' index is current, so the scriptlets themselves aren't asked for.
+        // The pinned scriptlets are here, and a revision never changes: they aren't asked for again.
         #expect(!Server.asked.contains { $0.url?.absoluteString.hasSuffix("list.txt") == true })
         // Not expired: nothing is asked at all.
         Server.asked = []
@@ -177,15 +179,66 @@ struct AdFiltersTests {
         let saved = try Data(contentsOf: directory.appendingPathComponent("ublock-filters.txt"))
         let first = AdFilterSources.lists[0].urls[0].absoluteString
         Server.answers[first] = .init(status: 200, body: Data("<html>Too many requests</html>".utf8))
-        let revision = String(repeating: "a", count: 64)
-        Server.answers[AdFilterSources.scriptletsIndex.absoluteString] = .init(status: 200, body: Data(#"{"revisions":["\#(revision)"]}"#.utf8))
-        Server.answers[AdFilterSources.scriptlets(revision: revision).absoluteString] = .init(status: 200, body: Self.scriptlets)
         // The mirror after it has the list.
         Server.answers[AdFilterSources.lists[0].urls[1].absoluteString] = .init(status: 200, body: Self.filters)
         #expect(await engine.update(force: true) == false)
         #expect(try Data(contentsOf: directory.appendingPathComponent("ublock-filters.txt")) == saved)
         #expect(try Data(contentsOf: directory.appendingPathComponent("scriptlets.json")) == Self.scriptlets)
         #expect(Server.asked.contains { $0.url == AdFilterSources.lists[0].urls[1] })
+    }
+
+    /// The scriptlets are the code that runs in pages: only a revision the release pinned is ever used, whatever the
+    /// CDN serves, and without one the lists run with no scriptlets.
+    @Test func onlyPinnedScriptletsRun() async throws {
+        Self.serveEverything()
+        let pin = Self.pinned[0]
+        // The CDN, or someone in between, serves something else at the pinned address.
+        var changed = Self.scriptlets
+        changed.append(contentsOf: Data(" ".utf8))
+        Server.answers[AdFilterSources.scriptlets(revision: pin).absoluteString] = .init(status: 200, body: changed)
+        let (engine, directory) = makeEngine()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        // A copy already on disk that isn't pinned (left from before, or changed there) isn't used either.
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try changed.write(to: directory.appendingPathComponent("scriptlets.json"))
+        engine.start()
+        try await waitUntilReady(engine)
+        #expect(engine.status.scriptlets == 0)
+        let youTube = await engine.injection(for: URL(string: "https://www.youtube.com/watch?v=x")!)
+        #expect(youTube.page.isEmpty && youTube.isolated.isEmpty)
+        // The lists still hide what they name.
+        #expect(youTube.styles.contains(".ad-box"))
+        // The pinned revision, once it comes, is taken.
+        Server.answers[AdFilterSources.scriptlets(revision: pin).absoluteString] = .init(status: 200, body: Self.scriptlets)
+        #expect(await engine.update(force: true))
+        #expect(try Data(contentsOf: directory.appendingPathComponent("scriptlets.json")) == Self.scriptlets)
+    }
+
+    /// A list names a scriptlet and hands it strings, nothing more: an argument that tries to close the scriptlet's
+    /// string and go on with code of its own stays a string.
+    @Test func aFiltersArgumentsStayStrings() async throws {
+        let sneaky = Self.list("Test sneaky", #"""
+            www.youtube.com##+js(set-flag, zigzagFlag, a`);window.zigzagRan=1;(`)
+            example.org##+js(set-flag, zigzagFlag, $'$`$&)
+            example.net##+js(set-flag, zigzagFlag, ${window.zigzagRan=2})
+            """#)
+        Self.serveEverything(filters: sneaky)
+        Server.answers[AdFilterSources.lists[1].urls[0].absoluteString] = .init(status: 200, body: Self.list("Test quick fixes", ""))
+        Server.answers[AdFilterSources.lists[2].urls[0].absoluteString] = .init(status: 200, body: Self.list("Test unbreak", ""))
+        let (engine, directory) = makeEngine()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        engine.start()
+        try await waitUntilReady(engine)
+        let expected = ["https://www.youtube.com/": "a`);window.zigzagRan=1;(`", "https://example.org/": "$'$`$&", "https://example.net/": "${window.zigzagRan=2}"]
+        for (address, value) in expected {
+            let script = try #require(await engine.injection(for: URL(string: address)!).page.first, "\(address)")
+            let context = try #require(JSContext())
+            context.evaluateScript("var window = globalThis;")
+            context.evaluateScript(script)
+            #expect(context.exception == nil, "\(address)")
+            #expect(context.evaluateScript("window.zigzagRan === undefined").toBool(), "\(address)")
+            #expect(context.evaluateScript("window.zigzagFlag").toString() == value, "\(address)")
+        }
     }
 
     // MARK: Pages
@@ -308,7 +361,7 @@ struct AdFiltersTests {
         #expect(try Data(contentsOf: directory.appendingPathComponent("zigzag-fixes.txt")) == Self.zigzagFixes)
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [Server.self]
-        let again = AdEngine(directory: directory, session: URLSession(configuration: configuration))
+        let again = AdEngine(directory: directory, session: URLSession(configuration: configuration), pinnedRevisions: Self.pinned)
         again.start()
         try await waitUntilReady(again)
         #expect(await again.injection(for: deepSeek).isEmpty)

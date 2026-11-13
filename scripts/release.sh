@@ -31,6 +31,10 @@ grep -q "^## \[$PLANNED\]" CHANGELOG.md || { echo "CHANGELOG.md has no section f
 # The Chinese notes should come with them. Without, a Mac in Chinese shows the English ones, so it's only a warning.
 grep -q "^## \[$PLANNED\]" CHANGELOG.zh-Hans.md || echo "Warning: CHANGELOG.zh-Hans.md has no section for $PLANNED, so Chinese readers get the English notes."
 
+# The ad blocking scriptlets a release accepts are pinned by hash in the app: one older than Ghostery's newest keeps
+# working, but misses its fixes. Pinning is a code change, so it's for before the release, not here.
+scripts/pin-scriptlets.sh --check || echo "Warning: the pinned scriptlets aren't the newest. Run scripts/pin-scriptlets.sh, commit, then release."
+
 # The network to the site and to Apple can drop for a moment: each upload is tried a few times before giving up.
 again() { local n; for n in 1 2 3 4 5; do "$@" && return 0; echo "Retrying ($n): $1"; sleep 5; done; return 1; }
 

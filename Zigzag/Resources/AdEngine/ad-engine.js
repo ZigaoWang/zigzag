@@ -105,6 +105,22 @@ var ZigzagAdEngine = (() => {
   // The scriptlets uBlock Origin runs apart from the page's own scripts; the others run beside them.
   let isolated = new Set();
 
+  // A scriptlet with a filter's arguments filled in. The code is the scriptlet's own, from the pinned resources
+  // (AdFilterSources.pinnedScriptletRevisions); a filter only names one and gives it strings. The engine puts those
+  // strings into the scriptlet's template literals escaped for a regular expression, which leaves a backtick as it
+  // is, and through String.replace, which reads `$'` and the like in them: an argument could close the literal and
+  // run code of its own. Here each is escaped for a template literal, and put in as it is, so it stays a string
+  // whatever it holds, with the value the engine would have given it.
+  function scriptFor(template, args) {
+    if (typeof template !== 'string') return undefined;
+    let script = template;
+    for (let i = 0; i < args.length; i += 1) {
+      const literal = String(args[i]).replace(/[\\`]/g, '\\$&').replace(/\$\{/g, '\\${');
+      script = script.replace(`{{${i + 1}}}`, () => literal);
+    }
+    return script;
+  }
+
   function adopt(built) {
     isolated = new Set(built.resources.scriptlets.filter((s) => s.executionWorld === 'ISOLATED').map((s) => s.name));
     engine = built;
@@ -122,8 +138,8 @@ var ZigzagAdEngine = (() => {
         loadPreprocessors: true,
       });
       built.updateEnv(environment);
+      // With no pinned scriptlets (AdFilters.swift), none: the lists still hide what they name.
       built.updateResources(resources, checksum);
-      if (built.resources.scriptlets.length === 0) throw new Error('No scriptlets in the resources');
       adopt(built);
       return JSON.stringify({ filters: built.cosmetics.getFilters().length, scriptlets: built.resources.scriptlets.length });
     },
@@ -145,7 +161,6 @@ var ZigzagAdEngine = (() => {
         getRulesFromDOM: false, getRulesFromHostname: true, getInjectionRules: true, getExtendedRules: false,
       });
       const hiding = [];
-      const getScriptlet = engine.resources.getScriptlet.bind(engine.resources);
       for (const { filter, exception } of matches) {
         if (filter === undefined || exception !== undefined) continue;
         if (!filter.isScriptInject()) {
@@ -153,8 +168,8 @@ var ZigzagAdEngine = (() => {
           continue;
         }
         const parsed = filter.parseScript();
-        const script = filter.getScript(getScriptlet);
-        if (parsed === undefined || script === undefined) continue;
+        const script = parsed === undefined ? undefined : scriptFor(engine.resources.getScriptlet(parsed.name), parsed.args);
+        if (script === undefined) continue;
         (isolated.has(engine.resources.getScriptletCanonicalName(parsed.name)) ? out.isolated : out.page).push(script);
       }
       if (hiding.length !== 0) {
