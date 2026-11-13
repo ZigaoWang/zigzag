@@ -47,6 +47,7 @@ struct UserScriptsTests {
         }
         #expect(leaves("https://greasyfork.org/scripts/1/code/x.user.js"))
         #expect(leaves("webkit-extension://\(tm)/ask.html?aid=1"))
+        #expect(leaves("webkit-extension://\(ExtensionShims.tampermonkeyBetaID)/ask.html?aid=1"))
         // Only Violentmonkey: its page opens.
         #expect(!leaves("https://greasyfork.org/scripts/1/code/x.user.js", on: false))
         // Its own pages and other tabs, as from its dashboard's "Install from URL".

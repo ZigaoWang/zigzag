@@ -791,10 +791,13 @@ enum ExtensionShims {
 
     /// Replace `find` with `replace` in one of the extension's files. Skipped, and logged, if `find` isn't there
     /// (a newer version that changed), so an update never breaks on an old fix.
+    /// With `pattern`, `find` is a regular expression and `replace` its template (`$1`): for code whose short
+    /// names change from one build to the next (Tampermonkey's beta), so the fix holds across them.
     struct Patch {
         let file: String
         let find: String
         let replace: String
+        var pattern = false
     }
 
     /// Every extension gets the compatibility layer first; some get their own fixes on top.
@@ -946,6 +949,8 @@ enum ExtensionShims {
         // Tampermonkey.
         tampermonkeyID: Shim(patches: [tampermonkeyStartPatch, tampermonkeyPagesPatch, tampermonkeyInstallPatch,
                                           tampermonkeyInlineCheckPatch, tampermonkeyInlinePatch]),
+        // Tampermonkey's beta: the same fixes, written to hold across its frequent builds, whose short names change.
+        tampermonkeyBetaID: Shim(patches: tampermonkeyBetaPatches),
         // Motrix, which hands downloads to the Motrix app.
         motrixID: Shim(backgroundPrelude: motrixPrelude),
     ]
@@ -975,6 +980,9 @@ enum ExtensionShims {
     """
 
     static let tampermonkeyID = "dhdgffkkebhmkfjojejmpbldmpobfkfo"
+    static let tampermonkeyBetaID = "gcalenpjmijncebpfijmoaglllgpjagf"
+    /// Either Tampermonkey: they're one extension to everything that makes room for it.
+    static let tampermonkeyIDs: Set<String> = [tampermonkeyID, tampermonkeyBetaID]
     static let violentmonkeyID = "jinjaccalgkegednnccohejagnlnfdag"
 
     /// With Tampermonkey and Violentmonkey both on, opening a .user.js address has each put its own install page in
@@ -984,7 +992,7 @@ enum ExtensionShims {
     static func leavesInstallToTampermonkey(_ extensionID: String, loading url: URL, tabURL: URL?, tampermonkeyOn: Bool) -> Bool {
         guard tampermonkeyOn, extensionID == violentmonkeyID, url.scheme == "webkit-extension", url.host() == violentmonkeyID,
               url.path() == "/confirm/index.html", let tabURL else { return false }
-        if tabURL.scheme == "webkit-extension" { return tabURL.host() == tampermonkeyID }
+        if tabURL.scheme == "webkit-extension" { return tabURL.host().map(tampermonkeyIDs.contains) ?? false }
         return ["http", "https", "file"].contains(tabURL.scheme ?? "") && tabURL.path().lowercased().hasSuffix(".user.js")
     }
 
@@ -1016,6 +1024,29 @@ enum ExtensionShims {
                                                             replace: #"var E;return L},Zz=e=>{if(void 0===Zz.v){const d=e.ownerDocument||document,x=d.documentElement,k="data-zigzag-inline",p=d.createElement("script"),n=xo();n&&p.setAttribute("nonce",n),x.setAttribute(k,""),p.textContent="document.documentElement.removeAttribute('"+k+"')";try{e.appendChild(p),p.remove()}catch(e){}Zz.v=!x.hasAttribute(k),x.removeAttribute(k)}return Zz.v},Ss=function(e,t,n,o,s){"#)
     private static let tampermonkeyInlinePatch = Patch(file: "content.js", find: #"try{c.textContent=t,e.appendChild(c)}catch(e){r=e.message||e}"#,
                                                        replace: #"try{Zz(e)?(c.textContent=t,e.appendChild(c)):(0,eval)(t)}catch(e){r=e.message||e}"#)
+
+    /// The beta has the same four troubles as the stable version, in code whose short names (and line breaks)
+    /// change with each build, so its fixes find the code by its shape. Checked against 5.6.6242.
+    static let tampermonkeyBetaPatches: [Patch] = [
+        // The empty test.js (tampermonkeyStartPatch): without this its start stopped at its first listener, and
+        // nothing else ran: no popup, no dashboard, no script.
+        Patch(file: "background.js", find: #"try\{\s*importScripts\("/test\.js"\)\}catch\(([\w$]+)\)\{console\.error\(\1\)\}"#, replace: "", pattern: true),
+        tampermonkeyPagesPatch,
+        // Script addresses (tampermonkeyInstallPatch): its "Auto" now picks a way by Chrome's version, the newest one
+        // in Chrome 152 and later and the redirect before; here it takes the way that works, watching the tab.
+        Patch(file: "background.js", find: #"return"auto"!=([\w$]+)\?\1:[\w$]+\(\)>=\d+\?"inline":"newtab""#,
+              replace: #"return"auto"!=$1?$1:"legacy""#, pattern: true),
+        // Inline scripts where the page allows none (tampermonkeyInlineCheckPatch, tampermonkeyInlinePatch), as one
+        // change: the first time on a page, a test script says whether inline scripts run there.
+        Patch(file: "content.js",
+              find: #"let ([\w$]+);const ([\w$]+)=([\w$]+)\(\),([\w$]+)=([\w$]+)\("script"\);\2&&\4\.setAttribute\("nonce",\2\);try\{\4\.textContent=([\w$]+),([\w$]+)\.appendChild\(\4\)\}catch"#,
+              replace: #"let $1;const $2=$3(),$4=$5("script");$2&&$4.setAttribute("nonce",$2);try{"# + inlineRunsCheck + #"($7,$2)?($4.textContent=$6,$7.appendChild($4)):(0,eval)($6)}catch"#,
+              pattern: true),
+    ]
+
+    /// Whether an inline script runs on this page (into `e`, with nonce `n`), found once per page and kept in the
+    /// content script's own world. No `$` or `\` in it: it goes into a regular expression's template.
+    private static let inlineRunsCheck = #"((e,n)=>{const g=globalThis;if(void 0===g.__zigzagInline){const d=e.ownerDocument||document,x=d.documentElement,k="data-zigzag-inline",p=d.createElement("script");n&&p.setAttribute("nonce",n),x.setAttribute(k,""),p.textContent="document.documentElement.removeAttribute('"+k+"')";try{e.appendChild(p),p.remove()}catch(e){}g.__zigzagInline=!x.hasAttribute(k),x.removeAttribute(k)}return g.__zigzagInline})"#
 
     /// Return YouTube Dislike writes its count into a copy of YouTube's label, class names and all. YouTube's
     /// own like and dislike code find their labels by class, so both write into the copy, in turns ("0", the
@@ -1287,7 +1318,7 @@ extension ExtensionStore {
         guard let package = packageDirectory(for: id), let state = self.package(id) else { return nil }
         let shim = ExtensionShims.shim(for: id)
         let prelude = shim?.backgroundPrelude
-        let patches = (shim?.patches ?? []).map { OverlayPatch(file: $0.file, find: $0.find, replace: $0.replace) }
+        let patches = (shim?.patches ?? []).map { OverlayPatch(file: $0.file, find: $0.find, replace: $0.replace, pattern: $0.pattern) }
         guard prelude != nil || !patches.isEmpty else { return package }
         let overlay = overlayFolder(in: folder, version: state.version)
         // What this overlay was made from: rebuilt whenever the prelude, a patch or the language fill changes.
@@ -1311,6 +1342,7 @@ extension ExtensionStore {
         let file: String
         let find: String
         let replace: String
+        var pattern = false
     }
 
     /// What scripts are given at their top (`filled`), for use off the main thread.
@@ -1402,14 +1434,25 @@ extension ExtensionStore {
         let source = package.appendingPathComponent(file), target = overlay.appendingPathComponent(file)
         guard var text = try? String(contentsOf: source, encoding: .utf8) else { return }
         for patch in patches {
-            guard text.range(of: patch.find, options: .literal) != nil else {
+            guard let changed = patched(text, by: patch) else {
                 ExtensionLog.write("patch for \(id) in \(file) skipped: this version changed")
                 continue
             }
-            text = text.replacingOccurrences(of: patch.find, with: patch.replace)
+            text = changed
         }
         try? FileManager.default.removeItem(at: target)
         try? text.write(to: target, atomically: true, encoding: .utf8)
+    }
+
+    /// The text with one patch applied, every place it fits; nil where it fits nowhere.
+    nonisolated static func patched(_ text: String, by patch: OverlayPatch) -> String? {
+        guard patch.pattern else {
+            guard text.range(of: patch.find, options: .literal) != nil else { return nil }
+            return text.replacingOccurrences(of: patch.find, with: patch.replace)
+        }
+        let whole = NSRange(text.startIndex..., in: text)
+        guard let regex = try? NSRegularExpression(pattern: patch.find), regex.firstMatch(in: text, range: whole) != nil else { return nil }
+        return regex.stringByReplacingMatches(in: text, range: whole, withTemplate: patch.replace)
     }
 
     nonisolated private static func linkTree(from source: URL, to target: URL) -> Bool {

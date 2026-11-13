@@ -1269,7 +1269,7 @@ extension Tab: WKWebExtensionTab {
 
     func loadURL(_ url: URL, for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         // Answered as done, not refused: Violentmonkey opens its page in a new tab when this one won't take it.
-        let tampermonkeyOn = profile.extensions.context(for: ExtensionShims.tampermonkeyID) != nil
+        let tampermonkeyOn = ExtensionShims.tampermonkeyIDs.contains { profile.extensions.context(for: $0) != nil }
         if ExtensionShims.leavesInstallToTampermonkey(context.uniqueIdentifier, loading: url, tabURL: webView?.url ?? self.url,
                                                         tampermonkeyOn: tampermonkeyOn) {
             completionHandler(nil)
