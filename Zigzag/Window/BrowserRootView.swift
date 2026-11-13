@@ -799,23 +799,13 @@ final class BrowserRootView: SpaceFrameView {
         return NSRect(x: round(page.midX - size.width / 2), y: round(page.midY - size.height / 2), width: size.width, height: size.height)
     }
 
-    /// Which of a pane's outer corners (its right ones, or its left ones with the sidebar on the right) are the
-    /// window's own corners: on the window's edge across from the sidebar and its top or bottom. The window rounds
-    /// those itself, so they're square; every other corner, a split's at the gap included, stays round.
-    /// Under the bar above the page, the top outer corner meets it and the window's edge in a line, as the window's
-    /// own corner would, so it's square too.
-    private func windowCorners(of pane: NSRect, attached: Bool) -> (top: Bool, bottom: Bool) {
-        let outer = sidebarOnRight ? pane.minX <= bounds.minX + 1 : pane.maxX >= bounds.maxX - 1
-        guard attached, outer else { return (false, false) }
-        let top = showsTopBar ? topBarFrame.maxY : bounds.minY
-        return (pane.minY <= top + 1, pane.maxY >= bounds.maxY - 1)
-    }
-
-    /// Squares a pane's window corners (`windowCorners`) on its side across from the sidebar; the other side rounds.
-    private func squareCorners(of card: PageCardView, pane: NSRect?, attached: Bool) {
-        let corners = pane.map { windowCorners(of: $0, attached: attached) } ?? (false, false)
-        card.squaresRightCorners = sidebarOnRight ? (false, false) : corners
-        card.squaresLeftCorners = sidebarOnRight ? corners : (false, false)
+    /// Every pane is a card of its own with all four corners at one radius, whichever window edge, gap, bar or other
+    /// pane it meets, in every layout and in full screen, as a page alone is (DESIGN.md › Page): squaring the ones on
+    /// the window's edge left a split's panes with corners that didn't match, square where the window doesn't round
+    /// them (full screen, or under the bar) and round at the gap.
+    private func squareCorners(of card: PageCardView) {
+        card.squaresRightCorners = (false, false)
+        card.squaresLeftCorners = (false, false)
     }
 
     /// The shown page's own color, for the bar above it (`paintTopBar`).
@@ -851,11 +841,11 @@ final class BrowserRootView: SpaceFrameView {
         card.band = left.height - frames[0].height
         topBar.pageColor = paintsTopBar ? pageColor : nil
         let attached = sidebarVisible && Self.isBorderless
-        squareCorners(of: card, pane: left, attached: attached)
+        squareCorners(of: card)
         card.isAttached = attached
         for (i, extra) in extraCards.enumerated() {
             let pane = frames.count > i + 1 ? frames[i + 1] : nil
-            squareCorners(of: extra, pane: pane, attached: attached)
+            squareCorners(of: extra)
             extra.isAttached = attached
             if let pane {
                 extra.isHidden = false
@@ -879,11 +869,9 @@ final class BrowserRootView: SpaceFrameView {
         if showsSidePanel {
             let frame = sidePanelFrame
             sidePanel.frame = frame
-            // Shaped like a page pane: the same corners, square where they're the window's own.
+            // Shaped like a page pane: all four corners at its radius.
             let attached = sidebarVisible && Self.isBorderless
-            // Beside a sidebar on the right it sits between the page and the sidebar, with no window corners.
-            sidePanel.setShape(radius: isEdgeToEdge ? 0 : attached ? PageCardView.attachedRadius : Tokens.Radius.card,
-                               squareRight: sidebarOnRight ? (false, false) : windowCorners(of: frame, attached: attached))
+            sidePanel.setShape(radius: isEdgeToEdge ? 0 : attached ? PageCardView.attachedRadius : Tokens.Radius.card, squareRight: (false, false))
         }
     }
 
@@ -1113,11 +1101,8 @@ final class BrowserRootView: SpaceFrameView {
         onSlide?(duration, Tokens.Motion.slide.timing)
         // Borderless: the corners square off as the page grows to the window's edges, and round again as it shrinks.
         // Beside the sidebar, borderless, the page rounds like the window's corner; floating, like a card.
-        let frames = tileFrames
-        let cards = paneCards
-        for (i, pageCard) in cards.enumerated() {
-            let pane = frames.indices.contains(i) ? (i == 0 ? cardViewFrame(frames[0]) : frames[i]) : nil
-            squareCorners(of: pageCard, pane: pane, attached: visible && Self.isBorderless)
+        for pageCard in paneCards {
+            squareCorners(of: pageCard)
             pageCard.isAttached = visible && Self.isBorderless
             pageCard.setEdgeToEdge(isEdgeToEdge, duration: duration)
         }
@@ -1129,7 +1114,7 @@ final class BrowserRootView: SpaceFrameView {
             let frames = self.tileFrames
             self.card.animator().frame = self.cardViewFrame(frames[0])
             self.emptyHint.animator().frame = Self.markFrame(in: frames[0])
-            for i in frames.indices.dropFirst() { cards[i].animator().frame = frames[i] }
+            for i in frames.indices.dropFirst() { self.paneCards[i].animator().frame = frames[i] }
         }, completion: {
             self.leavesDocked = false
             // Not if another slide took over meanwhile: that one ends it.
