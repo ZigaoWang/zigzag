@@ -84,11 +84,16 @@ struct AdFiltersTests {
         ]
     }
 
-    private func makeEngine() -> (AdEngine, URL) {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("AdFiltersTests-\(UUID().uuidString)", isDirectory: true)
+    private static func newDirectory() -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("AdFiltersTests-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    private func makeEngine(in directory: URL = newDirectory(), fetchScriptlets: AdEngine.ScriptletFetcher? = nil,
+                            watchNetwork: AdEngine.NetworkWatcher? = nil, retryDelays: [TimeInterval] = [5, 15, 60, 300, 900]) -> (AdEngine, URL) {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [Server.self]
-        return (AdEngine(directory: directory, session: URLSession(configuration: configuration), pinnedRevisions: Self.pinned), directory)
+        return (AdEngine(directory: directory, session: URLSession(configuration: configuration), pinnedRevisions: Self.pinned,
+                         fetchScriptlets: fetchScriptlets, watchNetwork: watchNetwork, retryDelays: retryDelays), directory)
     }
 
     private func waitUntilReady(_ engine: AdEngine, generation: Int = 1) async throws {
@@ -183,7 +188,7 @@ struct AdFiltersTests {
         Server.answers[AdFilterSources.lists[0].urls[1].absoluteString] = .init(status: 200, body: Self.filters)
         #expect(await engine.update(force: true) == false)
         #expect(try Data(contentsOf: directory.appendingPathComponent("ublock-filters.txt")) == saved)
-        #expect(try Data(contentsOf: directory.appendingPathComponent("scriptlets.json")) == Self.scriptlets)
+        #expect(try Data(contentsOf: engine.scriptletsFile(revision: Self.pinned[0])) == Self.scriptlets)
         #expect(Server.asked.contains { $0.url == AdFilterSources.lists[0].urls[1] })
     }
 
@@ -196,11 +201,14 @@ struct AdFiltersTests {
         var changed = Self.scriptlets
         changed.append(contentsOf: Data(" ".utf8))
         Server.answers[AdFilterSources.scriptlets(revision: pin).absoluteString] = .init(status: 200, body: changed)
-        let (engine, directory) = makeEngine()
+        // A copy already on disk that isn't pinned (left from before pinning, or changed there) isn't used either.
+        let directory = Self.newDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        // A copy already on disk that isn't pinned (left from before, or changed there) isn't used either.
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: directory.appendingPathComponent("Scriptlets"), withIntermediateDirectories: true)
         try changed.write(to: directory.appendingPathComponent("scriptlets.json"))
+        try changed.write(to: directory.appendingPathComponent("Scriptlets/\(pin).json"))
+        let (engine, _) = makeEngine(in: directory)
+        #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("scriptlets.json").path))
         engine.start()
         try await waitUntilReady(engine)
         #expect(engine.status.scriptlets == 0)
@@ -211,7 +219,131 @@ struct AdFiltersTests {
         // The pinned revision, once it comes, is taken.
         Server.answers[AdFilterSources.scriptlets(revision: pin).absoluteString] = .init(status: 200, body: Self.scriptlets)
         #expect(await engine.update(force: true))
-        #expect(try Data(contentsOf: directory.appendingPathComponent("scriptlets.json")) == Self.scriptlets)
+        #expect(try Data(contentsOf: engine.scriptletsFile(revision: pin)) == Self.scriptlets)
+    }
+
+    // MARK: Pinned scriptlets right after an update
+
+    /// The scriptlet CDN as the engine asks it: what each revision brings, nothing while "offline", and what was asked.
+    nonisolated final class FakeScriptlets: @unchecked Sendable {
+        private let lock = NSLock()
+        private var served: [String: Data] = [:]
+        private var log: [String] = []
+        var asked: [String] { lock.withLock { log } }
+        func serve(_ data: Data?, for revision: String) { lock.withLock { served[revision] = data } }
+        func fetch(_ revision: String) async -> Data? { lock.withLock { log.append(revision); return served[revision] } }
+    }
+
+    /// The network watch, fired by hand. Watching while what it handed out is held.
+    nonisolated final class FakeNetwork: @unchecked Sendable {
+        final class Watch { let gone: () -> Void; init(gone: @escaping () -> Void) { self.gone = gone }; deinit { gone() } }
+        private let lock = NSLock()
+        private var callback: (@Sendable () -> Void)?
+        var watching: Bool { lock.withLock { callback != nil } }
+        func watch(_ cameBack: @escaping @Sendable () -> Void) -> AnyObject {
+            lock.withLock { callback = cameBack }
+            return Watch { [weak self] in self?.lock.withLock { self?.callback = nil } }
+        }
+        func comeBack() { lock.withLock { callback }?() }
+    }
+
+    /// Another revision than `scriptlets`, one more scriptlet in it.
+    private static let olderScriptlets: Data = {
+        var all = (try! JSONSerialization.jsonObject(with: scriptlets) as! [String: Any])["scriptlets"] as! [[String: Any]]
+        all.append(["name": "older.js", "aliases": [], "body": "function older() {}", "dependencies": []])
+        return try! JSONSerialization.data(withJSONObject: ["scriptlets": all, "redirects": []])
+    }()
+
+    private func until(_ seconds: Double = 10, _ condition: () -> Bool) async throws {
+        let deadline = Date().addingTimeInterval(seconds)
+        while !condition(), Date() < deadline { try await Task.sleep(for: .milliseconds(20)) }
+    }
+
+    /// A Mac whose copy is from before the pin gets the pinned one at launch, on its own: not left with none until
+    /// the lists' next update.
+    @Test func aCopyThatIsntPinnedIsReplacedAtLaunch() async throws {
+        Self.serveEverything()
+        let pin = Self.pinned[0]
+        let fake = FakeScriptlets()
+        fake.serve(Self.scriptlets, for: pin)
+        let directory = Self.newDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Self.olderScriptlets.write(to: directory.appendingPathComponent("scriptlets.json"))
+        let (engine, _) = makeEngine(in: directory, fetchScriptlets: fake.fetch)
+        #expect(engine.needsScriptlets)
+        engine.start()
+        try await until(2) { fake.asked == [pin] }
+        #expect(fake.asked == [pin])
+        try await until { engine.status.scriptlets == 54 }
+        #expect(engine.status.scriptlets == 54)
+        #expect(!engine.needsScriptlets)
+        #expect(try Data(contentsOf: engine.scriptletsFile(revision: pin)) == Self.scriptlets)
+    }
+
+    /// Offline at launch: asked again after a while, longer each time, until they come; then no more.
+    @Test func offlineTheScriptletsAreAskedForAgainUntilTheyCome() async throws {
+        Self.serveEverything()
+        let pin = Self.pinned[0]
+        let fake = FakeScriptlets(), network = FakeNetwork()
+        let (engine, directory) = makeEngine(fetchScriptlets: fake.fetch, watchNetwork: network.watch, retryDelays: [0.05, 0.1])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        engine.start()
+        try await until { fake.asked.count >= 3 }
+        #expect(fake.asked.count >= 3)
+        #expect(network.watching)
+        try await waitUntilReady(engine)
+        #expect(engine.status.scriptlets == 0)
+        // Online again.
+        fake.serve(Self.scriptlets, for: pin)
+        try await until { engine.status.scriptlets == 54 }
+        #expect(engine.status.scriptlets == 54)
+        let asked = fake.asked.count
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(fake.asked.count == asked)
+        #expect(!network.watching)
+    }
+
+    /// The network coming back asks at once, not after the wait.
+    @Test func theNetworkComingBackAsksForTheScriptletsAtOnce() async throws {
+        Self.serveEverything()
+        let pin = Self.pinned[0]
+        let fake = FakeScriptlets(), network = FakeNetwork()
+        let (engine, directory) = makeEngine(fetchScriptlets: fake.fetch, watchNetwork: network.watch, retryDelays: [3_600])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        engine.start()
+        try await until { fake.asked.count == 1 && network.watching }
+        #expect(network.watching)
+        fake.serve(Self.scriptlets, for: pin)
+        network.comeBack()
+        try await until { engine.status.scriptlets == 54 }
+        #expect(engine.status.scriptlets == 54)
+        #expect(fake.asked.count == 2)
+        #expect(!network.watching)
+    }
+
+    /// A release that moves the pin keeps the one before in its list: the copy of it here runs until the new one
+    /// comes, and stays on disk after.
+    @Test func thePinBeforeRunsUntilTheNewOneComes() async throws {
+        Self.serveEverything()
+        let new = Self.pinned[0], old = Self.sha256(Self.olderScriptlets)
+        Self.pinned = [new, old]
+        let fake = FakeScriptlets()
+        let directory = Self.newDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory.appendingPathComponent("Scriptlets"), withIntermediateDirectories: true)
+        try Self.olderScriptlets.write(to: directory.appendingPathComponent("Scriptlets/\(old).json"))
+        let (engine, _) = makeEngine(in: directory, fetchScriptlets: fake.fetch, retryDelays: [0.05])
+        engine.start()
+        try await until { engine.status.scriptlets == 55 }
+        #expect(engine.status.scriptlets == 55)
+        #expect(fake.asked.first == new)
+        // Never the old one: it's here.
+        #expect(!fake.asked.contains(old))
+        fake.serve(Self.scriptlets, for: new)
+        try await until { engine.status.scriptlets == 54 }
+        #expect(engine.status.scriptlets == 54)
+        #expect(FileManager.default.fileExists(atPath: engine.scriptletsFile(revision: old).path))
     }
 
     /// A list names a scriptlet and hands it strings, nothing more: an argument that tries to close the scriptlet's
@@ -370,7 +502,7 @@ struct AdFiltersTests {
 
     /// uBlock Origin's own scriptlets (GPL-3.0) are kept out of the repository, so the test that runs Zigzag's list
     /// with them runs only where a copy is in Fixtures: `ublock-scriptlets.json`, as the app keeps it in
-    /// Ad Filters/scriptlets.json.
+    /// Ad Filters/Scriptlets/<revision>.json.
     nonisolated static var realScriptlets: URL? {
         Bundle(for: AdFiltersFixtureMarker.self).url(forResource: "ublock-scriptlets", withExtension: "json")
     }

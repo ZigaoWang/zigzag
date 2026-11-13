@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import JavaScriptCore
+import Network
 import os
 import WebKit
 
@@ -153,23 +154,51 @@ nonisolated final class AdEngine: @unchecked Sendable {
     /// Called on the main thread when a new set of lists is in use.
     var onChange: (@Sendable () -> Void)?
 
-    init(directory: URL, session: URLSession? = nil, pinnedRevisions: [String] = AdFilterSources.pinnedScriptletRevisions) {
+    /// Gets one pinned scriptlet revision, or nil when it can't be had now (offline, the CDN down). What it brings is
+    /// taken only if it hashes to the revision.
+    typealias ScriptletFetcher = @Sendable (_ revision: String) async -> Data?
+    /// Starts watching for the network to come back, calling the closure each time it does, until what it returns
+    /// goes.
+    typealias NetworkWatcher = (_ cameBack: @escaping @Sendable () -> Void) -> AnyObject
+
+    private let fetchScriptlets: ScriptletFetcher
+    private let watchNetwork: NetworkWatcher
+    /// How long to wait before asking again for pinned scriptlets that didn't come, by try; the last repeats.
+    private let retryDelays: [TimeInterval]
+
+    init(directory: URL, session: URLSession? = nil, pinnedRevisions: [String] = AdFilterSources.pinnedScriptletRevisions,
+         fetchScriptlets: ScriptletFetcher? = nil, watchNetwork: NetworkWatcher? = nil,
+         retryDelays: [TimeInterval] = [5, 15, 60, 300, 900]) {
         self.directory = directory
         self.pinnedRevisions = pinnedRevisions
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        self.session = session ?? {
+        let session = session ?? {
             let configuration = URLSessionConfiguration.ephemeral
             configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
             configuration.timeoutIntervalForRequest = 30
             configuration.httpAdditionalHeaders = ["User-Agent": "Zigzag"]
             return URLSession(configuration: configuration)
         }()
+        self.session = session
+        self.fetchScriptlets = fetchScriptlets ?? { revision in
+            guard let (data, response) = try? await session.data(from: AdFilterSources.scriptlets(revision: revision)),
+                  (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            return data
+        }
+        self.watchNetwork = watchNetwork ?? { ScriptletNetworkWatch(cameBack: $0) }
+        self.retryDelays = retryDelays.isEmpty ? [900] : retryDelays
+        adoptLegacyScriptlets()
     }
 
     // MARK: Files
 
     private func file(_ name: String) -> URL { directory.appendingPathComponent(name) }
-    private var scriptletsFile: URL { file("scriptlets.json") }
+    /// Each pinned revision downloaded, in a file of its own named for it: one a release has moved on from stays
+    /// until the new one is here, and a Mac back on an older release finds its revision still there.
+    private var scriptletsDirectory: URL { file("Scriptlets") }
+    func scriptletsFile(revision: String) -> URL { scriptletsDirectory.appendingPathComponent(revision + ".json") }
+    /// Where releases before the per-revision files kept the one copy.
+    private var legacyScriptletsFile: URL { file("scriptlets.json") }
     private func listFile(_ id: String) -> URL { file(id + ".txt") }
     private var engineFile: URL { file("engine.bin") }
     private var engineInfoFile: URL { file("engine.json") }
@@ -197,10 +226,39 @@ nonisolated final class AdEngine: @unchecked Sendable {
     /// The engine's resources with no scriptlets, for while no pinned copy is here.
     static let noScriptlets = #"{"scriptlets":[],"redirects":[]}"#
 
-    /// The kept scriptlets, if they're a pinned revision: a copy left from before pinning, or changed on disk, is not.
-    private func pinnedScriptlets() -> Data? {
-        guard let data = try? Data(contentsOf: scriptletsFile), pinnedRevisions.contains(AdFilterSources.sha256(data)) else { return nil }
-        return data
+    /// The newest pinned revision kept here, checked again as it's read: a copy left from before pinning, one a
+    /// release no longer pins, or one changed on disk is never used.
+    private func pinnedScriptlets() -> (revision: String, data: Data)? {
+        for revision in pinnedRevisions {
+            if let data = try? Data(contentsOf: scriptletsFile(revision: revision)), AdFilterSources.sha256(data) == revision {
+                return (revision, data)
+            }
+        }
+        return nil
+    }
+
+    /// The one copy an earlier release kept: into its revision's file if it's one this release pins. It goes either way.
+    private func adoptLegacyScriptlets() {
+        guard let data = try? Data(contentsOf: legacyScriptletsFile) else { return }
+        let revision = AdFilterSources.sha256(data)
+        if pinnedRevisions.contains(revision) { _ = install(data, revision: revision) }
+        try? FileManager.default.removeItem(at: legacyScriptletsFile)
+    }
+
+    /// Keeps a downloaded revision in its own file, and of the others no more than the two last kept.
+    private func install(_ data: Data, revision: String) -> Bool {
+        let fileManager = FileManager.default
+        try? fileManager.createDirectory(at: scriptletsDirectory, withIntermediateDirectories: true)
+        guard (try? data.write(to: scriptletsFile(revision: revision), options: .atomic)) != nil else { return false }
+        let others = ((try? fileManager.contentsOfDirectory(at: scriptletsDirectory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [])
+            .filter { $0.lastPathComponent != revision + ".json" && !pinnedRevisions.contains($0.deletingPathExtension().lastPathComponent) }
+            .sorted { modified($0) > modified($1) }
+        for old in others.dropFirst(2) { try? fileManager.removeItem(at: old) }
+        return true
+    }
+
+    private func modified(_ url: URL) -> Date {
+        (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
     }
 
     /// The downloaded lists and scriptlets as they are now (Zigzag's own list from the app until it's downloaded), or
@@ -213,7 +271,7 @@ nonisolated final class AdEngine: @unchecked Sendable {
             lists.append(text)
             hash.update(data: data)
         }
-        let data = pinnedScriptlets() ?? Data(Self.noScriptlets.utf8)
+        let data = pinnedScriptlets()?.data ?? Data(Self.noScriptlets.utf8)
         guard let scriptlets = String(data: data, encoding: .utf8) else { return nil }
         hash.update(data: data)
         return (lists, scriptlets, hash.finalize().map { String(format: "%02x", $0) }.joined())
@@ -237,6 +295,9 @@ nonisolated final class AdEngine: @unchecked Sendable {
                 rebuild()
             }
         }
+        // Without this release's newest pinned scriptlets (the copy here is a release's before), they're asked for
+        // now, on their own, rather than behind the lists or not until the next update.
+        ensureScriptlets()
         refresh()
         let timer = DispatchSource.makeTimerSource(queue: building)
         timer.schedule(deadline: .now() + 3_600, repeating: 3_600, leeway: .seconds(300))
@@ -396,21 +457,118 @@ nonisolated final class AdEngine: @unchecked Sendable {
                 break
             }
         }
-        // The newest pinned revision, unless it's here already. Each one never changes, so there's nothing to look up:
-        // it's downloaded once, and only if it hashes to its pin. Failing that, an older pinned copy stays in use.
-        let have = pinnedScriptlets().map(AdFilterSources.sha256)
-        if let newest = pinnedRevisions.first, have != newest {
-            // Only those newer than the one here.
-            for revision in pinnedRevisions.prefix(while: { $0 != have }) {
-                guard let (data, answer) = await get(AdFilterSources.scriptlets(revision: revision), etag: nil, lastModified: nil),
-                      answer.statusCode == 200, AdFilterSources.isScriptlets(data, revision: revision) else { continue }
-                if (try? data.write(to: scriptletsFile, options: .atomic)) != nil { changed = true }
-                break
-            }
-        }
+        // Unless they're being asked for already, or will be again shortly (ensureScriptlets).
+        if force || !withRetry({ $0.running || $0.pending != nil }), await updateScriptlets() { changed = true }
         writeFetched(fetched)
         if changed { state.withLock { $0.updated = now } }
         return changed
+    }
+
+    // MARK: Pinned scriptlets
+
+    /// Whether this release's newest pinned revision is missing here (an older pinned copy may still be in use).
+    var needsScriptlets: Bool {
+        guard let newest = pinnedRevisions.first else { return false }
+        return pinnedScriptlets()?.revision != newest
+    }
+
+    private struct Retry {
+        var attempt = 0
+        var pending: DispatchWorkItem?
+        var watch: AnyObject?
+        /// Whether ensureScriptlets is asking now; it decides itself when to ask again.
+        var running = false
+        /// The fetch running now; the next one waits for it, so one revision is never downloaded twice at once.
+        var last: Task<Bool, Never>?
+    }
+    private let retryLock = NSLock()
+    private var retryState = Retry()
+    private func withRetry<T>(_ body: (inout Retry) -> T) -> T { retryLock.withLock { body(&retryState) } }
+
+    /// Fetches the pinned scriptlets now if they're missing, and builds with them once they're here.
+    func ensureScriptlets() {
+        guard needsScriptlets, withRetry({ state in defer { state.running = true }; return !state.running }) else { return }
+        Task.detached(priority: .utility) { [self] in
+            if await updateScriptlets() { rebuild() }
+        }
+    }
+
+    /// Downloads the pinned revisions newer than the one here, newest first, and returns whether one came. Each never
+    /// changes, so there's nothing to look up: it's downloaded once, and kept only if it hashes to its pin. Failing
+    /// that, an older pinned copy stays in use, and it's asked for again: after a while, longer each time, and as
+    /// soon as the network comes back.
+    func updateScriptlets() async -> Bool {
+        let task = withRetry { state -> Task<Bool, Never> in
+            let previous = state.last
+            let task = Task.detached(priority: .utility) { [self] () -> Bool in
+                _ = await previous?.value
+                return await fetchNewerScriptlets()
+            }
+            state.last = task
+            return task
+        }
+        return await task.value
+    }
+
+    private func fetchNewerScriptlets() async -> Bool {
+        guard needsScriptlets else { stopRetrying(); return false }
+        let have = pinnedScriptlets()?.revision
+        var installed = false
+        for revision in pinnedRevisions.prefix(while: { $0 != have }) {
+            guard let data = await fetchScriptlets(revision), AdFilterSources.isScriptlets(data, revision: revision),
+                  install(data, revision: revision) else { continue }
+            installed = true
+            break
+        }
+        if needsScriptlets {
+            withRetry { $0.running = false }
+            retryLater()
+        } else {
+            stopRetrying()
+        }
+        return installed
+    }
+
+    private func retryLater() {
+        let work = DispatchWorkItem { [weak self] in self?.retried() }
+        let start = withRetry { state -> (delay: TimeInterval, watch: Bool)? in
+            guard state.pending == nil else { return nil }
+            let delay = retryDelays[min(state.attempt, retryDelays.count - 1)]
+            state.attempt += 1
+            state.pending = work
+            return (delay, state.watch == nil)
+        }
+        guard let start else { return }
+        building.asyncAfter(deadline: .now() + start.delay, execute: work)
+        if start.watch {
+            let watch = watchNetwork { [weak self] in self?.networkCameBack() }
+            withRetry { if $0.pending != nil, $0.watch == nil { $0.watch = watch } }
+        }
+    }
+
+    private func retried() {
+        withRetry { $0.pending = nil }
+        ensureScriptlets()
+    }
+
+    /// Back online: asked for at once, and the waits start short again.
+    private func networkCameBack() {
+        let pending = withRetry { state -> DispatchWorkItem? in
+            defer { state.pending = nil; state.attempt = 0 }
+            return state.pending
+        }
+        pending?.cancel()
+        ensureScriptlets()
+    }
+
+    private func stopRetrying() {
+        // The watch goes outside the lock: letting it go stops it.
+        let (pending, watch) = withRetry { state -> (DispatchWorkItem?, AnyObject?) in
+            defer { state.pending = nil; state.attempt = 0; state.watch = nil; state.running = false }
+            return (state.pending, state.watch)
+        }
+        pending?.cancel()
+        _ = watch
     }
 
     private func get(_ url: URL, etag: String?, lastModified: String?) async -> (Data, HTTPURLResponse)? {
@@ -423,6 +581,27 @@ nonisolated final class AdEngine: @unchecked Sendable {
 
     /// When the lists in use were last downloaded, from what each download recorded.
     var listsChecked: Date? { readFetched().values.map(\.checked).max() }
+}
+
+/// Tells the ad engine when the Mac comes back online, while it waits for scriptlets that couldn't download: only a
+/// change from offline to online, not the watch's first word on how things are.
+nonisolated final class ScriptletNetworkWatch: @unchecked Sendable {
+    private let monitor = NWPathMonitor()
+    private var wasOffline = false
+
+    init(cameBack: @escaping @Sendable () -> Void) {
+        let queue = DispatchQueue(label: "app.zigzag.ad-engine.network", qos: .utility)
+        monitor.pathUpdateHandler = { [weak self] path in
+            guard let self else { return }
+            if path.status != .satisfied { wasOffline = true; return }
+            guard wasOffline else { return }
+            wasOffline = false
+            cameBack()
+        }
+        monitor.start(queue: queue)
+    }
+
+    deinit { monitor.cancel() }
 }
 
 /// Puts what the engine has for a site into a web view's page scripts before a document of that site starts: each
