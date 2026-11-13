@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- Screen sharing in a web meeting can share a single window, not only a whole screen. When a site asks to share your screen, Zigzag offers Share Window… and Share Screen…, as Safari does, and macOS's picker comes up for the one you chose. ([#211](https://github.com/ZigaoWang/zigzag/issues/211))
+
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
