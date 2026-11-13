@@ -806,7 +806,12 @@ final class SidebarView: NSView {
             dots.forEach { $0.isHidden = isPrivate }
         }
     }
+    /// A hairline over the list: under the favorites, always, so they and the space's tabs read as two parts of the
+    /// sidebar (#210); without favorites, only while the list is scrolled under it.
     private let topSeparator = ColorView(color: Tokens.Color.separator)
+    /// A hairline at the list's foot, over the bottom bar, only while tabs run on under it, as a scroll edge does
+    /// on the Mac (#210).
+    private let bottomSeparator = ColorView(color: Tokens.Color.separator)
     /// Width reserved on the left of the top row for the traffic lights.
     var trafficLightsWidth: CGFloat = 52 { didSet { needsLayout = true } }
     /// The sidebar is on the window's right: its toggle's glyph shows that, and while the bar above the page holds the
@@ -874,7 +879,12 @@ final class SidebarView: NSView {
         addSubview(panes.right.scroll)
         topSeparator.alphaValue = 0
         addSubview(topSeparator)
+        bottomSeparator.alphaValue = 0
+        addSubview(bottomSeparator)
         NotificationCenter.default.addObserver(self, selector: #selector(listScrolled), name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
+        // Tabs opened or closed: the hairline over the bottom bar shows only while some run on under it.
+        list.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(listScrolled), name: NSView.frameDidChangeNotification, object: list)
 
         nowPlaying.isHidden = true
         addSubview(nowPlaying)
@@ -942,9 +952,13 @@ final class SidebarView: NSView {
     @objc private func listScrolled() {
         list.pinHeader()
         updateBottomFade()
-        let scrolled = scrollView.contentView.bounds.minY > 1
-        if (topSeparator.alphaValue > 0) != scrolled {
-            Tokens.Motion.animate(Tokens.Motion.feedback) { self.topSeparator.animator().alphaValue = scrolled ? 1 : 0 }
+        updateTopSeparator()
+    }
+
+    private func updateTopSeparator() {
+        let shows = !favorites.isHidden || scrollView.contentView.bounds.minY > 1
+        if (topSeparator.alphaValue > 0) != shows {
+            Tokens.Motion.animate(Tokens.Motion.feedback) { self.topSeparator.animator().alphaValue = shows ? 1 : 0 }
         }
     }
 
@@ -1013,7 +1027,11 @@ final class SidebarView: NSView {
         nowPlaying.frame = frames.nowPlaying
         let listBottom = frames.listBottom
         scrollView.frame = NSRect(x: pad + swipeOffset, y: listTop, width: width - pad * 2, height: listBottom - listTop)
-        topSeparator.frame = NSRect(x: pad * 2, y: listTop - Tokens.Metric.hairline, width: width - pad * 4, height: Tokens.Metric.hairline)
+        // Under the favorites, halfway down the gap to the list; without them, on the list's top edge.
+        let separatorY = favoritesHeight > 0 ? round(favorites.frame.maxY + (listTop - favorites.frame.maxY) / 2) : listTop - Tokens.Metric.hairline
+        topSeparator.frame = NSRect(x: pad * 2, y: separatorY, width: width - pad * 4, height: Tokens.Metric.hairline)
+        bottomSeparator.frame = NSRect(x: pad * 2, y: listBottom, width: width - pad * 4, height: Tokens.Metric.hairline)
+        updateTopSeparator()
         if list.frame.width != scrollView.contentSize.width {
             list.setFrameSize(NSSize(width: scrollView.contentSize.width, height: max(list.frame.height, scrollView.contentSize.height)))
         }
@@ -1024,6 +1042,10 @@ final class SidebarView: NSView {
 
     private func updateBottomFade() {
         Self.fade(bottomFade, for: scrollView, list: list)
+        let under = list.contentHeight - scrollView.contentView.bounds.maxY > 1
+        if (bottomSeparator.alphaValue > 0) != under {
+            Tokens.Motion.animate(Tokens.Motion.feedback) { self.bottomSeparator.animator().alphaValue = under ? 1 : 0 }
+        }
     }
 
     /// Tabs running on below the bottom of a list fade out there. Only the bottom: the top holds the space's name,

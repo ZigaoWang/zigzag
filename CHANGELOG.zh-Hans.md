@@ -17,6 +17,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 新功能
 - 从 Arc 导入时也会带上每个空间打开的标签页，顺序和 Arc 里一样，分屏浏览的页面仍然并排。它们要等你点按才载入，几百个标签页不会一下子全部载入，再次导入也不会把同一个标签页打开两次。导入窗口里“空间和固定标签页”旁边的“打开的标签页”可以不导入它们。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
 - 边栏底部的空间图标变大了，并跟随“设置 › 外观 › 边栏大小”：“中”比以前稍大一些，“大”明显更大。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
+- 边栏里多了两条淡淡的分隔线：一条在收藏和空间的标签页之间，另一条在底部栏上方，只在标签页延伸到它下面时出现。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
 
 ### 修复
 - 画中画的视频在你切换到别的 App 或别的桌面时会一直留在屏幕上，像在 Safari 里一样浮在所有窗口上面，直到你关掉它。以前它会被下一个 App 挡住，也只留在开始播放的那个桌面上。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
