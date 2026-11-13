@@ -1020,6 +1020,41 @@ enum DebugBridge {
             if let data = try? JSONSerialization.data(withJSONObject: ["tabs": rows, "fill": PageFullScreen.fill.rawValue, "windowFullScreen": controller.window?.styleMask.contains(.fullScreen) == true], options: [.prettyPrinted]) {
                 try? data.write(to: URL(fileURLWithPath: arg))
             }
+        case "fsgeom":
+            // fsgeom <path>: each card with a page: the card's page area, the page's holder and the page itself (window
+            // points), what WebKit keeps clear at the page's edges, its full screen state and the size the page sees (JSON).
+            var rows: [[String: Any]] = []
+            let group = DispatchGroup()
+            func rect(_ r: NSRect) -> [CGFloat] { [r.minX, r.minY, r.width, r.height] }
+            for card in controller.root.paneCards where !card.isHidden {
+                guard let webView = card.webView else { continue }
+                var row: [String: Any] = ["card": rect(card.convert(card.bounds, to: nil)), "page": rect(webView.convert(webView.bounds, to: nil)),
+                                          "pageFrame": rect(webView.frame), "parent": webView.superview.map { "\(type(of: $0))" } ?? "none",
+                                          "holderInCard": (webView as? BrowserWebView)?.owner?.pageHolder.map { $0.isDescendant(of: card) } ?? false,
+                                          "fullscreen": webView.fullscreenState.rawValue, "inWindow": webView.window === controller.window,
+                                          "magnification": webView.magnification,
+                                          "safeArea": [webView.safeAreaInsets.top, webView.safeAreaInsets.left, webView.safeAreaInsets.bottom, webView.safeAreaInsets.right]]
+                for key in ["_topContentInset", "_automaticallyAdjustsContentInsets", "_pageScale", "_viewScale"] where webView.responds(to: NSSelectorFromString(key)) {
+                    row[key] = "\(webView.value(forKey: key) ?? "nil")"
+                }
+                if let holder = webView.superview {
+                    row["holder"] = rect(holder.convert(holder.bounds, to: nil))
+                    row["holderViews"] = holder.subviews.map { "\(type(of: $0)) \(rect($0.frame))" }
+                }
+                if #available(macOS 26.0, *) {
+                    let i = webView.obscuredContentInsets
+                    row["insets"] = [i.top, i.left, i.bottom, i.right]
+                }
+                group.enter()
+                webView.evaluateJavaScript("[innerWidth, innerHeight, document.documentElement.clientWidth, document.documentElement.clientHeight, devicePixelRatio, !!document.fullscreenElement].join(' ')") { result, _ in
+                    row["inner"] = result as? String ?? "?"
+                    rows.append(row)
+                    group.leave()
+                }
+            }
+            group.notify(queue: .main) {
+                if let data = try? JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
+            }
         // developer on|off: Settings › Developer › Developer tools. devsite add|remove <site>: its list.
         // devstate: the switch, the list and which open tabs are development tabs, in the debug log.
         case "developer": DeveloperTools.isOn = arg == "on"
@@ -1125,9 +1160,11 @@ enum DebugBridge {
         case "darkseen": if arg == "forget" { DarkSeen.forget(in: controller.tabManager.profile.store) }
         case "resize":
             let n = arg.split(separator: " ").compactMap { Double($0) }
-            if n.count == 2, let window = controller.window {
+            // resize <w> <h> [x y]: the window's size, and its place on screen (bottom left) when given.
+            if n.count == 2 || n.count == 4, let window = controller.window {
                 var frame = window.frame
                 frame.size = NSSize(width: n[0], height: n[1])
+                if n.count == 4 { frame.origin = NSPoint(x: n[2], y: n[3]) }
                 window.setFrame(frame, display: true)
             }
         case "age":
