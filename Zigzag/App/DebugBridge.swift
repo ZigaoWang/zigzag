@@ -2092,6 +2092,19 @@ enum DebugBridge {
             // closematching <text>: closes this space's tabs whose title or address contains the text.
             let doomed = controller.tabManager.currentTabs.filter { $0.displayTitle.contains(arg) || ($0.url?.absoluteString.contains(arg) ?? false) }
             controller.tabManager.close(doomed)
+        case "floaters":
+            // floaters <path>: every window of Zigzag's that's up, and what keeps it on screen as you go to another
+            // app or desktop: its level, collection behavior, whether it hides when Zigzag isn't in front (JSON).
+            let behaviors: [(String, NSWindow.CollectionBehavior)] = [("canJoinAllSpaces", .canJoinAllSpaces), ("moveToActiveSpace", .moveToActiveSpace),
+                                                                      ("stationary", .stationary), ("fullScreenAuxiliary", .fullScreenAuxiliary),
+                                                                      ("ignoresCycle", .ignoresCycle), ("transient", .transient), ("managed", .managed)]
+            let rows = NSApp.windows.filter(\.isVisible).map { window -> [String: Any] in
+                ["class": "\(type(of: window))", "number": window.windowNumber, "level": window.level.rawValue, "frame": NSStringFromRect(window.frame),
+                 "hidesOnDeactivate": window.hidesOnDeactivate, "canHide": window.canHide, "onActiveSpace": window.isOnActiveSpace,
+                 "behavior": behaviors.filter { window.collectionBehavior.contains($0.1) }.map(\.0)]
+            }
+            let state: [String: Any] = ["active": NSApp.isActive, "windows": rows]
+            if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "pip":
             controller.selectedWebView?.callAsyncJavaScript("const v = [...document.querySelectorAll('video')].find(v => !v.paused); if (!v) return 'no video'; v.webkitSetPresentationMode('picture-in-picture'); await new Promise(r => setTimeout(r, 800)); return v.webkitPresentationMode;", arguments: [:], in: nil, in: .page) { result in
                 debugLog("pip => \(result)")

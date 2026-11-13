@@ -275,6 +275,7 @@ extension WKWebView {
     func togglePictureInPicture() {
         guard canTogglePictureInPicture || isPictureInPictureActive else { return }
         perform(Self.toggle)
+        PictureInPicture.floatSoon()
     }
 }
 
@@ -285,5 +286,40 @@ enum PictureInPicture {
     static var followsTabs: Bool {
         get { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+
+    /// WebKit's Picture in Picture window (`PIPPanel`), in any app but Safari, comes up as an ordinary window: at the
+    /// normal level, on the one desktop it opened on, so it went behind the next app you switched to and stayed
+    /// behind when you changed desktops (#210). Each one is lifted to float as Safari's does, over every app, on
+    /// every desktop and beside full screen windows, until it's closed.
+    static func floatPanels() {
+        for window in NSApp.windows where isPanel(window) { float(window) }
+    }
+
+    /// `floatPanels` now and again in a moment: WebKit makes the window a little after the video asks for it.
+    static func floatSoon() {
+        floatPanels()
+        for delay in [0.3, 1.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { MainActor.assumeIsolated { floatPanels() } }
+        }
+    }
+
+    nonisolated static func isPanel(_ window: NSWindow) -> Bool { isPanel(className: NSStringFromClass(type(of: window))) }
+    nonisolated static func isPanel(className: String) -> Bool { className.hasSuffix("PIPPanel") }
+
+    /// What the window may do as it floats: join every desktop and sit beside full screen windows; never move to
+    /// one desktop alone, nor stay on one.
+    nonisolated static func floatingBehavior(from current: NSWindow.CollectionBehavior) -> NSWindow.CollectionBehavior {
+        var behavior = current
+        behavior.subtract([.moveToActiveSpace, .stationary, .managed])
+        behavior.formUnion([.canJoinAllSpaces, .fullScreenAuxiliary])
+        return behavior
+    }
+
+    static func float(_ window: NSWindow) {
+        let behavior = floatingBehavior(from: window.collectionBehavior)
+        if window.collectionBehavior != behavior { window.collectionBehavior = behavior }
+        if window.level < .floating { window.level = .floating }
+        if window.hidesOnDeactivate { window.hidesOnDeactivate = false }
     }
 }

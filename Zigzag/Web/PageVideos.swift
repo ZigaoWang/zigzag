@@ -222,6 +222,8 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
         // Many ad frames come and go; the newest few dozen are plenty.
         if entry.frames.count > 32, let drop = entry.frames.values.first(where: { !$0.isMain && $0.videos.isEmpty }) { entry.frames[drop.id] = nil }
         entries[key] = entry
+        // A video gone into Picture in Picture, by the page's own button or WebKit's: its window floats (#210).
+        if body["pip"] as? Bool == true { PictureInPicture.floatSoon() }
         reported.send(webView)
     }
 

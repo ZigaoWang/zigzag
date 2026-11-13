@@ -156,6 +156,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillBecomeActive(_ notification: Notification) { MiniLinkWake.appWillActivate() }
+    func applicationWillResignActive(_ notification: Notification) {
+        // A Picture in Picture window that hasn't floated yet does before you're in the other app (#210).
+        PictureInPicture.floatPanels()
+    }
     func applicationDidResignActive(_ notification: Notification) { MiniLinkWake.appDidResign() }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
