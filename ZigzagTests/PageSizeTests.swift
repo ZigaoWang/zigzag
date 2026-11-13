@@ -199,6 +199,52 @@ struct PageSizeTests {
         }
     }
 
+    @Test func aDevicesSizeHasItsPixelRatioAndASizeOfYourOwnMayHaveOne() {
+        withDefaults {
+            #expect(PageSizes.seed.allSatisfy { $0.pixelRatio != nil })
+            #expect(PageSizes.seed.first { $0.name == "iPhone 16" }?.pixelRatio == 3)
+            #expect(PageSizes.seed.first { $0.name == "Pixel 7" }?.pixelRatio == 2.625)
+            // A list kept before sizes had pixel ratios: each device gets its own as it's read, and nothing is written.
+            let old = #"[{"name":"iPhone 16","width":393,"height":852},{"name":"Watch","width":205,"height":251}]"#
+            DeveloperTools.defaults.set(Data(old.utf8), forKey: "DeveloperPageSizes")
+            let read = PageSizes.all
+            #expect(read.map(\.pixelRatio) == [3, nil])
+            #expect(DeveloperTools.defaults.data(forKey: "DeveloperPageSizes") == Data(old.utf8))
+            // Removed as it's shown.
+            PageSizes.remove(read[0])
+            #expect(PageSizes.all.map(\.name) == ["Watch"])
+            // Added with one, kept with it; one out of range is left off.
+            PageSizes.add(PageSizes.Size(name: "Pixel 8a", width: 412, height: 915, pixelRatio: 2.625))
+            PageSizes.add(PageSizes.Size(name: "Odd", width: 412, height: 915, pixelRatio: 9))
+            let all = PageSizes.all
+            #expect(all.first { $0.name == "Pixel 8a" }?.pixelRatio == 2.625)
+            #expect(all.first { $0.name == "Odd" }.map { $0.pixelRatio == nil } == true)
+            // Added without one, a device's name and size included: it keeps none, and the page has the Mac's.
+            PageSizes.add(PageSizes.Size(name: "iPhone 16", width: 393, height: 852))
+            #expect(PageSizes.all.first { $0.name == "iPhone 16" }.map { $0.pixelRatio == nil } == true)
+            #expect(String(decoding: DeveloperTools.defaults.data(forKey: "DeveloperPageSizes") ?? Data(), as: UTF8.self).contains(#""pixelRatio":null"#))
+            // Kept since sizes have ratios, with none: none.
+            let kept = #"[{"name":"iPhone 16","width":393,"height":852,"pixelRatio":null}]"#
+            DeveloperTools.defaults.set(Data(kept.utf8), forKey: "DeveloperPageSizes")
+            #expect(PageSizes.all.map(\.pixelRatio) == [nil])
+        }
+    }
+
+    @Test func whatYouTypeBecomesAPixelRatio() {
+        #expect(PageSizes.pixelRatio(from: "3") == 3)
+        #expect(PageSizes.pixelRatio(from: " 2.625x ") == 2.625)
+        #expect(PageSizes.pixelRatio(from: "2×") == 2)
+        // A comma before the decimals, as many write them.
+        #expect(PageSizes.pixelRatio(from: "2,625") == 2.625 && PageSizes.pixelRatio(from: "2,625×") == 2.625)
+        #expect(PageSizes.pixelRatio(from: "2,5,1") == nil)
+        #expect(PageSizes.pixelRatio(from: "0.5") == nil && PageSizes.pixelRatio(from: "9") == nil && PageSizes.pixelRatio(from: "retina") == nil)
+        // Nothing typed is no ratio at all, which a size may have.
+        #expect(PageSizes.isPixelRatio("") && PageSizes.isPixelRatio("  ") && PageSizes.isPixelRatio("3") && !PageSizes.isPixelRatio("x"))
+        #expect(PageSizes.pixelRatioText(3) == "3×" && PageSizes.pixelRatioText(2.625) == "2.625×")
+        #expect(PageSizes.detail(PageSizes.Size(name: "iPhone 16", width: 393, height: 852, pixelRatio: 3)) == "393 × 852, 3×")
+        #expect(PageSizes.detail(PageSizes.Size(name: "Watch", width: 205, height: 251)) == "205 × 251")
+    }
+
     @Test func whatYouTypeBecomesASize() {
         #expect(PageSizes.size(width: "393", height: " 852 ") == CGSize(width: 393, height: 852))
         #expect(PageSizes.size(width: "393", height: "") == nil)

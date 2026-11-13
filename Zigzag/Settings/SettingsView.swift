@@ -3249,7 +3249,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let remove = PillButton(title: String(localized: "Remove", comment: "Button on a row in Settings › Developer: takes the site or the page size off its list."))
             remove.setAccessibilityLabel(String(localized: "Remove \(size.name)", comment: "VoiceOver name of the Remove button on a row in Settings › Developer: a site, like localhost, or a page size, like iPhone."))
             remove.onClick = { _ in PageSizes.remove(size) }
-            pageSizesGroup.add(FormRow(title: size.name, detail: size.dimensions, control: remove))
+            pageSizesGroup.add(FormRow(title: size.name, detail: PageSizes.detail(size), control: remove))
         }
     }
 

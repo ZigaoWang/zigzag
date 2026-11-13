@@ -28,20 +28,26 @@ enum PageSizeSheet {
         }
     }
 
-    /// Settings › Developer › Add Size…: a name, a width and a height, added to the list.
+    /// Settings › Developer › Add Size…: a name, a width and a height, and the device's pixel ratio if you know it,
+    /// added to the list.
     @discardableResult
     static func add(in host: NSView) -> FormSheet {
         let name = FilledField(placeholder: String(localized: "Name this size", comment: "Placeholder of the name field in the sheet that adds a page size to the list in Settings › Developer."))
         let width = field(nil, placeholder: "393"), height = field(nil, placeholder: "852")
+        let ratio = FilledField(placeholder: String(localized: "The Mac's", comment: "Placeholder of the pixel ratio field in the sheet that adds a page size: left empty, the page is shown with the Mac's own pixel ratio."))
+        let ratioLabel = String(localized: "Pixel ratio", comment: "Label of the field in the sheet that adds a page size for the device's pixel ratio, like 3 for an iPhone. Optional.")
+        let ratioNote = String(localized: "A device's pixel ratio, like 3 for an iPhone, from \(String(format: "%g", PageSizes.pixelRatioLimits.lowerBound)) to \(String(format: "%g", PageSizes.pixelRatioLimits.upperBound)). Leave it empty for the Mac's.", comment: "Note under the pixel ratio field in the sheet that adds a page size: what it is, the least and the most it can be, and that it can be left empty.")
         return FormSheet.show(in: host, title: String(localized: "Add a Page Size", comment: "Title of the sheet that adds a page size to the list in Settings › Developer."), symbol: "ipad.and.iphone",
-                              rows: [FormSheet.Row(label: nil, view: name), FormSheet.Row(label: widthLabel, view: width), FormSheet.Row(label: heightLabel, view: height), .note(limitsNote)],
+                              rows: [FormSheet.Row(label: nil, view: name), FormSheet.Row(label: widthLabel, view: width), FormSheet.Row(label: heightLabel, view: height), .note(limitsNote),
+                                     FormSheet.Row(label: ratioLabel, view: ratio), .note(ratioNote)],
                               confirmTitle: String(localized: "Add", comment: "Button that adds the size, in the sheet that adds a page size."),
-                              canConfirm: { [weak name, weak width, weak height] in
+                              canConfirm: { [weak name, weak width, weak height, weak ratio] in
             !(name?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
                 && PageSizes.size(width: width?.stringValue ?? "", height: height?.stringValue ?? "") != nil
+                && PageSizes.isPixelRatio(ratio?.stringValue ?? "")
         }) { confirmed in
             guard confirmed, let size = PageSizes.size(width: width.stringValue, height: height.stringValue) else { return }
-            PageSizes.add(PageSizes.Size(name: name.stringValue, width: Int(size.width), height: Int(size.height)))
+            PageSizes.add(PageSizes.Size(name: name.stringValue, width: Int(size.width), height: Int(size.height), pixelRatio: PageSizes.pixelRatio(from: ratio.stringValue)))
         }
     }
 }
