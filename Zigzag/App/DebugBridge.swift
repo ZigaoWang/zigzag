@@ -1213,19 +1213,28 @@ enum DebugBridge {
             let tabs = controller.tabManager.currentTabs
             guard let tab = Int(arg).flatMap({ tabs.indices.contains($0) ? tabs[$0] : nil }) ?? controller.tabManager.selectedTab else { break }
             DebugBridge.logDeveloperPage(of: tab)
-        // devsize <width> <height> | fill | rotate: the developer tools' Page Size for the tab in front; then the
-        // page's size and its holder's, and what's docked in it, in the debug log.
-        case "devsize":
+        // devsize <width> <height> | fill | rotate: the developer tools' Page Size for the tab in front; devratio
+        // device|1|2|3: its Pixel Ratio. Then the page's size and its holder's, what's docked in it, its scale, the
+        // pixel ratio the card gave it and what the page reads, in the debug log.
+        case "devsize", "devratio":
             guard let tab = controller.tabManager.selectedTab else { break }
             let n = arg.split(separator: " ").compactMap { Double($0) }
-            if n.count == 2 { tab.developer.size = CGSize(width: n[0], height: n[1]) }
-            if arg == "fill" { tab.developer.size = nil }
-            if arg == "rotate" { tab.developer.size = tab.developer.rotatedSize }
+            if name == "devsize" {
+                if n.count == 2 { tab.developer.size = CGSize(width: n[0], height: n[1]) }
+                if arg == "fill" { tab.developer.size = nil }
+                if arg == "rotate" { tab.developer.size = tab.developer.rotatedSize }
+            }
+            if name == "devratio", let ratio = arg == "device" ? .device : Int(arg).flatMap(DeveloperState.PixelRatio.init(rawValue:)) {
+                tab.developer.pixelRatio = ratio
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 controller.root.layoutSubtreeIfNeeded()
                 let holder = tab.pageHolder
                 let subs = (holder?.subviews ?? []).map { "\(type(of: $0)) \(Int($0.frame.width))x\(Int($0.frame.height))" }.joined(separator: " | ")
-                debugLog("devsize => chose=\(tab.developer.size.map { "\(Int($0.width))x\(Int($0.height))" } ?? "fill") card=\(controller.root.card.pageSize.map { "\(Int($0.width))x\(Int($0.height))" } ?? "fill") holder=\(holder.map { NSStringFromRect($0.frame) } ?? "-") docked=\(holder.map { NSStringFromSize($0.dockedRoom) } ?? "-") subs: \(subs) color=\(tab.pageColor != nil) scale=\(controller.root.card.pageScale)")
+                debugLog("devsize => chose=\(tab.developer.size.map { "\(Int($0.width))x\(Int($0.height))" } ?? "fill") card=\(controller.root.card.pageSize.map { "\(Int($0.width))x\(Int($0.height))" } ?? "fill") holder=\(holder.map { NSStringFromRect($0.frame) } ?? "-") docked=\(holder.map { NSStringFromSize($0.dockedRoom) } ?? "-") subs: \(subs) color=\(tab.pageColor != nil) scale=\(controller.root.card.pageScale) ratio=\(controller.root.card.pagePixelRatio.map { "\($0)" } ?? "mac")")
+                tab.webView?.evaluateJavaScript("[devicePixelRatio, matchMedia('(min-resolution: 2.9dppx)').matches, matchMedia('(min-resolution: 1.9dppx)').matches].join(' ')") { result, _ in
+                    debugLog("devratio => chose=\(tab.developer.pixelRatio) page: dpr mq3 mq2 = \(result ?? "-")")
+                }
             }
         // devbar on|off: Settings › Developer › Tools above the page. devbar: where the tools are, in the debug log.
         case "devbar":
