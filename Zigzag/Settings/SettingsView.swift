@@ -2262,6 +2262,46 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             .compactMap { $0.isHidden ? nil : ($0 as? FormRow)?.debugTitle }
     }
 
+    var debugScroll: NSScrollView? { scroll }
+    var debugSiteDataReady: Bool { siteDataList.model?.state == .loaded && siteDataList.debugListed > 0 }
+    var debugSiteDataCount: Int { siteDataList.model?.entries.count ?? 0 }
+    var debugSiteDataTop: CGFloat { siteDataGroup.frame.minY }
+    var debugSiteDataHeight: CGFloat { siteDataGroup.frame.height }
+    var debugSiteDataExpanded: Bool { siteDataList.debugExpanded && siteDataGroup.frame.height > SiteDataList.rowHeight * CGFloat(SiteDataList.collapsedCount + 2) }
+    func debugSiteDataShowAll() { siteDataList.showsAll = true }
+
+    /// sitedata find <text> | sort name|size | state <path>: the list's search typed, its order chosen, or what it
+    /// shows written as JSON.
+    func debugSiteData(_ arg: String) {
+        let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+        let rest = f.count > 1 ? f[1] : ""
+        switch f.first ?? "" {
+        case "find":
+            siteDataToolbar.search.stringValue = rest
+            siteDataList.model?.query = rest
+        case "sort":
+            siteDataToolbar.sort.selectedIndex = rest == "size" ? 1 : 0
+            siteDataList.model?.order = rest == "size" ? .size : .name
+        case "showall": siteDataList.showsAll = true
+        case "remove":
+            // As the sheet's Remove does once you've said yes, then the list read again from WebKit.
+            guard let model = siteDataList.model, let entry = model.entries.first(where: { $0.site == rest }) else { break }
+            Task {
+                await model.remove([entry])
+                model.refresh()
+            }
+        case "top":
+            documentView.scroll(NSPoint(x: 0, y: max(0, siteDataGroup.frame.minY - 120)))
+        case "state":
+            let model = siteDataList.model
+            let state: [String: Any] = ["sites": model?.entries.count ?? 0, "shown": model?.shown.count ?? 0, "listed": siteDataList.debugListed,
+                                        "rowViews": siteDataList.debugRowViews, "first": model?.shown.prefix(5).map(\.site) ?? [],
+                                        "sizes": model?.hasSizes ?? false, "height": siteDataGroup.frame.height, "remove": siteDataToolbar.removeAll.title]
+            if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: rest)) }
+        default: break
+        }
+    }
+
     func debugFind(_ text: String) {
         settingSearch.stringValue = text
         searchChanged()

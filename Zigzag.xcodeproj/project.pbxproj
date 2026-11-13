@@ -425,6 +425,7 @@
 		FB2AE7D5BF0E44C75BDAEBBB /* chrome-local-state.json in Resources */ = {isa = PBXBuildFile; fileRef = DDA8091D12FF865D4C6F3952 /* chrome-local-state.json */; };
 		FC7890AF73B47C398FD5A153 /* ExtensionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEBF6D0A14B73E1B6D7748A8 /* ExtensionBridge.swift */; };
 		FD3C4C3C5468FB4AB07AB0DE /* ExtensionMenuItemsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9A3CCB9D3C8B7537DC2AA25 /* ExtensionMenuItemsTests.swift */; };
+		FE400E2557BD9FF239AAB016 /* SiteDataBench.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C4237F81EED9D709728975F /* SiteDataBench.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -480,6 +481,7 @@
 		0A6D4409217ACDE22F8A28EA /* api-surface.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "api-surface.js"; sourceTree = "<group>"; };
 		0AF7047E5A8FD4E834836B5B /* ad-engine.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "ad-engine.js"; sourceTree = "<group>"; };
 		0C054793F49E04AC36C79015 /* CertificateDetails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificateDetails.swift; sourceTree = "<group>"; };
+		0C4237F81EED9D709728975F /* SiteDataBench.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteDataBench.swift; sourceTree = "<group>"; };
 		0C625E33D1E438FE873F8B42 /* PageScreenshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageScreenshot.swift; sourceTree = "<group>"; };
 		0C67092285DC153FB7BBDFCE /* Materials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Materials.swift; sourceTree = "<group>"; };
 		0C6B64529E363AA584C30979 /* PasswordHealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordHealth.swift; sourceTree = "<group>"; };
@@ -1201,6 +1203,7 @@
 				67B6B0BECF34D62E3B175E0A /* SettingsView.swift */,
 				FF4C5952AA98F3E6F967D1C5 /* Shortcuts.swift */,
 				DECEDC8885535F130965981A /* SiteData.swift */,
+				0C4237F81EED9D709728975F /* SiteDataBench.swift */,
 				58C3A67ABEDFF4E2FE3FC9AC /* SiteDataList.swift */,
 			);
 			path = Settings;
@@ -1984,6 +1987,7 @@
 				E7E71F580428AFC67EE93EA2 /* SignInImporter.swift in Sources */,
 				6358AB53F0B1E9EAD7CB79AD /* Signal.swift in Sources */,
 				915210234137A2CB955111A1 /* SiteData.swift in Sources */,
+				FE400E2557BD9FF239AAB016 /* SiteDataBench.swift in Sources */,
 				22CC06A44D827DE708625C96 /* SiteDataList.swift in Sources */,
 				57456DF0F211F4F978E29567 /* SitePanel.swift in Sources */,
 				6E7C92A60154EF30AE8E1983 /* SitePermissions.swift in Sources */,

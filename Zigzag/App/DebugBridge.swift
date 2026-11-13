@@ -1953,6 +1953,18 @@ enum DebugBridge {
             if f.count == 2 { Task { await WebsiteData.clear(f[0] == "cache" ? .cache : .cookies, site: f[1], in: controller.tabManager.profile.store); debugLog("cleared \(f[0]) for \(f[1])") } }
         case "cmd": controller.commandBar.runAction(arg)
         case "settingsfind": controller.tabManager.selectedTab?.settingsView?.debugFind(arg)
+        // sitedata seed <count> | bench <path>: made-up sites in the profile of the space in front, or Settings'
+        // list of what websites keep timed (#207).
+        case "sitedata":
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            let store = controller.tabManager.profile.store
+            if f.first == "seed", let count = f.count > 1 ? Int(f[1]) : nil { Task { await SiteDataBench.seed(count, in: store) } }
+            if f.first == "storage", let count = f.count > 1 ? Int(f[1]) : nil { Task { await SiteDataBench.seedStorage(count, in: store) } }
+            if f.first == "bench", f.count > 1, let settings = controller.tabManager.selectedTab?.settingsView {
+                Task { await SiteDataBench.run(settings, to: f[1]) }
+            } else if f.first != "seed", f.first != "storage" {
+                controller.tabManager.selectedTab?.settingsView?.debugSiteData(arg)
+            }
         // flags find <text> | all | top: Settings › Developer › Feature Flags in the tab in front. flagset <key> on|off|default,
         // flagsreset: a WebKit feature flag changed, or all of them back to WebKit's (#173).
         case "flags": controller.tabManager.selectedTab?.settingsView?.debugFlags(arg)
