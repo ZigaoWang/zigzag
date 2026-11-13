@@ -107,6 +107,34 @@ enum Brand {
         /// With Increase Contrast, both inks are a step deeper by day and paler at night (`highDay`, `highNight`).
         var quietInk: NSColor { inked(day: (0.47, 0.04), night: (0.8, 0.025), highDay: (0.36, 0.035), highNight: (0.88, 0.02), plain: Tokens.Color.textSecondary) }
 
+        /// A small solid mark on the frame that has to read at a glance (Developer Mode's chip on a tab's icon): the
+        /// space's accent wherever it holds 3:1, the least a graphic needs, against this space's own frame, bare and
+        /// under the hover and card washes; the row's ink, which always reads there, in a mode where it wouldn't (a
+        /// mid-tone custom color the accent sits too close to). On a see-through frame, whose ground can't be known, the
+        /// row's ink, as the titles beside it.
+        var badge: NSColor {
+            let accent = self.accent, ink = rowInk, grounds = inkGrounds
+            return NSColor(name: nil) { appearance in
+                var shown = accent
+                appearance.performAsCurrentDrawingAppearance {
+                    let mark = accent.usingColorSpace(.sRGB) ?? accent
+                    shown = !grounds.isEmpty && Self.washed(grounds).allSatisfy { Brand.contrast(mark, $0) >= 3 } ? mark : (ink.usingColorSpace(.sRGB) ?? ink)
+                }
+                return shown
+            }
+        }
+
+        /// The frame's colors bare and under the hover and card washes, in the current drawing appearance.
+        private static func washed(_ grounds: [NSColor]) -> [NSColor] {
+            let washes = [Tokens.Chrome.hover, Tokens.Chrome.card].map { $0.usingColorSpace(.sRGB)?.alphaComponent ?? 0 } + [0]
+            return grounds.compactMap { $0.usingColorSpace(.sRGB) }.flatMap { c in
+                washes.map { w in
+                    NSColor(srgbRed: c.redComponent + (1 - c.redComponent) * w, green: c.greenComponent + (1 - c.greenComponent) * w,
+                            blue: c.blueComponent + (1 - c.blueComponent) * w, alpha: 1)
+                }
+            }
+        }
+
         /// The space's ink at an OKLCH lightness and chroma, checked against this space's own frame in each mode,
         /// bare and under the hover and card washes: wherever it would fall under AA (4.5:1), that mode takes the plain
         /// text color instead. Computed per color, so a mid-scale custom shade keeps its ink in whichever mode it can.

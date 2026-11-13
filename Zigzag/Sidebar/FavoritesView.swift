@@ -410,34 +410,14 @@ final class FavoriteTile: InteractiveView {
         return button
     }()
 
-    /// Developer Mode (#141): the tile of a favorite whose open page is in it has the dashed edge a tab's row has,
-    /// inside its corners, and says so in its tooltip.
-    private lazy var developerEdge: CAShapeLayer = {
-        let edge = CAShapeLayer()
-        edge.fillColor = nil
-        edge.lineWidth = Tokens.Sidebar.developerEdge
-        edge.lineDashPattern = Tokens.Sidebar.developerDash
-        edge.isHidden = true
-        layer?.addSublayer(edge)
-        return edge
-    }()
+    /// Developer Mode (#141): the icon of a favorite whose open page is in it has the chip a tab's row has
+    /// (`FaviconView.developerBadge`), and its tooltip says so, with the host.
     private var inDeveloperMode: Bool { tab?.isDevelopment == true && !isPlaceholder }
 
     private func refreshDeveloperMode() {
-        let on = inDeveloperMode
-        guard on || !developerEdge.isHidden else { return }
-        Tokens.Motion.withoutAnimation {
-            developerEdge.isHidden = !on
-            developerEdge.strokeColor = cgColor(Tokens.Color.developer)
-        }
+        if inDeveloperMode { _ = themeToken }
         refreshLoading()
         stateDidChange(animated: false)
-        needsLayout = true
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        if !developerEdge.isHidden { Tokens.Motion.withoutAnimation { developerEdge.strokeColor = cgColor(Tokens.Color.developer) } }
     }
 
     private func refreshAudio() {
@@ -470,6 +450,11 @@ final class FavoriteTile: InteractiveView {
     private var numberHint: NumberHintView?
     private weak var tab: Tab?
     private var tabToken: SignalToken?
+    /// The Developer Mode chip follows the space's color as it changes, or another space is shown.
+    private lazy var themeToken: SignalToken = Brand.themeChanged.observe { [weak self] in
+        guard let self, self.inDeveloperMode else { return }
+        self.icon.developerBadge = Brand.Theme.for(self).badge
+    }
     /// An icon that arrives later (fetched, or saved by a visit) shows at once, not only after a relaunch.
     private var iconToken: SignalToken?
     var isPlaceholder = false { didSet { icon.isHidden = isPlaceholder; stateDidChange(animated: false) } }
@@ -535,8 +520,8 @@ final class FavoriteTile: InteractiveView {
         icon.isAsleep = tab?.isAsleep == true
         let name = Words.list([bookmark?.title, partner?.title].compactMap { $0 })
         // A favorite has no hover card, so a sleeping one says why, and what that freed, in its tooltip.
-        let note = tab?.asleepNote ?? (inDeveloperMode ? DeveloperTool.modeName : nil)
-        toolTip = note.map { name.isEmpty ? $0 : "\(name)\n\($0)" } ?? name
+        let notes = [inDeveloperMode ? TabRowView.developerTip(for: tab?.url) : nil, tab?.asleepNote].compactMap { $0 }
+        toolTip = ([name].filter { !$0.isEmpty } + notes).joined(separator: "\n")
         if let image = tab?.displayIcon, !(tab?.isLoading ?? false) { icon.image = image; needsLayout = true }
     }
 
@@ -585,13 +570,6 @@ final class FavoriteTile: InteractiveView {
             let size = icon.image.map { IconChoice.isPageIcon($0) || FaviconStore.sharpSide(of: $0) >= Self.iconSide } == true ? Self.iconSide : Tokens.Sidebar.favicon
             icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size).integral
         }
-        if !developerEdge.isHidden {
-            let line = Tokens.Sidebar.developerEdge / 2, radius = Tokens.Sidebar.favoriteRadius - line
-            Tokens.Motion.withoutAnimation {
-                developerEdge.frame = bounds
-                developerEdge.path = CGPath(roundedRect: bounds.insetBy(dx: line, dy: line), cornerWidth: radius, cornerHeight: radius, transform: nil)
-            }
-        }
         let side = Self.closeSide, edge = Self.closeInset
         closeButton.frame = NSRect(x: bounds.width - side - edge, y: isFlipped ? edge : bounds.height - side - edge, width: side, height: side)
         if !audioButton.isHidden { audioButton.frame = NSRect(x: edge, y: isFlipped ? edge : bounds.height - side - edge, width: side, height: side) }
@@ -614,6 +592,8 @@ final class FavoriteTile: InteractiveView {
         let value = [state, mode].compactMap { $0 }.joined(separator: String(localized: "accessibility.state-separator", defaultValue: ", ", comment: "Separates the states VoiceOver reads after a tab row's name, like “current tab, playing audio”."))
         setAccessibilityValue(value.isEmpty ? nil : value)
         setAccessibilitySelected(isSelected)
+        // In the space's color, so it follows the space as the tile's own fill does.
+        icon.developerBadge = inDeveloperMode ? Brand.Theme.for(self).badge : nil
         if isPlaceholder {
             // Where the first favorite will land: the drop target's look.
             layer?.backgroundColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha))
@@ -628,8 +608,7 @@ final class FavoriteTile: InteractiveView {
             : isPressed ? Tokens.Chrome.fieldPressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered, duration: Tokens.Motion.selection)
         Tokens.Motion.withoutAnimation {
-            // The dashes are its edge in Developer Mode: the hairline would double them.
-            layer?.borderWidth = (isSelected || isOpen) && !inDeveloperMode ? Tokens.Metric.hairline : 0
+            layer?.borderWidth = isSelected || isOpen ? Tokens.Metric.hairline : 0
             layer?.borderColor = cgColor(isSelected ? Tokens.Chrome.cardEdge : Tokens.Chrome.openEdge)
             setCardShadow(isSelected)
         }

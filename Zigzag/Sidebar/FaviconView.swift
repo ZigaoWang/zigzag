@@ -2,9 +2,13 @@ import AppKit
 
 /// A site icon that turns into the folding ribbon while its page loads. Falls back to a globe for sites without icons.
 final class FaviconView: NSView {
+    /// The picture, the sleeping ring and the globe together, so Developer Mode's chip can cut its gap out of all of
+    /// them at once.
+    private let body = CALayer()
     private let imageLayer = CALayer()
     private let spinner = RibbonView()
-    private let fallback = NSImageView()
+    /// The globe for a site without an icon.
+    private let fallback = CALayer()
     /// One-color icons (GitHub, X, Vercel) come in black or white, often whichever the page was in, so either can
     /// vanish against the sidebar. They take the sidebar's own ink instead, readable in light and dark.
     private var isInk = false
@@ -18,6 +22,8 @@ final class FaviconView: NSView {
         let dark: Bool, ink: Bool
     }
     private var lastRender: RenderKey?
+    private var lastGlobeDark: Bool?
+    private static let globe = Tokens.Symbol.image("globe", size: Tokens.Symbol.row)
     /// The image last drawn, held, so a new image at a reused address is never mistaken for it.
     private var renderedImage: NSImage?
 
@@ -26,6 +32,29 @@ final class FaviconView: NSView {
     /// A tab put to sleep: a thin dashed ring round its icon, as Chrome marks a tab whose page it let go.
     var isAsleep = false { didSet { if oldValue != isAsleep { asleepRing.isHidden = !isAsleep; needsLayout = true } } }
     private let asleepRing = CAShapeLayer()
+
+    /// Developer Mode (#141): a small round chip on the icon's bottom-trailing corner in this color, the mode's hammer
+    /// knocked out of it so the ground shows through, and the icon cut away round it by an even gap, as a status on
+    /// an avatar is. Beside the sleeping ring, the loader and every other state, on any space. Nil: no chip.
+    var developerBadge: NSColor? {
+        didSet {
+            // Drawn again only if the color it resolves to changed (`layoutBadge`).
+            guard oldValue !== developerBadge else { return }
+            Tokens.Motion.withoutAnimation { badge.isHidden = developerBadge == nil }
+            needsLayout = true
+        }
+    }
+    private let badge = CALayer()
+    private let badgeCut = CAShapeLayer()
+    private var renderedBadge: (side: CGFloat, scale: CGFloat, color: CGColor)?
+
+    /// Where the chip sits for an icon of `side` points (x right, y up, from the icon's bottom-left), its side a share
+    /// of the icon's and reaching a little past the icon's corner.
+    static func badgeFrame(side: CGFloat) -> CGRect {
+        let chip = (side * Tokens.Sidebar.developerBadgeShare * 2).rounded() / 2
+        let out = (chip * Tokens.Sidebar.developerBadgeOverhang * 2).rounded() / 2
+        return CGRect(x: side + out - chip, y: -out, width: chip, height: chip)
+    }
 
     /// The sleeping mark's look, as Chrome marks a tab it let go: a hairline ring of short even dashes in a quiet
     /// ink, an even gap out from the icon, which is drawn a little smaller inside it so the two never crowd.
@@ -54,14 +83,19 @@ final class FaviconView: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
+        layer?.addSublayer(body)
         imageLayer.contentsGravity = .resizeAspect
         imageLayer.minificationFilter = .trilinear
         imageLayer.cornerRadius = Tokens.Radius.small - 1
         imageLayer.masksToBounds = true
-        layer?.addSublayer(imageLayer)
+        body.addSublayer(imageLayer)
         asleepRing.fillColor = nil
         asleepRing.isHidden = true
-        layer?.addSublayer(asleepRing)
+        body.addSublayer(asleepRing)
+        badgeCut.fillRule = .evenOdd
+        badge.contentsGravity = .resizeAspect
+        badge.isHidden = true
+        layer?.addSublayer(badge)
 
         spinner.weight = 0.3
         // A page that never says it's done (long polling, a hung load) would keep it flowing forever: after a
@@ -70,10 +104,8 @@ final class FaviconView: NSView {
         spinner.alphaValue = 0
         addSubview(spinner)
 
-        fallback.image = Tokens.Symbol.image("globe", size: Tokens.Symbol.row)
-        fallback.contentTintColor = Tokens.Color.textTertiary
-        fallback.imageScaling = .scaleNone
-        addSubview(fallback)
+        fallback.contentsGravity = .center
+        body.addSublayer(fallback)
         refreshImage()
     }
 
@@ -82,17 +114,68 @@ final class FaviconView: NSView {
     override func layout() {
         super.layout()
         Tokens.Motion.withoutAnimation {
+            body.frame = bounds
             layoutAsleep()
             spinner.frame = bounds
             spinner.ribbonWidth = bounds.width * 0.62
             fallback.frame = bounds
+            layoutBadge()
         }
         refreshColors()
+    }
+
+    /// The chip on its corner, drawn again only when its size, the screen or its color changes; and the gap cut out
+    /// of the icon round it (the rest of the cut reaching well past the sleeping ring).
+    private func layoutBadge() {
+        guard let color = developerBadge, bounds.width > 0 else { body.mask = nil; return }
+        let frame = Self.badgeFrame(side: bounds.width)
+        badge.frame = frame
+        let gap = Tokens.Sidebar.developerBadgeGap
+        let reach = bounds.insetBy(dx: -bounds.width, dy: -bounds.height)
+        let path = CGMutablePath()
+        path.addRect(reach)
+        path.addEllipse(in: frame.insetBy(dx: -gap, dy: -gap))
+        badgeCut.frame = body.bounds
+        badgeCut.path = path
+        if body.mask !== badgeCut { body.mask = badgeCut }
+        let scale = window?.backingScaleFactor ?? 2
+        var resolved = color.cgColor
+        effectiveAppearance.performAsCurrentDrawingAppearance { resolved = color.cgColor }
+        if let last = renderedBadge, last.side == frame.width, last.scale == scale, last.color == resolved { return }
+        renderedBadge = (frame.width, scale, resolved)
+        badge.contents = Self.renderBadge(side: frame.width, scale: scale, color: resolved)
+        badge.contentsScale = scale
+    }
+
+    /// The chip: a disc of `color` with the hammer cut out of it, at exactly the pixels it fills.
+    private static func renderBadge(side: CGFloat, scale: CGFloat, color: CGColor) -> CGImage? {
+        let pixels = Int((side * scale).rounded())
+        guard pixels > 0, let context = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
+                                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        let rect = CGRect(x: 0, y: 0, width: pixels, height: pixels)
+        context.setFillColor(color)
+        context.fillEllipse(in: rect)
+        let config = NSImage.SymbolConfiguration(pointSize: side * scale, weight: .bold)
+        if let glyph = NSImage(systemSymbolName: DeveloperTool.modeSymbol + ".fill", accessibilityDescription: nil)?.withSymbolConfiguration(config)
+            ?? NSImage(systemSymbolName: DeveloperTool.modeSymbol, accessibilityDescription: nil)?.withSymbolConfiguration(config) {
+            // Its longer side a share of the disc's, in the middle of it.
+            let size = glyph.size
+            let fit = rect.width * Tokens.Sidebar.developerGlyphShare / max(size.width, size.height, 1)
+            let drawn = CGSize(width: size.width * fit, height: size.height * fit)
+            let target = CGRect(x: (rect.width - drawn.width) / 2, y: (rect.height - drawn.height) / 2, width: drawn.width, height: drawn.height)
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+            glyph.draw(in: target, from: .zero, operation: .destinationOut, fraction: 1)
+            NSGraphicsContext.restoreGraphicsState()
+        }
+        return context.makeImage()
     }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         refreshColors()
+        if developerBadge != nil { needsLayout = true }
     }
 
     /// The ring an even gap out from the icon, clear of its corners, its dashes dividing the circle exactly.
@@ -114,6 +197,7 @@ final class FaviconView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        if developerBadge != nil { needsLayout = true }
         imageLayer.contentsScale = window?.backingScaleFactor ?? 2
         if isLoading { startSpinning() }
     }
@@ -124,6 +208,11 @@ final class FaviconView: NSView {
             var ink = Tokens.Color.textTertiary.cgColor
             effectiveAppearance.performAsCurrentDrawingAppearance { ink = Tokens.Color.textTertiary.cgColor }
             asleepRing.strokeColor = ink
+            if fallback.contents == nil || lastGlobeDark != effectiveAppearance.isDark {
+                lastGlobeDark = effectiveAppearance.isDark
+                fallback.contents = Self.tinted(Self.globe, Tokens.Color.textTertiary, appearance: effectiveAppearance)
+                fallback.contentsScale = window?.backingScaleFactor ?? 2
+            }
             asleepRing.contentsScale = window?.backingScaleFactor ?? 2
             imageLayer.cornerRadius = isInk || isChosen ? 0 : Tokens.Radius.small - 1
             let scale = window?.backingScaleFactor ?? 2
@@ -157,7 +246,7 @@ final class FaviconView: NSView {
         isSymbol = isChosen && image?.isTemplate == true
         isInk = !isChosen && (image.map(FaviconView.isMonochrome) ?? false)
         refreshColors()
-        fallback.isHidden = image != nil || isLoading
+        Tokens.Motion.withoutAnimation { fallback.isHidden = image != nil || isLoading }
     }
 
     private static func render(_ image: NSImage, side: CGFloat, scale: CGFloat) -> CGImage? {
@@ -231,7 +320,7 @@ final class FaviconView: NSView {
 
     private func showLoading(_ on: Bool) {
         let showSpinner = on
-        fallback.isHidden = image != nil || isLoading
+        Tokens.Motion.withoutAnimation { fallback.isHidden = image != nil || isLoading }
         let toSpinner: Float = showSpinner ? 1 : 0
         let toImage: Float = showSpinner ? 0 : 1
         for (layer, target) in [(spinner.layer!, toSpinner), (imageLayer, toImage)] {
