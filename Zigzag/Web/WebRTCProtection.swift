@@ -83,9 +83,7 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
 
     static func apply(to webView: WKWebView, for url: URL?, here choices: [String: Bool]?) {
         guard isAvailable else { return }
-        let preferences = webView.configuration.preferences
-        let wanted = allows(url, here: choices)
-        if (preferences.value(forKey: preferenceKey) as? Bool) != wanted { preferences.setValue(wanted, forKey: preferenceKey) }
+        WebKitSetup.setIfAvailable(allows(url, here: choices), key: preferenceKey, in: webView.configuration.preferences)
     }
 
     /// A page's new window (a tab, or a pop-up window) comes with its opener's preferences, the same object: it gets

@@ -25,6 +25,19 @@ enum WebKitSetup {
         return configuration
     }
 
+    /// Sets one of WebKit's own unpublished preferences (`key`, as KVC has it: `_set<Key>:` behind it), only when this
+    /// WebKit still has it, and only when it differs (read only where WebKit has the getter too).
+    static func setIfAvailable(_ on: Bool, key: String, in preferences: WKPreferences) {
+        guard hasPreference(key) else { return }
+        if preferences.responds(to: NSSelectorFromString("_" + key)), preferences.value(forKey: key) as? Bool == on { return }
+        preferences.setValue(on, forKey: key)
+    }
+
+    /// Whether this WebKit has one of its unpublished preferences, by its KVC key.
+    static func hasPreference(_ key: String) -> Bool {
+        WKPreferences.instancesRespond(to: NSSelectorFromString("_set" + key.prefix(1).uppercased() + key.dropFirst() + ":"))
+    }
+
     /// Applies our defaults. Popup configurations handed to us by WebKit already carry most of these.
     static func configure(_ configuration: WKWebViewConfiguration, for profile: Profile) {
         configuration.websiteDataStore = profile.store
@@ -40,10 +53,8 @@ enum WebKitSetup {
         #endif
         // WKWebView leaves a page's own Picture in Picture off for every video (Safari has it on), so sites like
         // Bilibili say they "don't support it" and View › Picture in Picture finds nothing to float. Pages still need
-        // a click to float a video. The key is WebKit's own and unpublished, so it's only set when WebKit still has it.
-        if configuration.preferences.responds(to: NSSelectorFromString("_setAllowsPictureInPictureMediaPlayback:")) {
-            configuration.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
-        }
+        // a click to float a video.
+        setIfAvailable(true, key: "allowsPictureInPictureMediaPlayback", in: configuration.preferences)
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.upgradeKnownHostsToHTTPS = true
         configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
