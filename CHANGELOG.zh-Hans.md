@@ -12,29 +12,16 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-12
+
+分屏浏览最多放四个页面，网站可以安装成独立的应用，边栏可以放在左边或右边，标签页在窗口之间移动时保持原样。深色网页改用 Dark Reader，广告拦截加入了 uBlock Origin 的过滤列表，Cookie 弹窗会自动帮你拒绝，“网站设置”也重新做了。
+
 ### 新功能
 - 发行说明跟随 App 的语言；0.9.0 及之前的几个版本有了中文发行说明。
 - 空间的编辑面板（新建空间时也会打开）会说明：同一份个人资料中的空间共用登录状态、历史记录和扩展。它的“个人资料”菜单里有“新建个人资料”，一点就给这个空间建一份自己的个人资料，并以空间命名。有多份个人资料时，空间切换器和空间的右键菜单也会像边栏一样显示每个空间用的是哪份个人资料。感谢 [spongehah](https://github.com/spongehah)。([#201](https://github.com/ZigaoWang/zigzag/issues/201))
 - 开发者模式改为在“网站设置”的 ⋯ 菜单、命令栏或“显示 › 开发者”（⌥⇧⌘D）里选“开启开发者模式”来开关，“网站设置”的列表里不再另有一个开关，那个列表是给所有人用的。感谢 [Lakeland97](https://github.com/Lakeland97)。([#198](https://github.com/ZigaoWang/zigzag/issues/198))
 - “网站设置”里的“深色网页”从两个开关变成了一个下拉菜单：“自动”跟随“设置 › 外观 › 深色网页”，“打开”和“关闭”不管设置怎样都只对这个网站生效，“强制深色”会把看起来已经是深色的网站也画成深色。选“自动”时，下面会写出现在是开还是关。以前做过的选择保持不变。感谢 [Lakeland97](https://github.com/Lakeland97)。([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - 为某个网站关闭“深色网页”时，会让它显示浅色外观，所以跟随 Mac 浅色或深色的网站，即使 Mac 是深色的也会显示浅色。没有打开深色网页的地方，网页跟随 Mac 的浅色或深色，而不是空间的颜色或无痕浏览窗口的颜色。你在网站自己的设置里选的主题由网站保存，会保持你选的样子。感谢 [Lakeland97](https://github.com/Lakeland97)。([#134](https://github.com/ZigaoWang/zigzag/issues/134))
-
-### 修复
-- 深色网页能察觉网站自己切换主题了。一开始是深色、后来用网站自己的主题菜单换成浅色的网站，会被画成深色；换成深色的网站会保持原样，不用重新载入。感谢 [Lakeland97](https://github.com/Lakeland97)。([#134](https://github.com/ZigaoWang/zigzag/issues/134))
-- 网页载入后换了颜色时，比如深色的应用画在白色页面上，或者网站切换了主题，页面上方的栏、分屏浏览的标题栏和 Zigzag Mini 的顶栏也会跟着变，不会一直是白色。感谢 [Lakeland97](https://github.com/Lakeland97)。([#134](https://github.com/ZigaoWang/zigzag/issues/134))
-- YouTube Music 在你没在看的标签页里也会接着播下一首了。以前每首歌放完就卡在加载，要暂停再播放才继续：窗口外的网页加载不了下一首，所以正在播放声音的标签页现在会留在窗口里（看不见），小播放器在两首歌之间消失时也会把网页留在窗口里。感谢 [Lakeland97](https://github.com/Lakeland97)。([#199](https://github.com/ZigaoWang/zigzag/issues/199))
-- 隐藏的边栏滑出和收回更顺滑了，全屏时也一样。
-- 滑出来的边栏和固定显示的边栏颜色一致了，不会再偏灰。
-- Tampermonkey BETA 和正式版 Tampermonkey 一样能用了。以前它一启动就停住，弹出窗口打不开，脚本也不会运行；现在它能正常启动，打开脚本的 .user.js 地址会出现它的安装页，装好的脚本也会运行，不允许内联脚本的网站上也一样。 ([#200](https://github.com/ZigaoWang/zigzag/issues/200))
-- 在“设置 › 通用”里点“设为默认”后，macOS 一确认按钮就会更新，不用再点第二次。感谢 [ze-mu-zhou](https://github.com/ze-mu-zhou)。([#195](https://github.com/ZigaoWang/zigzag/issues/195))
-- “翻译”会翻译网页里所有不是你的语言的内容，不再只翻译整页都是别的语言的网页。英文网页里的一段中文或一句日文引语会单独翻译，中文网页里的英文代码保持原样。只有整页都已是你的语言时，才会提示“此页面已是”你的语言。在同一个窗口里再翻译一个同语言的网页，或者从已翻译的网页前往另一个网页后再翻译，也都可以了。感谢 [Lakeland97](https://github.com/Lakeland97)。([#197](https://github.com/ZigaoWang/zigzag/issues/197))
-- Motrix 扩展可以和 Motrix App 配对了。之前点“配对”还没连到 App 就提示连接失败：扩展认不出 Zigzag 给它自己文件的地址，现在只在需要的那一项检查里给它 Chrome 的地址。
-
-## [0.9.0] - 2026-11-12
-
-分屏浏览最多放四个页面，网站可以安装成独立的应用，边栏可以放在左边或右边，标签页在窗口之间移动时保持原样。深色网页改用 Dark Reader，广告拦截加入了 uBlock Origin 的过滤列表，Cookie 弹窗会自动帮你拒绝，“网站设置”也重新做了。
-
-### 新功能
 - “打开 App”现在是一项网站权限，和摄像头一样。网页想打开某个 App（比如 App Store 或 Zoom）时，Zigzag 会询问你，可以选“打开”（仅这一次）、“始终打开”（以后都打开这个 App）或“不打开”。网站问过一次之后，它的“网站设置”里的“权限”和“设置 › 隐私”里就会多出“打开 App”一行，可选“询问”“允许”和“阻止”，选“阻止”后这个网站就打不开任何 App。你自己键入或打开的地址仍然会直接打开对应的 App。感谢 [Lakeland97](https://github.com/Lakeland97)。([#192](https://github.com/ZigaoWang/zigzag/issues/192))
 - “设置 › 扩展”里的“从文件夹安装…”可以从 Mac 上的文件夹安装 Chrome 扩展。它取代了以前只在开发者模式下才出现的“加载已解压的扩展…”。([#194](https://github.com/ZigaoWang/zigzag/issues/194))
 - “设置 › 扩展”会找出 Mac 上 App 里自带的 Chrome 扩展，比如从 App Store 下载的 StopTheMadness Pro，列在“来自这台 Mac 上的 App”下面，带一个“安装”按钮。扩展直接从 App 里读取，不会被改动，所以 App 更新时扩展也跟着更新。感谢 [Lakeland97](https://github.com/Lakeland97)。([#194](https://github.com/ZigaoWang/zigzag/issues/194))
@@ -76,6 +63,15 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - “更改图标”里的第一个选项显示网站自己的图标，一看就知道它是用来恢复网站图标的。
 
 ### 修复
+- 深色网页能察觉网站自己切换主题了。一开始是深色、后来用网站自己的主题菜单换成浅色的网站，会被画成深色；换成深色的网站会保持原样，不用重新载入。感谢 [Lakeland97](https://github.com/Lakeland97)。([#134](https://github.com/ZigaoWang/zigzag/issues/134))
+- 网页载入后换了颜色时，比如深色的应用画在白色页面上，或者网站切换了主题，页面上方的栏、分屏浏览的标题栏和 Zigzag Mini 的顶栏也会跟着变，不会一直是白色。感谢 [Lakeland97](https://github.com/Lakeland97)。([#134](https://github.com/ZigaoWang/zigzag/issues/134))
+- YouTube Music 在你没在看的标签页里也会接着播下一首了。以前每首歌放完就卡在加载，要暂停再播放才继续：窗口外的网页加载不了下一首，所以正在播放声音的标签页现在会留在窗口里（看不见），小播放器在两首歌之间消失时也会把网页留在窗口里。感谢 [Lakeland97](https://github.com/Lakeland97)。([#199](https://github.com/ZigaoWang/zigzag/issues/199))
+- 隐藏的边栏滑出和收回更顺滑了，全屏时也一样。
+- 滑出来的边栏和固定显示的边栏颜色一致了，不会再偏灰。
+- Tampermonkey BETA 和正式版 Tampermonkey 一样能用了。以前它一启动就停住，弹出窗口打不开，脚本也不会运行；现在它能正常启动，打开脚本的 .user.js 地址会出现它的安装页，装好的脚本也会运行，不允许内联脚本的网站上也一样。 ([#200](https://github.com/ZigaoWang/zigzag/issues/200))
+- 在“设置 › 通用”里点“设为默认”后，macOS 一确认按钮就会更新，不用再点第二次。感谢 [ze-mu-zhou](https://github.com/ze-mu-zhou)。([#195](https://github.com/ZigaoWang/zigzag/issues/195))
+- “翻译”会翻译网页里所有不是你的语言的内容，不再只翻译整页都是别的语言的网页。英文网页里的一段中文或一句日文引语会单独翻译，中文网页里的英文代码保持原样。只有整页都已是你的语言时，才会提示“此页面已是”你的语言。在同一个窗口里再翻译一个同语言的网页，或者从已翻译的网页前往另一个网页后再翻译，也都可以了。感谢 [Lakeland97](https://github.com/Lakeland97)。([#197](https://github.com/ZigaoWang/zigzag/issues/197))
+- Motrix 扩展可以和 Motrix App 配对了。之前点“配对”还没连到 App 就提示连接失败：扩展认不出 Zigzag 给它自己文件的地址，现在只在需要的那一项检查里给它 Chrome 的地址。
 - 边栏在右边、地址栏在边栏里时，页面会一直延伸到窗口顶部，和边栏在左边时一样，上面不再多出一条。窗口按钮在边栏顶部那一行的开头，接着是边栏按钮，后退、前进和重新载入在那一行的末尾，和边栏在左边时同一行。地址栏在页面上方时，它们留在那一栏的开头。([#166](https://github.com/ZigaoWang/zigzag/issues/166))
 - 安装没有后台页面的扩展（比如一些只修改页面的扩展）不会再让 Zigzag 退出。([#194](https://github.com/ZigaoWang/zigzag/issues/194))
 - 设置开着时切换“无边框页面”，设置不会再保持原来的大小排版：分区列表旁边不再多一条滚动条、下面不再有一条白边，开关也和搜索栏对齐了。现在设置会随着页面留出或收回边距一起移动，页面的圆角和阴影也跟着移动，不再直接跳到最终位置。感谢 [vandenbulckjean](https://github.com/vandenbulckjean)。([#184](https://github.com/ZigaoWang/zigzag/issues/184))
