@@ -485,8 +485,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
     }
 
-    private func historyMenu(back: Bool) -> NSMenu? {
-        guard let webView = selectedWebView else { return nil }
+    private func historyMenu(back: Bool) -> NSMenu? { Self.historyMenu(of: selectedWebView, back: back) }
+
+    /// The pages behind or ahead of `webView`'s page, nearest first, for a right-click on Back or Forward.
+    static func historyMenu(of webView: WKWebView?, back: Bool) -> NSMenu? {
+        guard let webView else { return nil }
         let list = webView.backForwardList
         let items = back ? Array(list.backList.reversed()) : list.forwardList
         guard !items.isEmpty else { return nil }

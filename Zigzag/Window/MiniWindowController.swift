@@ -164,6 +164,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             MainActor.assumeIsolated { self?.refreshStrip() }
         }
         strip.spaceChip.onClick = { [weak self] _ in self?.showSpaceMenu() }
+        strip.backButton.onClick = { [weak self] _ in self?.goBack(nil) }
+        strip.forwardButton.onClick = { [weak self] _ in self?.goForward(nil) }
+        // Right-click Back or Forward: the pages that way, to jump several at once, as in a browser window.
+        strip.backButton.onRightClick = { [weak self] _ in BrowserWindowController.historyMenu(of: self?.tab.webView, back: true) }
+        strip.forwardButton.onRightClick = { [weak self] _ in BrowserWindowController.historyMenu(of: self?.tab.webView, back: false) }
+        strip.reloadButton.onClick = { [weak self] _ in
+            guard let self, !self.isLeaving else { return }
+            self.tab.isLoading ? self.tab.stopLoading() : self.tab.reload()
+        }
         root.card.showLoading(of: tab)
 
         tab.host = self
@@ -322,7 +331,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     private func tabChanged(_ change: Tab.Change) {
         switch change {
-        case .url, .loading, .title, .favicon, .webView:
+        case .url, .loading, .title, .favicon, .webView, .navigation:
             refreshStrip()
             window?.title = tab.displayTitle
             // A new web view (the page crashed and came back, or crossed into an extension's page) takes the old one's place.
@@ -352,6 +361,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         strip.openButton.show(openTitle, keys: Shortcuts.keys(for: #selector(openDocument(_:))))
         strip.openButton.isEnabled = tab.url != nil
         strip.copyButton.isEnabled = tab.url != nil
+        strip.showNavigation(canGoBack: tab.canGoBack, canGoForward: tab.canGoForward, isLoading: tab.isLoading)
         KeepOnTop.refresh(strip.pinButton, for: window)
         strip.needsLayout = true
     }
@@ -491,7 +501,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         ["editing": commandBar.isVisible, "titleShown": !strip.title.isHidden, "title": strip.title.text,
          "space": space.name, "profile": Library.shared.directory.profile(tab.profile.id)?.name ?? "",
          "store": tab.webView?.configuration.websiteDataStore.identifier?.uuidString ?? (tab.webView == nil ? "no page" : "default"),
-         "open": strip.openButton.title, "openEnabled": strip.openButton.isEnabled, "webViewHere": tab.webView?.window === window, "movedOut": movedOut,
+         "open": strip.openButton.title, "openEnabled": strip.openButton.isEnabled,
+         "backEnabled": strip.backButton.isEnabled, "forwardEnabled": strip.forwardButton.isEnabled, "reload": strip.reloadButton.symbol,
+         "strip": strip.debugFrames, "webViewHere": tab.webView?.window === window, "movedOut": movedOut,
          "loading": tab.isLoading, "alpha": window?.alphaValue ?? 0,
          "fullScreenAuxiliary": window?.collectionBehavior.contains(.fullScreenAuxiliary) == true, "glass": root.debugGlass]
     }
@@ -825,27 +837,27 @@ final class MiniRootView: SpaceFrameView {
 
 // MARK: - The top strip
 
-/// The strip on top, as slim as a split view pane's: the traffic lights, the space the page goes to, the page's site
-/// in the middle, and Keep on Top, Copy Link and Open in at the right end, lined up with the page's edge. Dragging it
-/// moves the window.
+/// The strip on top, as slim as a split view pane's: the traffic lights, back, forward and reload after them as in an
+/// installed app's strip, the space the page goes to, the page's site in the middle, and Keep on Top, Copy Link and
+/// Open in at the right end, lined up with the page's edge. Dragging it moves the window.
 final class MiniStripView: NSView {
+    /// Back, forward and reload: the browser window's own three, with its tooltips, at a pane strip's size.
+    let backButton = MiniStripView.button("chevron.left", toolTip: Shortcuts.tooltip(String(localized: "Back", comment: "Tooltip of the sidebar's back button."), for: #selector(MiniWindowController.goBack(_:))))
+    let forwardButton = MiniStripView.button("chevron.right", toolTip: Shortcuts.tooltip(String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."), for: #selector(MiniWindowController.goForward(_:))))
+    let reloadButton = MiniStripView.button("arrow.clockwise", toolTip: SidebarView.reloadTip(loading: false))
     let spaceChip = MiniSpaceChip()
     let title = MiniTitleView()
-    let copyButton: IconButton = {
-        let button = IconButton(symbol: "link", size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph,
-                                toolTip: Shortcuts.tooltip(String(localized: "Copy Link", comment: "Edit menu item."),
-                                                           for: #selector(MiniWindowController.copyPageURL(_:))))
-        // On the page's color: the neutral fills, which show on any color.
-        button.isOnPage = true
-        return button
-    }()
+    let copyButton = MiniStripView.button("link", toolTip: Shortcuts.tooltip(String(localized: "Copy Link", comment: "Edit menu item."),
+                                                                            for: #selector(MiniWindowController.copyPageURL(_:))))
     /// Window › Keep on Top for this window: a pin, filled while it's on.
-    let pinButton: IconButton = {
-        let button = IconButton(symbol: "pin", size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph, toolTip: KeepOnTop.title)
+    let pinButton = MiniStripView.button("pin", toolTip: KeepOnTop.title)
+
+    static func button(_ symbol: String, toolTip: String) -> IconButton {
+        let button = IconButton(symbol: symbol, size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph, toolTip: toolTip)
         // On the page's color: the neutral fills, which show on any color.
         button.isOnPage = true
         return button
-    }()
+    }
     let openButton = MiniOpenButton()
     /// Where ⌘L's command bar opens: the address field's size, in the middle of the strip.
     let anchor = NSView()
@@ -855,7 +867,7 @@ final class MiniStripView: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         anchor.isHidden = true
-        [anchor, spaceChip, title, pinButton, copyButton, openButton].forEach(addSubview)
+        [anchor, backButton, forwardButton, reloadButton, spaceChip, title, pinButton, copyButton, openButton].forEach(addSubview)
         setAccessibilityElement(false)
     }
 
@@ -866,12 +878,35 @@ final class MiniStripView: NSView {
 
     func refreshColors() { [spaceChip, title, openButton].forEach { $0.stateDidChange(animated: false) } }
 
+    /// Back and Forward only when there's a page that way, dimmed otherwise, as in a browser window; Reload is Stop
+    /// while the page loads, with what it does now in its tooltip.
+    func showNavigation(canGoBack: Bool, canGoForward: Bool, isLoading: Bool) {
+        backButton.isEnabled = canGoBack
+        forwardButton.isEnabled = canGoForward
+        reloadButton.symbol = isLoading ? "xmark" : "arrow.clockwise"
+        reloadButton.toolTip = SidebarView.reloadTip(loading: isLoading)
+    }
+
+    #if DEBUG
+    var debugFrames: [String: [CGFloat]] {
+        let views: [(String, NSView)] = [("back", backButton), ("forward", forwardButton), ("reload", reloadButton), ("space", spaceChip),
+                                         ("title", title), ("pin", pinButton), ("copy", copyButton), ("open", openButton)]
+        return Dictionary(uniqueKeysWithValues: views.map { ($0.0, [$0.1.frame.minX, $0.1.frame.width]) })
+    }
+    #endif
+
     override func layout() {
         super.layout()
         let mid = bounds.height / 2
         let h = Tokens.Pane.addressHeight, b = Tokens.Pane.button
         let y = round(mid - h / 2)
-        let left = Tokens.Sidebar.lightsX + trafficLightsWidth + Tokens.Space.x2
+        // Back, forward and reload right after the lights, as in an installed app's strip and a split view's pane.
+        var x = Tokens.Sidebar.lightsX + trafficLightsWidth + Tokens.Space.x2
+        for button in [backButton, forwardButton, reloadButton] {
+            button.frame = NSRect(x: x, y: round(mid - b / 2), width: b, height: b)
+            x += b
+        }
+        let left = x + Tokens.Space.x1
         // The button's end lines up with the framed page's right edge, the frame's width in, borderless too.
         let right = bounds.width - Tokens.Metric.miniFrame
         // Narrow, the shortcut goes first, then the space's name shortens.
@@ -881,7 +916,9 @@ final class MiniStripView: NSView {
         openButton.frame = NSRect(x: right - openWidth, y: y, width: openWidth, height: h)
         copyButton.frame = NSRect(x: openButton.frame.minX - Tokens.Space.x1 - b, y: round(mid - b / 2), width: b, height: b)
         pinButton.frame = NSRect(x: copyButton.frame.minX - b, y: round(mid - b / 2), width: b, height: b)
-        let chipWidth = max(0, min(spaceChip.fittingWidth, pinButton.frame.minX - Tokens.Space.x2 - left))
+        // At the narrowest the space's name gives way before anything overlaps; Open in still names the space.
+        var chipWidth = max(0, min(spaceChip.fittingWidth, pinButton.frame.minX - Tokens.Space.x2 - left))
+        if chipWidth < Tokens.Space.x8 { chipWidth = 0 }
         spaceChip.frame = NSRect(x: left, y: y, width: chipWidth, height: h)
         // The site stays in the middle of the window, as wide on both sides as the room beside it allows; with too
         // little room it steps aside.
