@@ -946,7 +946,33 @@ enum ExtensionShims {
         // Tampermonkey.
         tampermonkeyID: Shim(patches: [tampermonkeyStartPatch, tampermonkeyPagesPatch, tampermonkeyInstallPatch,
                                           tampermonkeyInlineCheckPatch, tampermonkeyInlinePatch]),
+        // Motrix, which hands downloads to the Motrix app.
+        motrixID: Shim(backgroundPrelude: motrixPrelude),
     ]
+
+    static let motrixID = "lggbokfckofcgjndaboioakcmincinpo"
+
+    /// Motrix pairs with its app over a WebSocket, and both sides prove who they are with the extension's origin:
+    /// the app reads it from the connection (Zigzag's WebSocketBridge sends Chrome's, chrome-extension://<id>), the
+    /// extension works it out from `runtime.getURL('/')`. That's webkit-extension://<id>/ here, a shape it refuses,
+    /// so pairing stopped before it began ("连接失败"). Only that one call, with just "/", gets Chrome's name; every
+    /// other address, and `getURL('')` it checks its own pages' senders against, stays WebKit's.
+    static let motrixPrelude = """
+    (() => {
+      const held = (globalThis.__zigzagHeld = globalThis.__zigzagHeld || []);
+      for (const api of new Set([globalThis.browser, globalThis.chrome])) {
+        const runtime = api && api.runtime;
+        if (!runtime || typeof runtime.getURL !== 'function' || !runtime.id) continue;
+        const getURL = runtime.getURL.bind(runtime);
+        const chromeRoot = 'chrome-extension://' + runtime.id + '/';
+        try {
+          Object.defineProperty(runtime, 'getURL', { value: (path) => (path === '/' ? chromeRoot : getURL(path)), configurable: true, writable: true });
+          held.push(runtime);
+        } catch (e) {}
+      }
+    })();
+
+    """
 
     static let tampermonkeyID = "dhdgffkkebhmkfjojejmpbldmpobfkfo"
     static let violentmonkeyID = "jinjaccalgkegednnccohejagnlnfdag"
