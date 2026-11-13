@@ -1014,10 +1014,12 @@ enum ExtensionShims {
     /// that may run; in WebKit the page's does, so on sites that allow no inline scripts (GitHub) nothing ran, and
     /// only its "Force DOM" setting helped. Once per page it now checks whether an inline script runs there; where it
     /// doesn't, a script runs in Tampermonkey's own world instead, as Force DOM does, and everywhere else as before.
+    /// That world is its user-script world (BridgeUserScripts), whose CSP Tampermonkey sets without 'unsafe-eval' but
+    /// with 'unsafe-inline': the world's runner for inline scripts runs it, as Chrome would have run the inline script.
     private static let tampermonkeyInlineCheckPatch = Patch(file: "content.js", find: #"var E;return L},Ss=function(e,t,n,o,s){"#,
                                                             replace: #"var E;return L},Zz=e=>{if(void 0===Zz.v){const d=e.ownerDocument||document,x=d.documentElement,k="data-zigzag-inline",p=d.createElement("script"),n=xo();n&&p.setAttribute("nonce",n),x.setAttribute(k,""),p.textContent="document.documentElement.removeAttribute('"+k+"')";try{e.appendChild(p),p.remove()}catch(e){}Zz.v=!x.hasAttribute(k),x.removeAttribute(k)}return Zz.v},Ss=function(e,t,n,o,s){"#)
     private static let tampermonkeyInlinePatch = Patch(file: "content.js", find: #"try{c.textContent=t,e.appendChild(c)}catch(e){r=e.message||e}"#,
-                                                       replace: #"try{Zz(e)?(c.textContent=t,e.appendChild(c)):(0,eval)(t)}catch(e){r=e.message||e}"#)
+                                                       replace: #"try{Zz(e)?(c.textContent=t,e.appendChild(c)):(globalThis.__zigzagInlineScript||(0,eval))(t)}catch(e){r=e.message||e}"#)
 
     /// The beta has the same four troubles as the stable version, in code whose short names (and line breaks)
     /// change with each build, so its fixes find the code by its shape. Checked against 5.6.6242.
@@ -1034,7 +1036,7 @@ enum ExtensionShims {
         // change: the first time on a page, a test script says whether inline scripts run there.
         Patch(file: "content.js",
               find: #"let ([\w$]+);const ([\w$]+)=([\w$]+)\(\),([\w$]+)=([\w$]+)\("script"\);\2&&\4\.setAttribute\("nonce",\2\);try\{\4\.textContent=([\w$]+),([\w$]+)\.appendChild\(\4\)\}catch"#,
-              replace: #"let $1;const $2=$3(),$4=$5("script");$2&&$4.setAttribute("nonce",$2);try{"# + inlineRunsCheck + #"($7,$2)?($4.textContent=$6,$7.appendChild($4)):(0,eval)($6)}catch"#,
+              replace: #"let $1;const $2=$3(),$4=$5("script");$2&&$4.setAttribute("nonce",$2);try{"# + inlineRunsCheck + #"($7,$2)?($4.textContent=$6,$7.appendChild($4)):(globalThis.__zigzagInlineScript||(0,eval))($6)}catch"#,
               pattern: true),
     ]
 

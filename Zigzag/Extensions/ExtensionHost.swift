@@ -383,6 +383,8 @@ final class ExtensionHost: NSObject {
             restoreGrants(for: context, extension: ext)
             try controller.load(context)
             contexts.append(context)
+            // Its user scripts, in every web view, from their next page.
+            bridge.userScripts.refresh()
             announceExistingWindows(to: context)
             Passkeys.refresh()
             changed.send()
@@ -503,6 +505,7 @@ final class ExtensionHost: NSObject {
     func applySiteAccess(_ id: String) {
         guard let context = context(for: id) else { return }
         applySiteAccess(to: context)
+        bridge.userScripts.refresh()
         changed.send()
     }
 
@@ -535,6 +538,7 @@ final class ExtensionHost: NSObject {
     /// Records what the extension is granted. WebKit keeps the bridge's permissions among the granted ones, so they're
     /// recorded with the rest; Zigzag's own two only as the person approved them (`approving`, or an earlier record).
     fileprivate func saveGrants(of context: WKWebExtensionContext, approving: Set<String> = []) {
+        defer { bridge.userScripts.refresh() }
         let before = Set(profile.installs.state(context.uniqueIdentifier)?.grantedPermissions ?? [])
         let permissions = Self.recordedGrants(Set(context.grantedPermissions.keys.map(\.rawValue)), before: before, approving: approving).sorted()
         // Per-site grants come from site access, not approval; only an "all sites" extension's grants are its approvals.

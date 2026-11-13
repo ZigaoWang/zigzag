@@ -32,6 +32,8 @@ final class ExtensionBridge {
     let proxy: BridgeProxy
     /// Sites' own sign-ins, which extensions' onAuthRequired listeners may answer before the sheet asks.
     let webRequest: BridgeWebRequest
+    /// User scripts, which every web view of the profile runs (Tab attaches its own).
+    let userScripts: BridgeUserScripts
     /// Open event ports, by extension, with the events each has listeners for.
     private var ports: [ObjectIdentifier: (port: WKWebExtension.MessagePort, id: String, events: Set<String>)] = [:]
 
@@ -42,10 +44,11 @@ final class ExtensionBridge {
         tabCapture = BridgeTabCapture(host: host)
         proxy = BridgeProxy(host: host)
         webRequest = BridgeWebRequest(host: host)
+        userScripts = BridgeUserScripts(host: host)
         let others: [any BridgeNamespace.Type] = [BridgeHistory.self, BridgeTopSites.self, BridgeBookmarks.self, BridgeDownloads.self, BridgeNotifications.self, BridgeIdle.self,
                                                   BridgeDisplay.self, BridgeContexts.self, BridgeRuntime.self, BridgeSpeech.self, BridgePower.self, BridgeIdentity.self,
-                                                  BridgeUserScripts.self, BridgeFavicons.self, BridgeExtensionFetch.self]
-        let all: [any BridgeNamespace] = others.map { $0.init(host: host) } + [offscreen, sidePanel, tabCapture, proxy, webRequest]
+                                                  BridgeFavicons.self, BridgeExtensionFetch.self]
+        let all: [any BridgeNamespace] = others.map { $0.init(host: host) } + [offscreen, sidePanel, tabCapture, proxy, webRequest, userScripts]
         namespaces = Dictionary(uniqueKeysWithValues: all.map { (type(of: $0).name, $0) })
     }
 

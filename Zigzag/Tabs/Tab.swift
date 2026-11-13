@@ -458,6 +458,12 @@ final class Tab: NSObject {
                 if #available(macOS 15.4, *) { configuration.webExtensionController = nil }
             }
         }
+        // Extensions' user scripts (BridgeUserScripts), in a page WebKit opened for another too. Private pages, and
+        // extensions' own pages, run none.
+        if #available(macOS 15.4, *), extensionConfiguration == nil, privateStore == nil,
+           configuration.webExtensionController === profile.extensions.controller {
+            profile.extensions.bridge.userScripts.attach(configuration.userContentController)
+        }
         showsExtensionPage = extensionConfiguration != nil
         openedByPage = fromWebKit
         if Self.isExtensionPage(url) { ExtensionPageErrors.attach(to: configuration) }

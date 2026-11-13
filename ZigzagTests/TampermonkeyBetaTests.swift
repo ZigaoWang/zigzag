@@ -67,7 +67,7 @@ struct TampermonkeyBetaTests {
     @Test func theFixesAlsoFitTheStableVersionsShape() {
         // The same code in the stable version, other short names: the shape is what's found.
         let stable = #"Ss=function(e,t,n,o,s){let r;const i=xo(),c=yo("script");i&&c.setAttribute("nonce",i);try{c.textContent=t,e.appendChild(c)}catch(e){r=e.message||e}"#
-        #expect(apply("content.js", stable)?.contains("(0,eval)(t)") == true)
+        #expect(apply("content.js", stable)?.contains("(globalThis.__zigzagInlineScript||(0,eval))(t)") == true)
     }
 
     @Test func aPatchThatNoLongerFitsIsSkipped() {

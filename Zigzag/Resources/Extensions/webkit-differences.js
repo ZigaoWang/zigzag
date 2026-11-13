@@ -687,11 +687,14 @@
       };
       // Only once the extension listens itself: a port nothing listens for should still end at once, as in Chrome.
       const add = onConnect.addListener.bind(onConnect);
+      // Every port counts, past the bridge's hiding of user scripts' ports from the extension (bridge.js): those keep
+      // the worker going too.
+      const addForAll = typeof globalThis.__zigzagConnectAll === 'function' ? globalThis.__zigzagConnectAll : add;
       let watching = false;
       const watch = () => {
         if (watching) return;
         watching = true;
-        add((port) => keepOpen(port));
+        addForAll((port) => keepOpen(port));
       };
       keepOpen = (port) => {
         if (open.has(port)) return;

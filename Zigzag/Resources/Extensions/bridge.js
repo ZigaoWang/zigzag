@@ -682,22 +682,15 @@
     try { api.runtime.getContexts = method('contexts', 'getContexts'); } catch (e) {}
   }
 
-  // userScripts (BridgeUserScripts in Swift): each user script is a content script of the extension's own, which
-  // WebKit registers from a file Zigzag writes. Calls run one at a time, the first being the background's look at what
-  // WebKit still has registered, so Zigzag's list and WebKit's never disagree.
+  // userScripts (BridgeUserScripts in Swift): Zigzag runs each user script in a world of its own, apart from the
+  // page and from the extension's content scripts, as Chrome does. Calls run one at a time, as WebKit's would.
+  // What a user script says reaches the extension from the content-script world of its frame, marked (MARK): it goes
+  // to onUserScriptMessage and onUserScriptConnect only, never to onMessage or onConnect, as in Chrome.
   const scripting = api.scripting;
-  if (asked.has('userScripts') && scripting && typeof scripting.registerContentScripts === 'function') {
-    const PREFIX = 'zz-us-';
+  if (asked.has('userScripts')) {
+    const MARK = '__zigzagUserScript';
     let queue = Promise.resolve();
     const serial = (work) => { const run = queue.then(work); queue = run.catch(() => {}); return run; };
-    // Zigzag registers them again each time the background starts, from its own list, so WebKit needn't keep them.
-    const toWebKit = (made) => ({ ...made, id: PREFIX + made.id, persistAcrossSessions: false });
-    const registered = async () => new Set((await scripting.getRegisteredContentScripts()).map((s) => s.id).filter((id) => id.startsWith(PREFIX)));
-    const forget = async (ids) => {
-      const have = await registered();
-      const gone = ids.map((id) => PREFIX + id).filter((id) => have.has(id));
-      if (gone.length) await scripting.unregisterContentScripts({ ids: gone });
-    };
     // Chrome checks the arguments' shape before anything runs, and throws.
     const RUN_AT = ['document_end', 'document_idle', 'document_start'], WORLDS = ['MAIN', 'USER_SCRIPT'];
     const shape = (fn, scripts) => {
@@ -719,49 +712,178 @@
       result.then((value) => callback(value), (error) => { console.warn(`chrome.userScripts.${fn}:`, error.message); callback(undefined); });
     };
     const inBackground = !inPage || (api.extension && typeof api.extension.getBackgroundPage === 'function' && api.extension.getBackgroundPage() === window);
+    // Earlier versions registered user scripts with WebKit as content scripts ("zz-us-"); any still there go.
     if (inBackground) {
       serial(async () => {
-        const all = await send('userScripts', 'restore', []);
-        const have = await registered();
-        const stale = [...have].filter((id) => !all.some((made) => PREFIX + made.id === id));
-        if (stale.length) await scripting.unregisterContentScripts({ ids: stale });
-        // One at a time: a script WebKit refuses (a match pattern it doesn't take) doesn't keep the others from running.
-        for (const made of all.filter((made) => !have.has(PREFIX + made.id))) {
-          try { await scripting.registerContentScripts([toWebKit(made)]); } catch (e) { console.warn(`chrome.userScripts: ${made.id}:`, e.message); }
-        }
+        await send('userScripts', 'restore', []);
+        if (!scripting || typeof scripting.getRegisteredContentScripts !== 'function') return;
+        const old = (await scripting.getRegisteredContentScripts()).map((s) => s.id).filter((id) => id.startsWith('zz-us-'));
+        if (old.length) await scripting.unregisterContentScripts({ ids: old });
       }).catch((e) => console.warn('chrome.userScripts:', e.message));
     }
     install('userScripts', {
-      register: call('register', (scripts) => shape('register', scripts), async (scripts) => {
-        const made = await send('userScripts', 'register', [scripts]);
-        try { await scripting.registerContentScripts(made.map(toWebKit)); } catch (error) {
-          await send('userScripts', 'unregister', [{ ids: made.map((m) => m.id) }]).catch(() => {});
-          throw error;
-        }
-      }),
-      update: call('update', (scripts) => shape('update', scripts), async (scripts) => {
-        const made = await send('userScripts', 'update', [scripts]);
-        await forget(made.map((m) => m.id));
-        await scripting.registerContentScripts(made.map(toWebKit));
-      }),
-      unregister: call('unregister', null, async (filter) => { await forget(await send('userScripts', 'unregister', [filter || {}])); }),
+      register: call('register', (scripts) => shape('register', scripts), async (scripts) => { await send('userScripts', 'register', [scripts]); }),
+      update: call('update', (scripts) => shape('update', scripts), async (scripts) => { await send('userScripts', 'update', [scripts]); }),
+      unregister: call('unregister', null, async (filter) => { await send('userScripts', 'unregister', [filter || {}]); }),
       getScripts: call('getScripts', null, (filter) => send('userScripts', 'getScripts', [filter || {}])),
+      // Each frame scripting.executeScript reaches asks Zigzag, from the extension's content-script world, to run the
+      // code in its user-script world, then the frames' results are collected.
       execute: call('execute', null, async (injection) => {
-        const made = await send('userScripts', 'execute', [injection]);
-        const results = await scripting.executeScript({ target: injection.target, files: made.js, world: made.world, injectImmediately: !!injection.injectImmediately });
-        return (results || []).map((r) => ({ frameId: r.frameId, documentId: r.documentId, result: r.result, ...(r.error ? { error: String(r.error.message || r.error) } : {}) }));
+        if (!scripting || typeof scripting.executeScript !== 'function') throw new Error('userScripts.execute needs scripting');
+        const { token } = await send('userScripts', 'execute', [injection]);
+        const ask = (token) => {
+          const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
+          try {
+            const asked = globalThis.webkit.messageHandlers.zigzagUserScriptRelay.postMessage({ kind: 'execute', token, nonce });
+            if (asked && asked.catch) asked.catch(() => {});
+          } catch (e) { return null; }
+          return nonce;
+        };
+        const frames = (await scripting.executeScript({ target: injection.target, world: 'ISOLATED', injectImmediately: !!injection.injectImmediately, func: ask, args: [token] })) || [];
+        const results = await send('userScripts', 'executeResults', [token, frames.map((r) => r.result).filter((n) => typeof n === 'string')]);
+        return frames.map((r) => {
+          const done = (results && typeof r.result === 'string' && results[r.result]) || {};
+          const out = { frameId: r.frameId, documentId: r.documentId };
+          if ('value' in done) out.result = done.value;
+          if (done.error || r.error) out.error = String(done.error || (r.error && r.error.message) || r.error);
+          return out;
+        });
       }),
       configureWorld: call('configureWorld', null, (properties) => send('userScripts', 'configureWorld', [properties || {}])),
       getWorldConfigurations: call('getWorldConfigurations', null, () => send('userScripts', 'getWorldConfigurations', [])),
       resetWorldConfiguration: call('resetWorldConfiguration', null, (worldId) => send('userScripts', 'resetWorldConfiguration', [worldId === undefined ? null : worldId])),
       ExecutionWorld: { MAIN: 'MAIN', USER_SCRIPT: 'USER_SCRIPT' },
     });
-    // In Chrome, user scripts' messages come to these instead of onMessage and onConnect. Here they're content
-    // scripts, whose messages come to onMessage and onConnect, where Tampermonkey listens as well; these never fire.
-    const silent = () => ({ addListener() {}, removeListener() {}, hasListener: () => false, hasListeners: () => false });
-    for (const name of ['onUserScriptMessage', 'onUserScriptConnect']) {
-      if (api.runtime[name]) continue;
-      try { Object.defineProperty(api.runtime, name, { value: silent(), configurable: true, enumerable: true }); } catch (e) {}
+
+    // runtime.onUserScriptMessage and onUserScriptConnect, as Chrome's: what user scripts send, and only that.
+    const localEvent = () => {
+      const listeners = new Set();
+      return {
+        listeners,
+        api: {
+          addListener(f) { if (typeof f === 'function') listeners.add(f); },
+          removeListener(f) { listeners.delete(f); },
+          hasListener(f) { return listeners.has(f); },
+          hasListeners() { return listeners.size > 0; },
+        },
+      };
+    };
+    // WebKit keeps its API objects only while something else does, and makes new ones, without what was set on them,
+    // when asked again after they're gone (webkit-differences.js, setMember): every object changed here is kept, or
+    // the extension could later be handed one where user scripts' messages aren't hidden.
+    const held = (globalThis.__zigzagHeld = globalThis.__zigzagHeld || []);
+    held.push(api, api.runtime, api.tabs);
+    const userMessage = localEvent(), userConnect = localEvent();
+    for (const [name, event] of [['onUserScriptMessage', userMessage], ['onUserScriptConnect', userConnect]]) {
+      try { Object.defineProperty(api.runtime, name, { value: event.api, configurable: true, enumerable: true }); } catch (e) {}
+    }
+    const marked = (value) => value && typeof value === 'object' && value[MARK] && typeof value[MARK] === 'object' ? value[MARK] : null;
+    const portInfo = (port) => {
+      if (!port || typeof port.name !== 'string' || !port.name.startsWith(MARK)) return null;
+      try { const info = JSON.parse(port.name.slice(MARK.length)); return info && typeof info === 'object' ? info : null; } catch (e) { return null; }
+    };
+    // Only from this extension, by WebKit's word: what its content-script worlds pass on.
+    const fromItself = (sender) => !!sender && sender.id === api.runtime.id;
+
+    // The extension's own onMessage and onConnect listeners never see what user scripts send.
+    const hide = (event, test) => {
+      if (!event || typeof event.addListener !== 'function') return;
+      held.push(event);
+      const add = event.addListener.bind(event);
+      const remove = event.removeListener && event.removeListener.bind(event);
+      const has = event.hasListener && event.hasListener.bind(event);
+      const wrapped = new WeakMap();
+      try {
+        event.addListener = (listener, ...rest) => {
+          if (typeof listener !== 'function') return add(listener, ...rest);
+          const guarded = (first, ...more) => (test(first) ? undefined : listener(first, ...more));
+          wrapped.set(listener, guarded);
+          return add(guarded, ...rest);
+        };
+        if (remove) event.removeListener = (listener) => remove(wrapped.get(listener) || listener);
+        if (has) event.hasListener = (listener) => has(wrapped.get(listener) || listener);
+      } catch (e) {}
+      return add;
+    };
+    const addMessage = hide(api.runtime.onMessage, marked);
+    const addConnect = hide(api.runtime.onConnect, (port) => !!portInfo(port));
+    if (addConnect) { try { Object.defineProperty(globalThis, '__zigzagConnectAll', { value: addConnect, configurable: true }); } catch (e) {} }
+
+    if (addMessage) addMessage((message, sender, sendResponse) => {
+      const packet = marked(message);
+      if (!packet || !fromItself(sender)) return undefined;
+      // A world that listens for its tab's messages: the background notes which tab and frame it's in.
+      if (packet.kind === 'hello') {
+        if (!inBackground || !sender.tab) return undefined;
+        send('userScripts', 'frame', [{ key: packet.key, tabId: sender.tab.id, frameId: sender.frameId, documentId: sender.documentId }])
+          .then(() => sendResponse(true), () => sendResponse(false));
+        return true;
+      }
+      if (packet.kind !== 'message' || !userMessage.listeners.size) return undefined;
+      let responded = false, waits = false;
+      const respond = (value) => { if (!responded) { responded = true; sendResponse(value); } };
+      for (const listener of [...userMessage.listeners]) {
+        let result;
+        try { result = listener(packet.message, sender, respond); } catch (e) { console.error(e); continue; }
+        if (result === true) waits = true;
+        else if (result && typeof result.then === 'function') { waits = true; result.then(respond, () => respond(undefined)); }
+      }
+      return waits && !responded ? true : undefined;
+    });
+
+    if (addConnect) addConnect((port) => {
+      const info = portInfo(port);
+      if (!info || !fromItself(port.sender)) return;
+      if (!userConnect.listeners.size) { try { port.disconnect(); } catch (e) {} return; }
+      // The port as the user script named it; its events hand listeners this port, not WebKit's.
+      const shown = { name: typeof info.name === 'string' ? info.name : '', sender: port.sender };
+      const relayed = (event) => {
+        const wrapped = new WeakMap();
+        return {
+          addListener(f) { if (typeof f !== 'function' || wrapped.has(f)) return; const w = (m) => (m === port ? f(shown) : f(m, shown)); wrapped.set(f, w); event.addListener(w); },
+          removeListener(f) { const w = wrapped.get(f); if (w) { event.removeListener(w); wrapped.delete(f); } },
+          hasListener(f) { return wrapped.has(f); },
+          hasListeners() { return typeof event.hasListeners === 'function' ? event.hasListeners() : false; },
+        };
+      };
+      Object.assign(shown, {
+        onMessage: relayed(port.onMessage), onDisconnect: relayed(port.onDisconnect),
+        postMessage: (message) => port.postMessage(message),
+        disconnect: () => port.disconnect(),
+      });
+      for (const listener of [...userConnect.listeners]) { try { listener(shown); } catch (e) { console.error(e); } }
+    });
+
+    // tabs.sendMessage: Chrome hands it to the tab's user scripts too, when their world listens (Tampermonkey runs
+    // its scripts and reloads its pages so). Zigzag sends it to those worlds while WebKit sends it to the content
+    // scripts; an answer from either is the answer, the content scripts' first.
+    const tabs = api.tabs;
+    if (tabs && typeof tabs.sendMessage === 'function') {
+      const sendToTab = tabs.sendMessage.bind(tabs);
+      const from = (() => { try { return { id: api.runtime.id, url: location.href, origin: location.origin }; } catch (e) { return { id: api.runtime.id }; } })();
+      const callWithError = (callback, error) => {
+        const runtime = api.runtime;
+        const before = Object.getOwnPropertyDescriptor(runtime, 'lastError');
+        try { Object.defineProperty(runtime, 'lastError', { get: () => ({ message: String((error && error.message) || error) }), configurable: true }); } catch (e) {}
+        try { callback(); } finally { try { if (before) Object.defineProperty(runtime, 'lastError', before); else delete runtime.lastError; } catch (e) {} }
+      };
+      try {
+        tabs.sendMessage = (tabId, message, ...rest) => {
+          const callback = typeof rest[rest.length - 1] === 'function' ? rest.pop() : null;
+          const options = rest[0] && typeof rest[0] === 'object' ? rest[0] : {};
+          const scripts = Promise.resolve().then(() => sendToTab(tabId, message, ...rest)).then((value) => ({ value }), (error) => ({ error }));
+          const worlds = send('userScripts', 'tabMessage', [{ tabId, frameId: options.frameId, documentId: options.documentId }, message, from]).catch(() => ({ reached: 0 }));
+          const answer = Promise.all([scripts, worlds]).then(([script, world]) => {
+            if (!script.error && script.value !== undefined) return script.value;
+            if (world && world.answered) return world.value;
+            if (!script.error || (world && world.reached)) return undefined;
+            throw script.error;
+          });
+          if (!callback) return answer;
+          answer.then((value) => callback(value), (error) => callWithError(callback, error));
+          return undefined;
+        };
+      } catch (e) {}
     }
   }
 
