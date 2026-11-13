@@ -13,6 +13,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The Motrix extension pairs with the Motrix app. Pair said it couldn't connect before it reached the app: the extension didn't recognize the address Zigzag gives its own files, and now it gets Chrome's for the one check that needs it.
 - The sidebar slides out smoothly when it's hidden, in full screen too.
 - The sidebar that slides out is the same color as when it's shown, in see-through spaces too.
+- Tampermonkey BETA works as the stable Tampermonkey does. It stopped as it started, so its popup never loaded and no script ever ran. Now it starts, a script's .user.js address opens its install page, and its scripts run, on sites that allow no inline scripts too.
 
 ## [0.9.0] - 2026-11-12
 
