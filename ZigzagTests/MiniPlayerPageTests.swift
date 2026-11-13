@@ -118,4 +118,38 @@ struct MiniPlayerPageTests {
         try await script("return window.__zigzagVideos.unisolate()", in: webView)
         #expect(try await script("return document.querySelectorAll('[data-zigzag-mini]').length", in: webView) as? Int == 0)
     }
+
+    /// A page out of the window counts as hidden, where WebKit won't load or start a playlist's next song; kept in the
+    /// window, out of sight, it counts as on screen (#199).
+    @Test func aPageKeptOutOfSightInTheWindowCountsAsOnScreen() async throws {
+        let window = NSWindow(contentRect: NSRect(x: -4000, y: -4000, width: 400, height: 300), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        window.contentView = root
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+        let webView = await load("<html><body><audio></audio></body></html>")
+        // Off screen it would count as hidden whatever its place, unless WebKit is told not to look.
+        let occlusion = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
+        if webView.responds(to: occlusion) {
+            typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
+            unsafeBitCast(webView.method(for: occlusion), to: SetBool.self)(webView, occlusion, false)
+        }
+        let holder = PageHolder(holding: webView)
+        let parking = MiniPlayerParking()
+        root.addSubview(parking)
+        func state() async throws -> String { try await script("return document.visibilityState", in: webView) as? String ?? "" }
+        func becomes(_ wanted: String) async throws -> Bool {
+            for _ in 0..<100 {
+                if try await state() == wanted { return true }
+                try await Task.sleep(for: .milliseconds(50))
+            }
+            return false
+        }
+        #expect(try await becomes("hidden"))
+        parking.park(holder)
+        #expect(try await becomes("visible"))
+        parking.release(holder)
+        #expect(try await becomes("hidden"))
+    }
 }

@@ -424,6 +424,24 @@ struct MiniPlayerTests {
         #expect(model.tab == nil)
     }
 
+    // MARK: Kept in the window
+
+    @Test func aPageYouLeavePlayingSoundStaysInTheWindow() {
+        // Out of the window, WebKit won't load or start a playlist's next song (#199).
+        #expect(MiniPlayerLayout.keepsInWindow(playingSound: true, followed: false, inFullScreen: false))
+        // A quiet page goes as ever; the mini player's card and a video's full screen hold the page themselves.
+        #expect(!MiniPlayerLayout.keepsInWindow(playingSound: false, followed: false, inFullScreen: false))
+        #expect(!MiniPlayerLayout.keepsInWindow(playingSound: true, followed: true, inFullScreen: false))
+        #expect(!MiniPlayerLayout.keepsInWindow(playingSound: true, followed: false, inFullScreen: true))
+    }
+
+    @Test func aPlaylistHasTimeForItsNextSong() {
+        // YouTube Music took up to 8 seconds from the end of one song to the start of the next.
+        #expect(MiniPlayerLayout.nextItemWait >= 20)
+        // Not kept for good: a page paused for a while leaves the window again.
+        #expect(MiniPlayerLayout.nextItemWait <= 120)
+    }
+
     // MARK: Moving between tabs
 
     private let a = UUID(), b = UUID(), c = UUID()
