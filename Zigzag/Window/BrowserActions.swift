@@ -151,11 +151,13 @@ extension BrowserWindowController: NSMenuItemValidation {
         if let pdf = selectedTab?.pdfViewer { pdf.save(); return }
         guard let webView = selectedWebView, let window, let tab = selectedTab, let url = tab.url else { return }
         let ext = url.pathExtension.lowercased()
-        let isFile = ["pdf", "png", "jpg", "jpeg", "gif", "webp", "svg", "mp4", "mov", "txt"].contains(ext)
+        let isFile = tab.showsPDF || ["pdf", "png", "jpg", "jpeg", "gif", "webp", "svg", "mp4", "mov", "txt"].contains(ext)
         let panel = NSSavePanel()
         let name = tab.displayTitle.replacingOccurrences(of: "/", with: "-")
         if isFile {
-            panel.nameFieldStringValue = url.lastPathComponent
+            // A PDF at an address without its file name is still saved as a PDF.
+            let file = url.lastPathComponent
+            panel.nameFieldStringValue = tab.showsPDF && !file.lowercased().hasSuffix(".pdf") ? name + ".pdf" : file
         } else {
             panel.allowedContentTypes = [.webArchive]
             panel.nameFieldStringValue = name + ".webarchive"

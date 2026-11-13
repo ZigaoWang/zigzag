@@ -3,13 +3,15 @@ import PDFKit
 import WebKit
 import os
 
-/// PDFs in Zigzag's own viewer: Apple's PDFKit (Preview's engine) for the pages, with our controls in a pill at the
-/// bottom: the pages or contents down the side, where you are (click it to jump), zoom, two pages side by side,
-/// dark pages, and saving. It reopens a PDF where you left off.
+/// PDFs on your Mac in Zigzag's own viewer: Apple's PDFKit (Preview's engine) for the pages, with our controls in a
+/// pill at the bottom: the pages or contents down the side, where you are (click it to jump), zoom, two pages side
+/// by side, dark pages, and saving. It reopens a PDF where you left off.
 ///
-/// WebKit still loads the PDF underneath, so Back, Forward, history and reopening after a restart work as for any
-/// page. The viewer fetches the same file with the page's cookies (PDFs behind a sign-in) and covers WebKit's own,
-/// a quiet blank while it loads; if that fails, WebKit's viewer simply shows.
+/// Only files: PDFKit reads a PDF in Zigzag itself, outside WebKit's sandbox, so a PDF from the web stays in WebKit's
+/// own viewer, which reads it in the page's sandboxed process. Downloaded, it opens here (`opens`).
+///
+/// WebKit still loads the file underneath, so Back, Forward, history and reopening after a restart work as for any
+/// page. The viewer covers WebKit's own, a quiet blank while it loads; if that fails, WebKit's viewer simply shows.
 @MainActor
 final class PDFViewerView: NSView, PDFViewDelegate {
     let url: URL
@@ -515,34 +517,16 @@ final class PDFViewerView: NSView, PDFViewDelegate {
 
     // MARK: Loading
 
-    /// Fetches the PDF the way the page did: its cookies and the browser's user agent, so a PDF behind a sign-in
-    /// comes too. Nil when it can't (WebKit's own viewer shows then).
-    static func load(_ url: URL, from webView: WKWebView, userAgent: String?) async -> (PDFDocument, Data)? {
-        let data: Data?
-        if url.isFileURL {
-            data = try? await Task.detached { try Data(contentsOf: url) }.value
-        } else if ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
-            // Only the cookies a link from another site would carry too: a "Strict" one, held back from the page's own
-            // load when another site sent you there, isn't sent behind its back now.
-            let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
-                .filter { $0.sameSitePolicy != .sameSiteStrict }
-            let configuration = URLSessionConfiguration.ephemeral
-            let storage = HTTPCookieStorage()
-            cookies.forEach { storage.setCookie($0) }
-            configuration.httpCookieStorage = storage
-            let session = URLSession(configuration: configuration)
-            defer { session.finishTasksAndInvalidate() }
-            var request = URLRequest(url: url)
-            if let userAgent { request.setValue(userAgent, forHTTPHeaderField: "User-Agent") }
-            guard let (body, response) = try? await session.data(for: request),
-                  ((response as? HTTPURLResponse)?.statusCode ?? 200) < 400 else { return nil }
-            data = body
-        } else {
-            data = nil
-        }
+    /// Whether a PDF at `url` opens in this viewer: only a file on your Mac, never one from the web.
+    nonisolated static func opens(_ url: URL) -> Bool { url.isFileURL }
+
+    /// Reads a PDF file for the viewer. Nil for anything that isn't a file on your Mac (WebKit's own viewer shows
+    /// that), or a file that can't be opened.
+    static func load(_ url: URL) async -> (PDFDocument, Data)? {
+        guard opens(url), let data = try? await Task.detached(operation: { try Data(contentsOf: url) }).value else { return nil }
         // Its pages come as `DarkablePage`, so dark pages can draw them. One behind a password is left to WebKit,
         // which asks for it.
-        guard let data, let document = DarkableDocument(data: data), !document.isLocked, document.pageCount > 0 else { return nil }
+        guard let document = DarkableDocument(data: data), !document.isLocked, document.pageCount > 0 else { return nil }
         return (document, data)
     }
 }

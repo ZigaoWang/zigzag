@@ -103,8 +103,10 @@ final class Tab: NSObject {
     private(set) var canGoBack = false
     private(set) var canGoForward = false
     private(set) var isClosed = false
-    /// A PDF shows in Zigzag's own viewer, over WebKit's; nil for any other page.
+    /// A PDF file on your Mac shows in Zigzag's own viewer, over WebKit's; nil for any other page.
     private(set) var pdfViewer: PDFViewerView?
+    /// The page is a PDF, in either viewer: saved as itself, not as a web archive.
+    private(set) var showsPDF = false
     /// The viewer's fetch, cancelled when the viewer goes.
     private var pdfTask: Task<Void, Never>?
     /// PDFs ours couldn't open on this page (a failed fetch, a password): WebKit's viewer stays for them, rather
@@ -1622,15 +1624,21 @@ extension Tab: WKUIDelegate {
 
 extension Tab {
     /// Whether the page is a PDF, asked of the document itself so Back, Forward and restored tabs are caught too.
-    /// A PDF gets Zigzag's viewer; anything else drops it. `fresh`: a new load of the page (Reload, or going to the
-    /// same address again), which fetches the PDF again even if it's showing.
+    /// A PDF file on your Mac gets Zigzag's viewer; one from the web stays in WebKit's (`PDFViewerView.opens`);
+    /// anything else drops it. `fresh`: a new load of the page (Reload, or going to the same address again), which
+    /// reads the PDF again even if it's showing.
     func checkForPDF(_ webView: WKWebView, fresh: Bool = false) {
-        guard let url = webView.url, !url.absoluteString.hasPrefix("blob:"), url.scheme != "data" else { setPDFViewer(nil); return }
-        webView.evaluateJavaScript("[document.contentType, navigator.userAgent]") { [weak self, weak webView] result, _ in
+        guard let url = webView.url, !url.absoluteString.hasPrefix("blob:"), url.scheme != "data" else {
+            showsPDF = false
+            setPDFViewer(nil)
+            return
+        }
+        webView.evaluateJavaScript("[document.contentType]") { [weak self, weak webView] result, _ in
             MainActor.assumeIsolated {
                 guard let self, let webView, webView === self.webView, webView.url == url else { return }
                 let values = result as? [String]
-                guard values?.first == "application/pdf" else {
+                self.showsPDF = values?.first == "application/pdf"
+                guard self.showsPDF else {
                     if self.pdfViewer != nil { self.setPDFViewer(nil) }
                     return
                 }
@@ -1641,8 +1649,8 @@ extension Tab {
                     self.title = file.isEmpty || file == "/" ? (url.host() ?? "") : (file.removingPercentEncoding ?? file)
                     self.changed.send(.title)
                 }
-                // In peek, a form's reply, or one ours couldn't open: WebKit's own viewer shows it.
-                guard !self.isPeek, self.pageIsGet, !self.pdfFailed.contains(url) else {
+                // From the web, in peek, a form's reply, or one ours couldn't open: WebKit's own viewer shows it.
+                guard PDFViewerView.opens(url), !self.isPeek, self.pageIsGet, !self.pdfFailed.contains(url) else {
                     if self.pdfViewer != nil { self.setPDFViewer(nil) }
                     return
                 }
@@ -1655,10 +1663,9 @@ extension Tab {
                 }
                 viewer.onSwipe = { [weak webView] event, room in (webView as? BrowserWebView)?.handleSwipe(event, room: room) ?? false }
                 self.setPDFViewer(viewer)
-                let userAgent = values?.count == 2 ? values?[1] : nil
                 self.pdfTask = Task { @MainActor [weak self, weak webView, weak viewer] in
                     guard let webView else { return }
-                    let loaded = await PDFViewerView.load(url, from: webView, userAgent: userAgent)
+                    let loaded = await PDFViewerView.load(url)
                     guard !Task.isCancelled, let self, let viewer, self.pdfViewer === viewer, self.webView === webView, webView.url == url else { return }
                     // Couldn't fetch or open it: WebKit's viewer underneath shows instead, and stays.
                     guard let (document, data) = loaded else {
