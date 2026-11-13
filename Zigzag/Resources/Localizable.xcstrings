@@ -6778,6 +6778,28 @@
         }
       }
     },
+    "Generated password" : {
+      "comment" : "In place of a username, for a strong password Zigzag made that the site hasn't accepted yet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成的密码"
+          }
+        }
+      }
+    },
+    "Generated password for %@" : {
+      "comment" : "In place of a username, for a strong password Zigzag made that the site hasn't accepted yet. The placeholder is the account's username, like sam@example.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为 %@ 生成的密码"
+          }
+        }
+      }
+    },
     "Get Extensions" : {
       "comment" : "Button in Settings › Extensions: opens the Chrome Web Store.\nTooltip of the + by the Extensions section in Site Controls, and the row there when you have none: opens the Chrome Web Store.",
       "localizations" : {
@@ -18284,6 +18306,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzag 无权存储到该文件夹"
+          }
+        }
+      }
+    },
+    "Zigzag made this strong password for a form on this site. It takes the place of the account’s saved password once the site accepts it; until then, the old one stays saved too." : {
+      "comment" : "Note on a generated password in the Passwords window that the site hasn't been seen to accept yet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是 Zigzag 为此网站上的表单生成的强密码。网站接受后，它会替换此账户已存储的密码；在此之前，旧密码也会继续保留。"
           }
         }
       }

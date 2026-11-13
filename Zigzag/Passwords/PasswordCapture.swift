@@ -52,6 +52,41 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
     /// Per tab: the login sent there whose answer hasn't come yet.
     private var held: [ObjectIdentifier: HeldLogin] = [:]
 
+    /// A strong password filled from Use Strong Password, kept as a pending login (`Credential.isPendingGenerated`)
+    /// until the site takes it. One per site: making another for the same form replaces it.
+    private final class PendingGenerated {
+        let origin: Origin
+        let id: UUID
+        let password: SecretString
+        let username: String
+        weak var tab: Tab?
+        /// The last press that may have sent its form (a button, or Return in one of its fields).
+        var attempted: Date?
+        var urlToken: SignalToken?
+        var checks: [DispatchWorkItem] = []
+
+        init(origin: Origin, id: UUID, password: SecretString, username: String, tab: Tab?) {
+            self.origin = origin
+            self.id = id
+            self.password = password
+            self.username = username
+            self.tab = tab
+        }
+
+        func stopWatching() {
+            urlToken = nil
+            checks.forEach { $0.cancel() }
+            checks = []
+        }
+    }
+
+    private var generated: [Origin: PendingGenerated] = [:]
+
+    /// How long a filled strong password is watched for its form going through.
+    private static let watchGeneratedFor: TimeInterval = 30 * 60
+    /// How long after a press that may have sent the form a new page, or a new address, counts as its answer.
+    nonisolated static let attemptCountsFor: TimeInterval = 45
+
     /// What the page in a tab shows after a login was sent.
     nonisolated struct PageAfterLogin: Equatable, Sendable {
         /// The host of the page now.
@@ -101,9 +136,15 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
 
         // A new page finished loading in the tab: the site's answer to a login sent before it, if one is waiting.
         if kind == "page" {
-            guard message.frameInfo.isMainFrame, held[key] != nil else { return }
-            judge(key, page: PageAfterLogin(host: origin.host, hasPasswordField: body["form"] as? Bool ?? false,
-                                            passwordFilled: body["filled"] as? Bool ?? false))
+            guard message.frameInfo.isMainFrame else { return }
+            let page = PageAfterLogin(host: origin.host, hasPasswordField: body["form"] as? Bool ?? false, passwordFilled: body["filled"] as? Bool ?? false)
+            if held[key] != nil { judge(key, page: page) }
+            pageChanged(in: tab, page: page)
+            return
+        }
+        // A press that may have sent the form a strong password was filled into.
+        if kind == "attempt" {
+            if message.frameInfo.isMainFrame, let pending = generated[origin], pending.tab === tab { pending.attempted = Date() }
             return
         }
         if kind == "username" {
@@ -117,7 +158,9 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
             username = pending.username
         }
         pendingUsernames[key] = nil
-        guard Self.offersToSave(in: tab.profile) else { return }
+        // A strong password Zigzag filled is settled whatever Offer to save says: choosing it was saying to keep it.
+        let isGenerated = generated[origin]?.password.matches(password) ?? false
+        guard Self.watches(offersToSave: Self.offersToSave(in: tab.profile), isGenerated: isGenerated) else { return }
         let framed = !message.frameInfo.isMainFrame && tab.url?.host()?.lowercased() != origin.host
         hold(HeldLogin(origin: origin, username: username, password: password, isChange: kind == "change", tab: tab,
                        framedOn: framed ? tab.url : nil), key: key)
@@ -187,64 +230,181 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
             release(key)
         case .offer:
             release(key)
-            guard let tab = login.tab, !tab.isClosed, Self.offersToSave(in: tab.profile) else { return }
-            Task { await self.consider(origin: login.origin, username: login.username, password: login.password, isChange: login.isChange, in: tab) }
+            guard let tab = login.tab, !tab.isClosed else { return }
+            let offers = Self.offersToSave(in: tab.profile)
+            let pending = generated[login.origin].flatMap { $0.password.matches(login.password) ? $0 : nil }
+            guard Self.watches(offersToSave: offers, isGenerated: pending != nil) else { return }
+            if let pending { forgetGenerated(pending) }
+            // The form's username, or else the one the strong password was made for.
+            let username = login.username.isEmpty ? (pending?.username ?? "") : login.username
+            Task { await self.consider(origin: login.origin, username: username, password: login.password, isChange: login.isChange, offers: offers, in: tab) }
         }
+    }
+
+    /// Whether a sent login is watched for the site's answer: always for a strong password Zigzag filled, which is
+    /// settled whatever Offer to save says; otherwise only when Zigzag offers to save.
+    nonisolated static func watches(offersToSave: Bool, isGenerated: Bool) -> Bool { offersToSave || isGenerated }
+
+    /// Whether a strong password whose form was never seen sent (a page that sends it by script) is settled by the
+    /// page the tab is on now: only soon after a press that may have sent it, and only once the site has taken it,
+    /// the way `verdict` reads a sent login. A link followed, or an address typed, with no such press settles
+    /// nothing, so a password the site never got never takes the account's place.
+    nonisolated static func settlesGenerated(attempted: Date?, now: Date, loginHost: String, page: PageAfterLogin) -> Bool {
+        guard let attempted else { return false }
+        let since = now.timeIntervalSince(attempted)
+        guard since >= 0, since < attemptCountsFor else { return false }
+        return verdict(loginHost: loginHost, page: page) == .offer
+    }
+
+    // MARK: Strong passwords
+
+    /// Keeps a strong password just filled into a page as a pending login of its own (never over the account's), and
+    /// watches the tab for its form going through. Filling another for the same site before the first could have
+    /// been sent replaces it, so trying a few leaves one behind, not several.
+    @discardableResult
+    func filledGenerated(_ password: SecretString, origin: Origin, username: String, in tab: Tab?) async throws -> Credential {
+        let previous = generated[origin]
+        // One that may have been sent stays: the site may have taken it.
+        let replacing = previous.flatMap { $0.attempted == nil ? $0.id : nil }
+        let credential = try await Self.keepGenerated(password, origin: origin, username: username, replacing: replacing, in: PasswordStore.shared)
+        if let current = generated[origin] { forgetGenerated(current) }
+        let pending = PendingGenerated(origin: origin, id: credential.id, password: password, username: username, tab: tab)
+        generated[origin] = pending
+        watch(pending)
+        return credential
+    }
+
+    /// Saves a strong password as a pending login: over the pending one `replacing` names when it's still there and
+    /// still pending on this site, otherwise as a new one.
+    static func keepGenerated(_ password: SecretString, origin: Origin, username: String, replacing: UUID?,
+                              in store: PasswordStore) async throws -> Credential {
+        if let replacing, var earlier = try await store.credentials(for: origin).first(where: { $0.id == replacing && $0.isPendingGenerated }) {
+            earlier.generatedFor = username
+            earlier.modified = Date()
+            try await store.update(earlier, password: password)
+            return earlier
+        }
+        return try await store.saveGenerated(origin: origin, for: username, password: password)
+    }
+
+    private func watch(_ pending: PendingGenerated) {
+        pending.urlToken = pending.tab?.changed.observe { [weak self, weak pending] change in
+            guard change == .url, let pending else { return }
+            self?.checkGenerated(pending, after: 0.8)
+        }
+        let expire = DispatchWorkItem { [weak self, weak pending] in
+            MainActor.assumeIsolated { if let pending { self?.forgetGenerated(pending) } }
+        }
+        pending.checks.append(expire)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.watchGeneratedFor, execute: expire)
+    }
+
+    /// Stops watching for its form. The pending login stays in the vault, listed as a generated password.
+    private func forgetGenerated(_ pending: PendingGenerated) {
+        pending.stopWatching()
+        if generated[pending.origin] === pending { generated[pending.origin] = nil }
+    }
+
+    /// A new page finished loading in a tab: the answer to a strong password's form sent from it, if there is one.
+    private func pageChanged(in tab: Tab, page: PageAfterLogin) {
+        for pending in generated.values where pending.tab === tab { settleIfTaken(pending, page: page) }
+    }
+
+    /// The tab's address changed without a new page (a single-page app): how its page looks a moment later.
+    private func checkGenerated(_ pending: PendingGenerated, after delay: TimeInterval) {
+        let work = DispatchWorkItem { [weak self, weak pending] in
+            MainActor.assumeIsolated {
+                guard let self, let pending, self.generated[pending.origin] === pending, pending.attempted != nil, let tab = pending.tab,
+                      !tab.isClosed, let webView = tab.webView, !webView.isLoading else { return }
+                // Only whether there's a password field and whether it's filled; never what's in it.
+                webView.evaluateJavaScript(Self.stateCall, in: nil, in: .defaultClient) { [weak self, weak pending, weak tab] result in
+                    guard let self, let pending, let tab, case .success(let value) = result, let state = value as? [String: Any] else { return }
+                    self.settleIfTaken(pending, page: PageAfterLogin(host: tab.url?.host(), hasPasswordField: state["form"] as? Bool ?? false,
+                                                                     passwordFilled: state["filled"] as? Bool ?? false))
+                }
+            }
+        }
+        pending.checks.append(work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func settleIfTaken(_ pending: PendingGenerated, page: PageAfterLogin) {
+        guard generated[pending.origin] === pending,
+              Self.settlesGenerated(attempted: pending.attempted, now: Date(), loginHost: pending.origin.host, page: page) else { return }
+        forgetGenerated(pending)
+        Task { _ = await Self.settleGenerated(origin: pending.origin, username: pending.username, password: pending.password, in: PasswordStore.shared) }
     }
 
     /// The watcher's own look at the page, from Zigzag's script world.
     private static let stateCall = "window.__zigzagPasswordState ? window.__zigzagPasswordState() : null"
 
-    /// A strong password from "Use Strong Password" is kept as a login of its own with no username the moment it's
-    /// filled (`Autofill.fillGenerated`), never over the one saved for the account, so a change the site turns down,
-    /// or a reload before the form is sent, loses nothing. Once the site has taken the form it settles: the account's
-    /// saved login (`username`'s) takes the new password and the stand-in goes, or, for a new account, the stand-in
-    /// is given the username. With no username to go by, the stand-in stays as it is. True when `password` was one.
+    /// A strong password from "Use Strong Password" is kept as a pending login of its own the moment it's filled
+    /// (`filledGenerated`), never over the one saved for the account, so a change the site turns down, or a reload
+    /// before the form is sent, loses nothing. Once the site has taken the form it settles: the account's saved login
+    /// (`username`'s, or else the one the form had when it was filled) takes the new password and the pending one
+    /// goes, or, for a new account, the pending one becomes its login. With no username to go by it stays pending,
+    /// unless it's the site's only login. True when `password` was one.
     static func settleGenerated(origin: Origin, username: String, password: SecretString, in store: PasswordStore) async -> Bool {
         let saved = (try? await store.credentials(for: origin)) ?? []
-        var generated: Credential?
-        for candidate in saved where candidate.username.isEmpty {
-            if let stored = try? await store.password(for: candidate.id), stored.matches(password) { generated = candidate; break }
-        }
-        guard let generated else { return false }
-        guard !username.isEmpty else {
-            try? await store.markUsed(generated.id)
-            return true
-        }
-        if var account = saved.first(where: { $0.id != generated.id && $0.username.caseInsensitiveCompare(username) == .orderedSame }) {
+        guard let generated = await pendingGenerated(matching: password, among: saved, in: store) else { return false }
+        let name = username.isEmpty ? generated.generatedFor : username
+        let accounts = saved.filter { $0.id != generated.id && !$0.isPendingGenerated }
+        // Email addresses are the same login whatever their capitals ("Sam@x.com" is "sam@x.com").
+        if !name.isEmpty, var account = accounts.first(where: { $0.username.caseInsensitiveCompare(name) == .orderedSame }) {
             account.modified = Date()
             do {
                 try await store.update(account, password: password)
                 try? await store.markUsed(account.id)
                 try? await store.delete(generated.id)
             } catch {
-                // Not updated: the stand-in keeps the new password, so it isn't lost.
+                // Not updated: the pending one keeps the new password, so it isn't lost.
             }
-        } else {
+        } else if !name.isEmpty || accounts.isEmpty {
             var named = generated
-            named.username = username
+            named.username = name
+            named.isPendingGenerated = false
+            named.generatedFor = ""
             named.modified = Date()
+            named.lastUsed = Date()
             try? await store.update(named)
+        } else {
+            // Which of the site's accounts it's for is yours to say; it stays, listed as a generated password.
+            try? await store.markUsed(generated.id)
         }
         return true
     }
 
-    /// Saves nothing by itself: decides whether to ask, and what.
-    private func consider(origin: Origin, username: String, password: SecretString, isChange: Bool, in tab: Tab) async {
+    /// The pending strong password on a site holding `password`, if there is one.
+    private static func pendingGenerated(matching password: SecretString, among saved: [Credential], in store: PasswordStore) async -> Credential? {
+        for candidate in saved where candidate.isPendingGenerated {
+            if let stored = try? await store.password(for: candidate.id), stored.matches(password) { return candidate }
+        }
+        return nil
+    }
+
+    /// An account given a pending strong password by hand (the update prompt): the pending one has done its job.
+    static func dropGenerated(origin: Origin, password: SecretString, in store: PasswordStore) async {
+        let saved = (try? await store.credentials(for: origin)) ?? []
+        if let generated = await pendingGenerated(matching: password, among: saved, in: store) { try? await store.delete(generated.id) }
+    }
+
+    /// Saves nothing by itself: decides whether to ask, and what. A strong password Zigzag filled is settled even
+    /// when Zigzag doesn't `offer` to save, or never saves on the site: you chose to keep it.
+    private func consider(origin: Origin, username: String, password: SecretString, isChange: Bool, offers: Bool, in tab: Tab) async {
         let store = PasswordStore.shared
-        guard await !store.neverSaves(on: origin) else { return }
-        // A strong password Zigzag filled here, now that the site has taken it.
         if await Self.settleGenerated(origin: origin, username: username, password: password, in: store) {
+            guard offers, await !store.neverSaves(on: origin) else { return }
             // A change form with no username, on a site with one account saved: that one is offered the new
-            // password, for you to say so, as a typed one would be. The stand-in keeps it meanwhile.
-            let named = ((try? await store.credentials(for: origin)) ?? []).filter { !$0.username.isEmpty }
+            // password, for you to say so, as a typed one would be. The pending one keeps it meanwhile.
+            let named = ((try? await store.credentials(for: origin)) ?? []).filter { !$0.username.isEmpty && !$0.isPendingGenerated }
             if isChange, username.isEmpty, named.count == 1, let account = named.first {
                 if let current = try? await store.password(for: account.id), current.matches(password) { return }
                 SavePasswordPrompt.show(.update(account), origin: origin, password: password, in: tab)
             }
             return
         }
-        let saved = (try? await store.credentials(for: origin)) ?? []
+        guard offers, await !store.neverSaves(on: origin) else { return }
+        let saved = ((try? await store.credentials(for: origin)) ?? []).filter { !$0.isPendingGenerated }
         // A change form often has no username; if there's one login for the site, it's that one.
         // Email addresses are the same login whatever their capitals ("Sam@x.com" is "sam@x.com").
         let target = saved.first { $0.username.caseInsensitiveCompare(username) == .orderedSame }
@@ -326,6 +486,30 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         if (!e.isTrusted) return;
         const button = e.target && e.target.closest ? e.target.closest('button, input[type=submit], [role=button]') : null;
         if (button && sends(button)) capture(button.form || button.closest('form') || document);
+      }, true);
+      // A press that may send the form a strong password was filled into (Zigzag marks those fields), for pages that
+      // send it by script: a button, or a link that goes nowhere, in its form if it has one, but not one to cancel,
+      // go back, show the password or follow a link; or Return in one of its fields.
+      const generatedForm = () => {
+        const marked = (window.__zigzagGenerated || []).filter((el) => el.isConnected && el.value);
+        return marked.length ? { form: marked[0].form } : null;
+      };
+      const staysHere = /cancel|back|close|dismiss|show|hide|reveal|forgot|reset|visib|取消|返回|关闭|显示|隐藏|忘记/i;
+      document.addEventListener('click', (e) => {
+        if (!e.isTrusted || !e.target || !e.target.closest) return;
+        const generated = generatedForm();
+        if (!generated) return;
+        const el = e.target.closest('button, input[type=submit], input[type=button], input[type=image], [role=button], a');
+        if (!el || staysHere.test(label(el))) return;
+        const href = el.tagName === 'A' ? (el.getAttribute('href') || '') : '';
+        if (href && href !== '#' && !/^javascript:/i.test(href)) return;
+        if (generated.form && el.form !== generated.form && !generated.form.contains(el)) return;
+        post({ kind: 'attempt' });
+      }, true);
+      document.addEventListener('keydown', (e) => {
+        if (!e.isTrusted || e.key !== 'Enter' || e.isComposing || !e.target || e.target.tagName !== 'INPUT') return;
+        const generated = generatedForm();
+        if (generated && (!generated.form || e.target.form === generated.form)) post({ kind: 'attempt' });
       }, true);
       // Return in the password field, or in the username on its own page of a two-step sign-in.
       document.addEventListener('keydown', (e) => {

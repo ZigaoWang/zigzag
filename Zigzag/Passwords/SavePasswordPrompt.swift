@@ -106,6 +106,8 @@ final class SavePasswordPrompt: FloatingPanelView {
                     case .update(var credential):
                         credential.modified = Date()
                         try await store.update(credential, password: password)
+                        // A strong password Zigzag made, kept pending until now: the account has it.
+                        await PasswordCapture.dropGenerated(origin: origin, password: password, in: store)
                         done = String(localized: "Password updated", comment: "Toast after the save-password prompt updated a password.")
                     }
                     controller.promptToast(done, symbol: "key", duration: 1.6)

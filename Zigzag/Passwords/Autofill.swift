@@ -379,12 +379,13 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 return
             }
             let password = candidates[index]
+            let username = (result?["username"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             do {
-                // Kept at once, so a reload or a submit that goes unnoticed never loses it, but as a login of its own
-                // with no username, never over the account's saved one: if the site turns the change down, the old
-                // password is still there. It takes the account's place once the site has taken the form
-                // (`PasswordCapture.settleGenerated`).
-                try await PasswordStore.shared.save(origin: origin, username: "", password: password, replacingExisting: false)
+                // Kept at once, so a reload or a submit that goes unnoticed never loses it, but as a pending login of
+                // its own, never over the account's saved one: if the site turns the change down, the old password is
+                // still there. It takes the account's place once the site has taken the form, and another made for
+                // the same form replaces it (`PasswordCapture.filledGenerated`).
+                try await PasswordCapture.shared.filledGenerated(password, origin: origin, username: username, in: webView.owner)
                 if let controller { Toast.show(String(localized: "Strong password saved for \(origin.displayName)", comment: "Toast after a strong password was filled and saved. The placeholder is a site, like github.com."), symbol: "key", duration: 2, in: controller) }
             } catch {
                 if let controller { Toast.show(String(localized: "Couldn’t save the new password. Copy it before you leave this page.", comment: "Toast when a strong password was filled but couldn't be saved."), symbol: "exclamationmark.triangle", duration: 4, in: controller) }
@@ -704,10 +705,14 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText' }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
     }
+    // The fields holding it, so a press that may send their form is noticed (the password watcher's script).
+    window.__zigzagGenerated = targets;
     const first = passwords[0];
     const users = inputs.filter((el) => ['text', 'email', 'tel', ''].includes(el.type) && el.value && inputs.indexOf(el) < inputs.indexOf(first));
     const marked = users.find((el) => /username|email/.test(el.autocomplete || '') || el.type === 'email');
-    return { index, username: (marked || users[users.length - 1] || {}).value || '' };
+    // A change form often names the account in a hidden field for password managers.
+    const named = [...scope.querySelectorAll('input[autocomplete~="username"]')].find((el) => el.value && el.type !== 'password');
+    return { index, username: (marked || users[users.length - 1] || named || {}).value || '' };
     """
 
     /// Fills the focused form's fields for your details from `values` (keyed by autocomplete token), each field found
@@ -984,7 +989,7 @@ private final class AutofillRow: InteractiveView {
         self.item = item
         switch item {
         case .login(let login):
-            name = Label(login.username.isEmpty ? String(localized: "No username", comment: "Shown in place of a login's username when it has none.") : login.username, font: Tokens.Font.body(.medium),
+            name = Label(login.shownUsername, font: Tokens.Font.body(.medium),
                          color: login.username.isEmpty ? Tokens.Color.textSecondary : Tokens.Color.textPrimary)
             detail = Label(String(localized: "Password for \(login.origin.displayName)", comment: "Under a login in the menu that fills a password into a page. The placeholder is a site, like github.com."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
             icon.image = origin.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key")

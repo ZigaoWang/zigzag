@@ -324,7 +324,7 @@ final class PasswordsView: NSView {
             let shown = visibleCredentials
             rows = shown.map { credential in
                 let row = SiteRow(title: credential.title.isEmpty ? credential.origin.displayName : credential.title,
-                                  subtitle: credential.username.isEmpty ? String(localized: "No username", comment: "Shown in place of a login's username when it has none.") : credential.username, origin: credential.origin)
+                                  subtitle: credential.shownUsername, origin: credential.origin)
                 row.credentialID = credential.id
                 row.onClick = { [weak self] _ in self?.select(credential.id) }
                 return row
@@ -740,6 +740,7 @@ private final class DetailView: NSView, NSTextFieldDelegate {
         title.stringValue = credential.title.isEmpty ? credential.origin.displayName : credential.title
         let changed = credential.modified.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Words.locale))
         subtitle.stringValue = String(localized: "Last changed \(changed)", comment: "Under a saved login's name in the Passwords window. The placeholder is a date, like Nov 8, 2026.")
+        if credential.isPendingGenerated { subtitle.stringValue = credential.shownUsername }
         usernameRow.value = credential.username.isEmpty ? String(localized: "No username", comment: "Shown in place of a login's username when it has none.") : credential.username
         usernameRow.isPlaceholder = credential.username.isEmpty
         usernameRow.showsActions = !credential.username.isEmpty
@@ -747,12 +748,15 @@ private final class DetailView: NSView, NSTextFieldDelegate {
         websiteRow.value = credential.origin.displayName + (credential.origin.port.map { ":\($0)" } ?? "")
         notesRow.value = credential.notes
         notesRow.isHidden = credential.notes.isEmpty
-        if isReused {
+        if credential.isPendingGenerated {
+            // Said first: until the site takes it, the account's saved password is the one that signs in.
+            warning.set(String(localized: "Zigzag made this strong password for a form on this site. It takes the place of the account’s saved password once the site accepts it; until then, the old one stays saved too.", comment: "Note on a generated password in the Passwords window that the site hasn't been seen to accept yet."), color: Tokens.Color.accent, symbol: "key.fill")
+        } else if isReused {
             warning.set(String(localized: "This password is used on other sites. If one of them leaks, this account is at risk too. Change it on the site, then update it here.", comment: "Warning on a reused password in the Passwords window."), color: Tokens.Color.caution)
         } else if isWeak {
             warning.set(String(localized: "This password is easy to guess. Change it on the site, and use a strong password Zigzag makes for you.", comment: "Warning on a weak password in the Passwords window."), color: Tokens.Color.warning)
         }
-        warning.isHidden = !(isWeak || isReused)
+        warning.isHidden = !(isWeak || isReused || credential.isPendingGenerated)
         applyEditing()
         needsLayout = true
     }
@@ -890,6 +894,9 @@ private final class DetailView: NSView, NSTextFieldDelegate {
         guard !newPassword.isEmpty else { toast(String(localized: "A password can’t be empty.", comment: "Toast when saving a login with its password cleared.")); return }
         edited.username = usernameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         edited.notes = notesField.stringValue
+        // Edited by hand, a generated password is yours like any other login.
+        edited.isPendingGenerated = false
+        edited.generatedFor = ""
         edited.modified = Date()
         Task { @MainActor in
             do {
@@ -1085,8 +1092,9 @@ private final class WarningBanner: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    func set(_ message: String, color: NSColor) {
+    func set(_ message: String, color: NSColor, symbol: String = "exclamationmark.triangle.fill") {
         text.stringValue = message
+        icon.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.body)
         self.color = color
         icon.contentTintColor = color
         updateColors()

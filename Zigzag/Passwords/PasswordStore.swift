@@ -56,9 +56,25 @@ nonisolated struct Credential: Identifiable, Hashable, Sendable {
     var created: Date
     var modified: Date
     var lastUsed: Date?
+    /// A strong password from Use Strong Password that the site hasn't been seen to take yet. It's kept as a login of
+    /// its own, never over the account's saved one, and the Passwords window calls it a generated password.
+    var isPendingGenerated = false
+    /// The account a pending generated password is for, from the form it was filled into, when it had a username.
+    var generatedFor = ""
 
     static func == (a: Credential, b: Credential) -> Bool { a.id == b.id && a.modified == b.modified }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+
+    /// What a list shows in place of the username: the username, "No username", or, for a strong password the site
+    /// hasn't taken yet, that it's a generated password (and for whom, when the form said).
+    var shownUsername: String {
+        if isPendingGenerated {
+            return generatedFor.isEmpty
+                ? String(localized: "Generated password", comment: "In place of a username, for a strong password Zigzag made that the site hasn't accepted yet.")
+                : String(localized: "Generated password for \(generatedFor)", comment: "In place of a username, for a strong password Zigzag made that the site hasn't accepted yet. The placeholder is the account's username, like sam@example.com.")
+        }
+        return username.isEmpty ? String(localized: "No username", comment: "Shown in place of a login's username when it has none.") : username
+    }
 }
 
 /// The only code that touches saved passwords. Each login is an internet-password item in Zigzag's own
@@ -162,7 +178,21 @@ actor PasswordStore {
     @discardableResult
     func save(origin: Origin, username: String, password: SecretString, title: String? = nil, notes: String = "", otpAuth: String = "",
               created: Date = Date(), replacingExisting: Bool = true) throws -> Credential {
-        if replacingExisting, var existing = try credentials(for: origin).first(where: { $0.username == username }) {
+        try save(origin: origin, username: username, password: password, title: title, notes: notes, otpAuth: otpAuth, created: created,
+                 replacingExisting: replacingExisting, generatedFor: nil)
+    }
+
+    /// A strong password the site hasn't taken yet: always a new login with no username of its own, marked as
+    /// pending for `account` (empty when the form had no username).
+    @discardableResult
+    func saveGenerated(origin: Origin, for account: String, password: SecretString) throws -> Credential {
+        try save(origin: origin, username: "", password: password, title: nil, notes: "", otpAuth: "", created: Date(),
+                 replacingExisting: false, generatedFor: account)
+    }
+
+    private func save(origin: Origin, username: String, password: SecretString, title: String?, notes: String, otpAuth: String,
+                      created: Date, replacingExisting: Bool, generatedFor: String?) throws -> Credential {
+        if replacingExisting, var existing = try credentials(for: origin).first(where: { $0.username == username && !$0.isPendingGenerated }) {
             existing.modified = Date()
             if let title { existing.title = title }
             if !notes.isEmpty { existing.notes = notes }
@@ -171,7 +201,8 @@ actor PasswordStore {
             return existing
         }
         let credential = Credential(id: UUID(), origin: origin, username: username, title: title ?? origin.displayName,
-                                    notes: notes, otpAuth: otpAuth, created: created, modified: Date(), lastUsed: nil)
+                                    notes: notes, otpAuth: otpAuth, created: created, modified: Date(), lastUsed: nil,
+                                    isPendingGenerated: generatedFor != nil, generatedFor: generatedFor ?? "")
         #if DEBUG
         if memory != nil { memory?[credential.id] = (credential, password); notify(); return credential }
         #endif
@@ -334,11 +365,16 @@ actor PasswordStore {
         var created: Date
         var modified: Date
         var lastUsed: Date?
+        // Only on a strong password the site hasn't taken yet; older items have neither.
+        var pendingGenerated: Bool?
+        var generatedFor: String?
     }
 
     private func attributes(for credential: Credential) -> [CFString: Any] {
         let details = Details(title: credential.title, notes: credential.notes, otpAuth: credential.otpAuth,
-                              created: credential.created, modified: credential.modified, lastUsed: credential.lastUsed)
+                              created: credential.created, modified: credential.modified, lastUsed: credential.lastUsed,
+                              pendingGenerated: credential.isPendingGenerated ? true : nil,
+                              generatedFor: credential.isPendingGenerated && !credential.generatedFor.isEmpty ? credential.generatedFor : nil)
         var item: [CFString: Any] = [
             kSecClass: kSecClassInternetPassword,
             kSecUseDataProtectionKeychain: true,
@@ -369,7 +405,8 @@ actor PasswordStore {
                           title: details?.title ?? origin.displayName, notes: details?.notes ?? "", otpAuth: details?.otpAuth ?? "",
                           created: details?.created ?? (item[kSecAttrCreationDate] as? Date ?? Date()),
                           modified: details?.modified ?? (item[kSecAttrModificationDate] as? Date ?? Date()),
-                          lastUsed: details?.lastUsed)
+                          lastUsed: details?.lastUsed, isPendingGenerated: details?.pendingGenerated ?? false,
+                          generatedFor: details?.generatedFor ?? "")
     }
 
     private func notify() {
