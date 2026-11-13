@@ -485,6 +485,7 @@ final class WindowManager {
         let tab = Tab(id: state.id, url: state.url, title: state.title, spaceID: spaceID, interactionState: interaction,
                       lastActivated: state.lastActivated, createdAt: state.createdAt)
         state.apply(to: tab)
+        tab.isRestored = true
         return tab
     }
 

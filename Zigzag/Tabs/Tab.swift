@@ -277,7 +277,22 @@ final class Tab: NSObject {
 
     private var extensionToken: SignalToken?
 
-    var isSuspended: Bool { webView == nil }
+    /// Its page is running: a web view is there. Not while it sleeps, nor for a tab restored after a relaunch until
+    /// it's shown or something loads it. What every place that draws a tab tells "not running" from (#205).
+    var isLoaded: Bool { webView != nil }
+    var isSuspended: Bool { !isLoaded }
+    /// Came back with the session after a relaunch and hasn't loaded since: its hover card says so, rather than
+    /// that it was put to sleep.
+    var isRestored = false
+    /// Why its page isn't running, for its hover card or a favorite's tooltip; nil while it is. Only a tab put to
+    /// sleep tells of memory it freed.
+    var notLoadedNote: String? {
+        guard !isLoaded else { return nil }
+        if let asleepNote { return asleepNote }
+        return isRestored
+            ? String(localized: "Not loaded since Zigzag reopened. Loads when you click it.", comment: "Under a tab's title in its hover card, or a favorite's tooltip: the tab came back after Zigzag was quit and opened again, and its page loads only once you click it.")
+            : String(localized: "Not loaded yet. Loads when you click it.", comment: "Under a tab's title in its hover card, or a favorite's tooltip: the tab's page hasn't loaded yet and loads once you click it.")
+    }
     /// Put to sleep this run (not merely not loaded yet after a relaunch), and whether it was for using a lot of energy:
     /// the sidebar marks it, so a tab never seems to have lost its page for no reason.
     private(set) var isAsleep = false
@@ -397,6 +412,7 @@ final class Tab: NSObject {
     func ensureWebView() -> BrowserWebView {
         if let webView { return webView }
         isAsleep = false
+        isRestored = false
         sleptForEnergy = false
         freedMemory = nil
         let fromWebKit = pendingConfiguration != nil

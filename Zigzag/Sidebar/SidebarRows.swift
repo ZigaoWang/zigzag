@@ -321,7 +321,23 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         layer?.addSublayer(mark)
         return mark
     }()
-    var isUnloaded = false { didSet { if oldValue != isUnloaded { refreshTitleColor() }; showsOpenEdge = isBookmark && !isUnloaded } }
+    /// A pinned page none of whose pages is running (never opened, put to sleep, or not loaded yet since Zigzag
+    /// reopened): no open edge and no unload button, the way a pinned page that was never opened looks (#205).
+    private(set) var isUnloaded = false { didSet { if oldValue != isUnloaded { refreshTitleColor() }; showsOpenEdge = isBookmark && !isUnloaded } }
+
+    /// Whether a page's icon wears the ring of a page that isn't running (#205). `loaded`: nil for no page. In the
+    /// Tabs list every row is a tab, so the ring is what tells one that isn't running, asleep or not loaded yet
+    /// since Zigzag reopened. Among pinned pages and favorites the open edge does (`showsOpenEdge(pinned:loaded:)`):
+    /// one that isn't running looks like one never opened, never ringed while those beside it aren't.
+    nonisolated static func ringsUnloaded(pinned: Bool, loaded: Bool?) -> Bool { !pinned && loaded == false }
+
+    /// Whether a pinned page's row, or a favorite's tile, has the open edge: only while one of its pages is loaded.
+    nonisolated static func showsOpenEdge(pinned: Bool, loaded: [Bool]) -> Bool { pinned && loaded.contains(true) }
+
+    private func showsUnloaded(_ page: Tab?) -> Bool { Self.ringsUnloaded(pinned: isBookmark, loaded: page?.isLoaded) }
+
+    private func refreshUnloaded() { isUnloaded = isBookmark && !Self.showsOpenEdge(pinned: true, loaded: pages.map(\.isLoaded)) }
+
     /// The other half of a split: shown in the same row, to the right.
     private(set) var partner: Tab?
     /// A pinned split's other page, by its pinned name and icon: there whether or not its page is open.
@@ -475,7 +491,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             let page = extraPartners.indices.contains(i) ? extraPartners[i] : nil
             views.icon.image = page?.displayIcon
             views.icon.isLoading = (page?.isLoading ?? false) && !(page?.isSuspended ?? true)
-            views.icon.isAsleep = page?.isAsleep == true
+            views.icon.isUnloaded = showsUnloaded(page)
             views.title.stringValue = page?.displayTitle ?? ""
             let sound = page?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
             if views.audio.symbol != sound { views.audio.symbol = sound }
@@ -483,6 +499,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             [views.icon, views.title, views.divider].forEach { $0.isHidden = page == nil }
             if renameField != nil, renamingPart == i + 2 { views.title.isHidden = true }
         }
+        refreshUnloaded()
         refreshAccessories()
         refreshAccessibilityLabel()
         refreshTitleColor()
@@ -501,11 +518,12 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         partnerTitle.stringValue = pinnedPartner?.title ?? partner?.displayTitle ?? ""
         partnerIcon.image = partner?.displayIcon ?? pinnedPartner?.icon
         partnerIcon.isLoading = (partner?.isLoading ?? false) && !(partner?.isSuspended ?? true)
-        partnerIcon.isAsleep = partner?.isAsleep == true
+        partnerIcon.isUnloaded = showsUnloaded(partner)
         // A symbol set again is drawn again: only when it changes.
         let partnerSound = partner?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
         if partnerAudioButton.symbol != partnerSound { partnerAudioButton.symbol = partnerSound }
         partnerAudioButton.toolTip = partner?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.") : String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
+        refreshUnloaded()
         refreshAccessories()
         refreshAccessibilityLabel()
         refreshTitleColor()
@@ -528,7 +546,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         }
         let split = partner != nil
         let development = showsDeveloperMode ? DeveloperTool.modeName : nil
-        let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, development, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
+        // What its ring shows: its page isn't running.
+        let unloaded = showsUnloaded(tab) ? String(localized: "not loaded", comment: "Spoken by VoiceOver after a tab row's name: the tab's page isn't running (put to sleep, or not loaded yet since Zigzag reopened); it loads when you click it.") : nil
+        let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, unloaded, development, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
             + extraPartners.map { sound($0, $0.displayTitle) })
             .compactMap { $0 }.joined(separator: String(localized: "accessibility.state-separator", defaultValue: ", ", comment: "Separates the states VoiceOver reads after a tab row's name, like “current tab, playing audio”."))
         setAccessibilityValue(state.isEmpty ? nil : state)
@@ -658,11 +678,13 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         title.stringValue = fixedTitle ?? tab?.displayTitle ?? ""
         icon.image = tab?.displayIcon ?? (fixedTitle != nil ? bookmarkIcon : nil)
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
-        // Why it sleeps, and what that freed, is in its hover card (`TabPreviewView`), not a tooltip on top of it.
-        icon.isAsleep = tab?.isAsleep == true
+        // Why it isn't running (asleep, and what that freed, or not loaded since Zigzag reopened) is in its hover card
+        // (`TabPreviewView`), not a tooltip on top of it.
+        icon.isUnloaded = showsUnloaded(tab)
         let sound = tab?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
         if audioButton.symbol != sound { audioButton.symbol = sound }
         audioButton.toolTip = tab?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.") : String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
+        refreshUnloaded()
         refreshAccessibilityLabel()
         refreshTitleColor()
         refreshAccessories()

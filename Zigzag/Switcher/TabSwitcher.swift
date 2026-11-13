@@ -196,11 +196,23 @@ final class TabThumbnailView: InteractiveView {
         icon.image = tab.displayIcon
         title.stringValue = tab.displayTitle
         icon2.image = partner?.displayIcon
+        // A page that isn't running wears the ring it has in the sidebar, and loses it the moment it loads (#205).
+        loadTokens = [tab, partner].compactMap { $0 }.map { page in
+            page.changed.observe { [weak self] change in if change == .webView { self?.refreshUnloaded() } }
+        }
+        refreshUnloaded()
         title2.stringValue = partner?.displayTitle ?? ""
         setAccessibilityLabel(pages.count > 1 ? Words.list(pages.map(\.displayTitle)) : tab.displayTitle)
         refreshImage()
         refreshAudio()
         needsLayout = true
+    }
+
+    private var loadTokens: [SignalToken] = []
+
+    private func refreshUnloaded() {
+        icon.isUnloaded = tab.map { !$0.isLoaded } ?? false
+        icon2.isUnloaded = partner.map { !$0.isLoaded } ?? false
     }
 
     /// The page with sound on (or muted), the first one's before its split partner's.

@@ -197,7 +197,8 @@ final class FavoritesView: NSView {
     }
 
     /// One tile per favorite; a split favorite's two pages share one, each half opening its own page.
-    func reload(favorites: [(Bookmark, partner: Bookmark?)], openIDs: Set<UUID>, selectedID: UUID?, tabs: [UUID: Tab] = [:]) {
+    /// `tabs`: the favorites' tabs, by favorite; a tile is open only while one of its pages is loaded (#205).
+    func reload(favorites: [(Bookmark, partner: Bookmark?)], selectedID: UUID?, tabs: [UUID: Tab] = [:]) {
         if tiles.map({ [$0.bookmark?.id, $0.partner?.id] }) != favorites.map({ [$0.0.id, $0.partner?.id] }) {
             // The tiles that stay are the same tiles, gliding to their new places; a new one fades in where it lands
             // and one that's gone fades out where it was.
@@ -241,8 +242,7 @@ final class FavoritesView: NSView {
             guard let id = tile.bookmark?.id else { continue }
             let ids = [id] + (tile.partner.map { [$0.id] } ?? [])
             tile.isSelected = selectedID.map(ids.contains) ?? false
-            tile.isOpen = ids.contains(where: openIDs.contains)
-            tile.track(tabs[id])
+            tile.track(tabs[id], partner: tile.partner.flatMap { tabs[$0.id] })
             tile.refreshIcon()
         }
     }
@@ -365,8 +365,9 @@ final class FavoriteTile: InteractiveView {
             dropHalf.isHidden = splitSide == nil
         }
     }
-    /// Its page is open in the background: a fine edge, so you can tell at a glance which are loaded.
-    var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
+    /// Its page is loaded in the background: a fine edge, so you can tell at a glance which are. Not for a page put
+    /// to sleep or not loaded yet since Zigzag reopened: that looks like a favorite never opened (#205).
+    private(set) var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
     override var pressSinks: Bool { get { true } set {} }
     var iconImage: NSImage? { icon.image }
     var partnerIconImage: NSImage? { partnerIcon.image }
@@ -450,6 +451,8 @@ final class FavoriteTile: InteractiveView {
     private var numberHint: NumberHintView?
     private weak var tab: Tab?
     private var tabToken: SignalToken?
+    private weak var partnerTab: Tab?
+    private var partnerToken: SignalToken?
     /// The Developer Mode chip follows the space's color as it changes, or another space is shown.
     private lazy var themeToken: SignalToken = Brand.themeChanged.observe { [weak self] in
         guard let self, self.inDeveloperMode else { return }
@@ -501,9 +504,16 @@ final class FavoriteTile: InteractiveView {
         }
     }
 
-    /// Follows the favorite's page, so the tile shows the loading ribbon while it loads, like a tab does.
-    func track(_ tab: Tab?) {
-        guard tab !== self.tab else { return }
+    /// Follows the favorite's page (and a split favorite's other page), so the tile shows the loading ribbon while it
+    /// loads, like a tab does, and its open edge only while one of them is loaded.
+    func track(_ tab: Tab?, partner partnerTab: Tab? = nil) {
+        if partnerTab !== self.partnerTab {
+            self.partnerTab = partnerTab
+            partnerToken = partnerTab?.changed.observe { [weak self] change in
+                if change == .webView { self?.refreshLoading() }
+            }
+        }
+        guard tab !== self.tab else { refreshLoading(); return }
         self.tab = tab
         tabToken = tab?.changed.observe { [weak self] change in
             if change == .loading || change == .favicon || change == .webView { self?.refreshLoading() }
@@ -517,10 +527,11 @@ final class FavoriteTile: InteractiveView {
 
     private func refreshLoading() {
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
-        icon.isAsleep = tab?.isAsleep == true
+        isOpen = TabRowView.showsOpenEdge(pinned: true, loaded: [tab, partnerTab].compactMap { $0?.isLoaded })
         let name = Words.list([bookmark?.title, partner?.title].compactMap { $0 })
-        // A favorite has no hover card, so a sleeping one says why, and what that freed, in its tooltip.
-        let notes = [inDeveloperMode ? TabRowView.developerTip(for: tab?.url) : nil, tab?.asleepNote].compactMap { $0 }
+        // A favorite has no hover card, so one whose page isn't running says why in its tooltip: asleep, and what
+        // that freed, or not loaded since Zigzag reopened. It looks like a favorite never opened: no edge, no ring.
+        let notes = [inDeveloperMode ? TabRowView.developerTip(for: tab?.url) : nil, tab?.notLoadedNote].compactMap { $0 }
         toolTip = ([name].filter { !$0.isEmpty } + notes).joined(separator: "\n")
         if let image = tab?.displayIcon, !(tab?.isLoading ?? false) { icon.image = image; needsLayout = true }
     }

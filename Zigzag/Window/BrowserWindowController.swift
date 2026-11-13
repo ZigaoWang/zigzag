@@ -473,9 +473,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func reloadFavorites() {
         // The tiles are the profile's of the space you're in.
         let favorites = Library.shared.favorites(in: tabManager.profile.id)
-        let open = Set(favorites.map(\.id).filter { tabManager.bookmarkTab(for: $0) != nil })
         let tabs = Dictionary(uniqueKeysWithValues: favorites.compactMap { favorite in tabManager.bookmarkTab(for: favorite.id).map { (favorite.id, $0) } })
-        sidebar.favorites.reload(favorites: Library.shared.favoriteTiles(in: tabManager.profile.id), openIDs: open, selectedID: tabManager.selectedTab?.isFavorite == true ? tabManager.selectedTab?.bookmarkID : nil, tabs: tabs)
+        sidebar.favorites.reload(favorites: Library.shared.favoriteTiles(in: tabManager.profile.id), selectedID: tabManager.selectedTab?.isFavorite == true ? tabManager.selectedTab?.bookmarkID : nil, tabs: tabs)
         sidebar.needsLayout = true
     }
 

@@ -9474,6 +9474,28 @@
         }
       }
     },
+    "Not loaded since Zigzag reopened. Loads when you click it." : {
+      "comment" : "Under a tab's title in its hover card, or a favorite's tooltip: the tab came back after Zigzag was quit and opened again, and its page loads only once you click it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 重新打开后还没有载入，点按即可载入。"
+          }
+        }
+      }
+    },
+    "Not loaded yet. Loads when you click it." : {
+      "comment" : "Under a tab's title in its hover card, or a favorite's tooltip: the tab's page hasn't loaded yet and loads once you click it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有载入，点按即可载入。"
+          }
+        }
+      }
+    },
     "Not secure" : {
       "comment" : "How a page loaded over plain http is marked, in the site panel and the address bar's tooltip.\nVoiceOver label of the warning before the address in a pop-up window.",
       "localizations" : {
@@ -18987,6 +19009,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新标签页 主页 首页 起始页 位置 顺序 同一网站 域名 分组 整理 homepage new tab"
+          }
+        }
+      }
+    },
+    "not loaded" : {
+      "comment" : "Spoken by VoiceOver after a tab row's name: the tab's page isn't running (put to sleep, or not loaded yet since Zigzag reopened); it loads when you click it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未载入"
           }
         }
       }

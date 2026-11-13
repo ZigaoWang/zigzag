@@ -1027,7 +1027,6 @@ final class SidebarListView: NSView {
             let beside = pinned == nil ? tab.flatMap(manager.partner(of:)) : nil
             row.configure(partner: partner ?? beside)
             row.partnerLeads = beside != nil && tab.flatMap(manager.split(for:))?.left == beside?.id
-            row.isUnloaded = tab == nil && partner == nil
             row.setAccessibilityDisclosureLevel(rowDepth[item] ?? 0)
             let other = partner ?? beside
             row.isSelected = (tab != nil && tab === selected) || (other != nil && other === selected)

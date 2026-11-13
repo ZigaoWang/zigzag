@@ -11,8 +11,8 @@ final class TabPreviewView: FloatingPanelView {
     private let detail = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
     private let title2 = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let detail2 = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
-    /// A page's line under its address: Developer Mode, if it's in it; and if it sleeps, why, and about how much memory
-    /// that freed.
+    /// A page's line under its address: Developer Mode, if it's in it; and if its page isn't running, why (asleep, and
+    /// about how much memory that freed, or not loaded since Zigzag reopened).
     private let note = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let note2 = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let imageClip = NSView()
@@ -81,9 +81,10 @@ final class TabPreviewView: FloatingPanelView {
         needsLayout = true
     }
 
-    /// The line under a page's address: that it's in Developer Mode (#141), and why it sleeps.
+    /// The line under a page's address: that it's in Developer Mode (#141), and why its page isn't running: asleep,
+    /// or not loaded since Zigzag reopened (#205).
     private static func note(for tab: Tab?) -> String {
-        [tab?.isDevelopment == true ? DeveloperTool.modeName : nil, tab?.asleepNote].compactMap { $0 }.joined(separator: "\n")
+        [tab?.isDevelopment == true ? DeveloperTool.modeName : nil, tab?.notLoadedNote].compactMap { $0 }.joined(separator: "\n")
     }
 
     /// Each page's picture, in order.

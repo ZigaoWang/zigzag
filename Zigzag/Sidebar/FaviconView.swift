@@ -29,8 +29,9 @@ final class FaviconView: NSView {
 
     var image: NSImage? { didSet { refreshImage() } }
     var isLoading = false { didSet { if oldValue != isLoading { refreshLoading() } } }
-    /// A tab put to sleep: a thin dashed ring round its icon, as Chrome marks a tab whose page it let go.
-    var isAsleep = false { didSet { if oldValue != isAsleep { asleepRing.isHidden = !isAsleep; needsLayout = true } } }
+    /// A tab whose page isn't running, however it got there (put to sleep, or not loaded yet since Zigzag reopened):
+    /// a thin dashed ring round its icon, as Chrome marks a tab whose page it let go.
+    var isUnloaded = false { didSet { if oldValue != isUnloaded { asleepRing.isHidden = !isUnloaded; needsLayout = true } } }
     private let asleepRing = CAShapeLayer()
 
     /// Developer Mode (#141): a small round chip on the icon's bottom-trailing corner in this color, the mode's hammer
@@ -182,9 +183,9 @@ final class FaviconView: NSView {
     private func layoutAsleep() {
         let style = Self.asleepStyle
         let local = NSRect(origin: .zero, size: bounds.size)
-        let shrink = isAsleep ? bounds.width * (1 - style.iconScale) / 2 : 0
+        let shrink = isUnloaded ? bounds.width * (1 - style.iconScale) / 2 : 0
         imageLayer.frame = bounds.insetBy(dx: shrink, dy: shrink)
-        guard isAsleep else { return }
+        guard isUnloaded else { return }
         let ring = local.insetBy(dx: -style.gap - style.lineWidth / 2, dy: -style.gap - style.lineWidth / 2)
         let even = Self.evenDashes(circumference: .pi * ring.width, dash: style.dash, space: style.space)
         asleepRing.frame = bounds
