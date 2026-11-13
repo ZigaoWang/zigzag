@@ -47,7 +47,7 @@
       }
     },
     "%@ (%@)" : {
-      "comment" : "A button's tooltip: its name, then its keyboard shortcut in parentheses, like “Reload (⌘R)”.",
+      "comment" : "A button's tooltip: its name, then its keyboard shortcut in parentheses, like “Reload (⌘R)”.\nThe pixel ratio choice that follows the device a page is sized as, with that device's ratio after it, like “As the Device (3×)”.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -644,7 +644,7 @@
       }
     },
     "%@, %@" : {
-      "comment" : "A size in the Page Size menu of the developer tools above the page: its name, then its width and height, like “iPhone, 393 × 852”.\nAccessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nOn the Permissions row of the site panel: how many allowed, then how many blocked, like “2 allowed, 1 blocked”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nVoiceOver name of the page's whole address in the developer tools' bar on a plain http page: the address, then that it's not secure.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.\nWhat VoiceOver says for a space in the space switcher with more than one profile: the space's name, then its profile's.",
+      "comment" : "A size in the Page Size menu of the developer tools above the page: its name, then its width and height, like “iPhone, 393 × 852”.\nAccessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nOn the Permissions row of the site panel: how many allowed, then how many blocked, like “2 allowed, 1 blocked”.\nSpoken by VoiceOver for Page Size among the developer tools above the page: the page's size, then its pixel ratio, like “393 × 852, 3×”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nUnder a page size's name in Settings › Developer: its width and height, then its pixel ratio, like “393 × 852, 3×”.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nVoiceOver name of the page's whole address in the developer tools' bar on a plain http page: the address, then that it's not secure.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.\nWhat VoiceOver says for a space in the space switcher with more than one profile: the space's name, then its profile's.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -869,6 +869,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@？"
+          }
+        }
+      }
+    },
+    "%@×" : {
+      "comment" : "A page's pixel ratio, how many of the screen's pixels it draws each of its own with, like “3×” or “2.625×”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@×"
           }
         }
       }
@@ -1746,6 +1757,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "位于 localhost 或 127.0.0.1、使用自有证书提供 https 的开发网站，打开时不再显示警告。仅限这台 Mac 上的服务器，且只信任它最先出示的证书。"
+          }
+        }
+      }
+    },
+    "A device's pixel ratio, like 3 for an iPhone, from %@ to %@. Leave it empty for the Mac's." : {
+      "comment" : "Note under the pixel ratio field in the sheet that adds a page size: what it is, the least and the most it can be, and that it can be left empty.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "A device's pixel ratio, like 3 for an iPhone, from %1$@ to %2$@. Leave it empty for the Mac's."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备的像素比，比如 iPhone 是 3，范围从 %1$@ 到 %2$@。留空就与 Mac 相同。"
           }
         }
       }
@@ -2814,6 +2842,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在所有网站上，页面打开时即翻译"
+          }
+        }
+      }
+    },
+    "As the Device" : {
+      "comment" : "Choice under Pixel Ratio in the Page Size menus: the page is shown with the pixel ratio of the device it's sized as.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随设备"
           }
         }
       }
@@ -11792,6 +11831,50 @@
         }
       }
     },
+    "Pixel Ratio" : {
+      "comment" : "Heading in the Page Size menus of the developer tools: how many of the screen's pixels the page draws each of its own with, its device's or 1×, 2× or 3×.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "像素比"
+          }
+        }
+      }
+    },
+    "Pixel Ratio: %@" : {
+      "comment" : "View › Developer › Page Size menu item and command, on a development site whose page has a size of its own, checked while so: the page is shown with this pixel ratio whatever its size, like “Pixel Ratio: 2×”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "像素比：%@"
+          }
+        }
+      }
+    },
+    "Pixel Ratio: As the Device" : {
+      "comment" : "View › Developer › Page Size menu item and command, on a development site whose page has a size of its own, checked while so: the page is shown with the pixel ratio of the device it's sized as, like 3× for an iPhone.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "像素比：跟随设备"
+          }
+        }
+      }
+    },
+    "Pixel ratio" : {
+      "comment" : "Label of the field in the sheet that adds a page size for the device's pixel ratio, like 3 for an iPhone. Optional.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "像素比"
+          }
+        }
+      }
+    },
     "Play" : {
       "comment" : "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of the mini player's play button while the video is paused.",
       "localizations" : {
@@ -15871,6 +15954,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "过去一小时…"
+          }
+        }
+      }
+    },
+    "The Mac's" : {
+      "comment" : "Placeholder of the pixel ratio field in the sheet that adds a page size: left empty, the page is shown with the Mac's own pixel ratio.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与 Mac 相同"
           }
         }
       }
