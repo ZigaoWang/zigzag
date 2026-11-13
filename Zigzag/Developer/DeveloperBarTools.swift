@@ -35,10 +35,10 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
     /// The address and Copy Link's group, and ⋯'s, which goes with reload's.
     private static let addressGroup = 0, moreGroup = 3
     /// What ⋯ always holds, after the buttons that gave way: what's on or off, the browser the page is told it's
-    /// in, and the rest. Each list is set apart by a line.
-    static let moreGroups: [[DeveloperTool]] = [[.javaScript, .outlines],
+    /// in, and the rest, those this Mac's WebKit has. Each list is set apart by a line.
+    static let moreGroups: [[DeveloperTool]] = [[.javaScript, .images, .styles, .outlines],
                                                 [.userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox],
-                                                [.phone, .viewSource, .settings, .site]]
+                                                [.phone, .viewSource, .settings, .site]].map { $0.filter(\.isAvailable) }
     static var moreTools: [DeveloperTool] { moreGroups.flatMap { $0 } }
 
     /// The tools under ⋯ when `shown` of the buttons show: the ones that gave way, then those always there.

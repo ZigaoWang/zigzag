@@ -25,6 +25,17 @@ enum WebKitSetup {
         return configuration
     }
 
+    /// A configuration WebKit hands over for a page another opened (a tab, or a pop-up window) shares that page's
+    /// preferences, the same object: a change made for one page (its WebRTC switch, Disable Styles) would reach the
+    /// other, whatever its site. Every web view made from one gets preferences of its own instead, the same in all
+    /// else, with what a tab's developer tools change back as WebKit has it; the page then sets its own (its tab's
+    /// choices, its WebRTC switch). Feature flags reach it as any open page (`FeatureFlags`).
+    static func separatePreferences(of configuration: WKWebViewConfiguration) {
+        guard let own = configuration.preferences.copy() as? WKPreferences else { return }
+        PageStyles.set(true, in: own)
+        configuration.preferences = own
+    }
+
     /// Sets one of WebKit's own unpublished preferences (`key`, as KVC has it: `_set<Key>:` behind it), only when this
     /// WebKit still has it, and only when it differs (read only where WebKit has the getter too).
     static func setIfAvailable(_ on: Bool, key: String, in preferences: WKPreferences) {

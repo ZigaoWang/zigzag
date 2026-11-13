@@ -116,7 +116,9 @@ enum ContentBlocker {
         removeOld(withPrefix: identifierPrefix, keeping: current)
     }
 
-    private static func removeOld(withPrefix prefix: String, keeping current: String) {
+    /// Takes every compiled list named with `prefix` out of the store but `current`: a list's version is in its name,
+    /// so each change leaves the one before behind.
+    static func removeOld(withPrefix prefix: String, keeping current: String) {
         let store = WKContentRuleListStore.default()!
         store.getAvailableContentRuleListIdentifiers { identifiers in
             MainActor.assumeIsolated {
@@ -269,8 +271,8 @@ enum AdBlockers {
     }
 }
 
-private extension Data {
-    /// FNV-1a: stable across launches, unlike `hashValue`.
+extension Data {
+    /// FNV-1a: stable across launches, unlike `hashValue`. Names a compiled content rule list by its rules' version.
     var hashValueStable: UInt64 {
         var hash: UInt64 = 0xcbf29ce484222325
         for byte in self { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }

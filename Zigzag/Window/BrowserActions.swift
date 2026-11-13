@@ -320,6 +320,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func togglePrintStyles(_ sender: Any?) { chooseForDevelopment { $0.printStyles.toggle() } }
 
     @objc func toggleJavaScript(_ sender: Any?) { chooseForDevelopment { $0.javaScriptOff.toggle() } }
+    @objc func toggleImages(_ sender: Any?) { chooseForDevelopment { $0.imagesOff.toggle() } }
+    @objc func toggleStyles(_ sender: Any?) { chooseForDevelopment { $0.stylesOff.toggle() } }
     @objc func toggleOutlines(_ sender: Any?) { chooseForDevelopment { $0.outlines.toggle() } }
     @objc func userAgentZigzag(_ sender: Any?) { chooseForDevelopment { $0.userAgent = .zigzag } }
     @objc func userAgentPhone(_ sender: Any?) { chooseForDevelopment { $0.userAgent = .iPhone } }
@@ -667,7 +669,8 @@ extension BrowserWindowController: NSMenuItemValidation {
             return DeveloperTool.site.isOffered(for: tab, isPrivate: tabManager.isPrivate)
         case #selector(pageAppearanceFollowsMac(_:)), #selector(pageAppearanceLight(_:)), #selector(pageAppearanceDark(_:)), #selector(togglePrintStyles(_:)),
              #selector(pageSizeFill(_:)), #selector(pageSizeCustom(_:)), #selector(rotatePage(_:)), #selector(togglePageSize(_:)),
-             #selector(toggleJavaScript(_:)), #selector(toggleOutlines(_:)), #selector(userAgentZigzag(_:)), #selector(userAgentPhone(_:)),
+             #selector(toggleJavaScript(_:)), #selector(toggleImages(_:)), #selector(toggleStyles(_:)), #selector(toggleOutlines(_:)),
+             #selector(userAgentZigzag(_:)), #selector(userAgentPhone(_:)),
              #selector(userAgentTablet(_:)), #selector(userAgentChrome(_:)), #selector(userAgentFirefox(_:)):
             guard let tool = DeveloperTool(action: item.action) else { return false }
             let state = tab?.developerInEffect ?? DeveloperState()

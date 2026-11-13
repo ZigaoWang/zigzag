@@ -128,9 +128,13 @@ enum FeatureFlags {
         for webView in openWebViews { engine.set(on, key: key, in: webView.configuration.preferences) }
     }
 
-    /// Every page in a browser window, a sleeping tab's left alone: it wakes with what's set then.
-    private static var openWebViews: [WKWebView] {
-        WindowManager.shared.controllers.flatMap(\.tabManager.allTabs).compactMap(\.webView)
+    /// Every open page, a sleeping tab's left alone: it wakes with what's set then. Each has preferences of its own
+    /// (`WebKitSetup.separatePreferences`), so each is set: browser windows' tabs, Mini and web app windows, pop-ups.
+    static var openWebViews: [WKWebView] {
+        let tabs: [Tab] = WindowManager.shared.controllers.flatMap(\.tabManager.allTabs)
+            + MiniWindowController.all.map(\.tab) + WebAppWindowController.all.map(\.tab)
+        let pages: [WKWebView] = tabs.compactMap { $0.webView }
+        return pages + PopupWindowController.all.map(\.webView)
     }
 
     /// Reloads every page that's showing a website in a browser window, so a change takes effect. Zigzag's own pages
