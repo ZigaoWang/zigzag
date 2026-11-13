@@ -62,9 +62,30 @@ enum PageTranslator {
     /// The page's language when it isn't the reader's and Apple can translate it; nil otherwise. What the offer
     /// goes by: the language most of the page is in, so an English page quoting a little Chinese doesn't ask.
     static func foreignLanguage(of webView: WKWebView) async -> Locale.Language? {
-        guard let language = await pageLanguage(of: webView), language.languageCode != readerLanguage.languageCode else { return nil }
+        await foreign(await pageLanguage(of: webView))
+    }
+
+    /// The language, when it isn't the reader's and Apple can translate it.
+    static func foreign(_ language: Locale.Language?) async -> Locale.Language? {
+        guard let language, language.languageCode != readerLanguage.languageCode else { return nil }
         return await canTranslate(from: language, to: readerLanguage) ? language : nil
     }
+
+    /// "Translate to English", for the page's right-click menu and a tab's in the sidebar; "Show Original" once
+    /// it's translated, the same words as in the site controls (#218).
+    static func menuTitle(translated: Bool) -> String {
+        translated ? String(localized: "Show Original", comment: "Tooltip of the Original action in the site panel.")
+            : String(localized: "Translate to \(name(of: readerLanguage))", comment: "Item in a page's right-click menu and a tab's in the sidebar: translates the page, whatever language it seemed to be in. The language is the one you read, by name, like English.")
+    }
+
+    /// A tab whose page could be translated: a website or a file, not one of Zigzag's own pages.
+    static func offersTranslation(_ tab: Tab) -> Bool {
+        guard let scheme = tab.url?.scheme?.lowercased() else { return false }
+        return ["http", "https", "file"].contains(scheme)
+    }
+
+    /// One that can be now: a tab that isn't loaded has no text to translate until it is.
+    static func canTranslate(_ tab: Tab) -> Bool { offersTranslation(tab) && tab.webView != nil }
 
     /// Apple can translate between these on this Mac (now, or once the language is downloaded).
     static func canTranslate(from source: Locale.Language, to target: Locale.Language) async -> Bool {
@@ -72,9 +93,58 @@ enum PageTranslator {
     }
 
     /// The language most of the page is in, whatever it is; nil when there's too little text to tell.
+    /// Told from the page's own paragraphs, the ones showing, each read on its own and counted by how much text it
+    /// has: a Spanish page under an English menu, or one marked lang="en", is still Spanish (#218). A page that's
+    /// all menus goes by all of its text.
     static func pageLanguage(of webView: WKWebView) async -> Locale.Language? {
-        guard let sample = try? await webView.evaluateJavaScript(script("sample()"), in: nil, contentWorld: .defaultClient) as? String else { return nil }
-        return dominantLanguage(of: sample)
+        guard let json = try? await webView.evaluateJavaScript(script("sample()"), in: nil, contentWorld: .defaultClient) as? String,
+              let sample = try? JSONDecoder().decode(Sample.self, from: Data(json.utf8)) else { return nil }
+        return dominantLanguage(ofBlocks: sample.blocks) ?? dominantLanguage(of: sample.all)
+    }
+
+    private struct Sample: Decodable {
+        var blocks: [String]
+        var all: String
+    }
+
+    /// The language most of these blocks are in, by how much text each has; nil when too few can be told, or no
+    /// one language has most of it.
+    nonisolated static func dominantLanguage(ofBlocks blocks: [String]) -> Locale.Language? {
+        var amounts: [NLLanguage: Int] = [:]
+        var total = 0
+        let recognizer = NLLanguageRecognizer()
+        for block in blocks {
+            let (amount, long) = measure(block)
+            guard long else { continue }
+            recognizer.reset()
+            recognizer.processString(String(block.prefix(600)))
+            guard let (code, confidence) = recognizer.languageHypotheses(withMaximum: 1).first, code != .undetermined,
+                  confidence >= 0.5 else { continue }
+            amounts[code, default: 0] += amount
+            total += amount
+        }
+        guard total >= 80, let (code, amount) = amounts.max(by: { $0.value < $1.value }), amount * 2 > total else { return nil }
+        return Locale.Language(identifier: code.rawValue)
+    }
+
+    /// How much text this is, an ideograph, kana or hangul syllable counting as a few letters (each is about a
+    /// word), and whether there's enough of it to tell its language by.
+    private nonisolated static func measure(_ text: String) -> (amount: Int, long: Bool) {
+        var amount = 0, letters = 0, latin = true
+        for scalar in text.unicodeScalars where scalar.properties.isAlphabetic {
+            letters += 1
+            if !isLatin(scalar) { latin = false }
+            amount += isWordLike(scalar) ? 3 : 1
+        }
+        return (amount, latin ? letters >= 24 : letters >= 8)
+    }
+
+    private nonisolated static func isWordLike(_ scalar: Unicode.Scalar) -> Bool {
+        if scalar.properties.isIdeographic { return true }
+        switch scalar.value {
+        case 0x3040...0x30FF, 0xAC00...0xD7AF: return true
+        default: return false
+        }
     }
 
     nonisolated static func dominantLanguage(of sample: String) -> Locale.Language? {
@@ -105,6 +175,14 @@ enum PageTranslator {
     static func text(in webView: WKWebView) async -> PageText {
         let json = try? await webView.evaluateJavaScript(script("collect()"), in: nil, contentWorld: .defaultClient) as? String
         return json.flatMap { try? JSONDecoder().decode(PageText.self, from: Data($0.utf8)) } ?? PageText(pieces: [], blocks: [], blockTexts: [])
+    }
+
+    /// The language a page is taken to be in when you ask for it translated. Seen as in your own language, or as
+    /// too little to tell, it's read again from all of its text: what was seen as it loaded can be a menu, or a
+    /// page still drawing (#218). Still mostly yours, it stays so, and only what isn't is translated.
+    nonisolated static func sourceLanguage(seen: Locale.Language?, text: PageText, into target: Locale.Language) -> Locale.Language? {
+        guard seen == nil || seen?.languageCode == target.languageCode else { return seen }
+        return dominantLanguage(ofBlocks: text.blockTexts) ?? seen
     }
 
     /// What to translate into `target`, a group for each language, the one with the most text first (#197). Each
@@ -142,7 +220,7 @@ enum PageTranslator {
         guard !letters.isEmpty else { return nil }
         let latin = letters.allSatisfy(isLatin)
         // Ideographs carry a word each: a few are as much to go on as a sentence of letters.
-        let long = latin ? letters.count >= 24 : letters.count >= 8
+        let long = measure(text).long
         if !long, latin, page != nil { return page }
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(String(text.prefix(600)))
@@ -197,7 +275,35 @@ enum PageTranslator {
         return found;
       };
       return {
-        sample: () => (document.body ? document.body.innerText : '').slice(0, 2000),
+        // The text of the paragraphs showing, a block each, leaving out the site's menus, header and footer; and the
+        // start of all of it, for a page that's nothing but those.
+        sample: () => {
+          const root = document.body;
+          if (!root) return JSON.stringify({ blocks: [], all: '' });
+          const chrome = 'nav, header, footer, aside, [role=navigation], [role=banner], [role=contentinfo], [aria-hidden=true]';
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+          const blocks = [], places = new Map();
+          let seen = 0, total = 0;
+          while (walker.nextNode() && seen < 4000 && total < 8000) {
+            seen++;
+            const node = walker.currentNode;
+            if (!wanted(node)) continue;
+            let block = node.parentElement;
+            while (block && !blockTags.has(block.tagName)) block = block.parentElement;
+            let place = places.get(block);
+            if (place === undefined) {
+              const shown = node.parentElement.getClientRects().length > 0 && !node.parentElement.closest(chrome);
+              place = shown ? blocks.length : -1;
+              places.set(block, place);
+              if (shown) blocks.push('');
+            }
+            if (place < 0 || blocks[place].length >= 600) continue;
+            const text = node.nodeValue.trim();
+            blocks[place] += (blocks[place] ? ' ' : '') + text;
+            total += text.length;
+          }
+          return JSON.stringify({ blocks, all: (root.innerText || '').slice(0, 2000) });
+        },
         collect: () => {
           nodes = walk();
           const pieces = [], blocks = [], blockTexts = [], places = new Map();

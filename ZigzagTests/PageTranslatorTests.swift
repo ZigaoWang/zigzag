@@ -179,6 +179,120 @@ struct PageTranslatorTests {
         #expect(groups.map { $0.source.languageCode } == [.japanese, .chinese])
     }
 
+    // MARK: Pages detection missed (#218)
+
+    /// A Spanish page marked lang="en", under a long English menu that fills the start of its text.
+    static let spanishUnderAnEnglishMenu = """
+    <html lang="en"><body>
+    <nav>\((1...40).map { "<a href=\"/\($0)\">Section number \($0) of the site menu</a>" }.joined(separator: " "))</nav>
+    <h1>Un paseo por el casco antiguo de la ciudad</h1>
+    <p>Pasamos toda la semana caminando por las calles estrechas del centro, probando la comida de los mercados y
+    hablando con la gente del barrio. Cada tarde el sol se ponía detrás de la catedral y las plazas se llenaban de música.</p>
+    <p>La próxima vez queremos quedarnos más tiempo y visitar los pueblos de la costa, que todos nos recomendaron.</p>
+    <p>Inicio</p><p>Contacto</p>
+    </body></html>
+    """
+
+    @Test func aPageIsToldByItsParagraphsNotItsMenuOrLangAttribute() async throws {
+        let (webView, loading) = await page(Self.spanishUnderAnEnglishMenu)
+        defer { _ = loading }
+        #expect(await PageTranslator.pageLanguage(of: webView)?.languageCode == .spanish)
+    }
+
+    @Test func blocksAreWeighedByHowMuchTheySay() {
+        // A Chinese page under a few lines of English: the Chinese, a word a character, says more.
+        let blocks = ["Sign in to your account to keep reading this article",
+                      "上海是一座充满活力的城市，外滩的夜景非常美丽。我们每天晚上都在江边散步，品尝当地的小吃。",
+                      "这座城市有很多博物馆和公园，周末的时候人们喜欢去那里放松。"]
+        #expect(PageTranslator.dominantLanguage(ofBlocks: blocks)?.languageCode == .chinese)
+        // Too little to tell by.
+        #expect(PageTranslator.dominantLanguage(ofBlocks: ["Home", "News"]) == nil)
+    }
+
+    @Test func askedForTranslationAPageSeenAsYoursIsReadAgain() {
+        // Seen as English (its menu, as it loaded), the page is mostly Spanish: its short words go with it too.
+        let page = text([
+            ["Inicio"], ["Contacto"],
+            ["Pasamos toda la semana caminando por las calles estrechas del centro, probando la comida de los mercados."],
+            ["La próxima vez queremos quedarnos más tiempo y visitar los pueblos de la costa, que todos nos recomendaron."],
+        ])
+        let source = PageTranslator.sourceLanguage(seen: Self.english, text: page, into: Self.english)
+        #expect(source?.languageCode == .spanish)
+        let groups = PageTranslator.plan(page, page: source, into: Self.english)
+        #expect(groups.count == 1 && groups.first?.pieces == [0, 1, 2, 3])
+        // Not known at all, the same.
+        #expect(PageTranslator.sourceLanguage(seen: nil, text: page, into: Self.english)?.languageCode == .spanish)
+        // A language seen as someone else's stands as it is.
+        #expect(PageTranslator.sourceLanguage(seen: Self.chinese, text: page, into: Self.english)?.languageCode == .chinese)
+    }
+
+    @Test func aPageMostlyInYourLanguageStaysSoWhenForced() {
+        // An English page with one Chinese paragraph: just that is translated, its menu left alone (#197).
+        let page = text([
+            ["Home"],
+            ["We spent most of the week walking along the river and eating far too many dumplings in the old town."],
+            ["Next time we want to take the train out to the water towns, which everyone told us not to miss at all."],
+            ["上海是一座充满活力的城市。"],
+        ])
+        let source = PageTranslator.sourceLanguage(seen: Self.english, text: page, into: Self.english)
+        #expect(source?.languageCode == .english)
+        let groups = PageTranslator.plan(page, page: source, into: Self.english)
+        #expect(groups.map { $0.source.languageCode } == [.chinese])
+        #expect(groups.first?.pieces == [3])
+    }
+
+    // MARK: Translate in the menus (#218)
+
+    @Test func theMenuItemSaysTranslateThenShowOriginal() {
+        let into = PageTranslator.name(of: PageTranslator.readerLanguage)
+        #expect(PageTranslator.menuTitle(translated: false) == String(localized: "Translate to \(into)", comment: "Item in a page's right-click menu and a tab's in the sidebar: translates the page, whatever language it seemed to be in. The language is the one you read, by name, like English."))
+        #expect(PageTranslator.menuTitle(translated: true) == String(localized: "Show Original", comment: "Tooltip of the Original action in the site panel."))
+    }
+
+    @Test func aTabsMenuTranslatesItsLoadedPage() throws {
+        let tab = Tab(url: URL(string: "http://127.0.0.1:1/a.html"), spaceID: UUID())
+        // Not loaded: there's no text yet, so it's there, dimmed.
+        let unloaded = try #require(SidebarMenus.translateItem(for: tab) {})
+        #expect(!unloaded.isEnabled && unloaded.title == PageTranslator.menuTitle(translated: false))
+        _ = tab.ensureWebView()
+        var asked = 0
+        let item = try #require(SidebarMenus.translateItem(for: tab) { asked += 1 })
+        #expect(item.isEnabled && item.title == PageTranslator.menuTitle(translated: false))
+        NSApp.sendAction(try #require(item.action), to: item.target, from: item)
+        #expect(asked == 1)
+        tab.isTranslated = true
+        #expect(SidebarMenus.translateItem(for: tab) {}?.title == PageTranslator.menuTitle(translated: true))
+        // Zigzag's own pages have nothing to translate.
+        let own = Tab(url: URL(string: "zigzag://history"), spaceID: UUID())
+        #expect(SidebarMenus.translateItem(for: own) {} == nil)
+    }
+
+    @Test func thePagesMenuHasTranslateUnderReload() throws {
+        let tab = Tab(url: URL(string: "https://example.com/"), spaceID: UUID())
+        func menu(_ identifiers: [String]) -> NSMenu {
+            let menu = NSMenu()
+            for id in identifiers {
+                let item = NSMenuItem(title: id, action: nil, keyEquivalent: "")
+                item.identifier = NSUserInterfaceItemIdentifier(id)
+                menu.addItem(item)
+            }
+            return menu
+        }
+        let page = menu(["WKMenuItemIdentifierGoBack", "WKMenuItemIdentifierGoForward", "WKMenuItemIdentifierReload", "WKMenuItemIdentifierInspectElement"])
+        BrowserWebView.addTranslate(to: page, for: tab, target: nil, action: #selector(NSText.copy(_:)))
+        let index = try #require(page.items.firstIndex { $0.identifier?.rawValue == BrowserWebView.translateItemIdentifier })
+        #expect(page.items[index - 1].identifier?.rawValue == "WKMenuItemIdentifierReload")
+        #expect(page.items[index].title == PageTranslator.menuTitle(translated: false))
+        tab.isTranslated = true
+        let translated = menu(["WKMenuItemIdentifierReload"])
+        BrowserWebView.addTranslate(to: translated, for: tab, target: nil, action: #selector(NSText.copy(_:)))
+        #expect(translated.items.last?.title == PageTranslator.menuTitle(translated: true))
+        // A link's or a selection's menu isn't about the page: no Translate there.
+        let link = menu(["WKMenuItemIdentifierOpenLink", "WKMenuItemIdentifierCopyLink"])
+        BrowserWebView.addTranslate(to: link, for: tab, target: nil, action: #selector(NSText.copy(_:)))
+        #expect(link.items.count == 2)
+    }
+
     @Test func theDominantLanguageNeedsEnoughText() {
         #expect(PageTranslator.dominantLanguage(of: "Bonjour") == nil)
         let french = String(repeating: "Nous avons passé la semaine à marcher le long de la rivière. ", count: 3)

@@ -9692,6 +9692,17 @@
         }
       }
     },
+    "Nothing on this page needed translating" : {
+      "comment" : "Toast when Translate finds no text on the page that isn't already in the person's language.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此页面上没有需要翻译的内容"
+          }
+        }
+      }
+    },
     "Nothing to bring over" : {
       "comment" : "Under a browser's name in the Import window's list.",
       "localizations" : {
@@ -15901,17 +15912,6 @@
         }
       }
     },
-    "This page is already in %@" : {
-      "comment" : "Toast when the page is already in the person's language. The language is its name, like English.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此页面已是%@"
-          }
-        }
-      }
-    },
     "This page is in %@" : {
       "comment" : "Toast offering to translate a page. The language is its name, like French.",
       "localizations" : {
@@ -16304,6 +16304,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "将网页翻译成"
+          }
+        }
+      }
+    },
+    "Translate to %@" : {
+      "comment" : "Item in a page's right-click menu and a tab's in the sidebar: translates the page, whatever language it seemed to be in. The language is the one you read, by name, like English.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译成%@"
           }
         }
       }

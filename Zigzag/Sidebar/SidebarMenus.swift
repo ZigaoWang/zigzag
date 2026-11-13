@@ -29,6 +29,13 @@ enum SidebarMenus {
         return item
     }
 
+    /// Translate to English, or Show Original once it is, for a tab's page, as in the page's own menu (#218). nil
+    /// for Zigzag's own pages; dimmed for a tab that isn't loaded, which has no text to translate yet.
+    static func translateItem(for tab: Tab, _ translate: @escaping () -> Void) -> NSMenuItem? {
+        guard PageTranslator.offersTranslation(tab) else { return nil }
+        return Item(PageTranslator.menuTitle(translated: tab.isTranslated), enabled: PageTranslator.canTranslate(tab), translate)
+    }
+
     /// For several picked rows: what makes sense for all of them at once, each item saying how many it acts on.
     /// With pinned pages and tabs picked together, each acts on the rows it makes sense for. The rows stay picked
     /// after it, wherever they now are, so the next one applies to the same set.
@@ -157,6 +164,7 @@ enum SidebarMenus {
         }
         menu.addItem(.separator())
         menu.addItem(Item(String(localized: "Reload Page", comment: "Item in a tab's context menu in the sidebar.")) { tab.reload() })
+        if let translate = translateItem(for: tab, { controller.translatePage(tab: tab) }) { menu.addItem(translate) }
         if tab.isPlayingAudio || tab.isMuted {
             menu.addItem(Item(tab.isMuted ? String(localized: "Unmute Tab", comment: "Item in a tab's context menu in the sidebar.") : String(localized: "Mute Tab", comment: "Item in a tab's context menu in the sidebar.")) { tab.setMuted(!tab.isMuted) })
         }
@@ -271,6 +279,7 @@ enum SidebarMenus {
             return menu
         }
         if let live {
+            if let translate = translateItem(for: live, { controller.translatePage(tab: live) }) { menu.addItem(translate) }
             menu.addItem(Item(String(localized: "Unload Page", comment: "Item in a pinned tab's context menu in the sidebar. Unloads the page; the pinned tab stays.")) { manager.close(live) })
         }
         // Pins are shared by every window: a private one doesn't take them away.
@@ -355,6 +364,7 @@ enum SidebarMenus {
             if live.isPlayingAudio || live.isMuted {
                 menu.addItem(Item(live.isMuted ? String(localized: "Unmute Tab", comment: "Item in a favorite's context menu.") : String(localized: "Mute Tab", comment: "Item in a favorite's context menu.")) { live.setMuted(!live.isMuted) })
             }
+            if let translate = translateItem(for: live, { controller.translatePage(tab: live) }) { menu.addItem(translate) }
             menu.addItem(Item(String(localized: "Unload Page", comment: "Item in a favorite's context menu. Unloads the page; the favorite stays.")) { manager.close(live) })
         }
         if !manager.isPrivate { menu.addItem(Item(String(localized: "Remove from Favorites", comment: "Item in a favorite's context menu.")) { controller.removeFavoriteWithUndo(favorite.id) }) }

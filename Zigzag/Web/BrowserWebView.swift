@@ -155,6 +155,8 @@ final class BrowserWebView: WKWebView {
                 break
             }
         }
+        // Only in a browser window's page, which does the translating; not Zigzag Mini's or a web app's.
+        if let owner, WindowManager.shared.controller(for: window) != nil { Self.addTranslate(to: menu, for: owner, target: self, action: #selector(translatePage(_:))) }
         Self.addAutoFill(to: menu)
         Self.placeInspectElementLast(in: menu)
         #if DEBUG
@@ -202,6 +204,24 @@ final class BrowserWebView: WKWebView {
 
     private static func hasItem(_ action: Selector, in menu: NSMenu) -> Bool {
         menu.items.contains { $0.action == action || $0.submenu.map { hasItem(action, in: $0) } == true }
+    }
+
+    /// The page's own menu (Back, Forward, Reload) has Translate to English under Reload, as in Chrome, or Show
+    /// Original once it's translated (#218). It's there whatever language the page seemed to be in.
+    static func addTranslate(to menu: NSMenu, for tab: Tab, target: AnyObject?, action: Selector) {
+        guard PageTranslator.offersTranslation(tab),
+              let reload = menu.items.firstIndex(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierReload" }) else { return }
+        let item = NSMenuItem(title: PageTranslator.menuTitle(translated: tab.isTranslated), action: action, keyEquivalent: "")
+        item.target = target
+        item.identifier = NSUserInterfaceItemIdentifier(translateItemIdentifier)
+        menu.insertItem(item, at: reload + 1)
+    }
+
+    static let translateItemIdentifier = "ZigzagTranslatePage"
+
+    @objc private func translatePage(_ sender: NSMenuItem) {
+        guard let owner, let controller = WindowManager.shared.controller(for: window) else { return }
+        controller.translatePage(tab: owner)
     }
 
     /// WebKit's Inspect Element stays the menu's last item, below extensions' own, where Chrome keeps it.

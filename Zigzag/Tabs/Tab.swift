@@ -740,6 +740,8 @@ final class Tab: NSObject {
     private(set) var isArticle = false
     /// The page's language, when it isn't the reader's and can be translated.
     private(set) var foreignLanguage: Locale.Language?
+    /// Which language check is the current one: one for a page since left changes nothing.
+    fileprivate var languageCheck = 0
     /// The page's text is shown translated.
     var isTranslated = false
 
@@ -884,6 +886,8 @@ final class Tab: NSObject {
         self.navigatedSinceSave = true
         // A page that changes its address without loading (YouTube, GitHub, Gmail) goes in history too.
         if changedPage, !wv.isLoading { self.recordHistory(url, title: nil) }
+        // Its language too, once the new page has drawn: it never finishes loading to be read then (#218).
+        if changedPage, !wv.isLoading { self.checkLanguage(of: wv, after: 1.5) }
         // Another site: never the last site's icon. Its own if it's known, otherwise none until the page offers one.
         if hostChanged {
             self.favicon = FaviconStore.shared.cachedIcon(for: url)
@@ -1538,11 +1542,24 @@ extension Tab: WKNavigationDelegate {
             self.isArticle = article
             self.changed.send(.reader)
         }
+        checkLanguage(of: webView)
+    }
+
+    /// Reads the page's language. A page that draws its text after it loads (a web app, a feed) has too little to
+    /// tell at first: it's read again a moment later, a couple of times (#218).
+    private func checkLanguage(of webView: WKWebView, after delay: TimeInterval = 0, retries: Int = 2) {
+        languageCheck += 1
+        let check = languageCheck
+        let url = webView.url
         Task { [weak self] in
-            let language = await PageTranslator.foreignLanguage(of: webView)
-            guard let self, self.webView === webView else { return }
+            if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            guard let self, self.languageCheck == check, self.webView === webView, webView.url == url, !self.isTranslated else { return }
+            let seen = await PageTranslator.pageLanguage(of: webView)
+            let language = await PageTranslator.foreign(seen)
+            guard self.languageCheck == check, self.webView === webView, webView.url == url, !self.isTranslated else { return }
             self.foreignLanguage = language
             self.changed.send(.language)
+            if seen == nil, retries > 0 { self.checkLanguage(of: webView, after: 2, retries: retries - 1) }
         }
     }
 
