@@ -180,7 +180,7 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         strip.title.stringValue = Self.stripTitle(app: app, page: tab.url)
         // Another site's host loses its start, never its domain (#189); the app's own name its end.
         strip.title.lineBreakMode = AddressView.lineBreak(forName: strip.title.stringValue)
-        strip.notSecure = tab.url?.scheme == "http"
+        strip.notSecure = tab.isNotSecure
         strip.back.isEnabled = tab.canGoBack
         strip.forward.isEnabled = tab.canGoForward
         strip.reload.symbol = tab.isLoading ? "xmark" : "arrow.clockwise"

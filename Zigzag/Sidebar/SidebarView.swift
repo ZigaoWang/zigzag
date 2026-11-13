@@ -436,14 +436,15 @@ final class AddressView: InteractiveView {
         return domain == name.lowercased() ? .byTruncatingMiddle : .byTruncatingHead
     }
 
-    func show(url: URL?, isSecure: Bool) {
+    func show(url: URL?, notSecure: Bool) {
         label.stringValue = Self.name(of: url)
         label.lineBreakMode = Self.lineBreak(forName: label.stringValue)
         // The host crisp, in the text's own color; the prompt quiet.
         label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textPrimary
         if label.stringValue.isEmpty { label.stringValue = String(localized: "Search or enter address", comment: "Placeholder of the address in the sidebar, on a new tab.") }
-        // Only a plain http page marks itself, with the not-secure symbol before the host.
-        let insecure = url?.scheme == "http"
+        // Only a page that isn't secure marks itself, with the not-secure symbol before the host: plain http, or a
+        // certificate let through on the warning page, for as long as it's in use.
+        let insecure = notSecure && url != nil
         lock.image = insecure ? Tokens.Symbol.image(SitePanel.notSecureSymbol, size: Tokens.Symbol.inline) : nil
         lock.isHidden = !insecure
         lock.toolTip = insecure ? SitePanel.notSecure : nil
@@ -1107,7 +1108,7 @@ final class SidebarView: NSView {
         reloadButton.isEnabled = tab != nil
         reloadButton.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
         reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
-        address.show(url: tab?.url, isSecure: tab?.url?.scheme == "https")
+        address.show(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
     }
 
     /// "Reload (⌘R)", or "Stop (⌘.)" while the page loads: what the button does now, with its shortcut.

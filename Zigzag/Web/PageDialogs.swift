@@ -88,20 +88,65 @@ enum PageDialogs {
 }
 
 /// HTTP authentication (basic/digest) and client certificate prompts.
-/// Sites whose certificate you chose to trust anyway, from the warning page. Only until Zigzag quits, as Safari does.
-/// Kept per website data store, so a private window's choices stay in that window and go when it does.
+/// Sites whose certificate you chose to trust anyway, from the warning page. Until Zigzag quits, as Safari does, and
+/// never longer than `lifetime`, as Chrome's are. Kept per website data store, so a private window's choices stay in
+/// that window and go when it does.
 @MainActor enum CertificateExceptions {
-    /// Per data store, each host's trusted certificate, as Safari keeps it: the one you were warned about and
-    /// chose to trust, not whatever that host shows next. (Empty data stands for a warning that came without one.)
-    private static let trusted = NSMapTable<WKWebsiteDataStore, NSMutableDictionary>.weakToStrongObjects()
-    static func allow(_ host: String, certificate: Data?, in store: WKWebsiteDataStore) {
-        let hosts = trusted.object(forKey: store) ?? NSMutableDictionary()
-        hosts[host.lowercased()] = certificate ?? Data()
-        trusted.setObject(hosts, forKey: store)
+    /// How long a choice lasts at most, if Zigzag is left open that long.
+    static let lifetime: TimeInterval = 24 * 60 * 60
+
+    /// The one certificate a host may show, and until when.
+    private final class Exception {
+        let leaf: Data
+        let until: Date
+        init(leaf: Data, until: Date) { self.leaf = leaf; self.until = until }
     }
+
+    /// Per data store, each host's trusted certificate, as Safari keeps it: the one you were warned about and
+    /// chose to trust, not whatever that host shows next.
+    private static let trusted = NSMapTable<WKWebsiteDataStore, NSMutableDictionary>.weakToStrongObjects()
+
+    /// Whether the warning may offer "Visit anyway": only with the certificate it's about in hand, the one choice
+    /// is for, and never for a site that asked to be reached only securely (HSTS), as in Chrome.
+    static func mayOffer(certificate: Data?, strictTransport: Bool) -> Bool {
+        guard let certificate, !certificate.isEmpty else { return false }
+        return !strictTransport
+    }
+
+    /// Trusts `certificate` for `host` in `store`. Refused without a certificate: an empty one would stand for any.
+    @discardableResult
+    static func allow(_ host: String, certificate: Data?, in store: WKWebsiteDataStore, now: Date = Date()) -> Bool {
+        guard let certificate, !certificate.isEmpty, !host.isEmpty else { return false }
+        let hosts = trusted.object(forKey: store) ?? NSMutableDictionary()
+        hosts[host.lowercased()] = Exception(leaf: certificate, until: now.addingTimeInterval(lifetime))
+        trusted.setObject(hosts, forKey: store)
+        return true
+    }
+
     static func allows(_ host: String, trust: SecTrust, in store: WKWebsiteDataStore) -> Bool {
-        guard let certificate = trusted.object(forKey: store)?[host.lowercased()] as? Data else { return false }
-        return certificate.isEmpty || leaf(of: trust) == certificate
+        allows(host, leaf: leaf(of: trust), in: store)
+    }
+
+    /// Whether `leaf` is the certificate you chose to trust for `host`, and the choice still holds.
+    static func allows(_ host: String, leaf: Data?, in store: WKWebsiteDataStore, now: Date = Date()) -> Bool {
+        guard let leaf, !leaf.isEmpty, let hosts = trusted.object(forKey: store),
+              let exception = hosts[host.lowercased()] as? Exception else { return false }
+        guard now < exception.until else {
+            hosts.removeObject(forKey: host.lowercased())
+            return false
+        }
+        return exception.leaf == leaf
+    }
+
+    /// Whether `host` has a choice to trust a certificate in `store` (it may be the one it shows, or not).
+    static func hasException(for host: String, in store: WKWebsiteDataStore, now: Date = Date()) -> Bool {
+        guard let exception = trusted.object(forKey: store)?[host.lowercased()] as? Exception else { return false }
+        return now < exception.until
+    }
+
+    /// The choices for `store` go (its site data was cleared).
+    static func forget(in store: WKWebsiteDataStore) {
+        trusted.removeObject(forKey: store)
     }
 
     /// Per data store, the certificate each development server on this Mac first showed, by host and port: two

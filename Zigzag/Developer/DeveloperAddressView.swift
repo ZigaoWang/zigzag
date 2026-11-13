@@ -40,9 +40,10 @@ final class DeveloperAddressView: InteractiveView {
         return text.removingPercentEncoding ?? text
     }
 
-    func show(_ url: URL?) {
+    /// `notSecure`: the page isn't secure though it's https (a certificate let through on the warning page).
+    func show(_ url: URL?, notSecure: Bool = false) {
         self.url = url
-        let secure = url?.scheme == "https"
+        let secure = url?.scheme == "https" && !notSecure
         text.stringValue = Self.shown(url)
         lock.image = Tokens.Symbol.image(secure ? "lock" : "lock.open", size: Tokens.Symbol.inline)
         lock.contentTintColor = Tokens.Color.textSecondary

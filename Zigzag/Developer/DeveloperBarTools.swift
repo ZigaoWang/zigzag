@@ -191,10 +191,10 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
             token = tab?.changed.observe { [weak self, weak tab] change in
                 guard let self, let tab, tab === self.tab else { return }
                 if change == .pageErrors { self.refreshErrors() }
-                if change == .url { self.address.show(tab.url) }
+                if change == .url || change == .navigation { self.address.show(tab.url, notSecure: tab.isNotSecure) }
             }
         }
-        address.show(tab?.url)
+        address.show(tab?.url, notSecure: tab?.isNotSecure ?? false)
         refreshTips()
         refreshErrors()
         refreshChoices()

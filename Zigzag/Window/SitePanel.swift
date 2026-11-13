@@ -60,6 +60,17 @@ final class SitePanel: FloatingPanelView {
     /// The ways into the panel's pages, one line each with what's there: Connection, Permissions, Extensions on
     /// This Site. Only those that apply.
     private var connectionRow: PanelLinkRow?
+    /// Why the connection isn't secure, under its row, when that isn't plain to see (a certificate let through).
+    private let connectionNote: Label = {
+        let label = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+        label.usesSingleLineMode = false
+        label.maximumNumberOfLines = 0
+        label.lineBreakMode = .byWordWrapping
+        label.cell?.wraps = true
+        label.cell?.truncatesLastVisibleLine = false
+        label.isHidden = true
+        return label
+    }()
     private var permissionsRow: PanelLinkRow?
     private var extensionsRow: PanelLinkRow?
     /// Settings › Extensions, under the extensions.
@@ -92,8 +103,22 @@ final class SitePanel: FloatingPanelView {
 
     static let width: CGFloat = 300
     /// How a plain http page is marked, here and in the address bar: one symbol and one wording.
-    static let notSecure = String(localized: "Not secure", comment: "How a page loaded over plain http is marked, in the site panel and the address bar's tooltip.")
+    static let notSecure = String(localized: "Not secure", comment: "How a page loaded over plain http, or with a certificate you chose to trust anyway, is marked, in the site panel and the address bar's tooltip.")
     static let notSecureSymbol = "lock.open.fill"
+
+    /// What the Connection row says: its one word, whether it warns, and why when that isn't plain to see.
+    /// `hasCertificate`: the page came with one; Zigzag's own warning in place of a page that didn't load has none,
+    /// and is never called secure.
+    static func connection(scheme: String?, onlySecureContent: Bool, certificateException: Bool, hasCertificate: Bool = true) -> (value: String, warns: Bool, reason: String?) {
+        let https = scheme?.lowercased() == "https"
+        if https, certificateException {
+            return (notSecure, true, String(localized: "Its certificate isn’t trusted. You chose to visit it anyway, until you quit Zigzag.", comment: "Under the Connection row of the site panel, on a page whose certificate isn't trusted but you chose Visit this site anyway on the warning."))
+        }
+        if https, !hasCertificate { return (notSecure, true, nil) }
+        if https, onlySecureContent { return (String(localized: "Secure", comment: "On the Connection row of the site panel: the page came over https."), false, nil) }
+        if https { return (String(localized: "Partly secure", comment: "On the Connection row of the site panel: an https page with some parts loaded over plain http."), true, nil) }
+        return (notSecure, true, nil)
+    }
     static let pinTitle = String(localized: "Pin to Address", comment: "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: gives the extension a button in the address bar.")
     static let unpinTitle = String(localized: "Unpin from Address", comment: "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: takes the extension's button out of the address bar.")
     static var pinLimitTip: String { String(localized: "At most \(ExtensionPins.limit) pins. Unpin one first.", comment: "Tooltip of the pin on an extension's tile, and of the disabled menu item, when the most extensions that can be pinned already are. The number is that limit.") }
@@ -144,19 +169,24 @@ final class SitePanel: FloatingPanelView {
         if ["http", "https"].contains(address.scheme ?? "") {
             // The connection, by its one word: secure, or not. Only an https page has a certificate to show; plain
             // http just says it's not secure. An extension's own page never crosses the network: no row.
-            let secure = address.scheme == "https" && (tab.webView?.hasOnlySecureContent ?? true)
+            // A certificate let through on the warning page is not secure, whatever else the page is, and says why.
+            let connection = Self.connection(scheme: address.scheme, onlySecureContent: tab.webView?.hasOnlySecureContent ?? true,
+                                             certificateException: tab.usesCertificateException,
+                                             hasCertificate: tab.webView.map { $0.serverTrust != nil } ?? true)
             let opens = address.scheme == "https" && tab.webView?.serverTrust != nil
-            let value = secure ? String(localized: "Secure", comment: "On the Connection row of the site panel: the page came over https.")
-                : address.scheme == "https" ? String(localized: "Partly secure", comment: "On the Connection row of the site panel: an https page with some parts loaded over plain http.")
-                : Self.notSecure
             let row = PanelLinkRow(String(localized: "Connection", comment: "Row in the site panel: whether the page's connection is secure. On an https page it opens the site's certificate."),
-                                   value: value, goes: opens) { [weak self] in self?.showCertificate() }
+                                   value: connection.value, goes: opens) { [weak self] in self?.showCertificate() }
             row.isEnabled = opens
-            if !secure { row.valueColor = Tokens.Color.warning }
+            if connection.warns { row.valueColor = Tokens.Color.warning }
             connectionRow = row
+            if let reason = connection.reason {
+                connectionNote.stringValue = reason
+                connectionNote.isHidden = false
+            }
         }
         [icon, siteName, siteNameHover, moreButton].forEach { addSubview($0) }
         if let connectionRow { addSubview(connectionRow) }
+        if !connectionNote.isHidden { addSubview(connectionNote) }
         let shownSite = site
         pageToken = tab.changed.observe { [weak self, weak tab] change in
             guard change == .url, let self, let now = tab?.url else { return }
@@ -985,6 +1015,13 @@ final class SitePanel: FloatingPanelView {
             link(row)
             placed = true
             end(0, slack: row.bottomSlack)
+            if kind == .connection, !connectionNote.isHidden {
+                let w = inner + Label.inset * 2
+                let h = ceil(connectionNote.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: w, height: 10_000)).height ?? connectionNote.lineHeight)
+                place(connectionNote, NSRect(x: pad - Label.inset, y: y, width: w, height: h))
+                y += h + Tokens.Space.x2
+                end(0)
+            }
         }
         if placed { end(Tokens.Space.x4, slack: slack) }
 

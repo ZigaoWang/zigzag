@@ -241,6 +241,17 @@ final class Tab: NSObject {
     private var certificateWarningNonce: String?
     let changed = Signal<Change>()
 
+    /// The page showing came with a certificate you chose to trust on the warning page ("Visit anyway"): the
+    /// connection is not secure, and the address and Site Controls say so for as long as it's in use.
+    var usesCertificateException: Bool {
+        guard let webView, let url = webView.url, url.scheme?.lowercased() == "https", let host = url.host(),
+              let trust = webView.serverTrust else { return false }
+        return CertificateExceptions.allows(host, trust: trust, in: webView.configuration.websiteDataStore)
+    }
+
+    /// The page isn't secure: plain http, or a certificate let through on the warning page.
+    var isNotSecure: Bool { url?.scheme?.lowercased() == "http" || usesCertificateException }
+
     private(set) var webView: BrowserWebView?
     /// Where the web view sits, with the Web Inspector when it's docked (`PageHolder`): what shows the tab borrows this,
     /// never the web view alone. Made with the first web view and kept, so the next one appears in its place.
@@ -1109,6 +1120,10 @@ final class Tab: NSObject {
                     self?.changed.send(.navigation)
                 }
             },
+            // The page's certificate came (or changed): the address says whether it's one let through on the warning.
+            webView.observe(\.serverTrust, options: [.new]) { [weak self] _, _ in
+                MainActor.assumeIsolated { self?.changed.send(.navigation) }
+            },
             webView.observe(\.cameraCaptureState, options: [.new]) { [weak self] _, _ in
                 MainActor.assumeIsolated { self?.changed.send(.capture) }
             },
@@ -1361,6 +1376,8 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse) async -> WKNavigationResponsePolicy {
         let response = navigationResponse.response
+        // A site that asks to be reached only securely gets no "Visit anyway" on a certificate warning later.
+        StrictTransport.note(response, in: webView.configuration.websiteDataStore)
         // A server error with nothing in it (a proxy on this Mac that couldn't reach the site) would be a blank
         // page: the error page says what happened instead, once this load has stopped.
         if navigationResponse.isForMainFrame, let failure = ErrorPage.emptyServerFailure(response) {
@@ -1528,11 +1545,19 @@ extension Tab: WKNavigationDelegate {
         // .mp4 or .mp3 link, reported as "plug-in handled load") are not failures.
         if nsError.code == NSURLErrorCancelled || (nsError.domain == "WebKitErrorDomain" && [102, 204].contains(nsError.code)) { return }
         let failingURL = (nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? url
-        certificateWarningHost = ErrorPage.offersProceed(nsError) ? failingURL?.host()?.lowercased() : nil
-        certificateWarningCertificate = certificateWarningHost == nil ? nil : CertificateExceptions.certificate(in: nsError)
-        certificateWarningNonce = certificateWarningHost == nil ? nil : CertificateExceptions.makeNonce()
+        // "Visit anyway" only with the very certificate it trusts in hand, and never for a site that asked to be
+        // reached only securely (HSTS): then the warning says why there's no way past.
+        let failingHost = failingURL?.host()?.lowercased()
+        let certificate = ErrorPage.offersProceed(nsError) ? CertificateExceptions.certificate(in: nsError) : nil
+        let store = webView.configuration.websiteDataStore
+        let strict = failingHost.map { StrictTransport.isKnown($0, in: store) } ?? false
+        let offers = ErrorPage.offersProceed(nsError) && failingHost != nil && CertificateExceptions.mayOffer(certificate: certificate, strictTransport: strict)
+        certificateWarningHost = offers ? failingHost : nil
+        certificateWarningCertificate = offers ? certificate : nil
+        certificateWarningNonce = offers ? CertificateExceptions.makeNonce() : nil
+        let noWayPast: ErrorPage.NoWayPast? = !ErrorPage.offersProceed(nsError) || offers ? nil : strict ? .strictTransport : .noCertificate
         Diagnostics.note("Page didn’t load", site: failingURL?.host(), Diagnostics.describe(nsError), isPrivate: isPrivate)
-        ErrorPage.show(error: nsError, url: failingURL, in: webView, proceedNonce: certificateWarningNonce)
+        ErrorPage.show(error: nsError, url: failingURL, in: webView, proceedNonce: certificateWarningNonce, noWayPast: noWayPast)
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

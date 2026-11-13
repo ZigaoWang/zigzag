@@ -39,7 +39,25 @@ enum ErrorPage {
 
     /// `proceedNonce`: the nonce for this warning's "Visit anyway" link. Without one (a popup, where a certificate
     /// can't be let through) the page explains, with no way past.
-    static func show(error: NSError, url: URL?, in webView: WKWebView, proceedNonce: String? = nil) {
+    /// Why a certificate warning has no "Visit anyway", said where the link would be.
+    enum NoWayPast: Equatable {
+        /// The site asked to be reached only over a secure connection (HSTS).
+        case strictTransport
+        /// The warning came without the certificate it's about, so there's none to trust.
+        case noCertificate
+
+        var text: String {
+            switch self {
+            case .strictTransport:
+                String(localized: "This site asks to be visited only over a secure connection, so it can’t be opened with this certificate.", comment: "Under Details on the page Zigzag shows for a site whose certificate can't be trusted, in place of Visit this site anyway, for a site that uses HSTS.")
+            case .noCertificate:
+                String(localized: "Zigzag couldn’t read the site’s certificate, so it can’t be trusted anyway.", comment: "Under Details on the page Zigzag shows for a site whose certificate can't be trusted, in place of Visit this site anyway, when the certificate couldn't be read.")
+            }
+        }
+    }
+
+    /// `noWayPast`: why a certificate warning has no "Visit anyway", said in its place.
+    static func show(error: NSError, url: URL?, in webView: WKWebView, proceedNonce: String? = nil, noWayPast: NoWayPast? = nil) {
         guard let url else { return }
         pending.add(webView)
         let kind = Self.kind(of: error, url: url)
@@ -49,7 +67,7 @@ enum ErrorPage {
         // whatever was before it.
         let canGoBack = webView.url == nil ? false : webView.url == url ? webView.canGoBack : true
         let proxy = blamesProxy(kind, url: url) ? ProxyCheck.localProxy(for: url) : nil
-        let page = html(error: error, url: url, canGoBack: canGoBack, proceedLink: proceed, proxy: proxy,
+        let page = html(error: error, url: url, canGoBack: canGoBack, proceedLink: proceed, noWayPast: proceed == nil ? noWayPast : nil, proxy: proxy,
                         style: PageStyle.css(theme: Brand.Theme.for(webView)), nonce: UUID().uuidString)
         if kind == .offline { OfflineRetry.wait(webView, for: url) } else { OfflineRetry.forget(webView) }
         // WebKit won't show anything at an address of an extension it doesn't have, so that page has none.
@@ -261,7 +279,8 @@ enum ErrorPage {
     // MARK: - The page
 
     /// The whole page, everything on it escaped, its one script allowed by `nonce` and nothing loaded from anywhere.
-    static func html(error: NSError, url: URL, canGoBack: Bool, proceedLink: URL?, proxy: String? = nil, style: String, nonce: String) -> String {
+    static func html(error: NSError, url: URL, canGoBack: Bool, proceedLink: URL?, noWayPast: NoWayPast? = nil, proxy: String? = nil,
+                     style: String, nonce: String) -> String {
         let kind = Self.kind(of: error, url: url)
         let (title, message) = describe(error, url: url, proxy: proxy)
         let site = siteName(for: url)
@@ -269,7 +288,8 @@ enum ErrorPage {
         let buttons = actions.enumerated().map { i, action in
             #"<button class="button\#(i == 0 ? " prominent" : "")" data-action="\#(name(of: action))">\#(escape(self.title(of: action)))</button>"#
         }.joined()
-        let reason = kind == .certificate ? #"<p class="why">\#(escape(certificateReason(error.code)))</p>"# : ""
+        let noWay = kind == .certificate && proceedLink == nil ? noWayPast.map { #"<p class="why">\#(escape($0.text))</p>"# } ?? "" : ""
+        let reason = kind == .certificate ? #"<p class="why">\#(escape(certificateReason(error.code)))</p>"# + noWay : ""
         let anyway = proceedLink.map {
             #"<a class="anyway" href="\#(escape($0.absoluteString))">\#(escape(String(localized: "Visit this site anyway", comment: "Link on the page Zigzag shows for a site whose certificate can't be trusted, under Show details.")))</a>"#
         } ?? ""
