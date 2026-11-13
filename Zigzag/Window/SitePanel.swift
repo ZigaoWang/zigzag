@@ -1908,13 +1908,3 @@ enum SitePanelRows {
         return links
     }
 }
-
-extension TabManager {
-    /// The page Site Controls opens for. From a split pane's strip, that pane's page, made the one you're in first as
-    /// a click in it does, so everything the panel does (Reader, translating, a reload) lands on it; otherwise the tab
-    /// you're in, which in a split is the pane you're in, never the group's first (#160).
-    @discardableResult func siteControlsTab(from pane: Tab? = nil) -> Tab? {
-        if let pane, !pane.isClosed, pane !== selectedTab { select(pane) }
-        return selectedTab
-    }
-}

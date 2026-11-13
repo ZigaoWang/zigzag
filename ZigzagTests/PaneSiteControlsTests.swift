@@ -21,7 +21,7 @@ import Testing
             guard let (manager, tabs) = group(count) else { Issue.record("no group"); return }
             defer { tabs.forEach { $0.close() }; manager.invalidate() }
             for (i, tab) in tabs.enumerated().reversed() {
-                #expect(manager.siteControlsTab(from: tab) === tab, "pane \(i) of \(count)")
+                #expect(manager.focusPane(tab), "pane \(i) of \(count)")
                 // That pane is the one you're in now, as a click in it makes it.
                 #expect(manager.selectedTab === tab)
                 #expect(manager.split(for: tab) != nil)
@@ -29,22 +29,13 @@ import Testing
         }
     }
 
-    @Test func fromTheSidebarItIsThePaneYouAreIn() {
-        guard let (manager, tabs) = group(3) else { Issue.record("no group"); return }
-        defer { tabs.forEach { $0.close() }; manager.invalidate() }
-        manager.select(tabs[2])
-        #expect(manager.siteControlsTab() === tabs[2])
-        manager.select(tabs[1])
-        #expect(manager.siteControlsTab() === tabs[1])
-        #expect(manager.siteControlsTab() !== tabs[0])
-    }
-
     @Test func aClosedPaneChangesNothing() {
         guard let (manager, tabs) = group(3) else { Issue.record("no group"); return }
         defer { tabs.forEach { $0.close() }; manager.invalidate() }
         manager.select(tabs[1])
         tabs[2].close()
-        #expect(manager.siteControlsTab(from: tabs[2]) === tabs[1])
+        #expect(!manager.focusPane(tabs[2]))
+        #expect(manager.selectedTab === tabs[1])
     }
 
     // MARK: The strip

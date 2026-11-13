@@ -451,6 +451,14 @@ final class TabManager {
 
     // MARK: Selecting
 
+    /// Makes a split's pane the one you're in, as a click in it does, for something done from that pane (its address,
+    /// its Site Controls, its tools) to land on its page: everything acts on the tab you're in. True once it is; false
+    /// for a pane closed since, which changes nothing.
+    @discardableResult func focusPane(_ pane: Tab) -> Bool {
+        if !pane.isClosed, pane !== selectedTab { select(pane) }
+        return selectedTab === pane
+    }
+
     func select(_ tab: Tab) {
         // A tab closed since (one an old undo step or a stale button still points at) never comes back from here.
         guard !tab.isClosed else { return }

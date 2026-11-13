@@ -1213,7 +1213,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// A split pane's address clicked: that pane becomes the one you're in, and its address opens for editing right
     /// over the pill, as the sidebar's does for the page you're in.
     func editAddress(of tab: Tab, from anchor: NSView) {
-        if tabManager.selectedTab !== tab { tabManager.select(tab) }
+        guard tabManager.focusPane(tab) else { return }
         commandBar.show(mode: .editCurrent, anchor: anchor)
     }
 
@@ -1221,8 +1221,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// under its address (#160).
     func showSiteControls(for tab: Tab, from anchor: NSView) {
         if SitePanel.isOpen(in: window), SitePanel.shown?.describes(tab) == false { SitePanel.closeCurrent() }
-        guard let page = tabManager.siteControlsTab(from: tab), page === tab else { return }
-        SitePanel.toggle(in: self, from: anchor, tab: page)
+        guard tabManager.focusPane(tab) else { return }
+        SitePanel.toggle(in: self, from: anchor, tab: tab)
     }
 
     /// In split view, clicking a pane makes its tab the one you're working in.
@@ -1237,7 +1237,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if let base = root.overlay.superview, root.overlay.hitTest(base.convert(windowPoint, from: nil)) != nil { return }
         guard let clickedID = Self.pane(at: point, frames: panes, ids: pair.ids, current: tab.id),
               let clicked = tabManager.tab(with: clickedID) else { return }
-        tabManager.select(clicked)
+        tabManager.focusPane(clicked)
     }
 
     /// The pane at a point of the page, when it isn't the one you're in already: the one to go to. Nil between panes,
