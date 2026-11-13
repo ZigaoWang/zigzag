@@ -42,7 +42,10 @@ enum MCPService {
         endpoint.onSessionEnded = { client in
             Task { @MainActor in AgentControl.shared.release(client) }
         }
-        AgentControl.shared.onStop = { [weak endpoint] client in endpoint?.endSession(of: client) }
+        AgentControl.shared.onStop = { [weak endpoint] _ in
+            endpoint?.refuseAll()
+            stopAccess()
+        }
         let server = MCPServer(port: port, endpoint: endpoint)
         server.onState = { state in
             Task { @MainActor in
@@ -68,6 +71,19 @@ enum MCPService {
         AgentControl.shared.onStop = nil
         AgentControl.shared.reset()
         changed.send()
+    }
+
+    /// Stop on the bar over a tab: no AI app uses Zigzag any more, not only the one on that tab. Its key is replaced,
+    /// so none can carry on with the old one, and the setting goes off, so nothing listens until you turn it back on
+    /// in Settings › Automation and give the app the new key.
+    static func stopAccess() {
+        server?.endpoint.refuseAll()
+        MCPKeyFile.reset()
+        setOn(false)
+        if let controller = WindowManager.shared.keyController {
+            Toast.show(String(localized: "AI apps can’t use Zigzag now. Turn them back on in Settings › Automation.", comment: "Toast after Stop on the bar over a tab an AI app was using: every AI app is cut off until the setting is turned on again."),
+                       symbol: "hand.raised", duration: 5, in: controller)
+        }
     }
 
     /// The key apps send, made the first time it's needed.

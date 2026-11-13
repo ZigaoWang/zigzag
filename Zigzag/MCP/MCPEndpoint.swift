@@ -175,12 +175,31 @@ nonisolated final class MCPEndpoint: @unchecked Sendable {
         ended.forEach { onSessionEnded?($0) }
     }
 
-    /// Ends a client's session, as Stop in the browser does: its next request finds none, and it has to start over.
+    /// Ends a client's session: its next request finds none, and it has to start over.
     func endSession(of client: MCPClient) {
         lock.lock()
         let removed = sessions.removeValue(forKey: client.key) != nil
         lock.unlock()
         if removed { onSessionEnded?(client) }
+    }
+
+    /// Stop in the browser: the key no longer works, every session ends, and every request from now on is refused,
+    /// with or without a session or the new key, until access is turned on again (which makes a new endpoint).
+    private var refusing = false
+
+    func refuseAll() {
+        lock.lock()
+        refusing = true
+        token = ""
+        let ended = sessions.values.map(\.client)
+        sessions = [:]
+        lock.unlock()
+        ended.forEach { onSessionEnded?($0) }
+    }
+
+    var refusesAll: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return refusing
     }
 
     var sessionCount: Int {
@@ -211,6 +230,11 @@ nonisolated final class MCPEndpoint: @unchecked Sendable {
         }
         guard request.path == Self.path else {
             return .json(404, RPCError.response(id: nil, code: RPCError.invalidRequest, message: "Not found. Zigzag's MCP endpoint is \(Self.path)."))
+        }
+        // Stopped from the browser: nothing gets through, whatever it sends, until it's turned on again in Settings.
+        guard !refusesAll else {
+            return .json(403, RPCError.response(id: nil, code: RPCError.invalidRequest,
+                                                message: "Forbidden: the person stopped AI apps from using Zigzag. Ask them to turn it back on in Zigzag's Settings › Automation."))
         }
         guard MCPAccess.authorized(request.header("authorization"), token: currentToken) else {
             return .json(401, RPCError.response(id: nil, code: RPCError.invalidRequest,
@@ -336,19 +360,20 @@ nonisolated final class MCPEndpoint: @unchecked Sendable {
                                 "serverInfo": serverInfo, "instructions": .string(Self.instructions)]
             return .json(200, ["jsonrpc": "2.0", "id": id, "result": result], headers: [("Mcp-Session-Id", sessionID)])
         }
-        // The session the app was given; one that ended (Stop, a new key) sends it back to initialize.
-        var client = MCPClient(key: "anonymous", name: nil)
-        if let sessionID = request.header("mcp-session-id") {
-            let session: Session? = lock.withLock {
-                let found = sessions[sessionID]
-                if found != nil { sessions[sessionID]?.lastSeen = Date() }
-                return found
-            }
-            guard let session else {
-                return .json(404, RPCError.response(id: id, code: RPCError.sessionNotFound, message: "Session not found. Initialize again."))
-            }
-            client = session.client
+        // The session the app was given; one that ended (a new key) sends it back to initialize. Every request after
+        // initialize carries it, as the transport has it: none is no session, not one of its own.
+        guard let sessionID = request.header("mcp-session-id") else {
+            return .json(400, RPCError.response(id: id, code: RPCError.invalidRequest, message: "Bad request: Mcp-Session-Id is required. Initialize first."))
         }
+        let session: Session? = lock.withLock {
+            let found = sessions[sessionID]
+            if found != nil { sessions[sessionID]?.lastSeen = Date() }
+            return found
+        }
+        guard let session else {
+            return .json(404, RPCError.response(id: id, code: RPCError.sessionNotFound, message: "Session not found. Initialize again."))
+        }
+        let client = session.client
         func result(_ value: [String: JSON]) -> HTTPResponse { .json(200, ["jsonrpc": "2.0", "id": id, "result": .object(value)]) }
         switch method {
         case "ping": return result([:])

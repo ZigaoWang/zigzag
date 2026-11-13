@@ -178,8 +178,10 @@ struct MCPServerTests {
         #expect(await endpoint.handle(post(["jsonrpc": "2.0", "id": 3, "method": "ping"], headers: headers)).status == 200)
     }
 
-    @Test func clearErrorsForBadMessages() async {
+    @Test func clearErrorsForBadMessages() async throws {
         let endpoint = endpoint()
+        let session = try #require(await endpoint.handle(post(Self.initialize)).header("Mcp-Session-Id"))
+        let headers = ["Mcp-Session-Id": session, "MCP-Protocol-Version": "2025-06-18"]
         let notJSON = HTTPRequest(method: "POST", path: "/mcp", headers: ["host": "localhost", "authorization": "Bearer \(Self.token)"], body: Data("{oops".utf8))
         let parse = await endpoint.handle(notJSON)
         #expect(parse.status == 400 && body(parse)["error"]?["code"] == .int(RPCError.parse))
@@ -187,11 +189,11 @@ struct MCPServerTests {
         #expect(batch.status == 400 && body(batch)["error"]?["code"] == .int(RPCError.invalidRequest))
         let version = await endpoint.handle(post(["jsonrpc": "1.0", "id": 1, "method": "ping"]))
         #expect(body(version)["error"]?["code"] == .int(RPCError.invalidRequest))
-        let unknown = await endpoint.handle(post(["jsonrpc": "2.0", "id": 4, "method": "resources/list"]))
+        let unknown = await endpoint.handle(post(["jsonrpc": "2.0", "id": 4, "method": "resources/list"], headers: headers))
         #expect(body(unknown)["error"]?["code"] == .int(RPCError.methodNotFound) && body(unknown)["id"] == 4)
-        let noTool = await endpoint.handle(post(["jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": ["name": "rm_rf"]]))
+        let noTool = await endpoint.handle(post(["jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": ["name": "rm_rf"]], headers: headers))
         #expect(body(noTool)["error"]?["code"] == .int(RPCError.invalidParams))
-        let badArgs = await endpoint.handle(post(["jsonrpc": "2.0", "id": 6, "method": "tools/call", "params": ["name": "echo", "arguments": [1]]]))
+        let badArgs = await endpoint.handle(post(["jsonrpc": "2.0", "id": 6, "method": "tools/call", "params": ["name": "echo", "arguments": [1]]], headers: headers))
         #expect(body(badArgs)["error"]?["code"] == .int(RPCError.invalidParams))
         let badID = await endpoint.handle(post(["jsonrpc": "2.0", "id": [1], "method": "ping"]))
         #expect(badID.status == 400)
@@ -223,6 +225,26 @@ struct MCPServerTests {
         delete.headers["mcp-session-id"] = third
         #expect(await endpoint.handle(delete).status == 200)
         #expect(endpoint.sessionCount == 0)
+    }
+
+    /// Stop in the browser: every session ends and nothing gets through after, with a session, the key, a new key or none.
+    @Test func stopRefusesEverythingAfter() async throws {
+        let endpoint = endpoint()
+        let session = try #require(await endpoint.handle(post(Self.initialize)).header("Mcp-Session-Id"))
+        let list: JSON = ["jsonrpc": "2.0", "id": 2, "method": "tools/list"]
+        let inSession = ["Mcp-Session-Id": session, "MCP-Protocol-Version": "2025-06-18"]
+        #expect(await endpoint.handle(post(list, headers: inSession)).status == 200)
+        // No session is no session: a request without one isn't let through as nobody in particular.
+        #expect(await endpoint.handle(post(list)).status == 400)
+        endpoint.refuseAll()
+        #expect(endpoint.refusesAll && endpoint.sessionCount == 0)
+        #expect(await endpoint.handle(post(list, headers: inSession)).status == 403)
+        #expect(await endpoint.handle(post(list)).status == 403)
+        #expect(await endpoint.handle(post(Self.initialize)).status == 403)
+        #expect(await endpoint.handle(post(Self.initialize, auth: false)).status == 403)
+        #expect(await endpoint.handle(modern("ping")).status == 403)
+        endpoint.setToken(Self.token)
+        #expect(await endpoint.handle(post(Self.initialize)).status == 403)
     }
 
     // MARK: 2026-07-28: everything in each request

@@ -105,7 +105,8 @@ struct MCPToolsTests {
         #expect(AgentControl.line(for: String(repeating: "a", count: 200)).count < 120)
     }
 
-    /// Stop lets the tab go, keeps it out of reach and disconnects the app; turning the setting off forgets it all.
+    /// Stop lets the tab go, keeps it out of reach and disconnects every app, not only the one on that tab; turning
+    /// the setting off forgets it all.
     @Test func stopKeepsTheTabOutOfReach() {
         let control = AgentControl()
         var disconnected: [MCPClient] = []
@@ -119,7 +120,8 @@ struct MCPToolsTests {
         control.stop(first.id)
         #expect(disconnected == [app])
         #expect(control.isStopped(first.id) && !control.isStopped(second.id))
-        #expect(control.inUse.keys.sorted { $0.uuidString < $1.uuidString } == [third.id])
+        #expect(control.inUse.isEmpty)
+        control.touch(third, by: other)
         control.release(other)
         #expect(control.inUse.isEmpty)
         control.touch(second, by: app, now: Date(timeIntervalSinceNow: -AgentControl.quietAfter - 1))

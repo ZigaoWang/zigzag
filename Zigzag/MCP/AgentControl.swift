@@ -1,8 +1,9 @@
 import AppKit
 
 /// Which tabs an AI app is using, and the bar that says so over each one with Stop. A tab is in use from the app's
-/// first tool on it until the app goes quiet for a while, its connection ends, or you press Stop. Stopped, the
-/// tab stays out of reach until Zigzag quits or the setting is turned off.
+/// first tool on it until the app goes quiet for a while, its connection ends, or you press Stop. Stop cuts off every
+/// AI app, not only that one (`MCPService.stopAccess`): the key is replaced and the setting goes off until you turn it
+/// back on.
 @MainActor
 final class AgentControl {
     static let shared = AgentControl()
@@ -17,7 +18,7 @@ final class AgentControl {
 
     private(set) var inUse: [UUID: Use] = [:]
     private(set) var stopped: Set<UUID> = []
-    /// Told when you press Stop: the app's connection ends.
+    /// Told when you press Stop: every AI app is cut off.
     var onStop: ((MCPClient) -> Void)?
     private var banners: [ObjectIdentifier: ToastView] = [:]
     private var quietTimer: Timer?
@@ -31,13 +32,13 @@ final class AgentControl {
 
     func isStopped(_ id: UUID) -> Bool { stopped.contains(id) }
 
-    /// Stop on the bar: the tab is let go, kept out of reach, and the app that had it is disconnected.
+    /// Stop on the bar: the tab is let go and kept out of reach, and every app is disconnected (`onStop`).
     func stop(_ id: UUID) {
         let client = inUse.removeValue(forKey: id)?.client
         stopped.insert(id)
         if let client {
-            // Everything else that app had is let go too: it was disconnected.
-            inUse = inUse.filter { $0.value.client != client }
+            // Every tab any app had is let go too: they're all disconnected.
+            inUse = [:]
             onStop?(client)
         }
         refresh()
