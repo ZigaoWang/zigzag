@@ -236,17 +236,6 @@
         }
       }
     },
-    "%@ is a development site" : {
-      "comment" : "Toast after a site is put on the list in Settings › Developer. The site is a host, like localhost.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 已成为开发网站"
-          }
-        }
-      }
-    },
     "%@ is blocking ads on YouTube." : {
       "comment" : "After the explanation under “Block ads and trackers” in Settings › Privacy, while an ad blocker extension (its name, like uBlock Origin Lite) handles YouTube instead of Zigzag.",
       "localizations" : {
@@ -265,17 +254,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 正在收听此标签页"
-          }
-        }
-      }
-    },
-    "%@ is no longer a development site" : {
-      "comment" : "Toast after a site is taken off the list in Settings › Developer. The site is a host, like localhost.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 不再是开发网站"
           }
         }
       }
@@ -627,7 +605,7 @@
       }
     },
     "%@, %@" : {
-      "comment" : "A size in the Page Size menu of the developer tools above the page: its name, then its width and height, like “iPhone, 393 × 852”.\nAccessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nOn the Permissions row of the site panel: how many allowed, then how many blocked, like “2 allowed, 1 blocked”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.",
+      "comment" : "A size in the Page Size menu of the developer tools above the page: its name, then its width and height, like “iPhone, 393 × 852”.\nAccessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nOn the Permissions row of the site panel: how many allowed, then how many blocked, like “2 allowed, 1 blocked”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nVoiceOver name of the page's whole address in the developer tools' bar on a plain http page: the address, then that it's not secure.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1978,7 +1956,7 @@
       }
     },
     "Add" : {
-      "comment" : "Button on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the site, in the sheet that adds a development site.\nButton that adds the size, in the sheet that adds a page size.",
+      "comment" : "Button on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the size, in the sheet that adds a page size.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2088,7 +2066,7 @@
       }
     },
     "Add Site…" : {
-      "comment" : "Button beside Development Sites in Settings › Developer: opens the sheet that adds a site to the list.",
+      "comment" : "Button beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2109,28 +2087,6 @@
         }
       }
     },
-    "Add This Site to Development Sites" : {
-      "comment" : "View › Developer menu item and command, on a site that isn't on the list in Settings › Developer: puts it on, and the developer tools show on it.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将此网站添加到开发网站"
-          }
-        }
-      }
-    },
-    "Add a Development Site" : {
-      "comment" : "Title of the sheet that adds a site to the list in Settings › Developer.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加开发网站"
-          }
-        }
-      }
-    },
     "Add a Page Size" : {
       "comment" : "Title of the sheet that adds a page size to the list in Settings › Developer.",
       "localizations" : {
@@ -2138,6 +2094,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加网页尺寸"
+          }
+        }
+      }
+    },
+    "Add a Site to Developer Mode" : {
+      "comment" : "Title of the sheet that turns Developer Mode on for a site, from Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为网站开启开发者模式"
           }
         }
       }
@@ -5450,6 +5417,39 @@
         }
       }
     },
+    "Developer Mode" : {
+      "comment" : "The name of a site's state in which it has the developer tools, as in Arc: the switch in Site Controls, the tooltip of the mark on a tab's row, and the main switch in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发者模式"
+          }
+        }
+      }
+    },
+    "Developer Mode off for %@" : {
+      "comment" : "Toast after Developer Mode is turned off for a site. The site is a host, like example.com or localhost.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已为 %@ 关闭开发者模式"
+          }
+        }
+      }
+    },
+    "Developer Mode on for %@" : {
+      "comment" : "Toast after Developer Mode is turned on for a site. The site is a host, like example.com or localhost.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已为 %@ 开启开发者模式"
+          }
+        }
+      }
+    },
     "Developer Settings…" : {
       "comment" : "Item in the ⋯ menu of the developer tools above the page, and a command: opens Settings › Developer.",
       "localizations" : {
@@ -5462,34 +5462,12 @@
       }
     },
     "Developer tools" : {
-      "comment" : "A setting in Settings › Developer: turns on the tools for building websites, which show only on the sites listed under it.\nRow in the site panel's This Site group: this site is one you develop on, listed in Settings › Developer, and gets the developer tools.\nVoiceOver name of the developer tools' buttons in the bar above a development site's page.",
+      "comment" : "VoiceOver name of the developer tools' buttons in the bar above a development site's page.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "开发者工具"
-          }
-        }
-      }
-    },
-    "Developer tools show on this site, on every port and on its subdomains." : {
-      "comment" : "Under the title of the sheet that adds a site to the list in Settings › Developer.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开发者工具会在这个网站上显示，包括它的所有端口和子域名。"
-          }
-        }
-      }
-    },
-    "Development Sites" : {
-      "comment" : "A heading in Settings › Developer: the sites Developer tools show on.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开发网站"
           }
         }
       }
@@ -5780,6 +5758,17 @@
         }
       }
     },
+    "Edit Address" : {
+      "comment" : "Item in the menu of the page's whole address in the developer tools' bar: opens it for editing, as clicking it does.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑地址"
+          }
+        }
+      }
+    },
     "Edit Profile" : {
       "comment" : "Title of the sheet that renames a profile and changes its color.",
       "localizations" : {
@@ -5831,6 +5820,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "编辑“%@”"
+          }
+        }
+      }
+    },
+    "Edits the address" : {
+      "comment" : "VoiceOver hint of the page's whole address in the developer tools' bar: pressing it opens the address for editing.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑地址"
           }
         }
       }
@@ -7238,13 +7238,13 @@
         }
       }
     },
-    "In the bar above a development site’s page: the console, inspecting an element, the page’s look and size, and more. Off, they’re in the site’s controls." : {
+    "In the bar above a page in Developer Mode: its full address, the console, inspecting an element, the page’s look and size, and more. Off, they’re in the site’s controls." : {
       "comment" : "Explanation under “Tools above the page” in Settings › Developer.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在开发网站页面上方的栏里：控制台、检查元素、页面的外观和大小等。关闭后，这些工具在网站设置里。"
+            "value" : "在开发者模式网页上方的栏里：完整地址、控制台、检查元素、网页的外观和大小等。关闭后，这些工具在网站设置里。"
           }
         }
       }
@@ -9244,7 +9244,7 @@
       }
     },
     "None yet" : {
-      "comment" : "A row in Settings › Developer, shown when no development site is listed.\nA row in Settings › Developer, shown when no page size is listed.\nA setting in Settings › Privacy.\nUnder Always Translate in Settings › Translation, when there's no language.",
+      "comment" : "A row in Settings › Developer, shown when no page size is listed.\nA row in Settings › Developer, shown when no site is in Developer Mode.\nA setting in Settings › Privacy.\nUnder Always Translate in Settings › Translation, when there's no language.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10449,7 +10449,7 @@
       }
     },
     "Page height" : {
-      "comment" : "VoiceOver name of the grip under a page with a size of its own, among the developer tools: drag it to change the page's height.",
+      "comment" : "VoiceOver name of the field beside Page Size above the page that holds the page's height in points; type into it to change it.\nVoiceOver name of the grip under a page with a size of its own, among the developer tools: drag it to change the page's height.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10482,7 +10482,7 @@
       }
     },
     "Page width" : {
-      "comment" : "VoiceOver name of the grip beside a page with a size of its own, among the developer tools: drag it to change the page's width.",
+      "comment" : "VoiceOver name of the field beside Page Size above the page that holds the page's width in points; type into it to change it.\nVoiceOver name of the grip beside a page with a size of its own, among the developer tools: drag it to change the page's width.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11937,17 +11937,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "移除快捷键"
-          }
-        }
-      }
-    },
-    "Remove This Site from Development Sites" : {
-      "comment" : "View › Developer menu item and command, on a site that's on the list in Settings › Developer: takes it off, and the developer tools go from it.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从开发网站中移除此网站"
           }
         }
       }
@@ -13883,6 +13872,17 @@
         }
       }
     },
+    "Sites in Developer Mode" : {
+      "comment" : "A heading in Settings › Developer: the sites the developer tools show on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发者模式中的网站"
+          }
+        }
+      }
+    },
     "Sites where you choose Never when Zigzag offers to save show up here, so you can change your mind." : {
       "comment" : "Shown in the Passwords window's Never Saved list when it's empty. Never is the button in the save-password prompt.",
       "localizations" : {
@@ -13894,13 +13894,13 @@
         }
       }
     },
-    "Sites you add show up here." : {
+    "Sites you turn Developer Mode on for show up here." : {
       "comment" : "Explanation under “None yet” in Settings › Developer.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你添加的网站会显示在这里。"
+            "value" : "你开启了开发者模式的网站会显示在这里。"
           }
         }
       }
@@ -14913,6 +14913,17 @@
         }
       }
     },
+    "The developer tools show on this site, on every port and on its subdomains." : {
+      "comment" : "Under the title of the sheet that turns Developer Mode on for a site, from Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发者工具会在这个网站上显示，包括它的所有端口和子域名。"
+          }
+        }
+      }
+    },
     "The file isn’t protected: anyone who opens it can read every password. Keep it somewhere safe and delete it when you’re done." : {
       "comment" : "Message of the sheet that confirms exporting passwords.",
       "localizations" : {
@@ -15750,7 +15761,7 @@
       }
     },
     "Tools above the page" : {
-      "comment" : "A setting in Settings › Developer: on a development site, the developer tools are in the bar above the page, after the address.",
+      "comment" : "A setting in Settings › Developer: on a site in Developer Mode, the developer tools are in the bar above the page, with its full address.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -15760,13 +15771,13 @@
         }
       }
     },
-    "Tools for building websites, on the sites listed here and nowhere else. A tab on one of them has a hammer on its row." : {
-      "comment" : "Explanation under “Developer tools” in Settings › Developer.",
+    "Tools for building websites, on the sites in Developer Mode and nowhere else. Turn it on for any site in its Site Controls, in the command bar or with View › Developer. A tab in Developer Mode has a dashed outline in the sidebar." : {
+      "comment" : "Explanation under the Developer Mode switch in Settings › Developer.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "用于构建网站的工具，只在这里列出的网站上显示。打开这些网站的标签页，所在的行上会有一个锤子标记。"
+            "value" : "用于构建网站的工具，只在开发者模式中的网站上显示。可以在任一网站的“网站设置”、命令栏或“显示 › 开发者”中为它开启。处于开发者模式的标签页在边栏中带有虚线边框。"
           }
         }
       }
@@ -15914,6 +15925,28 @@
         }
       }
     },
+    "Turn Off Developer Mode" : {
+      "comment" : "A command in the command bar and an item in the ⋯ menus of Site Controls and of the developer tools above the page, on a site in Developer Mode: turns it off for the site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭开发者模式"
+          }
+        }
+      }
+    },
+    "Turn Off Developer Mode for This Site" : {
+      "comment" : "View › Developer menu item, on a site in Developer Mode: turns it off for the site, and the developer tools go from it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为此网站关闭开发者模式"
+          }
+        }
+      }
+    },
     "Turn On" : {
       "comment" : "Button in the toast that offers to archive unused tabs.",
       "localizations" : {
@@ -15921,6 +15954,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开"
+          }
+        }
+      }
+    },
+    "Turn On Developer Mode" : {
+      "comment" : "A command in the command bar and an item in the ⋯ menu of Site Controls, on a site that isn't in Developer Mode: turns it on for the site, and the developer tools show on it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启开发者模式"
+          }
+        }
+      }
+    },
+    "Turn On Developer Mode for This Site" : {
+      "comment" : "View › Developer menu item, on a site that isn't in Developer Mode: turns it on for the site, and the developer tools show on it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为此网站开启开发者模式"
           }
         }
       }
@@ -17914,6 +17969,17 @@
         }
       }
     },
+    "at %lld%%" : {
+      "comment" : "After the page's width and height above the page, while a page larger than the window is shown smaller to fit: how large it's shown, like “at 72%”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩放至 %lld%%"
+          }
+        }
+      }
+    },
     "backup undo update rollback" : {
       "comment" : "Words that find the restore row with Find a setting in Settings. Not shown.",
       "localizations" : {
@@ -18064,17 +18130,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "默认 应用 链接 打开 启动 default"
-          }
-        }
-      }
-    },
-    "development site" : {
-      "comment" : "Spoken by VoiceOver after a tab row's name: the tab is on a site listed in Settings › Developer, and has a hammer on its row.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开发网站"
           }
         }
       }
