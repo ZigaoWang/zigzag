@@ -377,10 +377,9 @@ struct SitePanelRowsTests {
 
     @Test func rowsThatApplyOnlySomewhere() {
         var c = Context()
-        c.forceDarkOffered = true
         c.fullScreen = true
         c.foreignLanguage = true
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .forceDark, .keepAwake, .fullScreenFills, .alwaysTranslate])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .fullScreenFills, .alwaysTranslate])
     }
 
     /// Cookie banners (#175): there once a pop-up was found or a choice kept, under Ad blocking; never in a private
@@ -439,12 +438,26 @@ struct SitePanelRowsTests {
         #expect(SitePanelRows.links(c) == [.extensions])
     }
 
-    /// Force dark sits under Dark page, and only with it.
-    @Test func forceDarkOnlyWithDarkPage() {
-        var c = Context()
-        c.siteChoices = false
-        c.forceDarkOffered = true
-        #expect(!SitePanelRows.rows(c).contains(.forceDark))
+    /// Dark page is one dropdown (#134): Automatic, On, Off and Force, in that order, and no row of its own for Force.
+    @Test func darkPageIsOneDropdown() {
+        #expect(DarkPages.SiteChoice.allCases == [.automatic, .on, .off, .force])
+        #expect(DarkPages.SiteChoice.allCases.map(SitePanel.title(of:)) == ["Automatic", "On", "Off", "Force Dark"])
+        #expect(SitePanelRows.rows(Context()).filter { $0 == .darkPage }.count == 1)
+    }
+
+    /// Under Dark page, what it does here now: Automatic says whether Settings has it on, Force that it's always
+    /// dark, and On and Off nothing more, unless the site is dark on its own or the developer tools chose its look.
+    @Test func darkPageSaysWhatItDoesNow() {
+        typealias S = SitePanel.DarkStatus
+        #expect(S.of(.automatic, wanted: true, native: false, developerLook: false) == .nowOn)
+        #expect(S.of(.automatic, wanted: false, native: true, developerLook: false) == .nowOff)
+        #expect(S.of(.automatic, wanted: true, native: true, developerLook: false) == .darkAlready)
+        #expect(S.of(.on, wanted: true, native: false, developerLook: false) == .none)
+        #expect(S.of(.on, wanted: true, native: true, developerLook: false) == .darkAlready)
+        #expect(S.of(.off, wanted: false, native: true, developerLook: false) == .none)
+        #expect(S.of(.force, wanted: true, native: true, developerLook: false) == .alwaysDark)
+        #expect(S.of(.force, wanted: true, native: false, developerLook: true) == .developerTools)
+        #expect(S.none.text == nil && S.nowOn.text == "Now on")
     }
 
     @Test func permissionsOnlyOnceAsked() {

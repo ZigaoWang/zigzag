@@ -79,18 +79,53 @@ struct DarkPagesTests {
         }
     }
 
-    @Test func aChoiceTheSameAsTheSettingIsNotKept() {
+    /// A choice is kept as made, the same as the setting or not: the dropdown has Automatic to follow it, and On
+    /// chosen while the setting is Always stays On when the setting changes (#134).
+    @Test func aChoiceIsKeptAsMade() {
         withDefaults {
+            let url = URL(string: "https://example.com/")
             DarkPages.mode = .always
-            DarkPages.setChoice(true, for: URL(string: "https://example.com/"))
-            #expect(DarkPages.sitesOn.isEmpty)
-            DarkPages.setChoice(false, for: URL(string: "https://example.com/"))
-            #expect(DarkPages.sitesOff == ["example.com"])
-            #expect(!DarkPages.wants(URL(string: "https://example.com/")))
-            // Turned on again, it simply follows Always.
-            DarkPages.setChoice(true, for: URL(string: "https://example.com/"))
-            #expect(DarkPages.sitesOff.isEmpty && DarkPages.sitesOn.isEmpty)
+            DarkPages.setSiteChoice(.on, for: url)
+            #expect(DarkPages.sitesOn == ["example.com"] && DarkPages.siteChoice(for: url) == .on)
+            DarkPages.mode = .off
+            #expect(DarkPages.wants(url))
+            DarkPages.setSiteChoice(.off, for: url)
+            #expect(DarkPages.sitesOff == ["example.com"] && DarkPages.sitesOn.isEmpty && !DarkPages.wants(url))
+            DarkPages.setSiteChoice(.automatic, for: url)
+            #expect(DarkPages.sitesOff.isEmpty && DarkPages.sitesOn.isEmpty && DarkPages.siteChoice(for: url) == .automatic)
         }
+    }
+
+    /// The dropdown's four choices and the three lists they're kept in, both ways; what older versions kept reads as
+    /// the choice it meant.
+    @Test func theDropdownsChoicesAreTheListsKept() {
+        for choice in DarkPages.SiteChoice.allCases {
+            let lists = DarkPages.lists(for: choice)
+            #expect(DarkPages.siteChoice(on: lists.on, off: lists.off, forced: lists.forced) == choice)
+        }
+        // Force kept without On, as Force once was where the setting darkened the site already.
+        #expect(DarkPages.siteChoice(on: false, off: false, forced: true) == .force)
+        // Off holds over anything else.
+        #expect(DarkPages.siteChoice(on: true, off: true, forced: true) == .off)
+        withDefaults {
+            DarkPages.mode = .off
+            DarkPages.sitesForced = ["example.com"]
+            let url = URL(string: "https://www.example.com/")
+            #expect(DarkPages.siteChoice(for: url) == .force && DarkPages.choice(for: url) == true && DarkPages.wants(url))
+            #expect(DarkPages.config(for: nil, url: url)["topForced"] as? Bool == true)
+            DarkPages.setSiteChoice(.on, for: url)
+            #expect(DarkPages.sitesForced.isEmpty && DarkPages.sitesOn == ["example.com"])
+        }
+    }
+
+    /// What a page is asked for, light or dark (#134): dark where dark pages are wanted, light when forced (then
+    /// darkened); otherwise light for a site turned Off, else the Mac's, never the window's.
+    @Test func thePagesLookFollowsTheChoice() {
+        #expect(DarkPages.look(wanted: true, forced: false, siteOff: false, systemIsDark: false) == .darkAqua)
+        #expect(DarkPages.look(wanted: true, forced: true, siteOff: false, systemIsDark: true) == .aqua)
+        #expect(DarkPages.look(wanted: false, forced: false, siteOff: true, systemIsDark: true) == .aqua)
+        #expect(DarkPages.look(wanted: false, forced: false, siteOff: false, systemIsDark: true) == .darkAqua)
+        #expect(DarkPages.look(wanted: false, forced: false, siteOff: false, systemIsDark: false) == .aqua)
     }
 
     @Test func aSubdomainsChoiceTakesThePlaceOfItsSites() {

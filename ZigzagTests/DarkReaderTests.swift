@@ -173,7 +173,8 @@ struct DarkReaderTests {
             #expect(gray(webView.underPageBackgroundColor) == 0x18)
             DarkPages.mode = .off
             #expect(webView.value(forKey: "drawsBackground") as? Bool == true)
-            #expect(webView.underPageBackgroundColor == nil || webView.appearance == nil)
+            // Not darkened, the page is asked for the Mac's look, not the window's (#134).
+            #expect(webView.appearance?.name == (DarkPages.systemIsDark ? .darkAqua : .aqua))
         }
     }
 
@@ -214,6 +215,52 @@ struct DarkReaderTests {
             DarkPages.mode = .always
             let tookOver = await until { (try? await state(webView))?["plain"] as? Bool == false }
             #expect(tookOver)
+        }
+    }
+
+    /// A site that switches its own theme is looked at again (#134): gone light from dark with its own selector,
+    /// Dark Reader takes over, even through a fade of its background; back to dark, it steps aside.
+    @Test func aSiteSwitchingItsThemeIsDecidedAgain() async throws {
+        try await withDefaults { () async throws in
+            DarkPages.mode = .always
+            let html = """
+            <html data-theme="dark"><head><style>
+            html { transition: background-color .4s, color .4s; }
+            html[data-theme=dark] { background: #14161a; color: #e6e6e6; }
+            html[data-theme=light] { background: #ffffff; color: #1a1a1a; }
+            body { margin: 0; min-height: 600px; }
+            </style></head><body><p>Theme.</p></body></html>
+            """
+            let webView = await page(html)
+            let dark = await until { (try? await state(webView))?["native"] as? Bool == true }
+            #expect(dark)
+            _ = try await js(webView, "document.documentElement.dataset.theme = 'light'")
+            let darkened = await until(3) { (try? await state(webView))?["darkened"] as? Bool == true }
+            #expect(darkened)
+            _ = try await js(webView, "document.documentElement.dataset.theme = 'dark'")
+            let leftAlone = await until(3) {
+                let s = try? await state(webView)
+                return s?["darkened"] as? Bool == false && s?["native"] as? Bool == true
+            }
+            #expect(leftAlone)
+        }
+    }
+
+    /// With dark pages off, a dark app drawn over a white page well after it has loaded still gives the bar its dark
+    /// (#134), and a site gone light again gives it back.
+    @Test func anAppDrawnDarkLateIsSeenWithDarkPagesOff() async throws {
+        try await withDefaults { () async throws in
+            DarkPages.mode = .off
+            let html = "<html><head><meta name='theme-color' content='#ffffff'><style>body { background: #fff; margin: 0; min-height: 600px }</style></head><body><p>Loading</p></body></html>"
+            let webView = await page(html)
+            try? await Task.sleep(for: .milliseconds(300))
+            #expect(try await state(webView)["native"] as? Bool == false)
+            _ = try await js(webView, "const a = document.createElement('div'); a.id = 'app'; a.style.cssText = 'position:fixed;inset:0;background:#15202b;color:#eee'; a.textContent = 'App'; document.body.appendChild(a);")
+            let seen = await until(3) { (try? await state(webView))?["color"] as? String == "#15202b" }
+            #expect(seen)
+            _ = try await js(webView, "document.getElementById('app').remove()")
+            let light = await until(3) { (try? await state(webView))?["native"] as? Bool == false }
+            #expect(light)
         }
     }
 
