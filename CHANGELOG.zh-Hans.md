@@ -20,6 +20,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 滑出来的边栏和固定显示的边栏颜色一致了，不会再偏灰。
 - Tampermonkey BETA 和正式版 Tampermonkey 一样能用了。以前它一启动就停住，弹出窗口打不开，脚本也不会运行；现在它能正常启动，打开脚本的 .user.js 地址会出现它的安装页，装好的脚本也会运行，不允许内联脚本的网站上也一样。 ([#200](https://github.com/ZigaoWang/zigzag/issues/200))
 - 在“设置 › 通用”里点“设为默认”后，macOS 一确认按钮就会更新，不用再点第二次。感谢 [ze-mu-zhou](https://github.com/ze-mu-zhou)。([#195](https://github.com/ZigaoWang/zigzag/issues/195))
+- “翻译”会翻译网页里所有不是你的语言的内容，不再只翻译整页都是别的语言的网页。英文网页里的一段中文或一句日文引语会单独翻译，中文网页里的英文代码保持原样。只有整页都已是你的语言时，才会提示“此页面已是”你的语言。在同一个窗口里再翻译一个同语言的网页，或者从已翻译的网页前往另一个网页后再翻译，也都可以了。感谢 [Lakeland97](https://github.com/Lakeland97)。([#197](https://github.com/ZigaoWang/zigzag/issues/197))
 - Motrix 扩展可以和 Motrix App 配对了。之前点“配对”还没连到 App 就提示连接失败：扩展认不出 Zigzag 给它自己文件的地址，现在只在需要的那一项检查里给它 Chrome 的地址。
 
 ## [0.9.0] - 2026-11-12

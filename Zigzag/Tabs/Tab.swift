@@ -618,7 +618,18 @@ final class Tab: NSObject {
 
     // MARK: Navigation
 
+    /// Another page: what was known of the one before (its language, that it's shown translated) goes with it.
+    /// Called before the tab takes the new address, wherever it does, so a page you typed in isn't still taken
+    /// as translated (#197).
+    private func leavePage(for url: URL) {
+        guard url != self.url, foreignLanguage != nil || isTranslated else { return }
+        foreignLanguage = nil
+        isTranslated = false
+        changed.send(.language)
+    }
+
     func load(_ url: URL) {
+        leavePage(for: url)
         // Extension pages and websites need differently set up web views; crossing over swaps it.
         if let webView, Self.isExtensionPage(url) != showsExtensionPage {
             self.url = url
@@ -685,6 +696,7 @@ final class Tab: NSObject {
             pendingInteractionState = state
         }
         let webView = ensureWebView()
+        leavePage(for: url)
         self.url = url
         changed.send(.url)
         loadOwn(url, in: webView)
@@ -763,11 +775,7 @@ final class Tab: NSObject {
         guard let url = wv.url else { return }
         let hostChanged = url.host() != self.url?.host()
         if url != self.url, self.isArticle { self.isArticle = false; self.changed.send(.reader) }
-        if url != self.url, self.foreignLanguage != nil || self.isTranslated {
-            self.foreignLanguage = nil
-            self.isTranslated = false
-            self.changed.send(.language)
-        }
+        leavePage(for: url)
         let changedPage = url != self.url
         self.url = url
         self.navigatedSinceSave = true

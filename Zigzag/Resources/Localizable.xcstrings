@@ -3503,6 +3503,17 @@
         }
       }
     },
+    "Can’t translate %@ on this Mac" : {
+      "comment" : "Toast when the page's text is in a language Apple's translation can't translate on this Mac. The language is its name, like Latin.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 无法翻译%@"
+          }
+        }
+      }
+    },
     "Can’t undo: spaces or pinned tabs have changed since then" : {
       "comment" : "Toast when ⌘Z can't take back a change because the sidebar changed since.",
       "localizations" : {

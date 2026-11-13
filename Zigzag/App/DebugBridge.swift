@@ -829,6 +829,7 @@ enum DebugBridge {
         case "private": WindowManager.shared.newWindow(url: URL(string: arg), showCommandBar: false, isPrivate: true)
         case "pageshot": if let webView = controller.selectedWebView { PageScreenshot.debugCapture(webView, to: URL(fileURLWithPath: arg)) }
         case "reader": controller.toggleReader()
+        case "translate": controller.translatePage()
         case "split":
             // Splits the shown tab with the one at this sidebar position.
             let list = controller.tabManager.navigableTabs

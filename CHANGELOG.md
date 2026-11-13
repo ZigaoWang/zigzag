@@ -10,6 +10,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - After Set as Default in Settings › General, the button changes as soon as macOS confirms, instead of needing a second click. Thanks to [ze-mu-zhou](https://github.com/ze-mu-zhou). ([#195](https://github.com/ZigaoWang/zigzag/issues/195))
+- Translate translates every part of a page that isn't in your language, not only a page that's all in another one. An English page with a paragraph of Chinese or a quote in Japanese has just those translated, and a page in Chinese keeps its English code as it is. It says the page is already in your language only when all of it is. Translating another page in the same language in one window, or a page you went to from a translated one, works too. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#197](https://github.com/ZigaoWang/zigzag/issues/197))
 - The Motrix extension pairs with the Motrix app. Pair said it couldn't connect before it reached the app: the extension didn't recognize the address Zigzag gives its own files, and now it gets Chrome's for the one check that needs it.
 - The sidebar slides out smoothly when it's hidden, in full screen too.
 - The sidebar that slides out is the same color as when it's shown, in see-through spaces too.
