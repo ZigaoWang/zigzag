@@ -15,7 +15,7 @@ import Testing
     }
 
     /// Two spaces, each with pins and open tabs: one with a split view, a renamed tab, a file that isn't on the web,
-    /// pages in a list, and a tab that names the container without being in its list.
+    /// pages in a list, and a closed tab that names the container without being in its list.
     private func sidebar(wrapped: Bool = false) throws -> Data {
         let items: [[String: Any]] = [
             ["id": "pinA", "childrenIds": ["p1"], "data": ["itemContainer": [:]]],
@@ -29,6 +29,7 @@ import Testing
             tab("file", "file:///Users/someone/notes.txt"),
             ["id": "folder", "data": ["list": [:]], "childrenIds": ["f1"]],
             tab("f1", "https://example.com/inside"),
+            // Names the container but isn't in its list: closed since, left behind.
             tab("late", "https://example.com/late", parent: "openA"),
             ["id": "pinB", "childrenIds": [String](), "data": ["itemContainer": [:]]],
             ["id": "openB", "childrenIds": ["b1"], "data": ["itemContainer": [:]]],
@@ -53,7 +54,7 @@ import Testing
             // Pinned pages stay pins, never open tabs too.
             #expect(parsed.spaces[0].bookmarks.map(\.url.lastPathComponent) == ["pinned"])
             let home = parsed.openTabs[parsed.spaces[0].id] ?? []
-            #expect(home.map { $0.pages.map(\.url.lastPathComponent) } == [["1"], ["left", "right"], ["2"], ["inside"], ["late"]])
+            #expect(home.map { $0.pages.map(\.url.lastPathComponent) } == [["1"], ["left", "right"], ["2"], ["inside"]])
             #expect(home.first?.pages.first?.title == "One")
             #expect(home.first?.pages.first?.customTitle == nil)
             // A tab renamed in Arc keeps its name, over the page's own title.
@@ -115,6 +116,27 @@ import Testing
         #expect(both.openTabs.map(\.space) == [parsed.spaces[0].id, work.id])
     }
 
+    /// A tab closed long ago, still in an older copy of the sidebar, never comes back: only what the fullest copy's
+    /// container lists is open.
+    @Test func aClosedTabInAnOlderCopyStaysClosed() throws {
+        let space: [Any] = ["a", ["id": "a", "title": "Home", "containerIDs": ["unpinned", "openA"]]]
+        let older: [String: Any] = ["spaces": space, "items": [
+            ["id": "openA", "childrenIds": ["now", "closed"], "data": ["itemContainer": [:]]],
+            tab("now", "https://example.com/now", parent: "openA"),
+            tab("closed", "https://example.com/closed", parent: "openA"),
+        ]]
+        let current: [String: Any] = ["spaces": space, "items": [
+            ["id": "openA", "childrenIds": ["now", "new"], "data": ["itemContainer": [:]]],
+            tab("now", "https://example.com/now", parent: "openA"),
+            tab("new", "https://example.com/new", parent: "openA"),
+            ["id": "pins", "childrenIds": [String](), "data": ["itemContainer": [:]]],
+        ]]
+        let root: [String: Any] = ["sidebar": ["containers": [["global": [:]], older, current]]]
+        let parsed = try ArcImporter.readSidebar(JSONSerialization.data(withJSONObject: root))
+        let open = parsed.openTabs[try #require(parsed.spaces.first).id] ?? []
+        #expect(open.map { $0.pages.map(\.url.lastPathComponent) } == [["now"], ["new"]])
+    }
+
     /// A sidebar from before open tabs were read still gives its spaces and pins, with no open tabs.
     @Test func noUnpinnedContainer() throws {
         let root: [String: Any] = ["sidebar": ["containers": [["global": [:]], [
@@ -142,14 +164,14 @@ import Testing
         defer { manager.allTabs.forEach { $0.close() }; manager.invalidate() }
         let parsed = try ArcImporter.readSidebar(sidebar())
         let rows = parsed.openTabs[parsed.spaces[0].id] ?? []
-        #expect(ArcImporter.open([(space, rows)], in: manager) == 5)
+        #expect(ArcImporter.open([(space, rows)], in: manager) == 4)
         let tabs = manager.tabs(in: space)
-        #expect(tabs.map { $0.url?.lastPathComponent ?? "" } == ["1", "left", "right", "2", "inside", "late"])
+        #expect(tabs.map { $0.url?.lastPathComponent ?? "" } == ["1", "left", "right", "2", "inside"])
         #expect(tabs.allSatisfy { !$0.isLoaded })
         #expect(tabs.first { $0.url?.lastPathComponent == "2" }?.customTitle == "Mine")
         let left = try #require(tabs.first { $0.url?.lastPathComponent == "left" })
         #expect(manager.partner(of: left)?.url?.lastPathComponent == "right")
         #expect(ArcImporter.open([(space, rows)], in: manager) == 0)
-        #expect(manager.tabs(in: space).count == 6)
+        #expect(manager.tabs(in: space).count == 5)
     }
 }

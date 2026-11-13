@@ -252,14 +252,11 @@ enum ArcImporter {
             return dict
         }
         var items: [String: [String: Any]] = [:]
-        /// Item ids in the order the files list them, for items that name their container but aren't in its list.
-        var itemOrder: [String] = []
         var spaceByID: [String: [String: Any]] = [:]
         var classicOrder: [String] = []
         for copy in copies {
             for item in copy.items.compactMap(unwrapped) {
                 guard let id = item["id"] as? String else { continue }
-                if items[id] == nil { itemOrder.append(id) }
                 items[id] = item
             }
             for space in copy.spaces.compactMap(unwrapped) where space["containerIDs"] != nil || space["title"] != nil {
@@ -306,16 +303,13 @@ enum ArcImporter {
             return result
         }
 
-        /// The open tabs under a space's unpinned container, in Arc's order: the container's own list, then any item
-        /// that names it as its parent but isn't listed. A split view is one row of its pages; anything else that
-        /// holds pages gives each its own row. Archived tabs live in another file and never come over.
+        /// The open tabs under a space's unpinned container, in Arc's order: only those its list holds, as the fullest
+        /// copy has it. An item that names the container as its parent but isn't in its list is a tab closed since,
+        /// left behind in an older copy, so it never comes back. A split view is one row of its pages; anything else
+        /// that holds pages gives each its own row. Archived tabs live in another file and never come over.
         func openTabs(in containerID: String) -> [OpenTab] {
-            var children = items[containerID]?["childrenIds"] as? [String] ?? []
-            var listed = Set(children)
-            for id in itemOrder where !listed.contains(id) && items[id]?["parentID"] as? String == containerID {
-                children.append(id)
-                listed.insert(id)
-            }
+            var seen = Set<String>()
+            let children = (items[containerID]?["childrenIds"] as? [String] ?? []).filter { seen.insert($0).inserted }
             func page(_ node: [String: Any]) -> OpenPage? {
                 guard let data = node["data"] as? [String: Any], let tab = data["tab"] as? [String: Any],
                       let urlString = tab["savedURL"] as? String, let url = URL(string: urlString), url.scheme == "http" || url.scheme == "https" else { return nil }
