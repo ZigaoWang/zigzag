@@ -584,6 +584,10 @@ enum Tokens {
         static let edgeHideDelay: TimeInterval = 0.05
         /// Sidebar slides in and out: fast enough to feel attached to the pointer.
         static let slideDuration: TimeInterval = 0.18
+        /// The hidden sidebar sliding out at the window's edge, and back. It travels its own width over the page, so a
+        /// little longer than a docked slide, which only uncovers it.
+        static let edgeSlideDuration: TimeInterval = 0.26
+        static let edgeTuckDuration: TimeInterval = 0.2
 
         /// The tactile press: a button or row eases down to this scale as it's pressed (`pressIn`, eased out) and
         /// springs back when let go (`pressOut`, critically damped, so it never overshoots). The action never waits on it.
@@ -753,18 +757,27 @@ enum Tokens {
             let duration: TimeInterval
             /// When set, slides use a real spring with this much bounce instead of an eased curve.
             var bounce: CGFloat? = nil
-            var timing: CAMediaTimingFunction { Motion.easeOut }
+            var timing: CAMediaTimingFunction = Motion.easeOut
         }
 
         /// The one ease-out for anything arriving, leaving or settling: fast at first, so it answers at once, then a
         /// long soft finish (cubic-bezier(0.23, 1, 0.32, 1)). Never ease-in: it starts slow, right when you're looking.
         static let easeOut = CAMediaTimingFunction(controlPoints: 0.23, 1, 0.32, 1)
 
+        /// A panel the width of the sidebar coming out from the window's edge or going back: cubic-bezier(0.32, 0.72,
+        /// 0, 1), the drawer's curve. Eased out like `easeOut`, answering at once, but it starts at about twice its
+        /// average speed rather than four times, so the panel travels its whole width in even steps instead of
+        /// covering half of it in the first frame or two.
+        static let drawer = CAMediaTimingFunction(controlPoints: 0.32, 0.72, 0, 1)
+
         /// Something moving from one place on screen to another: cubic-bezier(0.77, 0, 0.175, 1).
         static let easeInOut = CAMediaTimingFunction(controlPoints: 0.77, 0, 0.175, 1)
 
         static let snappy = Curve(duration: standard)
         static let slide = Curve(duration: slideDuration)
+        /// The hidden sidebar coming out at the window's edge, and going back (quicker, as leaving is).
+        static let edgeSlide = Curve(duration: edgeSlideDuration, timing: drawer)
+        static let edgeTuck = Curve(duration: edgeTuckDuration, timing: drawer)
         /// Finishing a swipe: the fingers already did most of the travel, so the rest is quick.
         static let snap = Curve(duration: 0.14)
         /// Switching spaces: a quick slide that shows which way you went, eased out, with no bounce.

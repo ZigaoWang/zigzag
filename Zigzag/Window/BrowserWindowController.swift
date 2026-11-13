@@ -82,11 +82,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
         }
         root.onSidebarWidthChange = { [weak self] _ in self?.onStateChange?() }
-        root.onSlide = { [weak self] duration in
+        root.onSlide = { [weak self] duration, timing in
             guard let self else { return }
             self.sidebarSliding(duration)
-            PermissionPrompt.reposition(in: self, slide: duration)
-            Toast.reposition(in: self, slide: duration)
+            PermissionPrompt.reposition(in: self, slide: duration, timing: timing)
+            Toast.reposition(in: self, slide: duration, timing: timing)
             AgentControl.shared.reposition(in: self)
         }
         // A panel opened from the slid-out sidebar keeps it out until the panel closes, so it's never left floating alone.

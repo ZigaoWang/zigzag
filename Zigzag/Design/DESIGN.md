@@ -263,6 +263,11 @@ something came from, answers at once, and can be interrupted.
   away. Favorites keep their tiles by id and glide to new places; a new one fades in, a removed one fades out.
   A favicon that swaps for another cross-fades (`selection`). A split opens at `standard`, a closed pane fades where it
   was as the other grows over it, and double-clicking the divider glides the panes back to even.
+- The hidden sidebar comes out at the window's edge in `edgeSlideDuration` (260ms) and goes back in `edgeTuckDuration`
+  (200ms) on `Motion.drawer` (0.32, 0.72, 0, 1): eased out, but it starts at about twice its average speed, not four
+  times, so it travels its whole width in even steps. The card moves whole, glass, color, shadow and rows, as one
+  layer on the render server, with nothing laid out on the way. With Reduce Motion it fades where it lands, or where
+  it was.
 - The one movement past `large`: a download thrown into its button, `Motion.flight` (0.45s), eased out along its arc.
 - Moves whose completion must land on time (the Desk's zoom) use `Motion.easeAnimation`, not a spring, which settles
   well after it looks done.

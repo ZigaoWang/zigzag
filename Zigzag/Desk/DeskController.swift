@@ -1459,6 +1459,8 @@ private final class DeskSearchDelegate: NSObject, NSTextFieldDelegate {
 /// animated, and how long the main thread was busy at a stretch (a stretch past a frame is a frame missed), written
 /// to debug.log.
 final class DeskMeter: NSObject {
+    /// What it times, first in each line it logs: the desk, or the sidebar sliding out from the window's edge.
+    private let kind: String
     private var name = ""
     private var start: CFTimeInterval = 0
     private var last: CFTimeInterval = 0
@@ -1469,6 +1471,10 @@ final class DeskMeter: NSObject {
     private var link: CADisplayLink?
     private var observer: CFRunLoopObserver?
     private var count = 0
+
+    init(_ kind: String = "desk") {
+        self.kind = kind
+    }
 
     func begin(_ name: String, in view: NSView) {
         if link != nil { finish() }
@@ -1522,8 +1528,8 @@ final class DeskMeter: NSObject {
         let typical = sorted.isEmpty ? 0 : sorted[sorted.count / 2]
         let long = sorted.filter { $0 > typical * 1.5 }.count
         let stretches = busy.filter { $0 >= 4 }.map { String(format: "%.0f", $0) }.joined(separator: " ")
-        debugLog(String(format: "desk %@: %@; main busy %.0f ms, longest %.1f ms [%@]; first frame %.1f ms, %d frames, median %.1f ms, max %.1f ms, %d long [%@]",
-                        name, marks.joined(separator: ", "), busy.reduce(0, +), busy.max() ?? 0, stretches, frames.first ?? 0, frames.count,
+        debugLog(String(format: "%@ %@: %@; main busy %.0f ms, longest %.1f ms [%@]; first frame %.1f ms, %d frames, median %.1f ms, max %.1f ms, %d long [%@]",
+                        kind, name, marks.joined(separator: ", "), busy.reduce(0, +), busy.max() ?? 0, stretches, frames.first ?? 0, frames.count,
                         typical, sorted.last ?? 0, long, frames.map { String(format: "%.0f", $0) }.joined(separator: " ")))
     }
 }

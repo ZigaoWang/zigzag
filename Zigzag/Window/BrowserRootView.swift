@@ -476,8 +476,9 @@ final class BrowserRootView: SpaceFrameView {
     var sidebarWidth: CGFloat = Tokens.Metric.sidebarWidth
     private(set) var sidebarRevealed = false
     var onLayoutChange: (() -> Void)?
-    /// Called when the sidebar starts a slide, with how long it lasts (0 = no animation).
-    var onSlide: ((TimeInterval) -> Void)?
+    /// Called when the sidebar starts a slide, with how long it lasts (0 = no animation) and its curve, so what rides
+    /// along moves in step.
+    var onSlide: ((TimeInterval, CAMediaTimingFunction) -> Void)?
     var onSidebarWidthChange: ((CGFloat) -> Void)?
     /// The width when a drag on the sidebar's edge began, kept if the drag closes it.
     private var widthBeforeDrag: CGFloat = Tokens.Metric.sidebarMinWidth
@@ -1091,7 +1092,7 @@ final class BrowserRootView: SpaceFrameView {
             topBarSlideFrame = (topBarSlideFrame ?? oldBar).union(topBarFrame)
             placeTopBar()
         }
-        onSlide?(duration)
+        onSlide?(duration, Tokens.Motion.slide.timing)
         // Borderless: the corners square off as the page grows to the window's edges, and round again as it shrinks.
         // Beside the sidebar, borderless, the page rounds like the window's corner; floating, like a card.
         let frames = tileFrames
@@ -1136,10 +1137,10 @@ final class BrowserRootView: SpaceFrameView {
         layoutSubtreeIfNeeded()
         refreshGlassFrame()
         refreshGlassOcclusion()
-        guard animated, sidebarVisible, !Tokens.Motion.reduceMotion, window != nil else { onSlide?(0); return }
+        guard animated, sidebarVisible, !Tokens.Motion.reduceMotion, window != nil else { onSlide?(0, Tokens.Motion.gentle.timing); return }
         let curve = Tokens.Motion.gentle
         let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: oldSidebar.minX - sidebarContainer.frame.minX, curve: curve, fromKeyboard: true)
-        onSlide?(duration)
+        onSlide?(duration, curve.timing)
         if showsTopBar, duration > 0 {
             topBarSlideFrame = oldBar.union(topBarFrame)
             placeTopBar()
@@ -1293,20 +1294,65 @@ final class BrowserRootView: SpaceFrameView {
         guard !sidebarVisible, show != sidebarRevealed else { return }
         if !show && isHeld { return }
         let old = sidebarContainer.frame
+        #if DEBUG
+        revealMeter.begin(show ? "out" : "in", in: self)
+        #endif
         sidebarRevealed = show
         watchPointer(show)
         let target = sidebarFrame
         Tokens.Motion.withoutAnimation { sidebarContainer.frame = target }
-        // Frames are final at once; only the drawing slides. The real traffic lights can't follow,
-        // so a picture of them rides inside the sidebar until the slide ends.
-        let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: old.minX - target.minX, curve: Tokens.Motion.slide)
-        onSlide?(duration)
+        // Frames are final at once; only the drawing slides, the card whole (its glass, color, shadow and rows) as one
+        // layer, with nothing laid out on the way. The real traffic lights can't follow, so a picture of them rides
+        // inside the sidebar until the slide ends.
+        let curve = show ? Tokens.Motion.edgeSlide : Tokens.Motion.edgeTuck
+        let offset = old.minX - target.minX
+        if Tokens.Motion.reduceMotion {
+            Self.crossfadeReveal(sidebarContainer, show: show, from: offset)
+            onSlide?(0, curve.timing)
+            return
+        }
+        sidebarContainer.layer?.removeAnimation(forKey: Self.revealFadeKey)
+        let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: offset, curve: curve)
+        onSlide?(duration, curve.timing)
+    }
+
+    static let revealFadeKey = "revealFade"
+
+    /// Reduce Motion: the sidebar comes out and goes back without traveling, fading in where it lands, or out where it
+    /// was (`offset` back from where its frame now is, out of sight) before it's gone.
+    static func crossfadeReveal(_ view: NSView, show: Bool, from offset: CGFloat) {
+        guard let layer = view.layer else { return }
+        layer.removeAnimation(forKey: "slide")
+        let duration = Tokens.Motion.crossfade * Tokens.Motion.debugSlowdown
+        let fade = CABasicAnimation(keyPath: "opacity")
+        // From where a fade under way is; otherwise from nothing coming out, from whole going back.
+        let fading = layer.animation(forKey: revealFadeKey) != nil
+        fade.fromValue = fading ? layer.presentation()?.opacity ?? 1 : (show ? 0 : 1)
+        fade.toValue = show ? 1 : 0
+        let group = CAAnimationGroup()
+        if show {
+            group.animations = [fade]
+        } else {
+            // Held where it was while it fades, then gone to where its frame already is.
+            let stay = CABasicAnimation(keyPath: "transform.translation.x")
+            stay.fromValue = offset
+            stay.toValue = offset
+            group.animations = [fade, stay]
+        }
+        group.duration = duration
+        group.timingFunction = Tokens.Motion.easeOut
+        group.fillMode = .backwards
+        Tokens.Motion.withoutAnimation { layer.opacity = 1 }
+        layer.add(group, forKey: revealFadeKey)
     }
 
     /// True while the sidebar is in its floating, slid-in state.
     var isSidebarFloatingVisible: Bool { !sidebarVisible && sidebarRevealed }
 
     #if DEBUG
+    /// Testing builds: how evenly the frames come while the sidebar slides out or back (debug.log).
+    private let revealMeter = DeskMeter("reveal")
+
     /// Testing builds: the pointer counts as here (top-down, in the window's terms; left of the window is negative),
     /// wherever the real one is.
     private var debugPointer: NSPoint?

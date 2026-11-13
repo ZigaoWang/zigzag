@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - After Set as Default in Settings › General, the button changes as soon as macOS confirms, instead of needing a second click. Thanks to [ze-mu-zhou](https://github.com/ze-mu-zhou). ([#195](https://github.com/ZigaoWang/zigzag/issues/195))
 - The Motrix extension pairs with the Motrix app. Pair said it couldn't connect before it reached the app: the extension didn't recognize the address Zigzag gives its own files, and now it gets Chrome's for the one check that needs it.
+- The sidebar slides out smoothly when it's hidden, in full screen too.
 
 ## [0.9.0] - 2026-11-12
 
