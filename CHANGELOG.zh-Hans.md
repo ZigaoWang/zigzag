@@ -16,6 +16,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 发行说明跟随 App 的语言；0.9.0 及之前的几个版本有了中文发行说明。
 
 ### 修复
+- 在“设置 › 通用”里点“设为默认”后，macOS 一确认按钮就会更新，不用再点第二次。感谢 [ze-mu-zhou](https://github.com/ze-mu-zhou)。([#195](https://github.com/ZigaoWang/zigzag/issues/195))
 - Motrix 扩展可以和 Motrix App 配对了。之前点“配对”还没连到 App 就提示连接失败：扩展认不出 Zigzag 给它自己文件的地址，现在只在需要的那一项检查里给它 Chrome 的地址。
 
 ## [0.9.0] - 2026-11-12
