@@ -6373,6 +6373,17 @@
         }
       }
     },
+    "Fixed" : {
+      "comment" : "Heading in What’s New: what this version fixes.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修复"
+          }
+        }
+      }
+    },
     "Float" : {
       "comment" : "Action in the site panel, under its icon: plays the page's video in Picture in Picture.",
       "localizations" : {
@@ -8843,6 +8854,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "永不在 %@ 上提示存储"
+          }
+        }
+      }
+    },
+    "New" : {
+      "comment" : "Heading in What’s New: the new things in this version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新功能"
           }
         }
       }

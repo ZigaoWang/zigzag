@@ -145,6 +145,82 @@ struct WhatsNewTests {
     @Test func shippedNotesAreThere() {
         #expect(!WhatsNew.sections.isEmpty)
     }
+
+    /// Chinese reads the Chinese changelog; English and any other language read CHANGELOG.md alone.
+    @Test func chineseReadsItsOwnChangelog() {
+        #expect(WhatsNew.notesFile(for: "zh-Hans") == "CHANGELOG.zh-Hans")
+        #expect(WhatsNew.notesFile(for: "zh-Hans-CN") == "CHANGELOG.zh-Hans")
+        #expect(WhatsNew.notesFile(for: "en") == nil)
+        #expect(WhatsNew.notesFile(for: "en-GB") == nil)
+        #expect(WhatsNew.notesFile(for: "ja") == nil)
+    }
+
+    /// The translated notes when they have the version, the English ones when they don't.
+    @Test func translatedNotesFallBackToEnglish() {
+        let english = """
+        ## [1.1.0] - 2026-11-01
+
+        ### New
+        - One. ([#1](https://github.com/o/r/issues/1))
+
+        ## [1.0.0] - 2026-10-01
+
+        ### Fixed
+        - Old
+        """
+        let chinese = """
+        <!-- Each release adds its section here too. -->
+        # 更新日志
+
+        ## [1.1.0] - 2026-11-01
+
+        ### 新功能
+        - 一。([#1](https://github.com/o/r/issues/1))
+        """
+        let translated = WhatsNew.pick(english: english, localized: chinese, version: "1.1.0")
+        #expect(translated.sections.map(\.title) == ["新功能"])
+        #expect(translated.sections.first?.items.first?.text == "一。")
+        #expect(translated.sections.first?.items.first?.issues.map(\.number) == [1])
+        #expect(translated.date == ISO8601DateFormatter().date(from: "2026-11-01T00:00:00Z"))
+        // A version not translated yet: its English notes.
+        #expect(WhatsNew.pick(english: english, localized: chinese, version: "1.0.0").sections.map { $0.items.map(\.text) } == [["Old"]])
+        // No translation at all, as in English.
+        #expect(WhatsNew.pick(english: english, localized: nil, version: "1.1.0") == WhatsNew.parse(english, version: "1.1.0"))
+        #expect(WhatsNew.pick(english: english, localized: chinese, version: "2.0.0").sections.isEmpty)
+    }
+
+    /// New and Fixed are shown in the app's language from either changelog; other headings as written.
+    @Test func sectionHeadingsAreTheApps() {
+        let new = String(localized: "New", comment: "Heading in What’s New: the new things in this version.")
+        let fixed = String(localized: "Fixed", comment: "Heading in What’s New: what this version fixes.")
+        #expect(WhatsNew.heading("New") == new && WhatsNew.heading("新功能") == new)
+        #expect(WhatsNew.heading("Fixed") == fixed && WhatsNew.heading("修复") == fixed)
+        #expect(WhatsNew.heading("Security") == "Security")
+    }
+
+    /// The Chinese changelog in the app follows the English one: every version it has is a real one with the same day,
+    /// its sections are 新功能 and 修复 in the same order, and each point is there with the same issues.
+    @Test func shippedChineseNotesMatchTheEnglish() throws {
+        func text(_ name: String) throws -> String {
+            let url = try #require(Bundle.main.url(forResource: name, withExtension: "md"))
+            return try String(contentsOf: url, encoding: .utf8)
+        }
+        let english = try text("CHANGELOG"), chinese = try text("CHANGELOG.zh-Hans")
+        let versions = chinese.components(separatedBy: .newlines).compactMap { line -> String? in
+            guard line.hasPrefix("## ["), let end = line.firstIndex(of: "]") else { return nil }
+            return String(line[line.index(line.startIndex, offsetBy: 4)..<end])
+        }.filter { $0 != "Unreleased" }
+        #expect(versions.count >= 6)
+        let names = ["New": "新功能", "Fixed": "修复"]
+        for version in versions {
+            let en = WhatsNew.parse(english, version: version), zh = WhatsNew.parse(chinese, version: version)
+            #expect(!en.sections.isEmpty, "\(version) isn't in CHANGELOG.md")
+            #expect(zh.date == en.date, "\(version) has another day")
+            #expect(zh.sections.map(\.title) == en.sections.map { names[$0.title] ?? $0.title }, "\(version) has other sections")
+            #expect(zh.sections.map { $0.items.map { $0.issues.map(\.number) } } == en.sections.map { $0.items.map { $0.issues.map(\.number) } },
+                    "\(version) has other points or issues")
+        }
+    }
 }
 
 /// Light or dark text follows what actually reads on a space's colors.

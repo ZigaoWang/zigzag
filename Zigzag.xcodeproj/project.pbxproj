@@ -33,6 +33,7 @@
 		0F15525E39A4A1FE850A943D /* MiniLinkWake.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D8E0E7DB1C952078DABEE2B /* MiniLinkWake.swift */; };
 		0F7420EF801E473BA2A58F2A /* SpaceEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27025355902590144D7FABA3 /* SpaceEditor.swift */; };
 		0FFDB208CC831BB0246A6A7B /* SpaceFrameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2477477EEAA33212F1AA2281 /* SpaceFrameView.swift */; };
+		100451C092437BEBE1CA770F /* CHANGELOG.zh-Hans.md in Resources */ = {isa = PBXBuildFile; fileRef = B239957460C6C2AA3079E793 /* CHANGELOG.zh-Hans.md */; };
 		10324776656E836D07CD1B27 /* Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32289A47E7257A31AC82FCB0 /* Controls.swift */; };
 		10ED316D4DDDE144EAA77A5D /* ProxyCheckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 400EEF52096D1DE0A08306FF /* ProxyCheckTests.swift */; };
 		11436BB68F1FE91F774FF4A9 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7CC06A0253CAF1E0CAEA2F /* Profile.swift */; };
@@ -716,6 +717,7 @@
 		B13E82E7DA1A290559EC8C20 /* SplitDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDropTests.swift; sourceTree = "<group>"; };
 		B1C94BBE34DB020CBB3EA2A2 /* ProxyRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyRulesTests.swift; sourceTree = "<group>"; };
 		B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptHost.swift; sourceTree = "<group>"; };
+		B239957460C6C2AA3079E793 /* CHANGELOG.zh-Hans.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "CHANGELOG.zh-Hans.md"; sourceTree = "<group>"; };
 		B3AD1C19026E47583E6DC0CD /* ZigzagWebApp */ = {isa = PBXFileReference; includeInIndex = 0; path = ZigzagWebApp; sourceTree = BUILT_PRODUCTS_DIR; };
 		B3C20AE02E87B17A9AB6935B /* UpdateRelaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateRelaunchTests.swift; sourceTree = "<group>"; };
 		B44BD209A49B5F5B73ECE2BD /* PaneDrag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneDrag.swift; sourceTree = "<group>"; };
@@ -1458,6 +1460,7 @@
 			isa = PBXGroup;
 			children = (
 				C88A57E41A091A03DA97E06C /* CHANGELOG.md */,
+				B239957460C6C2AA3079E793 /* CHANGELOG.zh-Hans.md */,
 				E35F3B1C28D9313BCCFA9CA4 /* LICENSE */,
 				FA29F3657E11FE3895D8BAC3 /* THIRD_PARTY_NOTICES.md */,
 				B228F7478163465F1BC541F3 /* Zigzag */,
@@ -1686,6 +1689,7 @@
 			files = (
 				C64B09DFE581D1E682CA640C /* Assets.xcassets in Resources */,
 				09844A022115C19F24950AE6 /* CHANGELOG.md in Resources */,
+				100451C092437BEBE1CA770F /* CHANGELOG.zh-Hans.md in Resources */,
 				1845DD30334A776382156546 /* InfoPlist.xcstrings in Resources */,
 				35D7E0C77E5DE66D9B871D4F /* LICENSE in Resources */,
 				E5748A1AC50809EA8B52CB6D /* Localizable.xcstrings in Resources */,

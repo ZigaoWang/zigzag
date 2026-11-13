@@ -2,7 +2,8 @@ import AppKit
 import WebKit
 
 /// After an update: a note that Zigzag updated, and this version's notes on a sheet. The notes are this version's
-/// section of CHANGELOG.md, the same section the update window, the GitHub release and the website show.
+/// section of CHANGELOG.md, the same section the update window, the GitHub release and the website show, or of
+/// CHANGELOG.zh-Hans.md when the app speaks Chinese.
 enum WhatsNew {
     /// A GitHub issue or pull request a note is about: "#32" at its end, linked.
     struct Issue: Equatable {
@@ -30,12 +31,41 @@ enum WhatsNew {
 
     static var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "" }
 
-    /// This version's notes, read once from the copy of CHANGELOG.md in the app.
+    /// This version's notes, read once from the copies of the changelog in the app: in the app's language when
+    /// that has notes for it (CHANGELOG.zh-Hans.md), in English otherwise.
     static let release: Release = {
-        guard let url = Bundle.main.url(forResource: "CHANGELOG", withExtension: "md"),
-              let text = try? String(contentsOf: url, encoding: .utf8) else { return Release() }
-        return parse(text, version: notesVersion)
+        func text(_ name: String) -> String? {
+            Bundle.main.url(forResource: name, withExtension: "md").flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+        }
+        let localized = notesFile(for: Bundle.main.preferredLocalizations.first ?? "en").flatMap(text)
+        return pick(english: text("CHANGELOG") ?? "", localized: localized, version: notesVersion)
     }()
+
+    /// The changelog in the app's language, next to CHANGELOG.md in the app: none for English, and none for a
+    /// language without one.
+    static func notesFile(for language: String) -> String? {
+        Locale(identifier: language).language.languageCode?.identifier == "zh" ? "CHANGELOG.zh-Hans" : nil
+    }
+
+    /// The notes in the app's language when its changelog has this version, in English when it doesn't, so a
+    /// release whose translation isn't in yet still shows its notes.
+    static func pick(english: String, localized: String?, version: String) -> Release {
+        if let localized {
+            let release = parse(localized, version: version)
+            if !release.sections.isEmpty { return release }
+        }
+        return parse(english, version: version)
+    }
+
+    /// A section's heading as the sheet shows it: New and Fixed in the app's language, whichever changelog they came
+    /// from, and any other heading as it's written.
+    static func heading(_ title: String) -> String {
+        switch title {
+        case "New", "新功能": String(localized: "New", comment: "Heading in What’s New: the new things in this version.")
+        case "Fixed", "修复": String(localized: "Fixed", comment: "Heading in What’s New: what this version fixes.")
+        default: title
+        }
+    }
 
     static var sections: [Section] { release.sections }
 
@@ -320,7 +350,7 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
         scroll.autohidesScrollers = true
         let accent = controller.promptAccent
         for section in WhatsNew.sections {
-            let heading = Label(section.title, font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
+            let heading = Label(WhatsNew.heading(section.title), font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
             heading.setAccessibilityRole(.staticText)
             headings.append(heading)
             notes.addSubview(heading)
