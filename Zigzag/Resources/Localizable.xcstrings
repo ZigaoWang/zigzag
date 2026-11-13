@@ -5746,7 +5746,7 @@
       }
     },
     "Developer" : {
-      "comment" : "A section of Settings: tools for people who build websites, and the sites they build.\nRow in the About window: the developer's website.\nSection label over the developer tools' tiles in the site panel, on a development site.\nSubmenu of the View menu.",
+      "comment" : "A section of Settings: tools for people who build websites, and the sites they build.\nHeading in the ⋯ menu of a split view pane's strip, on a page in Developer Mode, over that page's developer tools.\nRow in the About window: the developer's website.\nSection label over the developer tools' tiles in the site panel, on a development site.\nSubmenu of the View menu.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7777,13 +7777,13 @@
         }
       }
     },
-    "In the bar above a page in Developer Mode: its full address, the console, inspecting an element, the page’s look and size, and more. Off, they’re in the site’s controls." : {
+    "In the bar above a page in Developer Mode: its full address, the console, inspecting an element, the page’s look and size, and more. In split view, in the page’s ⋯. Off, they’re in the site’s controls." : {
       "comment" : "Explanation under “Tools above the page” in Settings › Developer.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在开发者模式网页上方的栏里：完整地址、控制台、检查元素、网页的外观和大小等。关闭后，这些工具在网站设置里。"
+            "value" : "在开发者模式网页上方的栏里：完整地址、控制台、检查元素、网页的外观和大小等。在分屏浏览中，放在网页的 ⋯ 里。关闭后，这些工具在网站设置里。"
           }
         }
       }
