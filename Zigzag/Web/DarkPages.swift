@@ -3,15 +3,16 @@ import WebKit
 
 /// Dark pages: a page without a dark look of its own is drawn dark, one that has its own is left alone.
 ///
-/// Settings › Appearance › Dark pages turns it on always, while the Mac is dark, or not at all, and the site panel
-/// turns it on or off for one site. Where it's on, the page is first told dark is preferred (the web view's
+/// Settings › Appearance › Dark pages turns it on always, while the Mac is dark, or not at all, and the site panel's
+/// Dark page dropdown sets one site Automatic, On, Off or Force (`SiteChoice`). Where it's on, the page is first told dark is preferred (the web view's
 /// appearance is dark, so `prefers-color-scheme: dark` matches and a site with its own dark theme uses it). A page
 /// that still draws itself light is darkened by Dark Reader's dynamic theme (`darkreader.js`, run by dark-pages.js in
 /// Zigzag's own script world, with Dark Reader's site fixes from `DarkReaderFixes`), which rewrites the site's own
 /// style, so pictures and video stay as they are. Every frame gets it and decides for itself, as a page would: a
 /// light widget comes out dark and a dark video player as it is. Sites seen dark on their own are remembered
-/// (`DarkSeen`) and start on their own dark. Force dark, in the site panel, darkens a site that looks dark as if it
-/// didn't (#134). Pure black backgrounds draws white as black instead of a dark gray. Reader has its own themes and
+/// (`DarkSeen`) and start on their own dark. Force darkens a site that looks dark as if it didn't (#134). A page is
+/// looked at again whenever its look may have changed, so a site switching its own theme is darkened, or left alone,
+/// as it now looks. Where dark pages aren't wanted, a page is asked for its light look, or the Mac's (`look`). Pure black backgrounds draws white as black instead of a dark gray. Reader has its own themes and
 /// its own web view, and isn't touched.
 enum DarkPages {
     enum Mode: String, CaseIterable {
@@ -67,43 +68,72 @@ enum DarkPages {
         sites.contains { site == $0 || site.hasSuffix("." + $0) }
     }
 
-    /// The site's own choice: on, off, or nil to follow the setting.
-    static func choice(for url: URL?) -> Bool? {
-        guard let site = site(of: url) else { return nil }
-        if covers(sitesOn, site) { return true }
-        if covers(sitesOff, site) { return false }
-        return nil
+    /// A site's Dark page choice, as Site Controls' dropdown has it (#134): Automatic follows Settings › Appearance ›
+    /// Dark pages, On and Off hold whatever it says, and Force darkens the site even where it looks dark on its own.
+    enum SiteChoice: String, CaseIterable {
+        case automatic, on, off, force
     }
 
-    /// Turns dark pages on or off for a site, or back to following the setting (nil). A choice the same as the
-    /// setting's (Always, or Off) isn't kept: the site simply follows it. Anything but on lets go of Force dark.
-    static func setChoice(_ on: Bool?, for url: URL?) {
-        guard let site = site(of: url) else { return }
-        var yes = sitesOn.filter { !(site == $0 || site.hasSuffix("." + $0)) }
-        var no = sitesOff.filter { !(site == $0 || site.hasSuffix("." + $0)) }
-        let fixed: Bool? = mode == .always ? true : mode == .off ? false : nil
-        if let on, on != fixed {
-            if on { yes.insert(site) } else { no.insert(site) }
+    /// What's kept for a site read as one choice: on its Off list it's off, whatever else is kept; forced, it's Force,
+    /// on the On list or not (Force once went there only where the setting didn't darken the site already).
+    static func siteChoice(on: Bool, off: Bool, forced: Bool) -> SiteChoice {
+        if off { return .off }
+        if forced { return .force }
+        return on ? .on : .automatic
+    }
+
+    /// Which lists a choice puts a site on.
+    static func lists(for choice: SiteChoice) -> (on: Bool, off: Bool, forced: Bool) {
+        switch choice {
+        case .automatic: (false, false, false)
+        case .on: (true, false, false)
+        case .off: (false, true, false)
+        case .force: (true, false, true)
         }
+    }
+
+    /// The choice kept for the site of `url`: Automatic for none, or for no site.
+    static func siteChoice(for url: URL?) -> SiteChoice {
+        guard let site = site(of: url) else { return .automatic }
+        return siteChoice(on: covers(sitesOn, site), off: covers(sitesOff, site), forced: covers(sitesForced, site))
+    }
+
+    /// Keeps a choice for the site of `url`, in place of what it or a site it's part of had. Kept as chosen, the
+    /// same as the setting or not: Automatic is the way back to following it.
+    static func setSiteChoice(_ choice: SiteChoice, for url: URL?) {
+        guard let site = site(of: url) else { return }
+        let others = { (sites: Set<String>) in sites.filter { !(site == $0 || site.hasSuffix("." + $0)) } }
+        var yes = others(sitesOn), no = others(sitesOff), forced = others(sitesForced)
+        let lists = lists(for: choice)
+        if lists.on { yes.insert(site) }
+        if lists.off { no.insert(site) }
+        if lists.forced { forced.insert(site) }
         sitesOn = yes
         sitesOff = no
-        if on != true { sitesForced = sitesForced.filter { !(site == $0 || site.hasSuffix("." + $0)) } }
+        sitesForced = forced
         refreshAll()
     }
 
-    /// Whether a site is darkened even when it looks dark on its own.
-    static func isForced(_ url: URL?) -> Bool {
-        guard let site = site(of: url) else { return false }
-        return covers(sitesForced, site)
+    /// The site's own choice: on (Force too), off, or nil to follow the setting.
+    static func choice(for url: URL?) -> Bool? {
+        switch siteChoice(for: url) {
+        case .automatic: nil
+        case .on, .force: true
+        case .off: false
+        }
     }
 
-    /// Force dark for a site. On turns dark pages on there too, since forcing means drawing it dark.
+    /// Turns dark pages on or off for a site, or back to following the setting (nil). Anything but on lets go of Force.
+    static func setChoice(_ on: Bool?, for url: URL?) {
+        setSiteChoice(on.map { $0 ? .on : .off } ?? .automatic, for: url)
+    }
+
+    /// Whether a site is darkened even when it looks dark on its own.
+    static func isForced(_ url: URL?) -> Bool { siteChoice(for: url) == .force }
+
+    /// Force dark for a site, or back to plain On.
     static func setForced(_ on: Bool, for url: URL?) {
-        guard let site = site(of: url) else { return }
-        var forced = sitesForced.filter { !(site == $0 || site.hasSuffix("." + $0)) }
-        if on { forced.insert(site) }
-        sitesForced = forced
-        if on, !wants(url) { setChoice(true, for: url) } else { refreshAll() }
+        setSiteChoice(on ? .force : .on, for: url)
     }
 
     /// Every site's choice forgotten (Settings › Privacy › Sites › Reset All).
@@ -404,23 +434,29 @@ enum DarkPages {
         entries[ObjectIdentifier(webView)] = entry
         applyLook(to: webView)
         if appearanceObservation == nil {
-            // The Mac going dark or light, for "When the Mac is dark".
+            // The Mac going dark or light, for "When the Mac is dark"; elsewhere a page not darkened follows the Mac's
+            // look (`look`), which changes at once.
             appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { _, _ in
-                DispatchQueue.main.async { if mode == .system { refreshAll() } }
+                DispatchQueue.main.async {
+                    if mode == .system { refreshAll(); return }
+                    entries = entries.filter { $0.value.webView != nil }
+                    entries.values.compactMap(\.webView).forEach(applyLook)
+                }
             }
         }
     }
 
     /// The web view's look for the page it's on: dark when dark pages are wanted there (even with the Mac light), so
-    /// the page's own dark theme is the one used, and dark behind the page while it loads. Otherwise it follows the
-    /// window, as always.
+    /// the page's own dark theme is the one used, and dark behind the page while it loads. Otherwise light, or the
+    /// Mac's (`look`).
     private static func applyLook(to webView: WKWebView) {
         let url = webView.url
         let wanted = wanted(in: webView)
         // Forced dark, the site is asked for its light look, which is darkened as a light site's is: its own dark
         // look, which drew parts of it light, is what Force dark is for. A look chosen for the page is the page's,
         // whatever dark pages would have asked.
-        let appearance = (chosenLook(of: webView) ?? (wanted ? (isForced(url) ? .aqua : .darkAqua) : nil)).flatMap(NSAppearance.init(named:))
+        let look = chosenLook(of: webView) ?? Self.look(wanted: wanted, forced: isForced(url), siteOff: choice(for: url) == false, systemIsDark: systemIsDark)
+        let appearance = NSAppearance(named: look)
         if webView.appearance?.name != appearance?.name { webView.appearance = appearance }
         let tab = (webView as? BrowserWebView)?.owner
         // Not wanted here, the page isn't darkened any more: until its script says how it looks on its own, the bar
@@ -439,6 +475,16 @@ enum DarkPages {
         // WebKit holds what's shown while a page is on its way. Clear instead, the dark of the card shows there.
         let draws = !wanted
         if webView.value(forKey: "drawsBackground") as? Bool != draws { webView.setValue(draws, forKey: "drawsBackground") }
+    }
+
+    /// The look a page is asked for, which a site that follows the system's light or dark (`prefers-color-scheme`)
+    /// draws itself in (#134). Where dark pages are wanted, dark, so a site's own dark theme comes first; forced, light,
+    /// which is then darkened. Where they aren't: light for a site turned Off, else the Mac's own, never the window's,
+    /// which a deep space color or a private window makes dark on a light Mac. A theme a site keeps for itself (picked
+    /// on the site, kept in its storage) isn't the system's, and stays as the site keeps it.
+    static func look(wanted: Bool, forced: Bool, siteOff: Bool, systemIsDark: Bool) -> NSAppearance.Name {
+        if wanted { return forced ? .aqua : .darkAqua }
+        return !siteOff && systemIsDark ? .darkAqua : .aqua
     }
 
     /// The look chosen for this page alone, light or dark whatever the Mac and dark pages say (`Tab.chosenLook`).
