@@ -5,9 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- With the sidebar on the right and the address bar in the sidebar, the page runs up to the top of the window as it does beside a left sidebar, with no strip above it. The window's buttons sit at the start of the sidebar's top row, then the sidebar button, with back, forward and reload at its end, the same row as on the left. With the address bar above the page, they stay at the start of that bar. ([#166](https://github.com/ZigaoWang/zigzag/issues/166))
-
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
@@ -54,6 +51,7 @@ Split view with up to four pages, sites installed as apps of their own, the side
 - In Change Icon, the first choice shows the site's own icon, so it's clear that it puts the site's icon back.
 
 ### Fixed
+- With the sidebar on the right and the address bar in the sidebar, the page runs up to the top of the window as it does beside a left sidebar, with no strip above it. The window's buttons sit at the start of the sidebar's top row, then the sidebar button, with back, forward and reload at its end, the same row as on the left. With the address bar above the page, they stay at the start of that bar. ([#166](https://github.com/ZigaoWang/zigzag/issues/166))
 - Installing an extension with no background page, like some that only change pages, no longer quits Zigzag. ([#194](https://github.com/ZigaoWang/zigzag/issues/194))
 - Switching Borderless page with Settings open no longer leaves Settings laid out for the size it had: a scroll bar's strip beside the list of sections, a white band under it, and the switches out of line with the search field. Settings now moves with its page as the page takes or gives up its margin, and the page's corners and shadow follow the move instead of jumping to where they end. Thanks to [vandenbulckjean](https://github.com/vandenbulckjean). ([#184](https://github.com/ZigaoWang/zigzag/issues/184))
 - A permission set to Ask asks every time, as in Safari: answering a site's question for the camera, microphone, location or notifications holds for that page only, and the site asks again on its next visit. Allow and Block are kept, chosen in Site Controls, Settings › Privacy, or the address bar's camera button with Always Allow on This Site. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#174](https://github.com/ZigaoWang/zigzag/issues/174))
