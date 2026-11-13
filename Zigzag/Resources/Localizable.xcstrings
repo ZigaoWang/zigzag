@@ -6393,6 +6393,17 @@
         }
       }
     },
+    "Find a site" : {
+      "comment" : "Placeholder of the search field over the list in Settings › Privacy › Stored by Websites: finds a site by its name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查找网站"
+          }
+        }
+      }
+    },
     "Find on page" : {
       "comment" : "Placeholder of the find bar's field.",
       "localizations" : {
@@ -8129,6 +8140,17 @@
         }
       }
     },
+    "Loading…" : {
+      "comment" : "In Settings › Privacy › Stored by Websites while the list of sites is read.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在载入…"
+          }
+        }
+      }
+    },
     "Local Servers" : {
       "comment" : "A heading in Settings › Developer: development servers running on this Mac.",
       "localizations" : {
@@ -9285,6 +9307,17 @@
         }
       }
     },
+    "No sites match “%@”." : {
+      "comment" : "In Settings › Privacy › Stored by Websites when its search finds nothing; what was typed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有与“%@”匹配的网站。"
+          }
+        }
+      }
+    },
     "No sites or usernames match “%@”." : {
       "comment" : "Shown in the Passwords window when a search finds nothing. The placeholder is what was typed.",
       "localizations" : {
@@ -10436,6 +10469,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "橙色"
+          }
+        }
+      }
+    },
+    "Order" : {
+      "comment" : "VoiceOver name of the menu that orders the list in Settings › Privacy › Stored by Websites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "排序方式"
           }
         }
       }
@@ -12049,6 +12093,50 @@
         }
       }
     },
+    "Remove All" : {
+      "comment" : "Button of the sheet that removes every site's data, or every site a search shows, in Settings › Privacy.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部移除"
+          }
+        }
+      }
+    },
+    "Remove All Shown…" : {
+      "comment" : "Button over the list in Settings › Privacy › Stored by Websites while it's searched: removes the data of the sites shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除显示的网站…"
+          }
+        }
+      }
+    },
+    "Remove All…" : {
+      "comment" : "Button over the list in Settings › Privacy › Stored by Websites: removes every site's data.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部移除…"
+          }
+        }
+      }
+    },
+    "Remove Data for %@…" : {
+      "comment" : "Tooltip and VoiceOver name of the trash on a site's row in Settings › Privacy › Stored by Websites; the site, like apple.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除 %@ 的数据…"
+          }
+        }
+      }
+    },
     "Remove Folder" : {
       "comment" : "Item in a folder's context menu in the sidebar. The folder goes; its pinned tabs stay.\nUndo action name, shown in Edit › Undo.",
       "localizations" : {
@@ -12133,6 +12221,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要移除 %@ 的数据吗？"
+          }
+        }
+      }
+    },
+    "Remove data for every site?" : {
+      "comment" : "Title of the sheet that removes every site's data, from Remove All in Settings › Privacy › Stored by Websites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要移除所有网站的数据吗？"
+          }
+        }
+      }
+    },
+    "Remove data for the %lld sites shown?" : {
+      "comment" : "Title of the sheet that removes the data of the sites a search shows in Settings › Privacy › Stored by Websites; how many, always more than one.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要移除显示的 %lld 个网站的数据吗？"
           }
         }
       }
@@ -12270,7 +12380,7 @@
       }
     },
     "Remove…" : {
-      "comment" : "Button on a site's row in Settings › Privacy › Site Data.\nButton on an installed app's row in Settings › General › Installed Apps.",
+      "comment" : "Button on an installed app's row in Settings › General › Installed Apps.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14310,6 +14420,28 @@
         }
       }
     },
+    "Sort by Name" : {
+      "comment" : "A choice for the order of the list in Settings › Privacy › Stored by Websites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按名称排序"
+          }
+        }
+      }
+    },
+    "Sort by Size" : {
+      "comment" : "A choice for the order of the list in Settings › Privacy › Stored by Websites: largest first.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按大小排序"
+          }
+        }
+      }
+    },
     "Source Code" : {
       "comment" : "Row in the About window; GitHub is beside it.",
       "localizations" : {
@@ -15380,6 +15512,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "标签页、文件夹、收藏和地址栏的大小。若要放大 Mac 上的所有内容，请使用“系统设置 › 显示器”中的“更大字体”。"
+          }
+        }
+      }
+    },
+    "Their pages load fresh next time." : {
+      "comment" : "Message of the sheet that removes the data of the sites a search shows in Settings › Privacy, none of them with cookies.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下次会重新载入它们的页面。"
           }
         }
       }
@@ -17138,6 +17281,17 @@
         }
       }
     },
+    "Websites" : {
+      "comment" : "VoiceOver name of the list of sites in Settings › Privacy › Stored by Websites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站"
+          }
+        }
+      }
+    },
     "Websites without a dark look of their own are drawn dark. Pictures and video stay as they are." : {
       "comment" : "Explanation under “Dark pages” in Settings › Appearance.",
       "localizations" : {
@@ -17688,6 +17842,17 @@
         }
       }
     },
+    "You’ll be signed out of every site, and pages load fresh next time. Your passwords, pinned tabs and history stay." : {
+      "comment" : "Message of the sheet that removes every site's data, from Remove All in Settings › Privacy › Stored by Websites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你将在所有网站上退出登录，下次会重新载入页面。你的密码、已固定标签页和历史记录会保留。"
+          }
+        }
+      }
+    },
     "You’ll be signed out of every site. Your passwords, pinned tabs and history stay." : {
       "comment" : "Message of the sheet that asks before clearing every site's cookies.\nMessage of the sheet that clears cookies.",
       "localizations" : {
@@ -17695,6 +17860,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你将在所有网站上退出登录。你的密码、已固定标签页和历史记录会保留。"
+          }
+        }
+      }
+    },
+    "You’ll be signed out of them, and their pages load fresh next time." : {
+      "comment" : "Message of the sheet that removes the data of the sites a search shows in Settings › Privacy.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你将在这些网站上退出登录，下次会重新载入它们的页面。"
           }
         }
       }
@@ -19219,6 +19395,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "web app dock install application 网页应用 程序坞 安装 应用"
+          }
+        }
+      }
+    },
+    "website data cookies cache storage sites remove" : {
+      "comment" : "Words that find the list of what websites keep with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "website data cookies cache storage sites remove 网站数据 Cookie 缓存 存储 网站 移除"
           }
         }
       }

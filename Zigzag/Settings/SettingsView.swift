@@ -50,13 +50,23 @@ final class FormGroup: NSView {
         for row in rows {
             // A row that's off for now (the custom search address, until Custom is chosen) stays hidden whatever matches.
             let available = (row as? FormRow)?.isAvailable ?? true
-            row.isHidden = !available || (!all && !has((row as? SettingsSearchable)?.searchText ?? ""))
+            let named = all || has((row as? SettingsSearchable)?.searchText ?? "")
+            // A list searched inside (the sites keeping data): found by its own words, it shows whole; else it
+            // shows what in it matches, if anything does.
+            if let list = row as? SettingsFilteredRow {
+                let some = list.find(named ? [] : words)
+                row.isHidden = !available || !(named || some)
+                continue
+            }
+            row.isHidden = !available || !named
         }
         needsLayout = true
         return rows.filter { !$0.isHidden }.count
     }
 
-    private func rowHeight(_ row: NSView, _ width: CGFloat) -> CGFloat { (row as? FormRow)?.height(for: width) ?? row.frame.height }
+    private func rowHeight(_ row: NSView, _ width: CGFloat) -> CGFloat {
+        (row as? FormRow)?.height(for: width) ?? (row as? SettingsSizedRow)?.height(for: width) ?? row.frame.height
+    }
 
     override func layout() {
         super.layout()
@@ -162,6 +172,19 @@ final class FormRow: NSView, SettingsSearchable {
             detail.isHidden = newValue.isEmpty
             needsLayout = true
         }
+    }
+    /// Its title, which can change while it shows (a count).
+    var titleText: String {
+        get { title.stringValue }
+        set {
+            guard title.stringValue != newValue else { return }
+            title.stringValue = newValue
+            needsLayout = true
+        }
+    }
+    var titleColor: NSColor {
+        get { title.textColor ?? Tokens.Color.textPrimary }
+        set { title.textColor = newValue }
     }
     #if DEBUG
     var debugTitle: String { title.stringValue }
@@ -784,15 +807,22 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let passwordsWindowGroup = FormGroup()
     private let privacyGroup = FormGroup()
     private let sitesGroup = FormGroup()
-    /// Each site keeping cookies, storage or a cache on this Mac, to remove one at a time.
+    /// Each site keeping cookies, storage or a cache on this Mac, to remove one at a time (#207): one list, with
+    /// rows only for what's in view, and its search and Remove All by its heading.
     private let siteDataGroup = FormGroup()
-    private var siteDataShowsAll = false
+    private let siteDataList = SiteDataList()
+    private let siteDataToolbar = SiteDataToolbar()
+    /// Each profile's list as read while Settings is open, so showing it again is instant.
+    private var siteDataModels: [UUID: SiteDataModel] = [:]
+    /// While the page is laid out: a list that changes height then is measured by that layout already.
+    private var isLayingOutDocument = false
+    /// Whether sizes were in when the toolbar was last set: Sort shows once they are.
+    private var siteDataHadSizes = false
     /// Every site with a choice made for it, not only the first 30.
     private var sitesShowAll = false
     /// Permissions changed here while Settings is open ("origin|permission"): set back to Ask, a row stays, so the
     /// choice you just made doesn't vanish under the pointer.
     private var permissionsChangedHere: Set<String> = []
-    private var siteDataTask: Task<Void, Never>?
     /// Reset All beside the Sites heading, there only when something was chosen for a site.
     private var sitesReset: PillButton?
     private var alwaysReset: PillButton?
@@ -1005,6 +1035,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     // MARK: Building
 
     private func build() {
+        buildSiteData()
         // The column of sections, under the page's title.
         column.addSubview(columnTitle)
         column.addSubview(sectionSelection)
@@ -1407,6 +1438,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         header.trailing = [settingSearch]
 
         reloadPrivacy()
+        reloadListedSiteData()
 
         scroll.drawsBackground = false
         scroll.automaticallyAdjustsContentInsets = false
@@ -1597,7 +1629,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Opened from a search or a link while the column is scrolled: the chosen section comes into view.
         if let item = items.first(where: { $0.isSelected }) { column.scrollToVisible(item.frame.insetBy(dx: 0, dy: -Tokens.Space.x2)) }
         refreshTitle()
-        if showsWebsiteData { reloadPrivacy() }
+        if showsWebsiteData { reloadPrivacy(); reloadListedSiteData() }
         if pane == .shortcuts { reloadShortcuts() }
         if pane == .extensions { findAppExtensions() }
         layoutDocument()
@@ -1631,7 +1663,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             reloadBlocking()
             reloadPasswords()
             reloadTranslation()
-            if showsWebsiteData { reloadPrivacy() }
+            if showsWebsiteData { reloadPrivacy(); reloadListedSiteData() }
             layoutDocument()
         }
     }
@@ -1687,7 +1719,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             refreshProfilePicker()
             reloadExtensions()
             reloadBlocking()
-            if showsWebsiteData { reloadPrivacy() }
+            if showsWebsiteData { reloadPrivacy(); reloadListedSiteData() }
             reloadPasswords()
             layoutDocument()
         }
@@ -1735,7 +1767,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func profilesChanged() {
         layingOutOnce {
             followProfiles()
-            if showsWebsiteData { reloadPrivacy() }
+            if showsWebsiteData { reloadPrivacy(); reloadListedSiteData() }
             reloadPasswords()
             layoutDocument()
         }
@@ -2186,6 +2218,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     func controlTextDidChange(_ obj: Notification) {
         if (obj.object as? NSTextField) === settingSearch.field { searchChanged() }
         if (obj.object as? NSTextField) === flagSearch.field { layoutDocument() }
+        if (obj.object as? NSTextField) === siteDataToolbar.search.field { siteDataList.model?.query = siteDataToolbar.search.stringValue }
     }
 
     // MARK: Finding a setting
@@ -2198,6 +2231,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         moveSectionSelection(animated: false)
         refreshTitle()
         reloadShortcuts()
+        // "Find a setting" finds sites by name too: the list is read if no pane with it has been shown yet.
+        if isSearching, siteDataList.model == nil || siteDataList.model?.state == .idle { reloadSiteData() }
         layoutDocument()
         documentView.scroll(.zero)
     }
@@ -2207,6 +2242,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         if control === flagSearch.field, selector == #selector(cancelOperation(_:)), !flagSearch.stringValue.isEmpty {
             flagSearch.stringValue = ""
             layoutDocument()
+            return true
+        }
+        if control === siteDataToolbar.search.field, selector == #selector(cancelOperation(_:)), !siteDataToolbar.search.stringValue.isEmpty {
+            siteDataToolbar.search.stringValue = ""
+            siteDataList.model?.query = ""
             return true
         }
         guard control === settingSearch.field, selector == #selector(cancelOperation(_:)), isSearching else { return false }
@@ -2355,6 +2395,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         #if DEBUG
         debugLayouts += 1
         #endif
+        isLayingOutDocument = true
+        defer { isLayingOutDocument = false }
         // What's on the page stays on it and is only moved: taken off and put back, everything would fade out and in
         // when the page changes size inside an animation, instead of gliding to its place.
         var placed = Set<ObjectIdentifier>()
@@ -2389,6 +2431,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // A section: a quiet label low in its slot, standing in for a divider, then the group. A button that acts on the
         // whole group (New Space, Reset All) sits at the label's right, lined up with the rows' own controls.
         func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil) {
+            var accessory = accessory
+            // The sites' list has its search and Remove All by its heading, narrower on a narrow page.
+            if group === siteDataGroup {
+                siteDataToolbar.searchWidth = min(200, max(120, round(contentWidth / 3)))
+                siteDataToolbar.showsSort = (siteDataList.model?.hasSizes ?? false) && contentWidth > 560
+                accessory = siteDataToolbar
+            }
             if title != nil || accessory != nil {
                 let size = accessory.map { $0.fittingSize } ?? .zero
                 let slot = max(Tokens.Metric.sectionLabelHeight, size.height + Tokens.Space.x2)
@@ -3048,8 +3097,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             sitesGroup.add(FormRow(title: String(localized: "\(more) more sites", comment: "Under the first 30 sites in Settings › Privacy, beside Show All."), control: all))
         }
-        // What websites keep is read where it's listed: with more than one profile that's Website Data, and
-        // Privacy has no use for it.
+    }
+
+    /// What websites keep, read again where it's listed (with more than one profile that's Website Data, and
+    /// Privacy has no use for it): when the pane is shown, not each time a site's permission changes.
+    private func reloadListedSiteData() {
         if !(pane == .privacy && hasManyProfiles) { reloadSiteData() }
     }
 
@@ -3127,70 +3179,83 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// What each site keeps on this Mac, read from WebKit (it takes a moment, so the list fills in when it's ready),
-    /// with Remove for that site alone. The first 30 by name, then the rest on request.
-    private func reloadSiteData() {
-        siteDataTask?.cancel()
-        let store = profile.store
-        siteDataTask = Task { @MainActor [weak self] in
-            let records = await store.dataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes())
-            guard let self, !Task.isCancelled else { return }
-            self.siteDataGroup.removeAllRows()
-            let sorted = records.sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
-            if sorted.isEmpty {
-                self.siteDataGroup.add(FormRow(title: String(localized: "None yet", comment: "A setting in Settings › Privacy."),
-                                               detail: String(localized: "Sites you visit can keep cookies and files here, to keep you signed in and load faster.", comment: "Explanation under “None yet” in Settings › Privacy."),
-                                               control: NSView()))
-            }
-            let shown = self.siteDataShowsAll ? sorted[...] : sorted.prefix(30)
-            for record in shown {
-                let site = record.displayName
-                let remove = PillButton(title: String(localized: "Remove…", comment: "Button on a site's row in Settings › Privacy › Site Data."))
-                let signsOut = record.dataTypes.contains(WKWebsiteDataTypeCookies)
-                remove.onClick = { [weak self] _ in
-                    self?.confirm(title: String(localized: "Remove data for \(site)?", comment: "Title of the sheet that removes one site's data; the site, like apple.com."),
-                                  message: signsOut
-                                      ? String(localized: "You’ll be signed out of \(site), and its pages load fresh next time.", comment: "Message of the sheet that removes one site's data.")
-                                      : String(localized: "Its pages load fresh next time.", comment: "Message of the sheet that removes one site's data."),
-                                  action: String(localized: "Remove", comment: "Button of the sheet that removes one site's data.")) {
-                        Task { @MainActor in
-                            await store.removeData(ofTypes: record.dataTypes, for: [record])
-                            self?.reloadSiteData()
-                        }
-                    }
-                }
-                let icon = URL(string: "https://\(site)").flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
-                self.siteDataGroup.add(FormRow(title: site, detail: Self.describe(record.dataTypes), icon: icon, control: remove))
-            }
-            if shown.count < sorted.count {
-                let more = PillButton(title: String(localized: "Show All", comment: "Button under the first 30 sites in Settings › Privacy."))
-                more.onClick = { [weak self] _ in
-                    self?.siteDataShowsAll = true
-                    self?.reloadSiteData()
-                }
-                let rest = sorted.count - shown.count
-                self.siteDataGroup.add(FormRow(title: String(localized: "\(rest) more sites", comment: "Under the first 30 sites in Settings › Privacy, beside Show All."), control: more))
-            }
-            self.layoutDocument()
+    /// The list of what websites keep, its search, order and Remove All, wired once.
+    private func buildSiteData() {
+        siteDataGroup.add(siteDataList)
+        siteDataList.changed = { [weak self] grew in self?.siteDataChanged(grew) }
+        siteDataList.onRemove = { [weak self] entry in self?.confirmRemove([entry]) }
+        siteDataToolbar.search.field.delegate = self
+        siteDataToolbar.sort.onSelect = { [weak self] index in
+            self?.siteDataList.model?.order = SiteDataSort(rawValue: index) ?? .name
         }
+        siteDataToolbar.removeAll.onClick = { [weak self] _ in
+            guard let self, let model = self.siteDataList.model else { return }
+            self.confirmRemove(model.shown, all: !model.isFiltering)
+        }
+        siteDataChanged(false)
     }
 
-    /// What a site keeps, in a few plain words, as a label under its name: "Cookies, saved data and cache".
-    private static func describe(_ types: Set<String>) -> String {
-        let cache: Set<String> = [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeFetchCache, WKWebsiteDataTypeOfflineWebApplicationCache]
-        let cookies = types.contains(WKWebsiteDataTypeCookies)
-        let saved = !types.subtracting(cache).subtracting([WKWebsiteDataTypeCookies]).isEmpty
-        let cached = !types.isDisjoint(with: cache)
-        // Each combination whole, so a language can say it its own way.
-        switch (cookies, saved, cached) {
-        case (true, true, true): return String(localized: "Cookies, saved data and cache", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
-        case (true, true, false): return String(localized: "Cookies and saved data", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
-        case (true, false, true): return String(localized: "Cookies and cache", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
-        case (true, false, false): return String(localized: "Cookies", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
-        case (false, true, true): return String(localized: "Saved data and cache", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
-        case (false, true, false): return String(localized: "Saved data", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
-        case (false, false, true): return String(localized: "Cache", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
-        case (false, false, false): return String(localized: "Data", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.")
+    /// The profile's list: kept from the last time it was shown, and read again in the background, so it shows
+    /// at once and never empties while it's looked at. Only read where it's listed.
+    private func reloadSiteData() {
+        let profile = profile
+        let model = siteDataModels[profile.id] ?? {
+            let model = SiteDataModel(source: WebKitSiteData(store: profile.store))
+            siteDataModels[profile.id] = model
+            return model
+        }()
+        if siteDataList.model !== model {
+            model.query = siteDataToolbar.search.stringValue
+            model.order = SiteDataSort(rawValue: siteDataToolbar.sort.selectedIndex) ?? .name
+            siteDataList.showsAll = false
+            siteDataList.model = model
+        }
+        model.refresh()
+    }
+
+    /// The list changed what it shows: the toolbar follows, and the page lays out again if the list's height or
+    /// the toolbar's width changed.
+    private func siteDataChanged(_ grew: Bool) {
+        let model = siteDataList.model
+        let before = (siteDataToolbar.removeAll.title, siteDataToolbar.removeAll.isHidden, siteDataHadSizes)
+        siteDataToolbar.setRemoveTitle(filtering: model?.isFiltering ?? false)
+        siteDataToolbar.removeAll.isHidden = model?.shown.isEmpty ?? true
+        siteDataHadSizes = model?.hasSizes ?? false
+        if siteDataToolbar.sort.selectedIndex != model?.order.rawValue ?? 0 { siteDataToolbar.sort.selectedIndex = model?.order.rawValue ?? 0 }
+        let toolbarChanged = before != (siteDataToolbar.removeAll.title, siteDataToolbar.removeAll.isHidden, siteDataHadSizes)
+        guard !isLayingOutDocument, grew || toolbarChanged, window != nil else { return }
+        layoutDocument()
+    }
+
+    /// Asks before removing sites' data: one site by its name, the ones a search shows by how many, or all.
+    private func confirmRemove(_ entries: [SiteDataEntry], all: Bool = false) {
+        guard let model = siteDataList.model, !entries.isEmpty else { return }
+        let signsOut = entries.contains { $0.kinds.contains(.cookies) }
+        let title: String, message: String, action: String
+        if all {
+            title = String(localized: "Remove data for every site?", comment: "Title of the sheet that removes every site's data, from Remove All in Settings › Privacy › Stored by Websites.")
+            message = Words.sentences(String(localized: "You’ll be signed out of every site, and pages load fresh next time. Your passwords, pinned tabs and history stay.",
+                                             comment: "Message of the sheet that removes every site's data, from Remove All in Settings › Privacy › Stored by Websites."),
+                                      ProfileSheets.onlyNote(profile.id))
+            action = String(localized: "Remove All", comment: "Button of the sheet that removes every site's data, or every site a search shows, in Settings › Privacy.")
+        } else if entries.count == 1, let site = entries.first?.site {
+            title = String(localized: "Remove data for \(site)?", comment: "Title of the sheet that removes one site's data; the site, like apple.com.")
+            message = signsOut
+                ? String(localized: "You’ll be signed out of \(site), and its pages load fresh next time.", comment: "Message of the sheet that removes one site's data.")
+                : String(localized: "Its pages load fresh next time.", comment: "Message of the sheet that removes one site's data.")
+            action = String(localized: "Remove", comment: "Button of the sheet that removes one site's data.")
+        } else {
+            let count = entries.count
+            title = String(localized: "Remove data for the \(count) sites shown?", comment: "Title of the sheet that removes the data of the sites a search shows in Settings › Privacy › Stored by Websites; how many, always more than one.")
+            message = signsOut
+                ? String(localized: "You’ll be signed out of them, and their pages load fresh next time.", comment: "Message of the sheet that removes the data of the sites a search shows in Settings › Privacy.")
+                : String(localized: "Their pages load fresh next time.", comment: "Message of the sheet that removes the data of the sites a search shows in Settings › Privacy, none of them with cookies.")
+            action = String(localized: "Remove All", comment: "Button of the sheet that removes every site's data, or every site a search shows, in Settings › Privacy.")
+        }
+        confirm(title: title, message: message, action: action) {
+            Task { @MainActor in
+                if all { await model.removeAllShown() } else { await model.remove(entries) }
+            }
         }
     }
 

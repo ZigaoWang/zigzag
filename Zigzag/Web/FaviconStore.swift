@@ -83,6 +83,19 @@ final class FaviconStore {
         return nil
     }
 
+    /// The icon kept for a site, as `cachedIcon` has it, but read from disk off the main thread, for a long list
+    /// showing many sites at once (Settings' website data, #207). Never fetched: only what's already kept. Not put
+    /// in memory either, so a list of thousands doesn't push out the sidebar's icons.
+    func storedIcon(for url: URL) async -> NSImage? {
+        guard let key = key(for: url) else { return nil }
+        if let image = memory[key] { return image }
+        guard !missing.contains(key) else { return nil }
+        let file = file(for: key)
+        let data = await Task.detached(priority: .userInitiated) { try? Data(contentsOf: file) }.value
+        guard let data, let image = NSImage(data: data) else { return nil }
+        return image
+    }
+
     /// Picks the best declared icon (falling back to /favicon.ico), downloads, caches, and returns it.
     func resolve(pageURL: URL, links: [[String: String]], completion: @escaping (NSImage?) -> Void) {
         guard let key = key(for: pageURL) else { completion(nil); return }
