@@ -70,6 +70,8 @@ final class PeekController {
     private var token: SignalToken?
     private(set) var isVisible = false {
         didSet {
+            // A translation's toasts are for the page in view: the peeked one now, or the tab under it again.
+            if isVisible != oldValue { controller?.translationViewChanged() }
             guard !isVisible else { return }
             stopEsc()
             // Getting started's Peek step is done once a peek closes again, in whichever window it was.

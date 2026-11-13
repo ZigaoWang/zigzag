@@ -298,4 +298,42 @@ struct PageTranslatorTests {
         let french = String(repeating: "Nous avons passé la semaine à marcher le long de la rivière. ", count: 3)
         #expect(PageTranslator.dominantLanguage(of: french)?.languageCode == .french)
     }
+
+    private final class Run {}
+
+    /// Each tab translates on its own: asking for a second tab's never makes the first's stale, and asking again
+    /// for one already translating doesn't start another.
+    @Test func eachTabsTranslationRunsOnItsOwn() {
+        var runs = TranslationRuns<Int, Run>()
+        let first = Run(), second = Run(), again = Run()
+        let step1 = runs.begin(first, for: 1)
+        #expect(step1)
+        let step2 = runs.begin(second, for: 2)
+        #expect(step2)
+        #expect(runs.isCurrent(first, for: 1) && runs.isCurrent(second, for: 2))
+        let step3 = runs.begin(again, for: 1)
+        #expect(!step3)
+        #expect(runs.run(for: 1) === first)
+        // The second finishing leaves the first running.
+        let step4 = runs.end(second, for: 2)
+        #expect(step4)
+        #expect(runs.isCurrent(first, for: 1))
+        // Ended once only; a late answer from it changes nothing.
+        let step5 = runs.end(second, for: 2)
+        #expect(!step5)
+        #expect(!runs.isCurrent(second, for: 2))
+        let step6 = runs.end(first, for: 1)
+        #expect(step6)
+        #expect(runs.all.isEmpty)
+    }
+
+    /// A translation's toasts show only while its page is in view: the peeked page while Peek is open, otherwise
+    /// the tab you're on.
+    @Test func toastsFollowThePageInView() {
+        let tab = Run(), other = Run(), peeked = Run()
+        #expect(PageTranslator.isInView(tab, selected: tab, peeked: nil))
+        #expect(!PageTranslator.isInView(tab, selected: other, peeked: nil))
+        #expect(!PageTranslator.isInView(tab, selected: tab, peeked: peeked))
+        #expect(PageTranslator.isInView(peeked, selected: tab, peeked: peeked))
+    }
 }

@@ -347,8 +347,45 @@ private extension Dictionary {
 
 // MARK: - Running translations
 
-/// The Translation framework hands out sessions through a SwiftUI task, so each window keeps an invisible host
-/// for it. It also gives macOS a window to show its own "download this language?" prompt on.
+/// The translations running in a window, one per tab, each on its own: asking for another tab's never makes one
+/// already running stale, and asking again for a tab whose translation is running doesn't start a second.
+struct TranslationRuns<Key: Hashable, Run: AnyObject> {
+    private var runs: [Key: Run] = [:]
+
+    /// Starts `run` for `key`. False, changing nothing, when one is running there already.
+    mutating func begin(_ run: Run, for key: Key) -> Bool {
+        guard runs[key] == nil else { return false }
+        runs[key] = run
+        return true
+    }
+
+    func run(for key: Key) -> Run? { runs[key] }
+
+    /// Whether `run` is still the one for `key`: an answer from one that ended (gave up, its page went) changes nothing.
+    func isCurrent(_ run: Run, for key: Key) -> Bool { runs[key] === run }
+
+    /// Ends `run`. False when it wasn't the current one, so it's ended only once.
+    @discardableResult
+    mutating func end(_ run: Run, for key: Key) -> Bool {
+        guard runs[key] === run else { return false }
+        runs[key] = nil
+        return true
+    }
+
+    var all: [Run] { Array(runs.values) }
+}
+
+extension PageTranslator {
+    /// Whether a tab's translation toasts show: only while its page is the one in view, the page peeked at while
+    /// Peek is open, otherwise the tab you're on.
+    static func isInView(_ tab: AnyObject, selected: AnyObject?, peeked: AnyObject?) -> Bool {
+        if let peeked { return peeked === tab }
+        return selected === tab
+    }
+}
+
+/// The Translation framework hands out sessions through a SwiftUI task, so each translation keeps an invisible host
+/// for it, in its window. It also gives macOS a window to show its own "download this language?" prompt on.
 @MainActor
 final class TranslationHost {
     private let model = Model()
@@ -357,6 +394,12 @@ final class TranslationHost {
     init() {
         view = NSHostingView(rootView: HostView(model: model))
         view.frame = .zero
+    }
+
+    /// Stops it between batches: nothing more is put in the page, and the completion isn't called.
+    func cancel() {
+        model.isCancelled = true
+        model.job = nil
     }
 
     /// Translates the pieces of the page in a web view, a language at a time, into `target`. `pieces` are the
@@ -391,6 +434,7 @@ final class TranslationHost {
     @Observable @MainActor final class Model {
         var configuration: TranslationSession.Configuration?
         @ObservationIgnored var job: Job?
+        @ObservationIgnored var isCancelled = false
 
         /// Runs the task with a session for these languages. The same languages as last time take the same
         /// configuration, invalidated: a new one would equal the last (invalidated just as often) and never run.
@@ -403,7 +447,7 @@ final class TranslationHost {
         }
 
         func run(_ session: TranslationSession) async {
-            guard var job else { return }
+            guard !isCancelled, var job else { return }
             self.job = nil
             guard let webView = job.webView, webView.url == job.url else { job.completion(.failure(Cancelled())); return }
             let group = job.groups[job.current]
@@ -421,6 +465,8 @@ final class TranslationHost {
                     let responses = try await session.translations(from: requests)
                     var translated: [Int: String] = [:]
                     for response in responses { if let id = response.clientIdentifier.flatMap(Int.init) { translated[id] = response.targetText } }
+                    // Cancelled meanwhile: quietly, with nothing more put in the page.
+                    if isCancelled { return }
                     guard webView.url == job.url else { throw Cancelled() }
                     await PageTranslator.apply(translated, in: webView)
                     job.progress(Double(job.done + start + chunk.count) / Double(max(job.total, 1)))

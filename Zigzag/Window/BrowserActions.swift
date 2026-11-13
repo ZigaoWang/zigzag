@@ -412,7 +412,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func toggleReader(_ sender: Any?) { toggleReader() }
-    @objc func translatePage(_ sender: Any?) { translatePage() }
+    /// The page in view: the one peeked at while Peek is open, otherwise the tab you're on.
+    @objc func translatePage(_ sender: Any?) { translatePage(tab: peek.isVisible ? peek.tab : nil) }
 
     /// Floats the playing video. When WebKit can't tell which video that is, says how to do it from the page.
     @objc func togglePictureInPicture(_ sender: Any?) {
@@ -688,6 +689,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             item.title = isReaderOpen ? String(localized: "Hide Reader", comment: "Menu bar item: closes Reader.") : String(localized: "Show Reader", comment: "Menu bar item: opens the page in Reader.")
             return tab?.url != nil
         case #selector(translatePage(_:)):
+            let tab = peek.isVisible ? peek.tab : tab
             item.title = tab?.isTranslated == true ? String(localized: "Show Original", comment: "Menu bar item: shows the translated page as it was.")
                                                   : String(localized: "Translate Page", comment: "Menu bar item: translates the page.")
             return tab?.url != nil
