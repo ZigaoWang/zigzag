@@ -11,6 +11,8 @@
 #        scripts/release.sh --beta N   build version-beta.N and publish it to the beta feed only (Settings ›
 #                                      General › Beta updates); no DMG, website, GitHub release or Homebrew
 # Before releasing: add the version's section to CHANGELOG.md (New and Fixed); every place notes appear reads it.
+# Add it in Chinese to CHANGELOG.zh-Hans.md too (新功能 and 修复), for the app and the update window on a Mac in
+# Chinese; without it they show the English, and this script warns.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -26,6 +28,8 @@ rm -rf "$OUT" && mkdir -p "$OUT/updates"
 # The notes come first: CHANGELOG.md needs a section for the version being released, or nothing is built.
 PLANNED=$(awk -F'"' '/MARKETING_VERSION:/ {print $2; exit}' project.yml)
 grep -q "^## \[$PLANNED\]" CHANGELOG.md || { echo "CHANGELOG.md has no section for $PLANNED. Add one, then release."; exit 1; }
+# The Chinese notes should come with them. Without, a Mac in Chinese shows the English ones, so it's only a warning.
+grep -q "^## \[$PLANNED\]" CHANGELOG.zh-Hans.md || echo "Warning: CHANGELOG.zh-Hans.md has no section for $PLANNED, so Chinese readers get the English notes."
 
 # The network to the site and to Apple can drop for a moment: each upload is tried a few times before giving up.
 again() { local n; for n in 1 2 3 4 5; do "$@" && return 0; echo "Retrying ($n): $1"; sleep 5; done; return 1; }
@@ -115,33 +119,14 @@ xcrun stapler staple "$APP"
 rm "$ZIP" && ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 spctl --assess --type execute --verbose "$APP"
 
-# The release notes for the update window: this version's section of CHANGELOG.md as HTML, and for a GitHub release
-# as Markdown (build/release/notes.md, for --notes-file). A beta uses the section of the version it leads up to.
-write_notes() {
-  python3 - "$VERSION" "$PLANNED" "$OUT" <<'PY'
-import html, sys
-version, planned, out = sys.argv[1], sys.argv[2], sys.argv[3]
-# A line of prose under the version's heading, before its first section, is its summary.
-sections, summary, inside = [], [], False
-for raw in open("CHANGELOG.md", encoding="utf-8"):
-    line = raw.strip()
-    if line.startswith("## "):
-        if inside: break
-        inside = line.startswith(f"## [{planned}]")
-    elif inside and line.startswith("### "): sections.append((line[4:], []))
-    elif inside and line.startswith("- ") and sections: sections[-1][1].append(line[2:])
-    elif inside and line and not sections and not line.startswith("#"): summary.append(line)
-if not sections: sys.exit(f"CHANGELOG.md has no notes for {planned}")
-style = ("<style>:root{color-scheme:light dark}body{font:13px -apple-system,sans-serif;margin:0 4px}"
-         "h3{font-size:13px;margin:14px 0 6px}ul{margin:0;padding-left:18px}li{margin:4px 0;line-height:1.4}"
-         "p{margin:10px 0 0;line-height:1.4}</style>")
-body = "".join(f"<p>{html.escape(s)}</p>" for s in summary) + "".join(f"<h3>{html.escape(t)}</h3><ul>" + "".join(f"<li>{html.escape(i)}</li>" for i in items) + "</ul>" for t, items in sections)
-open(f"{out}/updates/Zigzag-{version}.html", "w", encoding="utf-8").write(style + body)
-md = "".join(f"{s}\n\n" for s in summary) + "\n\n".join(f"## {t}\n" + "\n".join(f"- {i}" for i in items) for t, items in sections)
-md += ("\n\nDownload the DMG, open it, and drag Zigzag to Applications. Requires macOS 15.4 or later. Updates install automatically."
-       "\n\nEvery version's notes: https://zigzagbrowser.com/release-notes\n")
-open(f"{out}/notes.md", "w", encoding="utf-8").write(md)
-PY
+# The release notes for the update window: this version's section of CHANGELOG.md as HTML, with
+# CHANGELOG.zh-Hans.md's beside it for a Mac in Chinese, and for a GitHub release as Markdown (build/release/notes.md,
+# for --notes-file). A beta uses the section of the version it leads up to. See scripts/release-notes.py.
+write_notes() { python3 scripts/release-notes.py "$VERSION" "$PLANNED" "$OUT"; }
+# The notes in each language are files of their own that the feed links to, so they go up before it.
+upload_notes() {
+  local notes=("$OUT"/updates/Zigzag-"$VERSION".*.html(N))
+  if (( ${#notes} )); then again rsync -a "${notes[@]}" "$SERVER:$SITE_ROOT/updates/"; fi
 }
 # Sparkle's tool comes with the package the archive just resolved.
 if $PUBLISHING; then
@@ -153,9 +138,10 @@ if [[ "${1:-}" == "--beta" ]]; then
   # Only the beta feed: everyone else stays on the stable one. The zip sits with the other releases.
   write_notes
   echo "Writing the beta feed…"
-  "$GENERATE" --download-url-prefix "https://$SITE_HOST/releases/" "$OUT/updates"
+  "$GENERATE" --download-url-prefix "https://$SITE_HOST/releases/" --release-notes-url-prefix "https://$SITE_HOST/updates/" "$OUT/updates"
   mv "$OUT/updates/appcast.xml" "$OUT/updates/beta.xml"
   again rsync -a "$ZIP" "$SERVER:$SITE_ROOT/releases/"
+  upload_notes
   again rsync -a "$OUT/updates/beta.xml" "$SERVER:$SITE_ROOT/updates/beta.xml"
   echo "Done: $VERSION is on the beta feed."
   exit 0
@@ -188,11 +174,12 @@ if [[ "${1:-}" == "--publish" ]]; then
   # Builds and the feed are served from zigzagbrowser.com (reachable everywhere, no GitHub needed).
   write_notes
   echo "Writing appcast…"
-  "$GENERATE" --download-url-prefix "https://$SITE_HOST/releases/" "$OUT/updates"
+  "$GENERATE" --download-url-prefix "https://$SITE_HOST/releases/" --release-notes-url-prefix "https://$SITE_HOST/updates/" "$OUT/updates"
   echo "Uploading to $SITE_HOST…"
   again rsync -a "$ZIP" "$DMG" "$SERVER:$SITE_ROOT/releases/"
   again ssh "$SERVER" "ln -sfn Zigzag-$VERSION.dmg $SITE_ROOT/releases/Zigzag-latest.dmg && ln -sfn Zigzag-$VERSION.zip $SITE_ROOT/releases/Zigzag-latest.zip"
-  # The feed goes last, so no Mac is offered an update before its zip is there.
+  upload_notes
+  # The feed goes last, so no Mac is offered an update before its zip and notes are there.
   again rsync -a "$OUT/updates/appcast.xml" "$SERVER:$SITE_ROOT/updates/appcast.xml"
   # The beta feed carries each stable release too, so anyone on a beta moves on to it, unless its betas already
   # lead up to a later version (0.5.0-beta.3 leads up to 0.5.0): replacing it then would move them back.

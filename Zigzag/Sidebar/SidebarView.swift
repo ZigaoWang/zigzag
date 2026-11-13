@@ -799,8 +799,8 @@ final class SidebarView: NSView {
     private let topSeparator = ColorView(color: Tokens.Color.separator)
     /// Width reserved on the left of the top row for the traffic lights.
     var trafficLightsWidth: CGFloat = 52 { didSet { needsLayout = true } }
-    /// The sidebar is on the window's right: its toggle's glyph shows that, and while the traffic lights aren't in it
-    /// its top row is the left one's mirror image (`topRowFrames`).
+    /// The sidebar is on the window's right: its toggle's glyph shows that, and while the bar above the page holds the
+    /// address and the traffic lights its top row is the left one's mirror image (`topRowFrames`).
     var isOnRight = false {
         didSet {
             guard isOnRight != oldValue else { return }
@@ -813,16 +813,7 @@ final class SidebarView: NSView {
     var holdsAddress = true {
         didSet {
             guard holdsAddress != oldValue else { return }
-            if holdsAddress { (holdsButtons ? addressViews : [address]).forEach(addSubview) }
-            needsLayout = true
-        }
-    }
-    /// Back, forward and reload are in its top row; false while the strip above the page beside a sidebar on the
-    /// right holds them, after the traffic lights (`BrowserRootView.lightsStrip`, #181).
-    var holdsButtons = true {
-        didSet {
-            guard holdsButtons != oldValue else { return }
-            if holdsButtons, holdsAddress { addressButtons.forEach(addSubview) }
+            if holdsAddress { addressViews.forEach(addSubview) }
             needsLayout = true
         }
     }
@@ -947,17 +938,17 @@ final class SidebarView: NSView {
 
     /// The top row across the sidebar's width, x only: the toggle, and back, forward and reload, in that order.
     /// The toggle sits right after the traffic lights, where Arc and Safari put it, its glyph `Sidebar.lightsGap`
-    /// after them (the button's own padding inside that); without them (full screen, or a sidebar on the right) it
-    /// starts the row, `Sidebar.edge` in. Back, forward and reload are at the trailing end, their glyphs a button
-    /// apart, reload's ink as far from the sidebar's edge as the lights' from the other.
-    /// `onRight` without the lights in it: the mirror image, the toggle at the sidebar's outer (right) end, where the
-    /// bar above the page keeps it while the sidebar is hidden, and back's ink as far from the left edge as reload's
-    /// is from the right one on the left. The lights at its left (slid out over the page with no bar) keep the
-    /// left's order, out of their way.
-    static func topRowFrames(width: CGFloat, trafficLightsWidth: CGFloat, onRight: Bool) -> (toggle: NSRect, buttons: [NSRect]) {
+    /// after them (the button's own padding inside that); without them (full screen) it starts the row,
+    /// `Sidebar.edge` in. Back, forward and reload are at the trailing end, their glyphs a button apart, reload's ink
+    /// as far from the sidebar's edge as the lights' from the other. A sidebar on the right has the same row, the
+    /// lights at its left end, as Arc's has (#166).
+    /// `mirrored` (on the right, with the bar above the page holding the address and the lights): the mirror image,
+    /// the toggle at the sidebar's outer (right) end, where the bar keeps it while the sidebar is hidden, and back's
+    /// ink (when they're there) as far from the left edge as reload's is from the right one on the left.
+    static func topRowFrames(width: CGFloat, trafficLightsWidth: CGFloat, onRight: Bool, mirrored: Bool = false) -> (toggle: NSRect, buttons: [NSRect]) {
         let b = toolbarButton, pad = Tokens.Sidebar.edge
         func at(_ x: CGFloat) -> NSRect { NSRect(x: x, y: 0, width: b, height: b) }
-        if onRight && trafficLightsWidth == 0 {
+        if mirrored {
             let backInk = Tokens.Symbol.inkSize("chevron.left", size: Tokens.Sidebar.glyph).width
             let x = round(trafficLightsX + backInk / 2 - b / 2)
             return (at(width - pad - b), (0..<3).map { at(x + CGFloat($0) * b) })
@@ -985,9 +976,9 @@ final class SidebarView: NSView {
         let width = bounds.width
         let rowCenter = trafficLightCenterY
         let button = Self.toolbarButton
-        let row = Self.topRowFrames(width: width, trafficLightsWidth: trafficLightsWidth, onRight: isOnRight)
+        let row = Self.topRowFrames(width: width, trafficLightsWidth: trafficLightsWidth, onRight: isOnRight, mirrored: isOnRight && !holdsAddress)
         func onLine(_ rect: NSRect) -> NSRect { NSRect(x: rect.minX, y: rowCenter - button / 2, width: button, height: button) }
-        for (b, rect) in zip([backButton, forwardButton, reloadButton], row.buttons) where holdsAddress && holdsButtons { b.frame = onLine(rect) }
+        for (b, rect) in zip([backButton, forwardButton, reloadButton], row.buttons) where holdsAddress { b.frame = onLine(rect) }
         sidebarButton.frame = onLine(row.toggle)
         if holdsAddress {
             address.frame = NSRect(x: pad, y: Tokens.Sidebar.addressTop, width: width - pad * 2, height: Tokens.Sidebar.addressHeight)

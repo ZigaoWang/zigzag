@@ -61,6 +61,12 @@ scripts/sync-strings.sh build/dev
 `LocalizationTests` fails while any string has no Chinese. [docs/i18n/glossary.md](docs/i18n/glossary.md) has
 the words to use and the typography rules. If you can't write the Chinese, say so in the pull request.
 
+Release notes are localized too. Each release adds its section to [CHANGELOG.md](CHANGELOG.md) and the same
+section in Chinese to [CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md), with the same version heading and date,
+`### 新功能` and `### 修复` for New and Fixed, and the issue links and credited names left as they are. What's New
+and the update window show the Chinese notes when Zigzag is in Chinese, and the English ones for a version that
+has none; `scripts/release.sh` warns when the version it releases has no Chinese section.
+
 ## Commits and pull requests
 
 - [Conventional Commits](https://www.conventionalcommits.org) without a scope: `feat: …`, `fix: …`, `docs: …`,

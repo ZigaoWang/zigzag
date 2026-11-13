@@ -448,9 +448,6 @@ final class BrowserRootView: SpaceFrameView {
     /// The bar holds the address and its buttons (the setting), rather than being there for a page's tools alone,
     /// with the address in the sidebar. What follows the address up there (the sidebar's rows) follows this.
     var barHoldsAddress = false { didSet { if barHoldsAddress != oldValue { needsLayout = true } } }
-    /// The strip above the page for the traffic lights beside a sidebar on the right (`lightsRoom`), with back,
-    /// forward and reload after them (#181).
-    let lightsStrip = LightsStripView()
     var showsTopBar = false {
         didSet {
             guard oldValue != showsTopBar else { return }
@@ -518,8 +515,6 @@ final class BrowserRootView: SpaceFrameView {
         }
         topBar.isHidden = true
         addSubview(topBar)
-        lightsStrip.isHidden = true
-        addSubview(lightsStrip)
         // Never so narrow (or short) that a pane's header loses its buttons: a share of the window, and points too.
         columnHandle.onDrag = { [weak self] x in
             guard let self, var shape = self.tiles else { return }
@@ -686,16 +681,6 @@ final class BrowserRootView: SpaceFrameView {
         return NSRect(x: bounds.minX + bounds.maxX - rect.maxX, y: rect.minY, width: rect.width, height: rect.height)
     }
 
-    /// With the sidebar on the right, the traffic lights stay at the window's top left, as on every Mac window: the
-    /// page leaves them a strip of the frame as tall as the sidebar's top row, so its top lines up with the sidebar's
-    /// address. Not with the bar above the page, which holds them, nor in full screen, where they're the menu bar's.
-    static let lightsStripHeight: CGFloat = Tokens.Sidebar.addressTop
-
-    /// The room above the page for the traffic lights (`lightsStripHeight`), or 0.
-    var lightsRoom: CGFloat {
-        sidebarOnRight && sidebarVisible && !showsTopBar && window?.styleMask.contains(.fullScreen) != true ? Self.lightsStripHeight : 0
-    }
-
     /// The bar above the page: from the sidebar's edge, or the window's with the sidebar hidden, to the window's other
     /// edge. `inset`: framed, the bar starts the frame's inset down, the top of the card it makes with the page, so its
     /// buttons and address sit in that card's middle.
@@ -733,15 +718,14 @@ final class BrowserRootView: SpaceFrameView {
     /// The page area as a whole, before a side panel takes its share.
     private var pageAreaFrame: NSRect {
         Self.pageArea(in: bounds, sidebarVisible: sidebarVisible, sidebarWidth: sidebarWidth, edgeToEdge: isEdgeToEdge,
-                      borderless: Self.isBorderless, topBar: showsTopBar, barInset: topBarInset, onRight: sidebarOnRight, lightsRoom: lightsRoom)
+                      borderless: Self.isBorderless, topBar: showsTopBar, barInset: topBarInset, onRight: sidebarOnRight)
     }
 
     /// Where the pages go. With the bar above the page, they start under it: framed, the bar stands in for the gap
     /// above the page; borderless or edge to edge, the page meets it in a straight line, as Zigzag Mini's meets its strip.
     /// `onRight`: the sidebar is on the right, and the page is the mirror image of its place beside a left one.
-    /// `lightsRoom`: the page starts at least this far down, under the traffic lights (`lightsStripHeight`).
     static func pageArea(in bounds: NSRect, sidebarVisible: Bool, sidebarWidth: CGFloat, edgeToEdge: Bool, borderless: Bool, topBar: Bool,
-                         barInset: CGFloat = 0, onRight: Bool = false, lightsRoom: CGFloat = 0) -> NSRect {
+                         barInset: CGFloat = 0, onRight: Bool = false) -> NSRect {
         let inset = Tokens.Metric.cardInset
         var area: NSRect
         if edgeToEdge {
@@ -754,13 +738,6 @@ final class BrowserRootView: SpaceFrameView {
             area = bounds.insetBy(dx: inset, dy: inset)
         }
         area = mirrored(area, in: bounds, if: onRight)
-        if !topBar, lightsRoom > 0 {
-            let top = bounds.minY + min(bounds.height, lightsRoom)
-            if area.minY < top {
-                area.size.height = max(0, area.maxY - top)
-                area.origin.y = top
-            }
-        }
         guard topBar else { return area }
         let top = bounds.minY + min(bounds.height, barInset + TopBarView.height)
         area.size.height = max(0, area.maxY - top)
@@ -806,12 +783,12 @@ final class BrowserRootView: SpaceFrameView {
     /// Which of a pane's outer corners (its right ones, or its left ones with the sidebar on the right) are the
     /// window's own corners: on the window's edge across from the sidebar and its top or bottom. The window rounds
     /// those itself, so they're square; every other corner, a split's at the gap included, stays round.
-    /// Under the bar above the page, or the strip for the traffic lights, the top outer corner meets it and the
-    /// window's edge in a line, as the window's own corner would, so it's square too.
+    /// Under the bar above the page, the top outer corner meets it and the window's edge in a line, as the window's
+    /// own corner would, so it's square too.
     private func windowCorners(of pane: NSRect, attached: Bool) -> (top: Bool, bottom: Bool) {
         let outer = sidebarOnRight ? pane.minX <= bounds.minX + 1 : pane.maxX >= bounds.maxX - 1
         guard attached, outer else { return (false, false) }
-        let top = showsTopBar ? topBarFrame.maxY : bounds.minY + lightsRoom
+        let top = showsTopBar ? topBarFrame.maxY : bounds.minY
         return (pane.minY <= top + 1, pane.maxY >= bounds.maxY - 1)
     }
 
@@ -930,8 +907,7 @@ final class BrowserRootView: SpaceFrameView {
         if showsTopBar { return bounds }
         // An empty space shows the frame where the page would be: glass under all of it.
         // A split view's seam between its two pages shows the frame too: glass under all of it then.
-        // So does the strip above the page for the traffic lights, beside a sidebar on the right.
-        guard sidebarVisible, lightsRoom == 0, card.isAttached, !card.isHidden, !isEmpty,
+        guard sidebarVisible, card.isAttached, !card.isHidden, !isEmpty,
               extraCards.allSatisfy({ $0.isHidden || $0.alphaValue == 0 }) else { return bounds }
         return Self.mirrored(NSRect(x: 0, y: 0, width: min(bounds.width, sidebarWidth + Tokens.Radius.attached * 2), height: bounds.height),
                              in: bounds, if: sidebarOnRight)
@@ -955,8 +931,6 @@ final class BrowserRootView: SpaceFrameView {
         placeStrips(animated: false)
         layoutCards()
         layoutTopBar()
-        lightsStrip.isHidden = lightsRoom == 0
-        if lightsRoom > 0 { lightsStrip.frame = NSRect(x: bounds.minX, y: bounds.minY, width: max(0, pageAreaFrame.maxX - bounds.minX), height: lightsRoom) }
         sidebarContainer.frame = sidebarFrame
         sidebarContainer.isFloating = !sidebarVisible && !leavesDocked
         // Docked beside the bar above the page, the sidebar's top row stays on the bar's middle line.

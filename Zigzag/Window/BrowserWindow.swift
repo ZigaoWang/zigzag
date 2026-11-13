@@ -333,10 +333,14 @@ final class BrowserWindow: NSWindow {
         return image
     }
 
-    /// Width the traffic lights take up, including their trailing gap.
+    /// Width the traffic lights take up, including their trailing gap. From their spacing once it's measured: read
+    /// mid-move (AppKit putting them back at the window's left while they sit by a sidebar on the right), the
+    /// buttons' own frames can come out bunched up or reversed.
     var trafficLightsWidth: CGFloat {
         guard let close = standardWindowButton(.closeButton), let zoom = standardWindowButton(.zoomButton) else { return 60 }
-        return zoom.frame.maxX - close.frame.minX
+        if let buttonSpacing { return buttonSpacing * 2 + close.frame.width }
+        let measured = zoom.frame.maxX - close.frame.minX
+        return measured > close.frame.width ? measured : 60
     }
 
     var trafficLightHeight: CGFloat { standardWindowButton(.closeButton)?.frame.height ?? 14 }

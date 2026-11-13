@@ -217,6 +217,13 @@ enum Tokens {
         /// A row's own small buttons (a tab's close and mute): a 20pt target, an 11pt glyph.
         static var rowButton: CGFloat { scaledEven(20) }
         static var rowGlyph: CGFloat { scaled(11) }
+        /// Developer Mode's edge round a row or a favorite (#141): a 1.5pt line in `Color.developer`, 4pt dashes 3pt
+        /// apart, as Arc marks it.
+        static let developerEdge: CGFloat = 1.5
+        static let developerDash: [NSNumber] = [4, 3]
+        /// How much closer than their own line heights a Developer Mode row's title and host line sit, so the two fit
+        /// a row's height at every sidebar size.
+        static var hostLineOverlap: CGFloat { scaled(2) }
         /// A section label's slot, the label low in it.
         static var labelHeight: CGFloat { scaledEven(24) }
         /// The space's name over its pinned tabs: larger and light, the one heading in the sidebar, with room above it.
@@ -461,6 +468,8 @@ enum Tokens {
         /// The sidebar's rows and address (13 regular), and its section labels (11 medium): `Tokens.Sidebar`.
         static func sidebarRow() -> NSFont { .systemFont(ofSize: Sidebar.rowText) }
         static func sidebarLabel() -> NSFont { .systemFont(ofSize: Sidebar.labelText, weight: .medium) }
+        /// The host under a Developer Mode row's title: small print at the sidebar's size.
+        static func sidebarHost() -> NSFont { .systemFont(ofSize: Sidebar.labelText) }
         /// Zigzag's voice: SF Pro Light, set a touch tight. The one type style that's ours, for every
         /// name and title that speaks for the app (a space's name, a page's title, a panel's title, the welcome) and,
         /// in its own case, the address bar's text. Always through `voice` and `voiceText`, so its size, weight and
@@ -479,6 +488,8 @@ enum Tokens {
         static func spaceName() -> NSFont { voice() }
         /// Numbers that count something on a control (a space key): tabular figures, so they sit like dial markings.
         static func figures(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont { .monospacedDigitSystemFont(ofSize: size, weight: weight) }
+        /// An address as a developer reads it, every character the same width (SF Mono): the developer tools' bar.
+        static func code(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont { .monospacedSystemFont(ofSize: size, weight: weight) }
     }
 
     // MARK: - Symbols (one weight everywhere)
@@ -1213,6 +1224,9 @@ enum Tokens {
         static let caution = dynamic(light: hex(0x9A5B00), dark: hex(0xF2C14E))
         /// Status: done and fine.
         static let success = NSColor.systemGreen
+        /// Developer Mode's mark (#141): the dashed edge of a row or favorite in it. A warm yellow, as Arc's, deep
+        /// enough to read on a light sidebar, bright on a dark one, and apart from every space's accent.
+        static let developer = dynamic(light: hex(0xC7900A), dark: hex(0xF5C842), highLight: hex(0x8F6400), highDark: hex(0xFFD75E))
 
         /// Text on a color Zigzag doesn't choose (a site's brand on its search chip, a page's own top color in Peek):
         /// near-white on dark colors, near-black on light ones.

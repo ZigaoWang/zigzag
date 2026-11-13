@@ -181,7 +181,7 @@ enum CommandRanker {
         var currentSpaceID: UUID?
         /// The developer tools (#141) that would do something on the page you're on.
         var developerTools: [DeveloperTool] = []
-        /// The site you're on is on the list of development sites.
+        /// The site you're on is in Developer Mode.
         var isDevelopmentSite = false
         /// The listed page sizes (Settings › Developer), offered by name where Page Size is.
         var pageSizes: [PageSizes.Size] = []
@@ -221,7 +221,7 @@ enum CommandRanker {
                                keywords: ["reopen", "closed", "tab", "undo", "restore", "back"], symbol: "arrow.uturn.backward"))
         }
         list += c.developerTools.map {
-            Action(id: $0.commandID, title: $0 == .site ? DeveloperTool.siteTitle(listed: c.isDevelopmentSite) : $0.title, keywords: $0.keywords, symbol: $0.symbol)
+            Action(id: $0.commandID, title: $0 == .site ? DeveloperTool.siteShortTitle(listed: c.isDevelopmentSite) : $0.title, keywords: $0.keywords, symbol: $0.symbol)
         }
         // Each listed size by its name, as the Page Size menu above the page has them: "iphone" finds iPhone 16.
         if c.developerTools.contains(.sizeCustom) {

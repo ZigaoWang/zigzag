@@ -2,8 +2,8 @@ import AppKit
 import Testing
 @testable import Zigzag
 
-/// Sidebar on the right (#166): every frame is the left layout's mirror image, the page leaves the traffic lights
-/// a strip at the window's top left, and the edges that resize and reveal the sidebar are on its side.
+/// Sidebar on the right (#166): every frame is the left layout's mirror image, the traffic lights ride in the
+/// sidebar's top row as on the left, and the edges that resize and reveal the sidebar are on its side.
 @MainActor
 struct SidebarSideTests {
     let window = NSRect(x: 0, y: 0, width: 1280, height: 800)
@@ -34,36 +34,16 @@ struct SidebarSideTests {
         #expect(revealed.minY == inset && revealed.height == 800 - inset * 2)
     }
 
-    @Test func thePageSitsLeftOfTheSidebarUnderTheLightsStrip() {
-        let room = BrowserRootView.lightsStripHeight
+    @Test func thePageSitsLeftOfTheSidebarRunningToTheTop() {
         for borderless in [false, true] {
             let left = BrowserRootView.pageArea(in: window, sidebarVisible: true, sidebarWidth: width, edgeToEdge: false, borderless: borderless, topBar: false)
             let right = BrowserRootView.pageArea(in: window, sidebarVisible: true, sidebarWidth: width, edgeToEdge: false, borderless: borderless, topBar: false,
-                                                 onRight: true, lightsRoom: room)
-            // The left layout's mirror image, only starting under the strip the traffic lights sit in.
-            #expect(right.minX == window.maxX - left.maxX && right.width == left.width)
+                                                 onRight: true)
+            // The left layout's mirror image, top included: no strip above it for the traffic lights, which are in
+            // the sidebar.
+            #expect(right == mirror(left))
             #expect(right.maxX == window.maxX - width)
-            #expect(right.minY == room && right.maxY == left.maxY)
-        }
-    }
-
-    @Test func theStripLinesThePageUpWithTheSidebarsAddress() {
-        #expect(BrowserRootView.lightsStripHeight == Tokens.Sidebar.addressTop)
-        // The lights' center line is well inside it.
-        #expect(Tokens.Sidebar.lightsCenter + 7 < BrowserRootView.lightsStripHeight)
-    }
-
-    /// The strip holds back, forward and reload after the traffic lights, where the bar above the page has them, on
-    /// the lights' line and inside the strip (#181).
-    @Test func theStripsButtonsFollowTheLightsAsTheBarsDo() {
-        let lights: CGFloat = 52
-        let strip = LightsStripView.buttonFrames(count: 3, trafficLightsWidth: lights)
-        let bar = TopBarView.frames(width: 1200, buttons: 3, trafficLightsWidth: lights, trailingInset: Tokens.Sidebar.edge).buttons
-        #expect(strip == bar)
-        #expect(strip[0].minX > Tokens.Sidebar.lightsX + lights)
-        for frame in strip {
-            #expect(frame.midY == Tokens.Sidebar.lightsCenter)
-            #expect(frame.maxY <= BrowserRootView.lightsStripHeight)
+            #expect(right.minY == left.minY)
         }
     }
 
@@ -73,10 +53,10 @@ struct SidebarSideTests {
             let right = BrowserRootView.pageArea(in: window, sidebarVisible: false, sidebarWidth: width, edgeToEdge: edgeToEdge, borderless: true, topBar: false, onRight: true)
             #expect(left == right)
         }
-        // The bar above the page holds the lights itself: no strip, and the page under the bar as on the left.
+        // The page under the bar above it as on the left.
         let left = BrowserRootView.pageArea(in: window, sidebarVisible: true, sidebarWidth: width, edgeToEdge: false, borderless: true, topBar: true)
         let right = BrowserRootView.pageArea(in: window, sidebarVisible: true, sidebarWidth: width, edgeToEdge: false, borderless: true, topBar: true,
-                                             onRight: true, lightsRoom: BrowserRootView.lightsStripHeight)
+                                             onRight: true)
         #expect(right == mirror(left))
     }
 
@@ -194,10 +174,10 @@ struct SidebarSideTests {
         #expect(topBar.sidebarButton.symbol == "sidebar.left")
     }
 
-    @Test func onTheRightTheSidebarsTopRowIsTheLeftOnesMirrorImage() {
+    @Test func withTheBarHoldingTheLightsTheRightSidebarsTopRowIsTheLeftOnesMirrorImage() {
         let b = SidebarView.toolbarButton
         let left = SidebarView.topRowFrames(width: width, trafficLightsWidth: 0, onRight: false)
-        let right = SidebarView.topRowFrames(width: width, trafficLightsWidth: 0, onRight: true)
+        let right = SidebarView.topRowFrames(width: width, trafficLightsWidth: 0, onRight: true, mirrored: true)
         func flipped(_ rect: NSRect) -> CGFloat { width - rect.maxX }
         // The toggle at the outer end, as far in as it is from the left edge on the left.
         #expect(flipped(right.toggle) == left.toggle.minX)
@@ -208,14 +188,24 @@ struct SidebarSideTests {
         let reloadInk = Tokens.Symbol.inkSize("arrow.clockwise", size: Tokens.Sidebar.glyph).width
         #expect(abs((right.buttons[0].midX - backInk / 2) - (width - left.buttons[2].midX - reloadInk / 2)) <= 1)
         #expect(right.buttons[2].maxX < right.toggle.minX && right.toggle.width == b)
-        // With the lights in it (slid out over the page with no bar) it keeps the left's order, clear of them.
+    }
+
+    /// Without the bar above the page, a sidebar on the right has the left one's top row, traffic lights and all, as
+    /// Arc's does: the lights, the toggle after them, back, forward and reload at the trailing end; in full screen
+    /// (no lights) the toggle starts the row as on the left.
+    @Test func withoutTheBarTheRightSidebarsTopRowIsTheLeftOnes() {
+        for lights: CGFloat in [52, 0] {
+            let left = SidebarView.topRowFrames(width: width, trafficLightsWidth: lights, onRight: false)
+            let right = SidebarView.topRowFrames(width: width, trafficLightsWidth: lights, onRight: true)
+            #expect(right.toggle == left.toggle && right.buttons == left.buttons)
+        }
         let lit = SidebarView.topRowFrames(width: width, trafficLightsWidth: 52, onRight: true)
-        #expect(lit.toggle.minX > Tokens.Sidebar.lightsX + 52 && lit.buttons[2].maxX > lit.toggle.maxX)
+        #expect(lit.toggle.minX > Tokens.Sidebar.lightsX + 52 && lit.buttons[0].minX > lit.toggle.maxX)
     }
 
     @Test func theToggleStaysPutAsARightSidebarComesAndGoes() throws {
         // Hidden, the bar spans the window and keeps the toggle at its end; docked, the sidebar's own is there too.
-        let row = SidebarView.topRowFrames(width: width, trafficLightsWidth: 0, onRight: true)
+        let row = SidebarView.topRowFrames(width: width, trafficLightsWidth: 0, onRight: true, mirrored: true)
         let docked = BrowserRootView.sidebarFrame(in: window, width: width, visible: true, revealed: false, onRight: true)
         for (lead, trail) in [(CGFloat(14), CGFloat(14)), (6, 6), (inset, inset)] {
             let bar = TopBarView.frames(width: window.width, buttons: 3, sidebarButton: true, onRight: true, trafficLightsWidth: 52,

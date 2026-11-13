@@ -629,7 +629,7 @@ enum SettingsPane: String, CaseIterable {
         case .websiteData: "internaldrive"
         case .shortcuts: "command"
         case .automation: "point.3.connected.trianglepath.dotted"
-        case .developer: "hammer"
+        case .developer: DeveloperTool.modeSymbol
         }
     }
 
@@ -753,7 +753,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let developerBarToggle = Toggle()
     private let developerTrustToggle = Toggle()
     private let localServersGroup = FormGroup()
-    private let addSiteButton = PillButton(title: String(localized: "Add Site…", comment: "Button beside Development Sites in Settings › Developer: opens the sheet that adds a site to the list."))
+    private let addSiteButton = PillButton(title: String(localized: "Add Site…", comment: "Button beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site."))
     private var developerToken: SignalToken?
     private var shortcutsToken: SignalToken?
     private let tabsGroup = FormGroup()
@@ -1091,14 +1091,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
         // Developer
         developerToolsToggle.onChange = { on in DeveloperTools.isOn = on }
-        let developerRow = FormRow(title: String(localized: "Developer tools", comment: "A setting in Settings › Developer: turns on the tools for building websites, which show only on the sites listed under it."),
-                                   detail: String(localized: "Tools for building websites, on the sites listed here and nowhere else. A tab on one of them has a hammer on its row.",
-                                                  comment: "Explanation under “Developer tools” in Settings › Developer."),
+        let developerRow = FormRow(title: DeveloperTool.modeName,
+                                   detail: String(localized: "Tools for building websites, on the sites in Developer Mode and nowhere else. Turn it on for any site in its Site Controls, in the command bar or with View › Developer. A tab in Developer Mode has a dashed outline in the sidebar.",
+                                                  comment: "Explanation under the Developer Mode switch in Settings › Developer."),
                                    control: developerToolsToggle)
         developerToolsGroup.add(developerRow)
         developerBarToggle.onChange = { on in DeveloperTools.showsInBar = on }
-        developerToolsGroup.add(FormRow(title: String(localized: "Tools above the page", comment: "A setting in Settings › Developer: on a development site, the developer tools are in the bar above the page, after the address."),
-                                        detail: String(localized: "In the bar above a development site’s page: the console, inspecting an element, the page’s look and size, and more. Off, they’re in the site’s controls.",
+        developerToolsGroup.add(FormRow(title: String(localized: "Tools above the page", comment: "A setting in Settings › Developer: on a site in Developer Mode, the developer tools are in the bar above the page, with its full address."),
+                                        detail: String(localized: "In the bar above a page in Developer Mode: its full address, the console, inspecting an element, the page’s look and size, and more. Off, they’re in the site’s controls.",
                                                        comment: "Explanation under “Tools above the page” in Settings › Developer."),
                                         control: developerBarToggle))
         developerTrustToggle.onChange = { on in DeveloperTools.trustsLocalServers = on }
@@ -2215,7 +2215,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private static var connectHeading: String { String(localized: "Connect an App", comment: "A heading in Settings › Automation: how to connect an AI app to Zigzag over MCP.") }
     private static var localServersHeading: String { String(localized: "Local Servers", comment: "A heading in Settings › Developer: development servers running on this Mac.") }
     private static var pageSizesHeading: String { String(localized: "Page Sizes", comment: "A heading in Settings › Developer: the sizes the developer tools offer for a page.") }
-    private static var developmentSitesHeading: String { String(localized: "Development Sites", comment: "A heading in Settings › Developer: the sites Developer tools show on.") }
+    private static var developmentSitesHeading: String { String(localized: "Sites in Developer Mode", comment: "A heading in Settings › Developer: the sites the developer tools show on.") }
     private static var scriptsHeading: String { String(localized: "Scripts", comment: "A heading in Settings › Automation: what AppleScript and Shortcuts may do in Zigzag.") }
     private static var spacesHeading: String { String(localized: "Your Spaces", comment: "A heading in Settings › Spaces.") }
     private static var profilesHeading: String { String(localized: "Your Profiles", comment: "A heading in Settings › Profiles.") }
@@ -2939,8 +2939,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         developmentSitesGroup.removeAllRows()
         let sites = DevelopmentSites.sites
         if sites.isEmpty {
-            developmentSitesGroup.add(FormRow(title: String(localized: "None yet", comment: "A row in Settings › Developer, shown when no development site is listed."),
-                                              detail: String(localized: "Sites you add show up here.", comment: "Explanation under “None yet” in Settings › Developer."),
+            developmentSitesGroup.add(FormRow(title: String(localized: "None yet", comment: "A row in Settings › Developer, shown when no site is in Developer Mode."),
+                                              detail: String(localized: "Sites you turn Developer Mode on for show up here.", comment: "Explanation under “None yet” in Settings › Developer."),
                                               control: NSView()))
         }
         for site in sites {

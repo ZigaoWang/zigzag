@@ -549,7 +549,7 @@ enum DebugBridge {
         case "sideframes":
             let r = controller.root, close = controller.window?.standardWindowButton(.closeButton)
             debugLog("sideframes right=\(r.sidebarOnRight) sidebar=\(r.sidebarContainer.frame) card=\(r.cardFrame) bar=\(r.showsTopBar ? r.topBarFrame : .zero) "
-                     + "lights=\(close.map { $0.convert($0.bounds, to: nil) } ?? .zero) hidden=\(close?.isHidden ?? true) room=\(r.lightsRoom)")
+                     + "lights=\(close.map { $0.convert($0.bounds, to: nil) } ?? .zero) hidden=\(close?.isHidden ?? true)")
         case "reveal": controller.root.holdReveal = arg == "hold"; controller.root.reveal(true)
         case "unreveal": controller.root.holdReveal = false; controller.root.reveal(false)
         // edgepointer <x> <y>|off: the pointer counts as there for the sidebar's edge (top-down, left of the window
@@ -1088,6 +1088,8 @@ enum DebugBridge {
         case "devphone":
             controller.openOnPhone(nil)
             debugLog("devphone => lan=\(PhoneLink.lanAddress() ?? "-") url=\(controller.tabManager.selectedTab?.url.flatMap { PhoneLink.url(for: $0, lanAddress: PhoneLink.lanAddress()) }?.absoluteString ?? "-")")
+        // devmode: View › Developer › Turn On (or Off) Developer Mode for This Site, toast and all.
+        case "devmode": controller.toggleDevelopmentSite(nil)
         case "devstate":
             let tabs = controller.tabManager.allTabs.map { "\($0.url?.host() ?? "-"):\($0.url?.port ?? 0)=\($0.isDevelopment)" }.sorted()
             let front = controller.tabManager.selectedTab

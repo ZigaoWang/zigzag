@@ -137,7 +137,7 @@ struct ExtensionScriptTests {
         #expect(!ExtensionBridgeScript.differences.isEmpty)
         #expect(parses(ExtensionBridgeScript.differences) == nil)
         // Each extension's background prelude, as assembled, including those with fixes of their own.
-        for id in ["anyextensionidaaaaaaaaaaaaaaaaaa", ExtensionStore.onePasswordID] {
+        for id in ["anyextensionidaaaaaaaaaaaaaaaaaa", ExtensionStore.onePasswordID, ExtensionShims.motrixID] {
             let prelude = ExtensionShims.shim(for: id)?.backgroundPrelude ?? ""
             #expect(parses(prelude) == nil, "background prelude for \(id)")
         }
@@ -173,6 +173,31 @@ struct ExtensionScriptTests {
       tabs: { sendMessage: (tabId, message, options) => { __scriptCalls.push([tabId, message, options]); return Promise.resolve(__background && 'script answer'); } },
     };
     """
+
+    @Test func motrixWorksOutChromesOriginForPairing() {
+        // Motrix checks its own origin against the one the app sees on the WebSocket, which Zigzag sends as Chrome's.
+        let id = ExtensionShims.motrixID
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("""
+        var runtime = { id: '\(id)', getURL: (p) => 'webkit-extension://\(id)/' + String(p).replace(/^\\//, '') };
+        var browser = { runtime };
+        var chrome = browser;
+        """)
+        context.evaluateScript(ExtensionShims.motrixPrelude)
+        // As its computeVerifiedOrigin does it: the root's protocol and host (no URL in a bare JSContext), which must
+        // look like Chrome's.
+        let origin = context.evaluateScript("(() => { const m = /^([a-z-]+:)\\/\\/([^/]+)\\/$/.exec(browser.runtime.getURL('/')); return m ? m[1] + '//' + m[2] : ''; })()").toString()
+        #expect(origin == "chrome-extension://\(id)")
+        #expect(context.evaluateScript("/^(chrome|moz)-extension:\\/\\/[^/]+$/.test('\(origin ?? "")')").toBool())
+        // Every other address stays WebKit's: its files, and the root its pages' senders are checked against.
+        #expect(context.evaluateScript("browser.runtime.getURL('')").toString() == "webkit-extension://\(id)/")
+        #expect(context.evaluateScript("browser.runtime.getURL('popup.html')").toString() == "webkit-extension://\(id)/popup.html")
+        #expect(context.evaluateScript("chrome.runtime.getURL('/')").toString() == "chrome-extension://\(id)/")
+        // The fix is Motrix's alone, and the origin Zigzag's WebSocket sends is the one it now works out.
+        #expect(ExtensionShims.shim(for: id)?.backgroundPrelude?.contains(ExtensionShims.motrixPrelude) == true)
+        #expect(ExtensionShims.shim(for: "anyextensionidaaaaaaaaaaaaaaaaaa")?.backgroundPrelude?.contains(ExtensionShims.motrixPrelude) == false)
+    }
 
     @Test func chromesNamedConstantsAreThere() {
         // Coupert's background reads chrome.tabs.TabStatus.LOADING first thing; WebKit has none of these.

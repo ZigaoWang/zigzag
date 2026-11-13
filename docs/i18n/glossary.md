@@ -106,6 +106,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Fill (a password, a form, from My Card) | 填写 | 填充 | What you'd do by hand, so it reads plainly: 填写存储的密码, 用“我的名片”填写表单, 在“%@”中存储和填写. |
 | AutoFill (the feature, as a heading) | 自动填充 | 自动填写 | Apple's own name for it in Safari and macOS; only as that name, never as the verb in a sentence. |
 | Developer tools | 开发者工具 | 开发工具 | Safari's and Chrome's word for them, beside 开发者 for the Developer menu and section. |
+| Developer Mode | 开发者模式 | 开发模式, 开发人员模式 | As macOS and Arc name it: a site's state with the developer tools, and the main switch in Settings › Developer. |
 | Development site | 开发网站 | 开发站点, 本地网站 | A site you build, listed in Settings › Developer: 网站 as everywhere else in Zigzag, and not 本地, since a listed site needn't be on this Mac. |
 
 ## How it reads

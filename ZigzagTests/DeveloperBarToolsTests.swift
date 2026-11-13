@@ -15,31 +15,71 @@ struct DeveloperBarToolsTests {
         #expect(!DeveloperBarTools.shows(isDevelopment: true, showsInBar: true, inSplit: true))
     }
 
+    /// With the address in the bar: the tools alone, as wide as they need, groups a line apart.
+    private var all: CGFloat {
+        let b = Tokens.Sidebar.button
+        // Console, Inspect | Appearance, Size | Reload, ⋯
+        return CGFloat(DeveloperBarTools.parts.count + 1) * b + 2 * DeveloperBarTools.lineRoom
+    }
+
     @Test func theButtonsGiveWayOneAtATimeAndMoreAlwaysShows() {
         let b = Tokens.Sidebar.button
         let count = DeveloperBarTools.parts.count
-        let all = DeveloperBarTools.width(shown: count)
-        #expect(all == CGFloat(count + 1) * b)
-        #expect(DeveloperBarTools.fit(width: 1200, count: count) == count)
-        #expect(DeveloperBarTools.fit(width: all, count: count) == count)
-        // A point less, and the last gives way; then one for each button's width.
-        #expect(DeveloperBarTools.fit(width: all - 1, count: count) == count - 1)
-        #expect(DeveloperBarTools.fit(width: all - b, count: count) == count - 1)
-        #expect(DeveloperBarTools.fit(width: all - b - 1, count: count) == count - 2)
+        let full = DeveloperBarTools.layout(width: 1200, address: false)
+        #expect(full.shown == count && full.width == all)
+        #expect(full.lines.count == 2)
+        #expect(DeveloperBarTools.layout(width: all, address: false).shown == count)
+        // A point less, and the last gives way, its group's line staying before ⋯.
+        #expect(DeveloperBarTools.layout(width: all - 1, address: false).shown == count - 1)
         // Room for ⋯ alone: none of them, never fewer.
-        #expect(DeveloperBarTools.fit(width: b, count: count) == 0)
-        #expect(DeveloperBarTools.fit(width: 0, count: count) == 0)
+        #expect(DeveloperBarTools.layout(width: b, address: false).shown == 0)
+        #expect(DeveloperBarTools.layout(width: b - 1, address: false).width == 0)
+    }
+
+    /// With the address in the sidebar the bar has the page's whole address from its leading end, Copy Link after
+    /// it, a line, then the tools at the trailing end; the address gives up its room before any button gives way.
+    @Test func theWholeAddressTakesTheRoomTheToolsLeave() {
+        let b = Tokens.Sidebar.button
+        let layout = DeveloperBarTools.layout(width: 900, address: true)
+        #expect(layout.width == 900)
+        let address = try! #require(layout.address)
+        #expect(address.minX == 0)
+        #expect(layout.copy.map { $0.minX > address.maxX } == true)
+        #expect(layout.shown == DeveloperBarTools.parts.count)
+        #expect(layout.lines.count == 3)
+        #expect(layout.more.maxX == 900)
+        #expect(address.width == 900 - all - b - DeveloperBarTools.lineRoom - Tokens.Space.x1)
+        // Narrow: the address keeps its least, and the buttons give way.
+        let narrow = DeveloperBarTools.layout(width: DeveloperBarTools.addressMinWidth + 4 * b, address: true)
+        #expect((narrow.address?.width ?? 0) >= DeveloperBarTools.addressMinWidth)
+        #expect(narrow.shown < DeveloperBarTools.parts.count)
+    }
+
+    /// The page's size follows its button: with its name where there's room, then without, then not at all.
+    @Test func theSizeGivesUpItsNameBeforeItsPlace() {
+        let readout = (named: CGFloat(240), bare: CGFloat(140))
+        let wide = DeveloperBarTools.layout(width: 1200, address: false, readout: readout)
+        #expect(wide.readout?.width == 240 && wide.readoutNamed)
+        let size = try! #require(DeveloperBarTools.parts.firstIndex { $0.tools.contains(.sizeFill) })
+        #expect(wide.readout?.minX == wide.buttons[size].maxX)
+        let less = DeveloperBarTools.layout(width: all + 200, address: false, readout: readout)
+        #expect(less.readout?.width == 140 && !less.readoutNamed && less.shown == DeveloperBarTools.parts.count)
+        let none = DeveloperBarTools.layout(width: all + 20, address: false, readout: readout)
+        #expect(none.readout == nil && none.shown == DeveloperBarTools.parts.count)
+    }
+
+    @Test func theAddressSaysTheWholeAddress() {
+        #expect(DeveloperAddressView.shown(URL(string: "https://www.google.com/")) == "https://www.google.com")
+        #expect(DeveloperAddressView.shown(URL(string: "http://localhost:3000/admin?tab=2")) == "http://localhost:3000/admin?tab=2")
+        #expect(DeveloperAddressView.shown(URL(string: "https://example.com/?q=dev%20mode")) == "https://example.com/?q=dev mode")
+        #expect(DeveloperAddressView.shown(nil) == "")
     }
 
     @Test func theyAskForTheRoomTheyNeedAndNoMore() {
         let tools = DeveloperBarTools()
-        let b = Tokens.Sidebar.button, count = DeveloperBarTools.parts.count
-        #expect(tools.width(fitting: 2000) == DeveloperBarTools.width(shown: count))
-        // Less room: fewer buttons, and ⋯.
-        #expect(tools.width(fitting: b * 3 + 5) == b * 3)
-        #expect(tools.width(fitting: b) == b)
-        // No room for ⋯ even: nothing.
-        #expect(tools.width(fitting: b - 1) == 0)
+        // Not in a bar: as with the address in it, the tools alone.
+        #expect(tools.width(fitting: 2000) == all)
+        #expect(tools.width(fitting: Tokens.Sidebar.button - 1) == 0)
     }
 
     @Test func theySitAtTheTrailingEndOfTheRoomTheyAreGiven() {
@@ -49,10 +89,10 @@ struct DeveloperBarToolsTests {
         let buttons = tools.subviews.compactMap { $0 as? IconButton }.filter { !$0.isHidden }
         // ⋯ ends where the room does, the others run up to it, all on the bar's middle line.
         #expect(buttons.map(\.frame.maxX).max() == 400)
-        #expect(buttons.map(\.frame.minX).min() == 400 - DeveloperBarTools.width(shown: DeveloperBarTools.parts.count))
+        #expect(buttons.map(\.frame.minX).min() == 400 - all)
         #expect(Set(buttons.map(\.frame.midY)) == [TopBarView.height / 2])
         // Narrower than they need: the last ones are under ⋯.
-        tools.frame.size.width = Tokens.Sidebar.button * 2
+        tools.frame.size.width = Tokens.Sidebar.button * 2 + DeveloperBarTools.lineRoom
         tools.needsLayout = true
         tools.layoutSubtreeIfNeeded()
         #expect(tools.shown == 1)

@@ -164,18 +164,57 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     let audioButton = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
     let partnerAudioButton = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
 
-    /// A development tab's mark (#141): a small hammer beside the close button's place, so the site you're building
-    /// is told from the one that's live. Only something to see: it takes no clicks. Its row keeps the close button's
-    /// room while that's hidden, as a row of several pages does, so the mark never moves under the pointer. Not on a
-    /// row of several pages.
-    private let developerMark: NSImageView = {
-        let view = NSImageView(image: Tokens.Symbol.image("hammer", size: Tokens.Sidebar.rowGlyph))
-        view.imageScaling = .scaleNone
-        view.isHidden = true
-        view.setAccessibilityElement(false)
-        return view
+    /// Developer Mode (#141), as Arc marks it: a row whose page is in Developer Mode has a dashed edge in
+    /// `Color.developer` all the way round, at rest as under the pointer, and its address's host as a second line
+    /// under the title, so the site you're building is told from the one that's live at a glance. A row of several
+    /// pages edges each part that's in Developer Mode, without the line, which has no room there.
+    private let developerEdge: CAShapeLayer = {
+        let edge = CAShapeLayer()
+        edge.fillColor = nil
+        edge.lineWidth = Tokens.Sidebar.developerEdge
+        edge.lineDashPattern = Tokens.Sidebar.developerDash
+        edge.isHidden = true
+        return edge
     }()
-    var showsDeveloperMark: Bool { tab?.isDevelopment == true && !isSplit }
+    private lazy var hostLine: Label = {
+        let label = Label("", font: Tokens.Font.sidebarHost(), color: Tokens.Color.textSecondary)
+        label.lineBreakMode = .byTruncatingMiddle
+        label.isHidden = true
+        label.setAccessibilityElement(false)
+        addSubview(label, positioned: .below, relativeTo: closeButton)
+        return label
+    }()
+
+    /// Which of the row's parts are in Developer Mode, in `half(at:)`'s order.
+    private var developerParts: [Bool] {
+        let pages: [Tab?] = isSplit ? [tab, partner] + extraPartners.map { Optional($0) } : [tab]
+        return pages.map { $0?.isDevelopment == true }
+    }
+
+    /// What Developer Mode shows on a row whose parts are `inMode` (one for a row of one page): the parts that get the
+    /// dashed edge, in the same order, and whether the host's line shows under the title. Only a row of one page has
+    /// room for the line, and not while its name is being edited.
+    nonisolated static func developerMarks(inMode: [Bool], renaming: Bool) -> (edged: [Int], hostLine: Bool) {
+        let edged = inMode.indices.filter { inMode[$0] }
+        return (edged, inMode.count == 1 && !edged.isEmpty && !renaming)
+    }
+
+    /// The host as the line under a Developer Mode row's title says it, as Arc does: without "www.", with its port
+    /// when it has one ("localhost:3000"). Nil for a page with no host, or one whose title already says just that.
+    nonisolated static func hostLineText(for url: URL?, title: String = "") -> String? {
+        guard let line = hostName(of: url), line != title.lowercased() else { return nil }
+        return line
+    }
+
+    nonisolated private static func hostName(of url: URL?) -> String? {
+        guard let url, let host = url.host(percentEncoded: false)?.lowercased(), !host.isEmpty else { return nil }
+        var name = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        if name.contains(":") { name = "[\(name)]" }
+        return url.port.map { "\(name):\($0)" } ?? name
+    }
+
+    private var developerMarks: (edged: [Int], hostLine: Bool) { Self.developerMarks(inMode: developerParts, renaming: renameField != nil) }
+    var showsDeveloperMode: Bool { !developerMarks.edged.isEmpty }
 
     static func rowButton(_ symbol: String, toolTip: String) -> IconButton {
         let button = IconButton(symbol: symbol, size: Tokens.Sidebar.rowButton, symbolSize: Tokens.Sidebar.rowGlyph, toolTip: toolTip)
@@ -422,7 +461,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         partnerTitle.isHidden = true
         divider.isHidden = true
         [partnerIcon, partnerTitle, divider].forEach { addSubview($0) }
-        addSubview(developerMark)
+        layer?.addSublayer(developerEdge)
         addSubview(audioButton)
         addSubview(partnerAudioButton)
         addSubview(closeButton)
@@ -433,7 +472,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         self.partner = partner
         partnerToken = partner?.changed.observe { [weak self] change in
             // `.webView`: it went to sleep or woke, which its icon shows.
-            if change == .title || change == .favicon || change == .loading || change == .url || change == .audio || change == .webView { self?.refreshPartner() }
+            if change == .title || change == .favicon || change == .loading || change == .url || change == .audio || change == .webView || change == .developer { self?.refreshPartner() }
         }
         [partnerIcon, partnerTitle, divider].forEach { $0.isHidden = !isSplit }
         refreshPartner()
@@ -447,7 +486,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         extraPartners = more
         extraTokens = more.map { page in
             page.changed.observe { [weak self] change in
-                if change == .title || change == .favicon || change == .loading || change == .url || change == .audio || change == .webView { self?.refreshExtras() }
+                if change == .title || change == .favicon || change == .loading || change == .url || change == .audio || change == .webView || change == .developer { self?.refreshExtras() }
             }
         }
         refreshExtras()
@@ -511,7 +550,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
                 ?? String(localized: "playing audio", comment: "Spoken by VoiceOver after a tab row's name: the tab plays sound.")
         }
         let split = partner != nil
-        let development = showsDeveloperMark ? String(localized: "development site", comment: "Spoken by VoiceOver after a tab row's name: the tab is on a site listed in Settings › Developer, and has a hammer on its row.") : nil
+        let development = showsDeveloperMode ? DeveloperTool.modeName : nil
         let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, development, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
             + extraPartners.map { sound($0, $0.displayTitle) })
             .compactMap { $0 }.joined(separator: String(localized: "accessibility.state-separator", defaultValue: ", ", comment: "Separates the states VoiceOver reads after a tab row's name, like “current tab, playing audio”."))
@@ -557,7 +596,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     @objc func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
         let index = half(at: point)
-        return partTitles.indices.contains(index) ? partTitles[index].stringValue : title.stringValue
+        let name = partTitles.indices.contains(index) ? partTitles[index].stringValue : title.stringValue
+        // A part in Developer Mode says so under its name.
+        return developerParts.indices.contains(index) && developerParts[index] ? "\(name)\n\(DeveloperTool.modeName)" : name
     }
 
     /// The page the point is over.
@@ -628,12 +669,11 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private var endSlot: CGFloat { showsClose ? closeButton.frame.width : showsNumber ? numberHint?.width ?? 0 : 0 }
 
     override var trailingAccessoryWidth: CGFloat {
-        let close = showsDeveloperMark ? max(endSlot, closeButton.frame.width) : endSlot
-        let mark = showsDeveloperMark ? Tokens.Sidebar.rowButton + Self.buttonGap : 0
-        let nested = showsNested ? Tokens.Sidebar.rowButton + (close + mark > 0 ? Self.buttonGap : 0) : 0
+        let close = endSlot
+        let nested = showsNested ? Tokens.Sidebar.rowButton + (close > 0 ? Self.buttonGap : 0) : 0
         // In a split each half's speaker sits at that half's end (laid out with the halves).
-        let audio = isSplit ? 0 : showsAudio ? audioButton.frame.width + (close + mark + nested > 0 ? Self.buttonGap : 0) : 0
-        return close + mark + nested + audio
+        let audio = isSplit ? 0 : showsAudio ? audioButton.frame.width + (close + nested > 0 ? Self.buttonGap : 0) : 0
+        return close + nested + audio
     }
 
     func refresh() {
@@ -658,9 +698,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         title.textColor = ink
         // One weight always: selection shows in the fill, never by text getting wider and shifting.
         partnerTitle.textColor = ink
-        // Quiet, as a folded group's button is at rest.
-        developerMark.contentTintColor = ink
-        developerMark.alphaValue = 0.6
+        hostLine.textColor = Brand.Theme.for(self).quietInk
+        Tokens.Motion.withoutAnimation { developerEdge.strokeColor = cgColor(Tokens.Color.developer) }
         extraViews?.forEach { $0.title.textColor = ink }
         dropHalf.color = Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha)
         dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
@@ -674,7 +713,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         closeButton.toolTip = isAway ? String(localized: "Back to Pinned Page", comment: "Tooltip of a button on a tab's row in the sidebar. The pinned tab wandered off; this goes back to its page.")
             : isBookmark ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.") : String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         audioButton.isHidden = !showsAudio || renameField != nil
-        developerMark.isHidden = !showsDeveloperMark || renameField != nil
+        refreshDeveloperMode()
         partnerAudioButton.isHidden = !isSplit || !partnerShowsAudio || renameField != nil
         for (i, views) in (extraViews ?? []).enumerated() {
             let page = extraPartners.indices.contains(i) ? extraPartners[i] : nil
@@ -684,6 +723,61 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         // Quiet at rest as a folder's is, clear under the pointer or while the tabs are folded away.
         if nestedTabs != nil { nestedButton.alphaValue = isHovered || nestedTabs == .collapsed ? 1 : 0.6 }
         needsLayout = true
+    }
+
+    /// Shows or hides Developer Mode's edge and line as the row's pages come into it or leave it.
+    private func refreshDeveloperMode() {
+        let marks = developerMarks
+        let host = marks.hostLine ? Self.hostLineText(for: tab?.url, title: title.stringValue) : nil
+        hostLine.stringValue = host ?? ""
+        hostLine.isHidden = host == nil
+        hostLine.toolTip = host == nil ? nil : DeveloperTool.modeName
+        Tokens.Motion.withoutAnimation { developerEdge.isHidden = marks.edged.isEmpty }
+        // The dashes are the row's edge: the card's own hairline would double them.
+        if !marks.edged.isEmpty, !isSplit { layer?.borderWidth = 0 }
+        needsLayout = true
+    }
+
+    /// The dashed edge round the row, or round each part in Developer Mode, inside the row's own corners; and the
+    /// title moved up for the host's line under it.
+    private func layoutDeveloperMode() {
+        let marks = developerMarks
+        Tokens.Motion.withoutAnimation {
+            developerEdge.frame = bounds
+            guard !marks.edged.isEmpty else { developerEdge.path = nil; return }
+            let path = CGMutablePath()
+            let inset = Tokens.Sidebar.developerEdge / 2
+            let radius = Tokens.Sidebar.rowRadius - inset
+            if !isSplit {
+                path.addRoundedRect(in: bounds.insetBy(dx: inset, dy: inset), cornerWidth: radius, cornerHeight: radius)
+            } else {
+                let spans = partSpans
+                for part in marks.edged {
+                    // The part as laid out, left to right: in a split of two the partner's half can lead.
+                    let spatial = extraPartners.isEmpty && partnerLeads ? 1 - part : part
+                    guard spans.indices.contains(spatial) else { continue }
+                    let span = spans[spatial]
+                    // The row's own ends keep the row's corners; between parts, the middle of the gap.
+                    let start = span.start == 0 ? inset : span.start + Tokens.Metric.dropInset
+                    let end = span.end >= bounds.width - 0.5 ? bounds.width - inset : span.end - Tokens.Metric.dropInset
+                    path.addRoundedRect(in: NSRect(x: start, y: inset, width: max(0, end - start), height: bounds.height - inset * 2),
+                                        cornerWidth: radius, cornerHeight: radius)
+                }
+            }
+            developerEdge.path = path
+        }
+        guard marks.hostLine, !hostLine.isHidden else { return }
+        // Title and host as one block in the middle of the row, the lines drawn close as Arc's are.
+        let titleH = title.frame.height
+        let hostH = ceil(hostLine.intrinsicContentSize.height)
+        let overlap = Tokens.Sidebar.hostLineOverlap
+        let block = titleH + hostH - overlap
+        let top = floor((bounds.height - block) / 2)
+        let titleTop = top, hostTop = top + titleH - overlap
+        title.frame.origin.y = isFlipped ? titleTop : bounds.height - titleTop - titleH
+        // Under the text column from its start, the pinned name's too while the tab is away.
+        let x = icon.frame.maxX + Self.titleOffset
+        hostLine.frame = NSRect(x: x, y: isFlipped ? hostTop : bounds.height - hostTop - hostH, width: max(0, title.frame.maxX - x), height: hostH)
     }
 
     private func layoutRenameField() {
@@ -757,6 +851,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             title.frame.origin.x += 6 + Tokens.Space.x1
             title.frame.size.width = max(0, title.frame.width - 6 - Tokens.Space.x1)
         }
+        if developerMarks.hostLine {
+            layoutDeveloperMode()
+            // The pinned name and the away mark sit on the title's line.
+            if isAway {
+                pinLabel.frame.origin.y = title.frame.minY
+                Tokens.Motion.withoutAnimation { awayMark.frame.origin.y = title.frame.midY - awayMark.frame.height / 2 }
+            }
+        }
         layoutRenameField()
     }
 
@@ -771,13 +873,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         }
         // A row of several pages keeps the close button's room whether or not it shows, so its parts never move as
         // the pointer comes and goes.
-        let slot = isSplit || showsDeveloperMark ? max(endSlot, size.width) : endSlot
+        let slot = isSplit ? max(endSlot, size.width) : endSlot
         var end = slot > 0 ? bounds.width - edge - slot - Self.buttonGap : bounds.width - edge
-        // The development mark stays beside the close button's place; the row's other buttons come before it.
-        if showsDeveloperMark {
-            developerMark.frame = NSRect(x: end - size.width, y: y, width: size.width, height: size.height)
-            end = developerMark.frame.minX - Self.buttonGap
-        }
         if showsNested {
             nestedButton.frame = NSRect(x: end - size.width, y: y, width: size.width, height: size.height)
             end = nestedButton.frame.minX - Self.buttonGap
@@ -786,6 +883,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         defer {
             refreshPartTips()
             layoutZoomMark()
+            layoutDeveloperMode()
         }
 
         guard isSplit else {

@@ -18,7 +18,7 @@ settings:
     MARKETING_VERSION: "0.9.0"
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     SPARKLE_PUBLIC_KEY: ""
-    CURRENT_PROJECT_VERSION: "92"
+    CURRENT_PROJECT_VERSION: "93"
     ENABLE_HARDENED_RUNTIME: YES
     DEAD_CODE_STRIPPING: YES
     CODE_SIGN_STYLE: Manual
@@ -61,8 +61,11 @@ targets:
       - path: Zigzag
         # Notes for whoever works on the design, not for the app.
         excludes: [Design/DESIGN.md]
-      # The release notes the app shows after an update: this version's section of the changelog.
+      # The release notes the app shows after an update: this version's section of the changelog, in Chinese
+      # from the Chinese changelog when the app speaks Chinese.
       - path: CHANGELOG.md
+        buildPhase: resources
+      - path: CHANGELOG.zh-Hans.md
         buildPhase: resources
       # The licenses About Zigzag › Acknowledgments shows: the same files as the repository's, never a copy.
       - path: LICENSE

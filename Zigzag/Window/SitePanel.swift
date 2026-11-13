@@ -378,6 +378,17 @@ final class SitePanel: FloatingPanelView {
             }))
             entries.append(.separator)
         }
+        // Developer Mode for the site, as View › Developer has it (#141).
+        if let controller, DeveloperTool.site.isOffered(for: tab, isPrivate: controller.tabManager.isPrivate) {
+            entries.append(.item(.init(title: DeveloperTool.siteShortTitle(listed: DevelopmentSites.covers(url)), symbol: DeveloperTool.modeSymbol,
+                                       shortcut: Shortcuts.keys(for: DeveloperTool.site.action)) { [weak self, weak controller] in
+                guard let self, let controller else { return }
+                let url = self.url
+                self.close()
+                controller.setDeveloperMode(for: url, on: !DevelopmentSites.covers(url))
+            }))
+            entries.append(.separator)
+        }
         // Clearing asks first: cookies sign you out of the site, and neither can be taken back.
         MenuPanel.show(entries + [
             .item(.init(title: String(localized: "Clear Cookies and Data…", comment: "Item in the … menu of the site panel: clears the site's cookies and what it keeps on this Mac, after asking.")) { [weak self] in self?.clear(.cookies) }),
@@ -628,7 +639,7 @@ final class SitePanel: FloatingPanelView {
         context.fullScreen = PageFullScreen.isOffered(for: url, isPrivate: isPrivate)
             && (PageFullScreen.choice(for: url) != nil || tab.webView.map({ PageVideos.shared.frames(in: $0).contains { !$0.videos.isEmpty } }) == true)
         context.foreignLanguage = tab.foreignLanguage != nil
-        context.developerTools = DeveloperTools.isOn && DevelopmentSites.isSwitchOffered(for: url, isPrivate: isPrivate)
+        context.developerMode = DeveloperTools.isOn && DevelopmentSites.isOffered(for: url, isPrivate: isPrivate)
         context.coveredPage = controller?.isShowingReader == true || tab.pdfViewer != nil || tab.webView == nil
         return context
     }
@@ -714,12 +725,12 @@ final class SitePanel: FloatingPanelView {
                     guard let self else { return }
                     KeepAwake.set(on, for: self.url)
                 })
-            case .developerTools:
-                // The site is one you develop on (#141): on the list in Settings › Developer, or off it.
-                rows.append(.toggle(String(localized: "Developer tools", comment: "Row in the site panel's This Site group: this site is one you develop on, listed in Settings › Developer, and gets the developer tools."),
-                                    on: DevelopmentSites.covers(url), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+            case .developerMode:
+                // Developer Mode for the site (#141): on the list in Settings › Developer, or off it. The same as
+                // View › Developer's item, toast and Undo included.
+                rows.append(.toggle(DeveloperTool.modeName, on: DevelopmentSites.covers(url), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                     guard let self else { return }
-                    DevelopmentSites.set(on, for: self.url)
+                    self.controller?.setDeveloperMode(for: self.url, on: on)
                 })
             case .fullScreenFills:
                 // Full screen in the page's own area instead of the whole screen (#168), for this site alone.
@@ -1525,7 +1536,7 @@ final class PanelPageHeader: NSView {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, forceDark, keepAwake, developerTools, fullScreenFills, alwaysTranslate }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, forceDark, keepAwake, fullScreenFills, alwaysTranslate, developerMode }
     /// The rows into the panel's other pages.
     enum Link: Equatable { case connection, permissions, extensions }
 
@@ -1545,9 +1556,9 @@ enum SitePanelRows {
         var fullScreen = false
         /// The page is in a language other than yours.
         var foreignLanguage = false
-        /// The site's Developer tools switch is offered: Developer tools is on, for a web page that's listed or looks
-        /// like one being built, and not in a private window (`DevelopmentSites.isSwitchOffered`).
-        var developerTools = false
+        /// The site's Developer Mode switch is offered: the main switch in Settings › Developer is on, for any web
+        /// page, and not in a private window (`DevelopmentSites.isOffered`).
+        var developerMode = false
         /// Reader or a PDF covers the page: the page's zoom isn't what you see.
         var coveredPage = false
         /// The site asked for something, or has an answer kept.
@@ -1566,9 +1577,10 @@ enum SitePanelRows {
             if c.forceDarkOffered { rows.append(.forceDark) }
             rows.append(.keepAwake)
         }
-        if c.developerTools { rows.append(.developerTools) }
         if c.fullScreen { rows.append(.fullScreenFills) }
         if c.foreignLanguage { rows.append(.alwaysTranslate) }
+        // Last, as it's for the people who build sites: there on every one, out of everyone else's way.
+        if c.developerMode { rows.append(.developerMode) }
         return rows
     }
 
