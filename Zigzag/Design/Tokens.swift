@@ -223,7 +223,7 @@ enum Tokens {
         static let developerDash: [NSNumber] = [4, 3]
         /// How much closer than their own line heights a Developer Mode row's title and host line sit, so the two fit
         /// a row's height at every sidebar size.
-        static var hostLineOverlap: CGFloat { scaled(3) }
+        static var hostLineOverlap: CGFloat { scaled(2) }
         /// A section label's slot, the label low in it.
         static var labelHeight: CGFloat { scaledEven(24) }
         /// The space's name over its pinned tabs: larger and light, the one heading in the sidebar, with room above it.
