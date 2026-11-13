@@ -1516,10 +1516,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard self.tabManager.selectedTab === tab, self.reader == nil else { return }
             let view = ReaderView(store: webView.configuration.websiteDataStore)
             view.onClose = { [weak self] in self?.closeReader() }
-            view.onOpenLink = { [weak self] link in self?.closeReader(); tab.load(link) }
-            view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab) }
-            view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab) }
-            view.onForegroundLink = { [weak self] link in self?.open(link, disposition: .foregroundTab, opener: tab, allowSwitch: false) }
+            // The article's links are the page's, wherever they open.
+            view.onOpenLink = { [weak self] link in self?.closeReader(); tab.load(link, by: .page) }
+            view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab, by: .page) }
+            view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab, by: .page) }
+            view.onForegroundLink = { [weak self] link in self?.open(link, disposition: .foregroundTab, opener: tab, allowSwitch: false, by: .page) }
             view.show(article, from: url, icon: tab.favicon)
             self.reader = view
             self.readerTab = tab
@@ -1874,7 +1875,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Opening pages
 
     /// Opens a URL the way the user asked, switching to an existing tab when the page is already open.
-    func open(_ url: URL, disposition: OpenDisposition = .foregroundTab, opener: Tab? = nil, allowSwitch: Bool = true) {
+    /// `sender`: who gave the address. A page's link (⌘-click, a link in Reader) is the page's doing, never yours.
+    func open(_ url: URL, disposition: OpenDisposition = .foregroundTab, opener: Tab? = nil, allowSwitch: Bool = true, by sender: Tab.LoadSender = .zigzag) {
         // A page that comes to the front, say a link from Mail, isn't left under the command bar the empty window opened with.
         if disposition == .foregroundTab || disposition == .currentTab, commandBar.isVisible { commandBar.dismiss(restoringFocus: false) }
         if allowSwitch, disposition == .foregroundTab, let existing = tabManager.existingTab(for: url) {
@@ -1883,13 +1885,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         switch disposition {
         case .currentTab:
-            if let tab = tabManager.selectedTab { tab.load(url) } else { tabManager.newTab(url: url) }
+            if let tab = tabManager.selectedTab { tab.load(url, by: sender) } else { tabManager.newTab(url: url, by: sender) }
         case .foregroundTab:
-            tabManager.newTab(url: url, opener: opener)
+            tabManager.newTab(url: url, opener: opener, by: sender)
         case .backgroundTab:
-            tabManager.newTab(url: url, select: false, opener: opener)
+            tabManager.newTab(url: url, select: false, opener: opener, by: sender)
         case .peek:
-            showPeek(url: url, configuration: nil)
+            showPeek(url: url, configuration: nil, by: sender)
         case .newWindow:
             // A private window's links stay private.
             WindowManager.shared.newWindow(url: url, isPrivate: tabManager.isPrivate)
@@ -1899,9 +1901,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @discardableResult
-    func showPeek(url: URL?, configuration: WKWebViewConfiguration?) -> WKWebView? {
+    func showPeek(url: URL?, configuration: WKWebViewConfiguration?, by sender: Tab.LoadSender = .zigzag) -> WKWebView? {
         commandBar.dismiss(restoringFocus: false)
-        return peek.show(url: url, configuration: configuration, opener: tabManager.selectedTab)
+        return peek.show(url: url, configuration: configuration, opener: tabManager.selectedTab, by: sender)
     }
 
     private func sidebarContains(_ event: NSEvent) -> Bool {
@@ -1962,39 +1964,45 @@ extension BrowserWindowController: TabHost {
 
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
         // Inside peek, another peek just navigates the card.
-        if tab.isPeek, disposition == .peek { tab.load(url); return }
+        // A page's link: the page's doing wherever it opens, never yours (Tab sends only links to the web here).
+        if tab.isPeek, disposition == .peek { tab.load(url, by: .page); return }
         // A result opened from a search page keeps the search one Back away.
         if disposition == .backgroundTab || disposition == .foregroundTab, let current = tab.url, SearchFolding.isSearchResultsPage(current),
            let history = tab.interactionStateForSaving {
             let newTab = tabManager.newTab(url: nil, select: disposition == .foregroundTab, opener: tab, title: url.host(), site: url)
-            newTab.restoreHistory(history, thenLoad: url)
+            newTab.restoreHistory(history, thenLoad: url, by: .page)
             return
         }
-        open(url, disposition: disposition, opener: tab, allowSwitch: false)
+        open(url, disposition: disposition, opener: tab, allowSwitch: false, by: .page)
     }
 
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView? {
         if let pending = BrowserWebView.takePendingDisposition(for: tab.webView) {
             if pending == .peek { return showPeek(url: nil, configuration: configuration) }
             // A new window gets its own fresh page, not one tied to this tab (and a private one never shares anything).
-            // From a private window, it is private too.
+            // From a private window, it is private too. Only a link to the web: an app's asks from the page here.
             if pending == .newWindow || pending == .privateWindow, let url = action.request.url {
-                WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: tabManager.isPrivate || pending == .privateWindow)
+                if Tab.route(forPageLink: url, from: tab.url) == .load {
+                    WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: tabManager.isPrivate || pending == .privateWindow, by: .page)
+                } else {
+                    tab.openFromPage(url, isClick: true, asker: action.sourceFrame.securityOrigin)
+                }
                 return nil
             }
             let newTab = tabManager.newTab(url: nil, select: false, configuration: configuration, opener: tab, site: action.request.url)
             return newTab.ensureWebView()
         }
-        // Peeked pages open their links in the card itself.
+        // Peeked pages open their links in the card itself, as the page's doing: an app's link asks, as it would
+        // from the page, and the site's Block holds.
         if tab.isPeek, features.width == nil, features.height == nil, let url = action.request.url {
-            tab.load(url)
+            tab.openFromPage(url, isClick: PopupNotice.isUserInitiated(action), asker: action.sourceFrame.securityOrigin)
             return nil
         }
         // Search folding: a result that wants a new tab replaces the search instead, so Back returns to it.
         if action.navigationType == .linkActivated, action.modifierFlags.intersection([.command, .shift, .option]).isEmpty,
            features.width == nil, features.height == nil,
            let current = tab.url, SearchFolding.isSearchResultsPage(current), let url = action.request.url {
-            tab.load(url)
+            tab.openFromPage(url, isClick: PopupNotice.isUserInitiated(action), asker: action.sourceFrame.securityOrigin)
             return nil
         }
         // Sized window.open() calls are sign-in and payment popups: give them a real small window.

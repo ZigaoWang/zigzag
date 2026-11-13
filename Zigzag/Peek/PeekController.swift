@@ -124,7 +124,7 @@ final class PeekController {
 
     /// Shows a URL in peek. With a configuration (from window.open), the page keeps its opener.
     @discardableResult
-    func show(url: URL?, configuration: WKWebViewConfiguration?, opener: Tab?) -> WKWebView? {
+    func show(url: URL?, configuration: WKWebViewConfiguration?, opener: Tab?, by sender: Tab.LoadSender = .zigzag) -> WKWebView? {
         guard let controller else { return nil }
         // A new peek replaces the old one rather than stacking.
         if let existing = tab { existing.close() }
@@ -136,6 +136,7 @@ final class PeekController {
         tab.host = controller
         tab.opener = opener
         tab.isPeek = true
+        tab.firstLoadSender = sender
         self.tab = tab
         token = tab.changed.observe { [weak self] change in self?.tabChanged(change) }
         let webView = tab.ensureWebView()

@@ -490,7 +490,7 @@ final class Tab: NSObject {
             // Interaction state restores history but may not start a load on its own.
             if webView.url == nil, let url { loadOwn(url, in: webView) }
         } else if let url, !fromWebKit {
-            loadOwn(url, in: webView)
+            loadFirst(url, in: webView)
         }
         // A new web view starts with sound and playing; carry over what you'd set on the old one.
         if isMuted { setMuted(true) }
@@ -647,7 +647,7 @@ final class Tab: NSObject {
         changed.send(.language)
     }
 
-    func load(_ url: URL) {
+    func load(_ url: URL, by sender: LoadSender = .zigzag) {
         leavePage(for: url)
         // Extension pages and websites need differently set up web views; crossing over swaps it.
         if let webView, Self.isExtensionPage(url) != showsExtensionPage {
@@ -658,13 +658,52 @@ final class Tab: NSObject {
             return
         }
         // The page that opened this tab can still write into the one showing: the address waits for the new page.
-        if webView == nil || !openedByPage {
+        // So does one a page asked for: it shows once it arrives, as any page's own navigation does.
+        if webView == nil || (!openedByPage && sender != .page) {
             self.url = url
             changed.send(.url)
         }
         let webView = ensureWebView()
-        loadOwn(url, in: webView)
+        load(url, in: webView, by: sender)
         refreshSettingsPage()
+    }
+
+    /// Who sent a tab to an address. Only you can let a link open another app without asking, and only Zigzag (you
+    /// included) can take a tab to one of its own pages or show the address before the page arrives.
+    enum LoadSender {
+        /// Typed in the address bar or chosen from the command bar.
+        case you
+        /// Zigzag itself: a bookmark, a restored tab, an extension or an agent asking through Zigzag.
+        case zigzag
+        /// A page: its window.open(), a link it opened in a new tab or a card, a link in its article or PDF.
+        case page
+    }
+
+    /// What a page may send a tab to on its own: only the web. An app's link goes to ExternalLinks, which asks (and
+    /// holds to the site's Block); a file on your Mac, a script address, an extension's page or one of Zigzag's own
+    /// is refused, except a local page linking to another file beside it.
+    enum PageLinkRoute: Equatable { case load, app, refuse }
+
+    static func route(forPageLink url: URL, from page: URL?) -> PageLinkRoute {
+        let scheme = url.scheme?.lowercased() ?? ""
+        if ["http", "https", "about", "data", "blob"].contains(scheme) { return .load }
+        if scheme == "file" { return page?.isFileURL == true ? .load : .refuse }
+        if scheme.isEmpty || ["javascript", "webkit-extension", HistoryPage.scheme].contains(scheme) { return .refuse }
+        return .app
+    }
+
+    /// Goes where a page asked this tab to go (its window.open() into a card or a web app's window): as the page's
+    /// doing, never Zigzag's or yours. An app's link asks first, from this page; anything else not on the web goes nowhere.
+    func openFromPage(_ url: URL, isClick: Bool, asker: WKSecurityOrigin?) {
+        switch Self.route(forPageLink: url, from: self.url) {
+        case .load:
+            load(url, by: .page)
+        case .app:
+            guard let webView else { return }
+            ExternalLinks.open(url, isMainFrame: true, isClick: isClick, from: webView, asker: asker, byYou: false)
+        case .refuse:
+            Diagnostics.note("Refused a page's link", site: self.url?.host(), "\(url.scheme ?? "no scheme"):", isPrivate: isPrivate)
+        }
     }
 
     /// The page looks like an article, so Reader is offered.
@@ -681,8 +720,11 @@ final class Tab: NSObject {
     /// Its web view was made by WebKit for a page's new window, so that page (its opener) can script it: every
     /// address it goes to waits until it commits, Zigzag's own loads too.
     private var openedByPage = false
-    /// Zigzag itself is loading this tab (the address bar, a link from elsewhere): its address shows at once.
-    private var ownLoadPending = false
+    /// Zigzag itself is loading this tab (the address bar, a link from elsewhere): its address shows at once. `.you`
+    /// when you typed or chose it, so an app's link opens without asking. Never `.page`: a page's own load is nil.
+    private var ownLoadPending: LoadSender?
+    /// Who the address this tab was made with came from, for its first load (a link a page opened in a new tab).
+    var firstLoadSender: LoadSender = .zigzag
     /// Where Zigzag itself is taking this tab back or forward (its buttons, a swipe, the keyboard, restored history):
     /// the only Back or Forward that may land on one of Zigzag's own pages. A page's history.back() may not.
     private var ownHistoryTarget: URL?
@@ -708,7 +750,7 @@ final class Tab: NSObject {
     }
 
     /// Starts this tab with another tab's back/forward list, then navigates: used for search folding.
-    func restoreHistory(_ state: Data, thenLoad url: URL) {
+    func restoreHistory(_ state: Data, thenLoad url: URL, by sender: LoadSender = .zigzag) {
         if let webView {
             restoreState(state, in: webView)
         } else {
@@ -718,7 +760,7 @@ final class Tab: NSObject {
         leavePage(for: url)
         self.url = url
         changed.send(.url)
-        loadOwn(url, in: webView)
+        load(url, in: webView, by: sender)
     }
 
     /// Gives a new tab another's back and forward history (Duplicate).
@@ -734,8 +776,20 @@ final class Tab: NSObject {
 
     /// Loads a page in this tab's web view as Zigzag's own doing (not the page's), so its address shows at once.
     private func loadOwn(_ url: URL, in webView: WKWebView) {
-        ownLoadPending = true
+        load(url, in: webView, by: .zigzag)
+    }
+
+    /// Loads a page in this tab's web view for `sender`: only Zigzag's own loads, and yours, count as its own.
+    private func load(_ url: URL, in webView: WKWebView, by sender: LoadSender) {
+        ownLoadPending = sender == .page ? nil : sender
         Self.load(url, in: webView)
+    }
+
+    /// The first load of a tab made with an address, as whoever gave it.
+    private func loadFirst(_ url: URL, in webView: WKWebView) {
+        let sender = firstLoadSender
+        firstLoadSender = .zigzag
+        load(url, in: webView, by: sender)
     }
 
     /// Local files need read access granted to their folder; everything else is a plain request.
@@ -1021,7 +1075,7 @@ final class Tab: NSObject {
                     // What you chose for this tab with the developer tools is for a development page: the page the
                     // web view is going to gets it, or goes without, before it starts.
                     if let self, !self.developer.isUnchanged { self.applyDeveloperState() }
-                    guard let self, !(self.addressWaitsForCommit && wv.isLoading), !(self.openedByPage && self.ownLoadPending) else { return }
+                    guard let self, !(self.addressWaitsForCommit && wv.isLoading), !(self.openedByPage && self.ownLoadPending != nil) else { return }
                     self.followAddress(of: wv)
                 }
             },
@@ -1140,10 +1194,11 @@ extension Tab: WKNavigationDelegate {
         // Zigzag's own load counts for the main frame's next decision only, whatever comes of it (a download, an
         // app's link): never for a later one the page starts.
         let decidesMainFrame = navigationAction.targetFrame?.isMainFrame == true
-        let ownLoad = decidesMainFrame && ownLoadPending
+        let ownSender = decidesMainFrame ? ownLoadPending : nil
+        let ownLoad = ownSender != nil
         let ownHistory = decidesMainFrame && ownHistoryTarget != nil && navigationAction.request.url == ownHistoryTarget
         if decidesMainFrame {
-            ownLoadPending = false
+            ownLoadPending = nil
             ownHistoryTarget = nil
         }
         if navigationAction.shouldPerformDownload {
@@ -1177,7 +1232,7 @@ extension Tab: WKNavigationDelegate {
                 let request = navigationAction.request
                 DispatchQueue.main.async { [weak self, weak webView] in
                     guard let self, let webView, self.webView === webView else { return }
-                    if ownLoad { self.loadOwn(url, in: webView) } else { webView.load(request) }
+                    if let ownSender { self.load(url, in: webView, by: ownSender) } else { webView.load(request) }
                 }
                 return (.cancel, preferences)
             }
@@ -1211,7 +1266,7 @@ extension Tab: WKNavigationDelegate {
         if ExternalLinks.isExternal(url) {
             ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
                                isClick: PopupNotice.isUserInitiated(navigationAction), from: webView,
-                               asker: navigationAction.sourceFrame.securityOrigin, byYou: ownLoad)
+                               asker: navigationAction.sourceFrame.securityOrigin, byYou: ownSender == .you)
             return (.cancel, preferences)
         }
 
@@ -1228,7 +1283,9 @@ extension Tab: WKNavigationDelegate {
         // Anything you do yourself ends the pinned page's settling-in.
         if isLinkClick || navigationAction.navigationType == .formSubmitted { landingUntil = nil }
         let isMainFrame = navigationAction.targetFrame?.isMainFrame ?? true
-        if isLinkClick && isMainFrame {
+        // Only a link to the web opens elsewhere (a tab, a card): one to a file or a script stays the page's to try,
+        // where WebKit holds it to what the page may reach.
+        if isLinkClick && isMainFrame && Self.route(forPageLink: url, from: self.url) == .load {
             let flags = navigationAction.modifierFlags
             if navigationAction.buttonNumber == 4 /* middle click */ || flags.contains(.command) {
                 host?.tab(self, openURL: url, disposition: flags.contains(.shift) ? .foregroundTab : .backgroundTab)
@@ -1657,7 +1714,7 @@ extension Tab {
                 guard fresh || !showing else { return }
                 // A quiet blank over WebKit's own viewer at once, so it never shows before ours.
                 let viewer = PDFViewerView(url: url, isPrivate: self.isPrivate, profile: self.profile.id)
-                viewer.onOpenLink = { [weak self] link in self?.load(link) }
+                viewer.onOpenLink = { [weak self] link in self?.load(link, by: .page) }
                 viewer.onExternalLink = { [weak webView] link in
                     if let webView { ExternalLinks.open(link, isMainFrame: true, isClick: true, from: webView) }
                 }

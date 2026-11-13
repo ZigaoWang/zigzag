@@ -930,11 +930,12 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let inCurrent = editing
         func open(_ url: URL, search: Bool = false) {
             if !inCurrent { Tutorial.complete("newTab") }
+            // Typed or chosen here: yours, so an app's link you typed opens without asking (the site's Block still holds).
             if inCurrent {
-                manager.selectedTab?.load(url)
+                manager.selectedTab?.load(url, by: .you)
                 manager.selectedTab?.isSearchTab = search
             } else {
-                let tab = manager.newTab(url: url, select: !inBackground)
+                let tab = manager.newTab(url: url, select: !inBackground, by: .you)
                 tab.isSearchTab = search
             }
         }

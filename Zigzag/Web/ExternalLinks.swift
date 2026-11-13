@@ -29,7 +29,8 @@ enum ExternalLinks {
     /// `isClick`: a real click or key started it (not a script's click()).
     /// `asker`: the frame that asked, when it's from another site than the page (an ad on a meeting page): it's named,
     /// and it never gets the page's saved answer, though the page's Block holds for it too.
-    /// `byYou`: Zigzag itself sent the tab there (typed in the address bar, a bookmark), never the page: it opens.
+    /// `byYou`: you typed it in the address bar or chose it in the command bar, never a page or Zigzag on its own: it
+    /// opens without asking, unless the site is set to Block.
     static func open(_ url: URL, isMainFrame: Bool, isClick: Bool, from webView: WKWebView, asker: WKSecurityOrigin? = nil, byYou: Bool = false) {
         let scheme = url.scheme?.lowercased() ?? ""
         // Only a site installed as an app sends these, from its own small app: never a page.
@@ -48,10 +49,6 @@ enum ExternalLinks {
             }
             return
         }
-        if byYou {
-            NSWorkspace.shared.open(url)
-            return
-        }
         let pageHost = webView.url?.host()?.lowercased() ?? ""
         let askerHost = asker?.host.lowercased() ?? ""
         let foreign = !askerHost.isEmpty && (PublicSuffix.registrableDomain(askerHost) ?? askerHost) != (PublicSuffix.registrableDomain(pageHost) ?? pageHost)
@@ -64,16 +61,16 @@ enum ExternalLinks {
         let key = "\(origin ?? host)|\(scheme)"
         // The page's Allow or Block, or the app it was told Always Open to. A frame from elsewhere gets only Block.
         let decision: () -> Bool? = { Self.decision(page: pageOrigin, scheme: scheme, foreign: foreign) }
-        if decision() == false {
+        let clickedHere = isClick && isMainFrame && webView.window != nil
+        switch verdict(byYou: byYou, decision: decision(), clickedHere: clickedHere, scheme: scheme) {
+        case .block:
             Diagnostics.note("Blocked opening an app", site: host, "\(scheme):", isPrivate: !webView.configuration.websiteDataStore.isPersistent)
             return
-        }
-        // Mail, phone and FaceTime open at once for a link you clicked in the page in front; from anywhere else
-        // (a hidden frame, a background tab, a script) they ask like any other app.
-        let clickedHere = isClick && isMainFrame && webView.window != nil
-        if clickedHere && everyday.contains(scheme) || decision() == true {
+        case .open:
             NSWorkspace.shared.open(url)
             return
+        case .ask:
+            break
         }
         guard let controller, webView.window != nil, !asking.contains(key), !declined.contains(key),
               putOff[key].map({ Date() > $0 }) ?? true else { return }
@@ -108,6 +105,18 @@ enum ExternalLinks {
                 putOff[key] = Date().addingTimeInterval(60)
             }
         }
+    }
+
+    enum Verdict: Equatable { case block, open, ask }
+
+    /// Whether a link for another app opens, asks first or goes nowhere. The site's Block always holds, even for an
+    /// address you typed: `byYou` only spares you the question. Mail, phone and FaceTime open at once for a link you
+    /// clicked in the page in front (`clickedHere`); from anywhere else (a hidden frame, a background tab, a script)
+    /// they ask like any other app.
+    static func verdict(byYou: Bool, decision: Bool?, clickedHere: Bool, scheme: String) -> Verdict {
+        if decision == false { return .block }
+        if byYou || decision == true || (clickedHere && everyday.contains(scheme)) { return .open }
+        return .ask
     }
 
     /// What's kept for the page at `page` opening `scheme`'s app: its Allow or Block, or the app it was told Always

@@ -184,7 +184,8 @@ final class WindowManager {
     }()
 
     @discardableResult
-    func newWindow(url: URL? = nil, spaceID: UUID? = nil, showCommandBar: Bool = true, isPrivate: Bool = false) -> BrowserWindowController {
+    func newWindow(url: URL? = nil, spaceID: UUID? = nil, showCommandBar: Bool = true, isPrivate: Bool = false,
+                   by sender: Tab.LoadSender = .zigzag) -> BrowserWindowController {
         // Opened for Zigzag Mini alone, the saved windows are still waiting: they come back first, so a new window never
         // saves over them, and a plain ⌘N is simply them.
         if sessionWaiting, !isPrivate, restoreSession(), url == nil, let restored = controllers.last(where: { !$0.tabManager.isPrivate }) {
@@ -218,7 +219,7 @@ final class WindowManager {
         // launch would show it instead of restoring this window and then save over it.
         if !isPrivate, Self.needsOnboarding { UserDefaults.standard.set(true, forKey: "ImportOfferDismissed") }
         if let url {
-            manager.newTab(url: url)
+            manager.newTab(url: url, by: sender)
         } else if isPrivate {
             controller.commandBar.show(mode: .newTab)
         } else if showCommandBar {

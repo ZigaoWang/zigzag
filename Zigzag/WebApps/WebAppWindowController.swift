@@ -309,13 +309,14 @@ extension WebAppWindowController: TabHost {
     /// The site stays here; a link for a tab of its own, or one to another site, goes to the browser window.
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
         switch disposition {
+        // A page's link (Tab sends only links to the web here): the page's doing wherever it opens.
         case .currentTab, .peek:
-            tab.load(url)
+            tab.load(url, by: .page)
         case .newWindow, .privateWindow:
-            WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: disposition == .privateWindow)
+            WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: disposition == .privateWindow, by: .page)
         case .foregroundTab, .backgroundTab:
             let target = MiniWindowController.browserWindow()
-            target.open(url, disposition: disposition, allowSwitch: false)
+            target.open(url, disposition: disposition, allowSwitch: false, by: .page)
             if disposition == .foregroundTab {
                 target.window?.makeKeyAndOrderFront(nil)
                 NSApp.activate()
@@ -326,7 +327,11 @@ extension WebAppWindowController: TabHost {
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView? {
         let pending = BrowserWebView.takePendingDisposition(for: tab.webView)
         if pending == .newWindow || pending == .privateWindow, let url = action.request.url {
-            WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: pending == .privateWindow)
+            if Tab.route(forPageLink: url, from: tab.url) == .load {
+                WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: pending == .privateWindow, by: .page)
+            } else {
+                tab.openFromPage(url, isClick: true, asker: action.sourceFrame.securityOrigin)
+            }
             return nil
         }
         // Sign-in and payment popups: their own small window, over this one.
@@ -334,9 +339,11 @@ extension WebAppWindowController: TabHost {
             return PopupWindowController.open(configuration: configuration, features: features, parent: window)
         }
         // A plain click on a link to the same site that asks for a new tab: it opens here, as the app is that site.
+        // An app's link from it (no site to leave) asks, as the page's own doing, and the site's Block holds.
         let modified = action.modifierFlags.contains(.command) || action.modifierFlags.contains(.shift)
-        if pending == nil, !modified, let url = action.request.url, let here = tab.url, !Tab.leavesSite(from: here, to: url) {
-            tab.load(url)
+        if pending == nil, !modified, let url = action.request.url, let here = tab.url,
+           Tab.route(forPageLink: url, from: here) != .load || !Tab.leavesSite(from: here, to: url) {
+            tab.openFromPage(url, isClick: PopupNotice.isUserInitiated(action), asker: action.sourceFrame.securityOrigin)
             return nil
         }
         let background = pending != nil || (action.modifierFlags.contains(.command) && !action.modifierFlags.contains(.shift))

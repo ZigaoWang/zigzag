@@ -738,7 +738,7 @@ extension MiniWindowController: CommandBarHost {
         if MiniQuickOpen.switchToTab(kind) { return true }
         guard let (url, search) = MiniQuickOpen.page(for: kind) else { return true }
         tab.isSearchTab = search
-        tab.load(url)
+        tab.load(url, by: .you)
         strip.title.isHidden = false
         commandBarRestoreFocus()
         return true
@@ -752,14 +752,15 @@ extension MiniWindowController: TabHost {
 
     /// One page lives here: a link that asks for a tab of its own goes to a browser window, as a sign-in popup's does.
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
+        // A page's link (Tab sends only links to the web here): the page's doing wherever it opens.
         switch disposition {
         case .currentTab, .peek:
-            tab.load(url)
+            tab.load(url, by: .page)
         case .newWindow, .privateWindow:
-            WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: disposition == .privateWindow)
+            WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: disposition == .privateWindow, by: .page)
         case .foregroundTab, .backgroundTab:
             let target = Self.browserWindow()
-            target.open(url, disposition: disposition, allowSwitch: false)
+            target.open(url, disposition: disposition, allowSwitch: false, by: .page)
             if disposition == .foregroundTab { target.window?.makeKeyAndOrderFront(nil) }
         }
     }
@@ -767,7 +768,11 @@ extension MiniWindowController: TabHost {
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView? {
         let pending = BrowserWebView.takePendingDisposition(for: tab.webView)
         if pending == .newWindow || pending == .privateWindow, let url = action.request.url {
-            WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: pending == .privateWindow)
+            if Tab.route(forPageLink: url, from: tab.url) == .load {
+                WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: pending == .privateWindow, by: .page)
+            } else {
+                tab.openFromPage(url, isClick: true, asker: action.sourceFrame.securityOrigin)
+            }
             return nil
         }
         // Sized window.open() calls are sign-in and payment popups: their own small window, over this one.
