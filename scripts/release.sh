@@ -144,7 +144,7 @@ if [[ "${1:-}" == "--beta" ]]; then
   # Only the beta feed: everyone else stays on the stable one. The zip sits with the other releases.
   write_notes
   echo "Writing the beta feed…"
-  "$GENERATE" --download-url-prefix "https://$SITE_HOST/releases/" --release-notes-url-prefix "https://$SITE_HOST/updates/" "$OUT/updates"
+  "$GENERATE" --download-url-prefix "https://$SITE_HOST/releases/" --release-notes-url-prefix "https://$SITE_HOST/updates/" --full-release-notes-url "https://$SITE_HOST/release-notes/" --link "https://$SITE_HOST/" "$OUT/updates"
   mv "$OUT/updates/appcast.xml" "$OUT/updates/beta.xml"
   again rsync -a "$ZIP" "$SERVER:$SITE_ROOT/releases/"
   upload_notes
@@ -180,7 +180,7 @@ if [[ "${1:-}" == "--publish" ]]; then
   # Builds and the feed are served from zigzagbrowser.com (reachable everywhere, no GitHub needed).
   write_notes
   echo "Writing appcast…"
-  "$GENERATE" --download-url-prefix "https://$SITE_HOST/releases/" --release-notes-url-prefix "https://$SITE_HOST/updates/" "$OUT/updates"
+  "$GENERATE" --download-url-prefix "https://$SITE_HOST/releases/" --release-notes-url-prefix "https://$SITE_HOST/updates/" --full-release-notes-url "https://$SITE_HOST/release-notes/" --link "https://$SITE_HOST/" "$OUT/updates"
   echo "Uploading to $SITE_HOST…"
   again rsync -a "$ZIP" "$DMG" "$SERVER:$SITE_ROOT/releases/"
   again ssh "$SERVER" "ln -sfn Zigzag-$VERSION.dmg $SITE_ROOT/releases/Zigzag-latest.dmg && ln -sfn Zigzag-$VERSION.zip $SITE_ROOT/releases/Zigzag-latest.zip"
