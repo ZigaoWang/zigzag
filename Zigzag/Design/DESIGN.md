@@ -294,7 +294,8 @@ something came from, answers at once, and can be interrupted.
   double-click renames that page (over its title, or the row for the moment when the part shows no title). A row of
   several pages keeps the close button's room while it's hidden, so nothing in it moves under the pointer.
   A pinned page that has wandered reads "<its name> / <the page it's on>". Then
-  the bottom bar: downloads, space dots, +.
+  the bottom bar: downloads, space dots, +. A space with an icon shows it in place of its dot, at the sidebar's size
+  (`Sidebar.spaceIcon`: 14, 16, 20), each in a 26pt key (28 at Large, `Sidebar.spaceTarget`).
 - **Sidebar on the right** (#166, Settings › Appearance, View › Move Sidebar to Right): the whole layout is the
   left one's mirror image (`BrowserRootView.mirrored`): the page on the left, its window corners on its left side,
   the resize edge on the sidebar's left, the hidden sidebar coming out of the right edge, panels that open beside

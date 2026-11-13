@@ -587,10 +587,12 @@ final class SpaceDotView: InteractiveView {
     var icon: String? {
         didSet {
             guard icon != oldValue else { return }
-            iconView.image = icon.map { IconChoice.image($0, size: 12) }
+            iconSize = 0
             stateDidChange(animated: false)
         }
     }
+    /// The side the icon's image was drawn for: drawn again when Settings › Appearance › Sidebar size changes it.
+    private var iconSize: CGFloat = 0
     var color: NSColor = .gray { didSet { stateDidChange(animated: false) } }
     var isDropTarget = false { didSet { stateDidChange(animated: true) } }
     /// While a swipe pulls toward or away from this space: how much it looks like the space you're in, 0 to 1,
@@ -662,7 +664,15 @@ final class SpaceDotView: InteractiveView {
         // the dot's tooltip names the space and its ⌃ key.
         // A space with an icon shows the icon, small, in place of its dot; the one you're in is simply the brightest.
         _ = side
-        let iconSide: CGFloat = 14
+        // The icon follows Settings › Appearance › Sidebar size; never larger than its key leaves room for.
+        let iconSide = min(Tokens.Sidebar.spaceIcon, max(10, min(bounds.width, bounds.height) - 6))
+        if let icon, iconSize != iconSide {
+            iconSize = iconSide
+            // A symbol's glyph sits a little inside its square, as the 12pt one did in the 14pt square.
+            iconView.image = IconChoice.image(icon, size: IconChoice.isSymbol(icon) ? round(iconSide * 6 / 7) : iconSide)
+        } else if icon == nil {
+            iconView.image = nil
+        }
         let dotSide: CGFloat = icon == nil ? 6 : 2
         let width = icon == nil ? dotSide + 10 * share : 0
         let dotY = icon == nil ? bounds.midY - dotSide / 2
@@ -839,7 +849,11 @@ final class SidebarView: NSView {
         favorites.onHeightChange = { [weak self] in self?.needsLayout = true }
         // Settings › Appearance › Sidebar size: the address and favorites take their new heights, the list moves.
         sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.needsLayout = true }
+            MainActor.assumeIsolated {
+                self?.needsLayout = true
+                // The spaces' icons take their new size even where their keys keep theirs.
+                self?.dots.forEach { $0.needsLayout = true }
+            }
         }
 
         scrollView.drawsBackground = false
@@ -1042,7 +1056,7 @@ final class SidebarView: NSView {
         let available = newSpaceButton.frame.minX - downloadsButton.frame.maxX - Tokens.Space.x2
         dotStrip.frame = NSRect(x: downloadsButton.frame.maxX + Tokens.Space.x1, y: 0, width: max(0, available), height: h)
         // Never smaller than a comfortable target; past that, the row scrolls.
-        let dotSize = max(DotStrip.smallest, min(Tokens.Sidebar.button, floor(available / CGFloat(max(dots.count, 1)))))
+        let dotSize = max(DotStrip.smallest, min(Tokens.Sidebar.spaceTarget, floor(available / CGFloat(max(dots.count, 1)))))
         let total = CGFloat(dots.count) * dotSize
         dotStrip.contentWidth = total
         var x = max(0, (available - total) / 2)

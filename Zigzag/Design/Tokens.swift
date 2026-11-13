@@ -285,6 +285,18 @@ enum Tokens {
 
         /// The bottom bar: 26pt buttons, 4pt from its edges, a space key (`spaceKey`) for each space.
         static let bottomBarHeight: CGFloat = 34
+        /// A space's icon in the bottom bar, in place of its dot (#210): with the sidebar's size, a step more than
+        /// its rows take, so a small mark still says which space it is (14, 16, 20).
+        static var spaceIcon: CGFloat {
+            switch current {
+            case .small: 14
+            case .medium: 16
+            case .large: 20
+            }
+        }
+        /// Each space's target in the bottom bar: a toolbar button, and at Large a little more round its larger icon,
+        /// as tall as the bar leaves room for.
+        static var spaceTarget: CGFloat { current == .large ? 28 : button }
         /// The now-playing strip above the bottom bar.
         static let nowPlayingHeight: CGFloat = 34
     }
