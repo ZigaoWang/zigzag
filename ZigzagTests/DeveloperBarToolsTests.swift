@@ -6,13 +6,30 @@ import Testing
 /// the page.
 @MainActor
 struct DeveloperBarToolsTests {
-    @Test func onlyADevelopmentTabOnItsOwnGetsTheTools() {
-        #expect(DeveloperBarTools.shows(isDevelopment: true, showsInBar: true, inSplit: false))
-        #expect(!DeveloperBarTools.shows(isDevelopment: false, showsInBar: true, inSplit: false))
-        // Tools above the page off, or a split, whose panes have the row for their own strips: the tools are in
-        // Site Controls.
-        #expect(!DeveloperBarTools.shows(isDevelopment: true, showsInBar: false, inSplit: false))
-        #expect(!DeveloperBarTools.shows(isDevelopment: true, showsInBar: true, inSplit: true))
+    @Test func aDevelopmentTabHasTheToolsInTheBarOrInItsPanesStrip() {
+        #expect(DeveloperBarTools.place(isDevelopment: true, showsInBar: true, inSplit: false) == .bar)
+        // In a split, whose panes have the row for their own strips: in its pane's ⋯.
+        #expect(DeveloperBarTools.place(isDevelopment: true, showsInBar: true, inSplit: true) == .pane)
+        // Not a development tab: none.
+        #expect(DeveloperBarTools.place(isDevelopment: false, showsInBar: true, inSplit: false) == nil)
+        #expect(DeveloperBarTools.place(isDevelopment: false, showsInBar: true, inSplit: true) == nil)
+        // Tools above the page off: none above it, and Site Controls has them.
+        #expect(DeveloperBarTools.place(isDevelopment: true, showsInBar: false, inSplit: false) == nil)
+        #expect(DeveloperBarTools.place(isDevelopment: true, showsInBar: false, inSplit: true) == nil)
+    }
+
+    @Test func aPanesMenuHasEveryToolOfferedInASplitAndNoOther() {
+        let placed = DeveloperBarTools.paneParts.flatMap(\.tools) + DeveloperBarTools.moreTools
+        #expect(Set(placed).count == placed.count)
+        let offered = DeveloperTool.allCases.filter {
+            DeveloperTool.isOffered($0, isOn: true, isDevelopment: true, url: URL(string: "http://localhost:3000/"), isPrivate: false, inSplit: true)
+        }
+        #expect(Set(placed) == Set(offered))
+        // Its ⋯ says a look chosen is in effect, as everything is under it there.
+        var state = DeveloperState()
+        state.appearance = .dark
+        #expect(DeveloperTool.hasChoiceInEffect(among: placed, in: state))
+        #expect(!DeveloperTool.hasChoiceInEffect(among: placed, in: DeveloperState()))
     }
 
     /// With the address in the bar: the tools alone, as wide as they need, groups a line apart.
@@ -96,6 +113,19 @@ struct DeveloperBarToolsTests {
         tools.needsLayout = true
         tools.layoutSubtreeIfNeeded()
         #expect(tools.shown == 1)
+    }
+
+    @Test func aCountIsOneBadgeOnTheButtonThatHoldsIt() {
+        let console = NSView(), more = NSView()
+        // Nothing to say: no badge.
+        #expect(BadgeView.show("", on: console, replacing: nil) == nil)
+        let badge = try! #require(BadgeView.show("3", on: console, replacing: nil))
+        #expect(badge.superview === console && badge.text == "3")
+        // The same badge, saying more, moved onto ⋯ when the console's button gave way into it.
+        let moved = BadgeView.show("12", on: more, replacing: badge)
+        #expect(moved === badge && badge.superview === more && badge.text == "12" && console.subviews.isEmpty)
+        // Gone once the count is.
+        #expect(BadgeView.show("", on: more, replacing: badge) == nil && more.subviews.isEmpty)
     }
 
     @Test func everyToolIsReachable() {

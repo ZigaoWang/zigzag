@@ -210,7 +210,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         tokens.append(tabManager.changed.observe { [weak self] change in self?.tabManagerChanged(change) })
         tokens.append(Library.shared.changed.observe { [weak self] in self?.libraryChanged() })
         // Tools above the page turned on or off (Settings › Developer): the page you're on gains or loses them.
-        tokens.append(DeveloperTools.changed.observe { [weak self] in self?.showDeveloperBarTools() })
+        tokens.append(DeveloperTools.changed.observe { [weak self] in
+            self?.showDeveloperBarTools()
+            self?.root.paneCards.forEach { $0.header.refreshDeveloperTools() }
+        })
         // Reduce Transparency turned on or off while Zigzag is open: the window follows at once.
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(displayOptionsChanged),
                                                           name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
@@ -982,7 +985,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func showDeveloperBarTools() {
         let tab = tabManager.selectedTab
         showPageSize()
-        let shows = showsDeveloperBarTools(for: tab)
+        let shows = developerToolsPlace(for: tab) == .bar
         // Never made for a window that has no use for it.
         let had = root.topBar.accessory != nil
         guard shows || had else { return }
@@ -1033,10 +1036,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         tool.run(in: self)
     }
 
-    /// Whether a tab has the tools in the bar above its page: Site Controls shows them where it doesn’t.
-    func showsDeveloperBarTools(for tab: Tab?) -> Bool {
-        DeveloperBarTools.shows(isDevelopment: tab?.isDevelopment == true, showsInBar: DeveloperTools.showsInBar,
-                             inSplit: tab.flatMap { tabManager.shownSplit(for: $0) } != nil)
+    /// Where a tab has its own tools above its page: the bar, its pane's strip in a split, or nowhere, where Site
+    /// Controls has them.
+    func developerToolsPlace(for tab: Tab?) -> DeveloperBarTools.Place? {
+        DeveloperBarTools.place(isDevelopment: tab?.isDevelopment == true, showsInBar: DeveloperTools.showsInBar,
+                                inSplit: tab.flatMap { tabManager.shownSplit(for: $0) } != nil)
     }
 
     /// Puts the selected tab in the page card, or the pages of its split or tile group side by side, each in a card.
@@ -1102,6 +1106,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                     self.editAddress(of: tab, from: card.header.address)
                 }
                 card.header.onSiteControls = { [weak self] tab, anchor in self?.showSiteControls(for: tab, from: anchor) }
+                // A development page's tools, in its strip's ⋯.
+                card.header.developerMenu = { [weak self] tab in
+                    guard let self, self.developerToolsPlace(for: tab) == .pane else { return nil }
+                    return DeveloperMenu(tab: tab, controller: self)
+                }
             }
         } else {
             root.setZoomedPane(nil, animated: false)

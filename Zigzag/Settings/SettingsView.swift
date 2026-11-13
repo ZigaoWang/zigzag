@@ -1174,7 +1174,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         developerToolsGroup.add(developerRow)
         developerBarToggle.onChange = { on in DeveloperTools.showsInBar = on }
         developerToolsGroup.add(FormRow(title: String(localized: "Tools above the page", comment: "A setting in Settings › Developer: on a site in Developer Mode, the developer tools are in the bar above the page, with its full address."),
-                                        detail: String(localized: "In the bar above a page in Developer Mode: its full address, the console, inspecting an element, the page’s look and size, and more. Off, they’re in the site’s controls.",
+                                        detail: String(localized: "In the bar above a page in Developer Mode: its full address, the console, inspecting an element, the page’s look and size, and more. In split view, in the page’s ⋯. Off, they’re in the site’s controls.",
                                                        comment: "Explanation under “Tools above the page” in Settings › Developer."),
                                         control: developerBarToggle))
         developerTrustToggle.onChange = { on in DeveloperTools.trustsLocalServers = on }

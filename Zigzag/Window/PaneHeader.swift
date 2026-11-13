@@ -31,7 +31,8 @@ final class PaneHeaderView: NSView {
     let close = PaneHeaderView.button("rectangle.split.2x1.slash", toolTip: String(localized: "Separate Tabs", comment: "Tooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs."))
     /// Closes this pane's page; the other one fills the window, as closing either half from the sidebar does.
     let closeTab = PaneHeaderView.button("xmark", toolTip: String(localized: "Close Tab", comment: "Tooltip of a button in the strip on top of each page of a split view: closes that page's tab, leaving the other page."))
-    /// Where the split's own buttons go when the pane is too narrow for them beside its address.
+    /// Where the split's own buttons go when the pane is too narrow for them beside its address, and, on a page in
+    /// Developer Mode, its developer tools: there whatever the width, then.
     let more = PaneHeaderView.button("ellipsis", toolTip: String(localized: "More", comment: "Tooltip of a button in the strip on top of each page of a narrow split view: opens a menu with the split's buttons that don't fit."))
     /// The page's address: click it to edit it, as the sidebar's address does for the page you're in.
     let address = PaneAddressView()
@@ -46,6 +47,13 @@ final class PaneHeaderView: NSView {
     var onEditAddress: ((Tab) -> Void)?
     /// Site Controls asked for, from the button at the address's end or ⋯: for this pane's page, under this view (#160).
     var onSiteControls: ((Tab, NSView) -> Void)?
+    /// The developer tools of this pane's page, where it has them in its strip (`BrowserWindowController`): nil for
+    /// a page that isn't in Developer Mode, or with Tools above the page off.
+    var developerMenu: ((Tab) -> DeveloperMenu?)? { didSet { refreshDeveloperTools() } }
+    /// This pane's page's developer tools, while it has them here.
+    private var developer: DeveloperMenu? { tab.flatMap { developerMenu?($0) } }
+    private var errorBadge: BadgeView?
+
     /// A split of two has swap and the layout; a tile group's pages keep the places they were dropped in (#160).
     var arrangesSplit = true { didSet { if arrangesSplit != oldValue { needsLayout = true } } }
     /// Up in the bar above the page (`TopBarView.strips`) instead of on the pane's card: the bar's height, on the
@@ -175,9 +183,27 @@ final class PaneHeaderView: NSView {
                 // Only this pane's own page: a change from a page the header no longer shows is old news.
                 guard let self, let tab, tab === self.tab else { return }
                 if change == .url || change == .navigation || change == .loading { self.refresh() }
+                // It became or stopped being a development page, a choice changed, or it threw.
+                if change == .developer || change == .pageErrors { self.refreshDeveloperTools() }
             }
         }
         refresh()
+        refreshDeveloperTools()
+    }
+
+    /// ⋯ for a page in Developer Mode: there whatever the width, filled while something chosen under it is in
+    /// effect, and carrying the count of the page's errors, as ⋯ above a page shown on its own does once the console
+    /// is in it.
+    func refreshDeveloperTools() {
+        let state = tab?.developerInEffect ?? DeveloperState()
+        let tools = developer
+        let hasChoice = tools != nil && DeveloperTool.hasChoiceInEffect(among: DeveloperBarTools.paneParts.flatMap(\.tools) + DeveloperBarTools.moreTools, in: state)
+        let symbol = DeveloperMenu.moreSymbol(hasChoice: hasChoice)
+        if more.symbol != symbol { more.symbol = symbol }
+        let count = tools == nil ? 0 : tab?.pageErrorCount ?? 0
+        errorBadge = BadgeView.show(DeveloperTool.errorBadge(count), on: more, replacing: errorBadge)
+        more.setAccessibilityValue(tools == nil ? nil : DeveloperMenu.moreValue(errors: count, hasChoice: hasChoice))
+        needsLayout = true
     }
 
     private func refresh() {
@@ -210,13 +236,14 @@ final class PaneHeaderView: NSView {
     /// The first fit, most buttons first, that leaves the address its room. Zoom, swap and the layout stay out only
     /// while the address shows whole, up to twice `Pane.addressMinWidth`; the rest give way only to keep it that
     /// minimum. Too narrow for any, the fewest buttons.
-    /// Without swap and the layout (`arrangesSplit` off), they take no room in any fit; zoom does.
-    static func fit(width: CGFloat, edge: CGFloat, address: CGFloat, splitButtons: Bool = true) -> Fit {
+    /// Without swap and the layout (`arrangesSplit` off), they take no room in any fit; zoom does. With ⋯ there
+    /// whatever the width (`alwaysMore`: a page in Developer Mode), it takes its room in every fit.
+    static func fit(width: CGFloat, edge: CGFloat, address: CGFloat, splitButtons: Bool = true, alwaysMore: Bool = false) -> Fit {
         let b = Tokens.Pane.button, gap = Tokens.Space.x2
         for fit in Fit.allCases {
             let need = min(address, Tokens.Pane.addressMinWidth * (fit == .all ? 2 : 1))
             let lo = edge + CGFloat(fit.leading) * b + gap
-            let trailing = fit.trailing - (!splitButtons && fit.showsSplitButtons ? 2 : 0)
+            let trailing = fit.trailing - (!splitButtons && fit.showsSplitButtons ? 2 : 0) + (alwaysMore && !fit.showsMore ? 1 : 0)
             let hi = width - edge - b - gap - CGFloat(trailing) * b - gap
             if hi - lo >= need { return fit }
         }
@@ -229,7 +256,7 @@ final class PaneHeaderView: NSView {
     /// On its card's top, on the card or up in the bar with the card behind it, rather than on the window's frame.
     private var overCard: Bool { !isInBar || isOnCard }
 
-    /// The buttons the strip has no room for, in its own menu under ⋯.
+    /// The buttons the strip has no room for, in its own menu under ⋯, then a development page's tools.
     private func showMore() {
         if let open = MenuPanel.current, open.anchor === more { open.close(); return }
         func item(_ button: IconButton, title: String? = nil) -> MenuPanel.Entry {
@@ -241,16 +268,27 @@ final class PaneHeaderView: NSView {
         // The address too narrow for its own button: Site Controls comes here, first, as it's about the page.
         if !address.showsSiteControls, tab != nil {
             entries.append(.item(.init(title: Self.siteControlsTitle, symbol: address.siteControls.symbol) { [weak self] in self?.openSiteControls() }))
-            entries.append(.separator)
         }
-        if !currentFit.showsForward { entries.append(item(forward)) }
-        if !currentFit.showsReload { entries.append(item(reload)) }
-        if !entries.isEmpty { entries.append(.separator) }
-        entries.append(item(zoom))
-        if arrangesSplit { entries += [item(swap), item(orientation)] }
+        var folded: [MenuPanel.Entry] = []
+        if !currentFit.showsForward { folded.append(item(forward)) }
+        if !currentFit.showsReload { folded.append(item(reload)) }
+        if !folded.isEmpty { entries += (entries.isEmpty ? [] : [.separator]) + folded }
+        var split: [MenuPanel.Entry] = []
+        if !currentFit.showsSplitButtons {
+            split.append(item(zoom))
+            if arrangesSplit { split += [item(swap), item(orientation)] }
+        }
         if !currentFit.showsSeparate {
-            entries.append(item(close, title: String(localized: "Separate Tabs", comment: "Tooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs.")))
+            split.append(item(close, title: String(localized: "Separate Tabs", comment: "Tooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs.")))
         }
+        if !split.isEmpty { entries += (entries.isEmpty ? [] : [.separator]) + split }
+        // A development page's tools, as ⋯ above a page shown on its own has them, all but its size.
+        if let developer {
+            let tools = [MenuPanel.Entry.header(String(localized: "Developer", comment: "Heading in the ⋯ menu of a split view pane's strip, on a page in Developer Mode, over that page's developer tools."))]
+                + developer.moreEntries(folded: DeveloperBarTools.paneParts)
+            entries += (entries.isEmpty ? [] : [.separator]) + tools
+        }
+        guard !entries.isEmpty else { return }
         more.isSelected = true
         MenuPanel.show(entries, from: more) { [weak self] in self?.more.isSelected = false }
     }
@@ -264,7 +302,9 @@ final class PaneHeaderView: NSView {
         // in from one edge as from the other: every pane's strip in a window alike.
         let edge = overCard ? Tokens.Radius.card : 0
         let y = isInBar ? round((bounds.height - b) / 2) : floor((bounds.height - Tokens.Metric.hairline - b) / 2)
-        let fit = Self.fit(width: bounds.width, edge: edge, address: address.text.isEmpty ? 0 : address.fittingWidth, splitButtons: arrangesSplit)
+        let hasDeveloper = developer != nil
+        let fit = Self.fit(width: bounds.width, edge: edge, address: address.text.isEmpty ? 0 : address.fittingWidth, splitButtons: arrangesSplit,
+                           alwaysMore: hasDeveloper)
         currentFit = fit
         forward.isHidden = !fit.showsForward
         reload.isHidden = !fit.showsReload
@@ -272,7 +312,7 @@ final class PaneHeaderView: NSView {
         orientation.isHidden = !fit.showsSplitButtons || !arrangesSplit
         zoom.isHidden = !fit.showsSplitButtons
         close.isHidden = !fit.showsSeparate
-        more.isHidden = !fit.showsMore
+        more.isHidden = !fit.showsMore && !hasDeveloper
         var x = edge
         for button in [back, forward, reload] where !button.isHidden {
             button.frame = NSRect(x: x, y: y, width: b, height: b)

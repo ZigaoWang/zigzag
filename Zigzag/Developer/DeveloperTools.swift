@@ -26,7 +26,8 @@ enum DeveloperTools {
     private static let barKey = "DeveloperToolsInBar"
 
     /// Settings › Developer › Tools above the page: a development tab has the tools in the bar above its page
-    /// (`DeveloperBarTools`). Off, they're in the site's controls.
+    /// (`DeveloperBarTools`), or in its pane's ⋯ in a split (`DeveloperBarTools.place`). Off, they're in the site's
+    /// controls.
     static var showsInBar: Bool {
         get { defaults.object(forKey: barKey) as? Bool ?? true }
         set {

@@ -2194,6 +2194,19 @@ final class BadgeView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// A count on `holder`, a button: `badge` (the one it had, or none) saying `text` there, moved onto it from
+    /// another button if it was on one, or none at all when there's nothing to say. Returns the badge it now has.
+    static func show(_ text: String, on holder: NSView, replacing badge: BadgeView?) -> BadgeView? {
+        guard !text.isEmpty else {
+            badge?.removeFromSuperview()
+            return nil
+        }
+        let shown = badge ?? BadgeView(text: text, attention: false)
+        shown.update(text: text, attention: false)
+        if shown.superview !== holder { holder.addSubview(shown) }
+        return shown
+    }
+
     /// What it says now, in place.
     func update(text: String, attention: Bool) {
         self.text = String(text.prefix(Self.maxLength))

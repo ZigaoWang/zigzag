@@ -45,10 +45,25 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
     /// The tools under ⋯ when `shown` of the buttons show: the ones that gave way, then those always there.
     static func toolsUnderMore(shown: Int) -> [DeveloperTool] { parts.dropFirst(shown).flatMap(\.tools) + moreTools }
 
-    /// Whether a page gets the tools above it: a development tab, shown on its own (a split's panes have the row
-    /// above them for their own strips), with Tools above the page on. Where it's a development tab and this says
-    /// no, Site Controls has the tools instead.
-    static func shows(isDevelopment: Bool, showsInBar: Bool, inSplit: Bool) -> Bool { isDevelopment && showsInBar && !inSplit }
+    /// Where a page has its own tools above it.
+    enum Place {
+        /// In the bar above the page, shown on its own.
+        case bar
+        /// In ⋯ of its pane's strip, in a split, whose panes have the row above them for their own strips.
+        case pane
+    }
+
+    /// Where a page gets the tools above it: a development tab's, with Tools above the page on; in the bar, or in its
+    /// pane's strip in a split. Nil where it's a development tab and has none above it: Site Controls has the tools
+    /// instead.
+    static func place(isDevelopment: Bool, showsInBar: Bool, inSplit: Bool) -> Place? {
+        guard isDevelopment, showsInBar else { return nil }
+        return inSplit ? .pane : .bar
+    }
+
+    /// The buttons' tools that a page in a split has, in its pane's ⋯: all but its size, which is for a page shown on
+    /// its own.
+    static let paneParts = parts.filter { part in !part.tools.contains { $0.group == .size } }
 
     /// Where everything goes in a bar `width` wide: the address and Copy Link when `address` (the address is in
     /// the sidebar), as many buttons as fit and ⋯, the lines between groups, and the page's size after its button,
@@ -211,15 +226,7 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         let text = DeveloperTool.errorBadge(count)
         let console = Self.parts.firstIndex { $0.tools == [.console] }
         let holder: IconButton = console.flatMap { $0 < shown ? buttons[$0] : nil } ?? more
-        if text.isEmpty {
-            errorBadge?.removeFromSuperview()
-            errorBadge = nil
-        } else {
-            let badge = errorBadge ?? BadgeView(text: text, attention: false)
-            badge.update(text: text, attention: false)
-            if badge.superview !== holder { holder.addSubview(badge) }
-            errorBadge = badge
-        }
+        errorBadge = BadgeView.show(text, on: holder, replacing: errorBadge)
         // Said by the button that carries it; ⋯ otherwise says whether a choice under it is in effect.
         if let console { buttons[console].setAccessibilityValue(holder === buttons[console] ? DeveloperTool.errorValue(count) : nil) }
         more.setAccessibilityValue(DeveloperMenu.moreValue(errors: holder === more ? count : nil, hasChoice: hasHiddenChoice))

@@ -29,6 +29,18 @@ import Testing
         #expect(PaneHeaderView.fit(width: 80, edge: edge, address: address) == .noReload)
     }
 
+    @Test func aDevelopmentPaneKeepsRoomForMoreAtEveryWidth() {
+        // Wide, everything shows and ⋯ is there too.
+        #expect(PaneHeaderView.fit(width: 700, edge: edge, address: address, alwaysMore: true) == .all)
+        // Where everything just fits without ⋯, keeping it there gives the next step.
+        let b = Tokens.Pane.button
+        let width = (stride(from: 700, through: 200, by: -1).map { CGFloat($0) }.last { PaneHeaderView.fit(width: $0, edge: edge, address: address) == .all })!
+        #expect(PaneHeaderView.fit(width: width, edge: edge, address: address, alwaysMore: true) == .splitInMore)
+        #expect(PaneHeaderView.fit(width: width + b, edge: edge, address: address, alwaysMore: true) == .all)
+        // Once something is folded ⋯ is there anyway, and costs nothing more.
+        #expect(PaneHeaderView.fit(width: 225, edge: edge, address: address, alwaysMore: true) == PaneHeaderView.fit(width: 225, edge: edge, address: address))
+    }
+
     @Test func aShortAddressNeedsLessRoom() {
         #expect(PaneHeaderView.fit(width: 250, edge: edge, address: 30) == .all)
     }

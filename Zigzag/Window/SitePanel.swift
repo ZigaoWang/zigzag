@@ -429,11 +429,12 @@ final class SitePanel: FloatingPanelView {
         }
     }
 
-    /// The console, inspecting and reloading as tiles, where a development page doesn't have them above it: Tools above the page is off, or
-    /// the page is in a split, whose panes keep their headers. They come after the page's actions, which never move.
+    /// The console, inspecting and reloading as tiles, where a development page doesn't have them above it: Tools
+    /// above the page is off. With it on they're in the bar, or in its pane's ⋯ in a split (`developerToolsPlace`).
+    /// They come after the page's actions, which never move.
     private func buildDeveloperTiles() {
         guard let controller else { return }
-        guard tab.isDevelopment, !controller.showsDeveloperBarTools(for: tab) else { return }
+        guard tab.isDevelopment, controller.developerToolsPlace(for: tab) == nil else { return }
         let tools = DeveloperTool.tiles.filter { $0.isOffered(for: tab, isPrivate: isPrivate) }
         developerTiles = tools.map { tool in
             let tile = PanelTile(symbol: tool.symbol, caption: tool.caption)
