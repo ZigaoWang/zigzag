@@ -189,4 +189,58 @@ struct PageHolderTests {
         // Sized from the card, the page would reflow under the video.
         #expect(holder.frame.size == NSSize(width: 800, height: 600))
     }
+
+    /// What WebKit does at the end of an element's full screen (#204): the page comes back into its parent at the
+    /// frame WebKit kept for it, which may no longer fit the card.
+    private func comeBack(_ page: WKWebView, to holder: PageHolder, at frame: NSRect) {
+        page.removeFromSuperview()
+        page.frame = frame
+        page.autoresizingMask = []
+        holder.addSubview(page)
+    }
+
+    @Test func aPageBackFromFullScreenFillsItsCardAgain() throws {
+        let card = card(), tab = tab()
+        let page = tab.ensureWebView()
+        card.band = 44
+        card.show(page)
+        card.layoutSubtreeIfNeeded()
+        let holder = try #require(tab.pageHolder)
+        // Off in full screen, the card changed; WebKit brings the page back where it was, lower and wider than the
+        // card has room for now.
+        page.removeFromSuperview()
+        card.setFrameSize(NSSize(width: 700, height: 500))
+        card.layoutSubtreeIfNeeded()
+        comeBack(page, to: holder, at: NSRect(x: 0, y: 24, width: 800, height: 556))
+        card.layoutSubtreeIfNeeded()
+        #expect(page.frame == holder.bounds)
+        #expect(card.convert(page.bounds, from: page) == NSRect(x: 0, y: 44, width: 700, height: 456))
+        #expect(page.autoresizingMask == [.width, .height])
+        // And it goes on following the card.
+        card.setFrameSize(NSSize(width: 900, height: 640))
+        card.layoutSubtreeIfNeeded()
+        #expect(card.convert(page.bounds, from: page) == NSRect(x: 0, y: 44, width: 900, height: 596))
+    }
+
+    @Test func aPageBackFromFullScreenKeepsItsInspectorBesideIt() throws {
+        let card = card(), tab = tab()
+        let page = tab.ensureWebView()
+        card.show(page)
+        card.layoutSubtreeIfNeeded()
+        let holder = try #require(tab.pageHolder)
+        let inspector = try dockInspector(beside: page)
+        // Back where WebKit placed it beside the inspector: that's where it stays.
+        comeBack(page, to: holder, at: NSRect(x: 0, y: 0, width: 500, height: 600))
+        #expect(page.frame == NSRect(x: 0, y: 0, width: 500, height: 600))
+        #expect(inspector.frame == NSRect(x: 500, y: 0, width: 300, height: 600))
+    }
+
+    @Test func aTabsPageIsNotInsetForATitleBar() throws {
+        let tab = tab()
+        let page = tab.ensureWebView()
+        let key = "_automaticallyAdjustsContentInsets"
+        guard page.responds(to: NSSelectorFromString(key)) else { return }
+        // Zigzag places the page under its own bars: WebKit insetting it for a title bar left a band along its top.
+        #expect(page.value(forKey: key) as? Bool == false)
+    }
 }

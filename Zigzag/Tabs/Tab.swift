@@ -455,6 +455,7 @@ final class Tab: NSObject {
         webView.allowsBackForwardNavigationGestures = false
         webView.allowsMagnification = true
         webView.isInspectable = true
+        Self.stopsAutomaticInsets(webView)
         #if DEBUG
         // Lets scripted screenshots capture pages while the window is behind other apps.
         let occlusion = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
@@ -851,6 +852,18 @@ final class Tab: NSObject {
             isMuted = muted
         }
         changed.send(.audio)
+    }
+
+    private static let setAutomaticInsets = NSSelectorFromString("_setAutomaticallyAdjustsContentInsets:")
+
+    /// The page is placed under Zigzag's own bars, never under the window's title bar, so WebKit isn't to inset it for
+    /// one (#204). Left to adjust itself, it insets the page by the title bar it finds above it, as it does in its
+    /// own full screen window, where the page is first laid out with a band along its top. Not public API, so only
+    /// where WebKit has it.
+    static func stopsAutomaticInsets(_ webView: WKWebView) {
+        guard webView.responds(to: setAutomaticInsets) else { return }
+        typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(webView.method(for: setAutomaticInsets), to: SetBool.self)(webView, setAutomaticInsets, false)
     }
 
     /// Mutes (or unmutes) the page's audio and video, and any it plays later, where WebKit can't mute the page.
