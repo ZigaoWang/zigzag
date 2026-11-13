@@ -25,13 +25,19 @@ struct AdFiltersTests {
     private static let quickFixes = list("Test quick fixes", "example.org##+js(set-flag, zigzagFlag, fixed)")
     private static let unbreak = list("Test unbreak", "example.org#@#+js(set-flag, zigzagFlag, fixed)", expires: "5 days")
 
+    /// Zigzag's own list as the website might serve it, in place of the one in the app.
+    private static let zigzagFixes = list("Test Zigzag fixes", "example.net##+js(set-flag, zigzagFlag, ours)")
+
     /// Fifty scriptlets, as the engine's resources are shaped: one that sets a value on the page, one that runs apart
-    /// from the page's scripts, and others that do nothing.
+    /// from the page's scripts, two that note what they were asked to stop under the names of uBlock Origin's, and
+    /// others that do nothing.
     private static let scriptlets: Data = {
         var all: [[String: Any]] = [
             ["name": "set-flag.js", "aliases": ["sf.js"], "body": "function setFlag(name, value) { window[name] = value; }", "dependencies": []],
             ["name": "mark-apart.js", "aliases": [], "executionWorld": "ISOLATED",
              "body": "function markApart() { window.zigzagApart = true; document.documentElement.dataset.apart = 'yes'; }", "dependencies": []],
+            ["name": "prevent-fetch.js", "aliases": [], "body": "function preventFetch(url) { (window.zigzagStopped ||= []).push('fetch ' + url); }", "dependencies": []],
+            ["name": "prevent-xhr.js", "aliases": [], "body": "function preventXhr(url) { (window.zigzagStopped ||= []).push('xhr ' + url); }", "dependencies": []],
         ]
         for n in 0..<50 { all.append(["name": "nothing-\(n).js", "aliases": [], "body": "function nothing() {}", "dependencies": []]) }
         return try! JSONSerialization.data(withJSONObject: ["scriptlets": all, "redirects": []])
@@ -61,10 +67,11 @@ struct AdFiltersTests {
         override func stopLoading() {}
     }
 
-    private static func serveEverything() {
+    private static func serveEverything(scriptlets: Data = scriptlets) {
         let revision = sha256(scriptlets)
         Server.asked = []
         Server.answers = [
+            AdFilterSources.zigzagFixes.urls[0].absoluteString: .init(status: 200, body: zigzagFixes, headers: ["ETag": "\"z1\""]),
             AdFilterSources.lists[0].urls[0].absoluteString: .init(status: 200, body: filters, headers: ["ETag": "\"f1\""]),
             AdFilterSources.lists[1].urls[0].absoluteString: .init(status: 200, body: quickFixes, headers: ["ETag": "\"q1\""]),
             AdFilterSources.lists[2].urls[0].absoluteString: .init(status: 200, body: unbreak, headers: ["Last-Modified": "Wed, 11 Nov 2026 12:00:00 GMT"]),
@@ -122,7 +129,7 @@ struct AdFiltersTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         engine.start()
         try await waitUntilReady(engine)
-        #expect(engine.status.scriptlets == 52)
+        #expect(engine.status.scriptlets == 54)
 
         let youTube = await engine.injection(for: URL(string: "https://www.youtube.com/watch?v=x")!)
         #expect(youTube.page.count == 1)
@@ -255,6 +262,126 @@ struct AdFiltersTests {
         #expect(ContentBlocker.extensionBlocker(for: webView) == nil)
     }
 
+    // MARK: Zigzag's own fixes
+
+    @Test func zigzagsOwnListIsInTheAppAndReadsAsAList() throws {
+        let data = try #require(AdFilterSources.zigzagFixes.bundledData)
+        #expect(AdFilterSources.isList(data, minimumSize: AdFilterSources.zigzagFixes.minimumSize))
+        #expect(AdFilterSources.lifetime(of: data) == 12 * 3_600)
+        let text = String(decoding: data, as: UTF8.self)
+        // DeepSeek's telemetry, which EasyPrivacy blocks (#208).
+        #expect(text.contains("\nchat.deepseek.com##+js(prevent-fetch, /api/v0/telemetry)\n"))
+        #expect(text.contains("\nchat.deepseek.com##+js(prevent-xhr, /api/v0/telemetry)\n"))
+        // Every filter is for a site it names: nothing in it reaches every site.
+        for line in text.split(separator: "\n") where !line.hasPrefix("!") {
+            #expect(!line.hasPrefix("#") && line.contains("#"), "\(line)")
+        }
+        // A cut-off copy, or an error page, isn't taken for it.
+        #expect(!AdFilterSources.isList(Data("! Title: Zigzag fixes\n".utf8), minimumSize: AdFilterSources.zigzagFixes.minimumSize))
+        #expect(!AdFilterSources.isList(Data(("<html>" + String(repeating: "Not found. ", count: 40)).utf8), minimumSize: AdFilterSources.zigzagFixes.minimumSize))
+    }
+
+    /// Offline, or before the website answers, the copy in the app is the one in use, for its own sites only; the
+    /// website's copy takes its place once it comes.
+    @Test func theCopyInTheAppIsUsedUntilTheWebsitesComes() async throws {
+        Self.serveEverything()
+        let website = AdFilterSources.zigzagFixes.urls[0].absoluteString
+        Server.answers[website] = nil
+        let (engine, directory) = makeEngine()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        engine.start()
+        try await waitUntilReady(engine)
+        #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("zigzag-fixes.txt").path))
+
+        let deepSeek = URL(string: "https://chat.deepseek.com/a/chat/s/x")!
+        let fixes = await engine.injection(for: deepSeek)
+        #expect(fixes.page.count == 2)
+        #expect(fixes.page.contains { $0.contains("preventFetch") && $0.contains("/api/v0/telemetry") })
+        #expect(fixes.page.contains { $0.contains("preventXhr") && $0.contains("/api/v0/telemetry") })
+        #expect(fixes.isolated.isEmpty && fixes.styles.isEmpty)
+        #expect(await engine.injection(for: URL(string: "https://deepseek.com/")!).isEmpty)
+        #expect(await engine.injection(for: URL(string: "https://example.com/")!).isEmpty)
+
+        // The website answers: its copy is downloaded, and the engine built from it next has it in place of the app's.
+        Server.answers[website] = .init(status: 200, body: Self.zigzagFixes)
+        #expect(await engine.update())
+        #expect(try Data(contentsOf: directory.appendingPathComponent("zigzag-fixes.txt")) == Self.zigzagFixes)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [Server.self]
+        let again = AdEngine(directory: directory, session: URLSession(configuration: configuration))
+        again.start()
+        try await waitUntilReady(again)
+        #expect(await again.injection(for: deepSeek).isEmpty)
+        #expect(await again.injection(for: URL(string: "https://example.net/")!).page.first?.contains("ours") == true)
+    }
+
+    /// uBlock Origin's own scriptlets (GPL-3.0) are kept out of the repository, so the test that runs Zigzag's list
+    /// with them runs only where a copy is in Fixtures: `ublock-scriptlets.json`, as the app keeps it in
+    /// Ad Filters/scriptlets.json.
+    nonisolated static var realScriptlets: URL? {
+        Bundle(for: AdFiltersFixtureMarker.self).url(forResource: "ublock-scriptlets", withExtension: "json")
+    }
+
+    /// The content blocker's rule for DeepSeek's telemetry, as EasyPrivacy has it, and one for a call that isn't it.
+    private static let telemetryRules = """
+    [{"trigger": {"url-filter": "\\\\/api\\\\/v0\\\\/telemetry"}, "action": {"type": "block"}},
+     {"trigger": {"url-filter": "\\\\/api\\\\/v0\\\\/blocked-call"}, "action": {"type": "block"}}]
+    """
+
+    /// DeepSeek's own flush, as its telemetry sends it: a keepalive POST to the blocked address, read as a network
+    /// failure when nothing comes back. Then the same by XMLHttpRequest.
+    private static let telemetry = """
+    const sent = await fetch('/api/v0/telemetry', { method: 'POST', body: new Uint8Array([1, 2, 3]), keepalive: true,
+                                                     headers: { 'Content-Type': 'application/octet-stream' } })
+      .then((response) => response.status, () => 'failed');
+    const posted = await new Promise((done) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/v0/telemetry');
+      xhr.onload = () => done(xhr.readyState + ' ' + xhr.status);
+      xhr.onerror = () => done('failed');
+      xhr.send('x');
+    });
+    return sent + ' ' + posted;
+    """
+
+    /// DeepSeek told you to check your browser extensions when its blocked telemetry kept failing (#208). With the
+    /// list's scriptlets, its fetch and XMLHttpRequest get an empty answer before the content blocker sees a request.
+    @Test(.enabled(if: realScriptlets != nil)) func deepSeeksBlockedTelemetryGetsAnAnswer() async throws {
+        Self.serveEverything(scriptlets: try Data(contentsOf: try #require(Self.realScriptlets)))
+        Server.answers[AdFilterSources.zigzagFixes.urls[0].absoluteString] = nil
+        let (engine, directory) = makeEngine()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        engine.start()
+        try await waitUntilReady(engine)
+
+        func page(at address: String, filters: Bool = true) async throws -> WKWebView {
+            let configuration = WKWebViewConfiguration()
+            configuration.websiteDataStore = .nonPersistent()
+            let rules = try #require(try await WKContentRuleListStore.default().compileContentRuleList(
+                forIdentifier: "zigzag-test-fixes-\(UUID().uuidString)", encodedContentRuleList: Self.telemetryRules))
+            configuration.userContentController.add(rules)
+            await PageFilters.prepare(configuration.userContentController, for: URL(string: address)!, mainFrame: true, wanted: filters, engine: engine)
+            let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 300), configuration: configuration)
+            await load(webView, at: address)
+            return webView
+        }
+        func run(_ body: String, in webView: WKWebView) async throws -> String? {
+            try await webView.callAsyncJavaScript(body, contentWorld: .page).map { String(describing: $0) }
+        }
+
+        let deepSeek = try await page(at: "https://chat.deepseek.com/")
+        #expect(try await run(Self.telemetry, in: deepSeek) == "200 4 200")
+        // On DeepSeek, a blocked address that isn't its telemetry stays blocked.
+        let call = "return await fetch('/api/v0/blocked-call').then((response) => String(response.status), () => 'failed')"
+        #expect(try await run(call, in: deepSeek) == "failed")
+        // Without the site filters (blocking off for the scriptlets, an ad blocker extension) it fails as before.
+        #expect(try await run(Self.telemetry, in: try await page(at: "https://chat.deepseek.com/", filters: false)) == "failed failed")
+        // Another site's own telemetry stays blocked, and its fetch stays the browser's.
+        let other = try await page(at: "https://example.com/")
+        #expect(try await run(Self.telemetry, in: other) == "failed failed")
+        #expect(try await run("return String(fetch.toString().includes('[native code]'))", in: other) == "true")
+    }
+
     // MARK: Stepping aside for an ad blocker extension
 
     @Test func knownAdBlockersAreFoundByTheirStoreIDs() {
@@ -288,3 +415,6 @@ struct AdFiltersTests {
         #expect(!AdBlockers.reachesYouTube(access: .all, approved: ["<all_urls>"], sites: [], offSites: ["youtube.com"]))
     }
 }
+
+/// Finds the test bundle, for the fixtures only some Macs have.
+private final class AdFiltersFixtureMarker {}

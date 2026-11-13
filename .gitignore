@@ -61,3 +61,4 @@ CLAUDE.local.md
 /EXTENSIONS.md
 /site/deploy.sh
 /ZigzagTests/Fixtures/custom-progress-bar.crx
+/ZigzagTests/Fixtures/ublock-scriptlets.json
