@@ -422,6 +422,7 @@
 		F44995777C048CCAB085C8AA /* MCPSetupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F62FA2BF2A457B8137CE704 /* MCPSetupTests.swift */; };
 		F4C758865F8C2B6ACB80A23B /* DeveloperMoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A93297F2D54632744E77896 /* DeveloperMoreTests.swift */; };
 		F561CDCA7B229704A348D99E /* AddressDropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD7578DF496E9D885F5A6548 /* AddressDropTests.swift */; };
+		F5AE9B5C49B7E19A0B3975C7 /* PDFSelectAllTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB15B823891581C7F60D5892 /* PDFSelectAllTests.swift */; };
 		F5D219451BC618FC595D20BA /* MCPService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62205A849DC72ED60ABA5EB7 /* MCPService.swift */; };
 		F642AD8EB346945EEB6E2E67 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4363A8C97194CFB82618511C /* main.swift */; };
 		F68205100699AE990735AFB7 /* ImportBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F8D15DA6B83F9C7DF8A4CB0 /* ImportBatch.swift */; };
@@ -929,6 +930,7 @@
 		FA29F3657E11FE3895D8BAC3 /* THIRD_PARTY_NOTICES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_NOTICES.md; sourceTree = "<group>"; };
 		FA898046DCAF6AC4AC020C07 /* ContactCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactCard.swift; sourceTree = "<group>"; };
 		FAB383D1A0A96BBBED89873A /* SplitRowAlignmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitRowAlignmentTests.swift; sourceTree = "<group>"; };
+		FB15B823891581C7F60D5892 /* PDFSelectAllTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFSelectAllTests.swift; sourceTree = "<group>"; };
 		FB5152360ED2798576497043 /* SettingsPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageTests.swift; sourceTree = "<group>"; };
 		FCA190F9EEBCEE2543FE55EB /* DeveloperState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperState.swift; sourceTree = "<group>"; };
 		FF4C5952AA98F3E6F967D1C5 /* Shortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shortcuts.swift; sourceTree = "<group>"; };
@@ -1522,6 +1524,7 @@
 				F5442E175B150EB5CA4E9BB9 /* PasswordHealthTests.swift */,
 				D9EC4A25A23CB02B95200F47 /* PasswordMenuTests.swift */,
 				804A63C8F2764EC4BE20451D /* PasswordStoreTests.swift */,
+				FB15B823891581C7F60D5892 /* PDFSelectAllTests.swift */,
 				599EFB79C407D6F01A467090 /* PhoneLinkTests.swift */,
 				D60DD3C9423AB6F82F6BF9E3 /* PictureInPictureFloatTests.swift */,
 				237C05967268C4FE34C059FC /* PinnedGroupTests.swift */,
@@ -2220,6 +2223,7 @@
 				6442D472EF68990B9ED4855E /* OrionImportTests.swift in Sources */,
 				1D559D9E556FBB7102DFE892 /* OwnScriptsTests.swift in Sources */,
 				F6E20DC18DFECE821A1E1AED /* OwnWindowTabsTests.swift in Sources */,
+				F5AE9B5C49B7E19A0B3975C7 /* PDFSelectAllTests.swift in Sources */,
 				7D3A948468098D6194DF7806 /* PageErrorCountTests.swift in Sources */,
 				DE92B9DF7B20A11C2231C638 /* PageFullScreenTests.swift in Sources */,
 				99F89444C80043DB635C413D /* PageHolderTests.swift in Sources */,

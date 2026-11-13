@@ -44,6 +44,12 @@ final class BrowserWebView: WKWebView {
     /// menu takes ⌘A before the page sees it, so it's handed on here; with something typed in the page's search
     /// field, that text is what's selected, as usual.
     override func selectAll(_ sender: Any?) {
+        // A PDF from the web is in WebKit's own viewer, which takes Select All only once its plugin has the page's
+        // focus, as a click in it gives: a PDF just opened has none, and ⌘A selected nothing (#219).
+        if isPDF, owner?.pdfViewer == nil {
+            Self.focusPDF(in: self) { [weak self] in self?.superSelectAll(sender) }
+            return
+        }
         guard HistoryPage.isHistory(url) else { super.selectAll(sender); return }
         evaluateJavaScript("window.zigzagSelectAll && window.zigzagSelectAll()") { [weak self] result, _ in
             MainActor.assumeIsolated {
@@ -53,6 +59,24 @@ final class BrowserWebView: WKWebView {
     }
 
     private func superSelectAll(_ sender: Any?) { super.selectAll(sender) }
+
+    /// The page is a PDF (`Tab.checkForPDF`), in WebKit's viewer unless Zigzag's covers it.
+    var isPDF = false
+
+    /// Gives WebKit's PDF viewer the page's focus, as a click in it would, then `then`. In Zigzag's own world, so
+    /// the page's scripts can't stand in its way.
+    static func focusPDF(in webView: WKWebView, then: @escaping @MainActor () -> Void) {
+        let script = """
+            (() => {
+              const plugin = document.contentType === 'application/pdf' && document.querySelector('embed');
+              if (plugin && document.activeElement !== plugin) plugin.focus();
+              return !!plugin;
+            })()
+            """
+        webView.evaluateJavaScript(script, in: nil, in: .defaultClient) { _ in
+            MainActor.assumeIsolated { then() }
+        }
+    }
 
     override func scrollWheel(with event: NSEvent) {
         // A sideways swipe to go back or forward is taken here; everything else scrolls the page.

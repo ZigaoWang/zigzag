@@ -1748,6 +1748,7 @@ extension Tab {
     func checkForPDF(_ webView: WKWebView, fresh: Bool = false) {
         guard let url = webView.url, !url.absoluteString.hasPrefix("blob:"), url.scheme != "data" else {
             showsPDF = false
+            (webView as? BrowserWebView)?.isPDF = false
             setPDFViewer(nil)
             return
         }
@@ -1756,6 +1757,7 @@ extension Tab {
                 guard let self, let webView, webView === self.webView, webView.url == url else { return }
                 let values = result as? [String]
                 self.showsPDF = values?.first == "application/pdf"
+                (webView as? BrowserWebView)?.isPDF = self.showsPDF
                 guard self.showsPDF else {
                     if self.pdfViewer != nil { self.setPDFViewer(nil) }
                     return
