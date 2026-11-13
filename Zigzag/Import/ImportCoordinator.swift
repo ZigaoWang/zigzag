@@ -52,7 +52,7 @@ enum ImportCoordinator {
         static let passwords = Choice(rawValue: 1)
         static let bookmarks = Choice(rawValue: 2)
         static let history = Choice(rawValue: 4)
-        /// Arc's spaces, pinned tabs and favorites.
+        /// Arc's spaces and pinned tabs. Its Favorites come with `bookmarks`.
         static let tabs = Choice(rawValue: 8)
         /// The sites you're signed in to there, so you stay signed in here.
         static let signIns = Choice(rawValue: 16)
@@ -349,10 +349,12 @@ enum ImportCoordinator {
         // Arc's spaces, pinned tabs, favorites, open tabs and history come through its own importer, which knows its
         // sidebar.
         var arcReading = reading
-        // Only the parts you chose: the sidebar for spaces, bookmarks and open tabs, history for history.
+        // Only the parts you chose, each on its own: the sidebar for spaces, Favorites (Arc's bookmarks) and open
+        // tabs, history for history.
         if isArc {
-            if !choice.isDisjoint(with: [.tabs, .bookmarks, .openTabs]) {
-                let result = ArcImporter.importSidebar(into: profile.id, openTabs: choice.contains(.openTabs)).result
+            let parts = ArcImporter.Parts(choice)
+            if !parts.isEmpty {
+                let result = ArcImporter.importSidebar(into: profile.id, parts: parts).result
                 summary.spaces = result.spaces
                 summary.bookmarks = result.bookmarks
                 summary.tabs = result.tabs

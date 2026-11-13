@@ -21,8 +21,9 @@ enum ArcImporter {
     private enum Part: String { case history, sidebar = "spaces and pinned tabs" }
 
     /// Turns a file error into something to show: macOS refusing access gets the fix that opens its setting.
-    /// `retries`: the import choices trying again runs; for the sidebar, spaces and open tabs (8 and 64).
-    private static func problem(reading part: Part, _ error: Error, retries: Int = 8 | 64) -> ImportProblem {
+    /// `retries`: the import choices trying again runs; for the sidebar, bookmarks (its Favorites), spaces and open
+    /// tabs (2, 8 and 64).
+    private static func problem(reading part: Part, _ error: Error, retries: Int = 2 | 8 | 64) -> ImportProblem {
         let ns = error as NSError
         log.error("Arc import: couldn't read \(part.rawValue, privacy: .public): \(ns.domain, privacy: .public) \(ns.code)")
         let denied = (ns.domain == NSCocoaErrorDomain && ns.code == NSFileReadNoPermissionError)
@@ -66,11 +67,59 @@ enum ArcImporter {
     /// Trying again reads history only (`Choice.history`), never the sidebar a second time.
     static func historyProblem(_ error: Error) -> ImportProblem { problem(reading: .history, error, retries: 4) }
 
-    /// Spaces, pinned tabs and Favorites, and with `openTabs` each space's open tabs. `into`: the profile the new
-    /// spaces are put on and the favorites go to. A space already here that gains pages stays on its own. Arc's
-    /// profiles aren't recreated.
+    /// The parts of Arc's sidebar an import brings, each on its own.
+    struct Parts: OptionSet, Hashable {
+        let rawValue: Int
+        /// Its spaces, with their pinned tabs.
+        static let spaces = Parts(rawValue: 1)
+        /// Its Favorites, the pages at the top of the sidebar, as favorites here.
+        static let favorites = Parts(rawValue: 2)
+        /// Each space's open tabs.
+        static let openTabs = Parts(rawValue: 4)
+        static let all: Parts = [.spaces, .favorites, .openTabs]
+
+        /// What the Import window's choices bring from the sidebar: Spaces and Pinned Tabs, Bookmarks (Arc's
+        /// Favorites are its bookmarks) and Open Tabs, each only when chosen.
+        init(_ choice: ImportCoordinator.Choice) {
+            var parts: Parts = []
+            if choice.contains(.tabs) { parts.insert(.spaces) }
+            if choice.contains(.bookmarks) { parts.insert(.favorites) }
+            if choice.contains(.openTabs) { parts.insert(.openTabs) }
+            self = parts
+        }
+
+        init(rawValue: Int) { self.rawValue = rawValue }
+    }
+
+    /// What importing `parts` of a sidebar does, worked out before anything changes. `openTabs`: each of Arc's
+    /// spaces' open tabs and the space here they go in. With spaces brought over, that's the space made for it, or
+    /// the one already here with its name (importing again merges); without, the one here with its name, or nil for
+    /// the space you're in, so open tabs never bring a space you didn't ask for.
+    struct Plan {
+        var favorites: [Bookmark] = []
+        var spaces: [SpaceInfo] = []
+        var openTabs: [(space: UUID?, tabs: [OpenTab])] = []
+    }
+
+    static func plan(_ sidebar: Sidebar, parts: Parts, existing: [SpaceInfo]) -> Plan {
+        var plan = Plan()
+        if parts.contains(.favorites) { plan.favorites = sidebar.favorites }
+        if parts.contains(.spaces) { plan.spaces = sidebar.spaces }
+        if parts.contains(.openTabs) {
+            plan.openTabs = sidebar.spaces.compactMap { space in
+                guard let tabs = sidebar.openTabs[space.id], !tabs.isEmpty else { return nil }
+                let here = existing.first { $0.name == space.name }?.id
+                return (here ?? (parts.contains(.spaces) ? space.id : nil), tabs)
+            }
+        }
+        return plan
+    }
+
+    /// The `parts` of Arc's sidebar chosen: spaces and their pinned tabs, Favorites, each space's open tabs. `into`:
+    /// the profile the new spaces are put on and the favorites go to. A space already here that gains pages stays on
+    /// its own. Arc's profiles aren't recreated.
     @discardableResult
-    static func importSidebar(into profile: UUID = Profile.defaultID, openTabs: Bool = true) -> (result: Result, firstSpace: UUID?) {
+    static func importSidebar(into profile: UUID = Profile.defaultID, parts: Parts = .all) -> (result: Result, firstSpace: UUID?) {
         var result = Result()
         let sidebar: Sidebar
         do {
@@ -79,22 +128,16 @@ enum ArcImporter {
             result.problems.append(problem(reading: .sidebar, error))
             sidebar = Sidebar()
         }
-        let (spaces, favorites) = (sidebar.spaces, sidebar.favorites)
-        // Where each of Arc's spaces lands: a space of its own, or the one here with its name.
-        var landsIn: [UUID: UUID] = [:]
-        for space in spaces { landsIn[space.id] = space.id }
-        var newSpaces = spaces
-        let addedFavorites = Library.shared.appendFavorites(favorites, in: profile)
-        for favorite in favorites { FaviconStore.shared.prefetch(for: favorite.url) }
-        result.spaces = newSpaces.count
-        result.bookmarks = newSpaces.map(\.bookmarks.count).reduce(0, +)
+        let plan = plan(sidebar, parts: parts, existing: Library.shared.spaces)
+        var newSpaces = plan.spaces
+        let addedFavorites = plan.favorites.isEmpty ? 0 : Library.shared.appendFavorites(plan.favorites, in: profile)
+        for favorite in plan.favorites { FaviconStore.shared.prefetch(for: favorite.url) }
 
         // Importing again merges: spaces with the same name gain only the bookmarks they don't have yet, in their Arc
         // folders, and pages already there but in no folder move into theirs (an earlier merge left them loose).
         var merged = 0
         newSpaces = newSpaces.filter { incoming in
             guard let existing = Library.shared.spaces.first(where: { $0.name == incoming.name }) else { return true }
-            landsIn[incoming.id] = existing.id
             let folders = incoming.folders ?? []
             func path(of id: UUID) -> [String] {
                 var names: [String] = []
@@ -137,9 +180,7 @@ enum ArcImporter {
             for space in pristine where Library.shared.spaces.count > 1 { Library.shared.removeSpace(space.id) }
             for bookmark in newSpaces.flatMap(\.bookmarks) { FaviconStore.shared.prefetch(for: bookmark.url) }
         }
-        if openTabs {
-            result.tabs = openInWindow(spaces.map { (landsIn[$0.id] ?? $0.id, sidebar.openTabs[$0.id] ?? []) })
-        }
+        result.tabs = openInWindow(plan.openTabs)
         log.notice("Arc import: \(result.spaces) spaces, \(result.bookmarks) bookmarks, \(result.tabs) open tabs, \(result.problems.count) problems")
         return (result, newSpaces.first?.id)
     }
@@ -382,12 +423,13 @@ enum ArcImporter {
     /// (its hover card says it isn't loaded yet; not that Zigzag reopened, as `isRestored` would).
     /// A page already open in that space isn't opened twice, so importing again adds only what's new. Returns how
     /// many came over.
-    static func openInWindow(_ bySpace: [(space: UUID, tabs: [OpenTab])]) -> Int {
+    /// A space of nil is the window's own, the one you're in.
+    static func openInWindow(_ bySpace: [(space: UUID?, tabs: [OpenTab])]) -> Int {
         guard bySpace.contains(where: { !$0.tabs.isEmpty }) else { return 0 }
         let windows = WindowManager.shared
         let key = windows.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
         guard let manager = (key ?? windows.controllers.last { !$0.tabManager.isPrivate } ?? windows.restoreIfNoWindows())?.tabManager else { return 0 }
-        return open(bySpace, in: manager)
+        return open(bySpace.map { ($0.space ?? manager.currentSpaceID, $0.tabs) }, in: manager)
     }
 
     /// `openInWindow`'s work, in one window's tabs.

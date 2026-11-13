@@ -65,6 +65,56 @@ import Testing
         }
     }
 
+    /// The sidebar's three parts come over only as chosen: Spaces and Pinned Tabs, Bookmarks (Arc's Favorites) and
+    /// Open Tabs, every combination of them.
+    @Test func eachChoiceBringsOnlyItsOwnPart() throws {
+        var root = try #require(JSONSerialization.jsonObject(with: sidebar()) as? [String: Any])
+        var sidebarRoot = try #require(root["sidebar"] as? [String: Any])
+        var containers = try #require(sidebarRoot["containers"] as? [[String: Any]])
+        var items = try #require(containers[1]["items"] as? [Any])
+        items += [["id": "top", "childrenIds": ["fav"], "data": ["itemContainer": [:]]], tab("fav", "https://example.com/favorite")]
+        containers[1]["items"] = items
+        containers[1]["topAppsContainerIDs"] = ["top"]
+        sidebarRoot["containers"] = containers
+        root["sidebar"] = sidebarRoot
+        let parsed = try ArcImporter.readSidebar(JSONSerialization.data(withJSONObject: root))
+        #expect(parsed.favorites.map(\.url.lastPathComponent) == ["favorite"])
+
+        let options: [ImportCoordinator.Choice] = [.tabs, .bookmarks, .openTabs]
+        for mask in 0..<8 {
+            var choice: ImportCoordinator.Choice = [.passwords, .history]
+            for (bit, option) in options.enumerated() where mask & (1 << bit) != 0 { choice.insert(option) }
+            let parts = ArcImporter.Parts(choice)
+            #expect(parts.contains(.spaces) == choice.contains(.tabs))
+            #expect(parts.contains(.favorites) == choice.contains(.bookmarks))
+            #expect(parts.contains(.openTabs) == choice.contains(.openTabs))
+            let plan = ArcImporter.plan(parsed, parts: parts, existing: [])
+            #expect(plan.spaces.isEmpty != choice.contains(.tabs), "spaces for \(mask)")
+            #expect(plan.favorites.isEmpty != choice.contains(.bookmarks), "favorites for \(mask)")
+            #expect(plan.openTabs.isEmpty != choice.contains(.openTabs), "open tabs for \(mask)")
+            for (space, tabs) in plan.openTabs {
+                #expect(!tabs.isEmpty)
+                // With the spaces, each into its own; without, none made for them: the space you're in.
+                #expect(space == (choice.contains(.tabs) ? parsed.spaces.first { parsed.openTabs[$0.id] == tabs }?.id : nil))
+            }
+        }
+        #expect(ArcImporter.Parts([.passwords, .history, .signIns, .extensions]).isEmpty)
+    }
+
+    /// Open tabs on their own go into the space here with the same name, when there is one.
+    @Test func openTabsAloneGoToTheSpaceWithTheirName() throws {
+        let parsed = try ArcImporter.readSidebar(sidebar())
+        let work = SpaceInfo(name: "Work", color: .sky)
+        let plan = ArcImporter.plan(parsed, parts: .openTabs, existing: [work])
+        #expect(plan.spaces.isEmpty && plan.favorites.isEmpty)
+        #expect(plan.openTabs.count == 2)
+        #expect(plan.openTabs.first?.space == nil)
+        #expect(plan.openTabs.last?.space == work.id)
+        // With spaces chosen too, a space here of the same name still takes them, as importing again merges.
+        let both = ArcImporter.plan(parsed, parts: [.spaces, .openTabs], existing: [work])
+        #expect(both.openTabs.map(\.space) == [parsed.spaces[0].id, work.id])
+    }
+
     /// A sidebar from before open tabs were read still gives its spaces and pins, with no open tabs.
     @Test func noUnpinnedContainer() throws {
         let root: [String: Any] = ["sidebar": ["containers": [["global": [:]], [

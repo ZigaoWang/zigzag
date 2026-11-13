@@ -14674,7 +14674,7 @@
       }
     },
     "Spaces and Pinned Tabs" : {
-      "comment" : "Choice in the Import window: bring Arc's spaces, pinned tabs and favorites over.",
+      "comment" : "Choice in the Import window: bring Arc's spaces and pinned tabs over.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

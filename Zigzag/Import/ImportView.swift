@@ -127,7 +127,7 @@ final class ImportView: NSView {
         for (choice, name) in [(ImportCoordinator.Choice.passwords, String(localized: "Passwords", comment: "Choice in the Import window: bring passwords over.")),
                                (.bookmarks, String(localized: "Bookmarks", comment: "Choice in the Import window: bring bookmarks over.")),
                                (.history, String(localized: "History", comment: "Choice in the Import window: bring browsing history over.")),
-                               (.tabs, String(localized: "Spaces and Pinned Tabs", comment: "Choice in the Import window: bring Arc's spaces, pinned tabs and favorites over.")),
+                               (.tabs, String(localized: "Spaces and Pinned Tabs", comment: "Choice in the Import window: bring Arc's spaces and pinned tabs over.")),
                                (.openTabs, String(localized: "Open Tabs", comment: "Choice in the Import window: bring the tabs open in each of Arc's spaces over, not pinned ones.")),
                                (.signIns, String(localized: "Sign-ins", comment: "Choice in the Import window: bring over the sites you're signed in to.")),
                                (.extensions, String(localized: "Extensions", comment: "Choice in the Import window: bring extensions over from the Chrome Web Store."))] {
