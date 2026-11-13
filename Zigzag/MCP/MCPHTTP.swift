@@ -81,9 +81,36 @@ nonisolated struct HTTPRequestReader: Sendable {
         case failure(Int)
     }
 
+    /// The most a connection may have sent and not yet been answered for: one whole request at its largest, and some
+    /// over for chunk framing. Past it the connection is cut, however the bytes are framed or however slowly they come.
+    static let maxBufferedBytes = maxHeaderBytes + maxBodyBytes + 64 * 1024
+    /// The most header lines a request may have.
+    static let maxHeaderCount = 100
+
     private(set) var buffer = Data()
 
-    mutating func append(_ data: Data) { buffer.append(data) }
+    /// Takes more bytes; false once more is waiting than any request could be.
+    @discardableResult
+    mutating func append(_ data: Data) -> Bool {
+        guard data.count <= Self.maxBufferedBytes - buffer.count else { return false }
+        buffer.append(data)
+        return true
+    }
+
+    /// A Content-Length, or a chunk's size: digits only (no sign, no space inside), in base 10 or 16. One too big to
+    /// count (7fffffffffffffff and up) is held at Int.max rather than overflowing, so it reads as too large; nil is
+    /// anything that isn't a number.
+    static func size(_ text: Substring, radix: Int) -> Int? {
+        guard !text.isEmpty else { return nil }
+        var value = 0
+        for character in text {
+            guard character.isASCII, let digit = character.hexDigitValue, digit < radix else { return nil }
+            let (shifted, overflowA) = value.multipliedReportingOverflow(by: radix)
+            let (next, overflowB) = shifted.addingReportingOverflow(digit)
+            value = overflowA || overflowB ? Int.max : next
+        }
+        return value
+    }
 
     mutating func next() -> Outcome {
         guard let headerEnd = buffer.range(of: Data("\r\n\r\n".utf8)) else {
@@ -95,21 +122,30 @@ nonisolated struct HTTPRequestReader: Sendable {
         let start = lines.removeFirst().split(separator: " ", omittingEmptySubsequences: true).map(String.init)
         guard start.count == 3, start[2].hasPrefix("HTTP/1."), !start[0].isEmpty,
               start[0].allSatisfy({ $0.isLetter && $0.isUppercase }) else { return .failure(400) }
+        guard lines.count <= Self.maxHeaderCount else { return .failure(431) }
         var headers: [String: String] = [:]
         for line in lines {
             guard let colon = line.firstIndex(of: ":") else { return .failure(400) }
-            let name = line[..<colon].trimmingCharacters(in: .whitespaces).lowercased()
-            guard !name.isEmpty, !name.contains(" ") else { return .failure(400) }
-            headers[name] = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            // No space before the colon (RFC 9112 5.1): a name with one is how requests get read two ways.
+            let name = line[..<colon].lowercased()
+            guard !name.isEmpty, name.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "!#$%&'*+-.^_`|~".contains($0)) }) else {
+                return .failure(400)
+            }
+            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            // The headers that say where the body ends are read once: two of them could disagree.
+            if ["content-length", "transfer-encoding"].contains(name), headers[name] != nil { return .failure(400) }
+            headers[name] = value
         }
         let target = start[1]
         let path = String(target.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false).first ?? "")
         let bodyStart = headerEnd.upperBound
         var body = Data()
         var consumed: Int
-        if headers["transfer-encoding"]?.lowercased().contains("chunked") == true {
+        if let encoding = headers["transfer-encoding"] {
+            // Only chunked, alone, and never with a Content-Length beside it.
+            guard encoding.lowercased() == "chunked", headers["content-length"] == nil else { return .failure(400) }
             switch Self.dechunk(buffer[bodyStart...]) {
-            case .incomplete: return buffer.count - bodyStart > Self.maxBodyBytes + 64 * 1024 ? .failure(413) : .incomplete
+            case .incomplete: return buffer.endIndex - bodyStart > Self.maxBodyBytes + 64 * 1024 ? .failure(413) : .incomplete
             case .invalid: return .failure(400)
             case .tooLarge: return .failure(413)
             case .done(let data, let length):
@@ -119,13 +155,14 @@ nonisolated struct HTTPRequestReader: Sendable {
         } else {
             let length: Int
             if let value = headers["content-length"] {
-                guard let parsed = Int(value), parsed >= 0 else { return .failure(400) }
+                guard let parsed = Self.size(Substring(value), radix: 10) else { return .failure(400) }
                 length = parsed
             } else {
                 length = 0
             }
+            // Refused before a byte of it is waited for.
             guard length <= Self.maxBodyBytes else { return .failure(413) }
-            guard buffer.count - (bodyStart - buffer.startIndex) >= length else { return .incomplete }
+            guard buffer.endIndex - bodyStart >= length else { return .incomplete }
             body = Data(buffer[bodyStart..<(bodyStart + length)])
             consumed = bodyStart + length
         }
@@ -135,15 +172,22 @@ nonisolated struct HTTPRequestReader: Sendable {
     }
 
     private enum Chunked { case incomplete, invalid, tooLarge, done(Data, Int) }
+    /// The longest a chunk's size line (its size and any extensions) or a trailer line may be.
+    static let maxChunkLineBytes = 1024
 
     private static func dechunk(_ bytes: Data) -> Chunked {
         var index = bytes.startIndex
         var body = Data()
         let crlf = Data("\r\n".utf8)
         while true {
-            guard let lineEnd = bytes.range(of: crlf, in: index..<bytes.endIndex) else { return .incomplete }
-            guard let line = String(data: bytes[index..<lineEnd.lowerBound], encoding: .ascii),
-                  let size = Int(line.split(separator: ";").first.map { $0.trimmingCharacters(in: .whitespaces) } ?? "", radix: 16), size >= 0
+            // A chunk's size line is short: one that runs on without ending isn't one.
+            guard let lineEnd = bytes.range(of: crlf, in: index..<bytes.endIndex) else {
+                return bytes.endIndex - index > maxChunkLineBytes ? .invalid : .incomplete
+            }
+            guard lineEnd.lowerBound - index <= maxChunkLineBytes,
+                  let line = String(data: bytes[index..<lineEnd.lowerBound], encoding: .ascii),
+                  let digits = line.split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false).first,
+                  let size = Self.size(Substring(digits.trimmingCharacters(in: .whitespaces)), radix: 16)
             else { return .invalid }
             index = lineEnd.upperBound
             if size == 0 {
@@ -157,7 +201,8 @@ nonisolated struct HTTPRequestReader: Sendable {
                 }
                 return .done(body, cursor.upperBound - bytes.startIndex)
             }
-            guard body.count + size <= maxBodyBytes else { return .tooLarge }
+            // Compared without adding, so a size near Int.max can't overflow into a small one.
+            guard size <= maxBodyBytes - body.count else { return .tooLarge }
             guard bytes.endIndex - index >= size + 2 else { return .incomplete }
             body.append(bytes[index..<(index + size)])
             index += size

@@ -117,6 +117,9 @@ nonisolated final class MCPServer: @unchecked Sendable {
 /// One client connection: requests read one after another, each answered before the next is read.
 nonisolated private final class Connection: @unchecked Sendable {
     static let idleTimeout: TimeInterval = 120
+    /// How long one request may take to arrive whole, from its first byte (or the connection opening): one sent a
+    /// byte at a time, to hold a connection open for ever, is cut off however often a byte comes.
+    static let requestTimeout: TimeInterval = 15
 
     private let connection: NWConnection
     private let endpoint: MCPEndpoint
@@ -127,6 +130,8 @@ nonisolated private final class Connection: @unchecked Sendable {
     /// The far end has sent all it will.
     private var peerDone = false
     private var idle: DispatchWorkItem?
+    /// Running while a request is on its way and not yet whole.
+    private var arriving: DispatchWorkItem?
     private let finished: (Connection) -> Void
 
     init(_ connection: NWConnection, endpoint: MCPEndpoint, queue: DispatchQueue, finished: @escaping (Connection) -> Void) {
@@ -145,6 +150,8 @@ nonisolated private final class Connection: @unchecked Sendable {
         }
         connection.start(queue: queue)
         armIdle()
+        // A connection that opens and sends nothing has as long as a request does.
+        armArriving()
         receive()
     }
 
@@ -154,8 +161,26 @@ nonisolated private final class Connection: @unchecked Sendable {
         guard !closed else { return }
         closed = true
         idle?.cancel()
+        arriving?.cancel()
         connection.cancel()
         finished(self)
+    }
+
+    /// Starts the clock on the request coming in, unless it's running already.
+    private func armArriving() {
+        guard arriving == nil, !closed else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, !self.busy, !self.closed else { return }
+            self.arriving = nil
+            self.send(.json(408, RPCError.response(id: nil, code: RPCError.invalidRequest, message: HTTPResponse.reason(408))), keepAlive: false)
+        }
+        arriving = work
+        queue.asyncAfter(deadline: .now() + Self.requestTimeout, execute: work)
+    }
+
+    private func requestArrived() {
+        arriving?.cancel()
+        arriving = nil
     }
 
     private func armIdle() {
@@ -173,7 +198,13 @@ nonisolated private final class Connection: @unchecked Sendable {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 256 * 1024) { [weak self] data, _, isComplete, error in
             guard let self else { return }
             if let data, !data.isEmpty {
-                self.reader.append(data)
+                // More waiting than any request could be (sent while one is being answered, or framed to never
+                // end): the connection is cut.
+                guard self.reader.append(data) else {
+                    if !self.busy { self.send(.json(413, RPCError.response(id: nil, code: RPCError.invalidRequest, message: HTTPResponse.reason(413))), keepAlive: false) }
+                    else { self.close() }
+                    return
+                }
                 self.armIdle()
                 self.process()
             }
@@ -190,10 +221,15 @@ nonisolated private final class Connection: @unchecked Sendable {
     private func process() {
         guard !busy, !closed else { return }
         switch reader.next() {
-        case .incomplete: return
+        case .incomplete:
+            // Part of the next request is here: it has a while to arrive whole.
+            if !reader.buffer.isEmpty { armArriving() }
+            return
         case .failure(let status):
+            requestArrived()
             send(.json(status, RPCError.response(id: nil, code: RPCError.invalidRequest, message: HTTPResponse.reason(status))), keepAlive: false)
         case .request(let request):
+            requestArrived()
             busy = true
             let endpoint = self.endpoint
             Task {

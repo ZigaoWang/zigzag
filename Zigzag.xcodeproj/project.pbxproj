@@ -156,6 +156,7 @@
 		5825C6C1A2BFB78C050115ED /* PasswordHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C6B64529E363AA584C30979 /* PasswordHealth.swift */; };
 		583F6F122488A3F4BCFC0676 /* DeveloperStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ACAEDF72C5BC700D0F2EAAD /* DeveloperStateTests.swift */; };
 		58E9C13EC966E01059CFEF0A /* ChromiumExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EA6931C96DF7709CF8A2B6 /* ChromiumExtensions.swift */; };
+		591D0F32133D82363A1359F9 /* MCPHTTPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A415AA1C66517812829F10FF /* MCPHTTPTests.swift */; };
 		5923DDCCED279AFD335C2C83 /* MCPEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4783D256F64B717D5311DE1 /* MCPEndpoint.swift */; };
 		59457E9E257B31175B33588C /* chrome-bookmarks-personal.json in Resources */ = {isa = PBXBuildFile; fileRef = DCF6BF1C148060F0A2977094 /* chrome-bookmarks-personal.json */; };
 		5C2BC30E87CD508B261F76AE /* ReadyPictures.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF6CDE5FE89667C45F373D /* ReadyPictures.swift */; };
@@ -759,6 +760,7 @@
 		9F78ECBEF8A16738C2C9DF0C /* SidebarMenus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarMenus.swift; sourceTree = "<group>"; };
 		A0872FF032E0FE3CBD091DB5 /* PublicSuffix.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicSuffix.swift; sourceTree = "<group>"; };
 		A31C428612569D93D17E6153 /* MiniPlayerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerTests.swift; sourceTree = "<group>"; };
+		A415AA1C66517812829F10FF /* MCPHTTPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPHTTPTests.swift; sourceTree = "<group>"; };
 		A43306E6C8C1E74DFDB70B17 /* HistoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStoreTests.swift; sourceTree = "<group>"; };
 		A45729EC68E69DC16773C6CA /* WebAppWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAppWindowController.swift; sourceTree = "<group>"; };
 		A61765B735BE30C84A0D55AA /* Feedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Feedback.swift; sourceTree = "<group>"; };
@@ -1476,6 +1478,7 @@
 				6B89CCE006086C641D713AAB /* LocalizationTests.swift */,
 				41C76DAA9705D717D9D98902 /* LocalServerTrustTests.swift */,
 				683CCE47B510EA40E8885D53 /* MainThreadStallTests.swift */,
+				A415AA1C66517812829F10FF /* MCPHTTPTests.swift */,
 				521AE408AF88148280EB7303 /* MCPServerTests.swift */,
 				8F62FA2BF2A457B8137CE704 /* MCPSetupTests.swift */,
 				B61ECD99BC5A8E42155612FF /* MCPToolsTests.swift */,
@@ -2187,6 +2190,7 @@
 				3699D6B6A7F9E5448CD76ABA /* LinkSiteTests.swift in Sources */,
 				F93332479C4E8E444308AC31 /* LocalServerTrustTests.swift in Sources */,
 				3BEF15777F24915D05FC1681 /* LocalizationTests.swift in Sources */,
+				591D0F32133D82363A1359F9 /* MCPHTTPTests.swift in Sources */,
 				8FFF17FE67210434B930B549 /* MCPServerTests.swift in Sources */,
 				F44995777C048CCAB085C8AA /* MCPSetupTests.swift in Sources */,
 				37EC1B1453CB6D5DDE86AB1C /* MCPToolsTests.swift in Sources */,
