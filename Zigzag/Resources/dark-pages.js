@@ -32,9 +32,11 @@
   const siteOf = (host) => host.toLowerCase().replace(/^www\./, '');
   const matches = (site, list) => list.some((s) => site === s || site.endsWith('.' + s));
   const site = siteOf(location.hostname || '');
-  // A frame follows the top page's choice.
+  // A frame follows the top page's choice. Off holds over anything else kept for the site, and Force is on too, as
+  // DarkPages.siteChoice reads them.
   const choice = () => (!isTop ? config.topWanted === true
-    : matches(site, config.sitesOn) ? true : matches(site, config.sitesOff) ? false : config.on);
+    : matches(site, config.sitesOff) ? false
+      : matches(site, config.sitesOn) || matches(site, config.sitesForced || []) ? true : config.on);
   // Force dark (the site panel, #134): darkened even when it looks dark on its own.
   const forced = () => (isTop ? matches(site, config.sitesForced || []) : config.topForced === true);
   let wanted = choice();
@@ -322,8 +324,20 @@
     }
     return out.filter((s) => !s.disabled);
   };
-  // True when the page draws itself dark, false when light.
-  const isDarkOnItsOwn = () => {
+  // Every transition ended where it's going, for a look just after the site switched its theme: one that fades its
+  // background over a moment would be read halfway, as the theme it's leaving (#134). Put in and taken out in the same
+  // go, so a fade that's under way just ends; nothing is drawn in between.
+  const freeze = document.createElement('style');
+  freeze.setAttribute('data-zigzag-dark', 'freeze');
+  freeze.textContent = '*, *::before, *::after { transition: none !important; }';
+  // True when the page draws itself dark, false when light. `settled`: with its transitions ended (`freeze`).
+  const isDarkOnItsOwn = (settled) => {
+    if (!settled) return looksDark();
+    const root = document.documentElement;
+    root.appendChild(freeze);
+    try { getComputedStyle(root).backgroundColor; return looksDark(); } finally { freeze.remove(); }
+  };
+  const looksDark = () => {
     const meta = document.querySelector('meta[name="color-scheme"]');
     if (meta) {
       const content = (meta.content || '').toLowerCase().trim();
@@ -357,13 +371,15 @@
     return false;
   };
 
-  const check = () => {
+  // `settled`: the site just switched its theme, so it's looked at as the theme ends up (`freeze`).
+  const check = (settled) => {
     if (retired) return;
+    settled = settled === true;
     wanted = choice();
     // Not wanted, it's still looked at, for the bar above it: a page dark on its own gives it its dark (#134).
-    if (!wanted) { dropPrepaint(); releaseMark(); apply(false); if (styled()) native = isDarkOnItsOwn() || !!quietDark(); send(); return; }
+    if (!wanted) { dropPrepaint(); releaseMark(); apply(false); if (styled()) native = isDarkOnItsOwn(settled) || !!quietDark(); send(); return; }
     if (forced()) { native = null; apply(true); return; }
-    if (styled()) { native = isDarkOnItsOwn(); dropPrepaint(); }
+    if (styled()) { native = isDarkOnItsOwn(settled); dropPrepaint(); }
     // Until the page can be looked at it stays on its dark ground (`prepaint`), never white: Dark Reader goes to work
     // only on a page that needs it, not first on every page with a dark look of its own too.
     else if (native === null) { putPrepaint(); send(); return; }
@@ -414,28 +430,97 @@
 
   // MARK: When to look
 
-  let checkTimer = 0;
-  const checkSoon = (delay) => {
+  // The page is looked at again whenever its look may have changed, live, for as long as it's open (#134): a site
+  // switching its theme with its own selector, an app drawing its dark over a white page after it has loaded, a
+  // style sheet swapped. Never more than once a `delay` from the first change asking: a page changing all the time
+  // is looked at as often as that, not once per change. A look asked for sooner than the one waiting takes its place.
+  let checkTimer = 0, checkDue = 0, checkSettled = false;
+  const checkSoon = (delay, settled) => {
+    if (retired) return;
+    if (settled) checkSettled = true;
+    const due = performance.now() + delay;
+    if (checkTimer && checkDue <= due) return;
     clearTimeout(checkTimer);
-    checkTimer = setTimeout(check, delay);
+    checkDue = due;
+    checkTimer = setTimeout(() => {
+      checkTimer = 0;
+      const s = checkSettled;
+      checkSettled = false;
+      check(s);
+    }, delay);
   };
-  // A theme switched on the page itself (a class or data-theme on the root or body) is looked at again; Dark Reader's
-  // own marks on the root aren't.
-  const themes = new MutationObserver(() => checkSoon(150));
-  const themeAttributes = ['class', 'data-theme', 'data-color-mode', 'data-mode', 'data-bs-theme', 'data-color-scheme'];
+  // The site switched its theme (a class, data-theme, color-scheme or style on the root or body): looked at almost at
+  // once, as the theme ends up, so Dark Reader takes over a page that went light, or steps aside for one that went
+  // dark, before much of the other is drawn; and again a little later, for a site whose script finishes it in steps.
+  const themeChanged = () => {
+    checkSoon(40, true);
+    setTimeout(() => checkSoon(0, true), 700);
+  };
+  // Only a change that's about the look: a theme mark set, a class like "dark" or "theme-light" put on or taken off,
+  // or the root's or body's own background, colors or color-scheme set inline. A site that sets a class or style on
+  // its body as you scroll or open a menu isn't looked at again for it.
+  const themeWord = /dark|light|theme|night|day|mode|scheme/i;
+  const tokens = (text) => new Set((text || '').split(/\s+/).filter(Boolean));
+  const declarations = (text) => {
+    const out = new Map();
+    for (const part of (text || '').split(';')) {
+      const i = part.indexOf(':');
+      if (i > 0) out.set(part.slice(0, i).trim().toLowerCase(), part.slice(i + 1).trim());
+    }
+    return out;
+  };
+  const lookProperty = /^(color|color-scheme|background|background-color)$|^--.*(color|bg|background|theme|surface|scheme|base)/;
+  const aboutTheLook = (r) => {
+    const now = r.target.getAttribute(r.attributeName);
+    if (r.attributeName === 'class') {
+      const was = tokens(r.oldValue), is = tokens(now);
+      return [...was].some((t) => !is.has(t) && themeWord.test(t)) || [...is].some((t) => !was.has(t) && themeWord.test(t));
+    }
+    if (r.attributeName === 'style') {
+      const was = declarations(r.oldValue), is = declarations(now);
+      return [...new Set([...was.keys(), ...is.keys()])].some((k) => lookProperty.test(k) && was.get(k) !== is.get(k));
+    }
+    return r.oldValue !== now;
+  };
+  const themes = new MutationObserver((records) => { if (records.some(aboutTheLook)) themeChanged(); });
+  const themeAttributes = ['class', 'style', 'data-theme', 'data-color-mode', 'data-mode', 'data-bs-theme', 'data-color-scheme',
+    'data-mantine-color-scheme'];
+  const themeOptions = { attributes: true, attributeOldValue: true, attributeFilter: themeAttributes };
+  // Dark Reader's own nodes and Zigzag's aren't the page changing.
+  const ours = (node) => node.nodeType !== 1 || node === prepaint || node === freeze || node === fallback
+    || (node.classList && node.classList.contains('darkreader')) || (node.getAttribute('name') || '') === 'darkreader';
+  const theirs = (records) => records.some((r) => r.type === 'attributes' ? !ours(r.target)
+    : [...r.addedNodes, ...r.removedNodes].some((n) => !ours(n)));
+  // What else can change the look: the body's own children (an app's root put in or swapped), and the head's style
+  // sheets, their media and addresses, and its color-scheme and theme-color.
+  const content = new MutationObserver((records) => { if (theirs(records)) checkSoon(400); });
   let watchedBody = null;
   const watchBody = () => {
     if (document.body && document.body !== watchedBody) {
       watchedBody = document.body;
-      themes.observe(watchedBody, { attributes: true, attributeFilter: themeAttributes });
+      themes.observe(watchedBody, themeOptions);
+      content.observe(watchedBody, { childList: true });
     }
   };
+  let watchedHead = null;
+  const watchHead = () => {
+    if (document.head && document.head !== watchedHead) {
+      watchedHead = document.head;
+      content.observe(watchedHead, { childList: true, subtree: true, attributes: true, attributeFilter: ['href', 'media', 'disabled', 'content'] });
+    }
+  };
+  // A fade of the root's or body's background, once it's done.
+  addEventListener('transitionend', (e) => {
+    if ((e.target === document.documentElement || e.target === document.body) && /^(background|color|all)/.test(e.propertyName)) checkSoon(30);
+  }, true);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkSoon(100); });
   // While the page comes in it's looked at just before each frame is drawn (`requestAnimationFrame` runs then), until
   // it has its style: the first look decides it in the frame its own colors would first show in.
   let decided = false;
   const beforeFrame = () => {
     if (decided) return;
     watchBody();
+    watchHead();
     if (!wanted || forced()) { decided = true; return; }
     if (styled()) { decided = true; check(); return; }
     requestAnimationFrame(beforeFrame);
@@ -446,19 +531,21 @@
   if (wanted && forced()) apply(true);
   else { if (wanted) { putPrepaint(); if (native === true) putMark(); } send(); }
   requestAnimationFrame(beforeFrame);
-  if (document.documentElement) themes.observe(document.documentElement, { attributes: true, attributeFilter: themeAttributes });
-  document.addEventListener('DOMContentLoaded', () => { watchBody(); if ((!decided || !wanted) && styled()) { decided = true; check(); } });
+  if (document.documentElement) themes.observe(document.documentElement, themeOptions);
+  document.addEventListener('DOMContentLoaded', () => { watchBody(); watchHead(); if ((!decided || !wanted) && styled()) { decided = true; check(); } });
   addEventListener('load', () => {
     decided = true;
     // A mark the site never touched isn't one its look uses now.
     if (markPut) setTimeout(() => { if (markPut) { releaseMark(); check(); } }, 2000);
     check();
-    // An app that draws a light loading screen, then its own dark.
-    setTimeout(check, 600);
-    setTimeout(check, 2000);
+    watchBody();
+    watchHead();
+    // An app that draws a light loading screen, then its own dark, by a style its watched parts don't show.
+    for (const t of [600, 2000, 5000, 10000]) setTimeout(() => checkSoon(0), t);
   });
   addEventListener('pageshow', (e) => { if (e.persisted) check(); });
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => checkSoon(100));
+  // The look the page is asked for changed (the Mac's, or a site's choice): a site that follows it switches its theme.
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', themeChanged);
 
   window.__zigzagDark = {
     // Zigzag's choice changed (a setting, the site's own row, the Mac's appearance).
@@ -473,6 +560,6 @@
     state: () => ({ wanted, darkened, native, color: colorOf(), engine: 'darkreader', forced: forced(), plain: DarkReader.plain === true }),
     // The plain script, which steps aside for Dark Reader's (`retire`) once dark pages are wanted.
     plain: DarkReader.plain === true,
-    retire() { retired = true; clearTimeout(checkTimer); themes.disconnect(); delete window.__zigzagDark; },
+    retire() { retired = true; clearTimeout(checkTimer); themes.disconnect(); content.disconnect(); delete window.__zigzagDark; },
   };
 })();
