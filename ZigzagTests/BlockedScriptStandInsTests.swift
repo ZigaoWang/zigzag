@@ -1,0 +1,114 @@
+import Foundation
+import Testing
+import WebKit
+@testable import Zigzag
+
+/// A site that calls FingerprintJS 2 to start (中语智汇's web.zyamoy.com) stayed blank with the file blocked; it gets a
+/// stand-in the moment the blocker stops the script, and nothing where the script isn't blocked.
+@MainActor
+struct BlockedScriptStandInsTests {
+    private final class Loading: NSObject, WKNavigationDelegate {
+        var done: CheckedContinuation<Void, Never>?
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
+    }
+
+    /// The blocker's own rule for the file, as EasyPrivacy has it, and the same for a page script's address.
+    private static let rules = """
+    [{"trigger": {"url-filter": "\\\\/fingerprint2\\\\.min\\\\.js"}, "action": {"type": "block"}},
+     {"trigger": {"url-filter": "\\\\/blocked-app\\\\.js"}, "action": {"type": "block"}}]
+    """
+
+    private func page(_ html: String, standIn: Bool = true, store: WKWebsiteDataStore = .nonPersistent()) async throws -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = store
+        let list = try #require(try await WKContentRuleListStore.default().compileContentRuleList(
+            forIdentifier: "zigzag-test-standins-\(UUID().uuidString)",encodedContentRuleList: Self.rules))
+        configuration.userContentController.add(list)
+        if standIn { configuration.userContentController.addUserScript(BlockedScriptStandIns.script) }
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 300), configuration: configuration)
+        let loading = Loading()
+        webView.navigationDelegate = loading
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString(html, baseURL: URL(string: "https://example.com/"))
+        }
+        withExtendedLifetime(loading) {}
+        return webView
+    }
+
+    /// The site's own start: its next script calls the library straight away.
+    private static let site = """
+    <script src="https://cdn.example.com/lib/fingerprint2.min.js"></script>
+    <script>
+      window.started = 'no';
+      Fingerprint2.get((components) => {
+        window.id = Fingerprint2.x64hash128(components.map((c) => c.value).join(''), 31);
+        window.started = 'yes';
+      });
+    </script>
+    """
+
+    private func waitFor(_ script: String, in webView: WKWebView) async throws -> Any? {
+        for _ in 0..<50 {
+            if let value = try await webView.evaluateJavaScript(script), !(value is NSNull) { return value }
+            try await Task.sleep(for: .milliseconds(40))
+        }
+        return nil
+    }
+
+    @Test func aSiteThatNeedsTheBlockedLibraryStarts() async throws {
+        let store = WKWebsiteDataStore.nonPersistent()
+        let webView = try await page(Self.site, store: store)
+        let id = try await waitFor("window.started === 'yes' ? window.id : null", in: webView) as? String
+        #expect(id?.count == 32)
+        // The same on the next visit to the site: one ID per site, kept with its own data.
+        let again = try await page(Self.site, store: store)
+        #expect(try await waitFor("window.started === 'yes' ? window.id : null", in: again) as? String == id)
+    }
+
+    @Test func withoutTheStandInTheSiteStopsAtItsFirstCall() async throws {
+        let webView = try await page(Self.site, standIn: false)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(try await webView.evaluateJavaScript("typeof Fingerprint2") as? String == "undefined")
+        #expect(try await webView.evaluateJavaScript("window.started") as? String == "no")
+    }
+
+    @Test func aPageThatNeverAskedForItSeesNothing() async throws {
+        let webView = try await page("<script>window.seen = typeof Fingerprint2</script>")
+        #expect(try await webView.evaluateJavaScript("window.seen") as? String == "undefined")
+    }
+
+    @Test func itGoesWithTheBlocker() {
+        let controller = WKUserContentController()
+        BlockedScriptStandIns.apply(true, to: controller)
+        BlockedScriptStandIns.apply(true, to: controller)
+        #expect(controller.userScripts.filter(BlockedScriptStandIns.isOurs).count == 1)
+        // Blocking off, or the site allowed: the library loads as it is, with nothing standing in.
+        BlockedScriptStandIns.apply(false, to: controller)
+        #expect(controller.userScripts.isEmpty)
+    }
+
+    @Test func noOtherBlockedScriptGetsOne() async throws {
+        let webView = try await page("<script src=\"https://cdn.example.com/blocked-app.js\"></script>")
+        #expect(try await webView.evaluateJavaScript("typeof Fingerprint2") as? String == "undefined")
+    }
+
+    @Test func theRealLibraryIsNeverReplaced() async throws {
+        // Loaded or not, a library the page already has stays the page's.
+        let webView = try await page("""
+        <script>window.Fingerprint2 = { real: true };</script>
+        <script src="https://cdn.example.com/lib/fingerprint2.min.js"></script>
+        """)
+        #expect(try await webView.evaluateJavaScript("Fingerprint2.real === true") as? Bool == true)
+    }
+
+    @Test func itsNamesAreTheOnesTheListsBlock() throws {
+        let names = try Regex(BlockedScriptStandIns.fingerprint2Files).ignoresCase()
+        for path in ["/fingerprint2.min.js", "/js/fingerprint2.js?v=2", "/lib/fp2.min.js", "/Fingerprintjs2/fpt2.js"] {
+            #expect(path.contains(names), "\(path)")
+        }
+        for path in ["/fingerprint2.min.js.map", "/myfingerprint2.min.js", "/app.js"] {
+            #expect(!path.contains(names), "\(path)")
+        }
+    }
+}

@@ -164,6 +164,7 @@ enum ContentBlocker {
     static func attach(to configuration: WKWebViewConfiguration) {
         guard isEnabled, let list = activeList else { return }
         configuration.userContentController.add(list)
+        BlockedScriptStandIns.apply(true, to: configuration.userContentController)
     }
 
     /// Puts the right list on a page's web view for where it's going: none if blocking is off or the site
@@ -175,6 +176,8 @@ enum ContentBlocker {
             controller.remove(list)
         }
         if let wanted { controller.add(wanted) }
+        // A library the lists stop that a site needs to start gets a harmless stand-in, where they're on.
+        BlockedScriptStandIns.apply(wanted != nil, to: controller)
         applyFilters(to: webView, for: url)
     }
 
