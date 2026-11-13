@@ -1117,7 +1117,9 @@ enum DebugBridge {
             controller.selectedWebView?.callAsyncJavaScript("return window.__zigzagDark ? JSON.stringify(window.__zigzagDark.state()) : 'none'",
                                                             arguments: [:], in: nil, in: DarkPages.world) { result in
                 let tab = controller.tabManager.selectedTab?.darkPage
-                debugLog("darkstate => \(result) tab=\(String(describing: tab))")
+                let color = controller.tabManager.selectedTab?.pageColor.map(DarkPages.hex) ?? "none"
+                let look = controller.selectedWebView?.appearance?.name.rawValue ?? "none"
+                debugLog("darkstate => \(result) tab=\(String(describing: tab)) pageColor=\(color) look=\(look)")
             }
         // darkseen forget: drops the profile's sites seen dark, as clearing History does.
         case "darkseen": if arg == "forget" { DarkSeen.forget(in: controller.tabManager.profile.store) }
@@ -1802,6 +1804,8 @@ enum DebugBridge {
         case "sitepage": SitePanel.shown?.debugPage(arg)
         case "sitezoom": SitePanel.shown?.debugZoom(arg)
         case "sitepermrow": SitePanel.shown?.debugPermissionRow(arg)
+        // sitedark <automatic|on|off|force>: the Dark page row's dropdown.
+        case "sitedark": SitePanel.shown?.debugDark(arg)
         case "sitepanelstate":
             guard let state = SitePanel.shown?.debugState,
                   let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) else { debugLog("sitepanelstate: no panel"); break }
