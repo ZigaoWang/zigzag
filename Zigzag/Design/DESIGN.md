@@ -57,7 +57,7 @@ night (`SpaceColor`, `Tokens.Frame`).
   by day and 7.5:1 at night, quiet words 5.2:1 and 4.8:1. Each space's inks are checked against its own frame (both
   ends of a gradient, bare and under the washes) in each mode, and only a mode that would miss AA falls back to the
   plain near-black or near-white. See-through frames, over a desktop no one can know, always take the plain ones.
-- **Switching spaces** cross-fades the frame's color (`Motion.standard`, eased out); from the keyboard too, since the
+- **Switching spaces** cross-fades the frame's color, gradient and grain together (`Motion.large`, eased out); from the keyboard too, since the
   layout of the window should move so you see where you went.
 - Everything on the frame derives from the color (`Tokens.Chrome`): washes of white over it, so in any space, on a
   gradient or see-through, each fill is a lighter step of that same color.
@@ -192,11 +192,11 @@ One look for each state, everywhere:
 - Pressed: a step darker (`pressedFill`, `controlPressed`, `primaryPressed`, `Chrome.pressed` on the frame) at
   once; the address and the favorites step back from their hover to `Chrome.fieldPressed`, never below the field at
   rest. Things that read as objects (space dots, pill buttons, favorites) sink (`pressSinks`, `showSink`): down
-  `Motion.pressSink` (1pt) in `pressIn` (80ms), eased out, and back over `pressSettle` (180ms), eased out, with
-  weight and no bounce. Rows and small icon buttons give instead (`pressScales`, `showPress`): to
-  `Motion.pressScale` (0.97) and a critically damped spring back. Both start from wherever they are, and the action
+  `Motion.pressSink` (1pt) in `pressIn` (100ms), eased out, and back over `pressSettle` (120ms), eased out, with
+  no bounce. Rows and small icon buttons give instead (`pressScales`, `showPress`): to
+  `Motion.pressScale` (0.97) and back the same way. Both start from wherever they are, and the action
   never waits on them. Not from the keyboard, not with Reduce Motion. The switch's knob travels its short way in
-  `pressSettle`, eased out.
+  `Motion.state`, eased out, with its track's color.
 - Selected / current: in the sidebar the light card of the space's color (`Chrome.card`, `cardEdge`, a shadow-sm);
   on a panel a clear neutral fill, `selectedFill`, with a 1px `selectedEdge` and `setLifted(true)`'s shadow-sm
   (`applyRowStyle`). In a list of places
@@ -221,6 +221,34 @@ One look for each state, everywhere:
 Quick, eased, no bounce (`Tokens.Motion`). The bar is the craft at animations.dev: every movement says where
 something came from, answers at once, and can be interrupted.
 
+Every animation plays one of five roles (`Motion.Role`), and takes its duration and curve from it, never from a
+number of its own (`scripts/check-motion.sh` fails on one):
+
+- **Feedback** (`.feedback`): hover hints and a press, `feedbackIn` 100ms down, `feedbackOut` 120ms back, eased out.
+- **State** (`.state`): a small change in place, a toggle, a row's selection, a chip fading in, `state` 160ms, eased out.
+- **Present** (`.present`): a panel, popover, menu or sheet showing up in `enter` 180ms, growing a little and fading,
+  and going in `exit` 120ms, eased out.
+- **Drawer** (`.drawer`): the sidebar sliding, a notice from beyond the window's edge, and the layout making room,
+  `drawerIn` 260ms out, `drawerOut` 200ms back (and for a move with no way in or out), on `Motion.drawer`.
+- **Large** (`.large`): switching spaces, the Desk, the whole window changing, `large` 280ms, on `Motion.drawer`.
+- **Reduce Motion**: feedback is instant, every other role only crossfades in place in `crossfade` 120ms.
+
+Two curves, one family: `Motion.easeOut` (0.23, 1, 0.32, 1) for what answers or appears, and for every fade and
+color change; `Motion.drawer` (0.32, 0.72, 0, 1) for what travels. Outside the roles: the download's flight and
+progress ring, the page's loading line (`progressCreep`), and ambient brand motion (`Motion.Ambient`).
+
+The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's HIG:
+
+- Ease out for anything entering or answering, never ease in: it starts slow, right when you're looking.
+- Custom curves, not the system's ease: the built-in ones are too weak.
+- Under 300ms: `large` is the ceiling, and most things are shorter.
+- Exits are quicker than entrances.
+- Animate from where it came from: a popover grows out of its control, never from its middle or from nothing.
+- What you do many times an hour, from the keyboard most of all, is instant or nearly so.
+- Springs only for what the fingers threw (a swipe let go mid-move), so it carries on at their speed.
+- Interruptible: a new change starts from what's on screen now, never jumps.
+- Reduce Motion is respected everywhere, with a crossfade or nothing.
+
 - Showing up and going: one vocabulary, `Motion.present(_:from:entering:)`, and `FloatingPanelView.present` and
   `dismiss` on it. Where a thing lives decides where it comes from (`Motion.Origin`):
   - `.point`: a menu, popover or panel grows out of the control that opened it (`growsFrom`), from `enterScale`
@@ -229,27 +257,23 @@ something came from, answers at once, and can be interrupted.
   - `.edge`: a bar that hangs from an edge slides `edgeOffset` (6pt) in from it: the find bar (⌘F) and a toast
     from the page's top, the Desk's and a PDF's bars from the bottom.
   - `.offstage`: a notice from outside (a site's question, Save password?, an offer) comes down from beyond the
-    window's top edge in `noticeIn` (250ms) and goes back up in `noticeOut` (170ms).
+    window's top edge in `noticeIn` (260ms) on the drawer curve and goes back up in `noticeOut` (200ms).
   - `.inPlace`: what stands in for something under it (the address being edited) only fades.
-  Leaving is quicker and subtler, always about two thirds: `exit` (120ms) toward 0.98, or half the edge offset.
+  Leaving is quicker and subtler, two thirds to three quarters: `exit` (120ms) toward 0.98, or half the edge offset.
   The fade runs a touch quicker than the movement coming in, so it's solid before it settles.
 - The selected tab's card slides: picking another row with the pointer, the card travels there from the row it was
   on (`SelectionCardView`, `Motion.selection`, eased out), and the new row takes it over when it lands. A click
   mid-slide carries on from where the card is. From the keyboard, with Reduce Motion or while dragging, it lands.
-- Space color: switching spaces cross-fades the frame; pointing at a preset in the space editor tries it on the
+- Space color: switching spaces cross-fades the frame, its color, gradient, grain and mode in one `large` fade; pointing at a preset in the space editor tries it on the
   window at once, and moving off puts back what you have.
-- One highlight that moves: in a menu, the soft gray pill glides from row to row (`highlightGlide`, 140ms) instead of
+- One highlight that moves: in a menu, the soft gray pill glides from row to row (`highlightGlide`, the state role) instead of
   each row lighting on its own. A list of places (Settings' sections) glides its selection the same way
   (`SelectionGlide`). From the keyboard it simply lands.
 - Interruptible: every animation starts from what's on screen now (`presentation()`), so opening and closing fast,
   or pressing twice, never queues or jumps. Turned around partway, it takes only the time left
   (`Motion.remainingDuration`): ⌘F pressed twice fast lifts the bar a little and brings it straight back.
 
-- Curve: `Motion.easeOut` for anything arriving, leaving or settling; `easeInOut` only for something traveling
-  across the screen. Never ease-in, never overshoot.
-- Durations: hover and press 0 (instant, both ways); `hoverFade` 0.15 only for hints you held a key for; `quick` 0.1 for small feedback; `selection` 0.15 for the card moving to a
-  new row; `standard` 0.2 for most transitions; `enter` 0.18 and `exit` 0.12 for anything showing up and going;
-  `large` 0.3 is the ceiling.
+- Hover itself is instant both ways: a fade on something you sweep past all day reads as lag.
 - Keys: a panel shows up and goes the same way whether a key or the pointer asked (⌘F, Esc, a menu), because the
   movement says where it is. What you summon to type in or flick through many times an hour is simply there and
   simply gone: the command bar (⌘T, ⌘L), the tab and space switchers (⌃Tab), the link under the pointer, and anything
@@ -265,17 +289,17 @@ something came from, answers at once, and can be interrupted.
   in place in `crossfade` (120ms), and a space switch cross-fades the list in place instead of sliding it.
 - Arrivals and departures in lists: a new tab's row opens its height from nothing as it fades in; a closed one folds
   away. Favorites keep their tiles by id and glide to new places; a new one fades in, a removed one fades out.
-  A favicon that swaps for another cross-fades (`selection`). A split opens at `standard`, a closed pane fades where it
+  A favicon that swaps for another cross-fades (`state`). A split opens at `standard`, a closed pane fades where it
   was as the other grows over it, and double-clicking the divider glides the panes back to even.
-- The hidden sidebar comes out at the window's edge in `edgeSlideDuration` (260ms) and goes back in `edgeTuckDuration`
-  (200ms) on `Motion.drawer` (0.32, 0.72, 0, 1): eased out, but it starts at about twice its average speed, not four
+- The sidebar, docked or hidden at the window's edge, comes out in `drawerIn` (260ms) and goes back in `drawerOut`
+  (200ms) on `Motion.drawer` (0.32, 0.72, 0, 1), the page and the bar with it: eased out, but it starts at about twice its average speed, not four
   times, so it travels its whole width in even steps. The card moves whole, glass, color, shadow and rows, as one
   layer on the render server, with nothing laid out on the way. With Reduce Motion it fades where it lands, or where
   it was. Whether the pointer meant it is decided once, 100ms after it meets the edge (`SidebarEdgeReveal`): a quick
   move counts, even one that runs on past the edge and comes back within 400ms or bounces back off the screen's
   edge, and then it slides all the way out before leaving can send it back, so a quick move and a slow one look
   the same.
-- The one movement past `large`: a download thrown into its button, `Motion.flight` (0.45s), eased out along its arc.
+- The one movement past `large`: a download thrown into its button, `Motion.flight` (1.1s), eased out along its arc.
 - Moves whose completion must land on time (the Desk's zoom) use `Motion.easeAnimation`, not a spring, which settles
   well after it looks done.
 
@@ -514,7 +538,7 @@ something came from, answers at once, and can be interrupted.
 - **Switch** (`Toggle`): a slide switch, 34 by 20: a matte recessed track (shade under its upper lip, a hairline
   around it) and a small round 14pt knob. Off, a porcelain knob on the left of a neutral track; on, the knob slides
   right, turns white, and the track fills with the space's accent (`Switch.knobOn`, `edgeOn`), a step deeper under
-  the pointer, so on reads at a glance in every space and with Increase Contrast. The knob settles in 200ms on a critically damped spring and stretches
+  the pointer, so on reads at a glance in every space and with Increase Contrast. The knob settles in `Motion.state` (160ms), eased out, and stretches
   4pt while held; the track's color fades over the same time. Reduce Motion: the knob jumps, the color fades.
 - **Field** (`FilledField`): soft fill, accent ring while typing; `.isPill` for a field on its own in a panel;
   `.isOutlined` for the page look, white with a hairline and a faint shadow like the buttons beside it, which a

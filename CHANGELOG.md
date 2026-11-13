@@ -8,6 +8,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### New
 - Zigzag Mini has Back, Forward and Reload after the traffic lights, as a browser window does: Back and Forward dim when there's no page that way, Reload turns into Stop while the page loads, and right-clicking Back or Forward lists the pages that way. ([#213](https://github.com/ZigaoWang/zigzag/issues/213))
 
+### Fixed
+- Animations share one set of timings: presses and hovers answer in about a tenth of a second, small changes like a switch take a moment longer, panels and menus grow out of what opened them and leave quicker than they came, and the sidebar, notices and the window's layout slide on one curve. Switching spaces fades the window's color, gradient and grain together, a switch's knob and color move in step, and nothing bounces. With Reduce Motion, nothing travels: things crossfade, or change at once. ([#217](https://github.com/ZigaoWang/zigzag/issues/217))
+
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
