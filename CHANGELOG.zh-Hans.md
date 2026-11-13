@@ -16,8 +16,12 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 发行说明跟随 App 的语言；0.9.0 及之前的几个版本有了中文发行说明。
 - 空间的编辑面板（新建空间时也会打开）会说明：同一份个人资料中的空间共用登录状态、历史记录和扩展。它的“个人资料”菜单里有“新建个人资料”，一点就给这个空间建一份自己的个人资料，并以空间命名。有多份个人资料时，空间切换器和空间的右键菜单也会像边栏一样显示每个空间用的是哪份个人资料。感谢 [spongehah](https://github.com/spongehah)。([#201](https://github.com/ZigaoWang/zigzag/issues/201))
 - 开发者模式改为在“网站设置”的 ⋯ 菜单、命令栏或“显示 › 开发者”（⌥⇧⌘D）里选“开启开发者模式”来开关，“网站设置”的列表里不再另有一个开关，那个列表是给所有人用的。感谢 [Lakeland97](https://github.com/Lakeland97)。([#198](https://github.com/ZigaoWang/zigzag/issues/198))
+- “网站设置”里的“深色网页”从两个开关变成了一个下拉菜单：“自动”跟随“设置 › 外观 › 深色网页”，“打开”和“关闭”不管设置怎样都只对这个网站生效，“强制深色”会把看起来已经是深色的网站也画成深色。选“自动”时，下面会写出现在是开还是关。以前做过的选择保持不变。感谢 [Lakeland97](https://github.com/Lakeland97)。([#134](https://github.com/ZigaoWang/zigzag/issues/134))
+- 为某个网站关闭“深色网页”时，会让它显示浅色外观，所以跟随 Mac 浅色或深色的网站，即使 Mac 是深色的也会显示浅色。没有打开深色网页的地方，网页跟随 Mac 的浅色或深色，而不是空间的颜色或无痕浏览窗口的颜色。你在网站自己的设置里选的主题由网站保存，会保持你选的样子。感谢 [Lakeland97](https://github.com/Lakeland97)。([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 
 ### 修复
+- 深色网页能察觉网站自己切换主题了。一开始是深色、后来用网站自己的主题菜单换成浅色的网站，会被画成深色；换成深色的网站会保持原样，不用重新载入。感谢 [Lakeland97](https://github.com/Lakeland97)。([#134](https://github.com/ZigaoWang/zigzag/issues/134))
+- 网页载入后换了颜色时，比如深色的应用画在白色页面上，或者网站切换了主题，页面上方的栏、分屏浏览的标题栏和 Zigzag Mini 的顶栏也会跟着变，不会一直是白色。感谢 [Lakeland97](https://github.com/Lakeland97)。([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - 隐藏的边栏滑出和收回更顺滑了，全屏时也一样。
 - 滑出来的边栏和固定显示的边栏颜色一致了，不会再偏灰。
 - Tampermonkey BETA 和正式版 Tampermonkey 一样能用了。以前它一启动就停住，弹出窗口打不开，脚本也不会运行；现在它能正常启动，打开脚本的 .user.js 地址会出现它的安装页，装好的脚本也会运行，不允许内联脚本的网站上也一样。 ([#200](https://github.com/ZigaoWang/zigzag/issues/200))
