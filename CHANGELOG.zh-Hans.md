@@ -66,12 +66,12 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 深色网页能察觉网站自己切换主题了。一开始是深色、后来用网站自己的主题菜单换成浅色的网站，会被画成深色；换成深色的网站会保持原样，不用重新载入。感谢 [Lakeland97](https://github.com/Lakeland97)。([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - 网页载入后换了颜色时，比如深色的应用画在白色页面上，或者网站切换了主题，页面上方的栏、分屏浏览的标题栏和 Zigzag Mini 的顶栏也会跟着变，不会一直是白色。感谢 [Lakeland97](https://github.com/Lakeland97)。([#134](https://github.com/ZigaoWang/zigzag/issues/134))
 - YouTube Music 在你没在看的标签页里也会接着播下一首了。以前每首歌放完就卡在加载，要暂停再播放才继续：窗口外的网页加载不了下一首，所以正在播放声音的标签页现在会留在窗口里（看不见），小播放器在两首歌之间消失时也会把网页留在窗口里。感谢 [Lakeland97](https://github.com/Lakeland97)。([#199](https://github.com/ZigaoWang/zigzag/issues/199))
-- 隐藏的边栏滑出和收回更顺滑了，全屏时也一样。
-- 滑出来的边栏和固定显示的边栏颜色一致了，不会再偏灰。
-- Tampermonkey BETA 和正式版 Tampermonkey 一样能用了。以前它一启动就停住，弹出窗口打不开，脚本也不会运行；现在它能正常启动，打开脚本的 .user.js 地址会出现它的安装页，装好的脚本也会运行，不允许内联脚本的网站上也一样。 ([#200](https://github.com/ZigaoWang/zigzag/issues/200))
 - 在“设置 › 通用”里点“设为默认”后，macOS 一确认按钮就会更新，不用再点第二次。感谢 [ze-mu-zhou](https://github.com/ze-mu-zhou)。([#195](https://github.com/ZigaoWang/zigzag/issues/195))
 - “翻译”会翻译网页里所有不是你的语言的内容，不再只翻译整页都是别的语言的网页。英文网页里的一段中文或一句日文引语会单独翻译，中文网页里的英文代码保持原样。只有整页都已是你的语言时，才会提示“此页面已是”你的语言。在同一个窗口里再翻译一个同语言的网页，或者从已翻译的网页前往另一个网页后再翻译，也都可以了。感谢 [Lakeland97](https://github.com/Lakeland97)。([#197](https://github.com/ZigaoWang/zigzag/issues/197))
+- 隐藏的边栏滑出和收回更顺滑了，全屏时也一样。
+- 滑出来的边栏和固定显示的边栏颜色一致了，不会再偏灰。
 - Motrix 扩展可以和 Motrix App 配对了。之前点“配对”还没连到 App 就提示连接失败：扩展认不出 Zigzag 给它自己文件的地址，现在只在需要的那一项检查里给它 Chrome 的地址。
+- Tampermonkey BETA 和正式版 Tampermonkey 一样能用了。以前它一启动就停住，弹出窗口打不开，脚本也不会运行；现在它能正常启动，打开脚本的 .user.js 地址会出现它的安装页，装好的脚本也会运行，不允许内联脚本的网站上也一样。 ([#200](https://github.com/ZigaoWang/zigzag/issues/200))
 - 边栏在右边、地址栏在边栏里时，页面会一直延伸到窗口顶部，和边栏在左边时一样，上面不再多出一条。窗口按钮在边栏顶部那一行的开头，接着是边栏按钮，后退、前进和重新载入在那一行的末尾，和边栏在左边时同一行。地址栏在页面上方时，它们留在那一栏的开头。([#166](https://github.com/ZigaoWang/zigzag/issues/166))
 - 安装没有后台页面的扩展（比如一些只修改页面的扩展）不会再让 Zigzag 退出。([#194](https://github.com/ZigaoWang/zigzag/issues/194))
 - 设置开着时切换“无边框页面”，设置不会再保持原来的大小排版：分区列表旁边不再多一条滚动条、下面不再有一条白边，开关也和搜索栏对齐了。现在设置会随着页面留出或收回边距一起移动，页面的圆角和阴影也跟着移动，不再直接跳到最终位置。感谢 [vandenbulckjean](https://github.com/vandenbulckjean)。([#184](https://github.com/ZigaoWang/zigzag/issues/184))
