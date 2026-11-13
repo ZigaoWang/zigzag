@@ -605,7 +605,7 @@
       }
     },
     "%@, %@" : {
-      "comment" : "A size in the Page Size menu of the developer tools above the page: its name, then its width and height, like “iPhone, 393 × 852”.\nAccessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nOn the Permissions row of the site panel: how many allowed, then how many blocked, like “2 allowed, 1 blocked”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nVoiceOver name of the page's whole address in the developer tools' bar on a plain http page: the address, then that it's not secure.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.",
+      "comment" : "A size in the Page Size menu of the developer tools above the page: its name, then its width and height, like “iPhone, 393 × 852”.\nAccessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nOn the Permissions row of the site panel: how many allowed, then how many blocked, like “2 allowed, 1 blocked”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nVoiceOver name of the page's whole address in the developer tools' bar on a plain http page: the address, then that it's not secure.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.\nWhat VoiceOver says for a space in the space switcher with more than one profile: the space's name, then its profile's.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8914,7 +8914,7 @@
       }
     },
     "New Profile" : {
-      "comment" : "Title of the sheet that makes a profile.",
+      "comment" : "Item at the end of the Profile menu in a space's editor: makes a profile named after the space and puts the space on it, in one step.\nTitle of the sheet that makes a profile.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8925,7 +8925,7 @@
       }
     },
     "New Profile…" : {
-      "comment" : "Button beside Your Profiles in Settings › Profiles: opens the sheet that makes a profile.\nItem at the end of the Profile menu in a space's editor: makes a profile and puts the space on it.",
+      "comment" : "Button beside Your Profiles in Settings › Profiles: opens the sheet that makes a profile.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14235,13 +14235,13 @@
         }
       }
     },
-    "Spaces on the same profile share sign-ins, extensions and history." : {
-      "comment" : "Note under the Profile row in a space's editor, saying what being on the same profile means.",
+    "Spaces on the same profile share sign-ins, history and extensions. Use another profile to keep them apart." : {
+      "comment" : "Note under the Profile row in a space's editor, which also opens for a new space: what being on the same profile means.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同一份个人资料中的空间共用登录状态、扩展和历史记录。"
+            "value" : "同一份个人资料中的空间共用登录状态、历史记录和扩展。想分开就用另一份个人资料。"
           }
         }
       }

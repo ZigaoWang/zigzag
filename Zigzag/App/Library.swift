@@ -1490,6 +1490,27 @@ final class Library {
         return info
     }
 
+    /// A profile of its own for a space, in one step (New Profile in a space's editor): named after the space, in
+    /// its color when that's one a profile can have, else the next one no profile has. It starts with no extensions.
+    @discardableResult
+    func addProfile(forSpace id: UUID) -> ProfileInfo? {
+        guard let space = space(id) else { return nil }
+        let used = profiles.map { color(of: $0) }
+        let pick = space.color.isNeutral || used.contains(space.color) ? SpaceColor.next(unused: used) : space.color
+        let info = directory.addOwn(for: id, named: space.name, taken: profiles.map(\.displayName), color: pick)
+        commit()
+        return info
+    }
+
+    /// A profile made for a space keeps its name while the space is being named: typed, the space's new name.
+    func renameProfile(_ id: UUID, after spaceName: String) {
+        guard let profile = directory.profile(id), !profile.isDefault else { return }
+        let name = ProfileDirectory.freshName(spaceName, taken: profiles.filter { $0.id != id }.map(\.displayName))
+        guard !name.isEmpty, name != profile.name else { return }
+        directory.update(id, name: name, color: profile.color)
+        commit()
+    }
+
     /// Lists again a profile whose data is on disk under `id` but which is in no list (Profiles.orphans): it's a
     /// profile once more, with what it kept.
     @discardableResult

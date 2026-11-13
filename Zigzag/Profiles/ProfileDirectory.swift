@@ -109,6 +109,25 @@ nonisolated struct ProfileDirectory: Codable, Equatable {
         spaces[space.uuidString] = profile == Profile.defaultID || !others.contains { $0.id == profile } ? nil : profile
     }
 
+    /// A profile of its own for `space`, in one step from where a space is made or edited: named after the space
+    /// (`taken` are the names shown already) and the space put on it.
+    @discardableResult
+    mutating func addOwn(for space: UUID, named name: String, taken: [String], color: SpaceColor? = nil) -> ProfileInfo {
+        let info = add(name: Self.freshName(name, taken: taken), color: color)
+        assign(space: space, to: info.id)
+        return info
+    }
+
+    /// `name`, or with a number after it when a profile is already called that, so two profiles never read alike.
+    static func freshName(_ name: String, taken: [String]) -> String {
+        let base = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let used = Set(taken.map { $0.lowercased() })
+        guard used.contains(base.lowercased()) else { return base }
+        var n = 2
+        while used.contains("\(base) \(n)".lowercased()) { n += 1 }
+        return "\(base) \(n)"
+    }
+
     mutating func assign(favorite: UUID, to profile: UUID) {
         favorites[favorite.uuidString] = profile == Profile.defaultID || !others.contains { $0.id == profile } ? nil : profile
     }

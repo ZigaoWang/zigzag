@@ -79,6 +79,26 @@ enum ProfileChoice {
 
     /// What a profile's dropdown is called, for VoiceOver, where no label stands beside it.
     static var label: String { String(localized: "Profile", comment: "What VoiceOver calls a menu that chooses a profile, and the label before that choice in a space's editor.") }
+
+    /// What being on a profile means, in a line under a space's choice of one: enough to choose without a trip to
+    /// Settings. Spaces aren't Chrome's profiles: a sign-in in one space is there in the others on its profile (#201).
+    static var spaceNote: String {
+        String(localized: "Spaces on the same profile share sign-ins, history and extensions. Use another profile to keep them apart.",
+               comment: "Note under the Profile row in a space's editor, which also opens for a new space: what being on the same profile means.")
+    }
+
+    /// The item at the end of a space's Profile menu: a profile of its own for the space, named after it, in one step.
+    static var newForSpace: String {
+        String(localized: "New Profile", comment: "Item at the end of the Profile menu in a space's editor: makes a profile named after the space and puts the space on it, in one step.")
+    }
+}
+
+extension ProfileDirectory {
+    /// The profile's name beside a space where spaces are listed (the sidebar's header, the space switcher, a
+    /// space's menu): only once there's more than one profile. With one, nothing speaks of profiles.
+    func shownName(ofSpace id: UUID) -> String? {
+        all.count > 1 ? profile(profileID(ofSpace: id))?.displayName : nil
+    }
 }
 
 /// The sheets that make, change and remove a profile, wherever they're asked for: Settings, or a space's editor.

@@ -1494,10 +1494,13 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     /// The profile the space is on: its sign-ins, extensions and website data.
     private let profileLabel = SpaceLookEditor.rowLabel(String(localized: "Profile", comment: "Label in a space's editor, before the choice of the profile the space is on."))
     private let profileButton = DropdownButton()
-    /// What a profile is, in a line under its row: enough to choose one without a trip to Settings.
-    private let profileNote = NSTextField.dialogText(String(localized: "Spaces on the same profile share sign-ins, extensions and history.", comment: "Note under the Profile row in a space's editor, saying what being on the same profile means."), font: Tokens.Font.detail())
-    /// While a question it asked is up (moving the space's tabs to another profile, a new profile's name), clicks
-    /// and keys are that question's: the editor stays as it is under it.
+    /// What a profile is, in a line under its row: enough to choose one without a trip to Settings. There even with
+    /// one profile: that's when nothing else says spaces share sign-ins (#201).
+    private let profileNote = NSTextField.dialogText(ProfileChoice.spaceNote, font: Tokens.Font.detail())
+    /// A profile New Profile made here, still called after the space: it takes the name as you type it.
+    private var namedProfile: UUID?
+    /// While a question it asked is up (moving the space's tabs to another profile), clicks and keys are that
+    /// question's: the editor stays as it is under it.
     private var isAsking = false
     private var monitor: Any?
     static let width: CGFloat = 300
@@ -1519,7 +1522,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         [nameBackground, nameField, editor, iconButton, profileLabel, profileButton, profileNote].forEach { addSubview($0) }
         refreshProfiles()
         profileButton.onSelect = { [weak self] index in self?.chooseProfile(at: index) }
-        profileButton.actions = [DropdownButton.Action(title: String(localized: "New Profile…", comment: "Item at the end of the Profile menu in a space's editor: makes a profile and puts the space on it."), symbol: "plus") { [weak self] in
+        profileButton.actions = [DropdownButton.Action(title: ProfileChoice.newForSpace, symbol: "plus") { [weak self] in
             self?.newProfile()
         }]
         refreshIconButton(space.icon)
@@ -1728,38 +1731,49 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     private func chooseProfile(at index: Int) {
         let library = Library.shared
-        guard profileIDs.indices.contains(index), let profile = library.directory.profile(profileIDs[index]), let space = library.space(spaceID) else { return }
+        guard profileIDs.indices.contains(index), let profile = library.directory.profile(profileIDs[index]) else { return }
         guard profile.id != library.profileID(ofSpace: spaceID) else { return }
-        // Pages that are loaded are rebuilt in the other profile, which is worth a question; a space with none
-        // open just changes.
-        let open = WindowManager.shared.controllers.flatMap { $0.tabManager.allTabs }.contains { $0.spaceID == spaceID && !$0.isPrivate && $0.webView != nil }
-        guard open, let host = sheetHost else { move(to: profile.id); return }
+        confirmMove(to: profile.displayName, cancelled: { [weak self] in self?.refreshProfiles() }) { [weak self] in self?.move(to: profile.id) }
+    }
+
+    /// Whether the space has pages loaded, which another profile rebuilds.
+    private var hasOpenPages: Bool {
+        WindowManager.shared.controllers.flatMap { $0.tabManager.allTabs }.contains { $0.spaceID == spaceID && !$0.isPrivate && $0.webView != nil }
+    }
+
+    /// Pages that are loaded are rebuilt in the other profile, which is worth a question; a space with none open
+    /// (a new one) just changes.
+    private func confirmMove(to profileName: String, cancelled: @escaping () -> Void, then move: @escaping () -> Void) {
+        guard hasOpenPages, let host = sheetHost, let space = Library.shared.space(spaceID) else { move(); return }
         isAsking = true
-        ConfirmSheet.show(in: host, title: String(localized: "Move \(space.name) to \(profile.displayName)?", comment: "Title of the sheet that asks before a space with open tabs is put on another profile. First the space's name, then the profile's."),
-                          message: String(localized: "Its open tabs reload in \(profile.displayName), with that profile’s sign-ins and extensions. Pages you were filling in may lose what you typed.", comment: "Message of the sheet that asks before a space with open tabs is put on another profile. The placeholder is the profile's name."),
+        ConfirmSheet.show(in: host, title: String(localized: "Move \(space.name) to \(profileName)?", comment: "Title of the sheet that asks before a space with open tabs is put on another profile. First the space's name, then the profile's."),
+                          message: String(localized: "Its open tabs reload in \(profileName), with that profile’s sign-ins and extensions. Pages you were filling in may lose what you typed.", comment: "Message of the sheet that asks before a space with open tabs is put on another profile. The placeholder is the profile's name."),
                           confirmTitle: String(localized: "Move", comment: "Button of the sheet that asks before a space is put on another profile.")) { [weak self] confirmed in
-            guard let self else { return }
-            self.isAsking = false
-            if confirmed { self.move(to: profile.id) } else { self.refreshProfiles() }
+            self?.isAsking = false
+            if confirmed { move() } else { cancelled() }
         }
     }
 
     private func move(to profile: UUID) {
         Library.shared.setProfile(profile, forSpace: spaceID)
+        if profile != namedProfile { namedProfile = nil }
         edited = true
         refreshProfiles()
     }
 
+    /// New Profile: one of the space's own, named after it, in one step. No sheet: its name and color can be
+    /// changed later in Settings › Profiles, and while the space is still being named here, it follows the name.
     private func newProfile() {
-        guard let host = sheetHost else { return }
-        isAsking = true
-        let sheet = ProfileSheets.new(in: host) { [weak self] made in
-            guard let self else { return }
-            self.isAsking = false
+        commitName()
+        let library = Library.shared
+        guard let space = library.space(spaceID) else { return }
+        let name = ProfileDirectory.freshName(space.name, taken: library.profiles.map(\.displayName))
+        confirmMove(to: name, cancelled: { [weak self] in self?.refreshProfiles() }) { [weak self] in
+            guard let self, let made = Library.shared.addProfile(forSpace: self.spaceID) else { return }
+            self.namedProfile = made.id
+            self.edited = true
             self.refreshProfiles()
-            if let index = Library.shared.profiles.firstIndex(where: { $0.id == made.id }) { self.chooseProfile(at: index) }
         }
-        sheet.onCancel = { [weak self] in self?.isAsking = false }
     }
 
     /// The space as it was when the editor opened; closing registers one ⌘Z for everything changed.
@@ -1801,11 +1815,24 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         if !name.isEmpty, name != Library.shared.space(spaceID)?.name {
             Library.shared.renameSpace(spaceID, to: name)
             edited = true
+            if let namedProfile {
+                Library.shared.renameProfile(namedProfile, after: name)
+                refreshProfiles()
+            }
         }
     }
 
     /// Use Default Colors, as its button does (the debug bridge).
     func useDefaultColors() { editor.useDefaultColors() }
+
+    #if DEBUG
+    /// For the debug bridge: New Profile in the Profile menu, and a name typed into the field.
+    func debugNewProfile() { newProfile() }
+    func debugType(_ name: String) {
+        nameField.stringValue = name
+        commitName()
+    }
+    #endif
 
     func controlTextDidChange(_ obj: Notification) { commitName() }
 

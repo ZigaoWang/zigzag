@@ -658,6 +658,9 @@ enum DebugBridge {
         case "editspace": SpaceEditorPanel.toggle(spaceID: controller.tabManager.currentSpaceID, in: controller)
         case "closeeditor": SpaceEditorPanel.current?.close()
         case "canceleditor": SpaceEditorPanel.current?.cancel()
+        // editornewprofile: the space editor's New Profile, as its menu item does. editorname <name>: types that name.
+        case "editornewprofile": SpaceEditorPanel.current?.debugNewProfile()
+        case "editorname": SpaceEditorPanel.current?.debugType(arg)
         case "tourskip": Tutorial.skip()
         case "tourend": Tutorial.isHidden = true; controller.root.overlay.subviews.compactMap { $0 as? GuidedTour }.forEach { $0.removeFromSuperview() }
         case "fullscreen": controller.window?.toggleFullScreen(nil)
