@@ -357,11 +357,12 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   `DeveloperBarTools.addressMinWidth` before a button gives way. With the address in the bar, the tools alone
   after it, the same groups, and they give way first, into ⋯, the last first; the address keeps
   `TopBarView.addressMinWidth`. The address and the sidebar's rows stay where the setting puts them, so nothing
-  in the sidebar moves for it. Never in a split, where the row is the panes' own strips: there, and with the
-  setting off, the console, inspecting and reloading are tiles under Developer in Site Controls, after the
-  page's actions. The console's button carries the page's errors as a count, the pill a pinned extension's
-  count is (`BadgeView`), "99+" past that; on ⋯ while the console is under it. A count of what happened on the
-  page, not a readout: nothing shows at zero.
+  in the sidebar moves for it. In a split the row is the panes' own strips, so a development page's tools are in
+  its pane's ⋯ (below), all but its size. With the setting off, the console, inspecting and reloading are tiles
+  under Developer in Site Controls, after the page's actions. One rule says which (`DeveloperBarTools.place`).
+  The console's button carries the page's errors as a count, the pill a pinned extension's count is
+  (`BadgeView`), "99+" past that; on ⋯ while the console is under it. A count of what happened on the page, not a
+  readout: nothing shows at zero.
   A button that holds a choice wears the choice's symbol (Page Appearance: the half-filled circle following the
   Mac, the sun, the moon, a printer for print styles), and its menu checks the one in effect.
   Page Size's button is a phone, a tablet or a laptop by the size chosen (a tablet: short side 500 or more, squarer
@@ -398,6 +399,13 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   line and reload state follow it, and clicking its address focuses that pane and opens the address bar over it.
   A tile group's panes (#160) have no swap or layout buttons: their places are where they were dropped. Its ink is
   light or dark by contrast with its page's color, as the bar above the page's is (`PaneHeaderView.ground`).
+  ⋯ holds what gives way as the pane narrows (Site Controls first when the address has no room for its button,
+  then Forward and Reload, then zoom, swap, the layout and Separate). On a page in Developer Mode it's there
+  whatever the width and its menu ends with Developer: that page's tools as ⋯ above a page shown on its own has
+  them, all but Page Size. It follows the site, like the bar above a page, not a passing state: the address gives
+  up a button's width while it's there. Filled and with the error count as that ⋯ is. Choosing a tool makes the
+  pane the one you're in first, as Site Controls from it does (`TabManager.focusPane`), and a click on a menu
+  lying over another pane is the menu's, never that pane's.
   Pressed and moved 4pt, the strip picks its pane up (`PaneDrag`), as every drag goes: the pane stays faint, a small
   rounded picture of its page follows the pointer, and the drop hint shows where it lands ("Swap Places", "Move Top
   Left"): another pane's middle swaps, the page's edges and corners take a half or quarter as for a tab, the sidebar's

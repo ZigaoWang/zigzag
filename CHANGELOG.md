@@ -20,9 +20,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Ad blocking's site filters are built once the filter lists have all downloaded, together with their scriptlets. On a first launch they could be built a moment early, from the lists that had come and the copy of Zigzag's own fixes in the app, and then built again. ([#129](https://github.com/ZigaoWang/zigzag/issues/129))
 - Restart to Update says it couldn't check for updates when Zigzag can't install the update right then, instead of doing nothing.
 - Find on page marks the matches in text that shows up as you open a section, like an accordion or Show more, not only in text a page adds.
+- A click on a split pane's ⋯ menu where it lies over the pane beside it no longer makes that pane the one you're in first.
 
 ### New
 - A page in Developer Mode at a phone's or a tablet's size has that device's pixel ratio, so it reads its `devicePixelRatio` and picks its images as it would there: 3× for an iPhone 16, 2.625× for a Pixel 7. Pixel Ratio in Page Size's menu chooses 1×, 2× or 3× instead, the size beside Page Size says it, and Add Size takes a ratio for a device of your own. ([#141](https://github.com/ZigaoWang/zigzag/issues/141))
+- In split view, a page in Developer Mode has its developer tools in its strip's ⋯: the console, inspecting, the page's look, reload's choices and the rest, all but its size, with the count of the page's errors on ⋯. Choosing one makes that pane the one you're in. ([#141](https://github.com/ZigaoWang/zigzag/issues/141))
 
 ## [0.9.1] - 2026-11-15
 
