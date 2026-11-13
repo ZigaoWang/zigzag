@@ -336,9 +336,9 @@ something came from, answers at once, and can be interrupted.
   agent, outlines), so no choice is one nothing shows. Its menu: what gave way, what's on or off, User Agent under
   its heading with Open In after it, then View Source, Developer Settings and Turn Off Developer Mode.
 - **Developer Mode for a site** (#141): one per-site switch (the list in Settings › Developer), turned on or off
-  alike from the Developer Mode switch, the last row of This Site in Site Controls on every web page; Turn On (Off)
-  Developer Mode in Site Controls' ⋯ menu and the command bar; and View › Developer › Turn On (Off) Developer Mode
-  for This Site (⌥⇧⌘D, shown in the menus). At once, with a toast naming the site and Undo, in `DeveloperTool.modeSymbol`
+  alike from Turn On (Off) Developer Mode in Site Controls' ⋯ menu and the command bar, and View › Developer ›
+  Turn On (Off) Developer Mode for This Site (⌥⇧⌘D, shown in the menus). Not a row of This Site (#198): it's for
+  the people who build sites, and one menu item is enough. At once, with a toast naming the site and Undo, in `DeveloperTool.modeSymbol`
   (the outline hammer, the one mark Developer Mode has in menus, toasts and Settings). Never from a private window,
   which keeps nothing about its sites: its tabs follow the list, but can't change it.
 - **A page at a size of its own** (`PageCardView.pageSize`, the developer tools'): in the middle of its room on
