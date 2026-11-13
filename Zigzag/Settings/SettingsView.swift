@@ -2699,8 +2699,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     private func makeDefault() {
-        DefaultBrowser.make()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.refresh(); self?.layoutDocument() }
+        DefaultBrowser.make { [weak self] in
+            self?.refresh()
+            self?.layoutDocument()
+        }
     }
 
     /// On the profile of the space the window is on, as one made from the sidebar is.
@@ -3382,16 +3384,24 @@ enum DefaultBrowser {
             || Bundle(url: app)?.bundleIdentifier == Bundle.main.bundleIdentifier
     }
 
-    static func make() {
+    static func make(completion: @escaping () -> Void = {}) {
         let app = Bundle.main.bundleURL
         // macOS asks once, for http, and that answer makes Zigzag the web browser. Asking for https at the same time
         // put a second, identical question on screen; it's only asked after, and only if the first didn't cover it.
         NSWorkspace.shared.setDefaultApplication(at: app, toOpenURLsWithScheme: "http") { error in
-            guard error == nil else { return }
+            guard error == nil else {
+                DispatchQueue.main.async(execute: completion)
+                return
+            }
             DispatchQueue.main.async {
                 guard let https = URL(string: "https://example.com"),
-                      NSWorkspace.shared.urlForApplication(toOpen: https)?.standardizedFileURL != app.standardizedFileURL else { return }
-                NSWorkspace.shared.setDefaultApplication(at: app, toOpenURLsWithScheme: "https") { _ in }
+                      NSWorkspace.shared.urlForApplication(toOpen: https)?.standardizedFileURL != app.standardizedFileURL else {
+                    completion()
+                    return
+                }
+                NSWorkspace.shared.setDefaultApplication(at: app, toOpenURLsWithScheme: "https") { _ in
+                    DispatchQueue.main.async(execute: completion)
+                }
             }
         }
     }
