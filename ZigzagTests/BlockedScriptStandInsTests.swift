@@ -15,10 +15,13 @@ struct BlockedScriptStandInsTests {
     /// The blocker's own rule for the file, as EasyPrivacy has it, and the same for a page script's address.
     private static let rules = """
     [{"trigger": {"url-filter": "\\\\/fingerprint2\\\\.min\\\\.js"}, "action": {"type": "block"}},
-     {"trigger": {"url-filter": "\\\\/blocked-app\\\\.js"}, "action": {"type": "block"}}]
+     {"trigger": {"url-filter": "\\\\/blocked-app\\\\.js"}, "action": {"type": "block"}},
+     {"trigger": {"url-filter": "\\\\/api\\\\/v0\\\\/telemetry"}, "action": {"type": "block"}},
+     {"trigger": {"url-filter": "\\\\/api\\\\/v0\\\\/blocked-call"}, "action": {"type": "block"}}]
     """
 
-    private func page(_ html: String, standIn: Bool = true, store: WKWebsiteDataStore = .nonPersistent()) async throws -> WKWebView {
+    private func page(_ html: String, standIn: Bool = true, store: WKWebsiteDataStore = .nonPersistent(),
+                      at address: String = "https://example.com/") async throws -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = store
         let list = try #require(try await WKContentRuleListStore.default().compileContentRuleList(
@@ -30,7 +33,7 @@ struct BlockedScriptStandInsTests {
         webView.navigationDelegate = loading
         await withCheckedContinuation { done in
             loading.done = done
-            webView.loadHTMLString(html, baseURL: URL(string: "https://example.com/"))
+            webView.loadHTMLString(html, baseURL: URL(string: address))
         }
         withExtendedLifetime(loading) {}
         return webView
@@ -109,6 +112,62 @@ struct BlockedScriptStandInsTests {
         }
         for path in ["/fingerprint2.min.js.map", "/myfingerprint2.min.js", "/app.js"] {
             #expect(!path.contains(names), "\(path)")
+        }
+    }
+
+    // MARK: Blocked requests a site checks on
+
+    /// DeepSeek's own flush, as its telemetry sends it: a keepalive POST to the blocked address, read as a network
+    /// failure when nothing comes back (#208). Then the same by XMLHttpRequest.
+    private static let telemetry = """
+    const sent = await fetch('/api/v0/telemetry', { method: 'POST', body: new Uint8Array([1, 2, 3]), keepalive: true,
+                                                     headers: { 'Content-Type': 'application/octet-stream' } })
+      .then((response) => response.status, () => 'failed');
+    const posted = await new Promise((done) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/v0/telemetry');
+      xhr.onload = () => done(xhr.readyState + ' ' + xhr.status);
+      xhr.onerror = () => done('failed');
+      xhr.send('x');
+    });
+    return sent + ' ' + posted;
+    """
+
+    private func run(_ body: String, in webView: WKWebView) async throws -> String? {
+        try await webView.callAsyncJavaScript(body, contentWorld: .page).map { String(describing: $0) }
+    }
+
+    @Test func deepSeeksBlockedTelemetryGetsAnEmptyAnswer() async throws {
+        let webView = try await page("<p>DeepSeek</p>", at: "https://chat.deepseek.com/")
+        #expect(try await run(Self.telemetry, in: webView) == "200 4 200")
+    }
+
+    @Test func withoutTheStandInTheTelemetryFails() async throws {
+        let webView = try await page("<p>DeepSeek</p>", standIn: false, at: "https://chat.deepseek.com/")
+        #expect(try await run(Self.telemetry, in: webView) == "failed failed")
+    }
+
+    @Test func otherSitesAndOtherCallsAreLeftAlone() async throws {
+        // Another site's own telemetry stays blocked, and its fetch stays the browser's.
+        let other = try await page("<p>Other</p>")
+        #expect(try await run(Self.telemetry, in: other) == "failed failed")
+        #expect(try await run("return String(fetch.toString().includes('[native code]'))", in: other) == "true")
+        // On DeepSeek, a blocked address that isn't its telemetry stays blocked too.
+        let deepSeek = try await page("<p>DeepSeek</p>", at: "https://chat.deepseek.com/")
+        let call = "return await fetch('/api/v0/blocked-call').then((response) => String(response.status), () => 'failed')"
+        #expect(try await run(call, in: deepSeek) == "failed")
+    }
+
+    @Test func quietAddressesAreTheOnesTheListsBlock() throws {
+        let deepSeek = try #require(BlockedScriptStandIns.quietRequests.first { $0.site == "chat.deepseek.com" })
+        let address = try Regex(deepSeek.address).ignoresCase()
+        // EasyPrivacy's `||chat.deepseek.com/api/v0/telemetry`.
+        for url in ["https://chat.deepseek.com/api/v0/telemetry", "https://chat.deepseek.com/api/v0/telemetry?x=1"] {
+            #expect(url.contains(address), "\(url)")
+        }
+        for url in ["https://chat.deepseek.com/api/v0/chat/completion", "https://example.com/chat.deepseek.com/api/v0/telemetry",
+                    "https://chat.deepseek.com.example/api/v0/telemetry"] {
+            #expect(!url.contains(address), "\(url)")
         }
     }
 }
