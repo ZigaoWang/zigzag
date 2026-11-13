@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- 中语智汇 (web.zyamoy.com) and other sites that need FingerprintJS 2 to start open again instead of staying blank. Ad and tracker blocking stops that library, and these sites gave up without it; now they get a harmless stand-in that tells them nothing about your Mac.
+
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
