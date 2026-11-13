@@ -80,7 +80,9 @@
         // DevTools pages only, and those get their own from WebKit. userScripts stays missing unless the bridge made it
         // (it needs WebKit's scripting), as Chrome leaves it missing until it's allowed: extensions check for it and take
         // another way, and a stand-in that does nothing would send them down this one.
-        if (path.startsWith('devtools.') || (path === 'userScripts' && !target.userScripts) || !available(spec)) continue;
+        // publicSuffix answers at once in Chrome, not with a promise: a stand-in's rejected promise, taken as the
+        // answer, would be a site's domain to its callers. Missing, they use their own list (Tampermonkey's beta does).
+        if (path.startsWith('devtools.') || (path === 'userScripts' && !target.userScripts) || path === 'publicSuffix' || !available(spec)) continue;
         let namespace = target;
         const parts = path.split('.');
         root = target;
