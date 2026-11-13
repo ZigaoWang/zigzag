@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Feature Flags, at the end of Settings › Developer, lists the WebKit feature flags your Mac's WebKit has, as Safari's Develop › Feature Flags does: each with its switch, WebKit's name for it and a line about it, under Stable, Preview, Testable and Developer, with Mature, Unstable and Internal under Show All, and a search by name or key. Only the flags you change are kept, marked Changed, and the rest follow WebKit's defaults; Reset to Defaults puts every one back. Changes apply to pages you open or reload, and Reload All Tabs is beside it. It's there while Developer Mode is on. Thanks to [micsama](https://github.com/micsama) for the idea and [vandenbulckjean](https://github.com/vandenbulckjean) for the Developer section. ([#173](https://github.com/ZigaoWang/zigzag/issues/173))
+
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
