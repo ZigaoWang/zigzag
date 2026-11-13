@@ -1088,6 +1088,8 @@ enum DebugBridge {
         case "devphone":
             controller.openOnPhone(nil)
             debugLog("devphone => lan=\(PhoneLink.lanAddress() ?? "-") url=\(controller.tabManager.selectedTab?.url.flatMap { PhoneLink.url(for: $0, lanAddress: PhoneLink.lanAddress()) }?.absoluteString ?? "-")")
+        // devmode: View › Developer › Turn On (or Off) Developer Mode for This Site, toast and all.
+        case "devmode": controller.toggleDevelopmentSite(nil)
         case "devstate":
             let tabs = controller.tabManager.allTabs.map { "\($0.url?.host() ?? "-"):\($0.url?.port ?? 0)=\($0.isDevelopment)" }.sorted()
             let front = controller.tabManager.selectedTab
