@@ -2705,12 +2705,20 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// On the profile of the space the window is on, as one made from the sidebar is.
+    /// On the profile of the space the window is on, as one made from the sidebar is. Its editor opens under it, as
+    /// the sidebar's does: to name it, and to give it a profile of its own there (#201).
     private func addSpace() {
         let profile = browser?.tabManager.profile.id ?? Profile.defaultID
-        BrowserWindowController.changeLibrary(String(localized: "New Space", comment: "What Edit › Undo undoes after a space is added.")) { Library.shared.addSpace(profile: profile) }
+        var made: SpaceInfo?
+        BrowserWindowController.changeLibrary(String(localized: "New Space", comment: "What Edit › Undo undoes after a space is added.")) { made = Library.shared.addSpace(profile: profile) }
         // Made here rather than from the sidebar, it's still the guide's "make a space" step.
         Tutorial.complete("space")
+        guard let made else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let row = self.spaceRows.first(where: { $0.spaceID == made.id }) else { return }
+            row.scrollToVisible(row.bounds)
+            row.openEditor()
+        }
     }
 
     // MARK: Privacy
