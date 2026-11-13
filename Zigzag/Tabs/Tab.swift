@@ -249,6 +249,19 @@ final class Tab: NSObject {
         return CertificateExceptions.allows(host, trust: trust, in: webView.configuration.websiteDataStore)
     }
 
+    #if DEBUG
+    /// visitanyway: what the warning's "Visit anyway" does, for a test copy whose clicks don't reach the page. Only
+    /// while this tab shows a warning that offers it, for that warning's certificate.
+    func debugVisitAnyway() {
+        guard let webView, let host = certificateWarningHost, certificateWarningNonce != nil, let url = webView.url,
+              url.host()?.lowercased() == host,
+              CertificateExceptions.allow(host, certificate: certificateWarningCertificate, in: webView.configuration.websiteDataStore) else { return }
+        certificateWarningHost = nil
+        certificateWarningNonce = nil
+        load(url)
+    }
+    #endif
+
     /// The page isn't secure: plain http, or a certificate let through on the warning page.
     var isNotSecure: Bool { url?.scheme?.lowercased() == "http" || usesCertificateException }
 

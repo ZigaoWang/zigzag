@@ -1064,6 +1064,8 @@ enum DebugBridge {
         // developer on|off: Settings › Developer › Developer tools. devsite add|remove <site>: its list.
         // devstate: the switch, the list and which open tabs are development tabs, in the debug log.
         case "developer": DeveloperTools.isOn = arg == "on"
+        // visitanyway: the certificate warning's "Visit anyway", on the tab you're in.
+        case "visitanyway": controller.tabManager.selectedTab?.debugVisitAnyway()
         // devtrust on|off: Settings › Developer › Trust certificates of servers on this Mac.
         case "devtrust": DeveloperTools.trustsLocalServers = arg == "on"
         case "devsite":
