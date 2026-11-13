@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Disable Images and Disable Styles, under ⋯ among the developer tools, in View › Developer and the command bar, show how a page in Developer Mode holds up without its pictures or without its CSS. Like the other choices they're that tab's alone. ([#141](https://github.com/ZigaoWang/zigzag/issues/141))
+
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.

@@ -365,8 +365,9 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   by 1, ⇧ by 10, Tab goes on to the height, and a side stays within `PageSizes.limits`. Pressed anywhere else, the
   readout (with the hover fill a button has) opens Page Size's menu. Where room is short the name goes first,
   then the readout.
-  ⋯ is filled (`ellipsis.circle.fill`) while something chosen under it is in effect (JavaScript off, another user
-  agent, outlines), so no choice is one nothing shows. Its menu: what gave way, what's on or off, User Agent under
+  ⋯ is filled (`ellipsis.circle.fill`) while something chosen under it is in effect (JavaScript, images or styles
+  off, another user agent, outlines, or what a button that gave way into it holds), so no choice is one nothing
+  shows. Its menu: what gave way, what's on or off, User Agent under
   its heading with Open In after it, then View Source, Developer Settings and Turn Off Developer Mode.
 - **Developer Mode for a site** (#141): one per-site switch (the list in Settings › Developer), turned on or off
   alike from Turn On (Off) Developer Mode in Site Controls' ⋯ menu and the command bar, and View › Developer ›
