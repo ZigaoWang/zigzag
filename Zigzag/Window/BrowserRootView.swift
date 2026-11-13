@@ -1193,44 +1193,71 @@ final class BrowserRootView: SpaceFrameView {
         return window.map { convert($0.mouseLocationOutsideOfEventStream, from: nil) }
     }
 
+    /// The pointer at the edge, over time: whether it meant to bring the sidebar out, decided once, and when it has
+    /// left it again (`SidebarEdgeReveal`).
+    private var edgeReveal = SidebarEdgeReveal()
+    /// The last moved event's time and speed, to tell how fast the pointer met the edge.
+    private var lastMoveTime: TimeInterval = 0
+    private var lastMoveSpeed: CGFloat = 0
+
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
-        if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge() }
+        // Toward the sidebar's edge, in points a second. From the event's own movement rather than its place: at the
+        // screen's edge the pointer stops, but the hand's push still shows.
+        let elapsed = event.timestamp - lastMoveTime
+        lastMoveSpeed = elapsed > 0 && elapsed < 0.1 ? (sidebarOnRight ? event.deltaX : -event.deltaX) / max(elapsed, 1.0 / 240) : 0
+        lastMoveTime = event.timestamp
+        if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge(at: event.timestamp, speed: lastMoveSpeed) }
     }
 
+    /// The speed of the last moved event, if it came just now: entering and leaving carry none of their own.
+    private func recentSpeed(at time: TimeInterval) -> CGFloat { time - lastMoveTime < 0.05 ? lastMoveSpeed : 0 }
+
     /// Leaving through the sidebar's edge of the window counts too: a quick move may never land a moved event
-    /// inside the edge strip, and at the screen's own edge the pointer stops there. Where it rests a moment later
-    /// decides (`pointerAtEdge`).
+    /// inside the edge strip, and at the screen's own edge the pointer stops there. Where it goes in the moment
+    /// after decides (`pointerAtEdge`).
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
-        if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge() }
+        if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge(at: event.timestamp, speed: recentSpeed(at: event.timestamp)) }
     }
 
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
-        if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge() }
+        if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge(at: event.timestamp, speed: recentSpeed(at: event.timestamp)) }
     }
 
-    /// A breath before it opens, so touching the edge and coming straight back to the page (a web app's own list
-    /// along that side) leaves it be, and so does crossing it on the way to the display beside this one. Still at
-    /// the edge, or just out past it, it opens.
-    private static let edgeGrace: TimeInterval = 0.1
+    /// Looks at the pointer every frame in the moment after it meets the edge, outside the window too, where no
+    /// events come, until `edgeReveal` has decided.
     private var edgeTimer: Timer?
 
-    private func pointerAtEdge() {
-        guard edgeTimer == nil, !sidebarVisible, !sidebarRevealed, blocksEdgeReveal?() != true else { return }
-        edgeTimer = Timer.scheduledTimer(withTimeInterval: Self.edgeGrace, repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                self.edgeTimer = nil
-                // Something may have opened over the window in the meantime (⌘L with the pointer resting here).
-                if let point = self.pointer, self.edgeZone.opens(at: point), self.blocksEdgeReveal?() != true { self.reveal(true) }
-            }
+    private func pointerAtEdge(at time: TimeInterval, speed: CGFloat) {
+        guard !sidebarVisible, !sidebarRevealed, blocksEdgeReveal?() != true else { return }
+        edgeReveal.met(at: time, speed: speed)
+        guard edgeTimer == nil else { return }
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            MainActor.assumeIsolated { self.decideEdge() }
         }
+        timer.tolerance = 0.004
+        RunLoop.main.add(timer, forMode: .common)
+        edgeTimer = timer
+    }
+
+    private func decideEdge() {
+        // Something may have opened over the window in the meantime (⌘L with the pointer resting here).
+        let open: Bool?
+        if let point = pointer, !sidebarVisible, !sidebarRevealed, blocksEdgeReveal?() != true {
+            open = edgeReveal.decide(at: point, time: ProcessInfo.processInfo.systemUptime, in: edgeZone)
+        } else {
+            open = false
+        }
+        guard let open else { return }
+        edgeTimer?.invalidate()
+        edgeTimer = nil
+        if open { reveal(true) } else { edgeReveal.dismiss() }
     }
 
     private var pointerTimer: Timer?
-    private var pointerLeftAt: Date?
     private var pointerObservers: [NSObjectProtocol] = []
 
     /// While the sidebar floats, follow the pointer itself: web views swallow mouse-moved events,
@@ -1238,7 +1265,6 @@ final class BrowserRootView: SpaceFrameView {
     private func watchPointer(_ on: Bool) {
         pointerTimer?.invalidate()
         pointerTimer = nil
-        pointerLeftAt = nil
         pointerObservers.forEach(NotificationCenter.default.removeObserver)
         pointerObservers = []
         guard on, let window else { return }
@@ -1264,7 +1290,7 @@ final class BrowserRootView: SpaceFrameView {
         // Every frame only once the pointer has left, to time the hide exactly; while it rests on the sidebar a tenth of
         // a second is quick enough to notice it leave, and doesn't wake the Mac sixty times a second meanwhile.
         let attentive = NSApp.isActive && window.isKeyWindow
-        let interval = !attentive ? 0.5 : pointerLeftAt == nil ? 0.1 : 1.0 / 60
+        let interval = !attentive ? 0.5 : !edgeReveal.isLeaving ? 0.1 : 1.0 / 60
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] timer in
             // The view went away while the sidebar floated: nothing left to follow for.
             guard let self else { timer.invalidate(); return }
@@ -1277,18 +1303,18 @@ final class BrowserRootView: SpaceFrameView {
 
     isolated deinit {
         pointerTimer?.invalidate()
+        edgeTimer?.invalidate()
         pointerObservers.forEach(NotificationCenter.default.removeObserver)
         if let borderlessToken { NotificationCenter.default.removeObserver(borderlessToken) }
     }
 
     private func followPointer() {
         guard let point = pointer, !sidebarVisible, sidebarRevealed else { watchPointer(false); return }
-        if edgeZone.keeps(at: point) || isHeld || NSEvent.pressedMouseButtons != 0 {
-            if pointerLeftAt != nil { pointerLeftAt = nil; pacePointer() }
-        } else if let left = pointerLeftAt {
-            if Date().timeIntervalSince(left) > Tokens.Motion.edgeHideDelay { reveal(false) }
-        } else {
-            pointerLeftAt = Date()
+        let wasLeaving = edgeReveal.isLeaving
+        let held = isHeld || NSEvent.pressedMouseButtons != 0
+        if edgeReveal.follow(at: point, time: ProcessInfo.processInfo.systemUptime, in: edgeZone, held: held) {
+            reveal(false)
+        } else if edgeReveal.isLeaving != wasLeaving {
             pacePointer()
         }
     }
@@ -1301,13 +1327,16 @@ final class BrowserRootView: SpaceFrameView {
         revealMeter.begin(show ? "out" : "in", in: self)
         #endif
         sidebarRevealed = show
+        let curve = show ? Tokens.Motion.edgeSlide : Tokens.Motion.edgeTuck
+        // Out, it slides all the way before the pointer can send it back: one slide, never cut short and begun again.
+        let slide = Tokens.Motion.reduceMotion ? Tokens.Motion.crossfade * Tokens.Motion.debugSlowdown : curve.duration
+        edgeReveal.shown(show, at: ProcessInfo.processInfo.systemUptime, settling: slide)
         watchPointer(show)
         let target = sidebarFrame
         Tokens.Motion.withoutAnimation { sidebarContainer.frame = target }
         // Frames are final at once; only the drawing slides, the card whole (its glass, color, shadow and rows) as one
         // layer, with nothing laid out on the way. The real traffic lights can't follow, so a picture of them rides
         // inside the sidebar until the slide ends.
-        let curve = show ? Tokens.Motion.edgeSlide : Tokens.Motion.edgeTuck
         let offset = old.minX - target.minX
         if Tokens.Motion.reduceMotion {
             Self.crossfadeReveal(sidebarContainer, show: show, from: offset)
@@ -1362,9 +1391,17 @@ final class BrowserRootView: SpaceFrameView {
 
     /// Testing builds: the pointer moves to `point` (nil: back to the real one), as the edge sees it.
     func debugEdgePointer(_ point: NSPoint?) {
+        let now = ProcessInfo.processInfo.systemUptime
+        // As fast as it came from the last place it was put, toward the sidebar's edge.
+        var speed: CGFloat = 0
+        if let point, let last = debugPointer, now - debugPointerTime < 0.1 {
+            speed = (sidebarOnRight ? point.x - last.x : last.x - point.x) / max(now - debugPointerTime, 1.0 / 240)
+        }
         debugPointer = point
-        if let point, edgeZone.opens(at: point) { pointerAtEdge() }
+        debugPointerTime = now
+        if let point, edgeZone.opens(at: point) { pointerAtEdge(at: now, speed: speed) }
     }
+    private var debugPointerTime: TimeInterval = 0
 
     /// Testing builds: a drag on the sidebar's edge, step by step ("begin", an x, "end"), as the handle reports it.
     func debugEdgeDrag(_ step: String) {
@@ -1422,6 +1459,90 @@ struct SidebarEdgeZone: Equatable {
         let point = turned(point), sidebar = turnedSidebar
         return sidebar.insetBy(dx: -Tokens.Space.x1, dy: -Tokens.Space.x1).contains(point)
             || (isBeside(point) && point.x <= max(stripEnd, sidebar.minX))
+    }
+
+    /// Out past the sidebar's edge of the window, level with it, further than the reach: where a quick move to the
+    /// edge carries on for a moment before the hand brings it back, or where it goes on its way to the next display.
+    func isPast(_ point: NSPoint) -> Bool {
+        let point = turned(point)
+        return point.x < bounds.minX - reach && point.y >= bounds.minY && point.y <= bounds.maxY
+    }
+}
+
+/// The hidden sidebar's edge over time, as the pointer meets it and leaves it: whether it meant to bring the sidebar
+/// out, decided once, and then one slide out that nothing cuts short. Times are seconds, on any one clock.
+///
+/// It decides a breath after the pointer met the edge (`grace`), so touching it and coming straight back to the page
+/// (a web app's own list along that side) leaves the sidebar be. A quick move counts as meaning it: it may run on
+/// past the edge for a moment and come back (`comeBack`), or, stopped by the screen's edge, bounce back onto where
+/// the sidebar lands, and either way the sidebar comes out once. Gone on past the edge to the next display, it
+/// stays hidden. Once out, it waits for the slide to end before the pointer can send it back.
+struct SidebarEdgeReveal: Equatable {
+    enum Phase: Equatable {
+        case hidden
+        /// The pointer met the edge at `since`; `flick`: it came quickly.
+        case deciding(since: TimeInterval, flick: Bool)
+        /// Out, sliding until `settles`; `leftAt`: when the pointer left it, while it's on its way back.
+        case out(settles: TimeInterval, leftAt: TimeInterval?)
+    }
+
+    private(set) var phase = Phase.hidden
+    static let grace: TimeInterval = 0.1
+    /// How long a pointer that ran out past the edge's reach has to come back to it.
+    static let comeBack: TimeInterval = 0.4
+    /// Points a second toward the edge: a move at least this quick into it means it, as a flick.
+    static let flickSpeed: CGFloat = 1200
+
+    /// The pointer met the edge. Meeting it again while deciding keeps the first moment, and a quick arrival.
+    mutating func met(at time: TimeInterval, speed: CGFloat) {
+        let flick = speed >= Self.flickSpeed
+        if case let .deciding(since, wasFlick) = phase {
+            phase = .deciding(since: since, flick: wasFlick || flick)
+        } else {
+            phase = .deciding(since: time, flick: flick)
+        }
+    }
+
+    /// While deciding, with the pointer at `point`: true to bring the sidebar out, false to leave it hidden, nil to
+    /// look again a frame later.
+    func decide(at point: NSPoint, time: TimeInterval, in zone: SidebarEdgeZone) -> Bool? {
+        guard case let .deciding(since, flick) = phase else { return false }
+        let waited = time - since >= Self.grace
+        if zone.opens(at: point) { return waited ? true : nil }
+        if zone.isPast(point) { return time - since < Self.comeBack ? nil : false }
+        if flick, zone.keeps(at: point) { return waited ? true : nil }
+        return false
+    }
+
+    /// It decided against it, or something else took over.
+    mutating func dismiss() {
+        if case .deciding = phase { phase = .hidden }
+    }
+
+    /// The sidebar came out (sliding for `settling`) or went back, by the pointer or any other way.
+    mutating func shown(_ out: Bool, at time: TimeInterval, settling: TimeInterval) {
+        phase = out ? .out(settles: time + settling, leftAt: nil) : .hidden
+    }
+
+    /// The pointer has left the sidebar, and it's about to go back.
+    var isLeaving: Bool {
+        if case .out(_, leftAt: .some) = phase { return true }
+        return false
+    }
+
+    /// While it's out, with the pointer at `point`: true once it should go back. `held`: something keeps it out (a
+    /// menu from it, a button pressed).
+    mutating func follow(at point: NSPoint, time: TimeInterval, in zone: SidebarEdgeZone, held: Bool) -> Bool {
+        guard case let .out(settles, leftAt) = phase else { return false }
+        if time < settles || held || zone.keeps(at: point) {
+            phase = .out(settles: settles, leftAt: nil)
+            return false
+        }
+        guard let leftAt else {
+            phase = .out(settles: settles, leftAt: time)
+            return false
+        }
+        return time - leftAt > Tokens.Motion.edgeHideDelay
     }
 }
 
