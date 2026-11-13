@@ -6,7 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
-- 中语智汇 (web.zyamoy.com) and other sites that need FingerprintJS 2 to start open again instead of staying blank. Ad and tracker blocking stops that library, and these sites gave up without it; now they get a harmless stand-in that tells them nothing about your Mac.
+- 中语智汇 (web.zyamoy.com) and other sites that need FingerprintJS 2 to start open again instead of staying blank. Ad and tracker blocking stops that library, and these sites gave up without it; now they get a harmless stand-in that tells them nothing about your Mac. ([#202](https://github.com/ZigaoWang/zigzag/issues/202))
 
 ## [0.9.0] - 2026-11-12
 
