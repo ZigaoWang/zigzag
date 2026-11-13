@@ -10,6 +10,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Animations share one set of timings: presses and hovers answer in about a tenth of a second, small changes like a switch take a moment longer, panels and menus grow out of what opened them and leave quicker than they came, and the sidebar, notices and the window's layout slide on one curve. Switching spaces fades the window's color, gradient and grain together, a switch's knob and color move in step, and nothing bounces. With Reduce Motion, nothing travels: things crossfade, or change at once. ([#217](https://github.com/ZigaoWang/zigzag/issues/217))
+- Security fixes from a private report: pictures from websites are read in a sandboxed helper and web PDFs stay in WebKit's sandboxed viewer, user scripts run apart from the extension that installed them, ad blocking only runs scriptlets this version knows, a page can't open another app without asking, a certificate you visit anyway shows as not secure, Stop really cuts off AI apps, and extension packages and permissions are checked more strictly.
 
 ## [0.9.0] - 2026-11-12
 
