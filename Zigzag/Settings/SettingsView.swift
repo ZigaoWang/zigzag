@@ -3384,13 +3384,13 @@ enum DefaultBrowser {
             || Bundle(url: app)?.bundleIdentifier == Bundle.main.bundleIdentifier
     }
 
-    static func make(completion: @escaping () -> Void = {}) {
+    static func make(completion: @escaping @MainActor @Sendable () -> Void = {}) {
         let app = Bundle.main.bundleURL
         // macOS asks once, for http, and that answer makes Zigzag the web browser. Asking for https at the same time
         // put a second, identical question on screen; it's only asked after, and only if the first didn't cover it.
         NSWorkspace.shared.setDefaultApplication(at: app, toOpenURLsWithScheme: "http") { error in
             guard error == nil else {
-                DispatchQueue.main.async(execute: completion)
+                DispatchQueue.main.async { completion() }
                 return
             }
             DispatchQueue.main.async {
@@ -3400,7 +3400,7 @@ enum DefaultBrowser {
                     return
                 }
                 NSWorkspace.shared.setDefaultApplication(at: app, toOpenURLsWithScheme: "https") { _ in
-                    DispatchQueue.main.async(execute: completion)
+                    DispatchQueue.main.async { completion() }
                 }
             }
         }
