@@ -41,12 +41,14 @@ nonisolated struct SpaceChoice: Equatable {
     }
 }
 
-/// One space in the switcher: its icon, or a dot of its color, and its name; its ⌃ number at the end.
+/// One space in the switcher: its icon, or a dot of its color, and its name; its profile's name once there's more
+/// than one, quiet after it, as the sidebar's header shows it; its ⌃ number at the end.
 final class SpaceChoiceRow: InteractiveView {
     private let iconView = NSImageView()
     private let dot = CALayer()
     private let name = Label("", font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
     private let number = Label("", font: Tokens.Font.figures(Tokens.TypeSize.body), color: Tokens.Color.textTertiary)
+    private let profile = Label("", font: Tokens.Font.row(), color: Tokens.Color.textTertiary)
     private var swatch: NSColor = .gray
     /// The space you're in, which VoiceOver says.
     var isCurrent = false { didSet { stateDidChange(animated: false) } }
@@ -60,25 +62,31 @@ final class SpaceChoiceRow: InteractiveView {
         layer?.addSublayer(dot)
         name.lineBreakMode = .byTruncatingTail
         number.alignment = .right
-        [iconView, name, number].forEach { addSubview($0) }
+        profile.lineBreakMode = .byTruncatingTail
+        [iconView, name, profile, number].forEach { addSubview($0) }
         setAccessibilityRole(.button)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func configure(_ space: SpaceInfo, position: Int) {
+    func configure(_ space: SpaceInfo, position: Int, profileName: String? = nil) {
         swatch = space.swatch
         iconView.image = space.icon.map { IconChoice.image($0, size: Tokens.Metric.favicon) }
         iconView.isHidden = space.icon == nil
         dot.isHidden = space.icon != nil
         name.stringValue = space.name
         number.stringValue = position <= 9 ? "\(position)" : ""
-        setAccessibilityLabel(space.name)
+        profile.stringValue = profileName ?? ""
+        profile.isHidden = profileName == nil
+        setAccessibilityLabel(profileName.map { String(localized: "\(space.name), \($0)", comment: "What VoiceOver says for a space in the space switcher with more than one profile: the space's name, then its profile's.") } ?? space.name)
         needsLayout = true
     }
 
     /// How wide the row wants to be for its name to show whole.
-    var fittingWidth: CGFloat { CommandRowView.titleX - Label.inset + name.textWidth + Tokens.Space.x4 + number.textWidth + CardRow.inset }
+    var fittingWidth: CGFloat {
+        CommandRowView.titleX - Label.inset + name.textWidth + (profile.stringValue.isEmpty ? 0 : Tokens.Space.x3 + profile.textWidth)
+            + Tokens.Space.x4 + number.textWidth + CardRow.inset
+    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -100,7 +108,13 @@ final class SpaceChoiceRow: InteractiveView {
         number.frame = NSRect(x: bounds.width - inset - nw + Label.inset, y: (bounds.height - number.lineHeight) / 2, width: nw, height: number.lineHeight)
         let x = CommandRowView.titleX - Label.inset
         let right = number.stringValue.isEmpty ? bounds.width - inset : number.frame.minX - Tokens.Space.x2
-        name.frame = NSRect(x: x, y: round((bounds.height - name.lineHeight) / 2), width: max(0, min(name.textWidth, right - x)), height: name.lineHeight)
+        // The name first; the profile's after it in what room is left, cut short before the name is.
+        let room = right - x
+        let profileWidth = profile.stringValue.isEmpty ? 0 : min(profile.textWidth, max(0, room - name.textWidth - Tokens.Space.x3))
+        let nameWidth = max(0, min(name.textWidth, room - (profileWidth > 0 ? profileWidth + Tokens.Space.x3 : 0)))
+        name.frame = NSRect(x: x, y: round((bounds.height - name.lineHeight) / 2), width: nameWidth, height: name.lineHeight)
+        profile.frame = NSRect(x: name.frame.maxX + Tokens.Space.x3, y: name.frame.minY, width: profileWidth, height: profile.lineHeight)
+        profile.isHidden = profile.stringValue.isEmpty || profileWidth < SpaceHeaderView.profileRoom
     }
 
     override func stateDidChange(animated: Bool) {
@@ -210,7 +224,7 @@ final class SpaceSwitcher {
         rows.forEach { $0.removeFromSuperview() }
         rows = all.enumerated().map { i, space in
             let row = SpaceChoiceRow()
-            row.configure(space, position: i + 1)
+            row.configure(space, position: i + 1, profileName: Library.shared.directory.shownName(ofSpace: space.id))
             row.isCurrent = i == current
             row.onClick = { [weak self] _ in
                 guard let self else { return }
