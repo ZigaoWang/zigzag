@@ -344,6 +344,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             spaceChanged()
         case .content:
             updateNowPlaying()
+            miniPlayer.soundChanged()
         }
         onStateChange?()
     }

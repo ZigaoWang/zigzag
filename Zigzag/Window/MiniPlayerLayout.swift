@@ -79,6 +79,17 @@ nonisolated enum MiniPlayerLayout {
     /// Widest and tallest shapes a card takes; a video beyond them is cropped to fit.
     static let aspectRange: ClosedRange<CGFloat> = 0.5...2.4
 
+    /// How long a page kept in the window out of sight (`keepsInWindow`, or minimized) stays there once nothing in it
+    /// plays: long enough for a playlist to load and start its next song. WebKit won't load or start the next one in
+    /// a page that's out of the window, so letting go of it between two songs leaves the player stuck.
+    static let nextItemWait: TimeInterval = 30
+
+    /// Whether a page you're leaving stays in the window, out of sight, rather than out of it: one playing sound,
+    /// unless the mini player takes it (`followed`) or it fills the screen with its video.
+    static func keepsInWindow(playingSound: Bool, followed: Bool, inFullScreen: Bool) -> Bool {
+        playingSound && !followed && !inFullScreen
+    }
+
     /// Whether it's playing a picture big enough to be the thing on the page.
     static func plays(_ video: PageVideo) -> Bool {
         video.isPlaying && !video.hasEnded && video.natural.width > 0 && video.natural.height > 0
