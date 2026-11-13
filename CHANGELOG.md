@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - Release notes follow the app's language; Chinese notes for 0.9.0 and earlier releases.
+- A space's editor, which also opens for every new space, says that spaces on the same profile share sign-ins, history and extensions, and its Profile menu has New Profile: a profile of the space's own, named after it, in one click. With more than one profile, the space switcher and a space's menu show which profile each space is on, as the sidebar does. Thanks to [spongehah](https://github.com/spongehah). ([#201](https://github.com/ZigaoWang/zigzag/issues/201))
 
 ### Fixed
 - After Set as Default in Settings › General, the button changes as soon as macOS confirms, instead of needing a second click. Thanks to [ze-mu-zhou](https://github.com/ze-mu-zhou). ([#195](https://github.com/ZigaoWang/zigzag/issues/195))

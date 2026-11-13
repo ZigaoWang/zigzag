@@ -452,7 +452,12 @@ something came from, answers at once, and can be interrupted.
 - **Space editor** (`SpaceEditorPanel`, `SpaceLookEditor`): the space's name, then one row of curated colors (one tap
   each, a live preview on hover), the wheel and Shade for a color of your own, and Effects folded under a disclosure
   (`DisclosureRow`): a second color and its direction, See-through, Grain. Effects opens by itself when the space
-  uses any of them. Then Profile: a dropdown of the profiles, with New Profile… at its end.
+  uses any of them. Between the name and the colors, Profile: a dropdown of the profiles, with New Profile at its end
+  (a profile of the space's own, named after it and following its name while you type it, in one step with no
+  sheet), and one `detail` line under it: spaces on the same profile share sign-ins, history and extensions. The
+  same editor opens for a new space, wherever it's made (the sidebar, the menus, the command bar, Settings ›
+  Spaces), so the choice is there from the start. With one profile nothing else names profiles; with more, the
+  space's header, the space switcher's rows and the top of a space's menu show its profile's name, quiet.
 - **Menu** (`MenuPanel`): Zigzag draws its own; only right-click menus are the system's, except the sidebar's empty
   space, whose menu is the +'s. The floating panel's
   surface and its one shadow, `Radius.panel`, a hairline `panelEdge`. `body` items
@@ -469,7 +474,7 @@ something came from, answers at once, and can be interrupted.
   its text lined up with the button's, as macOS places it; below the button when there's no room, scrolled when the
   list is taller than the window. Press and drag to an item to choose in one movement. With the keyboard, Space,
   Return, Up or Down opens it. VoiceOver: a pop-up button whose value is the choice. `actions` are items after a
-  separator that do something and choose nothing ("New Profile…"). A choice of profile is filled by
+  separator that do something and choose nothing ("New Profile"). A choice of profile is filled by
   `ProfileChoice`, each profile with its tile, wherever one is asked for. `showsPictureOnly` leaves only the
   choice's picture where there's no room for its name (Settings' profile menu beside the search on a narrow
   page); the name is then its tooltip and its VoiceOver value.
