@@ -397,4 +397,49 @@ struct ExtensionSecurityTests {
         #expect(!ExtensionShims.usesWebSocketShim(manifest: ["name": "No background"]))
         #expect(!ExtensionShims.usesWebSocketShim(manifest: nil))
     }
+
+    @Test func theBridgeAnswersOnlyWhatWasGrantedAndIsStillAskedFor() {
+        let forever = Date.distantFuture
+        let declared: (required: Set<String>, optional: Set<String>) = (["history", "proxy"], ["bookmarks"])
+        let granted: [WKWebExtension.Permission: Date] = [.init(rawValue: "history"): forever, .init(rawValue: "bookmarks"): forever,
+                                                          .init(rawValue: "downloads"): forever, .init(rawValue: "topSites"): .distantPast]
+        #expect(ExtensionBridge.allows("history", declared: declared, granted: granted))
+        #expect(ExtensionBridge.allows("bookmarks", declared: declared, granted: granted))
+        // Its files ask for it, and the person never allowed it: no.
+        #expect(!ExtensionBridge.allows("proxy", declared: declared, granted: granted))
+        // Allowed once, no longer asked for, or allowed only for a while that's over: no.
+        #expect(!ExtensionBridge.allows("downloads", declared: declared, granted: granted))
+        #expect(!ExtensionBridge.allows("topSites", declared: (["topSites"], []), granted: granted))
+    }
+
+    @Test func aFolderThatNowAsksForMoreWaitsForThePerson() async throws {
+        // WebKit leaves out what it doesn't know (the bridge's history, proxy, user scripts), so they're added from the
+        // package's own manifest; Zigzag's own native messaging and scripting only as that manifest asks.
+        let context = try await Self.context(["permissions": ["storage", "history", "userScripts", "nativeMessaging", "scripting"]])
+        let requested = Set(context.webExtension.requestedPermissions.map(\.rawValue))
+        #expect(!requested.contains("history"))
+        let approved = ExtensionHost.askedPermissions(requested: requested.union(["nativeMessaging", "scripting"]), declared: ["storage", "history", "userScripts"])
+        #expect(approved == ["storage", "history", "userScripts"])
+        #expect(ExtensionHost.askedPermissions(requested: ["storage", "nativeMessaging"], declared: ["storage", "nativeMessaging"]) == ["storage", "nativeMessaging"])
+
+        // The same folder, changed: now it asks for a proxy and a companion app too. What was recorded is all it has.
+        let now = ExtensionHost.askedPermissions(requested: ["storage", "nativeMessaging"], declared: ["storage", "history", "userScripts", "proxy", "nativeMessaging"])
+        #expect(now.subtracting(approved) == ["proxy", "nativeMessaging"])
+        let restored = Dictionary(uniqueKeysWithValues: approved.union(["nativeMessaging"]).map { (WKWebExtension.Permission(rawValue: $0), Date.distantFuture) })
+        #expect(!ExtensionBridge.allows("proxy", declared: (["storage", "history", "userScripts", "proxy", "nativeMessaging"], []), granted: restored))
+        #expect(ExtensionBridge.allows("history", declared: (["storage", "history", "userScripts", "proxy", "nativeMessaging"], []), granted: restored))
+    }
+
+    @Test func zigzagsOwnGrantsAreRecordedOnlyAsApproved() {
+        // Native messaging is granted to every extension for the bridge; recorded, it would pass for the person's yes.
+        let live: Set<String> = ["storage", "history", "nativeMessaging", "scripting"]
+        #expect(ExtensionHost.recordedGrants(live, before: [], approving: []) == ["storage", "history"])
+        #expect(ExtensionHost.recordedGrants(live, before: [], approving: ["nativeMessaging"]) == ["storage", "history", "nativeMessaging"])
+        #expect(ExtensionHost.recordedGrants(live, before: ["scripting"], approving: []) == ["storage", "history", "scripting"])
+        // A record from before: the bridge's permissions its manifest asks for are added, once; Zigzag's own two stay
+        // only as its manifest asks.
+        #expect(ExtensionHost.migratedGrants(["storage", "nativeMessaging", "scripting"], declared: ["storage", "history", "userScripts"])
+                == ["storage", "history", "userScripts"])
+        #expect(ExtensionHost.migratedGrants(["storage", "nativeMessaging"], declared: ["storage", "nativeMessaging"]) == ["storage", "nativeMessaging"])
+    }
 }

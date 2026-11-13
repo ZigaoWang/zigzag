@@ -406,20 +406,96 @@ final class ExtensionHost: NSObject {
 
     /// Grants what the person approved. Until the install sheet exists, installing approves what the
     /// extension asks for; that approval is recorded once and restored from then on.
+    ///
+    /// The permissions Zigzag's bridge answers (history, a proxy, user scripts) aren't WebKit's, so WebKit leaves them
+    /// out of what an extension requests; they're granted alongside, from the package's own manifest, and recorded with
+    /// the rest. From then on only what was recorded is granted. A manifest that later asks for more (an extension read
+    /// from a folder, inside an app or from Install from Folder, can change its files at any time) gets nothing more
+    /// until the person allows it, in the same sheet an update that wants more access shows (`askForNewAccess`).
     private func restoreGrants(for context: WKWebExtensionContext, extension ext: WKWebExtension) {
-        let state = profile.installs.state(context.uniqueIdentifier)
-        let permissions = state?.grantedPermissions.map { Set($0.map(WKWebExtension.Permission.init(rawValue:))) } ?? ext.requestedPermissions
+        let id = context.uniqueIdentifier
+        let declared = ExtensionStore.declaredPermissions(id).required
+        var state = profile.installs.state(id)
+        // A record from before the bridge's permissions were kept in it: what it was always given, taken once.
+        if var known = state, let granted = known.grantedPermissions, known.bridgeRecorded != true {
+            known.grantedPermissions = Self.migratedGrants(Set(granted), declared: declared).sorted()
+            known.bridgeRecorded = true
+            profile.installs.save(known, for: id)
+            state = known
+        }
+        let asked = Self.askedPermissions(requested: Set(ext.requestedPermissions.map(\.rawValue)), declared: declared)
+        let permissions = Set(state?.grantedPermissions ?? Array(asked)).map(WKWebExtension.Permission.init(rawValue:))
         let patterns = state?.grantedMatchPatterns.map { Set($0.compactMap { try? WKWebExtension.MatchPattern(string: $0) }) } ?? ext.allRequestedMatchPatterns
         for permission in permissions { context.setPermissionStatus(.grantedExplicitly, for: permission) }
         // For Zigzag's own bridge; ExtensionHost keeps real native hosts to extensions that asked for them.
         context.setPermissionStatus(.grantedExplicitly, for: .nativeMessaging)
-        // User scripts go through WebKit's scripting API (BridgeUserScripts), so asking for them brings it.
-        if ExtensionStore.declaredPermissions(context.uniqueIdentifier).required.contains("userScripts") {
+        // userScripts.execute goes through WebKit's scripting API (BridgeUserScripts), so being allowed user scripts brings it.
+        if permissions.contains(WKWebExtension.Permission(rawValue: BridgeUserScripts.permission)) {
             context.setPermissionStatus(.grantedExplicitly, for: .scripting)
         }
         for pattern in patterns { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
-        if state?.grantedPermissions == nil { saveGrants(of: context) }
+        if state?.grantedPermissions == nil { saveGrants(of: context, approving: asked) }
         applySiteAccess(to: context)
+        let wanted = asked.subtracting(profile.installs.state(id)?.grantedPermissions ?? [])
+        if !wanted.isEmpty { askForNewAccess(wanted, for: context) }
+    }
+
+    /// The permissions Zigzag grants every extension for its own needs (its bridge's native messaging; scripting for
+    /// user scripts). Granted, they say nothing of what the person approved, so a record holds them only as approved.
+    static let zigzagGranted: Set<String> = [WKWebExtension.Permission.nativeMessaging.rawValue, WKWebExtension.Permission.scripting.rawValue]
+
+    /// What an extension asks the person for: what WebKit reads in its loaded copy (which also asks for Zigzag's own
+    /// two), with those two only as its package's own manifest asks, and the permissions the bridge answers, which
+    /// WebKit leaves out.
+    static func askedPermissions(requested: Set<String>, declared: Set<String>) -> Set<String> {
+        requested.subtracting(zigzagGranted)
+            .union(declared.intersection(zigzagGranted))
+            .union(declared.intersection(ExtensionBridgeScript.permissions))
+    }
+
+    /// A record from before the bridge's permissions were kept: those its manifest asks for are added, as they were
+    /// always given, and Zigzag's own two, recorded then whatever was asked, stay only as the manifest asks.
+    static func migratedGrants(_ granted: Set<String>, declared: Set<String>) -> Set<String> {
+        granted.subtracting(zigzagGranted)
+            .union(declared.intersection(zigzagGranted))
+            .union(declared.intersection(ExtensionBridgeScript.permissions))
+    }
+
+    /// Asked once per load, when a window is there to ask in. Not allowed, the extension runs without it, and is asked
+    /// again the next time it loads.
+    private func askForNewAccess(_ wanted: Set<String>, for context: WKWebExtensionContext) {
+        let id = context.uniqueIdentifier
+        ExtensionLog.write("\(context.webExtension.displayName ?? id) now asks for \(wanted.sorted()); held until allowed")
+        Task { @MainActor [weak self, weak context] in
+            for _ in 0..<120 {
+                guard let self, let context, self.context(for: id) === context else { return }
+                if !ExtensionSheet.isShowing,
+                   let window = WindowManager.shared.keyController.flatMap({ $0.tabManager.isPrivate ? nil : $0 }) ?? self.openWindows.first {
+                    self.presentNewAccess(wanted, for: context, in: window)
+                    return
+                }
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    private func presentNewAccess(_ wanted: Set<String>, for context: WKWebExtensionContext, in window: BrowserWindowController) {
+        let ext = context.webExtension
+        let content = ExtensionSheet.Content(
+            icon: ext.icon(for: NSSize(width: 40, height: 40)),
+            title: ext.displayName.map { String(localized: "\($0) wants more access", comment: "Title of the sheet shown when an extension asks for more access. The name is the extension's.") }
+                ?? String(localized: "This extension wants more access", comment: "Title of the sheet shown when an extension with no name asks for more access."),
+            subtitle: String(localized: "Its files changed and now ask for more. Until you allow it, it runs without it.", comment: "Under the title of the sheet shown when an extension read from a folder (one that comes inside an app, or added from a folder) changed its files to ask for more access."),
+            heading: String(localized: "It would also be able to", comment: "Heading over the list of what an extension could also do, in the sheet shown when it asks for more access."),
+            report: ExtensionReport(requesting: wanted, id: context.uniqueIdentifier),
+            confirm: String(localized: "Allow", comment: "Button in the sheet shown when an extension asks for more access: gives it."),
+            cancel: String(localized: "Not Now", comment: "Button that leaves an extension's update waiting."))
+        ExtensionSheet.present(content, in: window, onConfirm: { [weak self, weak context] in
+            guard let self, let context, self.context(for: context.uniqueIdentifier) === context else { return }
+            for permission in wanted { context.setPermissionStatus(.grantedExplicitly, for: WKWebExtension.Permission(rawValue: permission)) }
+            if wanted.contains(BridgeUserScripts.permission) { context.setPermissionStatus(.grantedExplicitly, for: .scripting) }
+            self.saveGrants(of: context, approving: wanted)
+        })
     }
 
     // MARK: Site access
@@ -456,18 +532,35 @@ final class ExtensionHost: NSObject {
         ["*://\(site)/*", "*://*.\(site)/*"].compactMap { try? WKWebExtension.MatchPattern(string: $0) }
     }
 
-    fileprivate func saveGrants(of context: WKWebExtensionContext) {
-        let permissions = context.grantedPermissions.keys.map(\.rawValue).sorted()
+    /// Records what the extension is granted. WebKit keeps the bridge's permissions among the granted ones, so they're
+    /// recorded with the rest; Zigzag's own two only as the person approved them (`approving`, or an earlier record).
+    fileprivate func saveGrants(of context: WKWebExtensionContext, approving: Set<String> = []) {
+        let before = Set(profile.installs.state(context.uniqueIdentifier)?.grantedPermissions ?? [])
+        let permissions = Self.recordedGrants(Set(context.grantedPermissions.keys.map(\.rawValue)), before: before, approving: approving).sorted()
         // Per-site grants come from site access, not approval; only an "all sites" extension's grants are its approvals.
         guard profile.installs.siteAccess(context.uniqueIdentifier) == .all || profile.installs.state(context.uniqueIdentifier)?.grantedMatchPatterns == nil else {
-            profile.installs.update(context.uniqueIdentifier) { $0.grantedPermissions = permissions }
+            profile.installs.update(context.uniqueIdentifier) {
+                $0.grantedPermissions = permissions
+                $0.bridgeRecorded = true
+            }
             return
         }
         let patterns = context.grantedPermissionMatchPatterns.keys.map(\.string).sorted()
         profile.installs.update(context.uniqueIdentifier) {
             $0.grantedPermissions = permissions
             $0.grantedMatchPatterns = patterns
+            $0.bridgeRecorded = true
         }
+    }
+
+    static func recordedGrants(_ granted: Set<String>, before: Set<String>, approving: Set<String>) -> Set<String> {
+        granted.subtracting(zigzagGranted.subtracting(before).subtracting(approving))
+    }
+
+    /// Real native hosts (a companion app) only for an extension the person allowed native messaging. Zigzag grants
+    /// it to every extension for its own bridge, so WebKit's grant can't tell; what was recorded can.
+    private func mayUseNativeHosts(_ context: WKWebExtensionContext) -> Bool {
+        profile.installs.approves(WKWebExtension.Permission.nativeMessaging.rawValue, for: context.uniqueIdentifier)
     }
 
     private func announceExistingWindows(to context: WKWebExtensionContext) {
@@ -1167,7 +1260,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         }
         // A companion app only for an extension that asked for native messaging itself; the loaded copy's grant is
         // for Zigzag's bridge alone.
-        guard ExtensionBridge.allows("nativeMessaging", for: extensionContext),
+        guard mayUseNativeHosts(extensionContext),
               let host = NativeMessagingHost(name: applicationIdentifier, context: extensionContext, owner: self) else {
             companionAppMissing(for: extensionContext)
             replyHandler(nil, NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
@@ -1205,7 +1298,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             completionHandler(nil)
             return
         }
-        guard ExtensionBridge.allows("nativeMessaging", for: extensionContext),
+        guard mayUseNativeHosts(extensionContext),
               let host = NativeMessagingHost(name: port.applicationIdentifier, context: extensionContext, owner: self) else {
             companionAppMissing(for: extensionContext)
             completionHandler(NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))

@@ -7654,6 +7654,17 @@
         }
       }
     },
+    "Its files changed and now ask for more. Until you allow it, it runs without it." : {
+      "comment" : "Under the title of the sheet shown when an extension read from a folder (one that comes inside an app, or added from a folder) changed its files to ask for more access.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的文件有了改动，现在要更多权限。在你允许之前，它不会获得这些权限。"
+          }
+        }
+      }
+    },
     "Its open tabs reload in %@, with that profile’s sign-ins and extensions. Pages you were filling in may lose what you typed." : {
       "comment" : "Message of the sheet that asks before a space with open tabs is put on another profile. The placeholder is the profile's name.",
       "localizations" : {

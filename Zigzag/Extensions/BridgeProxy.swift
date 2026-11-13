@@ -192,7 +192,7 @@ final class BridgeProxy: BridgeNamespace {
 
     /// At launch, before any page loads: the settings of extensions still installed and on, as they left them.
     func restore() {
-        for id in host.profile.installs.installedIDs where host.profile.installs.isEnabled(id) && ExtensionStore.declaredPermissions(id).required.contains(Self.permission) {
+        for id in host.profile.installs.installedIDs where host.profile.installs.isEnabled(id) && host.profile.installs.approves(Self.permission, for: id) {
             guard let data = try? Data(contentsOf: file(for: id)), let value = Self.setting(from: data) else { continue }
             settings[id] = value
         }

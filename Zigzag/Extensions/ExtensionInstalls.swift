@@ -16,12 +16,16 @@ final class ExtensionInstalls {
         /// Permissions and site patterns the person approved. Nil until the first load records them.
         var grantedPermissions: [String]?
         var grantedMatchPatterns: [String]?
+        /// Whether `grantedPermissions` also holds the permissions Zigzag's bridge answers (history, a proxy, user
+        /// scripts), which WebKit doesn't know. Nil in records made before it did: those take what the manifest asks of
+        /// the bridge as approved, once, as they always had, and keep it from then on.
+        var bridgeRecorded: Bool?
         /// Where it may read and change pages. Nil means the default: everywhere it was approved for.
         var siteAccess: SiteAccess?
         /// For `.sites`: the sites it may use ("github.com"), and for `.click`, the ones clicked on so far.
         var accessSites: [String]?
 
-        fileprivate static let keys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "siteAccess", "accessSites"]
+        fileprivate static let keys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "bridgeRecorded", "siteAccess", "accessSites"]
 
         /// What another profile starts with when it gets this extension too: what was approved here and where it
         /// may run, so it gets nothing it wasn't allowed without the install sheet. Sites it was clicked on stay
@@ -82,6 +86,17 @@ final class ExtensionInstalls {
         guard var current = state(id) else { return }
         change(&current)
         save(current, for: id)
+    }
+
+    /// Whether the person approved one of the bridge's permissions for this extension, by what was recorded when they
+    /// did, and its manifest still asks for it. What its files ask for now never counts by itself: an extension read
+    /// from a folder (one inside an app, or Install from Folder) can change them at any time.
+    func approves(_ permission: String, for id: String) -> Bool {
+        let declared = ExtensionStore.declaredPermissions(id)
+        guard declared.required.contains(permission) || declared.optional.contains(permission), let state = state(id) else { return false }
+        // Not yet recorded (a record from before): what it was always given, until its next load records it.
+        guard state.bridgeRecorded == true, let granted = state.grantedPermissions else { return declared.required.contains(permission) }
+        return granted.contains(permission)
     }
 
     /// The extensions this profile has, on or off, whose package can be read.

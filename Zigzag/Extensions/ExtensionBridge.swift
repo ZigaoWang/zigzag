@@ -8,8 +8,10 @@ import WebKit
 /// a native message to `zigzag.bridge`, which lands here and is handed to the namespace that answers it. Events
 /// (`chrome.history.onVisited`) go the other way over a port the script opens only once something listens.
 ///
-/// Every call is checked against what the extension asked for in its own manifest: an extension that didn't ask for
-/// "history" can't read history through the bridge, whatever its scripts send. Private windows never show through.
+/// Every call is checked against what the person approved for the extension: one that wasn't allowed "history" can't
+/// read history through the bridge, whatever its scripts send, and one whose files now ask for more (an extension read
+/// from a folder can change them) gets it only once the person allows it (ExtensionHost.restoreGrants). Private
+/// windows never show through.
 @available(macOS 15.4, *)
 @MainActor
 final class ExtensionBridge {
@@ -80,14 +82,22 @@ final class ExtensionBridge {
         }
     }
 
-    /// Whether the extension asked for a permission in its own manifest (required, or optional and since granted).
-    /// The loaded copy's manifest also asks for native messaging, so the package's own is what counts.
+    /// Whether the extension may use a permission: the person granted it (when they approved the extension or an
+    /// update, or allowed it later), and its own manifest still asks for it. The manifest alone is never enough: what
+    /// a folder's files ask for can change behind the person's back. The loaded copy's manifest also asks for native
+    /// messaging, so the package's own is what's read.
     static func allows(_ permission: String, for context: WKWebExtensionContext) -> Bool {
         // Namespaces about the extension's own pages need no permission.
         if permission.isEmpty { return true }
-        let declared = ExtensionStore.declaredPermissions(context.uniqueIdentifier)
-        if declared.required.contains(permission) { return true }
-        return declared.optional.contains(permission) && context.hasPermission(WKWebExtension.Permission(rawValue: permission))
+        return allows(permission, declared: ExtensionStore.declaredPermissions(context.uniqueIdentifier), granted: context.grantedPermissions)
+    }
+
+    /// Asked for (required or optional), and granted and not yet expired. WebKit keeps permissions it doesn't know
+    /// itself (the bridge's) among the granted ones too.
+    static func allows(_ permission: String, declared: (required: Set<String>, optional: Set<String>),
+                       granted: [WKWebExtension.Permission: Date], now: Date = Date()) -> Bool {
+        guard declared.required.contains(permission) || declared.optional.contains(permission) else { return false }
+        return granted[WKWebExtension.Permission(rawValue: permission)].map { $0 > now } ?? false
     }
 
     /// The same, by the extension's ID, for namespaces that check a further permission ("downloads.open").
