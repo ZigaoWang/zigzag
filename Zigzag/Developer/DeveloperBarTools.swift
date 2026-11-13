@@ -54,8 +54,8 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
     static func width(shown: Int, words: CGFloat = 0) -> CGFloat { CGFloat(shown + 1) * Tokens.Sidebar.button + words }
 
     private let buttons: [IconButton]
-    /// The page's own size, said beside its button while it has one.
-    private let sizeLabel = Label("", font: Tokens.Font.figures(Tokens.TypeSize.label), color: Tokens.Color.textSecondary)
+    /// The page's own size beside its button while it has one: its name, and its width and height to type into.
+    private let sizeReadout = PageSizeReadout()
     private let more = SidebarView.chromeButton("ellipsis", toolTip: String(localized: "More Developer Tools", comment: "Tooltip of the ⋯ button among the developer tools above a development site's page: opens a menu with the rest of the tools."))
     private(set) weak var tab: Tab?
     private weak var controller: BrowserWindowController?
@@ -68,9 +68,10 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         super.init(frame: frame)
         buttons.forEach(addSubview)
         addSubview(more)
-        sizeLabel.isHidden = true
-        sizeLabel.setAccessibilityElement(false)
-        addSubview(sizeLabel)
+        sizeReadout.isHidden = true
+        sizeReadout.onSize = { [weak self] size in self?.controller?.setPageSize(size) }
+        sizeReadout.onMenu = { [weak self] in self?.showSizeMenu() }
+        addSubview(sizeReadout)
         for (i, button) in buttons.enumerated() {
             button.onClick = { [weak self] _ in self?.pressed(i) }
         }
@@ -91,7 +92,7 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
     override func mouseDown(with event: NSEvent) { window?.titleBarMouseDown(event) }
 
     /// The bar is the top of the page's card, in the page's color: the buttons' fills are a page's.
-    var isOnPage = false { didSet { (buttons + [more]).forEach { $0.isOnPage = isOnPage } } }
+    var isOnPage = false { didSet { (buttons + [more]).forEach { $0.isOnPage = isOnPage }; sizeReadout.isOnPage = isOnPage } }
 
     /// The tab whose page it sits on, and the window that runs its tools.
     func show(_ tab: Tab?, in controller: BrowserWindowController?) {
@@ -193,6 +194,14 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         MenuPanel.show(entries(of: part), from: button) { [weak button] in button?.isSelected = false }
     }
 
+    /// Page Size's menu from the size beside its button, pressed off its fields.
+    private func showSizeMenu() {
+        guard let sizeIndex else { return }
+        if let open = MenuPanel.current, open.anchor === sizeReadout { open.close(); return }
+        sizeReadout.isSelected = true
+        MenuPanel.show(entries(of: Self.parts[sizeIndex]), from: sizeReadout) { [weak self] in self?.sizeReadout.isSelected = false }
+    }
+
     /// A button's menu: its tools in their groups, and for the page's size the listed sizes among them, the one the
     /// page has checked either way up.
     private func entries(of part: Part) -> [MenuPanel.Entry] {
@@ -257,9 +266,9 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         let symbol = hidden ? "ellipsis.circle.fill" : "ellipsis"
         if more.symbol != symbol { more.symbol = symbol }
         hiddenChoiceValue = hidden ? String(localized: "Choices in effect", comment: "Spoken by VoiceOver after More Developer Tools while something chosen in its menu is in effect: JavaScript off, another user agent, or outlines.") : nil
-        let size = Self.sizeText(Self.shownSize(chosen: state.size, room: pageRoom), scale: pageScale)
-        if sizeLabel.stringValue != size {
-            sizeLabel.stringValue = size
+        let before = sizeReadout.width(withName: true)
+        sizeReadout.show(size: Self.shownSize(chosen: state.size, room: pageRoom), name: PageSizes.named(state.size)?.name, scale: pageScale)
+        if sizeReadout.width(withName: true) != before {
             needsLayout = true
             // The bar gives the tools the width they ask for: asked again.
             superview?.needsLayout = true
@@ -282,8 +291,8 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         MenuPanel.show(entries, from: more) { [weak self] in self?.more.isSelected = false }
     }
 
-    /// The words after Page Size's button while the page has a size of its own, with the gap before the next button.
-    private var sizeWords: CGFloat { sizeLabel.stringValue.isEmpty ? 0 : ceil(sizeLabel.fittingSize.width) + Tokens.Space.x2 }
+    /// The size after Page Size's button while the page has a size of its own, with the gap before the next button.
+    private var sizeWords: CGFloat { sizeReadout.size == nil ? 0 : sizeReadout.width(withName: true) + Tokens.Space.x1 }
     private var sizeIndex: Int? { Self.parts.firstIndex { $0.tools.contains(.sizeFill) } }
 
     /// How many buttons show in `room`, and whether the page's size is said: it is where there's room for it and
@@ -307,7 +316,7 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         let b = Tokens.Sidebar.button
         let fit = fitted(in: bounds.width)
         shown = fit.shown
-        sizeLabel.isHidden = fit.words == 0
+        sizeReadout.isHidden = fit.words == 0
         // At the trailing end of whatever room they were given: ⋯ last, the buttons before it.
         var x = bounds.width - Self.width(shown: shown, words: fit.words)
         let y = round((bounds.height - b) / 2)
@@ -317,8 +326,7 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
             button.frame = NSRect(x: x, y: y, width: b, height: b)
             x += b
             if fit.words > 0, i == sizeIndex {
-                let height = ceil(sizeLabel.fittingSize.height)
-                sizeLabel.frame = NSRect(x: x, y: y + floor((b - height) / 2), width: fit.words - Tokens.Space.x2, height: height)
+                sizeReadout.frame = NSRect(x: x, y: y, width: fit.words - Tokens.Space.x1, height: b)
                 x += fit.words
             }
         }
