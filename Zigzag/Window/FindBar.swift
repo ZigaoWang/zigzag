@@ -436,19 +436,38 @@ class FloatingPanelView: NSView {
 
     /// Whether a view a press landed on is a panel's own surface rather than one of its controls: a gap, a label, a
     /// box of rows. Only the panel takes such a press; it never moves the window or reaches what's behind (#216).
+    ///
+    /// Walking up from the hit view, anything that handles a press itself ends the walk as not bare: a control, a text
+    /// view, a field's own padding or bezel (the view around it that focuses it on a press), anything that takes first
+    /// responder or has a mouseDown of its own. Words that are only words (a label) are surface.
     static func isBareSurface(_ hit: NSView?) -> Bool {
         var view = hit
         while let current = view {
             if current is FloatingPanelView { return true }
-            // Anything that handles the pointer itself says so by not moving the window, as our controls do.
-            // Words that are only words (a label) are surface; a field you can type in or select from isn't.
-            if let field = current as? NSTextField {
-                if field.isEditable || field.isSelectable { return false }
-            } else if !current.mouseDownCanMoveWindow || current is NSControl || current is NSText || current is NSScroller
-                        || current is WKWebView { return false }
+            if handlesPress(current) { return false }
             view = current.superview
         }
         return false
+    }
+
+    private static func handlesPress(_ view: NSView) -> Bool {
+        if let field = view as? NSTextField, isLabel(field) { return false }
+        if view is NSControl || view is NSText || view is NSScroller || view is WKWebView { return true }
+        if let scroll = view as? NSScrollView, scroll.documentView is NSText { return true }
+        if !view.mouseDownCanMoveWindow || view.acceptsFirstResponder { return true }
+        return overridesMouseDown(type(of: view))
+    }
+
+    /// Plain words: not typed in, not selected from, no bezel. Its mouseDown (NSControl's) only hands the press on.
+    private static func isLabel(_ field: NSTextField) -> Bool {
+        !field.isEditable && !field.isSelectable && !field.isBezeled
+            && !(field is NSSearchField) && !(field is NSTokenField) && !(field is NSSecureTextField)
+    }
+
+    /// Whether a class answers a press itself rather than leaving it to NSView's, which only hands it on.
+    private static func overridesMouseDown(_ cls: AnyClass) -> Bool {
+        let selector = #selector(NSView.mouseDown(with:))
+        return class_getMethodImplementation(cls, selector) != class_getMethodImplementation(NSView.self, selector)
     }
 
     /// Content goes in the surface so it is clipped to the rounded shape.

@@ -56,3 +56,60 @@ struct PanelClickTests {
         #expect(!s.panel.mouseDownCanMoveWindow)
     }
 }
+
+/// A field in a panel is the field's, edge to edge: a press on its padding or bezel focuses it, never counts as the
+/// panel's surface (the Rename and icon panels, any panel with a text, search or token field).
+@MainActor
+struct PanelFieldPressTests {
+    /// A view around a field that focuses it on a press, as a third-party field wrapper would.
+    private final class Wrapper: NSView {
+        override func mouseDown(with event: NSEvent) {}
+    }
+
+    @Test func aPressOnAFieldsPaddingIsTheFields() {
+        // Held in a frame as the window's content is, so points are in its terms as AppKit's hit-testing has them.
+        let frame = FlippedView(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        let holder = FlippedView(frame: frame.bounds)
+        frame.addSubview(holder)
+        let panel = FloatingPanelView(frame: NSRect(x: 0, y: 0, width: 300, height: 300))
+        holder.addSubview(panel)
+        let filled = FilledField(placeholder: "Name")
+        filled.frame = NSRect(x: 12, y: 12, width: 260, height: 32)
+        panel.addSubview(filled)
+        let search = NSSearchField(frame: NSRect(x: 12, y: 60, width: 260, height: 24))
+        panel.addSubview(search)
+        let tokens = NSTokenField(frame: NSRect(x: 12, y: 100, width: 260, height: 24))
+        panel.addSubview(tokens)
+        let bezeled = NSTextField(frame: NSRect(x: 12, y: 140, width: 260, height: 24))
+        panel.addSubview(bezeled)
+        let wrapper = Wrapper(frame: NSRect(x: 12, y: 180, width: 260, height: 40))
+        wrapper.addSubview(NSTextField(frame: NSRect(x: 10, y: 8, width: 240, height: 24)))
+        panel.addSubview(wrapper)
+        let label = Label("Rename", font: Tokens.Font.label(), color: Tokens.Color.textTertiary)
+        label.frame = NSRect(x: 12, y: 240, width: 100, height: 16)
+        panel.addSubview(label)
+        panel.layoutSubtreeIfNeeded()
+        filled.layoutSubtreeIfNeeded()
+
+        // The filled field's padding: its left inset, outside the field inside it.
+        let padding = holder.hitTest(NSPoint(x: 14, y: 14))
+        #expect(padding === filled, "hit \(String(describing: padding))")
+        #expect(!FloatingPanelView.isBareSurface(padding))
+        #expect(!FloatingPanelView.isBareSurface(filled.field))
+        #expect(!filled.mouseDownCanMoveWindow)
+        // The bezel of a search, token or plain field.
+        for view in [search, tokens, bezeled] as [NSView] {
+            let hit = holder.hitTest(NSPoint(x: view.frame.minX + 1, y: view.frame.minY + 1))
+            #expect(!FloatingPanelView.isBareSurface(hit), "hit \(String(describing: hit))")
+            #expect(!FloatingPanelView.isBareSurface(view))
+        }
+        let wrapperPadding = holder.hitTest(NSPoint(x: 14, y: 182))
+        #expect(wrapperPadding === wrapper)
+        #expect(!FloatingPanelView.isBareSurface(wrapperPadding))
+
+        // Gaps and labels are still the panel's own.
+        #expect(FloatingPanelView.isBareSurface(holder.hitTest(NSPoint(x: 290, y: 290))))
+        #expect(FloatingPanelView.isBareSurface(holder.hitTest(NSPoint(x: 150, y: 52))))
+        #expect(FloatingPanelView.isBareSurface(label))
+    }
+}

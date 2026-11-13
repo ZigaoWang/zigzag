@@ -881,6 +881,8 @@ final class FilledField: NSView {
     }
 
     override func mouseDown(with event: NSEvent) { window?.makeFirstResponder(field) }
+    /// Its padding is the field's: a press there types, never drags the window.
+    override var mouseDownCanMoveWindow: Bool { false }
 
     /// Capsule ends instead of the field's corners: a search or address field standing on its own in a panel.
     var isPill = false { didSet { needsLayout = true } }

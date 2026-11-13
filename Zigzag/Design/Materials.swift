@@ -1027,6 +1027,8 @@ final class RecessedField: NSView {
     @objc private func editingChanged() { refresh(animated: true) }
 
     override func mouseDown(with event: NSEvent) { window?.makeFirstResponder(field) }
+    /// Its padding is the field's: a press there types, never drags the window.
+    override var mouseDownCanMoveWindow: Bool { false }
 
     override func layout() {
         super.layout()
