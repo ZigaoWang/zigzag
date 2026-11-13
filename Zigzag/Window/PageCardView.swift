@@ -323,14 +323,14 @@ final class PageCardView: NSView {
     private func startCreeping() {
         stopCreeping()
         guard !Tokens.Motion.reduceMotion else { return }
-        creep = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        creep = Timer.scheduledTimer(withTimeInterval: Tokens.Motion.progressCreep, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.isShowingProgress else { return }
                 let next = self.progress + (0.9 - self.progress) * 0.05
                 guard next > self.progress else { return }
                 self.progress = next
                 CATransaction.begin()
-                CATransaction.setAnimationDuration(0.5)
+                CATransaction.setAnimationDuration(Tokens.Motion.progressCreep)
                 CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .linear))
                 self.layoutProgress()
                 CATransaction.commit()

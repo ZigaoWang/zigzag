@@ -422,7 +422,7 @@ final class DeskController {
         #endif
 
         guard !Tokens.Motion.reduceMotion else {
-            Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 1 }) {
+            Tokens.Motion.animate(Tokens.Motion.crossfading, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 1 }) {
                 if self.isVisible { controller.root.glassCovered = true }
             }
             return
@@ -596,7 +596,7 @@ final class DeskController {
         CATransaction.setDisableActions(true)
         CATransaction.setCompletionBlock(completion)
         for key in ["position", "transform", "cornerRadius"] {
-            let spring = Tokens.Motion.easeAnimation(keyPath: key, duration: Tokens.Motion.zoom)
+            let spring = Tokens.Motion.easeAnimation(keyPath: key, duration: Tokens.Motion.zoom, timing: Tokens.Motion.Role.large.timing)
             spring.fromValue = from[key]
             spring.toValue = to[key]
             layer.setValue(to[key], forKeyPath: key)
@@ -650,7 +650,7 @@ final class DeskController {
                 let k: CGFloat = 0.96, size = card.bounds.size
                 let small = CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
                                                 CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0))
-                let grow = Tokens.Motion.easeAnimation(keyPath: "transform", duration: Tokens.Motion.zoom)
+                let grow = Tokens.Motion.easeAnimation(keyPath: "transform", duration: Tokens.Motion.zoom, timing: Tokens.Motion.Role.large.timing)
                 grow.fromValue = NSValue(caTransform3D: small)
                 grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
                 group.animations = [grow, fade]
@@ -710,7 +710,7 @@ final class DeskController {
             // Nothing to grow, or Reduce Motion: the desk simply fades away.
             switchTab()
             endFlight()
-            Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 0 }, completion: finish)
+            Tokens.Motion.animate(Tokens.Motion.crossfading, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 0 }, completion: finish)
             return
         }
         // Closing: the chosen card grows to fill the page area, exactly where its page is, and hands over to it.
@@ -1073,7 +1073,7 @@ final class DeskController {
         // A view's layer is anchored at its corner: scale from there, then move.
         let from = CATransform3DConcat(CATransform3DMakeScale(shown.width / frame.width, shown.height / frame.height, 1),
                                        CATransform3DMakeTranslation(shown.minX - frame.minX, shown.minY - frame.minY, 0))
-        let spring = Tokens.Motion.easeAnimation(keyPath: "transform", duration: Tokens.Motion.large)
+        let spring = Tokens.Motion.easeAnimation(keyPath: "transform", duration: Tokens.Motion.standard, timing: Tokens.Motion.drawer)
         spring.fromValue = NSValue(caTransform3D: from)
         spring.toValue = NSValue(caTransform3D: CATransform3DIdentity)
         layer.add(spring, forKey: "reflow")
@@ -1083,11 +1083,11 @@ final class DeskController {
     private func collapse(_ view: NSView) {
         guard let layer = view.layer, !Tokens.Motion.reduceMotion else { view.removeFromSuperview(); return }
         let size = view.bounds.size, k: CGFloat = 0.9
-        let shrink = Tokens.Motion.easeAnimation(keyPath: "transform", duration: Tokens.Motion.large)
+        let shrink = Tokens.Motion.easeAnimation(keyPath: "transform", duration: Tokens.Motion.standard, timing: Tokens.Motion.drawer)
         shrink.fromValue = NSValue(caTransform3D: layer.presentation()?.transform ?? CATransform3DIdentity)
         shrink.toValue = NSValue(caTransform3D: CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
                                                                     CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0)))
-        let fade = Tokens.Motion.easeAnimation(keyPath: "opacity", duration: Tokens.Motion.standard)
+        let fade = Tokens.Motion.easeAnimation(keyPath: "opacity", duration: Tokens.Motion.exit)
         fade.fromValue = layer.presentation()?.opacity ?? 1
         fade.toValue = 0
         let group = CAAnimationGroup()
@@ -1106,11 +1106,11 @@ final class DeskController {
         for card in cards {
             guard let layer = card.layer else { continue }
             let k: CGFloat = 0.96, size = card.bounds.size
-            let grow = Tokens.Motion.easeAnimation(keyPath: "transform", duration: Tokens.Motion.large)
+            let grow = Tokens.Motion.easeAnimation(keyPath: "transform", duration: Tokens.Motion.standard, timing: Tokens.Motion.drawer)
             grow.fromValue = NSValue(caTransform3D: CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
                                                                         CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0)))
             grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-            let fade = Tokens.Motion.easeAnimation(keyPath: "opacity", duration: Tokens.Motion.large)
+            let fade = Tokens.Motion.easeAnimation(keyPath: "opacity", duration: Tokens.Motion.enter)
             fade.fromValue = 0
             fade.toValue = 1
             let group = CAAnimationGroup()

@@ -694,8 +694,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // The words you typed fade as the field empties, rather than vanishing.
         let fade = CATransition()
         fade.type = .fade
-        fade.duration = curve.duration
-        fade.timingFunction = curve.timing
+        fade.duration = Tokens.Motion.change.duration
+        fade.timingFunction = Tokens.Motion.change.timing
         field.layer?.add(fade, forKey: "scope")
         guard entering, let layer = chip.layer else { return }
         // Grows from the chip's own middle: layers scale from their corner, so shift by half the shrink.
@@ -705,8 +705,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let pop = CABasicAnimation(keyPath: "transform")
         pop.fromValue = NSValue(caTransform3D: small)
         pop.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        pop.duration = curve.duration
-        pop.timingFunction = curve.timing
+        pop.duration = Tokens.Motion.change.duration
+        pop.timingFunction = Tokens.Motion.change.timing
         let show = CABasicAnimation(keyPath: "opacity")
         show.fromValue = 0
         show.toValue = 1

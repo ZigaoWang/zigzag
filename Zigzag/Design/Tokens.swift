@@ -574,65 +574,139 @@ enum Tokens {
         @MainActor private static var inkBoxes: [String: CGRect] = [:]
     }
 
-    // MARK: - Motion (short, spring based)
+    // MARK: - Motion (five roles, one curve family)
 
     enum Motion {
-        /// Hover and press feedback.
-        static let quick: TimeInterval = 0.1
-        /// Something that shows after you've held a key a while (the ⌘ and ⌃ numbers): a short fade, since it was
-        /// waited for. Hover itself never fades.
-        static let hoverFade: TimeInterval = 0.15
-        /// A change of selection in a list: the card settling onto the chosen row.
-        static let selection: TimeInterval = 0.15
-        /// Most UI transitions: sidebar slide, command bar, row moves.
-        static let standard: TimeInterval = 0.2
-        /// Large surface moves: the desk fading in and out.
-        static let large: TimeInterval = 0.3
-        /// The page shrinking into its card in desk view, and a card growing back into the page.
-        static let zoom: TimeInterval = 0.28
+        // MARK: Roles
+        //
+        // Every animation in the app plays one of these roles (DESIGN.md › Motion). Durations come from a role, never
+        // from a number at the call site (`scripts/check-motion.sh` holds the line). The one exception is the download
+        // thrown into its button (`flight`) and its progress ring.
+
+        /// The five kinds of movement, and how each one moves.
+        enum Role: CaseIterable {
+            /// Hover and press feedback: answers under the finger, `feedbackIn` / `feedbackOut`, eased out.
+            case feedback
+            /// A small change of state in place: a toggle, a row's selection, a chip fading in. `state`, eased out.
+            case state
+            /// A panel, popover, menu or sheet showing up (`enter`) and going (`exit`), eased out, from where it opened.
+            case present
+            /// A drawer or the sidebar sliding, and the window's layout making room: `drawerIn` / `drawerOut` on the
+            /// drawer curve.
+            case drawer
+            /// A large transition: switching spaces, the Desk, the whole window changing. `large`, on the drawer curve.
+            case large
+
+            /// How long it takes, coming in (or simply changing) or going. With Reduce Motion nothing travels: feedback
+            /// is instant, everything else only cross-fades, in `crossfade`.
+            func duration(entering: Bool = true, reduceMotion: Bool = Motion.reduceMotion) -> TimeInterval {
+                if reduceMotion { return self == .feedback ? 0 : crossfade }
+                switch self {
+                case .feedback: return entering ? feedbackIn : feedbackOut
+                case .state: return Motion.state
+                case .present: return entering ? enter : exit
+                case .drawer: return entering ? drawerIn : drawerOut
+                case .large: return Motion.large
+                }
+            }
+
+            /// The curve for what moves: the house ease-out for what answers or appears in place, the drawer's for what
+            /// travels. A fade or a color change in any role is on the house ease-out.
+            var timing: CAMediaTimingFunction {
+                switch self {
+                case .feedback, .state, .present: return Motion.easeOut
+                case .drawer, .large: return Motion.drawer
+                }
+            }
+
+            /// As a `Curve`, for `Motion.animate` and `Motion.slide`.
+            func curve(entering: Bool = true) -> Curve {
+                Curve(duration: duration(entering: entering, reduceMotion: false), timing: timing)
+            }
+        }
+
+        /// Feedback: a press going down, a hint fading. Hover itself is instant both ways.
+        static let feedbackIn: TimeInterval = 0.1
+        /// Feedback letting go: the press settling back.
+        static let feedbackOut: TimeInterval = 0.12
+        /// A small change of state in place.
+        static let state: TimeInterval = 0.16
+        /// Showing up: a menu, popover, panel, bar or sheet arrives in `enter`, eased out, growing from `enterScale` out
+        /// of what opened it (or sliding in from the edge it's attached to) as it fades in. Going is quicker and
+        /// subtler: `exit`, toward `exitScale`.
+        static let enter: TimeInterval = 0.18
+        static let exit: TimeInterval = 0.12
+        /// A drawer coming out (the sidebar, a notice from beyond the window's edge), and going back, quicker.
+        static let drawerIn: TimeInterval = 0.26
+        static let drawerOut: TimeInterval = 0.2
+        /// The ceiling for UI: switching spaces, the Desk zooming, the window changing. Under 300ms.
+        static let large: TimeInterval = 0.28
+        /// Reduce Motion: what moved or grew only crossfades in place, this quickly.
+        static let crossfade: TimeInterval = 0.12
+
+        // The roles under the names the app grew up with.
+
+        /// Feedback: a hint fading, a tile fading out of a list.
+        static let quick: TimeInterval = feedbackIn
+        /// Something that shows after you've held a key a while (the ⌘ and ⌃ numbers): a state change.
+        static let hoverFade: TimeInterval = state
+        /// A change of selection in a list (the card settling onto the chosen row), a fill or color changing: state.
+        static let selection: TimeInterval = state
+        /// One shared highlight gliding from row to row in a menu, and a selection gliding between a list's places
+        /// or a filter's segments: state.
+        static let highlightGlide: TimeInterval = state
+        /// A layout move with no way in or out (rows making room, a split opening): the drawer role at `drawerOut`.
+        static let standard: TimeInterval = drawerOut
+        /// The page shrinking into its card in the Desk, and a card growing back into the page: large.
+        static let zoom: TimeInterval = large
+        /// The hidden sidebar sliding out at the window's edge, and back: the drawer.
+        static let edgeSlideDuration: TimeInterval = drawerIn
+        static let edgeTuckDuration: TimeInterval = drawerOut
+        /// A notice coming in from beyond the window's edge (a site's question, an offer) travels like a drawer.
+        static let noticeIn: TimeInterval = drawerIn
+        static let noticeOut: TimeInterval = drawerOut
+
+        // Delays and ambient time, which aren't transitions.
+
         /// Delay before a hover preview appears.
         static let previewDelay: TimeInterval = 0.6
         /// How long the pointer can stray off the floating sidebar before it slides away.
         static let edgeHideDelay: TimeInterval = 0.05
-        /// Sidebar slides in and out: fast enough to feel attached to the pointer.
-        static let slideDuration: TimeInterval = 0.18
-        /// The hidden sidebar sliding out at the window's edge, and back. It travels its own width over the page, so a
-        /// little longer than a docked slide, which only uncovers it.
-        static let edgeSlideDuration: TimeInterval = 0.26
-        static let edgeTuckDuration: TimeInterval = 0.2
+        /// The page's loading line inching on between WebKit's steps, linearly, once this often.
+        static let progressCreep: TimeInterval = 0.5
+        /// Motion that isn't an answer to anything you did: the wordmark drawing itself, the guided tour's beat, a
+        /// space's atmosphere drifting. Never on the way of something you asked for.
+        enum Ambient {
+            /// The ribbon Z drawing in, the ZIGZAG wordmark writing itself, and the loading mark's cycle and breath.
+            static let draw: TimeInterval = 0.7
+            static let wordmark: TimeInterval = 1.1
+            static let markCycle: TimeInterval = 1.1
+            static let breathe: TimeInterval = 0.9
+            /// The guided tour's pulse on what to try.
+            static let beat: TimeInterval = 0.45
+            /// A space's atmosphere easing into its new look.
+            static let atmosphere: TimeInterval = 1.0
+            /// The materials showcase's float (a debug window).
+            static let float: TimeInterval = 3.6
+        }
 
-        /// The tactile press: a button or row eases down to this scale as it's pressed (`pressIn`, eased out) and
-        /// springs back when let go (`pressOut`, critically damped, so it never overshoots). The action never waits on it.
+        /// The tactile press: a button or row eases down to this scale as it's pressed (`pressIn`) and back when let
+        /// go (`pressSettle`), both eased out, never overshooting. The action never waits on it.
         static let pressScale: CGFloat = 0.97
-        static let pressIn: TimeInterval = 0.08
-        static let pressOut: TimeInterval = 0.2
+        static let pressIn: TimeInterval = feedbackIn
         /// The sink: keys, switches, pill buttons and favorites go down this far as they're pressed (`pressIn`), and
-        /// settle back over `pressSettle`, eased out, with weight and no bounce (`showSink`).
+        /// settle back over `pressSettle`, eased out, with no bounce (`showSink`).
         static let pressSink: CGFloat = 1
-        static let pressSettle: TimeInterval = 0.18
+        static let pressSettle: TimeInterval = feedbackOut
         /// A download thrown into its button: a slow, high lob you can follow, the one movement past `large`.
         static let flight: TimeInterval = 1.1
-        /// Showing up: a menu, popover, panel, bar or sheet arrives in `enter`, eased out, growing from `enterScale` out
-        /// of what opened it (or sliding in from the edge it's attached to) as it fades in. Going is quicker and
-        /// subtler: `exit`, toward `exitScale`.
         static let enterScale: CGFloat = 0.96
-        static let enter: TimeInterval = 0.18
-        static let exit: TimeInterval = 0.12
         static let exitScale: CGFloat = 0.98
-        /// A notice coming in from beyond the window's edge (a site's question, an offer): it travels further than a
-        /// menu grows, so it takes a little longer, and leaves in about two thirds of that.
-        static let noticeIn: TimeInterval = 0.25
-        static let noticeOut: TimeInterval = 0.17
         /// How far a bar attached to an edge (the find bar, a toast) slides in from it; it leaves half as far.
         static let edgeOffset: CGFloat = 6
-        /// Reduce Motion: what moved or grew only crossfades in place, this quickly.
-        static let crossfade: TimeInterval = 0.12
         /// A sheet (a confirmation, the notes) grows from a little below its middle, so it settles up into place over
         /// its scrim rather than swelling out of a point.
         static let sheetOrigin = CGPoint(x: 0.5, y: 0.7)
-        /// One shared highlight gliding from row to row in a menu, and a selection gliding between a list's places
-        /// or a filter's segments.
-        static let highlightGlide: TimeInterval = 0.14
 
         /// A layer's transform scaling it by `k` around `point` (0 to 1 across its bounds, from its top left), whatever
         /// its anchor: what a press or a growing menu uses.
@@ -663,7 +737,7 @@ enum Tokens {
         /// How long showing up or going takes. With Reduce Motion, only a short crossfade.
         static func presenceDuration(_ origin: Origin, entering: Bool, reduceMotion: Bool) -> TimeInterval {
             if reduceMotion { return crossfade }
-            if case .offstage = origin { return entering ? noticeIn : noticeOut }
+            if case .offstage = origin { return Role.drawer.duration(entering: entering, reduceMotion: false) }
             // Hung from an edge (a toast, the find bar): it lifts back the way it dropped in, at the same pace, so its
             // going reads as the same movement rather than a vanishing.
             if case .edge = origin { return enter }
@@ -750,7 +824,8 @@ enum Tokens {
             move.fromValue = NSValue(caTransform3D: fromTransform)
             move.toValue = NSValue(caTransform3D: entering ? CATransform3DIdentity : hidden)
             move.duration = time
-            move.timingFunction = easeOut
+            // A notice from beyond the window's edge travels, so it rides the drawer's curve; the rest appear in place.
+            if case .offstage = origin, !reduce { move.timingFunction = drawer } else { move.timingFunction = easeOut }
             // Leaving, it lands back in place the moment its fade reaches nothing, so nothing has to hold the pose.
             layer.add(move, forKey: "presence.transform")
             CATransaction.commit()
@@ -782,26 +857,31 @@ enum Tokens {
         /// covering half of it in the first frame or two.
         static let drawer = CAMediaTimingFunction(controlPoints: 0.32, 0.72, 0, 1)
 
-        /// Something moving from one place on screen to another: cubic-bezier(0.77, 0, 0.175, 1).
-        static let easeInOut = CAMediaTimingFunction(controlPoints: 0.77, 0, 0.175, 1)
+        // The roles as curves. Nothing eases in, and nothing springs unless the fingers threw it (`swipeSettle`).
 
-        static let snappy = Curve(duration: standard)
-        static let slide = Curve(duration: slideDuration)
-        /// The hidden sidebar coming out at the window's edge, and going back (quicker, as leaving is).
-        static let edgeSlide = Curve(duration: edgeSlideDuration, timing: drawer)
-        static let edgeTuck = Curve(duration: edgeTuckDuration, timing: drawer)
-        /// Finishing a swipe: the fingers already did most of the travel, so the rest is quick.
-        static let snap = Curve(duration: 0.14)
-        /// Switching spaces: a quick slide that shows which way you went, eased out, with no bounce.
-        static let spaceSwitch = Curve(duration: 0.22)
-        /// Letting go of a swipe between spaces: a critically damped spring that carries on at the fingers' speed
-        /// and never overshoots, whether it lands on the next space or springs back.
-        static let swipeSettle = Curve(duration: 0.15, bounce: 0)
-        static let gentle = Curve(duration: large)
-        static let feedback = Curve(duration: quick)
+        /// Feedback: a hint or a drop marker fading.
+        static let feedback = Role.feedback.curve()
+        /// A small change of state in place: a fade, a fill, a chip coming or going.
+        static let change = Role.state.curve()
+        /// A layout move: rows, tiles, panes and bars moving to make room (the drawer role, at `drawerOut`).
+        static let snappy = Role.drawer.curve(entering: false)
+        /// The sidebar, docked or hidden, coming out, and going back (quicker, as leaving is).
+        static let edgeSlide = Role.drawer.curve(entering: true)
+        static let edgeTuck = Role.drawer.curve(entering: false)
+        /// Finishing a swipe: the fingers already did most of the travel, so the rest is a state change.
+        static let snap = Role.state.curve()
+        /// Switching spaces: a large transition that shows which way you went, with no bounce.
+        static let spaceSwitch = Role.large.curve()
+        /// Letting go of a swipe between spaces: thrown, so a critically damped spring that carries on at the
+        /// fingers' speed and never overshoots, whether it lands on the next space or springs back.
+        static let swipeSettle = Curve(duration: state, bounce: 0)
+        /// A large transition: the Desk, the sidebar changing sides, the guided tour.
+        static let gentle = Role.large.curve()
         /// A scrim or a wash coming with something that shows up, and going with it.
-        static let entering = Curve(duration: enter)
-        static let leaving = Curve(duration: exit)
+        static let entering = Role.present.curve(entering: true)
+        static let leaving = Role.present.curve(entering: false)
+        /// Reduce Motion's stand-in for anything that would have moved: a crossfade in place.
+        static let crossfading = Curve(duration: crossfade)
 
         /// True while handling ⌘T: a new tab is for typing at once, so it appears instantly. Every other shortcut
         /// (⌘W, switching tabs and spaces) animates like the same action done with the pointer, so you see what changed.
@@ -926,7 +1006,7 @@ enum Tokens {
         /// places as well, so one that keeps to its far edge (a button at the address's end) stays on that edge
         /// all the way.
         static func glide(_ view: NSView, to frame: NSRect, duration: TimeInterval = standard,
-                          timing: CAMediaTimingFunction = easeInOut, resizes: Bool = false) {
+                          timing: CAMediaTimingFunction = drawer, resizes: Bool = false) {
             guard let layer = view.layer else { view.frame = frame; return }
             let size = view.frame.size
             var shown = view.frame.origin
@@ -977,16 +1057,17 @@ enum Tokens {
             CATransaction.commit()
         }
 
-        /// A critically damped spring: it never overshoots, and runs until it has settled.
-        /// The house ease-out over exactly `duration`: for movements whose completion has to land on time (a spring
-        /// settles well after it looks done).
-        static func easeAnimation(keyPath: String, duration: TimeInterval = standard) -> CABasicAnimation {
+        /// An eased animation over exactly `duration` (the house ease-out, or the drawer curve for something
+        /// traveling): for movements whose completion has to land on time (a spring settles well after it looks done).
+        static func easeAnimation(keyPath: String, duration: TimeInterval = standard, timing: CAMediaTimingFunction = easeOut) -> CABasicAnimation {
             let animation = CABasicAnimation(keyPath: keyPath)
             animation.duration = duration * debugSlowdown
-            animation.timingFunction = easeOut
+            animation.timingFunction = timing
             return animation
         }
 
+        /// A critically damped spring: it never overshoots, and runs until it has settled. Only for something the
+        /// fingers let go of mid-move (a swipe), so it carries on at their speed.
         static func springAnimation(keyPath: String, duration: TimeInterval = standard) -> CASpringAnimation {
             let spring = CASpringAnimation(perceptualDuration: duration * debugSlowdown, bounce: 0)
             spring.keyPath = keyPath

@@ -493,7 +493,7 @@ final class SpaceDeck: NSView {
             let float = CABasicAnimation(keyPath: "transform.translation.y")
             float.fromValue = -4
             float.toValue = 4
-            float.duration = 3.6
+            float.duration = Tokens.Motion.Ambient.float
             float.isAdditive = true
             float.autoreverses = true
             float.repeatCount = .infinity

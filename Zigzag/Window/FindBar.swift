@@ -775,7 +775,7 @@ enum Toast {
     /// Keeps the window's toast over the middle of the page when the page moves under it: the sidebar shown or
     /// hidden, full screen, a resize. Riding a sidebar slide (`slide` is its duration, `timing` its curve) it moves with the page, on the
     /// same curve.
-    static func reposition(in controller: BrowserWindowController, slide: TimeInterval? = nil, timing: CAMediaTimingFunction = Tokens.Motion.slide.timing) {
+    static func reposition(in controller: BrowserWindowController, slide: TimeInterval? = nil, timing: CAMediaTimingFunction = Tokens.Motion.drawer) {
         let host = controller.root.overlay
         guard let toast = showing[ObjectIdentifier(host)]?.toast, toast.superview === host, !toast.dismissing else { return }
         let old = toast.frame
@@ -787,8 +787,8 @@ enum Toast {
         let move = CABasicAnimation(keyPath: "transform")
         move.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(dx, dy, 0))
         move.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        move.duration = slide ?? 0.24
-        move.timingFunction = slide == nil ? Tokens.Motion.easeInOut : timing
+        move.duration = slide ?? Tokens.Motion.standard
+        move.timingFunction = slide == nil ? Tokens.Motion.drawer : timing
         move.fillMode = .backwards
         layer.add(move, forKey: "follow")
     }

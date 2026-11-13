@@ -469,7 +469,7 @@ final class SidebarListView: NSView {
                 view.layer?.removeAnimation(forKey: "glide")
                 Tokens.Motion.withoutAnimation { view.frame = frame }
             } else {
-                Tokens.Motion.glide(view, to: frame, duration: Tokens.Motion.standard, timing: Tokens.Motion.easeInOut)
+                Tokens.Motion.glide(view, to: frame, duration: Tokens.Motion.standard, timing: Tokens.Motion.drawer)
             }
         }
         if !changes.isEmpty { Tokens.Motion.animate { changes.forEach { $0() } } }
@@ -516,7 +516,7 @@ final class SidebarListView: NSView {
     }
 
     /// Shows a row's top `from`...`to` points through a mask, on the same curve and pace as the rows gliding around
-    /// it (`Motion.standard`, ease in-out), so the two edges move together and nothing overlaps.
+    /// it (`Motion.standard`, on the drawer curve), so the two edges move together and nothing overlaps.
     private func reveal(_ layer: CALayer, from: CGFloat, to: CGFloat) {
         let mask = CALayer()
         mask.backgroundColor = NSColor.black.cgColor
@@ -525,7 +525,7 @@ final class SidebarListView: NSView {
         mask.bounds = CGRect(x: 0, y: 0, width: layer.bounds.width, height: to)
         layer.mask = mask
         let open = Tokens.Motion.easeAnimation(keyPath: "bounds.size.height", duration: Tokens.Motion.standard)
-        open.timingFunction = Tokens.Motion.easeInOut
+        open.timingFunction = Tokens.Motion.drawer
         open.fromValue = from
         open.toValue = to
         open.fillMode = .backwards
@@ -657,7 +657,7 @@ final class SidebarListView: NSView {
         lift.keyTimes = [0, 0.25, 0.7, 1]
         lift.duration = Tokens.Motion.standard
         layer?.add(lift, forKey: "lift")
-        Tokens.Motion.glide(view, to: frame, duration: Tokens.Motion.standard, timing: Tokens.Motion.easeInOut)
+        Tokens.Motion.glide(view, to: frame, duration: Tokens.Motion.standard, timing: Tokens.Motion.drawer)
     }
 
     private func updateDocumentHeight() {

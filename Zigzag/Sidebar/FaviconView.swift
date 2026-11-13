@@ -328,7 +328,8 @@ final class FaviconView: NSView {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = layer.presentation()?.opacity ?? layer.opacity
             fade.toValue = target
-            fade.duration = Tokens.Motion.quick
+            fade.duration = Tokens.Motion.state
+            fade.timingFunction = Tokens.Motion.easeOut
             layer.add(fade, forKey: "fade")
             Tokens.Motion.withoutAnimation { layer.opacity = target }
         }
@@ -336,7 +337,7 @@ final class FaviconView: NSView {
             startSpinning()
         } else if spinner.isLooping {
             // Keeps flowing while it fades, then stops out of sight.
-            DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.quick + 0.05) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.state + 0.05) { [weak self] in
                 MainActor.assumeIsolated { if let self, !self.isLoading { self.spinner.stopLooping() } }
             }
         }

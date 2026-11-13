@@ -33,12 +33,16 @@ struct SidebarSlideTests {
     @Test func goingBackIsQuickerThanComingOutAndBothStayUnderTheCeiling() {
         #expect(Tokens.Motion.edgeTuck.duration < Tokens.Motion.edgeSlide.duration)
         #expect(Tokens.Motion.edgeSlide.duration <= Tokens.Motion.large)
-        #expect(Tokens.Motion.edgeSlide.duration > Tokens.Motion.slideDuration)
+        #expect(Tokens.Motion.edgeSlide.duration == Tokens.Motion.drawerIn)
     }
 
-    @Test func otherCurvesKeepTheHouseEaseOut() {
-        #expect(Tokens.Motion.slide.timing === Tokens.Motion.easeOut)
-        #expect(Tokens.Motion.gentle.timing === Tokens.Motion.easeOut)
+    @Test func whatTravelsRidesTheDrawerCurveAndTheRestTheHouseEaseOut() {
+        #expect(Tokens.Motion.snappy.timing === Tokens.Motion.drawer)
+        #expect(Tokens.Motion.gentle.timing === Tokens.Motion.drawer)
+        #expect(Tokens.Motion.spaceSwitch.timing === Tokens.Motion.drawer)
+        #expect(Tokens.Motion.feedback.timing === Tokens.Motion.easeOut)
+        #expect(Tokens.Motion.change.timing === Tokens.Motion.easeOut)
+        #expect(Tokens.Motion.entering.timing === Tokens.Motion.easeOut)
     }
 
     @Test func reduceMotionFadesInWhereItLands() throws {

@@ -193,7 +193,7 @@ final class GuidedTour: NSView {
         watch = nil
         tokens = []
         demo.clear()
-        Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { self.animator().alphaValue = 0 },
+        Tokens.Motion.animate(Tokens.Motion.leaving, evenFromKeyboard: true, { self.animator().alphaValue = 0 },
                               completion: { [weak self] in self?.removeFromSuperview() })
     }
 
@@ -657,7 +657,7 @@ final class GuidedTour: NSView {
         let beat = CABasicAnimation(keyPath: "opacity")
         beat.fromValue = 1
         beat.toValue = 0.25
-        beat.duration = 0.45
+        beat.duration = Tokens.Motion.Ambient.beat
         beat.autoreverses = true
         beat.repeatCount = .infinity
         beat.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)

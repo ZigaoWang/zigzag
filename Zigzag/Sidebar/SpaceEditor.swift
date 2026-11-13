@@ -159,7 +159,7 @@ final class ColorWheel: NSView {
         shownCount = spots.count
         CATransaction.begin()
         CATransaction.setDisableActions(!animated)
-        CATransaction.setAnimationDuration(Tokens.Motion.standard)
+        CATransaction.setAnimationDuration(Tokens.Motion.state)
         CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
         for (i, knob) in knobs.enumerated() {
             knob.layer.isHidden = i >= spots.count
@@ -1386,7 +1386,7 @@ final class SpaceLookEditor: NSView {
             return
         }
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = Tokens.Motion.standard
+            context.duration = Tokens.Motion.state
             context.timingFunction = Tokens.Motion.easeOut
             dial.animator().alphaValue = show ? 1 : 0
         } completionHandler: { [weak self] in
@@ -1599,8 +1599,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         if superview?.isFlipped == true, anchoredBelow == false { target.origin.y -= delta }
         target.origin.y = max(Tokens.Space.x2, target.origin.y)
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = Tokens.Motion.standard
-            context.timingFunction = Tokens.Motion.easeOut
+            context.duration = Tokens.Motion.reduceMotion ? 0 : Tokens.Motion.standard
+            context.timingFunction = Tokens.Motion.drawer
             context.allowsImplicitAnimation = true
             animator().frame = target
             layoutSubtreeIfNeeded()

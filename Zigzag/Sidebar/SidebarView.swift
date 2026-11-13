@@ -511,7 +511,7 @@ final class AddressView: InteractiveView {
         if lock.frame.width == 0 { lock.frame = lockFrame }
         guard label.frame != labelFrame || lock.frame != lockFrame else { return }
         if animated && label.frame.width > 0 {
-            Tokens.Motion.animate(Tokens.Motion.Curve(duration: Tokens.Motion.standard), moves: true) {
+            Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) {
                 self.label.animator().frame = labelFrame
                 self.lock.animator().frame = lockFrame
             }
@@ -525,7 +525,7 @@ final class AddressView: InteractiveView {
         guard drawn.insert(ObjectIdentifier(button)).inserted else {
             guard button.frame != frame else { return }
             if animated {
-                Tokens.Motion.glide(button, to: frame, timing: Tokens.Motion.easeOut)
+                Tokens.Motion.glide(button, to: frame)
             } else {
                 Tokens.Motion.withoutAnimation { button.frame = frame }
             }
@@ -701,7 +701,7 @@ final class SpaceDotView: InteractiveView {
         iconView.alphaValue = icon.map(IconChoice.isSymbol) == false ? 0.45 + 0.55 * share : 1
         if changed && !Tokens.Motion.reduceMotion {
             CATransaction.begin()
-            CATransaction.setAnimationDuration(Tokens.Motion.standard)
+            CATransaction.setAnimationDuration(Tokens.Motion.state)
             CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
             apply()
             CATransaction.commit()
@@ -1358,12 +1358,12 @@ final class SidebarView: NSView {
             nowPlaying.isHidden = false
             needsLayout = true
             nowPlaying.alphaValue = 0
-            Tokens.Motion.animate(Tokens.Motion.snappy) { self.nowPlaying.animator().alphaValue = 1 }
+            Tokens.Motion.animate(Tokens.Motion.change) { self.nowPlaying.animator().alphaValue = 1 }
             return
         }
         // Fades out where it is first; only then does the list take back its room, so nothing vanishes at once.
         nowPlayingFadingOut = true
-        Tokens.Motion.animate(Tokens.Motion.snappy, { self.nowPlaying.animator().alphaValue = 0 }, completion: {
+        Tokens.Motion.animate(Tokens.Motion.leaving, { self.nowPlaying.animator().alphaValue = 0 }, completion: {
             // Playing again before the fade finished: it stays.
             guard self.nowPlayingFadingOut else { return }
             self.nowPlayingFadingOut = false
@@ -1547,9 +1547,9 @@ final class SidebarView: NSView {
         if Tokens.Motion.reduceMotion {
             // Nothing slides: the two lists cross-fade where they stand, the old going as the new comes, so their
             // rows never show on top of each other.
-            Self.fadeIn(incoming.scroll, duration: Tokens.Motion.standard)
-            Self.fadeOut(scrollView, duration: Tokens.Motion.standard * 0.6)
-            DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.standard + 0.02, execute: work)
+            Self.fadeIn(incoming.scroll, duration: Tokens.Motion.crossfade)
+            Self.fadeOut(scrollView, duration: Tokens.Motion.exit)
+            DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.crossfade + 0.02, execute: work)
             return
         }
         let curve = landing == nil ? Tokens.Motion.spaceSwitch : Tokens.Motion.swipeSettle
@@ -1560,8 +1560,8 @@ final class SidebarView: NSView {
         Self.slideOut(scrollView, from: from, to: -side * width, like: incoming.scroll)
         // A swipe keeps both lists solid, as the fingers had them; otherwise the one leaving fades, so the two never
         // compete.
-        if landing == nil { Self.fadeOut(scrollView, duration: Tokens.Motion.slideDuration) }
-        DispatchQueue.main.asyncAfter(deadline: .now() + max(duration, Tokens.Motion.slideDuration) + 0.02, execute: work)
+        if landing == nil { Self.fadeOut(scrollView, duration: Tokens.Motion.drawerOut) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(duration, landing == nil ? Tokens.Motion.drawerOut : 0) + 0.02, execute: work)
     }
 
     /// A switch in progress: the pane bringing the new space in, and the swap to make once it's home.
@@ -1606,7 +1606,8 @@ final class SidebarView: NSView {
             animation = copy
         } else {
             animation = CABasicAnimation()
-            animation.duration = Tokens.Motion.slideDuration
+            animation.duration = Tokens.Motion.spaceSwitch.duration
+            animation.timingFunction = Tokens.Motion.spaceSwitch.timing
         }
         animation.keyPath = "transform.translation.x"
         animation.fromValue = from
@@ -1652,8 +1653,8 @@ final class SidebarView: NSView {
         guard !Tokens.Motion.reduceMotion else { ghost.removeFromSuperview(); return }
         let duration = Tokens.Motion.slide(ghost, fromOffsetX: direction * width + from, curve: Tokens.Motion.spaceSwitch, fromKeyboard: true)
         Tokens.Motion.slide(scrollView, fromOffsetX: direction * width + from, curve: Tokens.Motion.spaceSwitch, fromKeyboard: true)
-        Self.fadeOut(ghost, duration: Tokens.Motion.slideDuration)
-        DispatchQueue.main.asyncAfter(deadline: .now() + max(duration, Tokens.Motion.slideDuration) + 0.02) { ghost.removeFromSuperview() }
+        Self.fadeOut(ghost, duration: Tokens.Motion.drawerOut)
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(duration, Tokens.Motion.drawerOut) + 0.02) { ghost.removeFromSuperview() }
     }
 
     /// Fills a pane with a space's list, scrolled where you left that space.

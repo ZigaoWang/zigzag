@@ -512,7 +512,7 @@ final class SwipeArrowView: NSView {
             isArmed = true
         }
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = Tokens.Motion.reduceMotion ? 0 : navigated ? 0.3 : 0.18
+            context.duration = navigated ? Tokens.Motion.Role.large.duration() : Tokens.Motion.Role.present.duration(entering: false)
             context.timingFunction = Tokens.Motion.easeOut
             self.animator().alphaValue = 0
         }, completionHandler: { [weak self] in MainActor.assumeIsolated { self?.removeFromSuperview() } })

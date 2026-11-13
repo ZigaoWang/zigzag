@@ -119,7 +119,7 @@ struct TopBarTests {
         let before = topBar.controlPositions
         topBar.frame = NSRect(x: 0, y: 0, width: 1280, height: bar + inset)
         topBar.rowTop = inset
-        topBar.slideControls(from: before, curve: Tokens.Motion.slide)
+        topBar.slideControls(from: before, curve: Tokens.Motion.edgeSlide)
         // In their new places at once, the inset lower, and shown starting from where they were.
         let held = buttons[0].frame.minY
         #expect(held == before[ObjectIdentifier(buttons[0])]!.minY + inset)
@@ -165,7 +165,7 @@ struct TopBarTests {
         topBar.frame = NSRect(x: 0, y: 0, width: 1280, height: bar)
         topBar.trafficLightsWidth = 52
         topBar.showsSidebarButton = true
-        topBar.slideControls(from: before, curve: Tokens.Motion.slide)
+        topBar.slideControls(from: before, curve: Tokens.Motion.edgeSlide)
         // Each is in its new place at once, so layout and clicks see the truth, and is shown gliding there from
         // where it was: the address from its old width too.
         let frames = TopBarView.frames(width: 1280, buttons: 3, sidebarButton: true, trafficLightsWidth: 52, trailingInset: Tokens.Sidebar.edge)

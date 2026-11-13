@@ -1281,6 +1281,7 @@ final class SeparatorRowView: NSView {
         needsLayout = true
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = Tokens.Motion.selection
+            context.timingFunction = Tokens.Motion.easeOut
             context.allowsImplicitAnimation = true
             clearButton.animator().alphaValue = show ? 1 : 0
             layoutSubtreeIfNeeded()

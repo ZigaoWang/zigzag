@@ -140,7 +140,7 @@ final class NumberHintView: NSView {
             if Tokens.Motion.reduceMotion {
                 alphaValue = 1
             } else {
-                Tokens.Motion.animate(Tokens.Motion.Curve(duration: Tokens.Motion.hoverFade), evenFromKeyboard: true) { self.animator().alphaValue = 1 }
+                Tokens.Motion.animate(Tokens.Motion.change, evenFromKeyboard: true) { self.animator().alphaValue = 1 }
             }
         } else {
             layer?.removeAllAnimations()

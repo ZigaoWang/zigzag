@@ -16,7 +16,7 @@ class SpaceFrameView: ColorView {
                 if animated, crossFadesMode, !Tokens.Motion.reduceMotion, let frameLayer = window?.contentView?.superview?.layer {
                     let fade = CATransition()
                     fade.type = .fade
-                    fade.duration = Tokens.Motion.standard
+                    fade.duration = Tokens.Motion.large
                     fade.timingFunction = Tokens.Motion.easeOut
                     frameLayer.add(fade, forKey: "appearance")
                 }
@@ -36,7 +36,7 @@ class SpaceFrameView: ColorView {
         setGlass(clear, clear: space.usesClearGlass, tint: space.frameColor)
         // See-through, the wash goes in the gradient layer, the one above the frosted desktop (the frame's own color
         // sits under it and would be hidden); a single color washes as a gradient of itself.
-        setColor(clear ? .clear : color, animated: animated)
+        setColor(clear ? .clear : color, animated: animated, duration: Tokens.Motion.large)
         setGradient(from: color, to: clear ? end ?? color : end, angle: space.gradientAngle, animated: animated)
         setGrain(isPrivate ? 0 : space.grain ?? 0, animated: animated)
         return (color, end)
@@ -201,6 +201,7 @@ class SpaceFrameView: ColorView {
         CATransaction.begin()
         CATransaction.setDisableActions(!animated)
         CATransaction.setAnimationDuration(Tokens.Motion.large)
+        CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
         if let (start, end) = gradientColors {
             effectiveAppearance.performAsCurrentDrawingAppearance {
                 gradientLayer.colors = [start.cgColor, end.cgColor]
@@ -233,7 +234,8 @@ class SpaceFrameView: ColorView {
         guard grainLayer.opacity != target || glassGrain.opacity != target else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(!animated)
-        CATransaction.setAnimationDuration(Tokens.Motion.standard)
+        CATransaction.setAnimationDuration(Tokens.Motion.large)
+        CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
         grainLayer.opacity = target
         glassGrain.opacity = target
         CATransaction.commit()

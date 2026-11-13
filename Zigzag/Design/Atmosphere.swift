@@ -91,8 +91,8 @@ final class Atmosphere: NSView {
         let palette = palette(dark: effectiveAppearance.isDark)
         CATransaction.begin()
         CATransaction.setDisableActions(!animated)
-        CATransaction.setAnimationDuration(animated ? 1.0 : 0)
-        CATransaction.setAnimationTimingFunction(Tokens.Motion.easeInOut)
+        CATransaction.setAnimationDuration(animated ? Tokens.Motion.Ambient.atmosphere : 0)
+        CATransaction.setAnimationTimingFunction(Tokens.Motion.drawer)
         base.colors = [palette.top.cgColor, palette.bottom.cgColor]
         for (field, color) in zip(fields, palette.fields) { field.backgroundColor = color.cgColor }
         grain.opacity = effectiveAppearance.isDark ? 0.14 : 0.10
@@ -268,20 +268,17 @@ final class Stage3D: NSView {
         return steps.dropFirst().reduce(steps[0]) { CATransform3DConcat($0, $1) }
     }
 
-    /// Arrives tilted and settles flat. With Reduce Motion it is simply flat.
-    func settle(delay: CFTimeInterval = 0.08) {
+    /// Arrives a little tilted and settles flat, as anything showing up does (`Motion.enter`, eased out, from
+    /// `enterScale`). With Reduce Motion it is simply flat.
+    func settle(delay: CFTimeInterval = 0) {
         guard let layer, !Tokens.Motion.reduceMotion, bounds.width > 0 else { return }
-        let from = tilt(14, scale: 0.94)
-        let spring = CASpringAnimation(keyPath: "sublayerTransform")
-        spring.mass = 1
-        spring.stiffness = 120
-        spring.damping = 2 * sqrt(120)
-        spring.fromValue = NSValue(caTransform3D: from)
-        spring.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        spring.duration = spring.settlingDuration
-        spring.beginTime = CACurrentMediaTime() + delay
-        spring.fillMode = .backwards
+        let from = tilt(6, scale: Tokens.Motion.enterScale)
+        let arrive = Tokens.Motion.easeAnimation(keyPath: "sublayerTransform", duration: Tokens.Motion.enter)
+        arrive.fromValue = NSValue(caTransform3D: from)
+        arrive.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        arrive.beginTime = CACurrentMediaTime() + delay
+        arrive.fillMode = .backwards
         layer.sublayerTransform = CATransform3DIdentity
-        layer.add(spring, forKey: "settle")
+        layer.add(arrive, forKey: "settle")
     }
 }

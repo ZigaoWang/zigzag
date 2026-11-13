@@ -563,7 +563,7 @@ final class PermissionPrompt: FloatingPanelView {
     /// Puts the window's question back under the address after the sidebar or the window changed. It never jumps:
     /// riding a sidebar slide (`slide` is its duration, `timing` its curve) it moves with the sidebar, on the same curve; going between
     /// the address and the top of the page, it glides there.
-    static func reposition(in controller: PromptHost, slide: TimeInterval? = nil, timing: CAMediaTimingFunction = Tokens.Motion.slide.timing) {
+    static func reposition(in controller: PromptHost, slide: TimeInterval? = nil, timing: CAMediaTimingFunction = Tokens.Motion.drawer) {
         guard let prompt = shown[ObjectIdentifier(controller)], prompt.superview != nil, !prompt.isHidden else { return }
         let old = prompt.frame
         prompt.place(in: controller)
@@ -574,8 +574,8 @@ final class PermissionPrompt: FloatingPanelView {
         let move = CABasicAnimation(keyPath: "transform")
         move.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(dx, dy, 0))
         move.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        move.duration = slide ?? 0.24
-        move.timingFunction = slide == nil ? Tokens.Motion.easeInOut : timing
+        move.duration = slide ?? Tokens.Motion.standard
+        move.timingFunction = slide == nil ? Tokens.Motion.drawer : timing
         move.fillMode = .backwards
         layer.add(move, forKey: "follow")
     }

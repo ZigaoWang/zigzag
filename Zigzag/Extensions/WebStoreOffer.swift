@@ -116,7 +116,7 @@ final class WebStoreOffer: FloatingPanelView {
     private func step(aside: Bool) {
         let alpha: CGFloat = aside ? 0 : 1
         guard alphaValue != alpha else { return }
-        Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true) { self.animator().alphaValue = alpha }
+        Tokens.Motion.animate(Tokens.Motion.change, evenFromKeyboard: true) { self.animator().alphaValue = alpha }
     }
 
     private func busy(_ text: String) {

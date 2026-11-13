@@ -18,14 +18,74 @@ struct MotionTests {
             let enter = Motion.presenceDuration(origin, entering: true, reduceMotion: false)
             let exit = Motion.presenceDuration(origin, entering: false, reduceMotion: false)
             #expect(exit < enter)
-            // About two thirds, and nothing past the ceiling for UI.
-            #expect(exit / enter > 0.6 && exit / enter < 0.72)
-            #expect(enter <= 0.25)
+            // Two thirds to three quarters, and nothing past the ceiling for UI.
+            #expect(exit / enter > 0.6 && exit / enter < 0.8)
+            #expect(enter <= Motion.large)
         }
         #expect(Motion.presenceDuration(.point(.zero), entering: true, reduceMotion: false) == Motion.enter)
         // What hangs from an edge (a toast, the find bar) lifts back at the pace it dropped in.
         #expect(Motion.presenceDuration(.edge(.minY), entering: false, reduceMotion: false) == Motion.presenceDuration(.edge(.minY), entering: true, reduceMotion: false))
         #expect(Motion.presenceDuration(.offstage(.minY, 80), entering: true, reduceMotion: false) == Motion.noticeIn)
+    }
+
+    /// The five roles every animation plays (DESIGN.md › Motion).
+    @Test func everyRoleHasItsPlaceAndPace() {
+        #expect(Motion.Role.allCases == [.feedback, .state, .present, .drawer, .large])
+        let feedback = Motion.Role.feedback.duration(entering: true, reduceMotion: false)
+        let state = Motion.Role.state.duration(reduceMotion: false)
+        let enter = Motion.Role.present.duration(entering: true, reduceMotion: false)
+        let exit = Motion.Role.present.duration(entering: false, reduceMotion: false)
+        let drawerIn = Motion.Role.drawer.duration(entering: true, reduceMotion: false)
+        let drawerOut = Motion.Role.drawer.duration(entering: false, reduceMotion: false)
+        let large = Motion.Role.large.duration(reduceMotion: false)
+        // Hover and press: about a tenth of a second; a small change a touch longer; panels longer again.
+        #expect(feedback >= 0.08 && feedback <= 0.12)
+        #expect(Motion.Role.feedback.duration(entering: false, reduceMotion: false) <= 0.12)
+        #expect(state >= 0.15 && state <= 0.18)
+        #expect(enter >= 0.18 && enter <= 0.2)
+        #expect(exit >= 0.12 && exit <= 0.15)
+        #expect(drawerIn == 0.26 && drawerOut == 0.2)
+        // Under 300ms, the ceiling for every role.
+        #expect(large >= 0.25 && large < 0.3)
+        for role in Motion.Role.allCases {
+            #expect(role.duration(entering: true, reduceMotion: false) <= large)
+            #expect(role.duration(entering: false, reduceMotion: false) <= large)
+        }
+        // What shows up leaves quicker than it came. (A press lets go a touch slower than it went down, to settle.)
+        #expect(exit < enter && drawerOut < drawerIn)
+        // One family of curves: the ease-out for what answers or appears, the drawer's for what travels.
+        #expect(Motion.Role.feedback.timing === Motion.easeOut)
+        #expect(Motion.Role.state.timing === Motion.easeOut)
+        #expect(Motion.Role.present.timing === Motion.easeOut)
+        #expect(Motion.Role.drawer.timing === Motion.drawer)
+        #expect(Motion.Role.large.timing === Motion.drawer)
+        // The names the app uses are the roles.
+        #expect(Motion.quick == feedback && Motion.pressIn == feedback)
+        #expect(Motion.selection == state && Motion.highlightGlide == state && Motion.hoverFade == state)
+        #expect(Motion.standard == drawerOut && Motion.zoom == large)
+        #expect(Motion.edgeSlide.duration == drawerIn && Motion.edgeTuck.duration == drawerOut)
+        #expect(Motion.spaceSwitch.duration == large && Motion.gentle.duration == large)
+        #expect(Motion.noticeIn == drawerIn && Motion.noticeOut == drawerOut)
+        // Nothing springs except a swipe let go mid-move.
+        for curve in [Motion.feedback, Motion.change, Motion.snappy, Motion.edgeSlide, Motion.edgeTuck, Motion.snap,
+                      Motion.spaceSwitch, Motion.gentle, Motion.entering, Motion.leaving, Motion.crossfading] {
+            #expect(curve.bounce == nil)
+        }
+        #expect(Motion.swipeSettle.bounce == 0)
+    }
+
+    @Test func reduceMotionMakesEveryRoleInstantOrACrossfade() {
+        #expect(Motion.crossfade > 0 && Motion.crossfade <= 0.15)
+        for role in Motion.Role.allCases {
+            for entering in [true, false] {
+                let reduced = role.duration(entering: entering, reduceMotion: true)
+                #expect(reduced == 0 || reduced == Motion.crossfade)
+            }
+        }
+        // A press doesn't move at all; whatever else showed movement only crossfades.
+        #expect(Motion.Role.feedback.duration(reduceMotion: true) == 0)
+        #expect(Motion.Role.drawer.duration(reduceMotion: true) == Motion.crossfade)
+        #expect(Motion.Role.large.duration(reduceMotion: true) == Motion.crossfade)
     }
 
     @Test func reduceMotionOnlyCrossfades() {

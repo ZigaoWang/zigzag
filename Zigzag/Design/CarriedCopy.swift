@@ -163,7 +163,7 @@ final class CarriedCopy {
         didSet {
             guard showsAlternate != oldValue, let alternate else { return }
             let target = frame(alternate: showsAlternate)
-            Tokens.Motion.animate(Tokens.Motion.slide, moves: true) {
+            Tokens.Motion.animate(Tokens.Motion.change, moves: true) {
                 self.card.animator().frame = target
                 alternate.animator().alphaValue = self.showsAlternate ? 1 : 0
                 self.picture.animator().alphaValue = self.showsAlternate ? 0 : 1
@@ -198,7 +198,7 @@ final class CarriedCopy {
         let card = card.frame
         let target = NSRect(x: rect.minX - card.minX, y: rect.minY - card.minY, width: panel.frame.width, height: panel.frame.height)
         view.alphaValue = 0
-        Tokens.Motion.animate(Tokens.Motion.slide, moves: true, {
+        Tokens.Motion.animate(Tokens.Motion.snappy, moves: true, {
             panel.animator().setFrame(target, display: true)
             panel.animator().alphaValue = 1
         }, completion: {

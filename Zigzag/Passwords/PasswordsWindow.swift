@@ -941,7 +941,7 @@ private final class DetailView: NSView, NSTextFieldDelegate {
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 0.35
         fade.toValue = 1
-        fade.duration = Tokens.Motion.standard
+        fade.duration = Tokens.Motion.state
         fade.timingFunction = Tokens.Motion.easeOut
         wantsLayer = true
         layer?.add(fade, forKey: "settle")

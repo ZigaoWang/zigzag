@@ -339,7 +339,7 @@ final class FavoritesView: NSView {
                 // A row gaining or losing a column: the tiles change width as they move, in the same stride.
                 NSAnimationContext.runAnimationGroup { context in
                     context.duration = Tokens.Motion.standard
-                    context.timingFunction = Tokens.Motion.easeInOut
+                    context.timingFunction = Tokens.Motion.drawer
                     tile.animator().frame = frame
                 }
             } else {

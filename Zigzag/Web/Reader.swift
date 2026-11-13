@@ -639,7 +639,7 @@ final class ReaderControls: NSView {
         guard shown != isShown, options.superview == nil else { return }
         isShown = shown
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = Tokens.Motion.quick * Tokens.Motion.debugSlowdown
+            ctx.duration = Tokens.Motion.state * Tokens.Motion.debugSlowdown
             ctx.timingFunction = Tokens.Motion.easeOut
             animator().alphaValue = shown ? 1 : 0
         }

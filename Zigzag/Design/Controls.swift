@@ -84,8 +84,8 @@ extension CALayer {
             animation.fromValue = presentation()?.backgroundColor ?? backgroundColor
             animation.toValue = color
             animation.duration = duration
-            // A color changing in place: the plain ease, not the arrival curve.
-            animation.timingFunction = CAMediaTimingFunction(name: .default)
+            // A color changing in place: a state change, on the house ease-out.
+            animation.timingFunction = Tokens.Motion.easeOut
             add(animation, forKey: "backgroundColor")
         }
         Tokens.Motion.withoutAnimation { backgroundColor = color }
@@ -111,7 +111,7 @@ class InteractiveView: NSView {
             if pressScales { showPress(isPressed) } else if pressSinks { showSink(isPressed) }
         }
     }
-    /// Buttons and rows give under the finger: `Tokens.Motion.pressScale` while held, springing back on release.
+    /// Buttons and rows give under the finger: `Tokens.Motion.pressScale` while held, easing back on release.
     var pressScales = false
     /// Things that read as objects sink a point instead and settle back with weight (`showSink`).
     var pressSinks = false
@@ -1005,7 +1005,7 @@ final class Toggle: InteractiveView {
             let move = CABasicAnimation(keyPath: "position.x")
             move.fromValue = knob.presentation()?.position.x ?? knob.position.x
             move.toValue = knobFrame.midX
-            move.duration = Tokens.Motion.pressSettle
+            move.duration = Tokens.Motion.state
             move.timingFunction = Tokens.Motion.easeOut
             knob.add(move, forKey: "move")
         }
@@ -1026,8 +1026,8 @@ final class Toggle: InteractiveView {
         let accent = Brand.Theme.for(self).accent
         let track = isOn ? (isPressed ? accent.withSystemEffect(.pressed) : isHovered ? accent.withSystemEffect(.rollover) : accent)
             : (isPressed ? S.trackPressed : isHovered ? S.trackHover : S.track)
-        layer?.set(backgroundColor: cgColor(track), animated: fading, duration: Tokens.Motion.standard)
-        knob.set(backgroundColor: cgColor(isOn ? S.knobOn : S.knob), animated: fading, duration: Tokens.Motion.standard)
+        layer?.set(backgroundColor: cgColor(track), animated: fading, duration: Tokens.Motion.state)
+        knob.set(backgroundColor: cgColor(isOn ? S.knobOn : S.knob), animated: fading, duration: Tokens.Motion.state)
         Tokens.Motion.withoutAnimation {
             layer?.borderColor = cgColor(isOn ? S.edgeOn : S.edge)
             recess.colors = [cgColor(S.recess), cgColor(NSColor.clear)]
@@ -1454,6 +1454,7 @@ final class MenuPanel: FloatingPanelView {
         guard let highlighted, rows.indices.contains(highlighted) else {
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = Tokens.Motion.quick
+                context.timingFunction = Tokens.Motion.easeOut
                 pill.animator().alphaValue = 0
             }
             return

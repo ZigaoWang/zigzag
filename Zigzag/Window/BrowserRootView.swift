@@ -428,7 +428,7 @@ final class BrowserRootView: SpaceFrameView {
                 cards[i].alphaValue = 0
                 cards[i].frame = target(i)
             }
-            Tokens.Motion.animate(Tokens.Motion.feedback, evenFromKeyboard: true) { moving.forEach { cards[$0].animator().alphaValue = 1 } }
+            Tokens.Motion.animate(Tokens.Motion.crossfading, evenFromKeyboard: true) { moving.forEach { cards[$0].animator().alphaValue = 1 } }
             needsLayout = true
             return
         }
@@ -1093,12 +1093,14 @@ final class BrowserRootView: SpaceFrameView {
         let targetSidebar = visible ? sidebarFrame
             : Self.mirrored(NSRect(x: -sidebarWidth, y: 0, width: sidebarWidth, height: bounds.height), in: bounds, if: sidebarOnRight)
         Tokens.Motion.withoutAnimation { sidebarContainer.frame = targetSidebar }
-        let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: oldSidebar.minX - targetSidebar.minX, curve: Tokens.Motion.slide, fromKeyboard: true)
+        // A drawer: out in `drawerIn`, back in `drawerOut`, on the drawer curve, the page and bar with it.
+        let curve = visible ? Tokens.Motion.edgeSlide : Tokens.Motion.edgeTuck
+        let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: oldSidebar.minX - targetSidebar.minX, curve: curve, fromKeyboard: true)
         if showsTopBar, duration > 0 {
             topBarSlideFrame = (topBarSlideFrame ?? oldBar).union(topBarFrame)
             placeTopBar()
         }
-        onSlide?(duration, Tokens.Motion.slide.timing)
+        onSlide?(duration, curve.timing)
         // Borderless: the corners square off as the page grows to the window's edges, and round again as it shrinks.
         // Beside the sidebar, borderless, the page rounds like the window's corner; floating, like a card.
         for pageCard in paneCards {
@@ -1108,8 +1110,8 @@ final class BrowserRootView: SpaceFrameView {
         }
         refreshGlassOcclusion()
         // The bar's controls and the page move as one: nothing in the bar jumps to its new place.
-        if topBarSlideFrame != nil { topBar.slideControls(from: oldControls, curve: Tokens.Motion.slide) }
-        Tokens.Motion.animate(Tokens.Motion.slide, evenFromKeyboard: true, moves: true, {
+        if topBarSlideFrame != nil { topBar.slideControls(from: oldControls, curve: curve) }
+        Tokens.Motion.animate(curve, evenFromKeyboard: true, moves: true, {
             if self.topBarSlideFrame == nil, self.showsTopBar { self.topBar.animator().frame = self.topBarFrame }
             let frames = self.tileFrames
             self.card.animator().frame = self.cardViewFrame(frames[0])

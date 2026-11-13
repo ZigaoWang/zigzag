@@ -128,7 +128,7 @@ class GlassTile: InteractiveView {
 
 extension NSView {
     /// The tactile press, shared by every button and row (`InteractiveView.pressScales`): down to
-    /// `Motion.pressScale` around its middle as it's pressed, eased out at once, and a critically damped spring back
+    /// `Motion.pressScale` around its middle as it's pressed, eased out at once, and eased back over `Motion.pressSettle`
     /// when let go, from wherever it is, so quick taps never queue or jump. Nothing waits on it. Not with Reduce Motion,
     /// and not for a press from the keyboard, where the darker fill says it.
     func showPress(_ pressed: Bool) {
@@ -144,7 +144,7 @@ extension NSView {
             animation.duration = Tokens.Motion.pressIn
             animation.timingFunction = Tokens.Motion.easeOut
         } else {
-            animation = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.pressOut)
+            animation = Tokens.Motion.easeAnimation(keyPath: "transform", duration: Tokens.Motion.pressSettle)
         }
         animation.fromValue = NSValue(caTransform3D: shown)
         animation.toValue = NSValue(caTransform3D: target)

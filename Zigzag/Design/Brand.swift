@@ -285,9 +285,9 @@ enum Brand {
 
     // MARK: Motion
 
-    static let drawDuration: CFTimeInterval = 0.7
+    static let drawDuration: CFTimeInterval = Tokens.Motion.Ambient.draw
 
-    /// The one entrance: a fade while rising 8pt, on a critically damped spring (no bounce), each view a beat after
+    /// The one entrance: a fade while rising 8pt, in `Motion.enter` on the house ease-out, each view a beat after
     /// the last. Used for everything that arrives; the ribbon's writing is the only other motion.
     @MainActor static func enter(_ views: [NSView], delay: CFTimeInterval = 0, stagger: CFTimeInterval = 0.04) {
         let now = CACurrentMediaTime()
@@ -298,20 +298,16 @@ enum Brand {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1
-            fade.duration = Tokens.Motion.standard
+            fade.duration = Tokens.Motion.Role.present.duration()
             fade.beginTime = begin
             fade.fillMode = .backwards
             fade.timingFunction = Tokens.Motion.easeOut
             layer.add(fade, forKey: "enter.fade")
             // With Reduce Motion, it only fades in, in place.
             guard !Tokens.Motion.reduceMotion else { continue }
-            let rise = CASpringAnimation(keyPath: "transform.translation.y")
-            rise.mass = 1
-            rise.stiffness = 300
-            rise.damping = 2 * sqrt(300)   // critically damped: settles without overshoot
+            let rise = Tokens.Motion.easeAnimation(keyPath: "transform.translation.y", duration: Tokens.Motion.enter)
             rise.fromValue = view.isFlipped || view.superview?.isFlipped == true ? 8 : -8
             rise.toValue = 0
-            rise.duration = rise.settlingDuration
             rise.beginTime = begin
             rise.fillMode = .backwards
             layer.add(rise, forKey: "enter.rise")
@@ -411,7 +407,7 @@ class RibbonView: NSView {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1
-            fade.duration = Tokens.Motion.standard
+            fade.duration = Tokens.Motion.crossfade
             fade.beginTime = CACurrentMediaTime() + delay
             fade.fillMode = .backwards
             stroke.add(fade, forKey: "fade")
@@ -503,7 +499,7 @@ class RibbonView: NSView {
             let breathe = CABasicAnimation(keyPath: "opacity")
             breathe.fromValue = 1
             breathe.toValue = 0.45
-            breathe.duration = 0.9
+            breathe.duration = Tokens.Motion.Ambient.breathe
             breathe.autoreverses = true
             breathe.repeatCount = .infinity
             breathe.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
@@ -511,7 +507,7 @@ class RibbonView: NSView {
             return
         }
         Tokens.Motion.withoutAnimation { stroke.path = loopPath }
-        let cycle: CFTimeInterval = 1.1, length: CGFloat = 0.2
+        let cycle: CFTimeInterval = Tokens.Motion.Ambient.markCycle, length: CGFloat = 0.2
         let start = CABasicAnimation(keyPath: "strokeStart")
         start.fromValue = 0
         start.toValue = 0.5
@@ -791,13 +787,13 @@ final class WordmarkView: NSView {
     }
 
     /// Draws each stroke in, one after another, like a pen.
-    func drawIn(delay: CFTimeInterval = 0, total: CFTimeInterval = 1.1) {
+    func drawIn(delay: CFTimeInterval = 0, total: CFTimeInterval = Tokens.Motion.Ambient.wordmark) {
         layoutSubtreeIfNeeded()
         if Tokens.Motion.reduceMotion {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1
-            fade.duration = Tokens.Motion.standard
+            fade.duration = Tokens.Motion.crossfade
             fade.beginTime = CACurrentMediaTime() + delay
             fade.fillMode = .backwards
             layer?.add(fade, forKey: "fade")

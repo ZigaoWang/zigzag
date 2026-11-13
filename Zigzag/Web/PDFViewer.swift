@@ -153,7 +153,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         pageChanged()
         bar.isHidden = false
         needsLayout = true
-        Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true, moves: true) {
+        Tokens.Motion.animate(Tokens.Motion.Curve(duration: Tokens.Motion.large), evenFromKeyboard: true) {
             self.pdfView.animator().alphaValue = 1
         }
         bar.present(arrival: .pop)
@@ -250,7 +250,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         origin.y = min(max(origin.y, 0), maxY)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Tokens.Motion.snappy.duration
-            context.timingFunction = Tokens.Motion.easeInOut
+            context.timingFunction = Tokens.Motion.drawer
             clip.animator().setBoundsOrigin(origin)
         } completionHandler: { [weak self, weak clip] in
             MainActor.assumeIsolated {
@@ -323,7 +323,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         still.imageScaling = .scaleAxesIndependently
         addSubview(still, positioned: .above, relativeTo: pdfView)
         applyDarkPages()
-        Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { still.animator().alphaValue = 0 }, completion: { still.removeFromSuperview() })
+        Tokens.Motion.animate(Tokens.Motion.change, evenFromKeyboard: true, { still.animator().alphaValue = 0 }, completion: { still.removeFromSuperview() })
     }
 
     private static func around(dark: Bool) -> NSColor { dark ? Tokens.Color.pdfBackdropDarkPages : backdrop }
