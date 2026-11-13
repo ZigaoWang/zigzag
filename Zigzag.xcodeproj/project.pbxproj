@@ -250,6 +250,7 @@
 		91501632F628CC18660775E6 /* SecurityFixesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7890881D589D032D70E5DC20 /* SecurityFixesTests.swift */; };
 		915210234137A2CB955111A1 /* SiteData.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECEDC8885535F130965981A /* SiteData.swift */; };
 		91EDEB840F22A412835B1285 /* CookieBannersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076B80EC64306C6D0238E92E /* CookieBannersTests.swift */; };
+		923E3B7453B7A3BF2790936D /* PanelClickTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3273E02DCE98574C60A14B72 /* PanelClickTests.swift */; };
 		92E095E45C00B0891F8EBF6B /* ConfirmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD3351437EE20BC819F95CD /* ConfirmSheet.swift */; };
 		93F7D9887CC5E8E2800B8E67 /* orion-extensions.plist in Resources */ = {isa = PBXBuildFile; fileRef = 9B8A46E0AC7442B76186A940 /* orion-extensions.plist */; };
 		94ADB66CC737D1DA231E3D74 /* ads.html in Resources */ = {isa = PBXBuildFile; fileRef = 016FF1BFB8B47B23AE450117 /* ads.html */; };
@@ -581,6 +582,7 @@
 		30417C99681AAC2507555F94 /* ExtensionReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionReport.swift; sourceTree = "<group>"; };
 		316205FDAE606ECFE3682BA1 /* NumberHints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumberHints.swift; sourceTree = "<group>"; };
 		32289A47E7257A31AC82FCB0 /* Controls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Controls.swift; sourceTree = "<group>"; };
+		3273E02DCE98574C60A14B72 /* PanelClickTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelClickTests.swift; sourceTree = "<group>"; };
 		32D47467F8351F9270BAE20A /* SidebarRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarRows.swift; sourceTree = "<group>"; };
 		332AF8C9FDBEACF03ABEAA6B /* HostText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostText.swift; sourceTree = "<group>"; };
 		33E069B32844853E9DBACB51 /* PageFind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageFind.swift; sourceTree = "<group>"; };
@@ -1509,6 +1511,7 @@
 				64E2770A3BA856F78FB2CCFD /* PageWindowFrameTests.swift */,
 				62D48A2834BA10B13F89CC47 /* PaneFocusTests.swift */,
 				C1A5DAD33DF3076DABEC1B08 /* PaneHeaderTests.swift */,
+				3273E02DCE98574C60A14B72 /* PanelClickTests.swift */,
 				EC0CE69695B808069A887E8D /* PaneMoveTests.swift */,
 				48773DEB7199082B9EDA7805 /* PaneSiteControlsTests.swift */,
 				C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */,
@@ -2225,6 +2228,7 @@
 				817A7D3D01285ED4BD6BA651 /* PaneHeaderTests.swift in Sources */,
 				F428675EDF7E08FC94B923B0 /* PaneMoveTests.swift in Sources */,
 				9BB31B25E3F5A6DCF01CF154 /* PaneSiteControlsTests.swift in Sources */,
+				923E3B7453B7A3BF2790936D /* PanelClickTests.swift in Sources */,
 				44ECB58B498642EB6DB3648B /* PasswordGeneratorTests.swift in Sources */,
 				C8C7123A186337D2903807F1 /* PasswordHealthTests.swift in Sources */,
 				73BEB8BF61DB6AA3E32A3ACB /* PasswordMenuTests.swift in Sources */,

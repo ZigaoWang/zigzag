@@ -1908,8 +1908,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func sidebarContains(_ event: NSEvent) -> Bool {
         let container = root.sidebarContainer
-        guard root.sidebarVisible || root.isSidebarFloatingVisible else { return false }
-        return container.bounds.contains(container.convert(event.locationInWindow, from: nil))
+        guard root.sidebarVisible || root.isSidebarFloatingVisible,
+              container.bounds.contains(container.convert(event.locationInWindow, from: nil)) else { return false }
+        // Only where the sidebar is what's under the pointer: a panel over it (Site Controls, a menu) keeps its own
+        // scrolls, which would otherwise switch spaces behind it (#216).
+        return Self.isInSidebar(root.hitTest(root.superview.map { $0.convert(event.locationInWindow, from: nil) } ?? event.locationInWindow), container)
+    }
+
+    /// Whether the view a point hits is the sidebar's, not something floating over it.
+    static func isInSidebar(_ hit: NSView?, _ container: NSView) -> Bool {
+        hit?.isDescendant(of: container) ?? false
     }
 
     /// Closes the peek, which floats above the page, so ⌘W puts it away before the tab. Find belongs to the tab and

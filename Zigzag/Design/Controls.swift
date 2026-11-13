@@ -192,11 +192,25 @@ class InteractiveView: NSView {
             let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
             // With the button held, something is being dragged: rows sliding under it aren't hovered.
             let inside = bounds.contains(point) && !isHiddenOrHasHiddenAncestor && NSEvent.pressedMouseButtons == 0
+                && !isCoveredByPanel(at: window.mouseLocationOutsideOfEventStream)
             if inside != isHovered { isHovered = inside }
         }
     }
 
-    override func mouseEntered(with event: NSEvent) { isHovered = true }
+    /// Whether a floating panel this control isn't part of is what's under the pointer: tracking areas fire through
+    /// it, so a tab row under Site Controls would otherwise light up as if the pointer were on it (#216).
+    private func isCoveredByPanel(at windowPoint: NSPoint) -> Bool {
+        guard let frame = window?.contentView?.superview else { return false }
+        var view = frame.hitTest(frame.convert(windowPoint, from: nil))
+        while let current = view {
+            if current === self { return false }
+            if current is FloatingPanelView { return !isDescendant(of: current) }
+            view = current.superview
+        }
+        return false
+    }
+
+    override func mouseEntered(with event: NSEvent) { isHovered = !isCoveredByPanel(at: event.locationInWindow) }
     override func mouseExited(with event: NSEvent) { isHovered = false; if !dragging { isPressed = false } }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }

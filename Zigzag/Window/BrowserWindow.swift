@@ -164,7 +164,17 @@ final class BrowserWindow: NSWindow {
         if movesWindow(for: event) { return }
         if event.type == .scrollWheel, pdfView(at: event.locationInWindow)?.takesSwipe(event) == true { return }
         if routeTitlebarEvent(event) { return }
+        if swallowsPanelPress(event) { return }
         super.sendEvent(event)
+    }
+
+    /// A press on a floating panel's own surface (a gap between its rows, a label, its corner) stays the panel's: the
+    /// window is movable by its background, so AppKit would otherwise take it as a drag of the window or a double-click
+    /// on the title bar, and nothing behind the panel ever hears it (#216).
+    private func swallowsPanelPress(_ event: NSEvent) -> Bool {
+        guard [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(event.type), let content = contentView,
+              let frame = content.superview else { return false }
+        return FloatingPanelView.isBareSurface(frame.hitTest(frame.convert(event.locationInWindow, from: nil)))
     }
 
     // MARK: Moving the window from the page

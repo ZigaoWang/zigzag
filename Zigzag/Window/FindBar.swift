@@ -431,6 +431,25 @@ class FloatingPanelView: NSView {
     }
 
     override var isFlipped: Bool { true }
+    /// A panel is never a handle for the window (#216).
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    /// Whether a view a press landed on is a panel's own surface rather than one of its controls: a gap, a label, a
+    /// box of rows. Only the panel takes such a press; it never moves the window or reaches what's behind (#216).
+    static func isBareSurface(_ hit: NSView?) -> Bool {
+        var view = hit
+        while let current = view {
+            if current is FloatingPanelView { return true }
+            // Anything that handles the pointer itself says so by not moving the window, as our controls do.
+            // Words that are only words (a label) are surface; a field you can type in or select from isn't.
+            if let field = current as? NSTextField {
+                if field.isEditable || field.isSelectable { return false }
+            } else if !current.mouseDownCanMoveWindow || current is NSControl || current is NSText || current is NSScroller
+                        || current is WKWebView { return false }
+            view = current.superview
+        }
+        return false
+    }
 
     /// Content goes in the surface so it is clipped to the rounded shape.
     override func addSubview(_ view: NSView) {
