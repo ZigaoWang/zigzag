@@ -520,6 +520,11 @@ enum DebugBridge {
             return
         }
         if name.hasPrefix("popupwin") { popupWindow(name, arg); return }
+        // Each command is a step of its own for ⌘Z, as a click or a key is: AppKit closes the undo manager's group
+        // once an event has been handled, and with no event between them one command's group would take in the
+        // next's, so ⌘Z would take back both. An event of our own after it closes it.
+        if let event = NSEvent.otherEvent(with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                                          context: nil, subtype: 0, data1: 0, data2: 0) { NSApp.postEvent(event, atStart: false) }
         NSApp.activate()
         controller.window?.makeKeyAndOrderFront(nil)
         switch name {
@@ -1207,7 +1212,7 @@ enum DebugBridge {
             func pinned(_ ids: [UUID]) -> [String] {
                 var out: [String] = [], seen = Set<UUID>()
                 for id in ids where !seen.contains(id) {
-                    let both = Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id]
+                    let both = Library.shared.pinnedSplit(containing: id).map(\.ids) ?? [id]
                     both.forEach { seen.insert($0) }
                     out.append(both.compactMap { Library.shared.bookmark($0)?.title }.joined(separator: "|"))
                 }
@@ -2079,6 +2084,7 @@ enum DebugBridge {
                 debugLog("pip => \(result)")
             }
         case "undo":
+            debugLog("undo \(controller.sidebarUndo.undoActionName) groups=\(controller.sidebarUndo.groupingLevel)")
             controller.sidebarUndo.undo()
             debugLog("after undo selected=\(controller.tabManager.selectedTab?.url?.absoluteString ?? "nil")")
         case "menutitles":
@@ -2280,6 +2286,48 @@ enum DebugBridge {
             if let favorite = Library.shared.favorites.first(where: { $0.title == arg }) { controller.tabManager.openBookmark(favorite) }
         case "favorite":
             if let tab = controller.tabManager.selectedTab { controller.tabManager.favoriteTab(tab) }
+        case "pinsel":
+            // pinsel [n]: the tab you're on dropped among the pinned tabs at place n (none: the end), as a drag there
+            // does, undoably; a split's or tile group's row pins all its pages (#203).
+            if let tab = controller.tabManager.selectedTab { controller.listBookmark(tab, at: Int(arg) ?? Int.max, in: controller.tabManager.currentSpaceID) }
+        case "favsel":
+            // favsel [n]: the tab you're on dropped on the favorites at tile n (none: the end), undoably.
+            if let tab = controller.tabManager.selectedTab { controller.favoriteWithUndo(tab, at: Int(arg)) }
+        case "unpinnamed":
+            // unpinnamed <title>: that pinned page (or favorite) dropped among the tabs at the top, undoably.
+            if let id = (Library.shared.spaces.flatMap(\.bookmarks) + Library.shared.favorites).first(where: { $0.title.contains(arg) })?.id {
+                if Library.shared.isFavorite(id) { controller.unfavoriteWithUndo(id, to: 0) } else { controller.listUnbookmark(id, to: 0) }
+            }
+        case "openpinnamed":
+            // openpinnamed <title>: that pinned page or favorite opened, as a click on it does.
+            if let mark = (Library.shared.spaces.flatMap(\.bookmarks) + Library.shared.favorites).first(where: { $0.title.contains(arg) }) {
+                controller.tabManager.openBookmark(mark)
+            }
+        case "folderpinnamed":
+            // folderpinnamed <title>: that pinned page (with its split or group) into the space's first folder, undoably.
+            if let id = Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).first(where: { $0.title.contains(arg) })?.id,
+               let folder = Library.shared.folders(in: controller.tabManager.currentSpaceID).first {
+                controller.listSetFolder(of: id, to: folder.id)
+            }
+            let space = controller.tabManager.currentSpaceID
+            debugLog("pinstate folders=\(Library.shared.folders(in: space).map { "\($0.name) \($0.bookmarkIDs.compactMap { Library.shared.bookmark($0)?.title })" }) list=\(Library.shared.bookmarks(in: space).map(\.title))")
+        case "capture":
+            // capture <path>: this window as it shows on screen, web pages and all, by its own window number (so never
+            // another app's or another copy's window), as a PNG.
+            guard let number = controller.window?.windowNumber else { break }
+            let shot = Process()
+            shot.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+            shot.arguments = ["-x", "-o", "-l", "\(number)", arg]
+            try? shot.run()
+        case "pinstate":
+            // pinstate: the pinned splits and favorite splits, with their pages' names and places, in the debug log.
+            func names(_ split: PinnedSplit) -> String {
+                split.ids.map { Library.shared.bookmark($0)?.title.prefix(12).description ?? "?" }.joined(separator: "|") + " regions=\(split.regions?.map(\.rawValue) ?? [])"
+            }
+            let pinned = Library.shared.pinnedSplits(in: controller.tabManager.currentSpaceID).map(names)
+            let favorites = Library.shared.favoriteSplits.map(names)
+            let splits = controller.tabManager.splits.map { pair in pair.ids.compactMap { controller.tabManager.tab(with: $0)?.displayTitle.prefix(12).description }.joined(separator: "|") + " \(pair.shape.regions.map(\.rawValue))" }
+            debugLog("pinstate pinned=\(pinned) favorites=\(favorites) onscreen=\(splits) tabs=\(controller.tabManager.currentTabs.map { $0.displayTitle.prefix(12) })")
         case "pagecorner":
             if let r = Double(arg) { PageCardView.attachedRadius = r; controller.root.paneCards.forEach { $0.needsLayout = true } }
         case "spacedepth":

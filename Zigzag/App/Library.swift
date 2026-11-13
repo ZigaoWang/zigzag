@@ -70,23 +70,102 @@ extension Array where Element == BookmarkFolder {
     }
 }
 
-/// Two pinned pages that open side by side, as the split view they were pinned from. Its pages stay in the space's
-/// own list, the right one just after the left, in the same folder.
-struct PinnedSplit: Codable {
+/// Pinned pages that open side by side, as the split view or tile group (#160, #203) they were pinned from: two
+/// halves, or three or four pages in their places. Its pages stay in the space's own list in its order (the group's
+/// reading order), one right after another, in the same folder; its first page's row (or tile) carries the rest.
+nonisolated struct PinnedSplit: Codable, Sendable {
     var left: UUID
     var right: UUID
-    /// Share of the width (or height, when vertical) the left page gets.
+    /// Share of the width (or height, when vertical) the left page gets. In a group of more, the share of the width
+    /// left of the line between the columns.
     var ratio = 0.5
     /// Stacked top and bottom instead of side by side.
     var vertical = false
+    /// A tile group's third and fourth pages.
+    var more: [UUID] = []
+    /// Where each page of a group of more than two sits, in `ids` order; nil for two, whose halves `vertical` says.
+    var regions: [TileRegion]? = nil
+    /// The other line's share: in a group of more, of the height above the line between the rows.
+    var otherRatio = 0.5
 
-    func contains(_ id: UUID) -> Bool { left == id || right == id }
+    init(left: UUID, right: UUID) {
+        self.left = left
+        self.right = right
+    }
+
+    /// Pages `ids` (in `pair`'s order) laid out as `pair` lays out its own; nil when the two don't match.
+    init?(_ ids: [UUID], as pair: TabManager.SplitPair) {
+        guard ids.count == pair.more.count + 2, Set(ids).count == ids.count else { return nil }
+        left = ids[0]
+        right = ids[1]
+        more = Array(ids.dropFirst(2))
+        ratio = pair.ratio
+        vertical = pair.vertical
+        regions = more.isEmpty ? nil : pair.regions
+        otherRatio = pair.otherRatio
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        left = try c.decode(UUID.self, forKey: .left)
+        right = try c.decode(UUID.self, forKey: .right)
+        ratio = try c.decodeIfPresent(Double.self, forKey: .ratio) ?? 0.5
+        vertical = try c.decodeIfPresent(Bool.self, forKey: .vertical) ?? false
+        otherRatio = (try? c.decodeIfPresent(Double.self, forKey: .otherRatio)) ?? 0.5
+        // A group whose pages or places don't add up opens as the split of its first two.
+        let more = ((try? c.decodeIfPresent([UUID].self, forKey: .more)) ?? nil) ?? []
+        let regions = (try? c.decodeIfPresent([TileRegion].self, forKey: .regions)) ?? nil
+        if !more.isEmpty, let regions, regions.count == more.count + 2, TileShape.isValid(regions),
+           Set([left, right] + more).count == more.count + 2 {
+            self.more = more
+            self.regions = regions
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(left, forKey: .left)
+        try c.encode(right, forKey: .right)
+        try c.encode(ratio, forKey: .ratio)
+        try c.encode(vertical, forKey: .vertical)
+        // Two pages are written as they always were.
+        if isGroup {
+            try c.encode(more, forKey: .more)
+            try c.encode(regions, forKey: .regions)
+            try c.encode(otherRatio, forKey: .otherRatio)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey { case left, right, ratio, vertical, more, regions, otherRatio }
+
+    /// Its pages, in order.
+    var ids: [UUID] { [left, right] + more }
+    /// The pages that ride in the first one's row or tile.
+    var riders: ArraySlice<UUID> { ids.dropFirst() }
+    /// Three or four pages, not a split of two.
+    var isGroup: Bool { !more.isEmpty }
+    func contains(_ id: UUID) -> Bool { left == id || right == id || more.contains(id) }
+
+    /// How it opens: tabs `tabIDs` (one for each of its pages, in its order) side by side as it was laid out.
+    func pair(of tabIDs: [UUID]) -> TabManager.SplitPair? {
+        guard tabIDs.count == ids.count, Set(tabIDs).count == tabIDs.count else { return nil }
+        var pair = TabManager.SplitPair(left: tabIDs[0], right: tabIDs[1])
+        pair.ratio = ratio
+        pair.vertical = vertical
+        pair.otherRatio = otherRatio
+        if isGroup {
+            guard let regions, regions.count == tabIDs.count, TileShape.isValid(regions) else { return nil }
+            pair.more = Array(tabIDs.dropFirst(2))
+            pair.regions = regions
+        }
+        return pair
+    }
 }
 
-/// The same pinned split pairs the same pages in the same order. Its size and direction are left out, so resizing it
+/// The same pinned split keeps the same pages in the same order. Its size and direction are left out, so resizing it
 /// doesn't count as changing the library, and ⌘Z for what came before still works.
 extension PinnedSplit: Equatable {
-    static func == (a: PinnedSplit, b: PinnedSplit) -> Bool { a.left == b.left && a.right == b.right }
+    static func == (a: PinnedSplit, b: PinnedSplit) -> Bool { a.ids == b.ids }
 }
 
 struct SpaceInfo: Codable, Identifiable, Equatable {
@@ -726,13 +805,14 @@ final class Library {
 
     func profileID(ofFavorite id: UUID) -> UUID { directory.profileID(ofFavorite: id) }
 
-    /// A profile's favorites as the grid shows them: one tile each, a split's two pages in one (its left page leads).
-    func favoriteTiles(in profile: UUID) -> [(Bookmark, partner: Bookmark?)] {
+    /// A profile's favorites as the grid shows them: one tile each, a split's or tile group's pages in one (its first
+    /// page leads, the others its `partners`, in order).
+    func favoriteTiles(in profile: UUID) -> [(Bookmark, partners: [Bookmark])] {
         let favorites = favorites(in: profile)
-        let rights = Set(favoriteSplits.map(\.right))
+        let riders = Set(favoriteSplits.flatMap(\.riders))
         let byID = Dictionary(favorites.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        return favorites.filter { !rights.contains($0.id) }.map { favorite in
-            (favorite, favoriteSplits.first { $0.left == favorite.id }.flatMap { byID[$0.right] })
+        return favorites.filter { !riders.contains($0.id) }.map { favorite in
+            (favorite, favoriteSplits.first { $0.left == favorite.id }.map { $0.riders.compactMap { byID[$0] } } ?? [])
         }
     }
 
@@ -745,14 +825,14 @@ final class Library {
         return favorite
     }
 
-    /// Two pages as one favorite, side by side, at a tile's place.
-    func addFavoriteSplit(_ left: Bookmark, _ right: Bookmark, at slot: Int? = nil, ratio: Double = 0.5, vertical: Bool = false, in profile: UUID) {
-        favoriteSplits.removeAll { $0.contains(left.id) || $0.contains(right.id) }
-        arrangeFavorites(Self.placing([left.id, right.id], atSlot: slot, in: favorites(in: profile).map(\.id), splits: favoriteSplits), adding: [left, right], in: profile)
-        var split = PinnedSplit(left: left.id, right: right.id)
-        split.ratio = ratio
-        split.vertical = vertical
-        favoriteSplits.append(split)
+    /// A split's two pages, or a tile group's three or four, as one favorite at a tile's place, laid out as `layout`
+    /// (whose pages are `marks`, in order).
+    func addFavoriteSplit(_ marks: [Bookmark], as layout: PinnedSplit, at slot: Int? = nil, in profile: UUID) {
+        let ids = marks.map(\.id)
+        guard ids == layout.ids else { return }
+        favoriteSplits.removeAll { split in ids.contains(where: split.contains) }
+        arrangeFavorites(Self.placing(ids, atSlot: slot, in: favorites(in: profile).map(\.id), splits: favoriteSplits), adding: marks, in: profile)
+        favoriteSplits.append(layout)
         tidyFavorites()
         commit()
     }
@@ -773,7 +853,7 @@ final class Library {
     /// Moves a favorite (and its split's other page with it) to a tile's place.
     func moveFavorite(_ id: UUID, to slot: Int) {
         guard isFavorite(id) else { return }
-        let ids = favoriteSplits.first { $0.contains(id) }.map { [$0.left, $0.right] } ?? [id]
+        let ids = favoriteSplits.first { $0.contains(id) }.map(\.ids) ?? [id]
         let profile = profileID(ofFavorite: id)
         arrangeFavorites(Self.placing(ids, atSlot: slot, in: favorites(in: profile).map(\.id), splits: favoriteSplits), in: profile)
         commit()
@@ -795,9 +875,9 @@ final class Library {
     }
 
     /// The favorites' ids with `moving` (one tile's pages) put before the tile at `slot` among the rest, or after the
-    /// last (nil, or past the end). A split's right page doesn't count as a tile of its own.
+    /// last (nil, or past the end). A split's pages but its first don't count as tiles of their own.
     nonisolated static func placing(_ moving: [UUID], atSlot slot: Int?, in ids: [UUID], splits: [PinnedSplit]) -> [UUID] {
-        let rights = Set(splits.map(\.right))
+        let rights = Set(splits.flatMap(\.riders))
         var rest = ids.filter { !moving.contains($0) }
         let tiles = rest.filter { !rights.contains($0) }
         let at = slot.flatMap { $0 >= 0 && $0 < tiles.count ? rest.firstIndex(of: tiles[$0]) : nil } ?? rest.count
@@ -814,17 +894,17 @@ final class Library {
     }
 
     /// Turns a space bookmark into a favorite at a tile's place (nil: the end), keeping its id (and so its live page).
-    /// Half of a pinned split brings the other half: they stay one split, now a favorite.
+    /// A page of a pinned split or group brings the rest: they stay one split, now a favorite.
     func makeFavorite(_ bookmarkID: UUID, at slot: Int? = nil, in profile: UUID) {
         guard let bookmark = bookmark(bookmarkID), !isFavorite(bookmarkID) else { return }
-        if let pinned = pinnedSplit(containing: bookmarkID), let left = self.bookmark(pinned.left), let right = self.bookmark(pinned.right) {
+        if let pinned = pinnedSplit(containing: bookmarkID), case let marks = pinned.ids.compactMap(self.bookmark), marks.count == pinned.ids.count {
             for s in spaces.indices {
                 spaces[s].bookmarks.removeAll { pinned.contains($0.id) }
                 spaces[s].pinnedSplits?.removeAll { $0.contains(bookmarkID) }
                 if spaces[s].pinnedSplits?.isEmpty == true { spaces[s].pinnedSplits = nil }
                 tidyFolders(s)
             }
-            arrangeFavorites(Self.placing([left.id, right.id], atSlot: slot, in: favorites(in: profile).map(\.id), splits: favoriteSplits), adding: [left, right], in: profile)
+            arrangeFavorites(Self.placing(pinned.ids, atSlot: slot, in: favorites(in: profile).map(\.id), splits: favoriteSplits), adding: marks, in: profile)
             favoriteSplits.append(pinned)
             tidyFavorites()
             commit()
@@ -840,7 +920,7 @@ final class Library {
     func pinFavorite(_ id: UUID, in spaceID: UUID, at index: Int) {
         guard let s = self.index(of: spaceID) else { return }
         let pair = favoriteSplits.first { $0.contains(id) }
-        let ids = pair.map { [$0.left, $0.right] } ?? [id]
+        let ids = pair.map(\.ids) ?? [id]
         let moving = favorites.filter { ids.contains($0.id) }
         guard !moving.isEmpty else { return }
         favorites.removeAll { ids.contains($0.id) }
@@ -859,29 +939,32 @@ final class Library {
         return bookmark
     }
 
-    /// Each favorite split keeps two different favorites, in no other split, its right page just after its left.
+    /// Each favorite split keeps different favorites, in no other split, each of its pages just after the one before.
     private func tidyFavorites() {
         (favorites, favoriteSplits) = Self.tidied(favorites, splits: favoriteSplits, directory: directory)
     }
 
-    /// The favorites and their pairs as they may be kept: each pair two different favorites of one profile, in no
-    /// other pair, its right page just after its left. An older Zigzag, which shows every profile's favorites
+    /// The favorites and their splits as they may be kept: each split different favorites of one profile, in no
+    /// other split, each page just after the one before it. An older Zigzag, which shows every profile's favorites
     /// together, can pair two that aren't one profile's; half of such a pair would show in neither, so it's undone.
     nonisolated static func tidied(_ favorites: [Bookmark], splits: [PinnedSplit], directory: ProfileDirectory) -> ([Bookmark], [PinnedSplit]) {
         var favorites = favorites
         let ids = Set(favorites.map(\.id))
         var paired: Set<UUID> = []
         let splits = splits.filter { split in
-            guard split.left != split.right, ids.contains(split.left), ids.contains(split.right),
-                  directory.profileID(ofFavorite: split.left) == directory.profileID(ofFavorite: split.right),
-                  !paired.contains(split.left), !paired.contains(split.right) else { return false }
-            paired.formUnion([split.left, split.right])
+            let pages = split.ids
+            guard Set(pages).count == pages.count, pages.allSatisfy(ids.contains),
+                  Set(pages.map { directory.profileID(ofFavorite: $0) }).count == 1,
+                  paired.isDisjoint(with: pages) else { return false }
+            paired.formUnion(pages)
             return true
         }
         for split in splits {
-            guard let from = favorites.firstIndex(where: { $0.id == split.right }) else { continue }
-            let right = favorites.remove(at: from)
-            favorites.insert(right, at: (favorites.firstIndex { $0.id == split.left } ?? favorites.count - 1) + 1)
+            for (previous, id) in zip(split.ids, split.riders) {
+                guard let from = favorites.firstIndex(where: { $0.id == id }) else { continue }
+                let page = favorites.remove(at: from)
+                favorites.insert(page, at: (favorites.firstIndex { $0.id == previous } ?? favorites.count - 1) + 1)
+            }
         }
         return (favorites, splits)
     }
@@ -1018,7 +1101,7 @@ final class Library {
         guard bookmark(id) != nil, let target = self.index(of: spaceID) else { return }
         let from = self.spaceID(ofBookmark: id)
         let pinned = pinnedSplit(containing: id)
-        let ids = pinned.map { [$0.left, $0.right] } ?? [id]
+        let ids = pinned.map(\.ids) ?? [id]
         let moving = ids.compactMap(bookmark)
         for s in spaces.indices { spaces[s].bookmarks.removeAll { ids.contains($0.id) } }
         let at = max(0, min(index, spaces[target].bookmarks.count))
@@ -1216,7 +1299,7 @@ final class Library {
         }
         var group: [UUID: UUID] = [:]
         for folder in folders { let r = root(folder.id); for id in folder.bookmarkIDs { group[id] = r } }
-        for split in splits where group[split.left] == nil { group[split.left] = split.left; group[split.right] = split.left }
+        for split in splits where group[split.left] == nil { for id in split.ids { group[id] = split.left } }
         let at = max(0, min(index, ids.count))
         guard at > 0, at < ids.count, let g = group[ids[at - 1]], group[ids[at]] == g else { return at }
         var start = at, end = at
@@ -1227,7 +1310,7 @@ final class Library {
 
     /// Puts a pinned page in a folder of its space (at the end of it), or takes it out of any folder (nil).
     func setFolder(of bookmarkID: UUID, to folderID: UUID?) {
-        // A pinned split goes in as one: its left page leads, and its right one follows it there.
+        // A pinned split goes in as one: its first page leads, and the rest follow it there.
         let bookmarkID = pinnedSplit(containing: bookmarkID)?.left ?? bookmarkID
         guard let s = spaces.firstIndex(where: { $0.bookmarks.contains { $0.id == bookmarkID } }) else { return }
         for f in (spaces[s].folders ?? []).indices { spaces[s].folders?[f].bookmarkIDs.removeAll { $0 == bookmarkID } }
@@ -1275,27 +1358,29 @@ final class Library {
         spaces[s].pinnedSplits = tidy.splits.isEmpty ? nil : tidy.splits
     }
 
-    /// The rule behind pinned splits, on its own so it can be checked: a split keeps two different pages that are in
-    /// the list and in no other split, and its right page sits just after its left one, in the same folder.
+    /// The rule behind pinned splits, on its own so it can be checked: a split keeps different pages that are in the
+    /// list and in no other split, each just after the one before it (its first page leads), in the same folder.
     nonisolated static func tidied(_ bookmarks: [Bookmark], _ folders: [BookmarkFolder], _ splits: [PinnedSplit])
         -> (bookmarks: [Bookmark], folders: [BookmarkFolder], splits: [PinnedSplit]) {
         let ids = Set(bookmarks.map(\.id))
         var paired: Set<UUID> = []
         let kept = splits.filter { split in
-            guard split.left != split.right, ids.contains(split.left), ids.contains(split.right),
-                  !paired.contains(split.left), !paired.contains(split.right) else { return false }
-            paired.formUnion([split.left, split.right])
+            let pages = split.ids
+            guard Set(pages).count == pages.count, pages.allSatisfy(ids.contains), paired.isDisjoint(with: pages) else { return false }
+            paired.formUnion(pages)
             return true
         }
         var list = bookmarks
         var folders = folders
         for split in kept {
-            guard let from = list.firstIndex(where: { $0.id == split.right }) else { continue }
-            let right = list.remove(at: from)
-            list.insert(right, at: (list.firstIndex { $0.id == split.left } ?? list.count - 1) + 1)
-            for f in folders.indices {
-                folders[f].bookmarkIDs.removeAll { $0 == split.right }
-                if folders[f].bookmarkIDs.contains(split.left) { folders[f].bookmarkIDs.append(split.right) }
+            for (previous, id) in zip(split.ids, split.riders) {
+                guard let from = list.firstIndex(where: { $0.id == id }) else { continue }
+                let page = list.remove(at: from)
+                list.insert(page, at: (list.firstIndex { $0.id == previous } ?? list.count - 1) + 1)
+                for f in folders.indices {
+                    folders[f].bookmarkIDs.removeAll { $0 == id }
+                    if folders[f].bookmarkIDs.contains(split.left) { folders[f].bookmarkIDs.append(id) }
+                }
             }
         }
         let (tidyList, tidyFolders) = tidied(list, folders)
@@ -1313,15 +1398,13 @@ final class Library {
         return nil
     }
 
-    /// Pins two pages of a split view together at a place in a space's list, the left one first, in one change.
-    func addPinnedSplit(_ left: Bookmark, _ right: Bookmark, to spaceID: UUID, at index: Int? = nil, ratio: Double = 0.5, vertical: Bool = false) {
-        guard let s = self.index(of: spaceID) else { return }
+    /// Pins the pages of a split view or tile group together at a place in a space's list, laid out as `layout`
+    /// (whose pages are `marks`, in order), in one change.
+    func addPinnedSplit(_ marks: [Bookmark], as layout: PinnedSplit, to spaceID: UUID, at index: Int? = nil) {
+        guard let s = self.index(of: spaceID), marks.map(\.id) == layout.ids else { return }
         let at = min(index ?? spaces[s].bookmarks.count, spaces[s].bookmarks.count)
-        spaces[s].bookmarks.insert(contentsOf: [left, right], at: at)
-        var split = PinnedSplit(left: left.id, right: right.id)
-        split.ratio = ratio
-        split.vertical = vertical
-        spaces[s].pinnedSplits = (spaces[s].pinnedSplits ?? []) + [split]
+        spaces[s].bookmarks.insert(contentsOf: marks, at: at)
+        spaces[s].pinnedSplits = (spaces[s].pinnedSplits ?? []) + [layout]
         tidyFolders(s)
         commit()
     }
@@ -1363,18 +1446,19 @@ final class Library {
         commit()
     }
 
-    /// How an open pinned split was last laid out, so it opens that way again. A swap trades its pages' places in the
-    /// list too; a new size or direction is only saved.
+    /// How an open pinned split was last laid out, so it opens that way again. A swap (or a group's pages in a new
+    /// order) trades their places in the list too; a new size, direction or place is only saved.
     func setPinnedSplitLayout(_ layout: PinnedSplit) {
-        if let i = favoriteSplits.firstIndex(where: { $0.contains(layout.left) && $0.contains(layout.right) }) {
-            let swapped = favoriteSplits[i].left != layout.left
+        let pages = Set(layout.ids)
+        if let i = favoriteSplits.firstIndex(where: { Set($0.ids) == pages }) {
+            let swapped = favoriteSplits[i].ids != layout.ids
             favoriteSplits[i] = layout
             if swapped { tidyFavorites(); commit() } else { save() }
             return
         }
         for s in spaces.indices {
-            guard let i = spaces[s].pinnedSplits?.firstIndex(where: { $0.contains(layout.left) && $0.contains(layout.right) }) else { continue }
-            let swapped = spaces[s].pinnedSplits?[i].left != layout.left
+            guard let i = spaces[s].pinnedSplits?.firstIndex(where: { Set($0.ids) == pages }) else { continue }
+            let swapped = spaces[s].pinnedSplits?[i].ids != layout.ids
             spaces[s].pinnedSplits?[i] = layout
             if swapped {
                 tidyFolders(s)

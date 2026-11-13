@@ -253,14 +253,14 @@ enum SidebarMenus {
         if let pinned {
             // Both stay pinned, each in a row of its own.
             menu.addItem(Item(String(localized: "Separate Tabs", comment: "Item in a pinned tab's context menu in the sidebar. Parts a pinned split view into two pinned tabs.")) {
-                let open = [pinned.left, pinned.right].compactMap(manager.bookmarkTab(for:)).first { manager.split(for: $0) != nil }
+                let open = pinned.ids.compactMap(manager.bookmarkTab(for:)).first { manager.split(for: $0) != nil }
                 if let open {
                     controller.unsplitWithUndo(open)
                 } else {
                     controller.libraryChange(String(localized: "Separate Tabs", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.removePinnedSplit(containing: bookmark.id) }
                 }
             })
-            let pages = [pinned.left, pinned.right].compactMap(manager.bookmarkTab(for:))
+            let pages = pinned.ids.compactMap(manager.bookmarkTab(for:))
             if !pages.isEmpty {
                 menu.addItem(Item(String(localized: "Unload Pages", comment: "Item in a pinned tab's context menu in the sidebar. Unloads both pages of a pinned split view.")) { manager.close(pages) })
             }
@@ -343,7 +343,7 @@ enum SidebarMenus {
             menu.addItem(Item(String(localized: "Separate Tabs", comment: "Item in a favorite's context menu. Parts a split favorite into two favorites.")) { controller.separateFavoriteSplitWithUndo(favorite.id) })
             if !manager.isPrivate { menu.addItem(Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite back into a pinned tab.")) { controller.unfavoriteWithUndo(favorite.id, to: 0) }) }
             menu.addItem(.separator())
-            let pages = [pair.left, pair.right].compactMap { manager.bookmarkTab(for: $0) }
+            let pages = pair.ids.compactMap { manager.bookmarkTab(for: $0) }
             if !pages.isEmpty { menu.addItem(Item(String(localized: "Unload Pages", comment: "Item in a favorite's context menu. Unloads both pages of a split favorite.")) { manager.close(pages) }) }
             if !manager.isPrivate { menu.addItem(Item(String(localized: "Remove from Favorites", comment: "Item in a favorite's context menu.")) { controller.removeFavoriteWithUndo(favorite.id) }) }
             return menu
@@ -601,9 +601,9 @@ extension BrowserWindowController {
         items.compactMap { item in if case .bookmark(let id) = item { id } else { nil } }
     }
 
-    /// Every pinned page in these rows, both of a pinned split.
+    /// Every pinned page in these rows, all of a pinned split or group.
     func markedPinPages(_ pins: [UUID]) -> [UUID] {
-        pins.flatMap { id in Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id] }
+        pins.flatMap { id in Library.shared.pinnedSplit(containing: id).map(\.ids) ?? [id] }
     }
 
     func unpinMarked(_ pins: [UUID]) {
@@ -676,7 +676,7 @@ extension BrowserWindowController {
                 var at = 0
                 for id in pins {
                     Library.shared.moveBookmark(id, to: at, in: spaceID)
-                    at += Library.shared.pinnedSplit(containing: id) == nil ? 1 : 2
+                    at += Library.shared.pinnedSplit(containing: id)?.ids.count ?? 1
                 }
             }
         }

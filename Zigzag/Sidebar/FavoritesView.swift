@@ -11,7 +11,7 @@ final class FavoritesView: NSView {
     func debugTiles() -> [(String, NSRect)] {
         guard let window else { return [] }
         return tiles.map { tile in
-            ("fav:" + [tile.bookmark?.title, tile.partner?.title].compactMap { $0 }.joined(separator: "|"),
+            ("fav:" + ([tile.bookmark?.title] + tile.partners.map(\.title)).compactMap { $0 }.joined(separator: "|"),
              tile.convert(tile.bounds, to: nil).flippedIn(window))
         }
     }
@@ -56,7 +56,7 @@ final class FavoritesView: NSView {
         // Most of a tile, away from its edges, is for a split.
         let middle = tiles.first { tile in
             guard tile !== moving, let carried, tile.frame.insetBy(dx: tile.frame.width * 0.2, dy: tile.frame.height * 0.2).contains(point) else { return false }
-            return TabManager.canSplit(carried, onto: TabManager.SplitSide(kind: .favorite, inSplit: tile.partner != nil))
+            return TabManager.canSplit(carried, onto: TabManager.SplitSide(kind: .favorite, inSplit: !tile.partners.isEmpty))
         }
         if let middle, let id = middle.bookmark?.id {
             showSplit((id, point.x > middle.frame.midX))
@@ -196,29 +196,29 @@ final class FavoritesView: NSView {
         return CGFloat(rows) * Self.tileHeight + CGFloat(rows - 1) * Tokens.Sidebar.favoriteGap
     }
 
-    /// One tile per favorite; a split favorite's two pages share one, each half opening its own page.
+    /// One tile per favorite; a split favorite's two pages, or a tile group's three or four (#203), share one, each
+    /// part opening its own page (and the rest with it).
     /// `tabs`: the favorites' tabs, by favorite; a tile is open only while one of its pages is loaded (#205).
-    func reload(favorites: [(Bookmark, partner: Bookmark?)], selectedID: UUID?, tabs: [UUID: Tab] = [:]) {
-        if tiles.map({ [$0.bookmark?.id, $0.partner?.id] }) != favorites.map({ [$0.0.id, $0.partner?.id] }) {
+    func reload(favorites: [(Bookmark, partners: [Bookmark])], selectedID: UUID?, tabs: [UUID: Tab] = [:]) {
+        if tiles.map({ [$0.bookmark?.id] + $0.partners.map(\.id) }) != favorites.map({ [$0.0.id] + $0.partners.map(\.id) }) {
             // The tiles that stay are the same tiles, gliding to their new places; a new one fades in where it lands
             // and one that's gone fades out where it was.
             let animated = window != nil && !tiles.isEmpty && !Tokens.Motion.isFromKey
             var kept: [[UUID?]: FavoriteTile] = [:]
-            for tile in tiles { kept[[tile.bookmark?.id, tile.partner?.id]] = tile }
-            let wanted = Set(favorites.map { [$0.0.id, $0.partner?.id] as [UUID?] })
+            for tile in tiles { kept[[tile.bookmark?.id] + tile.partners.map(\.id)] = tile }
+            let wanted = Set(favorites.map { [$0.0.id] + $0.partners.map(\.id) as [UUID?] })
             for (key, tile) in kept where !wanted.contains(key) {
                 kept[key] = nil
                 guard animated else { tile.removeFromSuperview(); continue }
                 Tokens.Motion.animate(Tokens.Motion.feedback, { tile.animator().alphaValue = 0 }, completion: { tile.removeFromSuperview() })
             }
-            tiles = favorites.map { favorite, partner in
-                if let tile = kept[[favorite.id, partner?.id]] { return tile }
-                let tile = FavoriteTile(bookmark: favorite, partner: partner)
+            tiles = favorites.map { favorite, partners in
+                if let tile = kept[[favorite.id] + partners.map(\.id)] { return tile }
+                let tile = FavoriteTile(bookmark: favorite, partners: partners)
                 // Each reads the tile's favorite when it happens, never the one it was made with.
                 tile.onClick = { [weak self, weak tile] event in
                     guard let self, let tile, let favorite = tile.bookmark else { return }
-                    let onRight = tile.convert(event.locationInWindow, from: nil).x > tile.bounds.midX
-                    self.onOpen?(onRight ? tile.partner ?? favorite : favorite)
+                    self.onOpen?(tile.page(at: tile.convert(event.locationInWindow, from: nil)) ?? favorite)
                 }
                 tile.onRightClick = { [weak self, weak tile] _ in tile?.bookmark.flatMap { self?.onMenu?($0) } }
                 tile.onClose = { [weak self, weak tile] in if let favorite = tile?.bookmark { self?.onClose?(favorite) } }
@@ -237,12 +237,14 @@ final class FavoritesView: NSView {
             }
             relayout(gliding: animated)
         }
-        for (tile, favorite) in zip(tiles, favorites) { tile.update(favorite.0, partner: favorite.partner) }
+        for (tile, favorite) in zip(tiles, favorites) {
+            tile.update(favorite.0, partners: favorite.partners, regions: Library.shared.pinnedSplit(containing: favorite.0.id)?.regions)
+        }
         for tile in tiles {
             guard let id = tile.bookmark?.id else { continue }
-            let ids = [id] + (tile.partner.map { [$0.id] } ?? [])
+            let ids = [id] + tile.partners.map(\.id)
             tile.isSelected = selectedID.map(ids.contains) ?? false
-            tile.track(tabs[id], partner: tile.partner.flatMap { tabs[$0.id] })
+            tile.track(tabs[id], partners: tile.partners.compactMap { tabs[$0.id] })
             tile.refreshIcon()
         }
     }
@@ -252,8 +254,8 @@ final class FavoritesView: NSView {
         for tile in tiles { tile.number = tile.bookmark.flatMap { numbers[$0.id] } }
     }
 
-    /// The tile showing a favorite (either page of a split one).
-    func tile(for bookmarkID: UUID) -> NSView? { tiles.first { $0.bookmark?.id == bookmarkID || $0.partner?.id == bookmarkID } }
+    /// The tile showing a favorite (any page of a split or group one).
+    func tile(for bookmarkID: UUID) -> NSView? { tiles.first { $0.bookmark?.id == bookmarkID || $0.partners.contains { $0.id == bookmarkID } } }
 
     /// Picks the tile up, as a row in the tab list is: it stays in its place, faint, and a see-through copy follows
     /// the pointer. Over the grid a bar shows where it would go, and the middle of another favorite offers to open
@@ -262,7 +264,7 @@ final class FavoritesView: NSView {
     private func drag(_ tile: FavoriteTile, favorite: Bookmark, event: NSEvent) {
         guard let window, let from = tiles.firstIndex(where: { $0 === tile }) else { return }
         let start = window.convertPoint(toScreen: event.locationInWindow)
-        let row = CarriedRow(favorite, icon: tile.iconImage, partner: tile.partner, partnerIcon: tile.partnerIconImage)
+        let row = CarriedRow(favorite, icon: tile.iconImage, partners: tile.partners, partnerIcons: tile.partnerIconImages)
         let rowSize = NSSize(width: bounds.width, height: Tokens.Sidebar.rowHeight)
         // As a row it's held just past its icon, as if it had been picked up there.
         let rowGrab = NSPoint(x: Tokens.Sidebar.rowInset + Tokens.Sidebar.favicon + Tokens.Space.x1, y: rowSize.height / 2)
@@ -270,7 +272,7 @@ final class FavoritesView: NSView {
                                radius: Tokens.Sidebar.favoriteRadius, alternate: (row, rowSize, rowGrab, Tokens.Sidebar.rowRadius))
         tile.alphaValue = CarriedCopy.faint
         copy.lift()
-        let carried = TabManager.SplitSide(kind: .favorite, inSplit: tile.partner != nil)
+        let carried = TabManager.SplitSide(kind: .favorite, inSplit: !tile.partners.isEmpty)
         var last = start
         var inside = true
         let released = CarriedCopy.track(in: window) { event in
@@ -347,14 +349,21 @@ final class FavoritesView: NSView {
     }
 }
 
-/// A favorite: a soft gray tile with the site's icon, or a split's two icons side by side.
+/// A favorite: a soft gray tile with the site's icon, a split's two icons side by side, or a tile group's three or
+/// four small icons placed as its pages are on screen (#203).
 final class FavoriteTile: InteractiveView {
     /// The favorite as it is now: renamed or moved to another address, the same tile shows and opens the new one.
     private(set) var bookmark: Bookmark?
-    /// A split favorite's right page, shown beside the left one in the same tile.
-    private(set) var partner: Bookmark?
+    /// A split favorite's other page, or a tile group's other pages, in order, shown with the first in the same tile.
+    private(set) var partners: [Bookmark] = []
+    /// A tile group's places, in its pages' order; nil for a favorite of one page or a split of two.
+    private var regions: [TileRegion]?
     private let icon = FaviconView()
     private let partnerIcon = FaviconView()
+    /// A tile group's third and fourth pages' icons.
+    private var extraIcons: [FaviconView] = []
+    /// Every page's icon view, in order.
+    private var pageIcons: [FaviconView] { [icon, partnerIcon] + extraIcons }
     /// While a tab is held over this tile's middle: the half it would open in, as a tab row shows it.
     private let dropHalf = ColorView()
     /// 0: would open on the left, 1: on the right, nil: not a split target.
@@ -370,7 +379,21 @@ final class FavoriteTile: InteractiveView {
     private(set) var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
     override var pressSinks: Bool { get { true } set {} }
     var iconImage: NSImage? { icon.image }
-    var partnerIconImage: NSImage? { partnerIcon.image }
+    var partnerIconImages: [NSImage?] { Array(pageIcons.dropFirst().prefix(partners.count).map(\.image)) }
+
+    /// The page a click at `point` opens: the part of the tile it's in, as the pages share the page area; the first
+    /// page for a favorite of one.
+    func page(at point: NSPoint) -> Bookmark? {
+        guard let bookmark, !partners.isEmpty else { return bookmark }
+        let pages = [bookmark] + partners
+        if let regions, regions.count == pages.count {
+            let column = point.x > bounds.midX ? 1 : 0
+            let row = (point.y > bounds.midY) == isFlipped ? 1 : 0
+            let cell: UInt8 = 1 << (row * 2 + column)
+            return regions.firstIndex { $0.cells & cell != 0 }.map { pages[$0] } ?? bookmark
+        }
+        return point.x > bounds.midX ? partners[0] : bookmark
+    }
     var onClose: (() -> Void)?
     /// Shown under the pointer on every favorite that's open, the one you're on too, as a tab's is: a small ×
     /// tucked into the tile's top-right corner, clear of the icon even four to a row, and never past the tile's edge.
@@ -451,8 +474,10 @@ final class FavoriteTile: InteractiveView {
     private var numberHint: NumberHintView?
     private weak var tab: Tab?
     private var tabToken: SignalToken?
-    private weak var partnerTab: Tab?
-    private var partnerToken: SignalToken?
+    /// A split or group favorite's other pages, while open.
+    private struct WeakTab { weak var tab: Tab? }
+    private var partnerTabs: [WeakTab] = []
+    private var partnerTokens: [SignalToken] = []
     /// The Developer Mode chip follows the space's color as it changes, or another space is shown.
     private lazy var themeToken: SignalToken = Brand.themeChanged.observe { [weak self] in
         guard let self, self.inDeveloperMode else { return }
@@ -462,15 +487,16 @@ final class FavoriteTile: InteractiveView {
     private var iconToken: SignalToken?
     var isPlaceholder = false { didSet { icon.isHidden = isPlaceholder; stateDidChange(animated: false) } }
 
-    init(bookmark: Bookmark?, partner: Bookmark? = nil) {
+    init(bookmark: Bookmark?, partners: [Bookmark] = []) {
         self.bookmark = bookmark
-        self.partner = partner
+        self.partners = partners
         super.init(frame: .zero)
         layer?.cornerRadius = Tokens.Sidebar.favoriteRadius
         layer?.cornerCurve = .continuous
         addSubview(icon)
-        partnerIcon.isHidden = partner == nil
+        partnerIcon.isHidden = partners.isEmpty
         addSubview(partnerIcon)
+        makeExtraIcons()
         dropHalf.wantsLayer = true
         dropHalf.layer?.cornerRadius = Tokens.Sidebar.favoriteRadius - Tokens.Metric.dropInset
         dropHalf.layer?.cornerCurve = .continuous
@@ -483,34 +509,53 @@ final class FavoriteTile: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// The same favorite, changed (renamed, another address): its name and icon follow.
-    func update(_ bookmark: Bookmark, partner: Bookmark?) {
-        let changed = bookmark != self.bookmark || partner != self.partner
+    /// The same favorite, changed (renamed, another address, its group laid out anew): its name and icons follow.
+    func update(_ bookmark: Bookmark, partners: [Bookmark], regions: [TileRegion]? = nil) {
+        let changed = bookmark != self.bookmark || partners != self.partners
+        let placed = partners.count > 1 ? regions : nil
+        if placed != self.regions { self.regions = placed; needsLayout = true }
         self.bookmark = bookmark
-        self.partner = partner
+        self.partners = partners
+        makeExtraIcons()
         if changed { describe() }
     }
 
+    /// One icon view for each of a group's third and fourth pages.
+    private func makeExtraIcons() {
+        while extraIcons.count < partners.count - 1 {
+            let view = FaviconView()
+            addSubview(view, positioned: .above, relativeTo: partnerIcon)
+            extraIcons.append(view)
+        }
+        partnerIcon.isHidden = partners.isEmpty
+        for (i, view) in extraIcons.enumerated() { view.isHidden = i >= partners.count - 1 }
+    }
+
+    /// Its pages' names, in order.
+    private var name: String { Words.list(([bookmark] + partners.map { Optional($0) }).compactMap { $0?.title }) }
+
     private func describe() {
-        let name = Words.list([bookmark?.title, partner?.title].compactMap { $0 })
+        let name = self.name
         toolTip = name
         setAccessibilityLabel(name)
         refreshIcon()
         // Only its own sites' icons arriving redraw it.
-        let keys = Set([bookmark?.url, partner?.url].compactMap { FaviconStore.shared.iconKey(for: $0) })
+        let keys = Set(([bookmark] + partners.map { Optional($0) }).compactMap { $0.flatMap { FaviconStore.shared.iconKey(for: $0.url) } })
         iconToken = FaviconStore.shared.updated.observe { [weak self] key in
             guard let self, keys.contains(key), self.tab?.favicon == nil || self.tab?.isLoading != true else { return }
             self.refreshIcon()
         }
     }
 
-    /// Follows the favorite's page (and a split favorite's other page), so the tile shows the loading ribbon while it
-    /// loads, like a tab does, and its open edge only while one of them is loaded.
-    func track(_ tab: Tab?, partner partnerTab: Tab? = nil) {
-        if partnerTab !== self.partnerTab {
-            self.partnerTab = partnerTab
-            partnerToken = partnerTab?.changed.observe { [weak self] change in
-                if change == .webView { self?.refreshLoading() }
+    /// Follows the favorite's page (and a split or group favorite's other pages), so the tile shows the loading ribbon
+    /// while it loads, like a tab does, and its open edge only while one of them is loaded.
+    func track(_ tab: Tab?, partners: [Tab] = []) {
+        if partners.map(ObjectIdentifier.init) != partnerTabs.compactMap({ $0.tab.map(ObjectIdentifier.init) }) {
+            partnerTabs = partners.map { WeakTab(tab: $0) }
+            partnerTokens = partners.map { page in
+                page.changed.observe { [weak self] change in
+                    if change == .webView { self?.refreshLoading() }
+                }
             }
         }
         guard tab !== self.tab else { refreshLoading(); return }
@@ -527,8 +572,8 @@ final class FavoriteTile: InteractiveView {
 
     private func refreshLoading() {
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
-        isOpen = TabRowView.showsOpenEdge(pinned: true, loaded: [tab, partnerTab].compactMap { $0?.isLoaded })
-        let name = Words.list([bookmark?.title, partner?.title].compactMap { $0 })
+        isOpen = TabRowView.showsOpenEdge(pinned: true, loaded: ([tab] + partnerTabs.map(\.tab)).compactMap { $0?.isLoaded })
+        let name = self.name
         // A favorite has no hover card, so one whose page isn't running says why in its tooltip: asleep, and what
         // that freed, or not loaded since Zigzag reopened. It looks like a favorite never opened: no edge, no ring.
         let notes = [inDeveloperMode ? TabRowView.developerTip(for: tab?.url) : nil, tab?.notLoadedNote].compactMap { $0 }
@@ -538,12 +583,12 @@ final class FavoriteTile: InteractiveView {
 
     func refreshIcon() {
         guard let bookmark else { return }
-        if let partner {
+        for (partner, view) in zip(partners, pageIcons.dropFirst()) {
             if let image = partner.displayIcon {
-                partnerIcon.image = image
+                view.image = image
             } else {
                 // Back to its site's icon, not fetched yet: the one you chose doesn't stay meanwhile.
-                if partnerIcon.image.map(IconChoice.isPageIcon) == true { partnerIcon.image = nil }
+                if view.image.map(IconChoice.isPageIcon) == true { view.image = nil }
                 FaviconStore.shared.prefetch(for: partner.url)
             }
         }
@@ -565,7 +610,21 @@ final class FavoriteTile: InteractiveView {
         dropHalf.frame = NSRect(x: splitSide == 1 ? bounds.midX : inset, y: inset, width: bounds.width / 2 - inset, height: bounds.height - inset * 2)
         dropHalf.color = Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha)
         dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
-        if partner != nil {
+        if let regions, regions.count == partners.count + 1, partners.count > 1 {
+            // A tile group: a small icon for each page, placed as the pages share the page area, in a grid of two
+            // columns and two rows; a half sits across the two cells it covers.
+            let rowGap: CGFloat = 2, columnGap = Tokens.Space.x1
+            let size = min(Tokens.Sidebar.favicon, floor((bounds.height - Tokens.Space.x1 * 2 - rowGap) / 2),
+                           floor((bounds.width - inset * 2 - columnGap) / 2))
+            let columns = [bounds.midX - (size + columnGap) / 2, bounds.midX + (size + columnGap) / 2]
+            let top = bounds.midY + (isFlipped ? -1 : 1) * (size + rowGap) / 2, bottom = bounds.midY + (isFlipped ? 1 : -1) * (size + rowGap) / 2
+            let rows = [top, bottom]
+            for (region, view) in zip(regions, pageIcons) {
+                let x = region.columns.map { columns[$0] }.reduce(0, +) / CGFloat(region.columns.count)
+                let y = region.rows.map { rows[$0] }.reduce(0, +) / CGFloat(region.rows.count)
+                view.frame = NSRect(x: x - size / 2, y: y - size / 2, width: size, height: size).integral
+            }
+        } else if !partners.isEmpty {
             // A split: both pages' icons side by side, at a tab's size. In the narrowest tiles they move closer, then
             // shrink, so the two always fit inside it.
             let room = bounds.width - inset * 2
@@ -629,35 +688,35 @@ final class FavoriteTile: InteractiveView {
     private static var iconSide: CGFloat { Tokens.Sidebar.favoriteIcon }
 }
 
-/// The row a carried favorite turns into over the tab list: its page, or a split's two pages side by side with a
-/// hairline between, as the split's row will look there.
+/// The row a carried favorite turns into over the tab list: its page, or a split's or tile group's pages side by side
+/// with a hairline between each, as the row will look there.
 final class CarriedRow: NSView {
-    private let left = SidebarRowView()
-    private let right: SidebarRowView?
-    private let divider = ColorView(color: Tokens.Color.separator)
+    private let parts: [SidebarRowView]
+    private let dividers: [ColorView]
 
-    init(_ favorite: Bookmark, icon: NSImage?, partner: Bookmark?, partnerIcon: NSImage?) {
-        right = partner.map { _ in SidebarRowView() }
+    init(_ favorite: Bookmark, icon: NSImage?, partners: [Bookmark], partnerIcons: [NSImage?]) {
+        parts = ([favorite] + partners).map { _ in SidebarRowView() }
+        dividers = partners.map { _ in ColorView(color: Tokens.Color.separator) }
         super.init(frame: .zero)
-        left.title.stringValue = favorite.title
-        left.icon.image = icon
-        addSubview(left)
-        if let right, let partner {
-            right.title.stringValue = partner.title
-            right.icon.image = partnerIcon
-            addSubview(right)
-            addSubview(divider)
+        let icons = [icon] + partnerIcons
+        for (i, (part, page)) in zip(parts, [favorite] + partners).enumerated() {
+            // Three or four parts are too narrow for names: their icons alone, as the row shows them.
+            part.title.stringValue = parts.count > 2 ? "" : page.title
+            part.icon.image = icons.indices.contains(i) ? icons[i] : nil
+            addSubview(part)
         }
+        dividers.forEach(addSubview)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     override func layout() {
         super.layout()
-        guard let right else { left.frame = bounds; return }
-        let half = floor(bounds.width / 2)
-        left.frame = NSRect(x: 0, y: 0, width: half, height: bounds.height)
-        right.frame = NSRect(x: half, y: 0, width: bounds.width - half, height: bounds.height)
-        divider.frame = NSRect(x: half, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4)
+        let width = bounds.width / CGFloat(parts.count)
+        for (i, part) in parts.enumerated() {
+            let x = floor(width * CGFloat(i))
+            part.frame = NSRect(x: x, y: 0, width: floor(width * CGFloat(i + 1)) - x, height: bounds.height)
+            if i > 0 { dividers[i - 1].frame = NSRect(x: x, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4) }
+        }
     }
 }

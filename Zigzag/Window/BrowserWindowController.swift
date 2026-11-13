@@ -242,7 +242,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // A split favorite unloads both its pages, as its Unload Pages does.
         sidebar.favorites.onClose = { [weak self] favorite in
             guard let self else { return }
-            let ids = Library.shared.pinnedSplit(containing: favorite.id).map { [$0.left, $0.right] } ?? [favorite.id]
+            let ids = Library.shared.pinnedSplit(containing: favorite.id).map(\.ids) ?? [favorite.id]
             let pages = ids.compactMap(self.tabManager.bookmarkTab(for:))
             if !pages.isEmpty { self.tabManager.close(pages) }
         }
@@ -430,7 +430,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// A pinned page carried over from another window's list: its open pages come along (one already open here stays
     /// instead), it lands among the pinned tabs or the tabs right where it was dropped, and this window comes forward.
     func takePinned(_ bookmarkID: UUID, from source: BrowserWindowController, at screenPoint: NSPoint) -> NSView? {
-        let ids = Library.shared.pinnedSplit(containing: bookmarkID).map { [$0.left, $0.right] } ?? [bookmarkID]
+        let ids = Library.shared.pinnedSplit(containing: bookmarkID).map(\.ids) ?? [bookmarkID]
         for id in ids {
             if tabManager.bookmarkTab(for: id) != nil {
                 if let live = source.tabManager.bookmarkTab(for: id) { source.tabManager.close(live) }
@@ -457,7 +457,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// A favorite carried over from another window's Favorites: its open pages come along (one already open here
     /// stays instead), it lands as it would from this window's own, and this window comes forward.
     func takeFavorite(_ favorite: Bookmark, from source: BrowserWindowController, at screenPoint: NSPoint) -> NSView? {
-        let ids = Library.shared.favoriteSplits.first { $0.contains(favorite.id) }.map { [$0.left, $0.right] } ?? [favorite.id]
+        let ids = Library.shared.favoriteSplits.first { $0.contains(favorite.id) }.map(\.ids) ?? [favorite.id]
         for id in ids {
             if tabManager.bookmarkTab(for: id) != nil {
                 if let live = source.tabManager.bookmarkTab(for: id) { source.tabManager.close(live) }
@@ -2137,7 +2137,7 @@ extension BrowserWindowController: SidebarDelegate {
 
     /// The same question for a pinned page, whose open page goes where it does.
     private func confirmProfileCrossing(pinned id: UUID, to spaceID: UUID, then move: @escaping () -> Void) {
-        let ids = Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id]
+        let ids = Library.shared.pinnedSplit(containing: id).map(\.ids) ?? [id]
         confirmProfileCrossing(ids.compactMap { tabManager.bookmarkTab(for: $0) }, to: spaceID, then: move)
     }
 

@@ -1857,7 +1857,7 @@ final class LiveBrowser: NSView {
     var liveFavorites: [Bookmark]? {
         didSet {
             favoritesView.isHidden = liveFavorites == nil
-            favoritesView.reload(favorites: (liveFavorites ?? []).map { ($0, partner: nil) }, selectedID: nil)
+            favoritesView.reload(favorites: (liveFavorites ?? []).map { ($0, partners: []) }, selectedID: nil)
             needsLayout = true
             needsDisplay = true
         }

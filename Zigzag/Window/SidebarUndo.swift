@@ -188,7 +188,7 @@ extension BrowserWindowController {
     func separateFavoriteSplitWithUndo(_ favoriteID: UUID) {
         guard let pair = Library.shared.pinnedSplit(containing: favoriteID) else { return }
         pageChange(String(localized: "Separate Tabs", comment: "Undo action name, shown in the Edit menu as Undo Separate Tabs.")) { [tabManager] in
-            for id in [pair.left, pair.right] { if let live = tabManager.bookmarkTab(for: id) { tabManager.unsplit(live) } }
+            for id in pair.ids { if let live = tabManager.bookmarkTab(for: id) { tabManager.unsplit(live) } }
             Library.shared.removePinnedSplit(containing: favoriteID)
         }
     }
@@ -235,7 +235,7 @@ extension BrowserWindowController {
 
     func removeFavoriteWithUndo(_ id: UUID) {
         // A split favorite goes as one: both its pages.
-        let ids = Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id]
+        let ids = Library.shared.pinnedSplit(containing: id).map(\.ids) ?? [id]
         libraryChange(String(localized: "Remove from Favorites", comment: "Undo action name, shown in the Edit menu as Undo Remove from Favorites.")) {
             for id in ids { if let live = tabManager.bookmarkTab(for: id) { tabManager.close(live) } }
             Library.shared.removeBookmarks(ids)

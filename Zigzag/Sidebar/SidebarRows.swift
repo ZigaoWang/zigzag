@@ -171,7 +171,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     /// Which of the row's parts are in Developer Mode, in `half(at:)`'s order.
     private var developerParts: [Bool] {
-        let pages: [Tab?] = isSplit ? [tab, partner] + extraPartners.map { Optional($0) } : [tab]
+        let pages: [Tab?] = isSplit ? [tab, partner] + extraPages : [tab]
         return pages.map { $0?.isDevelopment == true }
     }
 
@@ -243,7 +243,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// The page being renamed: in a row of several pages, the one whose part was double-clicked.
     private(set) var renamingPage: Tab?
     /// Which part's name is being edited (`half(at:)`'s numbering).
-    private var renamingPart = 0
+    private(set) var renamingPart = 0
 
     /// Double-click: the title becomes a field, the whole name selected. Return keeps it, Escape doesn't. In a row of
     /// several pages, the part at `point` (or `page`'s part): the field takes that part's title, its icon staying; a
@@ -366,7 +366,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             return mark
         }()
         // The part as laid out, left to right: in a split of two the partner's half can lead.
-        let spatial = extraPartners.isEmpty && partnerLeads ? 1 - part : part
+        let spatial = extraCount == 0 && partnerLeads ? 1 - part : part
         let spans = partSpans
         guard spans.indices.contains(spatial) else { zoomMark.isHidden = true; return }
         let inset = Tokens.Metric.dropInset
@@ -395,8 +395,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             let divider = ColorView(color: Tokens.Color.separator)
             let audio = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
             audio.onClick = { [weak self] _ in
-                guard let self, self.extraPartners.indices.contains(i) else { return }
-                let page = self.extraPartners[i]
+                guard let self, self.extraPages.indices.contains(i), let page = self.extraPages[i] else { return }
                 page.setMuted(!page.isMuted)
             }
             [icon, title, divider].forEach { $0.isHidden = true; addSubview($0, positioned: .below, relativeTo: closeButton) }
@@ -408,9 +407,17 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         return made
     }
     /// Every page the row shows, its own first, in the group's order.
-    var pages: [Tab] { ([tab, partner] + extraPartners).compactMap { $0 } }
+    var pages: [Tab] { ([tab, partner] + extraPages).compactMap { $0 } }
+    /// A pinned group's third and fourth pages (#203), by their pinned names and icons, with their pages while open.
+    private var pinnedExtras: [(title: String, icon: NSImage?, page: Tab?)] = []
+    /// The third and fourth parts' pages, in order: nil for a pinned page that isn't open.
+    var extraPages: [Tab?] { pinnedExtras.isEmpty ? extraPartners.map { Optional($0) } : pinnedExtras.map(\.page) }
+    /// The third and fourth parts' names.
+    private var extraTitles: [String] { pinnedExtras.isEmpty ? extraPartners.map(\.displayTitle) : pinnedExtras.map(\.title) }
+    /// How many parts the row has after its own and its partner's.
+    private var extraCount: Int { pinnedExtras.isEmpty ? extraPartners.count : pinnedExtras.count }
     /// How many parts the row is split into: one, two halves, or a tile group's three or four.
-    private var segmentCount: Int { isSplit ? 2 + extraPartners.count : 1 }
+    private var segmentCount: Int { isSplit ? 2 + extraCount : 1 }
     /// While another tab is dragged over this row's right half: where it would open.
     private let dropHalf = ColorView()
     /// 0 = would open on the left, 1 = on the right, nil = not a drop target.
@@ -485,18 +492,34 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         refreshExtras()
     }
 
+    /// A pinned group's third and fourth pages, each by its pinned name and icon, with its page where it's open;
+    /// none for a row of one or two.
+    func configure(pinnedExtras parts: [(title: String, icon: NSImage?, page: Tab?)]) {
+        guard !(parts.isEmpty && pinnedExtras.isEmpty) else { return }
+        pinnedExtras = Array(parts.prefix(2))
+        extraTokens = pinnedExtras.compactMap(\.page).map { page in
+            page.changed.observe { [weak self] change in
+                if change == .favicon || change == .loading || change == .audio || change == .webView || change == .developer { self?.refreshExtras() }
+            }
+        }
+        refreshExtras()
+    }
+
     private func refreshExtras() {
-        guard !extraPartners.isEmpty || extraViews != nil else { return }
+        guard extraCount > 0 || extraViews != nil else { return }
+        let pages = extraPages, titles = extraTitles
         for (i, views) in extras.enumerated() {
-            let page = extraPartners.indices.contains(i) ? extraPartners[i] : nil
-            views.icon.image = page?.displayIcon
+            let shown = i < extraCount
+            let page = pages.indices.contains(i) ? pages[i] : nil
+            let pinned = pinnedExtras.indices.contains(i) ? pinnedExtras[i] : nil
+            views.icon.image = page?.displayIcon ?? pinned?.icon
             views.icon.isLoading = (page?.isLoading ?? false) && !(page?.isSuspended ?? true)
             views.icon.isUnloaded = showsUnloaded(page)
-            views.title.stringValue = page?.displayTitle ?? ""
+            views.title.stringValue = titles.indices.contains(i) ? titles[i] : ""
             let sound = page?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
             if views.audio.symbol != sound { views.audio.symbol = sound }
             views.audio.toolTip = page?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.") : String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
-            [views.icon, views.title, views.divider].forEach { $0.isHidden = page == nil }
+            [views.icon, views.title, views.divider].forEach { $0.isHidden = !shown }
             if renameField != nil, renamingPart == i + 2 { views.title.isHidden = true }
         }
         refreshUnloaded()
@@ -532,7 +555,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     /// A split row reads out both of its pages.
     private func refreshAccessibilityLabel() {
-        let others = extraPartners.isEmpty ? partnerTitle.stringValue : Words.list([partnerTitle.stringValue] + extraPartners.map(\.displayTitle))
+        let others = extraCount == 0 ? partnerTitle.stringValue : Words.list([partnerTitle.stringValue] + extraTitles)
         setAccessibilityLabel(!isSplit ? title.stringValue : String(localized: "\(title.stringValue), split with \(others)", comment: "Accessibility label of a split view's row in the sidebar: the two pages' titles."))
         // What VoiceOver says after the name: the tab you're on, and whether either page is playing or muted.
         func sound(_ tab: Tab?, _ name: String?) -> String? {
@@ -549,7 +572,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         // What its ring shows: its page isn't running.
         let unloaded = showsUnloaded(tab) ? String(localized: "not loaded", comment: "Spoken by VoiceOver after a tab row's name: the tab's page isn't running (put to sleep, or not loaded yet since Zigzag reopened); it loads when you click it.") : nil
         let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, unloaded, development, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
-            + extraPartners.map { sound($0, $0.displayTitle) })
+            + zip(extraPages, extraTitles).map { sound($0, $1) })
             .compactMap { $0 }.joined(separator: String(localized: "accessibility.state-separator", defaultValue: ", ", comment: "Separates the states VoiceOver reads after a tab row's name, like “current tab, playing audio”."))
         setAccessibilityValue(state.isEmpty ? nil : state)
         setAccessibilitySelected(isSelected)
@@ -557,7 +580,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     /// Which page the point is over: 0 for this row's own, 1 for its partner, 2 and 3 for a tile group's others.
     func half(at point: NSPoint) -> Int {
-        guard extraPartners.isEmpty else {
+        guard extraCount == 0 else {
             let count = segmentCount
             // The parts as laid out, each reaching to the middle of the gap on either side of it.
             guard partEdges.count == count - 1 else { return min(count - 1, max(0, Int(point.x / max(1, bounds.width / CGFloat(count))))) }
@@ -595,13 +618,13 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         let index = half(at: point)
         let name = partTitles.indices.contains(index) ? partTitles[index].stringValue : title.stringValue
         // A part in Developer Mode says so under its name, with its host.
-        let pages = [tab, partner] + extraPartners.map { Optional($0) }
+        let pages = [tab, partner] + extraPages
         return developerParts.indices.contains(index) && developerParts[index] ? "\(name)\n\(Self.developerTip(for: pages[index]?.url))" : name
     }
 
     /// The page the point is over.
     func page(at point: NSPoint) -> Tab? {
-        let pages = [tab, partner] + extraPartners.map { Optional($0) }
+        let pages = [tab, partner] + extraPages
         let index = half(at: point)
         return pages.indices.contains(index) ? pages[index] ?? tab : tab
     }
@@ -714,7 +737,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         refreshDeveloperMode()
         partnerAudioButton.isHidden = !isSplit || !partnerShowsAudio || renameField != nil
         for (i, views) in (extraViews ?? []).enumerated() {
-            let page = extraPartners.indices.contains(i) ? extraPartners[i] : nil
+            let page = extraPages.indices.contains(i) ? extraPages[i] : nil
             views.audio.isHidden = page.map { !($0.isPlayingAudio || $0.isMuted) } ?? true || renameField != nil
         }
         if nestedTabs != nil || renameField != nil { nestedButton.isHidden = !showsNested }
@@ -728,7 +751,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private func refreshDeveloperMode() {
         let badged = Set(Self.developerBadges(inMode: developerParts))
         let color = badged.isEmpty ? nil : Brand.Theme.for(self).badge
-        let pages = [tab, partner] + extraPartners.map { Optional($0) }
+        let pages = [tab, partner] + extraPages
         let icons = [icon, partnerIcon] + (extraViews ?? []).map(\.icon)
         for (i, view) in icons.enumerated() {
             let on = badged.contains(i)
@@ -858,7 +881,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         }
         let leadEnd = mid - edge, trailEnd = end
         partEdges = [mid]
-        if !extraPartners.isEmpty, let views = extraViews {
+        if extraCount > 0, let views = extraViews {
             // A tile group: a part for each page, in its order, a hairline between; a title only where it has room.
             let parts = Self.segments(count: segmentCount, start: 0, end: trailEnd, mid: mid, gap: edge)
             partEdges = parts.dropFirst().map { round($0.start - edge / 2) }

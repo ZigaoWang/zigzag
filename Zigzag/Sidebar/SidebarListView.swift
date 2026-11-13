@@ -239,7 +239,7 @@ final class SidebarListView: NSView {
         rowDepth = [:]
         folderPageCounts = [:]
         // The right page of a pinned split rides in its left page's row, as a split among tabs does.
-        let riders = Set(Library.shared.pinnedSplits(in: spaceID).map(\.right))
+        let riders = Set(Library.shared.pinnedSplits(in: spaceID).flatMap(\.riders))
         let current = manager.selectedTab?.bookmarkID.map(Self.rowID)
         // A pinned page that's open shows even inside a shut folder or a collapsed section, as in Arc: you see what's
         // open without opening every folder on the way to it. The page you're on is always open.
@@ -901,8 +901,8 @@ final class SidebarListView: NSView {
         case .bookmark(let id):
             let row = TabRowView()
             row.isBookmark = true
-            // Not a pinned split's row: it carries two pages, and a new name would only reach the left one.
-            row.onDoubleClick = { [weak row] in if Library.shared.pinnedSplit(containing: id) == nil { row?.beginRename(at: Self.pointer(in: row)) } }
+            // In a pinned split's or group's row, the part double-clicked is the page renamed.
+            row.onDoubleClick = { [weak row] in row?.beginRename(at: Self.pointer(in: row)) }
             row.onRename = { [weak self, weak row] name in
                 // The tab split beside the pinned page, riding in its row, keeps a name of its own.
                 if let page = row?.renamingPage, page.bookmarkID == nil {
@@ -910,17 +910,20 @@ final class SidebarListView: NSView {
                     return
                 }
                 guard !name.isEmpty else { return }
-                self?.delegate?.listRenameBookmark(id, to: name)
+                let part = row?.renamingPart ?? 0
+                let page = Library.shared.pinnedSplit(containing: id).flatMap { $0.ids.indices.contains(part) ? $0.ids[part] : nil } ?? id
+                self?.delegate?.listRenameBookmark(page, to: name)
             }
             row.onClick = { [weak self, weak row] event in
                 guard let self, let row else { return }
                 if self.mark(item, with: event) { return }
-                // A pinned split row: each half opens its own page, and both open side by side.
+                // A pinned split's or group's row: each part opens its own page, and all open side by side.
                 var opening = id
-                if row.half(at: row.convert(event.locationInWindow, from: nil)) == 1 {
-                    if let pinned = Library.shared.pinnedSplit(containing: id) {
-                        opening = pinned.right
-                    } else if let partner = row.partner, partner.bookmarkID == nil {
+                let part = row.half(at: row.convert(event.locationInWindow, from: nil))
+                if part > 0 {
+                    if let pinned = Library.shared.pinnedSplit(containing: id), pinned.ids.indices.contains(part) {
+                        opening = pinned.ids[part]
+                    } else if part == 1, let partner = row.partner, partner.bookmarkID == nil {
                         // The tab split beside it, riding in this row.
                         self.delegate?.listSelect(partner)
                         return
@@ -928,11 +931,11 @@ final class SidebarListView: NSView {
                 }
                 if let bookmark = Library.shared.bookmark(opening) { self.delegate?.listOpenBookmark(bookmark) }
             }
-            // A pinned split row unloads both its pages, the one you're not on first.
+            // A pinned split's or group's row unloads all its pages, the one you're on last.
             let unload = { [weak self, weak row] in
                 guard let self, let row else { return }
                 let selected = self.manager?.selectedTab
-                for tab in [row.partner, row.tab].compactMap({ $0 }).sorted(by: { $1 === selected && $0 !== selected }) {
+                for tab in ([row.partner, row.tab] + row.extraPages).compactMap({ $0 }).sorted(by: { $1 === selected && $0 !== selected }) {
                     self.delegate?.listClose(tab)
                 }
             }
@@ -1013,24 +1016,28 @@ final class SidebarListView: NSView {
             row.fixedTitle = away ? nil : bookmark.title
             row.pinName = away ? bookmark.title : nil
             row.configure(tab: tab)
-            // A pinned split shows both its pages, open or not, the way a split among tabs does.
-            let pinned = Library.shared.pinnedSplit(containing: id).flatMap { $0.left == id ? Library.shared.bookmark($0.right) : nil }
+            // A pinned split or group shows all its pages, open or not, the way a split among tabs does.
+            let riders = Library.shared.pinnedSplit(containing: id).flatMap { $0.left == id ? $0.riders.compactMap(Library.shared.bookmark) : nil } ?? []
+            for mark in riders where mark.displayIcon == nil { FaviconStore.shared.prefetch(for: mark.url) }
+            let pinned = riders.first
             let partner = pinned.flatMap { manager.bookmarkTab(for: $0.id) }
             if let pinned {
-                let icon = pinned.displayIcon
-                if icon == nil { FaviconStore.shared.prefetch(for: pinned.url) }
-                row.configure(pinnedPartner: pinned.title, icon: icon, unloaded: partner == nil)
+                row.configure(pinnedPartner: pinned.title, icon: pinned.displayIcon, unloaded: partner == nil)
             } else {
                 row.configure(pinnedPartner: nil, icon: nil, unloaded: false)
             }
+            row.configure(pinnedExtras: riders.dropFirst().map { ($0.title, $0.displayIcon, manager.bookmarkTab(for: $0.id)) })
+            let extraPages = row.extraPages
             // Split beside a tab, it carries that tab too: the page shows once, in its own place.
             let beside = pinned == nil ? tab.flatMap(manager.partner(of:)) : nil
             row.configure(partner: partner ?? beside)
             row.partnerLeads = beside != nil && tab.flatMap(manager.split(for:))?.left == beside?.id
             row.setAccessibilityDisclosureLevel(rowDepth[item] ?? 0)
             let other = partner ?? beside
-            row.isSelected = (tab != nil && tab === selected) || (other != nil && other === selected)
-            row.focusedHalf = other != nil && other === selected ? 1 : 0
+            let parts: [Tab?] = [tab, other] + extraPages
+            let focused = selected.flatMap { selected in parts.firstIndex { $0 != nil && $0 === selected } }
+            row.isSelected = focused != nil
+            row.focusedHalf = focused ?? 0
             row.isMarked = marked.contains(item)
         default:
             break
@@ -1282,7 +1289,7 @@ final class SidebarListView: NSView {
             let tab = manager?.bookmarkTab(for: id)
             urls = [Library.shared.bookmark(id)?.url, tab?.url, tab.flatMap { manager?.partner(of: $0) }?.url]
             if let pair = Library.shared.pinnedSplit(containing: id) {
-                urls += [Library.shared.bookmark(pair.left)?.url, Library.shared.bookmark(pair.right)?.url]
+                urls += pair.ids.map { Library.shared.bookmark($0)?.url }
             }
         default:
             break
@@ -1309,7 +1316,7 @@ final class SidebarListView: NSView {
             switch item {
             case .tab(let id): name = "tab:" + (manager.tab(with: id).map { tab in manager.panes(of: tab) }?.map(\.displayTitle).joined(separator: "|") ?? "")
             case .bookmark(let id):
-                let ids = Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id]
+                let ids = Library.shared.pinnedSplit(containing: id).map(\.ids) ?? [id]
                 var titles: [String] = ids.compactMap { Library.shared.bookmark($0)?.title }
                 if let beside = manager.bookmarkTab(for: id).flatMap(manager.partner(of:)), beside.bookmarkID == nil { titles.append(beside.displayTitle) }
                 name = "pin:" + titles.joined(separator: "|")
@@ -1427,7 +1434,7 @@ final class SidebarListView: NSView {
         var moving: Set<UUID> = []
         for item in carried {
             switch item {
-            case .bookmark(let id): moving.formUnion(Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id])
+            case .bookmark(let id): moving.formUnion(Library.shared.pinnedSplit(containing: id).map(\.ids) ?? [id])
             case .folder(let id): moving.formUnion(Library.shared.allBookmarkIDs(inFolder: id))
             default: break
             }
@@ -1457,7 +1464,7 @@ final class SidebarListView: NSView {
         return { row in
             switch row {
             case .bookmark(let id):
-                let ids = Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id]
+                let ids = Library.shared.pinnedSplit(containing: id).map(\.ids) ?? [id]
                 return ids.compactMap { at[$0] }.max().map { $0 + 1 } ?? 0
             case .folder(let id):
                 guard let folder = byID[id], let places = span[id] else { return 0 }
