@@ -324,11 +324,13 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
     /// A button's menu: its tools in their groups, and for the page's size the listed sizes among them, the one the
     /// page has checked either way up.
     private func entries(of part: Part) -> [MenuPanel.Entry] {
-        var groups = Self.grouped(part.tools).map { $0.map { entry($0, short: part.title != nil) } }
-        if part.tools.contains(.sizeFill), !groups.isEmpty {
+        let sets = Self.grouped(part.tools)
+        var groups = sets.map { $0.map { entry($0, short: part.title != nil) } }
+        // The listed sizes are choices of the page's size, with Fill the Window.
+        if let sizes = sets.firstIndex(where: { $0.first?.choice == .size }) {
             let state = tab?.developerInEffect ?? DeveloperState()
             let now = PageSizes.named(state.size)
-            groups[0] += PageSizes.all.map { size in
+            groups[sizes] += PageSizes.all.map { size in
                 .item(.init(title: PageSizes.menuTitle(size),
                             isChecked: size == now, isEnabled: tab?.isDevelopment == true) { [weak self] in self?.controller?.setPageSize(size.size) })
             }
@@ -347,11 +349,14 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         }
     }
 
-    /// A button's tools as its menu has them: the choices of one thing together, a line before what stands apart.
+    /// A button's tools as its menu has them: each set of choices together, in the order the tools have them, then
+    /// what stands apart, a line between each.
     static func grouped(_ tools: [DeveloperTool]) -> [[DeveloperTool]] {
-        let choices = tools.filter(\.isChoice)
-        let rest = tools.filter { !$0.isChoice }
-        return [choices, rest].filter { !$0.isEmpty }
+        var sets: [[DeveloperTool]] = []
+        for tool in tools where tool.isChoice {
+            if let i = sets.firstIndex(where: { $0.first?.choice == tool.choice }) { sets[i].append(tool) } else { sets.append([tool]) }
+        }
+        return (sets + [tools.filter { !$0.isChoice }]).filter { !$0.isEmpty }
     }
 
     /// The device a size is nearest, either way up: a phone by its short side; then a tablet, squarer than a

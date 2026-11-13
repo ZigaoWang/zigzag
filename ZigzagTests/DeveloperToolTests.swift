@@ -113,6 +113,20 @@ struct DeveloperToolTests {
         }
     }
 
+    /// The command bar offers what the menus have enabled: Rotate Page only for a page with a size of its own.
+    @Test func theCommandBarOffersOnlyWhatHasSomethingToDo() {
+        withDefaults {
+            let space = Library.shared.spaces[0].id
+            let manager = TabManager(spaceID: space)
+            let tab = manager.newTab(url: URL(string: "http://localhost:1/"), spaceID: space, select: true)
+            defer { tab.close(); manager.invalidate() }
+            #expect(tab.isDevelopment)
+            #expect(!CommandRanker.context(for: manager).developerTools.contains(.rotate))
+            tab.developer.size = CGSize(width: 393, height: 852)
+            #expect(CommandRanker.context(for: manager).developerTools.contains(.rotate))
+        }
+    }
+
     private func items(_ menu: NSMenu) -> [NSMenuItem] { menu.items.flatMap { $0.submenu.map(items) ?? [$0] } }
     private func actions(_ menu: NSMenu) -> [Selector] { items(menu).compactMap(\.action) }
 

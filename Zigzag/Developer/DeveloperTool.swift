@@ -127,9 +127,19 @@ enum DeveloperTool: String, CaseIterable {
         }
     }
 
-    /// One of several of which exactly one is in effect (a look, a size, a browser), rather than something on or off
-    /// or something to do.
-    var isChoice: Bool { appearance != nil || userAgent != nil || self == .sizeFill }
+    /// A set of choices, of which exactly one is in effect: a look, a size, a browser.
+    enum Choice: Equatable {
+        case appearance, size, userAgent
+    }
+
+    /// The set of choices the tool is one of; nil for something on or off, or something to do.
+    var choice: Choice? {
+        if appearance != nil { return .appearance }
+        if userAgent != nil { return .userAgent }
+        return self == .sizeFill ? .size : nil
+    }
+
+    var isChoice: Bool { choice != nil }
 
     /// The choice of its kind that leaves the page as any page: following the Mac, Zigzag's own user agent, filling
     /// the window.

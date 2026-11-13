@@ -63,8 +63,9 @@ enum MainMenu {
                 inside = top.submenu ?? NSMenu()
                 submenus[group] = inside
             }
+            // A line between one set of choices and the next, and before what stands apart.
             if let last = inside.items.last, !last.isSeparatorItem,
-               DeveloperTool(action: last.action)?.isChoice != tool.isChoice { inside.addItem(.separator()) }
+               DeveloperTool(action: last.action)?.choice != tool.choice { inside.addItem(.separator()) }
             inside.addItem(item(tool.shortTitle, tool.action, tool.key?.0 ?? "", tool.key?.1 ?? [.command]))
         }
         refreshPageSizes(in: main)
