@@ -12,23 +12,14 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
-### 修复
-- 网页会议里共享屏幕时，现在可以只共享一个窗口，而不只是整个屏幕。网站请求共享你的屏幕时，Zigzag 会像 Safari 一样提供“共享窗口…”和“共享屏幕…”，选了哪个，就会出现 macOS 对应的选取器。([#211](https://github.com/ZigaoWang/zigzag/issues/211))
-### 新功能
-- 从 Arc 导入时也会带上每个空间打开的标签页，顺序和 Arc 里一样，分屏浏览的页面仍然并排。它们要等你点按才载入，几百个标签页不会一下子全部载入，再次导入也不会把同一个标签页打开两次。导入窗口里“空间和固定标签页”旁边的“打开的标签页”可以不导入它们。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
-- 边栏底部的空间图标变大了，并跟随“设置 › 外观 › 边栏大小”：“中”比以前稍大一些，“大”明显更大。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
-- 边栏里多了两条淡淡的分隔线：一条在收藏和空间的标签页之间，另一条在底部栏上方，只在标签页延伸到它下面时出现。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
-
-### 修复
-- 画中画的视频在你切换到别的 App 或别的桌面时会一直留在屏幕上，像在 Safari 里一样浮在所有窗口上面，直到你关掉它。以前它会被下一个 App 挡住，也只留在开始播放的那个桌面上。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
-- 没有标签页的空间会显示一张空的页面卡片，带阴影，颜色也和边栏不同，不再是边栏的颜色铺满整个窗口。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
-- 这台 Mac 上没有其他浏览器时，导入窗口会显示“在这台 Mac 上没有找到其他浏览器”，并提供“选取文件…”，用来导入密码 .csv 文件或 Safari 的导出文件。以前它的选项会全部堆在窗口左上角。([#212](https://github.com/ZigaoWang/zigzag/issues/212))
-
 ## [0.9.0] - 2026-11-12
 
 分屏浏览最多放四个页面，网站可以安装成独立的应用，边栏可以放在左边或右边，标签页在窗口之间移动时保持原样。深色网页改用 Dark Reader，广告拦截加入了 uBlock Origin 的过滤列表，Cookie 弹窗会自动帮你拒绝，“网站设置”也重新做了。
 
 ### 新功能
+- 从 Arc 导入时也会带上每个空间打开的标签页，顺序和 Arc 里一样，分屏浏览的页面仍然并排。它们要等你点按才载入，几百个标签页不会一下子全部载入，再次导入也不会把同一个标签页打开两次。导入窗口里“空间和固定标签页”旁边的“打开的标签页”可以不导入它们。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
+- 边栏底部的空间图标变大了，并跟随“设置 › 外观 › 边栏大小”：“中”比以前稍大一些，“大”明显更大。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
+- 边栏里多了两条淡淡的分隔线：一条在收藏和空间的标签页之间，另一条在底部栏上方，只在标签页延伸到它下面时出现。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
 - “设置 › 隐私”（有多份个人资料时是“网站数据”）里的“网站存储的数据”，标题旁边新增了搜索，边输入边找到网站，匹配的部分会标出来，找不到时也会说明。每个网站会显示它存储了多少数据，列表可以按名称或大小排序，“全部移除…”会在确认后清除所有网站的数据，搜索时只清除显示的网站。要移除单个网站，把指针移到它那一行，点按出现的废纸篓，和其他设置行一样。 ([#207](https://github.com/ZigaoWang/zigzag/issues/207))
 - “设置 › 开发者”的最后新增“功能标志”，像 Safari 的“开发 › 功能标志”一样，列出这台 Mac 上 WebKit 提供的功能标志：每个都有开关、WebKit 给它的名字和一行说明，分在“稳定”“预览”“可测试”和“开发者”下面，“成熟”“不稳定”和“内部”收在“全部显示”里，还可以按名字或键搜索。只有你改过的功能标志会被记下，并标上“已更改”，其他的都跟随 WebKit 的默认设置；“恢复默认设置”会把它们全部还原。更改会应用到之后打开或重新载入的页面，旁边有“重新载入所有标签页”。开发者模式打开时才会显示。感谢 [micsama](https://github.com/micsama) 提出这个想法，感谢 [vandenbulckjean](https://github.com/vandenbulckjean) 做的开发者设置。([#173](https://github.com/ZigaoWang/zigzag/issues/173))
 - 发行说明跟随 App 的语言；0.9.0 及之前的几个版本有了中文发行说明。
@@ -77,6 +68,10 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - “更改图标”里的第一个选项显示网站自己的图标，一看就知道它是用来恢复网站图标的。
 
 ### 修复
+- 网页会议里共享屏幕时，现在可以只共享一个窗口，而不只是整个屏幕。网站请求共享你的屏幕时，Zigzag 会像 Safari 一样提供“共享窗口…”和“共享屏幕…”，选了哪个，就会出现 macOS 对应的选取器。([#211](https://github.com/ZigaoWang/zigzag/issues/211))
+- 画中画的视频在你切换到别的 App 或别的桌面时会一直留在屏幕上，像在 Safari 里一样浮在所有窗口上面，直到你关掉它。以前它会被下一个 App 挡住，也只留在开始播放的那个桌面上。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
+- 没有标签页的空间会显示一张空的页面卡片，带阴影，颜色也和边栏不同，不再是边栏的颜色铺满整个窗口。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
+- 这台 Mac 上没有其他浏览器时，导入窗口会显示“在这台 Mac 上没有找到其他浏览器”，并提供“选取文件…”，用来导入密码 .csv 文件或 Safari 的导出文件。以前它的选项会全部堆在窗口左上角。([#212](https://github.com/ZigaoWang/zigzag/issues/212))
 - 分屏浏览的每个页面四个角都是同样的圆角，不管挨着窗口的哪条边、页面之间的空隙还是上方的工具栏：左右排、上下排、三个或四个页面，边栏在左边或右边，全屏时也一样。以前挨着窗口边缘的角是方的，全屏时和其他角对不上。 ([#203](https://github.com/ZigaoWang/zigzag/issues/203))
 - 边栏里分屏浏览的那一行和周围的标签页对齐了：每个页面的图标都在标签页图标的位置上，第一个正好在上面那些图标的正下方，有空间时显示标题，你所在的那一行里当前页面会亮起来。已固定列表和文件夹里也一样，边栏的每种大小都是如此。 ([#203](https://github.com/ZigaoWang/zigzag/issues/203))
 - 三个或四个页面的分屏浏览现在可以像两个页面的一样固定、加入收藏和放进文件夹：在边栏里是一行，在收藏里是一个方块，每个页面一个小图标，按页面的位置排好。点开后所有页面按原来的布局打开，重启后还在，取消固定或拖回“标签页”时也保持原样。以前固定时只会固定其中一个页面，其余的留在原处，按 ⌘Z 后还会少一个页面；现在按一次 ⌘Z 就能把每个页面放回原位。在固定分屏的那一行里双击某个页面，可以给这个页面改名。 ([#203](https://github.com/ZigaoWang/zigzag/issues/203))
