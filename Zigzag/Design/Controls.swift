@@ -1571,6 +1571,12 @@ final class MenuPanel: FloatingPanelView {
 
     /// The menu that's open, if any. Panels that close on Esc or a click elsewhere leave those to it while it's open.
     static weak var current: MenuPanel?
+
+    /// Whether a point in a window is on the menu open in it: a click there is the menu's, not what lies under it.
+    static func contains(_ windowPoint: NSPoint, in window: NSWindow?) -> Bool {
+        guard let menu = current, let window, menu.window === window else { return false }
+        return menu.bounds.contains(menu.convert(windowPoint, from: nil))
+    }
     private(set) weak var anchor: NSView?
 
     private let entries: [Entry]

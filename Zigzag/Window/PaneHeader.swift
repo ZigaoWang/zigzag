@@ -66,6 +66,16 @@ final class PaneHeaderView: NSView {
     /// start under the traffic lights. Nil centers it on the strip.
     var addressCenter: CGFloat? { didSet { if addressCenter != oldValue { needsLayout = true } } }
 
+    /// The split pane's strip a view is in, if any: what opened from it (Site Controls, a menu) goes with its pane.
+    static func strip(of view: NSView) -> PaneHeaderView? {
+        var next: NSView? = view
+        while let v = next {
+            if let strip = v as? PaneHeaderView { return strip }
+            next = v.superview
+        }
+        return nil
+    }
+
     static func button(_ symbol: String, toolTip: String) -> IconButton {
         IconButton(symbol: symbol, size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph, toolTip: toolTip)
     }

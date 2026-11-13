@@ -244,7 +244,7 @@ final class SitePanel: FloatingPanelView {
         guard let panel = SitePanel(controller: controller, tab: tab) else { return }
         controller.closeFloatingPanels()
         panel.anchor = anchor
-        panel.isFromPane = Self.paneStrip(of: anchor) != nil
+        panel.isFromPane = PaneHeaderView.strip(of: anchor) != nil
         let overlay = controller.root.overlay
         let anchorFrame = anchor.convert(anchor.bounds, to: overlay)
         // From the address bar in the sidebar: its width and left edge, just below it. With the sidebar slid out or
@@ -252,7 +252,7 @@ final class SitePanel: FloatingPanelView {
         // From the address above the page, the sidebar's width, under the address's end where its button is.
         // From a split pane's strip (on its card or up in the bar), its own width, under that pane's address's end,
         // where its button is, and kept in the window.
-        let pane = Self.paneStrip(of: anchor) != nil
+        let pane = PaneHeaderView.strip(of: anchor) != nil
         let aboveThePage = anchor.isDescendant(of: controller.root.topBar)
         let sidebarLane = controller.root.sidebarWidth - Tokens.Metric.sidebarPadding * 2
         let inset = Tokens.Metric.cardInset
@@ -344,16 +344,6 @@ final class SitePanel: FloatingPanelView {
         let onAnchor = anchor.map { $0.bounds.contains($0.convert(event.locationInWindow, from: nil)) } ?? false
         if !inside && !onAnchor { close() }
         return event
-    }
-
-    /// The split pane's strip a view is in, if any.
-    private static func paneStrip(of view: NSView) -> PaneHeaderView? {
-        var next: NSView? = view
-        while let v = next {
-            if let strip = v as? PaneHeaderView { return strip }
-            next = v.superview
-        }
-        return nil
     }
 
     func close() {

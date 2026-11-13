@@ -1045,12 +1045,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Going to another pane of it (a click on its part of the row) puts the zoomed one back too.
         if paneZoom.isZoomed, paneZoom.tabID != tab?.id { paneZoom.clear() }
         let zoomed = paneZoom.index(in: pair?.ids, places: pair?.shape.regions)
-        // Site Controls opened from a pane's strip sits under it: when the panes move (the split parts, a pane goes,
-        // swaps or zooms), it would be left over nothing.
+        // Site Controls or a menu opened from a pane's strip sits under it: when the panes move (the split parts, a
+        // pane goes, swaps or zooms), it would be left over nothing, or over another pane.
         let layout = pair.map { "\($0.ids) \(String(describing: $0.shape)) \(zoomed ?? -1)" } ?? ""
         if layout != shownPaneLayout {
             shownPaneLayout = layout
             if SitePanel.isOpen(in: window), SitePanel.shown?.isFromPane == true { SitePanel.closeCurrent() }
+            if let menu = MenuPanel.current, menu.window === window, menu.anchor.flatMap(PaneHeaderView.strip(of:)) != nil { menu.close(animated: false) }
         }
         defer {
             refreshZoomEsc()
@@ -1233,8 +1234,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // A pane's strip up in the bar above the page is that pane's too.
         let panes = root.tileTargets
         let point = root.convert(windowPoint, from: nil)
-        // Clicks on what floats over the page (find, the command bar, a prompt) are for it, not the pane below.
+        // Clicks on what floats over the page (find, the command bar, a prompt, a menu) are for it, not the pane below.
         if let base = root.overlay.superview, root.overlay.hitTest(base.convert(windowPoint, from: nil)) != nil { return }
+        if MenuPanel.contains(windowPoint, in: window) { return }
         guard let clickedID = Self.pane(at: point, frames: panes, ids: pair.ids, current: tab.id),
               let clicked = tabManager.tab(with: clickedID) else { return }
         tabManager.focusPane(clicked)
