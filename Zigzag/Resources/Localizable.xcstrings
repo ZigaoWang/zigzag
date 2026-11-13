@@ -2588,6 +2588,17 @@
         }
       }
     },
+    "Always dark" : {
+      "comment" : "Short, it fits beside a dropdown. Under Dark page in the site panel's This Site group, set to Force Dark: the site is drawn dark even where it looks dark on its own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终深色"
+          }
+        }
+      }
+    },
     "Always translate %@" : {
       "comment" : "Row in the site panel's This Site group: pages in this language are translated as they open, on every site. The name is a language's, like English.",
       "localizations" : {
@@ -2908,7 +2919,7 @@
       }
     },
     "Automatic" : {
-      "comment" : "A choice for “Favorites per row” in Settings › Appearance: as many as fit the sidebar's width.",
+      "comment" : "A choice for “Favorites per row” in Settings › Appearance: as many as fit the sidebar's width.\nA choice in the Dark page dropdown of the site panel: the site follows Settings › Appearance › Dark pages.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5208,6 +5219,17 @@
         }
       }
     },
+    "Dark already" : {
+      "comment" : "Short, it fits beside a dropdown. Under Dark page in the site panel's This Site group: dark pages are on, and the site has a dark look of its own, so it's left as it is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本身就是深色"
+          }
+        }
+      }
+    },
     "Dark page" : {
       "comment" : "Row in the site panel's This Site group: draws this site's pages dark.",
       "localizations" : {
@@ -5473,7 +5495,7 @@
       }
     },
     "Developer tools" : {
-      "comment" : "VoiceOver name of the developer tools' buttons in the bar above a development site's page.",
+      "comment" : "Short, it fits beside a dropdown. Under Dark page in the site panel's This Site group, on a development site whose page was set to Light or Dark with the developer tools: they set this tab's look, and dark pages leave it alone.\nVoiceOver name of the developer tools' buttons in the bar above a development site's page.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6472,8 +6494,8 @@
         }
       }
     },
-    "Force dark" : {
-      "comment" : "Row in the site panel's This Site group, under Dark page: draws this site dark even though it looks dark on its own, for a site that leaves parts of itself light.",
+    "Force Dark" : {
+      "comment" : "A choice in the Dark page dropdown of the site panel: this site is drawn dark even where it looks dark on its own, for a site that leaves parts of itself light.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9536,6 +9558,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知"
+          }
+        }
+      }
+    },
+    "Now off" : {
+      "comment" : "Short, it fits beside a dropdown. Under Dark page in the site panel's This Site group, set to Automatic: Settings › Appearance › Dark pages leaves this site as it is now.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现在关闭"
+          }
+        }
+      }
+    },
+    "Now on" : {
+      "comment" : "Short, it fits beside a dropdown. Under Dark page in the site panel's This Site group, set to Automatic: Settings › Appearance › Dark pages has this site drawn dark now.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现在打开"
           }
         }
       }
@@ -13311,17 +13355,6 @@
         }
       }
     },
-    "Set by developer tools" : {
-      "comment" : "Short, it fits beside a switch. Under Dark page in the site panel's This Site group, on a development site whose page was set to Light or Dark with the developer tools: dark pages leave this tab's page alone.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "由开发者工具设定"
-          }
-        }
-      }
-    },
     "Settings" : {
       "comment" : "A command in the command bar, named as in the menu bar.\nItem in an extension's menu: opens the extension's own settings page.\nThe address bar's name for Zigzag's Settings page.\nThe name of the tab showing Zigzag's Settings.\nTitle of the Settings page, also its tab's name.",
       "localizations" : {
@@ -15569,17 +15602,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此网站在这台 Mac 上受到限制"
-          }
-        }
-      }
-    },
-    "This site is dark already" : {
-      "comment" : "Under Dark page in the site panel's This Site group: dark pages are on, and the site has a dark look of its own, so it's left as it is.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此网站本身就是深色"
           }
         }
       }
@@ -18152,6 +18174,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开深色网页"
+          }
+        }
+      }
+    },
+    "dark-page.off" : {
+      "comment" : "A choice in the Dark page dropdown of the site panel: this site's pages are never drawn dark, and are asked for their light look.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Off"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
+          }
+        }
+      }
+    },
+    "dark-page.on" : {
+      "comment" : "A choice in the Dark page dropdown of the site panel: this site's pages are drawn dark.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "On"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开"
           }
         }
       }
