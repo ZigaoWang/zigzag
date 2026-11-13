@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - 中语智汇 (web.zyamoy.com) and other sites that need FingerprintJS 2 to start open again instead of staying blank. Ad and tracker blocking stops that library, and these sites gave up without it; now they get a harmless stand-in that tells them nothing about your Mac. ([#202](https://github.com/ZigaoWang/zigzag/issues/202))
+- Tabs that come back after you quit and reopen Zigzag no longer look loaded before they are. A tab whose page isn't running now looks the same however it got there: in the Tabs list it has the thin dashed ring a sleeping tab has, and a pinned page or favorite has its open edge only while its page is loaded. Its hover card says why: asleep to save memory, or not loaded since Zigzag reopened. Clicking it loads it, as before. ([#205](https://github.com/ZigaoWang/zigzag/issues/205))
 
 ## [0.9.0] - 2026-11-12
 
