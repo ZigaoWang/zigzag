@@ -11,16 +11,16 @@ final class TabPreviewView: FloatingPanelView {
     private let detail = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
     private let title2 = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let detail2 = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
-    /// A sleeping page's line under its address: why it sleeps, and about how much memory that freed.
+    /// A page's line under its address: Developer Mode, if it's in it; and if it sleeps, why, and about how much memory
+    /// that freed.
     private let note = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let note2 = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let imageClip = NSView()
     /// How a split's or tile group's pages share the picture; nil for one page.
     private var shape: TileShape?
     static let footerHeight = Tokens.Metric.previewCaptionHeight
-    /// The caption's height: a line taller while a page in it sleeps, for what it says of that.
-    /// The caption's height in a card this wide: taller while a page in it sleeps, by what it says of that (two lines
-    /// at most, when it's half of a split).
+    /// The caption's height in a card this wide: taller by its note while a page in it is in Developer Mode or sleeps
+    /// (three lines at most, when it's half of a split).
     func footerHeight(width: CGFloat) -> CGFloat {
         let textX = Self.textX, first = firstCaptionWidth(width)
         func height(_ label: Label, _ room: CGFloat) -> CGFloat {
@@ -52,7 +52,7 @@ final class TabPreviewView: FloatingPanelView {
         [title, detail, note, title2, detail2, note2].forEach { addSubview($0) }
         for label in [note, note2] {
             label.usesSingleLineMode = false
-            label.maximumNumberOfLines = 2
+            label.maximumNumberOfLines = 3
             label.lineBreakMode = .byWordWrapping
         }
         onLayout = { [weak self] in self?.layoutContent() }
@@ -72,13 +72,18 @@ final class TabPreviewView: FloatingPanelView {
         detail2.stringValue = partner?.url.map(CommandRanker.displayURL) ?? ""
         title2.isHidden = partner == nil
         detail2.isHidden = partner == nil
-        note.stringValue = tab?.asleepNote ?? ""
-        note.isHidden = tab?.asleepNote == nil
-        note2.stringValue = partner?.asleepNote ?? ""
-        note2.isHidden = partner?.asleepNote == nil
+        note.stringValue = Self.note(for: tab)
+        note.isHidden = note.stringValue.isEmpty
+        note2.stringValue = Self.note(for: partner)
+        note2.isHidden = note2.stringValue.isEmpty
         placeholder.image = tab?.displayIcon ?? bookmark?.displayIcon
         setImages([tab?.snapshot] + partners.map(\.snapshot))
         needsLayout = true
+    }
+
+    /// The line under a page's address: that it's in Developer Mode (#141), and why it sleeps.
+    private static func note(for tab: Tab?) -> String {
+        [tab?.isDevelopment == true ? DeveloperTool.modeName : nil, tab?.asleepNote].compactMap { $0 }.joined(separator: "\n")
     }
 
     /// Each page's picture, in order.
