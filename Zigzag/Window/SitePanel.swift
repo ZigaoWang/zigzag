@@ -470,6 +470,12 @@ final class SitePanel: FloatingPanelView {
          "zoom": zoomStepper.map { ZoomLevels.percent($0.zoom) } ?? ""]
     }
 
+    /// sitedark <automatic|on|off|force>: chooses in the Dark page row's dropdown.
+    func debugDark(_ arg: String) {
+        guard let index = DarkPages.SiteChoice.allCases.firstIndex(where: { $0.rawValue == arg }) else { return }
+        darkRow?.debugChoose(index)
+    }
+
     /// sitezoom in|out|reset: the Zoom row's buttons.
     func debugZoom(_ arg: String) { zoomStepper?.debugPress(arg) }
 
@@ -622,6 +628,56 @@ final class SitePanel: FloatingPanelView {
     private static let onHere = String(localized: "On for this site", comment: "Under a row's name in the site panel's This Site group, what it's set to: on.")
     private static let offHere = String(localized: "Off for this site", comment: "Under a row's name in the site panel's This Site group, what it's set to: off.")
 
+    /// A choice in the Dark page row's dropdown.
+    static func title(of choice: DarkPages.SiteChoice) -> String {
+        switch choice {
+        case .automatic: String(localized: "Automatic", comment: "A choice in the Dark page dropdown of the site panel: the site follows Settings › Appearance › Dark pages.")
+        case .on: String(localized: "dark-page.on", defaultValue: "On", comment: "A choice in the Dark page dropdown of the site panel: this site's pages are drawn dark.")
+        case .off: String(localized: "dark-page.off", defaultValue: "Off", comment: "A choice in the Dark page dropdown of the site panel: this site's pages are never drawn dark, and are asked for their light look.")
+        case .force: String(localized: "Force Dark", comment: "A choice in the Dark page dropdown of the site panel: this site is drawn dark even where it looks dark on its own, for a site that leaves parts of itself light.")
+        }
+    }
+
+    /// What the Dark page row says under its name: what dark pages do on this page now. The dropdown beside it says
+    /// what was chosen, so On and Off say nothing more, unless the page is dark on its own; the words are short, to fit
+    /// beside the dropdown.
+    enum DarkStatus: Equatable {
+        /// Nothing: the choice says it.
+        case none
+        /// Automatic, and Settings has it drawn dark now, or doesn't.
+        case nowOn, nowOff
+        /// On, and the site is dark on its own: left as it is.
+        case darkAlready
+        /// Force.
+        case alwaysDark
+        /// The developer tools chose this tab's look: the site's choice waits.
+        case developerTools
+
+        static func of(_ choice: DarkPages.SiteChoice, wanted: Bool, native: Bool, developerLook: Bool) -> DarkStatus {
+            if developerLook { return .developerTools }
+            if choice == .force { return .alwaysDark }
+            if wanted, native { return .darkAlready }
+            if choice == .automatic { return wanted ? .nowOn : .nowOff }
+            return .none
+        }
+
+        var text: String? {
+            switch self {
+            case .none: nil
+            case .nowOn: String(localized: "Now on", comment: "Short, it fits beside a dropdown. Under Dark page in the site panel's This Site group, set to Automatic: Settings › Appearance › Dark pages has this site drawn dark now.")
+            case .nowOff: String(localized: "Now off", comment: "Short, it fits beside a dropdown. Under Dark page in the site panel's This Site group, set to Automatic: Settings › Appearance › Dark pages leaves this site as it is now.")
+            case .darkAlready: String(localized: "Dark already", comment: "Short, it fits beside a dropdown. Under Dark page in the site panel's This Site group: dark pages are on, and the site has a dark look of its own, so it's left as it is.")
+            case .alwaysDark: String(localized: "Always dark", comment: "Short, it fits beside a dropdown. Under Dark page in the site panel's This Site group, set to Force Dark: the site is drawn dark even where it looks dark on its own.")
+            case .developerTools: String(localized: "Developer tools", comment: "Short, it fits beside a dropdown. Under Dark page in the site panel's This Site group, on a development site whose page was set to Light or Dark with the developer tools: they set this tab's look, and dark pages leave it alone.")
+            }
+        }
+    }
+
+    static func darkStatus(tab: Tab, url: URL) -> String? {
+        DarkStatus.of(DarkPages.siteChoice(for: url), wanted: DarkPages.wants(url), native: tab.darkPage?.native == true,
+                      developerLook: tab.developerInEffect.appearance != .followsMac).text
+    }
+
     /// Which rows apply to this page, as `SitePanelRows` decides from what the page is.
     private var rowContext: SitePanelRows.Context {
         var context = SitePanelRows.Context()
@@ -634,7 +690,6 @@ final class SitePanel: FloatingPanelView {
         if #available(macOS 15.4, *) { context.extensionHost = tab.extensionHost != nil && !isBlank }
         context.hasPermissions = origin.map { !SitePermissions.shown(origin: $0, isPrivate: isPrivate || tab.isPrivate).isEmpty } ?? false
         context.siteChoices = KeepAwake.isOffered(for: url, isPrivate: isPrivate)
-        context.forceDarkOffered = tab.darkPage?.native == true || DarkPages.isForced(url)
         // Offered on a page with a video, or once chosen; the setting is in Settings › Tabs.
         context.fullScreen = PageFullScreen.isOffered(for: url, isPrivate: isPrivate)
             && (PageFullScreen.choice(for: url) != nil || tab.webView.map({ PageVideos.shared.frames(in: $0).contains { !$0.videos.isEmpty } }) == true)
@@ -643,14 +698,15 @@ final class SitePanel: FloatingPanelView {
         return context
     }
 
+    /// The Dark page row, while there is one.
+    private weak var darkRow: PanelRow?
+
     private func buildRows() {
         rows = []
         zoomStepper = nil
         // Each is offered only where it does something (`SitePanelRows`). The choices kept for a site (ad blocking,
         // dark pages, keeping tabs awake) aren't offered in a private window: its site would be kept in Settings ›
         // Privacy › Sites. Its tabs still follow the ones made elsewhere.
-        weak var darkRow: PanelRow?
-        weak var forceRow: PanelRow?
         for kind in SitePanelRows.rows(rowContext) {
             switch kind {
             case .zoom:
@@ -688,34 +744,17 @@ final class SitePanel: FloatingPanelView {
                     self.tab.reload()
                 })
             case .darkPage:
-                // Dark pages, for this site alone: on here though off everywhere else, or the other way round. A site
-                // that's dark on its own says so: there's nothing for Zigzag to darken.
-                let native = String(localized: "This site is dark already", comment: "Under Dark page in the site panel's This Site group: dark pages are on, and the site has a dark look of its own, so it's left as it is.")
+                // Dark pages for this site alone (#134): Automatic follows Settings, On and Off hold whatever it says,
+                // Force darkens it even where it looks dark on its own. Under the name, what that means here now.
                 let tab = tab, url = url
-                let row = PanelRow.toggle(String(localized: "Dark page", comment: "Row in the site panel's This Site group: draws this site's pages dark."), on: DarkPages.wants(url),
-                                          status: { on in
-                    // This tab's page was asked for a look of its own with the developer tools: the site's choice waits.
-                    if tab.developerInEffect.appearance != .followsMac {
-                        return String(localized: "Set by developer tools", comment: "Short, it fits beside a switch. Under Dark page in the site panel's This Site group, on a development site whose page was set to Light or Dark with the developer tools: dark pages leave this tab's page alone.")
-                    }
-                    return on && tab.darkPage?.native == true && !DarkPages.isForced(url) ? native : on ? Self.onHere : Self.offHere
-                }) { [weak self] on in
+                let choices = DarkPages.SiteChoice.allCases
+                let row = PanelRow.choice(String(localized: "Dark page", comment: "Row in the site panel's This Site group: draws this site's pages dark."),
+                                    options: choices.map(Self.title(of:)), selected: choices.firstIndex(of: DarkPages.siteChoice(for: url)) ?? 0,
+                                    status: { _ in Self.darkStatus(tab: tab, url: url) }) { [weak self] index in
                     guard let self else { return }
-                    DarkPages.setChoice(on, for: self.url)
-                    if !on { forceRow?.setOn(false) }
+                    DarkPages.setSiteChoice(choices[index], for: self.url)
                 }
                 darkRow = row
-                rows.append(row)
-            case .forceDark:
-                // Force dark (#134): for a site that looks dark on its own but leaves parts light, or says it's dark
-                // and isn't. Offered where that's so, or once it's on.
-                let row = PanelRow.toggle(String(localized: "Force dark", comment: "Row in the site panel's This Site group, under Dark page: draws this site dark even though it looks dark on its own, for a site that leaves parts of itself light."),
-                                          on: DarkPages.isForced(url), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
-                    guard let self else { return }
-                    DarkPages.setForced(on, for: self.url)
-                    darkRow?.setOn(DarkPages.wants(self.url))
-                }
-                forceRow = row
                 rows.append(row)
             case .keepAwake:
                 // The site's tabs never sleep in the background (TabSleep, EnergyWatch).
@@ -1250,7 +1289,7 @@ final class PanelRow: NSView {
     private let control: NSView
     private let value: Label?
     /// The words' height: the title, and the line under it when there is one.
-    var contentHeight: CGFloat { title.lineHeight + (value?.lineHeight ?? 0) }
+    var contentHeight: CGFloat { title.lineHeight + (value.flatMap { $0.isHidden ? nil : $0.lineHeight } ?? 0) }
 
     private init(_ title: String, control: NSView, value: String? = nil) {
         self.title = Label(title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
@@ -1274,7 +1313,6 @@ final class PanelRow: NSView {
         let toggle = Toggle(isOn: on)
         toggle.setAccessibilityLabel(title)
         let row = PanelRow(title, control: toggle, value: status(on))
-        row.status = status
         toggle.onChange = { [weak row] on in
             row?.value?.stringValue = status(on)
             changed(on)
@@ -1282,25 +1320,23 @@ final class PanelRow: NSView {
         return row
     }
 
-    /// What a toggle row's status says for each state.
-    private var status: ((Bool) -> String)?
-
-    /// A toggle row's switch moved by another row (Force dark turns Dark page on), without running its own change;
-    /// what it says is read again either way.
-    func setOn(_ on: Bool) {
-        guard let toggle = control as? Toggle else { return }
-        toggle.isOn = on
-        if let status { value?.stringValue = status(on) }
-    }
-
-    /// A name and a dropdown of choices: a permission's Ask, Allow or Block.
-    static func choice(_ title: String, options: [String], selected: Int, chose: @escaping (Int) -> Void) -> PanelRow {
+    /// A name and a dropdown of choices: a permission's Ask, Allow or Block. With `status`, what the choice means
+    /// right now sits under the name, read again once a choice has been made (Dark page's "On, following Settings").
+    static func choice(_ title: String, options: [String], selected: Int, status: ((Int) -> String?)? = nil, chose: @escaping (Int) -> Void) -> PanelRow {
         let dropdown = DropdownButton()
         dropdown.options = options.map { DropdownButton.Option(title: $0) }
         dropdown.selectedIndex = selected
-        dropdown.onSelect = chose
         dropdown.setAccessibilityLabel(title)
-        return PanelRow(title, control: dropdown)
+        let row = PanelRow(title, control: dropdown, value: status.map { $0(selected) ?? "" })
+        row.value?.isHidden = row.value?.stringValue.isEmpty ?? true
+        dropdown.onSelect = { [weak row] index in
+            chose(index)
+            guard let row, let status, let value = row.value else { return }
+            value.stringValue = status(index) ?? ""
+            value.isHidden = value.stringValue.isEmpty
+            row.needsLayout = true
+        }
+        return row
     }
 
     /// A name and a control of the panel's own (the zoom stepper).
@@ -1309,7 +1345,9 @@ final class PanelRow: NSView {
     #if DEBUG
     /// Its name, and what its dropdown or switch is set to.
     var debugTitle: String {
-        if let dropdown = control as? DropdownButton { return "\(title.stringValue): \(dropdown.accessibilityValue() as? String ?? "")" }
+        if let dropdown = control as? DropdownButton {
+            return "\(title.stringValue): \(dropdown.accessibilityValue() as? String ?? "")" + (value.flatMap { $0.isHidden ? nil : " (\($0.stringValue))" } ?? "")
+        }
         if let toggle = control as? Toggle { return "\(title.stringValue): \(toggle.isOn ? "on" : "off")" }
         return title.stringValue
     }
@@ -1328,7 +1366,7 @@ final class PanelRow: NSView {
         control.frame = NSRect(x: bounds.width - size.width, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
         let x = -Label.inset
         let right = control.frame.minX - Tokens.Space.x2 - x
-        guard let value else {
+        guard let value, !value.isHidden else {
             // A long name beside its control ("Camera and microphone" by a dropdown) takes a second line rather than
             // being cut short; the row has room for two.
             let twoLines = title.textWidth > right
@@ -1528,7 +1566,7 @@ final class PanelPageHeader: NSView {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, forceDark, keepAwake, fullScreenFills, alwaysTranslate }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, fullScreenFills, alwaysTranslate }
     /// The rows into the panel's other pages.
     enum Link: Equatable { case connection, permissions, extensions }
 
@@ -1542,8 +1580,6 @@ enum SitePanelRows {
         var cookieBanners = false
         /// Choices kept for a site (dark page, keeping tabs awake) are offered for it (`KeepAwake.isOffered`).
         var siteChoices = true
-        /// The site looks dark on its own, or was forced dark already.
-        var forceDarkOffered = false
         /// Full screen in the page is offered here, and the page has a video or a choice was made.
         var fullScreen = false
         /// The page is in a language other than yours.
@@ -1563,7 +1599,6 @@ enum SitePanelRows {
         if c.isWeb, c.cookieBanners, !c.isPrivate { rows.append(.cookieBanners) }
         if c.siteChoices {
             rows.append(.darkPage)
-            if c.forceDarkOffered { rows.append(.forceDark) }
             rows.append(.keepAwake)
         }
         if c.fullScreen { rows.append(.fullScreenFills) }
