@@ -386,10 +386,13 @@ final class ExtensionHost: NSObject {
             announceExistingWindows(to: context)
             Passkeys.refresh()
             changed.send()
-            // A background that won't start leaves its popup waiting with nothing in the log; it says why here.
-            Task { [weak self] in
-                do { try await context.loadBackgroundContent() } catch {
-                    ExtensionLog.write("background for \(self?.displayName(for: id) ?? id) didn't start: \(error.localizedDescription)")
+            // A background that won't start leaves its popup waiting with nothing in the log; it says why here. One
+            // with no background isn't asked: WebKit answers that twice, which brought Zigzag down.
+            if ext.hasBackgroundContent {
+                Task { [weak self] in
+                    do { try await context.loadBackgroundContent() } catch {
+                        ExtensionLog.write("background for \(self?.displayName(for: id) ?? id) didn't start: \(error.localizedDescription)")
+                    }
                 }
             }
             return context
