@@ -1786,6 +1786,92 @@ enum DebugBridge {
             PasswordAuthentication.unlockForTesting()
             PasswordsWindowController.show()
             (PasswordsWindowController.shared?.window?.contentView as? PasswordsView)?.debugShow("open")
+        // pbsave / pblen / pbrestore: keeps what's on the clipboard, logs how long its text is now, puts it back.
+        case "pbsave": DebugKeyWindow.savedClipboard = NSPasteboard.general.pasteboardItems?.map { item in
+                item.types.reduce(into: [NSPasteboard.PasteboardType: Data]()) { $0[$1] = item.data(forType: $1) }
+            } ?? []
+        case "pblen": debugLog("pblen \(NSPasteboard.general.string(forType: .string)?.count ?? -1)")
+        case "pbrestore":
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.writeObjects(DebugKeyWindow.savedClipboard.map { saved in
+                let item = NSPasteboardItem()
+                for (type, data) in saved { item.setData(data, forType: type) }
+                return item
+            })
+        case "keyprobe":
+            // keyprobe <char> [cmd|shift|ctrl|opt...] [focus] [mini] [dry|send|post]: the shortcut as the window gets it
+            // (its key equivalents, then the first responder), with the copy left behind other apps. Logs the first
+            // responder, the menu item it matches, whether it's enabled and what takes it, then the page's selection
+            // and any sheet (cancelled). Copy, Cut and Paste reach the real clipboard: check them dry, or pbsave first.
+            let f = arg.split(separator: " ").map(String.init)
+            // keyprobe … mini: in the last Zigzag Mini window instead.
+            let mini = f.contains("mini") ? MiniWindowController.all.last : nil
+            guard let ch = f.first, let window = f.contains("mini") ? mini?.window : controller.window else { break }
+            var flags: NSEvent.ModifierFlags = []
+            for m in f.dropFirst() {
+                switch m { case "cmd": flags.insert(.command); case "shift": flags.insert(.shift); case "ctrl": flags.insert(.control); case "opt": flags.insert(.option); default: break }
+            }
+            // As if key, without bringing Zigzag forward: menu validation looks for its targets in the key window.
+            let pretended = DebugKeyWindow.window
+            DebugKeyWindow.pretend(window)
+            // keyprobe … focus: the page has the keyboard first.
+            if f.contains("focus"), let page = mini?.tab.webView ?? controller.selectedWebView { window.makeFirstResponder(page) }
+            let codes: [String: UInt16] = ["a": 0, "s": 1, "c": 8, "v": 9, "x": 7, "z": 6, "f": 3, "p": 35, "l": 37]
+            func find(_ menu: NSMenu) -> NSMenuItem? {
+                for item in menu.items {
+                    if let sub = item.submenu, let found = find(sub) { return found }
+                    if item.keyEquivalent == ch, item.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask) == flags { return item }
+                }
+                return nil
+            }
+            let item = NSApp.mainMenu.flatMap(find)
+            let responder = window.firstResponder.map { "\(type(of: $0))" } ?? "nil"
+            // The window isn't key behind other apps, so NSApp finds no target: walk its chain as AppKit would.
+            var chain: [AnyObject] = []
+            var next: NSResponder? = window.firstResponder
+            while let r = next { chain.append(r); next = r.nextResponder }
+            if let delegate = window.delegate, !chain.contains(where: { $0 === delegate }) { chain.append(delegate) }
+            chain.append(NSApp)
+            if let delegate = NSApp.delegate { chain.append(delegate) }
+            let found = item?.action.flatMap { action in chain.first { $0.responds(to: action) } }
+            let valid: Bool = {
+                guard let item, let found else { return false }
+                if let v = found as? NSMenuItemValidation { return v.validateMenuItem(item) }
+                if let v = found as? NSUserInterfaceValidations { return v.validateUserInterfaceItem(item) }
+                return true
+            }()
+            let target = found.map { "\(type(of: $0))" } ?? "nil"
+            item?.menu?.update()
+            guard let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
+                                           windowNumber: window.windowNumber, context: nil, characters: ch, charactersIgnoringModifiers: ch,
+                                           isARepeat: false, keyCode: codes[ch] ?? 0) else { break }
+            // keyprobe … send: the item's action straight to the target found, as the menu sends it once enabled.
+            let handled: Bool
+            if f.contains("dry") {
+                // keyprobe … dry: only what the menu would do, nothing sent (Copy, Cut and Paste reach the clipboard).
+                handled = false
+            } else if f.contains("send"), let item, let action = item.action, let found, valid {
+                handled = NSApp.sendAction(action, to: found, from: item)
+            } else if f.contains("post") {
+                // keyprobe … post: into the app's event queue, so it meets the event monitors and NSApp as a typed key does.
+                NSApp.postEvent(e, atStart: false)
+                handled = true
+            } else {
+                handled = window.performKeyEquivalent(with: e)
+                if !handled { window.sendEvent(e) }
+            }
+            debugLog("keyprobe \(arg): responder=\(responder) item=\(item?.title ?? "none") enabled=\(item?.isEnabled ?? false) target=\(target) validates=\(valid) handled=\(handled)")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                MainActor.assumeIsolated {
+                    DebugKeyWindow.pretend(pretended)
+                    let sheet = window.attachedSheet
+                    debugLog("keyprobe \(arg) after: responder=\(window.firstResponder.map { "\(type(of: $0))" } ?? "nil") sheet=\(sheet.map { "\(type(of: $0))" } ?? "none") editorSelection=\((window.firstResponder as? NSTextView)?.selectedRange().length ?? -1)")
+                    if let sheet { window.endSheet(sheet, returnCode: .cancel) }
+                    (mini?.tab.webView ?? controller.selectedWebView)?.evaluateJavaScript("(() => { const a = document.activeElement; const s = String(getSelection()).length; const f = a && 'selectionStart' in a && a.selectionStart != null ? a.selectionEnd - a.selectionStart : -1; return s + ' field=' + f + ' active=' + (a ? a.tagName : '') })()") { result, _ in
+                        debugLog("keyprobe \(arg) page selection: \(String(describing: result))")
+                    }
+                }
+            }
         case "key":
             // key <char> [cmd|shift|ctrl|opt...] — goes through the real event path, menus included.
             let f = arg.split(separator: " ").map(String.init)
@@ -2581,5 +2667,35 @@ extension NSRect {
     func flippedIn(_ window: NSWindow) -> NSRect {
         NSRect(x: minX, y: window.frame.height - maxY, width: width, height: height)
     }
+}
+#endif
+
+#if DEBUG
+/// For `keyprobe`: NSApp answers as if `window` were key and main, so the menu bar validates and sends its shortcuts
+/// as it does in front, while the test copy stays behind the app you're using.
+@MainActor
+enum DebugKeyWindow {
+    nonisolated(unsafe) static var window: NSWindow?
+    private static var swapped = false
+    static var savedClipboard: [[NSPasteboard.PasteboardType: Data]] = []
+
+    static func pretend(_ window: NSWindow?) {
+        if !swapped {
+            swapped = true
+            for (original, stand) in [("keyWindow", "zz_keyWindow"), ("mainWindow", "zz_mainWindow")] {
+                if let a = class_getInstanceMethod(NSApplication.self, NSSelectorFromString(original)),
+                   let b = class_getInstanceMethod(NSApplication.self, NSSelectorFromString(stand)) {
+                    method_exchangeImplementations(a, b)
+                }
+            }
+        }
+        self.window = window
+    }
+}
+
+extension NSApplication {
+    // After the exchange, these names call AppKit's own.
+    @objc func zz_keyWindow() -> NSWindow? { DebugKeyWindow.window ?? zz_keyWindow() }
+    @objc func zz_mainWindow() -> NSWindow? { DebugKeyWindow.window ?? zz_mainWindow() }
 }
 #endif
