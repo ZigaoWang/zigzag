@@ -291,13 +291,15 @@ something came from, answers at once, and can be interrupted.
   left one's mirror image (`BrowserRootView.mirrored`): the page on the left, its window corners on its left side,
   the resize edge on the sidebar's left, the hidden sidebar coming out of the right edge, panels that open beside
   the sidebar (previews, the space editor, icons) opening left of it, the mini player first in the page's bottom
-  left. The traffic lights stay at the window's top left, as on every Mac window: docked, the page leaves them a
-  strip of the frame (`lightsStripHeight`, the sidebar's `addressTop`, so the page's top meets the address's line)
-  that holds back, forward and reload right after them, as the bar above the page does (`LightsStripView`, #181),
-  and the sidebar's top row keeps the toggle at its outer end, where the bar above the page keeps it while the sidebar is hidden (`SidebarView.topRowFrames`,
-  its glyph `sidebar.right`), so it stays put as the sidebar comes and goes; with the bar above the page they're at the
-  bar's leading end, as with the sidebar hidden; slid out without the bar, the floating sidebar carries them, the one piece of
-  chrome then in view. The command bar stays centered on the window. Changing sides, the sidebar slides across
+  left. Everything else is the left layout's, not its mirror: the traffic lights ride in the sidebar's top row, as
+  Arc's right sidebar has them, and the row reads as the left one does, the lights, the toggle after them (glyph
+  `sidebar.right`), back, forward and reload at the trailing end (`SidebarView.topRowFrames`), so the page runs up
+  to the top as beside a left sidebar, with no strip of frame above it. Hidden, the lights go with the sidebar and
+  come back with it slid out, as on the left; a bar above the page there for a page's tools alone leaves them in the
+  sidebar, and carries them at its leading end only while the sidebar is hidden, as on the left. With the address
+  bar above the page they're at the bar's leading end always, and the sidebar's top row is the mirror image, the
+  toggle at its outer end where the bar keeps it while the sidebar is hidden, so it stays put as the sidebar comes
+  and goes. The command bar stays centered on the window. Changing sides, the sidebar slides across
   while the pages glide the other way (`gentle`).
 - **Developer tools in the bar** (`DeveloperBarTools`, #141): for a tab on a site listed in Settings › Developer and
   shown on its own, with Tools above the page on. They're in the bar above the page, at its trailing end after
