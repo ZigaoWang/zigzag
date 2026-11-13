@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Zigzag Mini has Back, Forward and Reload after the traffic lights, as a browser window does: Back and Forward dim when there's no page that way, Reload turns into Stop while the page loads, and right-clicking Back or Forward lists the pages that way. ([#213](https://github.com/ZigaoWang/zigzag/issues/213))
+
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
