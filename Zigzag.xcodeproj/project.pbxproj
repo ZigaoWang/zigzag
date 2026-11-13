@@ -142,7 +142,6 @@
 		51EE9D0D64F917582D398645 /* MainThreadStallTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 683CCE47B510EA40E8885D53 /* MainThreadStallTests.swift */; };
 		52954A58F54060FB7FCEF032 /* custom-progress-bar.crx in Resources */ = {isa = PBXBuildFile; fileRef = 3CB299E45AC189FC47ACB508 /* custom-progress-bar.crx */; };
 		529A6EE9C8FC1FAFA5D383A8 /* NumberHints.swift in Sources */ = {isa = PBXBuildFile; fileRef = 316205FDAE606ECFE3682BA1 /* NumberHints.swift */; };
-		5369F94213B632536A8AD85C /* ublock-scriptlets.json in Resources */ = {isa = PBXBuildFile; fileRef = 2FDFB4912545EFB9A8843DFB /* ublock-scriptlets.json */; };
 		5407D3683D005B57D0D03AD8 /* tab-capture.js in Resources */ = {isa = PBXBuildFile; fileRef = ECFB222D7082B8C1D2724708 /* tab-capture.js */; };
 		54665D76641D0469C5A31D12 /* CommandActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F18C84CC63265389A43E642F /* CommandActionTests.swift */; };
 		548A302B2614C99406A1F549 /* AdFilters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165DC73A78E5DF3E0A0AB05D /* AdFilters.swift */; };
@@ -546,7 +545,6 @@
 		2ED37168840DD1514429F6DA /* SettingsLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsLayoutTests.swift; sourceTree = "<group>"; };
 		2FC330CEE0425B72CE83C21D /* PageHolder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageHolder.swift; sourceTree = "<group>"; };
 		2FD8BEABF4B3488FB915B002 /* autoconsent-compact-rules.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "autoconsent-compact-rules.json"; sourceTree = "<group>"; };
-		2FDFB4912545EFB9A8843DFB /* ublock-scriptlets.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "ublock-scriptlets.json"; sourceTree = "<group>"; };
 		3014AEB17D7BEE4384710CD9 /* DeveloperToolsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperToolsTests.swift; sourceTree = "<group>"; };
 		30417C99681AAC2507555F94 /* ExtensionReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionReport.swift; sourceTree = "<group>"; };
 		316205FDAE606ECFE3682BA1 /* NumberHints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumberHints.swift; sourceTree = "<group>"; };
@@ -1353,7 +1351,6 @@
 				DDA8091D12FF865D4C6F3952 /* chrome-local-state.json */,
 				3CB299E45AC189FC47ACB508 /* custom-progress-bar.crx */,
 				8BC5CFBDE21CD4D0E29009EB /* find-count.html */,
-				2FDFB4912545EFB9A8843DFB /* ublock-scriptlets.json */,
 				9DF2A2D01D8BD422F0F2323B /* firefox-profile */,
 				4DB46F7EBC33B0D2A4962BF7 /* orion */,
 			);
@@ -1747,7 +1744,6 @@
 				93F7D9887CC5E8E2800B8E67 /* orion-extensions.plist in Resources */,
 				4ACC19B6A01DF157CE2C9A94 /* orion-history.sql in Resources */,
 				C2C05749A76907433E6BEC4D /* reading_list.plist in Resources */,
-				5369F94213B632536A8AD85C /* ublock-scriptlets.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2242,7 +2238,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 94;
+				CURRENT_PROJECT_VERSION = 95;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 432GL3WKY2;
@@ -2361,7 +2357,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 94;
+				CURRENT_PROJECT_VERSION = 95;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 432GL3WKY2;
