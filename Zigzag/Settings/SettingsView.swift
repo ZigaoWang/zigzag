@@ -743,8 +743,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let aiGroup = FormGroup()
     private let connectGroup = FormGroup()
     private let scriptsGroup = FormGroup()
-    /// Settings › Developer (#141): the switch, and the sites you develop on. (`developerGroup` is Extensions'
-    /// Developer mode.)
+    /// Settings › Developer (#141): the switch, and the sites you develop on.
     private let developerToolsGroup = FormGroup()
     private let developmentSitesGroup = FormGroup()
     /// The sizes the developer tools offer for a page.
@@ -787,7 +786,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let translationGroup = FormGroup()
     private let alwaysGroup = FormGroup()
     private let extensionsGroup = FormGroup()
-    private let developerGroup = FormGroup()
+    /// Extensions that come inside apps on this Mac (#194), each with Install. Looked for when the page opens.
+    private let appExtensionsGroup = FormGroup()
+    private var appExtensionsFound: [AppBundledExtensions.Found] = []
+    private var appExtensionsTask: Task<Void, Never>?
+    private var appExtensionsListing = GroupListing<[String]>()
     /// Extensions another profile has and this one doesn't, each with a way to add it here.
     private let otherProfilesGroup = FormGroup()
     /// What's on disk from a profile that's in no list, to bring back or delete. Only there when there's any.
@@ -928,7 +931,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let addSpaceButton = PillButton(title: String(localized: "New Space", comment: "Button beside Your Spaces in Settings › Spaces."))
     private let addProfileButton = PillButton(title: String(localized: "New Profile…", comment: "Button beside Your Profiles in Settings › Profiles: opens the sheet that makes a profile."))
     private let getExtensionsButton = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens the Chrome Web Store."))
-    private let loadUnpackedButton = PillButton(title: String(localized: "Load Unpacked…", comment: "Button in Settings › Extensions, in developer mode: loads an extension from a folder."))
+    private let loadUnpackedButton = PillButton(title: String(localized: "Install from Folder…", comment: "Button in Settings › Extensions: installs an extension from a folder on this Mac, one you're building or one that came with an app."))
     private var spaceRows: [SpaceSettingsRow] = []
     private var token: SignalToken?
     private var extensionsToken: SignalToken?
@@ -942,6 +945,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Its own layer, so it paints the page's surface rather than showing whatever is under it.
         wantsLayer = true
         build()
+        if self.pane == .extensions { findAppExtensions() }
         token = Library.shared.changed.observe { [weak self] in
             guard let self, self.window != nil else { return }
             self.layingOutOnce {
@@ -1562,6 +1566,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshTitle()
         if showsWebsiteData { reloadPrivacy() }
         if pane == .shortcuts { reloadShortcuts() }
+        if pane == .extensions { findAppExtensions() }
         layoutDocument()
         documentView.scroll(.zero)
     }
@@ -1728,10 +1733,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private func reloadExtensions() {
         extensionsGroup.removeAllRows()
-        developerGroup.removeAllRows()
         defer { if pane == .extensions || isSearching { layoutDocument() } }
         guard #available(macOS 15.4, *) else { return }
-        loadUnpackedButton.isHidden = !ExtensionStore.developerMode
+        listAppExtensions()
         let installed = profile.extensions.installed.sorted {
             ($0.value.displayName ?? $0.key).localizedCaseInsensitiveCompare($1.value.displayName ?? $1.key) == .orderedAscending
         }
@@ -1777,14 +1781,61 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 if self.pane == .extensions || self.isSearching { self.layoutDocument() }
             }
         }
-        let developer = Toggle(isOn: ExtensionStore.developerMode)
-        developer.onChange = { [weak self] on in
-            ExtensionStore.developerMode = on
+    }
+
+    /// Looks through the apps in Applications for extensions that come inside them, off the main thread, then lists
+    /// them. When the Extensions page opens, and only then.
+    private func findAppExtensions() {
+        appExtensionsTask?.cancel()
+        appExtensionsTask = Task { @MainActor [weak self] in
+            let found = await Task.detached(priority: .utility) { AppBundledExtensions.find() }.value
+            guard let self, !Task.isCancelled else { return }
+            self.appExtensionsFound = found
+            if #available(macOS 15.4, *) { self.listAppExtensions() }
+        }
+    }
+
+    /// From Apps on This Mac: what was found, less what this profile has installed already, each with Install. Read
+    /// from each folder for its name and icon; the rows showing stay until the new ones are in.
+    @available(macOS 15.4, *)
+    private func listAppExtensions() {
+        let here = profile, has = Set(here.installs.installedIDs)
+        let offered = appExtensionsFound.filter { !has.contains(ExtensionStore.unpackedID(for: $0.folder)) }
+        let key = offered.map(\.folder.path)
+        if offered.isEmpty {
+            appExtensionsGroup.removeAllRows()
+            appExtensionsListing.show(key)
+            return
+        }
+        guard appExtensionsListing.needs(key) else { return }
+        Task { @MainActor [weak self] in
+            var rows: [FormRow] = []
+            for found in offered {
+                guard let ext = try? await WKWebExtension(resourceBaseURL: found.folder) else { continue }
+                let install = PillButton(title: String(localized: "Install", comment: "Button on an extension that comes inside an app, in Settings › Extensions › From Apps on This Mac."))
+                install.onClick = { [weak self] _ in self?.install(found) }
+                rows.append(FormRow(title: ext.displayName ?? found.appName,
+                                    detail: String(localized: "Comes with \(found.appName)", comment: "Under an extension in Settings › Extensions › From Apps on This Mac: the app on this Mac it comes inside, like StopTheMadness Pro."),
+                                    icon: ext.icon(for: NSSize(width: 24, height: 24)), control: install))
+            }
+            guard let self, self.appExtensionsListing.arrived(key) else { return }
+            self.appExtensionsGroup.removeAllRows()
+            rows.forEach(self.appExtensionsGroup.add)
+            if self.pane == .extensions || self.isSearching { self.layoutDocument() }
+        }
+    }
+
+    /// Installs an extension from the app it comes in, read from there: the app's updates update it.
+    private func install(_ found: AppBundledExtensions.Found) {
+        let profile = profile
+        Task { @MainActor [weak self] in
+            if await ExtensionStore.loadUnpacked(found.folder, in: profile) == nil, let host = self {
+                ConfirmSheet.notice(in: host, title: String(localized: "Couldn’t load this extension", comment: "Title of the notice when an unpacked extension can't load."),
+                                    message: String(localized: "\(found.appName) may have changed or moved. Open it once, then try again.",
+                                                    comment: "Message of the notice when an extension that comes inside an app can't install. The placeholder is the app, like StopTheMadness Pro."))
+            }
             self?.reloadExtensions()
         }
-        developerGroup.add(FormRow(title: String(localized: "Developer mode", comment: "A setting in Settings › Extensions."),
-                                   detail: String(localized: "Load an extension from a folder to test it.", comment: "Explanation under “Developer mode” in Settings › Extensions."),
-                                   control: developer))
     }
 
     @available(macOS 15.4, *)
@@ -1819,8 +1870,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // What matters about it at a glance, as one plain sentence.
         var detail: [String] = [ext.version.map { String(localized: "Version \($0)", comment: "An extension's version, under its name in Settings › Extensions.") } ?? ""]
             .filter { !$0.isEmpty }
-        if ExtensionStore.isUnpacked(id) {
-            detail.append(String(localized: "Unpacked", comment: "Under an extension's name in Settings › Extensions: it was loaded from a folder."))
+        if let path = ExtensionStore.package(id)?.unpackedPath {
+            if let app = AppBundledExtensions.app(containing: path) {
+                detail.append(String(localized: "From \(app)", comment: "Under an extension's name in Settings › Extensions: it was installed from inside an app on this Mac, like StopTheMadness Pro."))
+            } else {
+                detail.append(String(localized: "Unpacked", comment: "Under an extension's name in Settings › Extensions: it was loaded from a folder."))
+            }
         }
         if ExtensionStore.needsApproval(id) {
             detail.append(String(localized: "Update wants more access", comment: "Under an extension's name in Settings › Extensions."))
@@ -1846,7 +1901,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
-        panel.prompt = String(localized: "Load", comment: "Button of the panel that loads an unpacked extension from a folder.")
+        panel.prompt = String(localized: "Install", comment: "Button of the panel that installs an extension from a folder.")
         panel.message = String(localized: "Choose the folder that contains the extension’s manifest.json.",
                                comment: "Message of the panel that loads an unpacked extension. manifest.json is a file name.")
         let profile = profile
@@ -2193,6 +2248,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// more than one profile (`SettingsPane.websiteData(manyProfiles:)`).
     private var websiteDataGroups: [(title: String?, group: FormGroup)] { [(browsingDataHeading, privacyGroup), (siteDataHeading, siteDataGroup)] }
     private static var otherProfilesHeading: String { String(localized: "In Other Profiles", comment: "A heading in Settings › Extensions: extensions your other profiles have and the one shown doesn't.") }
+    private static var appExtensionsHeading: String { String(localized: "From Apps on This Mac", comment: "A heading in Settings › Extensions: extensions that come inside apps installed on this Mac, to install from there.") }
     /// What a button says for a moment once it has cleared something.
     private static var cleared: String { String(localized: "Cleared", comment: "Shown on a Clear button in Settings › Privacy for a moment after it clears.") }
 
@@ -2210,7 +2266,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .privacy: [(nil, blockingGroup), (Self.sitesHeading, sitesGroup)] + (SettingsPane.websiteData(manyProfiles: hasManyProfiles) == .privacy ? websiteDataGroups : [])
         case .websiteData: SettingsPane.websiteData(manyProfiles: hasManyProfiles) == .websiteData ? websiteDataGroups : []
         case .translation: [(nil, translationGroup), (Self.alwaysTranslateHeading, alwaysGroup)]
-        case .extensions: [(installedHeading, extensionsGroup), (Self.otherProfilesHeading, otherProfilesGroup), (nil, developerGroup)]
+        case .extensions: [(installedHeading, extensionsGroup), (Self.appExtensionsHeading, appExtensionsGroup), (Self.otherProfilesHeading, otherProfilesGroup)]
         case .shortcuts: shortcutGroups.map { ($0.0, $0.1) }
         case .automation: [(nil, aiGroup), (Self.connectHeading, connectGroup), (Self.scriptsHeading, scriptsGroup)]
         case .developer: [(nil, developerToolsGroup), (Self.developmentSitesHeading, developmentSitesGroup), (Self.pageSizesHeading, pageSizesGroup), (Self.localServersHeading, localServersGroup)]
@@ -2379,8 +2435,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 return buttons
             }
             section(installedHeading, extensionsGroup, accessory: buttons)
+            if !appExtensionsGroup.rows.isEmpty { section(Self.appExtensionsHeading, appExtensionsGroup) }
             if !otherProfilesGroup.rows.isEmpty { section(Self.otherProfilesHeading, otherProfilesGroup) }
-            section(nil, developerGroup)
         case .shortcuts:
             let resetAll: PillButton = made("reset") {
                 let resetAll = PillButton(title: String(localized: "Reset All…", comment: "Button in Settings › Shortcuts that puts every shortcut back."))

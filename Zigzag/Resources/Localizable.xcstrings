@@ -392,6 +392,17 @@
         }
       }
     },
+    "%@ may have changed or moved. Open it once, then try again." : {
+      "comment" : "Message of the notice when an extension that comes inside an app can't install. The placeholder is the app, like StopTheMadness Pro.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 可能已更改或移动。请先打开它一次，然后再试一次。"
+          }
+        }
+      }
+    },
     "%@ morning" : {
       "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”.",
       "localizations" : {
@@ -4553,6 +4564,17 @@
         }
       }
     },
+    "Comes with %@" : {
+      "comment" : "Under an extension in Settings › Extensions › From Apps on This Mac: the app on this Mac it comes inside, like StopTheMadness Pro.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 自带"
+          }
+        }
+      }
+    },
     "Connect 1Password to Zigzag" : {
       "comment" : "Title of the note shown from the 1Password extension's button until the 1Password app trusts Zigzag.",
       "localizations" : {
@@ -5435,17 +5457,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "开发者设置…"
-          }
-        }
-      }
-    },
-    "Developer mode" : {
-      "comment" : "A setting in Settings › Extensions.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开发者模式"
           }
         }
       }
@@ -6550,12 +6561,23 @@
       }
     },
     "From %@" : {
-      "comment" : "Name of the space imported bookmarks go into. The placeholder is a browser's name: From Chrome.",
+      "comment" : "Name of the space imported bookmarks go into. The placeholder is a browser's name: From Chrome.\nUnder an extension's name in Settings › Extensions: it was installed from inside an app on this Mac, like StopTheMadness Pro.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "来自 %@"
+          }
+        }
+      }
+    },
+    "From Apps on This Mac" : {
+      "comment" : "A heading in Settings › Extensions: extensions that come inside apps installed on this Mac, to install from there.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自这台 Mac 上的 App"
           }
         }
       }
@@ -7250,7 +7272,7 @@
       }
     },
     "Install" : {
-      "comment" : "Button of the Install as App sheet.",
+      "comment" : "Button of the Install as App sheet.\nButton of the panel that installs an extension from a folder.\nButton on an extension that comes inside an app, in Settings › Extensions › From Apps on This Mac.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7278,6 +7300,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "安装为应用…"
+          }
+        }
+      }
+    },
+    "Install from Folder…" : {
+      "comment" : "Button in Settings › Extensions: installs an extension from a folder on this Mac, one you're building or one that came with an app.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从文件夹安装…"
           }
         }
       }
@@ -8006,39 +8039,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "来自其他 App 的链接会在这里打开。"
-          }
-        }
-      }
-    },
-    "Load" : {
-      "comment" : "Button of the panel that loads an unpacked extension from a folder.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "载入"
-          }
-        }
-      }
-    },
-    "Load Unpacked…" : {
-      "comment" : "Button in Settings › Extensions, in developer mode: loads an extension from a folder.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "载入已解压的扩展…"
-          }
-        }
-      }
-    },
-    "Load an extension from a folder to test it." : {
-      "comment" : "Explanation under “Developer mode” in Settings › Extensions.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从文件夹载入扩展以进行测试。"
           }
         }
       }

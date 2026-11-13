@@ -7,6 +7,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - Open apps is a site permission like the camera's. When a page wants to open an app, like the App Store or Zoom, Zigzag asks with Open (this time), Always Open (that app, from now on) and Don’t Open. Once a site has asked, Permissions in its Site Controls and Settings › Privacy › Sites have an Open apps row with Ask, Allow and Block, and Block keeps every app closed for that site. Addresses you type or open yourself still open their app right away. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#192](https://github.com/ZigaoWang/zigzag/issues/192))
+- Install from Folder…, in Settings › Extensions, installs a Chrome extension from a folder on your Mac. It replaces Load Unpacked…, which only showed with Developer mode on. ([#194](https://github.com/ZigaoWang/zigzag/issues/194))
+- Settings › Extensions finds Chrome extensions that come inside apps on your Mac, like StopTheMadness Pro from the App Store, and lists them under From Apps on This Mac with an Install button. The extension is read from inside the app and never changed, so the app's updates update it too. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#194](https://github.com/ZigaoWang/zigzag/issues/194))
+
+### Fixed
+- Installing an extension with no background page, like some that only change pages, no longer quits Zigzag. ([#194](https://github.com/ZigaoWang/zigzag/issues/194))
 
 ## [0.9.0] - 2026-11-12
 

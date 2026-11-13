@@ -52,12 +52,12 @@ struct ExtensionPins: Equatable {
 ///     Extensions/<id>/state.json
 ///     Extensions/<id>/versions/<version>/   ← the package, untouched
 ///
-/// Unpacked extensions (for developers) are read in place from the folder the person chose.
+/// Extensions installed from a folder (one you're building, or one that comes inside an app) are read in place
+/// from that folder.
 enum ExtensionStore {
     static let onePasswordID = "aeblfdkhhhdcdjpifhhbdiojplfjncoa"
     private static let lastUpdateKey = "ExtensionsLastUpdateCheck"
     private static let removedKey = "RemovedExtensions"
-    private static let developerModeKey = "ExtensionsDeveloperMode"
 
     static var root: URL { Paths.directory("Extensions") }
     static func folder(for id: String) -> URL { root.appendingPathComponent(id, isDirectory: true) }
@@ -213,12 +213,6 @@ enum ExtensionStore {
     private static var removedIDs: Set<String> {
         get { Set(UserDefaults.standard.stringArray(forKey: removedKey) ?? []) }
         set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: removedKey) }
-    }
-
-    /// Shows "Load Unpacked…" in Settings.
-    static var developerMode: Bool {
-        get { UserDefaults.standard.bool(forKey: developerModeKey) }
-        set { UserDefaults.standard.set(newValue, forKey: developerModeKey) }
     }
 
     // MARK: The Chrome Web Store
@@ -447,12 +441,18 @@ enum ExtensionStore {
         return (ext, ExtensionReport(newIn: ext, manifest: newManifest, comparedTo: oldManifest, id: id))
     }
 
-    /// Loads an extension from a folder on disk, for testing one you're building. Its ID comes from the
-    /// folder's path, the way Chrome does it, so reloading the same folder keeps its data.
+    /// The ID of an extension read from a folder: from the folder's path, the way Chrome makes it, so loading the
+    /// same folder again keeps its data.
+    static func unpackedID(for url: URL) -> String {
+        CRXPackage.extensionID(Array(SHA256.hash(data: Data(url.standardizedFileURL.path.utf8)).prefix(16)))
+    }
+
+    /// Loads an extension from a folder on disk (Install from Folder, or one that comes inside an app), read where it
+    /// is and never changed.
     static func loadUnpacked(_ url: URL, in profile: Profile) async -> String? {
         guard #available(macOS 15.4, *),
               FileManager.default.fileExists(atPath: url.appendingPathComponent("manifest.json").path) else { return nil }
-        let id = CRXPackage.extensionID(Array(SHA256.hash(data: Data(url.standardizedFileURL.path.utf8)).prefix(16)))
+        let id = unpackedID(for: url)
         if !profile.installs.hasRecord(id) { profile.installs.newlyInstalled.insert(id) }
         save(Package(version: manifestVersion(in: url) ?? "0", unpackedPath: url.standardizedFileURL.path), for: id)
         // Loaded again from its folder, it starts as a new install would: on, with what it asks for approved afresh.
