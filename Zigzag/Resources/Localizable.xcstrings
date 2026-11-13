@@ -1887,6 +1887,17 @@
         }
       }
     },
+    "AI apps can’t use Zigzag now. Turn them back on in Settings › Automation." : {
+      "comment" : "Toast after Stop on the bar over a tab an AI app was using: every AI app is cut off until the setting is turned on again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 应用现在不能使用 Zigzag 了。可在“设置 › 自动化”中重新打开。"
+          }
+        }
+      }
+    },
     "About Zigzag" : {
       "comment" : "Title of the About window.\nZigzag menu item.",
       "localizations" : {
@@ -7621,6 +7632,17 @@
         }
       }
     },
+    "Its certificate isn’t trusted. You chose to visit it anyway, until you quit Zigzag." : {
+      "comment" : "Under the Connection row of the site panel, on a page whose certificate isn't trusted but you chose Visit this site anyway on the warning.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的证书不受信任。你选择了仍然访问，直到退出 Zigzag 为止。"
+          }
+        }
+      }
+    },
     "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins and history. Make sure you have your recovery phrases. This can’t be undone." : {
       "comment" : "Message of the sheet that asks before deleting data left by a profile that's no longer listed.",
       "localizations" : {
@@ -9506,7 +9528,7 @@
       }
     },
     "Not secure" : {
-      "comment" : "How a page loaded over plain http is marked, in the site panel and the address bar's tooltip.\nVoiceOver label of the warning before the address in a pop-up window.",
+      "comment" : "How a page loaded over plain http, or with a certificate you chose to trust anyway, is marked, in the site panel and the address bar's tooltip.\nVoiceOver label of the warning before the address in a pop-up window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -15912,6 +15934,17 @@
         }
       }
     },
+    "This site asks to be visited only over a secure connection, so it can’t be opened with this certificate." : {
+      "comment" : "Under Details on the page Zigzag shows for a site whose certificate can't be trusted, in place of Visit this site anyway, for a site that uses HSTS.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此网站要求只通过安全连接访问，所以无法用这个证书打开。"
+          }
+        }
+      }
+    },
     "This site can’t prove it is who it says it is, so Zigzag didn’t open it. Someone could be pretending to be it to see what you send." : {
       "comment" : "Message on the page Zigzag shows for a site whose certificate can't be trusted.",
       "localizations" : {
@@ -18086,6 +18119,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzag 未能读取它已有的密码，所以没有添加任何密码。请再试一次。"
+          }
+        }
+      }
+    },
+    "Zigzag couldn’t read the site’s certificate, so it can’t be trusted anyway." : {
+      "comment" : "Under Details on the page Zigzag shows for a site whose certificate can't be trusted, in place of Visit this site anyway, when the certificate couldn't be read.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 无法读取该网站的证书，所以无法仍然信任它。"
           }
         }
       }
