@@ -13,17 +13,37 @@ import WebKit
 /// (YouTube's, most often) arrive within hours, without an update to Zigzag. The engine is MPL-2.0 and ships as its
 /// own, unmodified file. The lists and the scriptlets (GPL-3.0) never ship in Zigzag: each Mac downloads them, as
 /// every blocker's users do; a first launch has them a few seconds in.
+///
+/// Zigzag's own fixes for sites its blocking gets in the way of are a list too, "Zigzag fixes", in the same syntax:
+/// site/filters/zigzag-fixes.txt, published at zigzagbrowser.com/filters/zigzag-fixes.txt with the website, and in the
+/// app as the copy used until the first download comes (or while offline). It's downloaded, checked, kept and run as
+/// uBlock Origin's lists are, so a site fix is a line there, not code. To add one: a line with the site and what it
+/// needs (a scriptlet such as `example.com##+js(prevent-fetch, /blocked/path)`, a hiding rule, or an exception to the
+/// lists before it such as `example.com#@#+js(...)`), its issue in a comment above it; deploy the site
+/// (site/deploy.sh); every Zigzag has it within the list's "Expires" time (12 hours), pages from their next load, with
+/// no release. Only what the engine takes reaches pages: scriptlets, exceptions and hiding for a named site. Letting
+/// a blocked request through instead belongs in the content blocker's lists (scripts/update_blocklists.sh), which come
+/// with releases.
 nonisolated enum AdFilterSources {
     struct List: Sendable {
         let id: String
         /// The publisher's addresses, in the order uBlock Origin itself tries them.
         let urls: [URL]
+        /// The name of the copy in the app, used until a download has come (Zigzag's own list only).
+        var bundled: String?
+        /// The size below which a download is taken for a cut-off or error page. Zigzag's own list is short.
+        var minimumSize = 1_000
+
+        /// The copy in the app, if the list has one.
+        var bundledData: Data? {
+            bundled.flatMap { Bundle.main.url(forResource: $0, withExtension: "txt") }.flatMap { try? Data(contentsOf: $0) }
+        }
     }
 
     private static func urls(_ strings: String...) -> [URL] { strings.compactMap(URL.init(string:)) }
 
-    /// uBlock Origin's own lists. Quick fixes, where YouTube's fixes land first, comes from its source before the
-    /// mirrors, which follow it by hours.
+    /// uBlock Origin's own lists, then Zigzag's. Quick fixes, where YouTube's fixes land first, comes from its source
+    /// before the mirrors, which follow it by hours.
     static let lists: [List] = [
         List(id: "ublock-filters", urls: urls("https://ublockorigin.github.io/uAssetsCDN/filters/filters.min.txt",
                                               "https://ublockorigin.pages.dev/filters/filters.min.txt",
@@ -35,7 +55,12 @@ nonisolated enum AdFilterSources {
         List(id: "ublock-unbreak", urls: urls("https://ublockorigin.github.io/uAssetsCDN/filters/unbreak.min.txt",
                                               "https://ublockorigin.pages.dev/filters/unbreak.min.txt",
                                               "https://cdn.jsdelivr.net/gh/uBlockOrigin/uAssetsCDN@main/filters/unbreak.min.txt")),
+        zigzagFixes,
     ]
+
+    /// Zigzag's own site fixes, last, so they can make exceptions to the lists before them.
+    static let zigzagFixes = List(id: "zigzag-fixes", urls: urls("https://zigzagbrowser.com/filters/zigzag-fixes.txt"),
+                                  bundled: "zigzag-fixes", minimumSize: 100)
 
     /// uBlock Origin's scriptlets, as Ghostery publishes them for its engine: an index naming each version by its
     /// SHA-256, and the versions themselves, which never change.
@@ -45,8 +70,8 @@ nonisolated enum AdFilterSources {
     }
 
     /// A list as its publisher writes one: text that starts with its title, and more than a few lines of it.
-    static func isList(_ data: Data) -> Bool {
-        guard data.count > 1_000, let head = String(data: data.prefix(512), encoding: .utf8) else { return false }
+    static func isList(_ data: Data, minimumSize: Int = 1_000) -> Bool {
+        guard data.count > minimumSize, let head = String(data: data.prefix(512), encoding: .utf8) else { return false }
         return head.hasPrefix("! Title:") || head.hasPrefix("[Adblock") && head.contains("! Title:")
     }
 
@@ -158,12 +183,13 @@ nonisolated final class AdEngine: @unchecked Sendable {
         if let data = try? JSONEncoder().encode(fetched) { try? data.write(to: stateFile, options: .atomic) }
     }
 
-    /// The downloaded lists and scriptlets as they are now, or nil while one is missing.
+    /// The downloaded lists and scriptlets as they are now (Zigzag's own list from the app until it's downloaded), or
+    /// nil while one is missing.
     private func inputs() -> (lists: [String], scriptlets: String, checksum: String)? {
         var lists: [String] = []
         var hash = SHA256()
         for list in AdFilterSources.lists {
-            guard let data = try? Data(contentsOf: listFile(list.id)), let text = String(data: data, encoding: .utf8) else { return nil }
+            guard let data = (try? Data(contentsOf: listFile(list.id))) ?? list.bundledData, let text = String(data: data, encoding: .utf8) else { return nil }
             lists.append(text)
             hash.update(data: data)
         }
@@ -338,7 +364,7 @@ nonisolated final class AdEngine: @unchecked Sendable {
                     fetched[list.id]?.checked = now
                     break
                 }
-                guard response.statusCode == 200, AdFilterSources.isList(data) else { continue }
+                guard response.statusCode == 200, AdFilterSources.isList(data, minimumSize: list.minimumSize) else { continue }
                 if (try? Data(contentsOf: listFile(list.id))) != data {
                     guard (try? data.write(to: listFile(list.id), options: .atomic)) != nil else { continue }
                     changed = true

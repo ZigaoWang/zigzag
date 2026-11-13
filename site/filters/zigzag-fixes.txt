@@ -1,0 +1,15 @@
+! Title: Zigzag fixes
+! Description: Fixes for sites that Zigzag's ad and tracker blocking gets in the way of, in uBlock Origin's syntax.
+! Zigzag downloads this list with uBlock Origin's own and runs it through the same engine and scriptlets.
+! Homepage: https://zigzagbrowser.com
+! Expires: 12 hours
+!
+! To add a fix: one line here, then deploy the site. Each Zigzag has it within 12 hours, with no new release.
+! Keep each entry as narrow as the block it works around, with its issue above it. More in Zigzag/Web/AdFilters.swift.
+
+! DeepSeek posts its telemetry to /api/v0/telemetry and EasyPrivacy blocks it (||chat.deepseek.com/api/v0/telemetry).
+! After three failures in a row, while its other calls go through, it says "Please check your browser extensions".
+! Its fetch and XMLHttpRequest get an empty answer instead: nothing is sent, as with the block.
+! https://github.com/ZigaoWang/zigzag/issues/208
+chat.deepseek.com##+js(prevent-fetch, /api/v0/telemetry)
+chat.deepseek.com##+js(prevent-xhr, /api/v0/telemetry)

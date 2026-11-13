@@ -72,6 +72,9 @@ targets:
         buildPhase: resources
       - path: THIRD_PARTY_NOTICES.md
         buildPhase: resources
+      # Zigzag's own site fixes, as the website publishes them: the copy used until the first download (AdFilters.swift).
+      - path: site/filters/zigzag-fixes.txt
+        buildPhase: resources
     dependencies:
       - package: Sparkle
       # The small app each site installed as an app runs (File › Install as App…): copied out of here into the

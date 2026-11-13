@@ -141,6 +141,7 @@
 		51EE9D0D64F917582D398645 /* MainThreadStallTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 683CCE47B510EA40E8885D53 /* MainThreadStallTests.swift */; };
 		52954A58F54060FB7FCEF032 /* custom-progress-bar.crx in Resources */ = {isa = PBXBuildFile; fileRef = 3CB299E45AC189FC47ACB508 /* custom-progress-bar.crx */; };
 		529A6EE9C8FC1FAFA5D383A8 /* NumberHints.swift in Sources */ = {isa = PBXBuildFile; fileRef = 316205FDAE606ECFE3682BA1 /* NumberHints.swift */; };
+		5369F94213B632536A8AD85C /* ublock-scriptlets.json in Resources */ = {isa = PBXBuildFile; fileRef = 2FDFB4912545EFB9A8843DFB /* ublock-scriptlets.json */; };
 		5407D3683D005B57D0D03AD8 /* tab-capture.js in Resources */ = {isa = PBXBuildFile; fileRef = ECFB222D7082B8C1D2724708 /* tab-capture.js */; };
 		54665D76641D0469C5A31D12 /* CommandActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F18C84CC63265389A43E642F /* CommandActionTests.swift */; };
 		548A302B2614C99406A1F549 /* AdFilters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165DC73A78E5DF3E0A0AB05D /* AdFilters.swift */; };
@@ -347,6 +348,7 @@
 		CFF40171919A4F0A934D4576 /* FaviconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192303361A76A758A8F9346F /* FaviconView.swift */; };
 		D1159A4A8B99C34E9E7A190F /* darkreader-proxy.js in Resources */ = {isa = PBXBuildFile; fileRef = 5995F9210B74A17F9F99A426 /* darkreader-proxy.js */; };
 		D14729ACC5D7A52A9E69E2A9 /* ChromiumImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59824EC63CB9D39A3EFC97CC /* ChromiumImporter.swift */; };
+		D1538CF3EF3457C5D0AE2445 /* zigzag-fixes.txt in Resources */ = {isa = PBXBuildFile; fileRef = 6E9A75D867A4168258E45153 /* zigzag-fixes.txt */; };
 		D230403602A78BE3B228B74C /* ErrorPageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09641835EC802C4387DBF55 /* ErrorPageTests.swift */; };
 		D2985616CED5916351C99C8F /* PublicSuffix.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0872FF032E0FE3CBD091DB5 /* PublicSuffix.swift */; };
 		D2C57092BCC2EE225A2762E1 /* SidebarRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32D47467F8351F9270BAE20A /* SidebarRows.swift */; };
@@ -539,6 +541,7 @@
 		2ED37168840DD1514429F6DA /* SettingsLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsLayoutTests.swift; sourceTree = "<group>"; };
 		2FC330CEE0425B72CE83C21D /* PageHolder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageHolder.swift; sourceTree = "<group>"; };
 		2FD8BEABF4B3488FB915B002 /* autoconsent-compact-rules.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "autoconsent-compact-rules.json"; sourceTree = "<group>"; };
+		2FDFB4912545EFB9A8843DFB /* ublock-scriptlets.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "ublock-scriptlets.json"; sourceTree = "<group>"; };
 		3014AEB17D7BEE4384710CD9 /* DeveloperToolsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperToolsTests.swift; sourceTree = "<group>"; };
 		30417C99681AAC2507555F94 /* ExtensionReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionReport.swift; sourceTree = "<group>"; };
 		316205FDAE606ECFE3682BA1 /* NumberHints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumberHints.swift; sourceTree = "<group>"; };
@@ -628,6 +631,7 @@
 		6CE05E70848504F5FE346B61 /* ZigzagRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ZigzagRelease.entitlements; sourceTree = "<group>"; };
 		6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
 		6E41E2FFAB5C045AC7D0D6C2 /* DarkReaderFixes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkReaderFixes.swift; sourceTree = "<group>"; };
+		6E9A75D867A4168258E45153 /* zigzag-fixes.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "zigzag-fixes.txt"; sourceTree = "<group>"; };
 		6E9E28B1061F9D52B96C814E /* ZigzagTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZigzagTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6F3D2DE7666043EE722FAEF2 /* TileLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileLayout.swift; sourceTree = "<group>"; };
 		6FCB792604C01E2E8F11B27E /* FindCountTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindCountTests.swift; sourceTree = "<group>"; };
@@ -1338,10 +1342,27 @@
 				DDA8091D12FF865D4C6F3952 /* chrome-local-state.json */,
 				3CB299E45AC189FC47ACB508 /* custom-progress-bar.crx */,
 				8BC5CFBDE21CD4D0E29009EB /* find-count.html */,
+				2FDFB4912545EFB9A8843DFB /* ublock-scriptlets.json */,
 				9DF2A2D01D8BD422F0F2323B /* firefox-profile */,
 				4DB46F7EBC33B0D2A4962BF7 /* orion */,
 			);
 			path = Fixtures;
+			sourceTree = "<group>";
+		};
+		CD39D1D910FD12A53CD6ABF8 /* site */ = {
+			isa = PBXGroup;
+			children = (
+				D4CF610C97072612D904C951 /* filters */,
+			);
+			path = site;
+			sourceTree = "<group>";
+		};
+		D4CF610C97072612D904C951 /* filters */ = {
+			isa = PBXGroup;
+			children = (
+				6E9A75D867A4168258E45153 /* zigzag-fixes.txt */,
+			);
+			path = filters;
 			sourceTree = "<group>";
 		};
 		DF27ED16EF9BB28D19F995E5 /* ZigzagTests */ = {
@@ -1495,6 +1516,7 @@
 				B239957460C6C2AA3079E793 /* CHANGELOG.zh-Hans.md */,
 				E35F3B1C28D9313BCCFA9CA4 /* LICENSE */,
 				FA29F3657E11FE3895D8BAC3 /* THIRD_PARTY_NOTICES.md */,
+				CD39D1D910FD12A53CD6ABF8 /* site */,
 				B228F7478163465F1BC541F3 /* Zigzag */,
 				DF27ED16EF9BB28D19F995E5 /* ZigzagTests */,
 				727FA9FDF3F79DE1A19C683E /* ZigzagWebApp */,
@@ -1713,6 +1735,7 @@
 				93F7D9887CC5E8E2800B8E67 /* orion-extensions.plist in Resources */,
 				4ACC19B6A01DF157CE2C9A94 /* orion-history.sql in Resources */,
 				C2C05749A76907433E6BEC4D /* reading_list.plist in Resources */,
+				5369F94213B632536A8AD85C /* ublock-scriptlets.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1760,6 +1783,7 @@
 				60C9CEF1FC960DAA8A7ED766 /* web-locks.js in Resources */,
 				8FC0847BA73A7DC315B4C5B7 /* web-store.js in Resources */,
 				3CBD062C1C7BADC2672D4998 /* webkit-differences.js in Resources */,
+				D1538CF3EF3457C5D0AE2445 /* zigzag-fixes.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
