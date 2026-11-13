@@ -97,7 +97,7 @@ enum ExternalLinks {
                                                     answered: { decision().map { $0 ? .allow : .deny } })
             asking.remove(key)
             switch answer {
-            case .allow:
+            case .allow, .alternate:
                 NSWorkspace.shared.open(url)
             case .always:
                 if saves, let origin { SitePermissions.allowOpeningApp(origin: origin, scheme: scheme) }

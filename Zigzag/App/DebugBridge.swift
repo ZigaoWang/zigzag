@@ -59,7 +59,7 @@ enum DebugBridge {
     /// minimenu <char> [cmd|shift|ctrl|opt...] (a menu item's action, sent as the menu would to Zigzag Mini),
     /// ministate <path> (JSON), minishot <path> (the window's own drawing, as a PNG; web content may be blank),
     /// miniclosebrowsers, minijs <script> (run in the mini page), miniesc (Esc in the address field), miniquit,
-    /// miniask notifications, minianswer allow|deny|notnow (the site's question), minisave save|notnow,
+    /// miniask notifications, minianswer allow|always|alternate|deny|notnow (the site's question), minisave save|notnow,
     /// minieval <path> <script>, miniswipe <dx> [slow] [noend] (as `swipe page`, over the mini page),
     /// miniborderless on|off (Settings › Appearance › Borderless page). With no Zigzag Mini open, miniask and minianswer
     /// use the front browser window.
@@ -220,7 +220,7 @@ enum DebugBridge {
             }
         case "minianswer":
             guard let host: PromptHost = mini ?? WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { break }
-            PermissionPrompt.debugAnswer(arg == "allow" ? .allow : arg == "always" ? .always : arg == "deny" ? .deny : .notNow, in: host)
+            PermissionPrompt.debugAnswer(arg == "allow" ? .allow : arg == "always" ? .always : arg == "alternate" ? .alternate : arg == "deny" ? .deny : .notNow, in: host)
         case "minisave": SavePasswordPrompt.debugAnswer(saved: arg == "save")
         case "minieval":
             // minieval <path> <script>: the script's result (it may await), written to the file.
@@ -276,6 +276,7 @@ enum DebugBridge {
             // The questions on screen, and which window each is in.
             if let mini { json["permissionInMini"] = PermissionPrompt.debugShowing(in: mini) ?? "" }
             json["permissionInBrowsers"] = WindowManager.shared.controllers.map { PermissionPrompt.debugShowing(in: $0) ?? "" }
+            json["permissionButtons"] = WindowManager.shared.controllers.map { PermissionPrompt.debugButtons(in: $0) }
             if let save = SavePasswordPrompt.debugShowing {
                 json["savePrompt"] = save.text
                 json["savePromptInMini"] = save.window != nil && save.window === mini?.window

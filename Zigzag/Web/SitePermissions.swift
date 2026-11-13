@@ -322,7 +322,7 @@ enum SitePermissions {
                                                 title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
                                                 answered: { notifications(origin: origin, tab: tab).map { $0 ? .allow : .deny } })
         switch answer {
-        case .allow, .always, .deny:
+        case .allow, .always, .alternate, .deny:
             tab?.permissionAnswers.note(answer != .deny, key: origin, kind: "notifications")
             return answer != .deny
         case .notNow:
@@ -353,7 +353,7 @@ enum SitePermissions {
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
                                                 answered: { key.flatMap { location(key: $0, tab: tab) }.map { $0 ? .allow : .deny } })
         switch answer {
-        case .allow, .always, .deny:
+        case .allow, .always, .alternate, .deny:
             if let key { tab?.permissionAnswers.note(answer != .deny, key: key, kind: "location") }
             return answer != .deny ? .grant : .deny
         case .notNow:
@@ -383,11 +383,50 @@ enum SitePermissions {
                                                 answered: { key.flatMap { decision(key: $0, type: type, tab: tab) }.map { $0 ? .allow : .deny } })
         // Only a clicked answer holds for the page; Esc, or the window closing, is "not now".
         switch answer {
-        case .allow, .always, .deny:
+        case .allow, .always, .alternate, .deny:
             if let key { tab?.permissionAnswers.note(answer != .deny, key: key, kind: kind(type)) }
             return answer != .deny ? .grant : .deny
         case .notNow:
             return .deny
+        }
+    }
+
+    /// Screen sharing (getDisplayMedia): asked every time, as Safari does, and nothing kept. Don't Allow, Share
+    /// Screen…, then Share Window… filled, as Safari offers them; either share hands over to macOS's own picker (ScreenCaptureKit's) for a window or a display, where you pick which.
+    static func requestDisplayCapture(origin securityOrigin: WKSecurityOrigin, window: NSWindow?, tab: Tab?) async -> DisplayCaptureChoice {
+        guard let controller = WindowManager.shared.promptHost(for: window) else { return .deny }
+        let site = SiteOrigin.of(securityOrigin)
+        let answer = await PermissionPrompt.ask(host: askerName(site), origin: site, what: "your screen", symbol: "rectangle.on.rectangle",
+                                                in: controller, tab: tab, title: DisplayCaptureChoice.title,
+                                                allowTitle: DisplayCaptureChoice.window.buttonTitle,
+                                                alternateTitle: DisplayCaptureChoice.screen.buttonTitle,
+                                                denyTitle: DisplayCaptureChoice.deny.buttonTitle)
+        return DisplayCaptureChoice(answer)
+    }
+}
+
+/// How a screen-sharing question is answered, as WebKit takes it (`WKDisplayCapturePermissionDecision` in
+/// WKUIDelegatePrivate.h): no, macOS's picker for a display, or its picker for a window. WebKit has no answer for one
+/// picker with both, short of asking nothing first.
+enum DisplayCaptureChoice: Int, CaseIterable {
+    case deny = 0, screen = 1, window = 2
+
+    /// From the prompt: Share Window… is its filled answer, Share Screen… the other way, anything else is no.
+    init(_ answer: PermissionPrompt.Answer) {
+        switch answer {
+        case .allow: self = .window
+        case .alternate: self = .screen
+        case .always, .deny, .notNow: self = .deny
+        }
+    }
+
+    static var title: String { String(localized: "Share your screen", comment: "Title of the prompt when a site asks to share the screen.") }
+
+    var buttonTitle: String {
+        switch self {
+        case .deny: String(localized: "Don’t Allow", comment: "Button on a site's permission question.")
+        case .screen: String(localized: "Share Screen…", comment: "Button on a site's question to share the screen: macOS's picker comes up to choose a display.")
+        case .window: String(localized: "Share Window…", comment: "Button on a site's question to share the screen: macOS's picker comes up to choose a window.")
         }
     }
 }
@@ -507,8 +546,9 @@ final class PermissionPrompt: FloatingPanelView {
     private weak var controller: PromptHost?
     private var tabsToken: SignalToken?
 
-    /// `always` only comes from a question that offers it (`alwaysTitle`): Allow, kept for the site.
-    enum Answer { case allow, always, deny, notNow }
+    /// `always` only comes from a question that offers it (`alwaysTitle`): Allow, kept for the site. `alternate` is
+    /// the other way to allow, from a question that offers one (`alternateTitle`): Share Screen… beside Share Window….
+    enum Answer { case allow, always, alternate, deny, notNow }
 
     private static var queue: [ObjectIdentifier: Task<Answer, Never>] = [:]
     /// The question on screen in each window, so it can follow the sidebar.
@@ -545,10 +585,11 @@ final class PermissionPrompt: FloatingPanelView {
     /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
     /// `tab` is the tab whose page asked; without one, it's the tab in front when the question comes up.
     /// `host` is how the site is named in the question; `origin`, when given, is the site it's for (`SiteOrigin`).
-    /// `alwaysTitle` adds a third answer between the two, Allow kept for the site (`Answer.always`).
+    /// `alwaysTitle` adds a third answer between the two, Allow kept for the site (`Answer.always`); `alternateTitle`
+    /// puts another way to allow there instead (`Answer.alternate`).
     static func ask(host: String, origin: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil, allowTitle: String = String(localized: "Allow", comment: "Button on a site's permission question."),
-                    alwaysTitle: String? = nil,
+                    alwaysTitle: String? = nil, alternateTitle: String? = nil,
                     denyTitle: String = String(localized: "Don’t Allow", comment: "Button on a site's permission question."), answered: @escaping () -> Answer? = { nil }) async -> Answer {
         let key = ObjectIdentifier(controller)
         let before = queue[key]
@@ -556,13 +597,14 @@ final class PermissionPrompt: FloatingPanelView {
             _ = await before?.value
             if let known = answered() { return known }
             return await show(host: host, request: title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English."), symbol: symbol, icon: icon, allowTitle: allowTitle,
-                              alwaysTitle: alwaysTitle, denyTitle: denyTitle, origin: origin, in: controller, tab: tab)
+                              alwaysTitle: alwaysTitle, alternateTitle: alternateTitle, denyTitle: denyTitle, origin: origin, in: controller, tab: tab)
         }
         queue[key] = task
         let answer = await task.value
         let said = switch answer {
         case .allow: "allowed"
         case .always: "always allowed"
+        case .alternate: "allowed the other way"
         case .deny: "not allowed"
         case .notNow: "put off"
         }
@@ -572,7 +614,7 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, allowTitle: String,
-                             alwaysTitle: String?, denyTitle: String, origin: String?, in controller: PromptHost, tab: Tab?) async -> Answer {
+                             alwaysTitle: String?, alternateTitle: String?, denyTitle: String, origin: String?, in controller: PromptHost, tab: Tab?) async -> Answer {
         // Never under What's New, where it couldn't be seen: it waits until the notes close.
         await withCheckedContinuation { continuation in
             WhatsNewSheet.afterClosing(in: controller.window) { continuation.resume() }
@@ -612,13 +654,14 @@ final class PermissionPrompt: FloatingPanelView {
             }
             // Kept for the site: plain, between the two, so the filled answer at the right stays the one-time one.
             var row: [PillButton] = [deny]
-            if let alwaysTitle {
-                let always = PillButton(title: alwaysTitle, style: .plain)
-                always.onClick = { [weak prompt] _ in
+            // Or the other way to allow, plain there too, so the filled one at the right stays the one you'd pick.
+            if let (middleTitle, middleAnswer) = alwaysTitle.map({ ($0, Answer.always) }) ?? alternateTitle.map({ ($0, Answer.alternate) }) {
+                let middle = PillButton(title: middleTitle, style: .plain)
+                middle.onClick = { [weak prompt] _ in
                     guard let prompt, prompt.acceptsAllow else { return }
-                    prompt.finish(.always)
+                    prompt.finish(middleAnswer)
                 }
-                row.append(always)
+                row.append(middle)
             }
             row.append(allow)
             for button in row { prompt.addSubview(button) }
@@ -690,7 +733,8 @@ final class PermissionPrompt: FloatingPanelView {
         isElevated = true
         radius = Tokens.Radius.panel
         let area = controller.focusedPaneFrame
-        let width = min(Self.width, area.width - Tokens.Space.x6)
+        // Wider when its answers need it (three long ones, like Share Screen… and Share Window…), so each keeps its room.
+        let width = min(max(Self.width, buttonsWidth + Self.pad * 2), area.width - Tokens.Space.x6)
         frame = NSRect(x: round(area.midX - width / 2), y: area.minY + Tokens.Space.x3, width: width, height: height(for: width))
     }
 
@@ -757,7 +801,7 @@ final class PermissionPrompt: FloatingPanelView {
     /// first half second.
     static func debugAnswer(_ answer: Answer, in host: PromptHost) {
         guard let prompt = shown[ObjectIdentifier(host)], !prompt.isHidden else { return }
-        if answer == .allow || answer == .always, !prompt.acceptsAllow { return }
+        if answer != .deny && answer != .notNow, !prompt.acceptsAllow { return }
         prompt.finish(answer)
     }
 
@@ -765,6 +809,12 @@ final class PermissionPrompt: FloatingPanelView {
     static func debugShowing(in host: PromptHost) -> String? {
         guard let prompt = shown[ObjectIdentifier(host)], prompt.superview != nil, !prompt.isHidden else { return nil }
         return prompt.request.stringValue + " " + prompt.asker.stringValue
+    }
+
+    /// The answers on the question showing in `host`, left to right.
+    static func debugButtons(in host: PromptHost) -> [String] {
+        guard let prompt = shown[ObjectIdentifier(host)], prompt.superview != nil, !prompt.isHidden else { return [] }
+        return prompt.buttons.compactMap { ($0.button as? PillButton)?.title }
     }
     #endif
 
@@ -790,6 +840,11 @@ final class PermissionPrompt: FloatingPanelView {
         return h + Tokens.Space.x4 + Self.buttonHeight + Self.pad
     }
 
+    /// The answers side by side at their own width, with the gaps between.
+    private var buttonsWidth: CGFloat {
+        buttons.reduce(0) { $0 + $1.width } + Self.buttonGap * CGFloat(max(0, buttons.count - 1))
+    }
+
     private func layoutContent() {
         let pad = Self.pad, w = bounds.width
         let textWidth = w - textX - pad - closeRoom
@@ -804,7 +859,7 @@ final class PermissionPrompt: FloatingPanelView {
         asker.frame = NSRect(x: textX - Label.inset, y: request.frame.maxY + 2, width: textWidth + Label.inset * 2, height: asker.lineHeight)
         let y = pad + header + Tokens.Space.x4
         // The two answers share the row evenly when it's narrow (in the sidebar); otherwise they sit at the right.
-        let total = buttons.reduce(0) { $0 + $1.width } + Self.buttonGap * CGFloat(max(0, buttons.count - 1))
+        let total = buttonsWidth
         let even = total > w - pad * 2 || w < Self.width
         let each = (w - pad * 2 - Self.buttonGap * CGFloat(max(0, buttons.count - 1))) / CGFloat(max(1, buttons.count))
         var x = w - pad

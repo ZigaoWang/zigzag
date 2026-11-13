@@ -13650,6 +13650,28 @@
         }
       }
     },
+    "Share Screen…" : {
+      "comment" : "Button on a site's question to share the screen: macOS's picker comes up to choose a display.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共享屏幕…"
+          }
+        }
+      }
+    },
+    "Share Window…" : {
+      "comment" : "Button on a site's question to share the screen: macOS's picker comes up to choose a window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共享窗口…"
+          }
+        }
+      }
+    },
     "Share your screen" : {
       "comment" : "Title of the prompt when a site asks to share the screen.",
       "localizations" : {
