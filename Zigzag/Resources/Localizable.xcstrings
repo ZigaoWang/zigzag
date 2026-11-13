@@ -576,6 +576,17 @@
         }
       }
     },
+    "%@ won’t work in Zigzag." : {
+      "comment" : "Under an extension's name in Settings › Extensions, after its version: the features it uses that Zigzag lacks, like “Side panel and notifications won’t work in Zigzag.”",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@在 Zigzag 里用不了。"
+          }
+        }
+      }
+    },
     "%@ works together with an app on your Mac, and Zigzag couldn’t find it. Install the app, then reopen Zigzag." : {
       "comment" : "Shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name.",
       "localizations" : {
@@ -1044,41 +1055,6 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld 个扩展"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "%lld features won’t work here" : {
-      "comment" : "Under an extension's name in Settings › Extensions.",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld feature won’t work here"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld features won’t work here"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld 项功能在这里无法使用"
                 }
               }
             }
@@ -17383,7 +17359,7 @@
       }
     },
     "Won’t work in Zigzag: %@." : {
-      "comment" : "In the extension install sheet. The placeholder lists features the extension uses that Zigzag lacks, like “side panel and notifications”.\nTooltip of an extension's row in Settings › Extensions: a list of the features Zigzag lacks.",
+      "comment" : "In the extension install sheet. The placeholder lists features the extension uses that Zigzag lacks, like “side panel and notifications”.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

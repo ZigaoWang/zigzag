@@ -1913,19 +1913,20 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         if ExtensionStore.needsApproval(id) {
             detail.append(String(localized: "Update wants more access", comment: "Under an extension's name in Settings › Extensions."))
         }
-        var limitsNote: String?
+        // The features it asks for that Zigzag lacks, named right in the row rather than counted: "2 features"
+        // says something is missing without saying what.
+        var summary = detail.isEmpty ? "" : Words.list(detail)
         if let manifest = ExtensionStore.manifest(for: id) {
             let limits = ExtensionReport(extension: ext, manifest: manifest, id: id).limits
-            if !limits.isEmpty {
-                detail.append(String(localized: "\(limits.count) features won’t work here", comment: "Under an extension's name in Settings › Extensions."))
-                let names = Words.list(limits.map { $0.prefix(1).lowercased() + $0.dropFirst() })
-                limitsNote = String(localized: "Won’t work in Zigzag: \(names).",
-                                    comment: "Tooltip of an extension's row in Settings › Extensions: a list of the features Zigzag lacks.")
+            if let first = limits.first {
+                let names = Words.list([first] + limits.dropFirst().map { $0.prefix(1).lowercased() + $0.dropFirst() })
+                let note = String(localized: "\(names) won’t work in Zigzag.",
+                                  comment: "Under an extension's name in Settings › Extensions, after its version: the features it uses that Zigzag lacks, like “Side panel and notifications won’t work in Zigzag.”")
+                summary = summary.isEmpty ? note : summary + "\n" + note
             }
         }
-        let row = FormRow(title: ext.displayName ?? id, detail: detail.isEmpty ? "" : Words.list(detail), icon: ext.icon(for: NSSize(width: 24, height: 24)), control: stack)
+        let row = FormRow(title: ext.displayName ?? id, detail: summary, icon: ext.icon(for: NSSize(width: 24, height: 24)), control: stack)
         row.revealsOnHover(remove)
-        row.toolTip = limitsNote
         return row
     }
 
