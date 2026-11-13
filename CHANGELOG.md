@@ -5,19 +5,14 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- Open apps is a site permission like the camera's. When a page wants to open an app, like the App Store or Zoom, Zigzag asks with Open (this time), Always Open (that app, from now on) and Don’t Open. Once a site has asked, Permissions in its Site Controls and Settings › Privacy › Sites have an Open apps row with Ask, Allow and Block, and Block keeps every app closed for that site. Addresses you type or open yourself still open their app right away. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#192](https://github.com/ZigaoWang/zigzag/issues/192))
-- Install from Folder…, in Settings › Extensions, installs a Chrome extension from a folder on your Mac. It replaces Load Unpacked…, which only showed with Developer mode on. ([#194](https://github.com/ZigaoWang/zigzag/issues/194))
-- Settings › Extensions finds Chrome extensions that come inside apps on your Mac, like StopTheMadness Pro from the App Store, and lists them under From Apps on This Mac with an Install button. The extension is read from inside the app and never changed, so the app's updates update it too. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#194](https://github.com/ZigaoWang/zigzag/issues/194))
-
-### Fixed
-- Installing an extension with no background page, like some that only change pages, no longer quits Zigzag. ([#194](https://github.com/ZigaoWang/zigzag/issues/194))
-
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
 
 ### New
+- Open apps is a site permission like the camera's. When a page wants to open an app, like the App Store or Zoom, Zigzag asks with Open (this time), Always Open (that app, from now on) and Don’t Open. Once a site has asked, Permissions in its Site Controls and Settings › Privacy › Sites have an Open apps row with Ask, Allow and Block, and Block keeps every app closed for that site. Addresses you type or open yourself still open their app right away. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#192](https://github.com/ZigaoWang/zigzag/issues/192))
+- Install from Folder…, in Settings › Extensions, installs a Chrome extension from a folder on your Mac. It replaces Load Unpacked…, which only showed with Developer mode on. ([#194](https://github.com/ZigaoWang/zigzag/issues/194))
+- Settings › Extensions finds Chrome extensions that come inside apps on your Mac, like StopTheMadness Pro from the App Store, and lists them under From Apps on This Mac with an Install button. The extension is read from inside the app and never changed, so the app's updates update it too. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#194](https://github.com/ZigaoWang/zigzag/issues/194))
 - Settings › Privacy › Sites lists each site's permissions under it, with Ask, Allow and Block as in its Site Controls, so you can change or take one back without opening the site. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#174](https://github.com/ZigaoWang/zigzag/issues/174))
 - Show in Finder, on each installed app's row in Settings › General and in the app's own File menu, shows the app selected in its folder. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
 - Drag a link, an address or some text onto the address, in the sidebar, the bar above the page, a split page's strip or Zigzag Mini: a link or an address opens there, and other text is searched for with your search engine. A ring around the address shows where it lands. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#182](https://github.com/ZigaoWang/zigzag/issues/182))
@@ -56,6 +51,7 @@ Split view with up to four pages, sites installed as apps of their own, the side
 - In Change Icon, the first choice shows the site's own icon, so it's clear that it puts the site's icon back.
 
 ### Fixed
+- Installing an extension with no background page, like some that only change pages, no longer quits Zigzag. ([#194](https://github.com/ZigaoWang/zigzag/issues/194))
 - Switching Borderless page with Settings open no longer leaves Settings laid out for the size it had: a scroll bar's strip beside the list of sections, a white band under it, and the switches out of line with the search field. Settings now moves with its page as the page takes or gives up its margin, and the page's corners and shadow follow the move instead of jumping to where they end. Thanks to [vandenbulckjean](https://github.com/vandenbulckjean). ([#184](https://github.com/ZigaoWang/zigzag/issues/184))
 - A permission set to Ask asks every time, as in Safari: answering a site's question for the camera, microphone, location or notifications holds for that page only, and the site asks again on its next visit. Allow and Block are kept, chosen in Site Controls, Settings › Privacy, or the address bar's camera button with Always Allow on This Site. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#174](https://github.com/ZigaoWang/zigzag/issues/174))
 - Find on page counts exactly the matches it goes through, as Safari does: hidden text, scripts and words running across two paragraphs no longer count, and matches in frames do. The count is read again when the page finishes loading. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#180](https://github.com/ZigaoWang/zigzag/issues/180))
