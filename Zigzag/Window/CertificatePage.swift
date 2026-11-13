@@ -171,7 +171,9 @@ final class CertificatePage: NSView {
             y += Tokens.Space.x5
             place(chainLabel, NSRect(x: pad - Label.inset, y: y, width: inner + Label.inset * 2, height: chainLabel.lineHeight))
             y += chainLabel.lineHeight + Tokens.Space.x2
-            for row in chainRows {
+            // A little room between rows, as the sidebar's have, so the chosen one's fill and the hovered one's never touch.
+            for (i, row) in chainRows.enumerated() {
+                if i > 0 { y += PanelLinkRow.gap }
                 place(row, NSRect(x: pad - PanelLinkRow.outset, y: y, width: inner + PanelLinkRow.outset * 2, height: ChainRow.height))
                 y += ChainRow.height
             }

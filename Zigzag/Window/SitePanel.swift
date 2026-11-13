@@ -1012,6 +1012,7 @@ final class SitePanel: FloatingPanelView {
             guard let row else { continue }
             row.isHidden = !links.contains(kind)
             guard !row.isHidden else { continue }
+            if placed, gapAfter == 0 { y += PanelLinkRow.gap }
             link(row)
             placed = true
             end(0, slack: row.bottomSlack)
@@ -1426,6 +1427,8 @@ final class PanelRow: NSView {
 final class PanelLinkRow: InteractiveView {
     static let height = Tokens.Page.rowHeight
     static let outset = Tokens.Space.x2
+    /// Between two rows in a list, the sidebar's gap: a hovered row's fill never touches its neighbor's.
+    static let gap = Tokens.Sidebar.rowGap
     private let title: Label
     /// What's there, quiet at the trailing end, before the chevron: "Secure", "2 allowed".
     private let valueLabel = Label("", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
