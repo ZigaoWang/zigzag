@@ -446,7 +446,7 @@ final class SitePanel: FloatingPanelView {
             tile.onClick = { [weak self] _ in
                 guard let self, let controller = self.controller else { return }
                 self.close()
-                tool.run(in: controller)
+                controller.runDeveloperTool(tool, on: self.tab)
             }
             addSubview(tile)
             return tile

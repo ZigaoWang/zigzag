@@ -1022,7 +1022,7 @@ extension CommandBarController {
         case "new-space": controller.newSpace(nil)
         default:
             // A developer tool does what its menu item does.
-            if let tool = DeveloperTool(commandID: id) { tool.run(in: controller); return }
+            if let tool = DeveloperTool(commandID: id) { controller.runDeveloperTool(tool, on: controller.tabManager.selectedTab); return }
             if let size = PageSizes.size(commandID: id) { controller.setPageSize(size.size); return }
             if id.hasPrefix("space:"), let space = UUID(uuidString: String(id.dropFirst(6))), Library.shared.space(space) != nil {
                 controller.tabManager.switchToSpace(space)

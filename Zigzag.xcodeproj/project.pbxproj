@@ -121,6 +121,7 @@
 		3F301EE8453229EED42DFAED /* ImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BD5AAEBB8EB9458DBC73239 /* ImportTests.swift */; };
 		3F3737BCE078C7D39FB1FC7B /* PhoneLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 599EFB79C407D6F01A467090 /* PhoneLinkTests.swift */; };
 		3F44E584CDB22914EEFD966E /* FirefoxImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F512EE34F01C45AF2FE2C52 /* FirefoxImporter.swift */; };
+		3FBB8E732936162A5C8EC8DE /* DeveloperMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95C8B6EAA27028D1A30EFAE8 /* DeveloperMenu.swift */; };
 		4026E10B64D404C941974769 /* SidebarMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6567506B7F99FD1755289D6C /* SidebarMenuTests.swift */; };
 		4049A34E6137133411D1BC58 /* DeveloperBarToolsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64016A5E5662CB06CF07C33 /* DeveloperBarToolsTests.swift */; };
 		406211D9FE2D298CC49C3183 /* SafePDF.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6549370C4EBE20CEA25CD102 /* SafePDF.swift */; };
@@ -807,6 +808,7 @@
 		9569CB3512DF9E729E1FDA49 /* PopupNotice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupNotice.swift; sourceTree = "<group>"; };
 		959ACDC16ECDF0A6CED7B431 /* PasswordGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordGenerator.swift; sourceTree = "<group>"; };
 		95BE2DC23683FEEFF817A678 /* SidebarUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarUndo.swift; sourceTree = "<group>"; };
+		95C8B6EAA27028D1A30EFAE8 /* DeveloperMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperMenu.swift; sourceTree = "<group>"; };
 		95F44051F969F0AE56E0C778 /* NestedTabsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NestedTabsTests.swift; sourceTree = "<group>"; };
 		95FCFEE43D95B1A09B1F883D /* chrome-api.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "chrome-api.json"; sourceTree = "<group>"; };
 		9639DF654DDE86C4358E43CB /* UpdateReadyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateReadyTests.swift; sourceTree = "<group>"; };
@@ -1735,6 +1737,7 @@
 			children = (
 				F1DAEEC9047C52B943D6F5E0 /* DeveloperAddressView.swift */,
 				3F1832E89D6F479620EBD61E /* DeveloperBarTools.swift */,
+				95C8B6EAA27028D1A30EFAE8 /* DeveloperMenu.swift */,
 				FCA190F9EEBCEE2543FE55EB /* DeveloperState.swift */,
 				635884E4DFD996B99AF4A7B7 /* DeveloperTool.swift */,
 				D88CA508C5606C98329015FB /* DeveloperTools.swift */,
@@ -2097,6 +2100,7 @@
 				3C594139A69C469E17BC1FA4 /* DeskController.swift in Sources */,
 				AF7B0E0C7B9B9E4F6BC801C2 /* DeveloperAddressView.swift in Sources */,
 				D3A86D92C8E9D6BBEC5DAF34 /* DeveloperBarTools.swift in Sources */,
+				3FBB8E732936162A5C8EC8DE /* DeveloperMenu.swift in Sources */,
 				CC863940E1D9104CAF03EB77 /* DeveloperState.swift in Sources */,
 				668F6AF894F474367C2F58F3 /* DeveloperTool.swift in Sources */,
 				A071E6A36E3CEF8A3CA1D201 /* DeveloperTools.swift in Sources */,

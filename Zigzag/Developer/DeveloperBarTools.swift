@@ -202,8 +202,8 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
     // MARK: Errors
 
     private var errorBadge: BadgeView?
-    /// What ⋯ says of the choices under it, where it doesn't carry the count.
-    private var hiddenChoiceValue: String?
+    /// Whether something chosen under ⋯ is in effect.
+    private var hasHiddenChoice = false
 
     /// The page's errors, counted on the console's button, or on ⋯ while the console is under it.
     private func refreshErrors() {
@@ -221,19 +221,17 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
             errorBadge = badge
         }
         // Said by the button that carries it; ⋯ otherwise says whether a choice under it is in effect.
-        let errors = DeveloperTool.errorValue(count)
-        if let console { buttons[console].setAccessibilityValue(holder === buttons[console] ? errors : nil) }
-        more.setAccessibilityValue(holder === more ? errors ?? hiddenChoiceValue : hiddenChoiceValue)
+        if let console { buttons[console].setAccessibilityValue(holder === buttons[console] ? DeveloperTool.errorValue(count) : nil) }
+        more.setAccessibilityValue(DeveloperMenu.moreValue(errors: holder === more ? count : nil, hasChoice: hasHiddenChoice))
     }
 
     /// ⋯ says whether something chosen under it is in effect, the buttons that gave way included: a choice nothing
     /// shows is one you forget you made. Then the count, which goes with what's under ⋯ too.
     private func refreshMore() {
         let state = tab?.developerInEffect ?? DeveloperState()
-        let hidden = DeveloperTool.hasChoiceInEffect(among: Self.toolsUnderMore(shown: shown), in: state)
-        let symbol = hidden ? "ellipsis.circle.fill" : "ellipsis"
+        hasHiddenChoice = DeveloperTool.hasChoiceInEffect(among: Self.toolsUnderMore(shown: shown), in: state)
+        let symbol = DeveloperMenu.moreSymbol(hasChoice: hasHiddenChoice)
         if more.symbol != symbol { more.symbol = symbol }
-        hiddenChoiceValue = hidden ? String(localized: "Choices in effect", comment: "Spoken by VoiceOver after More Developer Tools while something chosen in its menu is in effect, like JavaScript off, another user agent, or a look the page was asked for while its button is in the menu.") : nil
         refreshErrors()
     }
 
@@ -299,30 +297,15 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
     /// Whether the bar shows the page's whole address: the address itself is in the sidebar.
     private var showsAddress: Bool { (superview as? TopBarView).map { !$0.holdsAddress } ?? false }
 
-    private var isPrivate: Bool { controller?.tabManager.isPrivate ?? false }
-
-    private func run(_ tool: DeveloperTool) {
-        guard let controller, tool.isOffered(for: tab, isPrivate: isPrivate) else { return }
-        tool.run(in: controller)
-    }
-
-    /// `short`: under a heading that already says what it's about.
-    private func entry(_ tool: DeveloperTool, short: Bool = false) -> MenuPanel.Entry {
-        let state = tab?.developerInEffect ?? DeveloperState()
-        let title = tool == .site ? DeveloperTool.siteShortTitle(listed: DevelopmentSites.covers(tab?.url))
-            : tool == .pixelRatioDevice ? DeveloperTool.pixelRatioDeviceTitle(for: state.size, short: short)
-            : short ? tool.shortTitle : tool.title
-        return .item(.init(title: title, symbol: tool.symbol, isChecked: tab?.isDevelopment == true && tool.isChecked(in: state),
-                           isEnabled: tool.isOffered(for: tab, isPrivate: isPrivate) && tool.applies(in: state),
-                           shortcut: Shortcuts.keys(for: tool.action)) { [weak self] in self?.run(tool) })
-    }
+    /// The menus for the tab it shows.
+    private var tools: DeveloperMenu { DeveloperMenu(tab: tab, controller: controller) }
 
     private func pressed(_ index: Int) {
         let part = Self.parts[index], button = buttons[index]
-        guard part.tools.count > 1 else { part.tools.first.map(run); return }
+        guard part.tools.count > 1 else { part.tools.first.map { controller?.runDeveloperTool($0, on: tab) }; return }
         if let open = MenuPanel.current, open.anchor === button { open.close(); return }
         button.isSelected = true
-        MenuPanel.show(entries(of: part), from: button) { [weak button] in button?.isSelected = false }
+        MenuPanel.show(tools.entries(of: part), from: button) { [weak button] in button?.isSelected = false }
     }
 
     /// Page Size's menu from the size beside its button, pressed off its fields.
@@ -330,37 +313,7 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         guard let sizeIndex else { return }
         if let open = MenuPanel.current, open.anchor === sizeReadout { open.close(); return }
         sizeReadout.isSelected = true
-        MenuPanel.show(entries(of: Self.parts[sizeIndex]), from: sizeReadout) { [weak self] in self?.sizeReadout.isSelected = false }
-    }
-
-    /// A button's menu: its tools in their groups, and for the page's size the listed sizes among them, the one the
-    /// page has checked either way up.
-    private func entries(of part: Part) -> [MenuPanel.Entry] {
-        let sets = Self.grouped(part.tools)
-        var groups = sets.map { set in
-            (set.first?.choice?.heading.map { [MenuPanel.Entry.header($0)] } ?? []) + set.map { entry($0, short: part.title != nil) }
-        }
-        // The listed sizes are choices of the page's size, with Fill the Window.
-        if let sizes = sets.firstIndex(where: { $0.first?.choice == .size }) {
-            let state = tab?.developerInEffect ?? DeveloperState()
-            let now = PageSizes.named(state.size)
-            groups[sizes] += PageSizes.all.map { size in
-                .item(.init(title: PageSizes.menuTitle(size),
-                            isChecked: size == now, isEnabled: tab?.isDevelopment == true) { [weak self] in self?.controller?.setPageSize(size.size) })
-            }
-        }
-        return (part.title.map { [.header($0)] } ?? []) + groups.joined(separator: [.separator]).map { $0 }
-    }
-
-    /// Open In: the page in the other browsers on this Mac.
-    private func openInEntries() -> [MenuPanel.Entry] {
-        guard let url = tab?.url, tab?.isDevelopment == true else { return [] }
-        let browsers = OtherBrowsers.all(for: url)
-        guard !browsers.isEmpty else { return [] }
-        let heading = String(localized: "Open In", comment: "Heading in the ⋯ menu of the developer tools above the page, over the other browsers on this Mac: opens the page in one of them.")
-        return [.separator, .header(heading)] + browsers.map { browser in
-            .item(.init(title: browser.name, image: NSWorkspace.shared.icon(forFile: browser.url.path)) { OtherBrowsers.open(url, in: browser) })
-        }
+        MenuPanel.show(tools.entries(of: Self.parts[sizeIndex]), from: sizeReadout) { [weak self] in self?.sizeReadout.isSelected = false }
     }
 
     /// A button's tools as its menu has them: each set of choices together, in the order the tools have them, then
@@ -417,17 +370,8 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
     /// The buttons there's no room for, then the tools that are always under ⋯.
     private func showMore() {
         if let open = MenuPanel.current, open.anchor === more { open.close(); return }
-        var entries = Self.parts.dropFirst(shown).map(entries(of:)).joined(separator: [.separator]).map { $0 }
-        for group in Self.moreGroups {
-            if !entries.isEmpty { entries.append(.separator) }
-            // The choices of one thing under its name.
-            let heading = group.first?.group.flatMap { name in group.allSatisfy { $0.group == name } ? name.title : nil }
-            if let heading { entries.append(.header(heading)) }
-            entries += group.map { entry($0, short: heading != nil) }
-            if group.contains(.userAgentZigzag) { entries += openInEntries() }
-        }
         more.isSelected = true
-        MenuPanel.show(entries, from: more) { [weak self] in self?.more.isSelected = false }
+        MenuPanel.show(tools.moreEntries(folded: Self.parts.dropFirst(shown)), from: more) { [weak self] in self?.more.isSelected = false }
     }
 
     private var sizeIndex: Int? { Self.parts.firstIndex { $0.tools.contains(.sizeFill) } }

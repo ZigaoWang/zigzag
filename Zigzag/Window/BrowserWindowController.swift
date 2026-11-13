@@ -1023,6 +1023,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         paintTopBar()
     }
 
+    /// Runs a developer tool for a tab's page, from its menus wherever they are: that pane made the one you're in
+    /// first, as a click in it does, since every tool acts on the tab you're in. Only a tool offered there, with
+    /// something to do for the page's choices as they are, asked before anything changes: one that can't run leaves
+    /// you in the pane you were in.
+    func runDeveloperTool(_ tool: DeveloperTool, on tab: Tab?) {
+        guard let tab, tool.isOffered(for: tab, isPrivate: tabManager.isPrivate, inSplit: tabManager.shownSplit(for: tab) != nil),
+              tool.applies(in: tab.developerInEffect), tabManager.focusPane(tab) else { return }
+        tool.run(in: self)
+    }
+
     /// Whether a tab has the tools in the bar above its page: Site Controls shows them where it doesn’t.
     func showsDeveloperBarTools(for tab: Tab?) -> Bool {
         DeveloperBarTools.shows(isDevelopment: tab?.isDevelopment == true, showsInBar: DeveloperTools.showsInBar,
