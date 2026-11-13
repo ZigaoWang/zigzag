@@ -12,6 +12,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - A video in Picture in Picture stays on screen when you switch to another app or desktop, floating over everything as it does in Safari, until you close it. It used to go behind the next app and stay on the desktop it started on. Thanks to [alextend](https://github.com/alextend). ([#210](https://github.com/ZigaoWang/zigzag/issues/210))
+- A space with no tabs shows the empty page card, with its shadow and its own color apart from the sidebar's, instead of the sidebar's color running across the whole window. Thanks to [alextend](https://github.com/alextend). ([#210](https://github.com/ZigaoWang/zigzag/issues/210))
 
 ## [0.9.0] - 2026-11-12
 

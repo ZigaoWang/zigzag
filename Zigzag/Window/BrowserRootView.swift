@@ -279,14 +279,15 @@ final class BrowserRootView: SpaceFrameView {
     static let minimumPaneHeight: CGFloat = 160
     let sidebarContainer: SidebarContainer
     let card = PageCardView()
-    /// With no tab open, the page steps away and leaves the space's color, with one way to start.
+    /// With no tab open, the page card stays, empty, its own color apart from the sidebar's, with the wordmark on
+    /// it (#210): the window still reads as a sidebar and a page, as it does with a page open.
     let emptyHint = EmptySpaceMark()
     var isEmpty = false {
         didSet {
             guard oldValue != isEmpty else { return }
+            // The bar above the page takes the page's color, and there's none now.
             refreshGlassFrame()
             Tokens.Motion.animate(Tokens.Motion.feedback) {
-                self.card.animator().alphaValue = self.isEmpty || self.pagesHidden ? 0 : 1
                 self.emptyHint.animator().alphaValue = self.isEmpty ? 1 : 0
             }
         }
@@ -297,7 +298,7 @@ final class BrowserRootView: SpaceFrameView {
         didSet {
             guard oldValue != pagesHidden else { return }
             Tokens.Motion.withoutAnimation {
-                card.alphaValue = isEmpty || pagesHidden ? 0 : 1
+                card.alphaValue = pagesHidden ? 0 : 1
                 extraCards.forEach { $0.alphaValue = pagesHidden ? 0 : 1 }
             }
             refreshGlassOcclusion()
@@ -909,12 +910,11 @@ final class BrowserRootView: SpaceFrameView {
     /// of the whole window every frame the page changes (a video, an animation). Otherwise the whole window.
     override var glassFrame: NSRect {
         // Edge to edge under the bar above the page, only the bar shows the frame, as in Zigzag Mini.
-        if showsTopBar, isEdgeToEdge, !card.isHidden, !isEmpty { return topBarFrame }
+        if showsTopBar, isEdgeToEdge, !card.isHidden { return topBarFrame }
         // Beside the sidebar too, the frame shows along the top and the side: glass under all of it.
         if showsTopBar { return bounds }
-        // An empty space shows the frame where the page would be: glass under all of it.
-        // A split view's seam between its two pages shows the frame too: glass under all of it then.
-        guard sidebarVisible, card.isAttached, !card.isHidden, !isEmpty,
+        // A split view's seam between its two pages shows the frame: glass under all of it then.
+        guard sidebarVisible, card.isAttached, !card.isHidden,
               extraCards.allSatisfy({ $0.isHidden || $0.alphaValue == 0 }) else { return bounds }
         return Self.mirrored(NSRect(x: 0, y: 0, width: min(bounds.width, sidebarWidth + Tokens.Radius.attached * 2), height: bounds.height),
                              in: bounds, if: sidebarOnRight)
@@ -931,7 +931,7 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     /// Nothing to see through: the page runs edge to edge, or the tab overview covers the window with its own glass.
-    override var glassIsCovered: Bool { (isEdgeToEdge && (!showsTopBar || paintsTopBar) && !card.isHidden && !isEmpty) || glassCovered }
+    override var glassIsCovered: Bool { (isEdgeToEdge && (!showsTopBar || paintsTopBar) && !card.isHidden) || glassCovered }
 
     override func layout() {
         super.layout()
@@ -1702,7 +1702,7 @@ final class SplitDropHint: NSView {
 }
 
 
-/// What a space with no tabs shows on its color: the wordmark lightly engraved into it. The letters' floor is a
+/// What a space with no tabs shows on its empty page card: the wordmark lightly engraved into it. The letters' floor is a
 /// shade darker, their upper wall casts a soft shadow inside them, and their lower rim catches a thin line of light,
 /// so it reads as pressed in on any color, black and white included. Nothing to click or dismiss; ⌘T and the
 /// sidebar's New Tab are where a tab comes from.
