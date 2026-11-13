@@ -231,6 +231,7 @@
 		8E3C385DDEE5EEBB729EF55B /* BrowserRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 253D16FCBE561D267ED6957C /* BrowserRootView.swift */; };
 		8EA92F19466027B9503E537A /* ExtensionCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDEA633FD3B5DC3FC7268252 /* ExtensionCenter.swift */; };
 		8FC0847BA73A7DC315B4C5B7 /* web-store.js in Resources */ = {isa = PBXBuildFile; fileRef = BFA4024AB1ACBF6FB0BDD0BD /* web-store.js */; };
+		8FE22A2F18661ACD22105921 /* SplitRowAlignmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB383D1A0A96BBBED89873A /* SplitRowAlignmentTests.swift */; };
 		8FFF17FE67210434B930B549 /* MCPServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521AE408AF88148280EB7303 /* MCPServerTests.swift */; };
 		902CD60C9DC21A528D47701B /* CrashReports.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8551A279CC24B357CC11755E /* CrashReports.swift */; };
 		91501632F628CC18660775E6 /* SecurityFixesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7890881D589D032D70E5DC20 /* SecurityFixesTests.swift */; };
@@ -866,6 +867,7 @@
 		FA1F3192157697E1DC3F2FA2 /* favourites.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = favourites.plist; sourceTree = "<group>"; };
 		FA29F3657E11FE3895D8BAC3 /* THIRD_PARTY_NOTICES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_NOTICES.md; sourceTree = "<group>"; };
 		FA898046DCAF6AC4AC020C07 /* ContactCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactCard.swift; sourceTree = "<group>"; };
+		FAB383D1A0A96BBBED89873A /* SplitRowAlignmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitRowAlignmentTests.swift; sourceTree = "<group>"; };
 		FB5152360ED2798576497043 /* SettingsPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageTests.swift; sourceTree = "<group>"; };
 		FCA190F9EEBCEE2543FE55EB /* DeveloperState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperState.swift; sourceTree = "<group>"; };
 		FF4C5952AA98F3E6F967D1C5 /* Shortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shortcuts.swift; sourceTree = "<group>"; };
@@ -1461,6 +1463,7 @@
 				16AEB2E8A02B7015054DCA5D /* SpaceProfileTests.swift */,
 				87D85B5B031BEAE510CBFC57 /* SpaceSwitcherTests.swift */,
 				B13E82E7DA1A290559EC8C20 /* SplitDropTests.swift */,
+				FAB383D1A0A96BBBED89873A /* SplitRowAlignmentTests.swift */,
 				84DC4BF1B68F50F24CC6EF1E /* SystemPasswordsTests.swift */,
 				E18895E549507CE748D20047 /* TabDropIndexTests.swift */,
 				C07FFC0A0F58B379C40EE66C /* TabMuteTests.swift */,
@@ -2121,6 +2124,7 @@
 				AE818F69AF3976205EEFA7F0 /* SpaceProfileTests.swift in Sources */,
 				1AB813A270FF9CA633D5E2F7 /* SpaceSwitcherTests.swift in Sources */,
 				40D4C0EB780B16A242E6E1E6 /* SplitDropTests.swift in Sources */,
+				8FE22A2F18661ACD22105921 /* SplitRowAlignmentTests.swift in Sources */,
 				7E8182058C1A204FEFEC999B /* SystemPasswordsTests.swift in Sources */,
 				686B2764EE4C4C1D72AF1B54 /* TabDropIndexTests.swift in Sources */,
 				28E294D56D1D8EBE737612AF /* TabMuteTests.swift in Sources */,

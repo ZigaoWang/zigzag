@@ -345,15 +345,17 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// Two pages in one row: a split of tabs, or a pinned split.
     var isSplit: Bool { partner != nil || pinnedPartner != nil }
     /// Which page you're working in, when split (0 = this row's own, 1 = its partner).
-    var focusedHalf = 0 { didSet { if oldValue != focusedHalf { refreshTitleColor() } } }
+    var focusedHalf = 0 { didSet { if oldValue != focusedHalf { refreshTitleColor(); needsLayout = true } } }
     /// The part whose page is zoomed over the rest of its split or group (`half(at:)`'s numbering), lit; nil for none.
     var zoomedPart: Int? { didSet { if oldValue != zoomedPart { needsLayout = true } } }
     /// The light under the zoomed part: the row's own pressed fill, inset as the split drop's half is.
     /// Made the first time a part of this row is zoomed.
     private var zoomMarkView: ColorView?
 
+    /// The part lit under its page: the one zoomed over the rest, or else, in the row you're on, the page you're in,
+    /// so a row of several pages says which one has you, as the page area does.
     private func layoutZoomMark() {
-        guard let part = zoomedPart, isSplit else {
+        guard let part = zoomedPart ?? (isSelected ? focusedHalf : nil), isSplit else {
             zoomMarkView?.isHidden = true
             return
         }
@@ -373,6 +375,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         let span = spans[spatial]
         // The row's own ends keep the row's inset; between parts, the middle of the gap.
         zoomMark.frame = NSRect(x: span.start + inset, y: inset, width: max(0, span.end - span.start - inset * 2), height: bounds.height - inset * 2)
+        // The page you're in, the row's hover wash; one zoomed over the rest, its pressed fill.
+        zoomMark.color = zoomedPart == nil ? Tokens.Color.hoverFill : Tokens.Color.pressedFill
         zoomMark.isHidden = false
     }
     /// The partner is on the left of the page, so it's on the left of the row too (a pinned page beside a tab).
@@ -888,17 +892,17 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             let lines = [divider] + views.map(\.divider)
             let pieces: [(NSView, NSView, IconButton)] = [(icon, title, audioButton), (partnerIcon, partnerTitle, partnerAudioButton)]
                 + views.map { ($0.icon, $0.title, $0.audio) }
-            // Every part the same: titles in all of them or in none. Without titles each part's icon (and its speaker,
-            // while it plays) sits in the middle of the part, so the row reads as even steps rather than icons pushed
-            // to the left of empty room; pointing at a part names its page.
+            // Every part the same: titles in all of them or in none. Each part's icon sits where a tab's does in its
+            // row, its part's inset in from where the part starts, so the first lines up with the icons of the rows
+            // above and below and the rest step along after it, as a split of two's do; without titles the speaker,
+            // while that page plays, follows its icon. Pointing at a part names its page.
             let titles = parts.first.map { Self.segmentShowsTitle(width: $0.end - $0.start) } ?? false
             for (i, part) in parts.enumerated() where i < pieces.count {
                 let (icon, title, audio) = pieces[i]
                 if titles {
                     place(icon: icon, title: title, audio: audio, from: part.start, to: part.end)
                 } else {
-                    let width = side + (audio.isHidden ? 0 : Self.buttonGap + size.width)
-                    icon.frame = NSRect(x: round((part.start + part.end - width) / 2), y: iconY, width: side, height: side)
+                    icon.frame = NSRect(x: part.start + Self.inset, y: iconY, width: side, height: side)
                     if !audio.isHidden { audio.frame.origin = NSPoint(x: icon.frame.maxX + Self.buttonGap, y: y) }
                     title.frame = NSRect(x: icon.frame.maxX, y: titleY, width: 0, height: titleH)
                 }
