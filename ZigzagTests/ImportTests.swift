@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import SQLite3
@@ -262,6 +263,71 @@ struct ImportAgainTests {
         #expect(!ImportWindowController.startsOver(.choose))
         #expect(!ImportWindowController.startsOver(.importing))
         #expect(!ImportWindowController.startsOver(nil))
+    }
+}
+
+/// The Import window laid out with no browser, with some, and going from one to the other: everything it shows has
+/// a place of its own. With none found, its choices once drew piled in the top-left corner (#212).
+@MainActor
+struct ImportLayoutTests {
+    /// Made-up files, so no run reads a real browser's folders.
+    static func files(_ count: Int) -> [ImportCoordinator.Source] {
+        (0..<count).map { ImportCoordinator.fileSource(FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-layout-\($0).csv")) }
+    }
+
+    static func laidOut(_ view: ImportView) -> [NSView] {
+        view.frame = NSRect(x: 0, y: 0, width: 560, height: 2000)
+        view.needsLayout = true
+        view.layoutSubtreeIfNeeded()
+        return view.subviews.filter { !$0.isHidden }
+    }
+
+    static func expectNothingPiled(_ shown: [NSView], sourceLocation: SourceLocation = #_sourceLocation) {
+        for view in shown {
+            #expect(view.frame.width > 0 && view.frame.height > 0, "\(type(of: view)) has no size", sourceLocation: sourceLocation)
+        }
+        for (i, a) in shown.enumerated() {
+            for b in shown[(i + 1)...] {
+                #expect(!a.frame.intersects(b.frame), "\(type(of: a)) \(a.frame) overlaps \(type(of: b)) \(b.frame)", sourceLocation: sourceLocation)
+            }
+        }
+    }
+
+    @Test func noBrowsersShowsTheEmptyStateAndNoChoices() {
+        let view = ImportView(presentation: .window, detect: { [] })
+        let shown = Self.laidOut(view)
+        Self.expectNothingPiled(shown)
+        #expect(shown.contains { $0 is ImportEmptyState })
+        #expect(!shown.contains { $0 is ChoicePill })
+        #expect(view.foundNone)
+    }
+
+    @Test func oneAndManyBrowsersShowTheirChoices() {
+        for count in [1, 6] {
+            let view = ImportView(presentation: .window, detect: { Self.files(count) })
+            let shown = Self.laidOut(view)
+            Self.expectNothingPiled(shown)
+            #expect(!shown.contains { $0 is ImportEmptyState })
+            #expect(shown.contains { $0 is ChoicePill })
+        }
+    }
+
+    @Test func goingFromNoneToSomeAndBackLaysOutAgain() {
+        var found: [ImportCoordinator.Source] = []
+        let view = ImportView(presentation: .window, detect: { found })
+        Self.expectNothingPiled(Self.laidOut(view))
+        found = Self.files(2)
+        view.reloadSources()
+        let some = Self.laidOut(view)
+        Self.expectNothingPiled(some)
+        #expect(!some.contains { $0 is ImportEmptyState })
+        #expect(some.contains { $0 is ChoicePill })
+        found = []
+        view.reloadSources()
+        let none = Self.laidOut(view)
+        Self.expectNothingPiled(none)
+        #expect(none.contains { $0 is ImportEmptyState })
+        #expect(!none.contains { $0 is ChoicePill })
     }
 }
 

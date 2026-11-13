@@ -1695,6 +1695,8 @@ enum DebugBridge {
                 }
             }
         case "importgo": (ImportWindowController.shared?.window?.contentView as? ImportView)?.debugImport()
+        // The Import window looks for browsers again, as it does when it comes forward with none found.
+        case "importrescan": (ImportWindowController.shared?.window?.contentView as? ImportView)?.reloadSources()
         // The Import window's Not Now, or Don't Add while it asks about extensions.
         case "importnotnow": (ImportWindowController.shared?.window?.contentView as? ImportView)?.debugNotNow()
         case "onboardgo": (WelcomeWindowController.shared?.window?.contentView as? OnboardingView)?.debugNext()

@@ -66,11 +66,14 @@ final class ImportView: NSView {
     private var reviewAnswer: CheckedContinuation<Bool, Never>?
     private var importTask: Task<Void, Never>?
     private var extensionFailures: [ExtensionImport.Failure] = []
-    private let emptyNote = NSTextField(wrappingLabelWithString: String(localized: "No other browsers with data were found on this Mac. You can still bring passwords from a CSV export.",
-                                                                            comment: "Import window, when no other browser was found."))
+    /// With no other browser found: says so, and what can still come over from a file.
+    private let emptyState = ImportEmptyState()
+    /// Finds the browsers to list; a test hands in its own, so no run reads a real browser's folders.
+    private let detect: @MainActor () -> [ImportCoordinator.Source]
 
-    init(presentation: Presentation) {
+    init(presentation: Presentation, detect: @escaping @MainActor () -> [ImportCoordinator.Source] = ImportCoordinator.detectedSources) {
         self.presentation = presentation
+        self.detect = detect
         super.init(frame: .zero)
         wantsLayer = true
         switch presentation {
@@ -93,9 +96,6 @@ final class ImportView: NSView {
         signInsNote.font = Tokens.Font.small()
         signInsNote.textColor = Tokens.Color.textSecondary
         signInsNote.isSelectable = false
-        emptyNote.font = Tokens.Font.body()
-        emptyNote.textColor = Tokens.Color.textSecondary
-        emptyNote.isSelectable = false
         rowScroll.drawsBackground = false
         rowScroll.useSlimScroller()
         rowScroll.verticalScrollElasticity = .allowed
@@ -103,7 +103,8 @@ final class ImportView: NSView {
         rowScroll.contentView = FlippedClipView()
         rowScroll.contentView.drawsBackground = false
         rowScroll.documentView = rowList
-        [title, subtitle, rowScroll, choiceLabel, signInsNote, intoLabel, intoPicker, chooseFile, primary, secondary].forEach { addSubview($0) }
+        emptyState.isHidden = true
+        [title, subtitle, emptyState, rowScroll, choiceLabel, signInsNote, intoLabel, intoPicker, chooseFile, primary, secondary].forEach { addSubview($0) }
         intoIDs = ProfileChoice.fill(intoPicker, selected: intoProfile)
         intoPicker.setAccessibilityLabel(intoLabel.stringValue)
         intoPicker.onSelect = { [weak self] index in
@@ -149,9 +150,11 @@ final class ImportView: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    private func reloadSources() {
+    /// Lists the browsers found now. Again later (a browser installed while it's open), it starts the choice over.
+    func reloadSources() {
+        guard stage == .choose else { return }
         rows.forEach { $0.removeFromSuperview() }
-        let found = ImportCoordinator.detectedSources()
+        let found = detect()
         let suggested = ImportCoordinator.suggested(found)
         // The browser you use first and on; the rest start off so nothing comes over by surprise.
         sources = found.filter { suggested.contains($0.id) } + found.filter { !suggested.contains($0.id) }
@@ -162,24 +165,45 @@ final class ImportView: NSView {
             rowList.addSubview(row)
             return row
         }
-        if sources.isEmpty { addSubview(emptyNote) } else { emptyNote.removeFromSuperview() }
         choicesChanged()
+        fitWindow()
     }
 
+    /// Whether there are browsers to choose from and what to bring from them: not with none found, nor once importing.
+    private var showsChoices: Bool { stage == .choose && !sources.isEmpty }
+    var foundNone: Bool { sources.isEmpty }
+    /// With no browser found, a file is the only way in, so choosing one is the main button.
+    private var choosesFileFirst: Bool { stage == .choose && sources.isEmpty }
+
     @objc private func choicesChanged() {
-        let anyArc = rows.contains { $0.isChosen && $0.source.offers.contains(.tabs) }
-        for pair in choiceButtons where pair.0 == .tabs || pair.0 == .openTabs { pair.1.isHidden = !anyArc }
+        func anyChosen(offering choice: ImportCoordinator.Choice) -> Bool { rows.contains { $0.isChosen && $0.source.offers.contains(choice) } }
         // Safari's stay behind (they need Full Disk Access), so Sign-ins shows only for a browser that has them.
-        let anySignIns = rows.contains { $0.isChosen && $0.source.offers.contains(.signIns) }
-        // A browser whose Keychain item isn't known (Comet) brings no passwords; alone, it offers none.
-        choiceButtons.first { $0.0 == .passwords }?.1.isHidden = rows.contains(where: \.isChosen) && !rows.contains { $0.isChosen && $0.source.offers.contains(.passwords) }
-        choiceButtons.first { $0.0 == .signIns }?.1.isHidden = !anySignIns
-        // Only in their own window: the welcome has a step of its own for extensions.
+        let anySignIns = anyChosen(offering: .signIns)
+        for (choice, pill) in choiceButtons {
+            let offered: Bool
+            switch choice {
+            case .tabs, .openTabs: offered = anyChosen(offering: .tabs)
+            // A browser whose Keychain item isn't known (Comet) brings no passwords; alone, it offers none.
+            case .passwords: offered = !rows.contains(where: \.isChosen) || anyChosen(offering: .passwords)
+            case .signIns: offered = anySignIns
+            // Only in their own window: the welcome has a step of its own for extensions.
+            case .extensions: offered = presentation == .window && anyChosen(offering: .extensions)
+            default: offered = true
+            }
+            // With nothing to choose from, no choice shows at all: left showing, they drew with no frame, piled in
+            // the window's corner.
+            pill.isHidden = !showsChoices || !offered
+        }
+        choiceLabel.isHidden = !showsChoices
         let extensionsPill = choiceButtons.first { $0.0 == .extensions }?.1
-        extensionsPill?.isHidden = presentation != .window || !rows.contains { $0.isChosen && $0.source.offers.contains(.extensions) }
         let otherStores = extensionsPill.map { !$0.isHidden && $0.isOn } == true && rows.contains { $0.isChosen && !$0.source.offers.contains(.extensions) }
         signInsNote.stringValue = [anySignIns ? Self.signInsText : nil, otherStores ? Self.extensionsText : nil].compactMap { $0 }.joined(separator: " ")
-        primary.isEnabled = stage != .choose || (rows.contains(where: \.isChosen) && !chosenData.isEmpty)
+        emptyState.isHidden = !choosesFileFirst
+        if stage == .choose {
+            chooseFile.isHidden = choosesFileFirst
+            primary.title = choosesFileFirst ? chooseFile.title : String(localized: "Import", comment: "Main button in the Import window.")
+        }
+        primary.isEnabled = stage != .choose || choosesFileFirst || (rows.contains(where: \.isChosen) && !chosenData.isEmpty)
         needsLayout = true
     }
 
@@ -189,7 +213,7 @@ final class ImportView: NSView {
 
     private func primaryAction() {
         switch stage {
-        case .choose: startImport(rows.filter(\.isChosen))
+        case .choose: if choosesFileFirst { pickFile() } else { startImport(rows.filter(\.isChosen)) }
         case .importing: if review != nil { answerReview(true) }
         case .done: onClose?()
         }
@@ -407,7 +431,9 @@ final class ImportView: NSView {
         let bottom = subviews.filter { !$0.isHidden && $0.superview === self }.map(\.frame.maxY).max() ?? bounds.height
         let height = min(bottom + Tokens.Space.x6, 780)
         var frame = window.frame
-        let delta = height - window.contentLayoutRect.height
+        // Against the view's own height, as the window was first sized: it runs under the title bar, so the
+        // layout rect (below it) fitted every later change a title bar too tall.
+        let delta = height - bounds.height
         guard abs(delta) > 1 else { return }
         frame.size.height += delta
         frame.origin.y -= delta
@@ -515,7 +541,6 @@ final class ImportView: NSView {
         let visibleRows = items.filter { !$0.isHidden && $0.superview === rowList }
         let rowHeights: [CGFloat] = visibleRows.map { $0.preferredHeight(for: width) }
         let rowsHeight: CGFloat = rowHeights.reduce(0, +) + CGFloat(max(0, visibleRows.count - 1)) * Tokens.Space.x2
-        let showsChoices = stage == .choose && !sources.isEmpty
         let signInsShown = showsChoices && !signInsNote.stringValue.isEmpty
         let noteHeight: CGFloat = signInsShown ? Tokens.Space.x2 + ceil(signInsNote.sizeThatFits(NSSize(width: width, height: 200)).height) : 0
         // The choices wrap onto a second line when they don't fit one (Arc's Spaces and Tabs with Sign-ins).
@@ -529,7 +554,7 @@ final class ImportView: NSView {
         // Where it goes is asked only once there's a choice, and only before importing.
         let showsInto = stage == .choose && Library.shared.hasManyProfiles
         let intoHeight: CGFloat = showsInto ? Tokens.Space.x4 + intoLabel.lineHeight + Tokens.Space.x2 + Tokens.Space.x8 : 0
-        let emptyHeight: CGFloat = sources.isEmpty && stage == .choose ? ceil(emptyNote.sizeThatFits(NSSize(width: width, height: 200)).height) + Tokens.Space.x4 : 0
+        let emptyHeight: CGFloat = choosesFileFirst ? emptyState.preferredHeight(for: width) + Tokens.Space.x4 : 0
         let showsHero = hero.superview != nil
         let heroHeight: CGFloat = showsHero ? ImportHero.height + Tokens.Space.x8 : 0
         let titleHeight = ceil(title.intrinsicContentSize.height)
@@ -548,9 +573,13 @@ final class ImportView: NSView {
         }
         title.alignment = .left
         title.attributedStringValue = Brand.display(title.stringValue, size: Tokens.TypeSize.display, color: Tokens.Color.textPrimary)
-        if !title.stringValue.isEmpty { place(title, height: titleHeight, gap: Tokens.Space.x2) }
-        if !subtitle.stringValue.isEmpty { place(subtitle, height: subtitleHeight, gap: Tokens.Space.x6) }
-        if emptyHeight > 0 { place(emptyNote, height: emptyHeight - Tokens.Space.x4, gap: Tokens.Space.x4) }
+        // What isn't placed is hidden, so nothing is left drawing where it last was, or in the corner.
+        title.isHidden = title.stringValue.isEmpty
+        subtitle.isHidden = subtitle.stringValue.isEmpty
+        if !title.isHidden { place(title, height: titleHeight, gap: Tokens.Space.x2) }
+        if !subtitle.isHidden { place(subtitle, height: subtitleHeight, gap: Tokens.Space.x6) }
+        emptyState.isHidden = emptyHeight == 0
+        if emptyHeight > 0 { place(emptyState, height: emptyHeight - Tokens.Space.x4, gap: Tokens.Space.x4) }
         // The rows get what's left once everything else fits: in their own window, as tall as the screen allows.
         let limit: CGFloat
         if presentation == .window {
@@ -573,7 +602,6 @@ final class ImportView: NSView {
         if !visibleRows.isEmpty { place(rowScroll, height: rowsHeight > listHeight ? listHeight : rowsHeight, gap: Tokens.Space.x2) }
         if showsChoices {
             y += Tokens.Space.x4
-            choiceLabel.isHidden = false
             place(choiceLabel, height: choiceLabel.lineHeight, gap: Tokens.Space.x2)
             var cx = x
             for (_, box) in choiceButtons where !box.isHidden {
@@ -884,6 +912,12 @@ final class ImportWindowController: NSWindowController, NSWindowDelegate {
     /// it comes forward as it is.
     static func startsOver(_ stage: ImportView.Stage?) -> Bool { stage == .done }
 
+    /// With none found, coming back to it looks again: a browser installed meanwhile shows up.
+    func windowDidBecomeKey(_ notification: Notification) {
+        guard let view = window?.contentView as? ImportView, view.foundNone else { return }
+        view.reloadSources()
+    }
+
     func windowWillClose(_ notification: Notification) {
         (window?.contentView as? ImportView)?.stop()
         Self.shared = nil
@@ -1028,5 +1062,57 @@ private final class ImportHero: NSView {
         caption.frame = NSRect(x: pad, y: y, width: textWidth, height: captionHeight)
         y = caption.frame.maxY + 4
         detail.frame = NSRect(x: pad, y: y, width: textWidth, height: detailHeight)
+    }
+}
+
+/// No other browser on this Mac: said plainly, on a faint panel where the browsers would be, with what can still
+/// come over from a file.
+final class ImportEmptyState: NSView {
+    private let heading = NSTextField(wrappingLabelWithString: String(localized: "No other browsers found on this Mac", comment: "Import window, when no other browser was found."))
+    private let note = NSTextField(wrappingLabelWithString: String(localized: "You can still bring passwords from an exported .csv file, or bookmarks and history from Safari’s export (a .zip file).",
+                                                                   comment: "Import window, under “No other browsers found on this Mac”: what can still come over from a file."))
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.cornerRadius = Tokens.Radius.group
+        layer?.cornerCurve = .continuous
+        heading.font = Tokens.Font.body(.medium)
+        heading.textColor = Tokens.Color.textPrimary
+        note.font = Tokens.Font.body()
+        note.textColor = Tokens.Color.textSecondary
+        for label in [heading, note] {
+            label.isSelectable = false
+            addSubview(label)
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        layer?.backgroundColor = cgColor(Tokens.Color.chromeFill)
+    }
+
+    private var pad: CGFloat { Tokens.Space.x4 }
+
+    private func heights(for width: CGFloat) -> (heading: CGFloat, note: CGFloat) {
+        let text = NSSize(width: max(0, width - pad * 2), height: 400)
+        return (ceil(heading.sizeThatFits(text).height), ceil(note.sizeThatFits(text).height))
+    }
+
+    func preferredHeight(for width: CGFloat) -> CGFloat {
+        let h = heights(for: width)
+        return pad + h.heading + Tokens.Space.x1 + h.note + pad
+    }
+
+    override func layout() {
+        super.layout()
+        let h = heights(for: bounds.width)
+        let textWidth = max(0, bounds.width - pad * 2)
+        for label in [heading, note] { label.preferredMaxLayoutWidth = textWidth }
+        heading.frame = NSRect(x: pad, y: pad, width: textWidth, height: h.heading)
+        note.frame = NSRect(x: pad, y: heading.frame.maxY + Tokens.Space.x1, width: textWidth, height: h.note)
     }
 }

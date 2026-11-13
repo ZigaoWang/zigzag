@@ -22,6 +22,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 修复
 - 画中画的视频在你切换到别的 App 或别的桌面时会一直留在屏幕上，像在 Safari 里一样浮在所有窗口上面，直到你关掉它。以前它会被下一个 App 挡住，也只留在开始播放的那个桌面上。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
 - 没有标签页的空间会显示一张空的页面卡片，带阴影，颜色也和边栏不同，不再是边栏的颜色铺满整个窗口。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
+- 这台 Mac 上没有其他浏览器时，导入窗口会显示“在这台 Mac 上没有找到其他浏览器”，并提供“选取文件…”，用来导入密码 .csv 文件或 Safari 的导出文件。以前它的选项会全部堆在窗口左上角。([#212](https://github.com/ZigaoWang/zigzag/issues/212))
 
 ## [0.9.0] - 2026-11-12
 

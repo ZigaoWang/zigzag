@@ -9252,13 +9252,13 @@
         }
       }
     },
-    "No other browsers with data were found on this Mac. You can still bring passwords from a CSV export." : {
+    "No other browsers found on this Mac" : {
       "comment" : "Import window, when no other browser was found.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在这台 Mac 上没有找到其他存有数据的浏览器。你仍然可以从导出的 CSV 文件导入密码。"
+            "value" : "在这台 Mac 上没有找到其他浏览器"
           }
         }
       }
@@ -17651,6 +17651,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "昨天上午"
+          }
+        }
+      }
+    },
+    "You can still bring passwords from an exported .csv file, or bookmarks and history from Safari’s export (a .zip file)." : {
+      "comment" : "Import window, under “No other browsers found on this Mac”: what can still come over from a file.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你仍然可以从导出的 .csv 文件导入密码，或从 Safari 导出的 .zip 文件导入书签和历史记录。"
           }
         }
       }
