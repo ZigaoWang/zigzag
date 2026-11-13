@@ -295,18 +295,10 @@ nonisolated enum WebAppIcon {
         return data as Data
     }
 
-    /// A picture from data a site sent: PNG, JPEG, ICO (its largest), WebP, SVG; nil for anything else. The largest
-    /// of the pictures in it.
-    static func picture(from data: Data) -> CGImage? {
-        guard data.count < 8_000_000 else { return nil }
-        if let source = CGImageSourceCreateWithData(data as CFData, nil), CGImageSourceGetCount(source) > 0 {
-            let best = (0..<CGImageSourceGetCount(source)).compactMap { CGImageSourceCreateImageAtIndex(source, $0, nil) }.max { $0.width < $1.width }
-            if let best { return best }
-        }
-        // An SVG: NSImage draws it, at the size the icon needs.
-        guard let image = NSImage(data: data), image.size.width > 0 else { return nil }
-        var rect = CGRect(x: 0, y: 0, width: 512, height: 512 * image.size.height / image.size.width)
-        return image.cgImage(forProposedRect: &rect, context: nil, hints: nil)
+    /// A picture from data a site sent: PNG, JPEG, ICO (its largest), WebP, SVG; nil for anything else. Read by the
+    /// sandboxed picture helper, at most the 1024 pixels the app icon is drawn at.
+    static func picture(from data: Data, using pictures: SafePictures = .shared) async -> CGImage? {
+        await pictures.decode(data, maxSide: PictureFormat.maxSide)?.image
     }
 }
 
@@ -358,7 +350,7 @@ enum WebAppIconFinder {
         for candidate in WebAppIcon.ranked(candidates, origin: origin).prefix(5) {
             guard let (data, response) = try? await session.data(from: candidate.url),
                   (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true,
-                  let picture = WebAppIcon.picture(from: data), min(picture.width, picture.height) >= 64 else { continue }
+                  let picture = await WebAppIcon.picture(from: data), min(picture.width, picture.height) >= 64 else { continue }
             return Found(name: name, picture: picture, themeColor: themeColor)
         }
         return Found(name: name, picture: nil, themeColor: themeColor)

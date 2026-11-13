@@ -720,24 +720,24 @@ enum DarkPages {
 
     /// An SVG picture, given as a data: URL, drawn as a PNG for Dark Reader to look at, with its own size in CSS
     /// pixels; nil if it isn't one. Where a page's policy won't let an image load a data: URL, its picture can't be
-    /// looked at otherwise (#134).
-    nonisolated static func rasterize(_ dataURL: String) -> (width: Double, height: Double, png: String)? {
+    /// looked at otherwise (#134). Drawn by the sandboxed picture helper: the page chose these bytes.
+    nonisolated static func rasterize(_ dataURL: String, using pictures: SafePictures = .shared) async -> (width: Double, height: Double, png: String)? {
         guard dataURL.utf8.count <= maxImageBytes, dataURL.lowercased().hasPrefix("data:image/svg+xml"),
-              let comma = dataURL.firstIndex(of: ",") else { return nil }
-        let head = dataURL[..<comma].lowercased(), body = String(dataURL[dataURL.index(after: comma)...])
-        let data = head.hasSuffix(";base64") ? Data(base64Encoded: body) : body.removingPercentEncoding.map { Data($0.utf8) }
-        guard let data, let image = NSImage(data: data), image.size.width > 0, image.size.height > 0 else { return nil }
-        let scale = min(1, maxImageSide / max(image.size.width, image.size.height))
-        let width = max(1, Int((image.size.width * scale).rounded())), height = max(1, Int((image.size.height * scale).rounded()))
-        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8, samplesPerPixel: 4,
-                                         hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
-              let context = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = context
-        image.draw(in: NSRect(x: 0, y: 0, width: width, height: height))
-        NSGraphicsContext.restoreGraphicsState()
-        guard let png = rep.representation(using: .png, properties: [:]) else { return nil }
-        return (Double(image.size.width), Double(image.size.height), png.base64EncodedString())
+              let data = SafePictures.bytes(ofDataURL: dataURL, limit: maxImageBytes), PictureFormat.sniff(data) == .svg,
+              let picture = await pictures.decode(data, maxSide: Int(maxImageSide)), picture.isVector else { return nil }
+        // Drawn to fill the most it may; Dark Reader needs no more than the picture's own size.
+        let scale = min(1, maxImageSide / max(picture.size.width, picture.size.height))
+        let width = max(1, Int((picture.size.width * scale).rounded())), height = max(1, Int((picture.size.height * scale).rounded()))
+        var image = picture.image
+        if width < image.width || height < image.height, let space = CGColorSpace(name: CGColorSpace.sRGB),
+           let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+            context.interpolationQuality = .high
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            image = context.makeImage() ?? image
+        }
+        guard let png = SafePictures.png(image) else { return nil }
+        return (Double(picture.size.width), Double(picture.size.height), png.base64EncodedString())
     }
 
     /// Draws SVG pictures for a page's Dark Reader (`rasterize`), off the main thread.
@@ -747,7 +747,7 @@ enum DarkPages {
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
             guard let url = message.body as? String else { replyHandler(nil, nil); return }
             Task.detached(priority: .utility) {
-                let drawn = DarkPages.rasterize(url)
+                let drawn = await DarkPages.rasterize(url)
                 await MainActor.run { replyHandler(drawn.map { ["width": $0.width, "height": $0.height, "png": $0.png] }, nil) }
             }
         }

@@ -1638,7 +1638,9 @@ private struct Suggestion {
     iconWaiters[source, default: []].append(then ?? { _ in })
     guard first else { return }
     Task { @MainActor in
-        guard let (data, _) = try? await URLSession.shared.data(from: source), let image = NSImage(data: data), image.isValid else {
+        // Read by the sandboxed picture helper, like any picture a site sends.
+        guard let (data, _) = try? await URLSession.shared.data(from: source),
+              let image = await SafePictures.shared.decode(data, maxSide: 256)?.nsImage else {
             iconWaiters[source] = nil
             return
         }

@@ -314,17 +314,17 @@ struct DarkReaderTests {
 
     /// An SVG picture is drawn for Dark Reader to look at, at its own size (Hacker News's vote arrow); anything else,
     /// or too much, isn't.
-    @Test func anSVGIsDrawnForDarkReader() throws {
+    @Test func anSVGIsDrawnForDarkReader() async throws {
         let svg = ##"<svg height="32" viewBox="0 0 32 16" width="32" xmlns="http://www.w3.org/2000/svg"><path d="m2 27 14-29 14 29z" fill="#999"/></svg>"##
-        let base64 = try #require(DarkPages.rasterize("data:image/svg+xml;base64," + Data(svg.utf8).base64EncodedString()))
+        let base64 = try #require(await DarkPages.rasterize("data:image/svg+xml;base64," + Data(svg.utf8).base64EncodedString()))
         #expect(base64.width == 32 && base64.height == 32)
         let png = try #require(Data(base64Encoded: base64.png))
         #expect(NSBitmapImageRep(data: png)?.pixelsWide == 32)
-        let escaped = try #require(DarkPages.rasterize("data:image/svg+xml," + (svg.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")))
+        let escaped = try #require(await DarkPages.rasterize("data:image/svg+xml," + (svg.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")))
         #expect(escaped.width == 32)
-        #expect(DarkPages.rasterize("data:image/png;base64,iVBORw0KGgo=") == nil)
-        #expect(DarkPages.rasterize("data:image/svg+xml;base64,bm90IGFuIHN2Zw==") == nil)
-        #expect(DarkPages.rasterize("data:image/svg+xml," + String(repeating: "a", count: DarkPages.maxImageBytes)) == nil)
+        #expect(await DarkPages.rasterize("data:image/png;base64,iVBORw0KGgo=") == nil)
+        #expect(await DarkPages.rasterize("data:image/svg+xml;base64,bm90IGFuIHN2Zw==") == nil)
+        #expect(await DarkPages.rasterize("data:image/svg+xml," + String(repeating: "a", count: DarkPages.maxImageBytes)) == nil)
     }
 
     // MARK: Pages

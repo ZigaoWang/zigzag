@@ -189,10 +189,12 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         if let icon, fetches {
             var request = URLRequest(url: icon, timeoutInterval: 4)
             request.setValue(WebKitSetup.applicationNameForUserAgent, forHTTPHeaderField: "User-Agent")
+            // Read by the sandboxed picture helper and handed on as a PNG of its pixels, never as the site's bytes.
             if let (bytes, response) = try? await Self.session.data(for: request, delegate: Self.redirects), bytes.count < 4_000_000,
-               let mime = response.mimeType, let found = UTType(mimeType: mime), [UTType.png, .jpeg, .gif].contains(found) {
-                data = bytes
-                type = found
+               let mime = response.mimeType, let found = UTType(mimeType: mime), [UTType.png, .jpeg, .gif].contains(found),
+               let picture = await SafePictures.shared.decode(bytes, maxSide: 256) {
+                data = SafePictures.png(picture.image)
+                type = .png
             }
         }
         if data == nil, let fallback, let tiff = fallback.tiffRepresentation {

@@ -144,8 +144,9 @@ final class WebStoreOffer: FloatingPanelView {
             MainActor.assumeIsolated {
                 guard let string = result as? String, let url = URL(string: string), url.scheme == "https" else { return }
                 Task { @MainActor [weak self] in
-                    guard let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data), image.isValid,
-                          let self else { return }
+                    // Read by the sandboxed picture helper, like any picture a site sends.
+                    guard let (data, _) = try? await URLSession.shared.data(from: url),
+                          let image = await SafePictures.shared.decode(data, maxSide: 256)?.nsImage, let self else { return }
                     self.icon.image = image
                     self.icon.contentTintColor = nil
                     // Store icons come square, often on white: set on a rounded tile with a hairline, like an app icon,
