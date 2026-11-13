@@ -639,7 +639,6 @@ final class SitePanel: FloatingPanelView {
         context.fullScreen = PageFullScreen.isOffered(for: url, isPrivate: isPrivate)
             && (PageFullScreen.choice(for: url) != nil || tab.webView.map({ PageVideos.shared.frames(in: $0).contains { !$0.videos.isEmpty } }) == true)
         context.foreignLanguage = tab.foreignLanguage != nil
-        context.developerMode = DeveloperTools.isOn && DevelopmentSites.isOffered(for: url, isPrivate: isPrivate)
         context.coveredPage = controller?.isShowingReader == true || tab.pdfViewer != nil || tab.webView == nil
         return context
     }
@@ -724,13 +723,6 @@ final class SitePanel: FloatingPanelView {
                                     on: KeepAwake.isOn(for: url), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                     guard let self else { return }
                     KeepAwake.set(on, for: self.url)
-                })
-            case .developerMode:
-                // Developer Mode for the site (#141): on the list in Settings › Developer, or off it. The same as
-                // View › Developer's item, toast and Undo included.
-                rows.append(.toggle(DeveloperTool.modeName, on: DevelopmentSites.covers(url), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
-                    guard let self else { return }
-                    self.controller?.setDeveloperMode(for: self.url, on: on)
                 })
             case .fullScreenFills:
                 // Full screen in the page's own area instead of the whole screen (#168), for this site alone.
@@ -1536,7 +1528,7 @@ final class PanelPageHeader: NSView {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, forceDark, keepAwake, fullScreenFills, alwaysTranslate, developerMode }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, forceDark, keepAwake, fullScreenFills, alwaysTranslate }
     /// The rows into the panel's other pages.
     enum Link: Equatable { case connection, permissions, extensions }
 
@@ -1556,9 +1548,6 @@ enum SitePanelRows {
         var fullScreen = false
         /// The page is in a language other than yours.
         var foreignLanguage = false
-        /// The site's Developer Mode switch is offered: the main switch in Settings › Developer is on, for any web
-        /// page, and not in a private window (`DevelopmentSites.isOffered`).
-        var developerMode = false
         /// Reader or a PDF covers the page: the page's zoom isn't what you see.
         var coveredPage = false
         /// The site asked for something, or has an answer kept.
@@ -1579,8 +1568,6 @@ enum SitePanelRows {
         }
         if c.fullScreen { rows.append(.fullScreenFills) }
         if c.foreignLanguage { rows.append(.alwaysTranslate) }
-        // Last, as it's for the people who build sites: there on every one, out of everyone else's way.
-        if c.developerMode { rows.append(.developerMode) }
         return rows
     }
 
