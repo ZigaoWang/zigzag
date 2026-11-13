@@ -372,7 +372,23 @@ struct SitePanelRowsTests {
 
     @Test func anOrdinaryPage() {
         #expect(SitePanelRows.rows(Context()) == [.zoom, .adBlocking, .darkPage, .keepAwake])
-        #expect(SitePanelRows.links(Context()) == [.connection, .extensions])
+        #expect(SitePanelRows.links(Context()) == [.connection])
+    }
+
+    /// Extensions are on the first page itself (#215), not behind a row; whether they run here is a switch of This
+    /// Site, once there are some, on a web page outside a private window.
+    @Test func extensionsSwitchOnceThereAreSome() {
+        var c = Context()
+        #expect(!SitePanelRows.rows(c).contains(.extensions))
+        c.hasExtensions = true
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .extensions])
+        var privately = c
+        privately.isPrivate = true
+        privately.extensionHost = false
+        #expect(!SitePanelRows.rows(privately).contains(.extensions))
+        var extensionPage = c
+        extensionPage.isWeb = false
+        #expect(!SitePanelRows.rows(extensionPage).contains(.extensions))
     }
 
     @Test func rowsThatApplyOnlySomewhere() {
@@ -435,7 +451,7 @@ struct SitePanelRowsTests {
         c.siteChoices = false
         #expect(SitePanelRows.rows(c).isEmpty)
         // No connection to judge.
-        #expect(SitePanelRows.links(c) == [.extensions])
+        #expect(SitePanelRows.links(c).isEmpty)
     }
 
     /// Dark page is one dropdown (#134): Automatic, On, Off and Force, in that order, and no row of its own for Force.
@@ -464,7 +480,7 @@ struct SitePanelRowsTests {
         var c = Context()
         #expect(!SitePanelRows.links(c).contains(.permissions))
         c.hasPermissions = true
-        #expect(SitePanelRows.links(c) == [.connection, .permissions, .extensions])
+        #expect(SitePanelRows.links(c) == [.connection, .permissions])
     }
 
     @Test func permissionsSayWhatWasChosen() {

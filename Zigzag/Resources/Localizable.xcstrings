@@ -3501,6 +3501,17 @@
         }
       }
     },
+    "Can’t read this site" : {
+      "comment" : "Tooltip line under an extension's name in Site Controls: the extension wants this site but its site access doesn't include it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取此网站"
+          }
+        }
+      }
+    },
     "Can’t translate %@ on this Mac" : {
       "comment" : "Toast when the page's text is in a language Apple's translation can't translate on this Mac. The language is its name, like Latin.",
       "localizations" : {
@@ -6207,7 +6218,7 @@
       }
     },
     "Extensions" : {
-      "comment" : "A section of Settings.\nChoice in the Import window: bring extensions over from the Chrome Web Store.\nHeading in the site panel, in the welcome window’s picture of Zigzag.\nLabel in the sheet that makes a profile: which extensions it starts with.\nRow in the site panel's This Site group.\nTitle of the site panel on a new tab, over your extensions.",
+      "comment" : "A section of Settings.\nChoice in the Import window: bring extensions over from the Chrome Web Store.\nHeading in the site panel, in the welcome window’s picture of Zigzag.\nLabel in the sheet that makes a profile: which extensions it starts with.\nRow in the site panel's This Site group.\nSection label in Site Controls over your extensions, which folds them away; also the title of the panel on a new tab.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6228,6 +6239,17 @@
         }
       }
     },
+    "Extensions are off on this site" : {
+      "comment" : "Tooltip line under an extension's name in Site Controls: the Extensions switch is off for this site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扩展已在此网站上关闭"
+          }
+        }
+      }
+    },
     "Extensions come from Chrome and browsers built on it. Firefox and Safari get theirs from stores of their own." : {
       "comment" : "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari.",
       "localizations" : {
@@ -6235,17 +6257,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "扩展只能从 Chrome 及基于它的浏览器导入。Firefox 和 Safari 的扩展来自它们各自的商店。"
-          }
-        }
-      }
-    },
-    "Extensions on This Site" : {
-      "comment" : "Row in the site panel, and the title of its page: the extensions, whether they run on this site, and a way to manage them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此网站上的扩展"
           }
         }
       }
@@ -6768,7 +6779,7 @@
       }
     },
     "Get Extensions" : {
-      "comment" : "Button in Settings › Extensions: opens the Chrome Web Store.\nTooltip and VoiceOver name of the + button after the extensions in the site panel: opens the Chrome Web Store.",
+      "comment" : "Button in Settings › Extensions: opens the Chrome Web Store.\nTooltip of the + by the Extensions section in Site Controls, and the row there when you have none: opens the Chrome Web Store.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8273,7 +8284,7 @@
       }
     },
     "Manage Extensions" : {
-      "comment" : "Row under the extensions in the site panel: opens Settings › Extensions.",
+      "comment" : "Row under the extensions in Site Controls: opens Settings › Extensions.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9418,7 +9429,7 @@
       }
     },
     "None" : {
-      "comment" : "In place of the keys of a command with no shortcut, in Settings › Shortcuts.\nOn the Extensions on This Site row of the site panel: no extensions are installed.",
+      "comment" : "In place of the keys of a command with no shortcut, in Settings › Shortcuts.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9792,7 +9803,7 @@
       }
     },
     "Off" : {
-      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.\nOn the Extensions on This Site row of the site panel: extensions don't run on this site.",
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11291,7 +11302,7 @@
       }
     },
     "Pinned" : {
-      "comment" : "Said once a step is done in the getting-started guide, a card in the window.\nToast after a tab is pinned.\nVoiceOver value of an extension's button in the site panel when it's pinned to the address bar.",
+      "comment" : "Said once a step is done in the getting-started guide, a card in the window.\nToast after a tab is pinned.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12852,6 +12863,17 @@
         }
       }
     },
+    "Runs on this site when you click it" : {
+      "comment" : "Tooltip line under an extension's name in Site Controls: its site access is When You Click It, and it hasn't been clicked on this site yet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在你点按它后在此网站上运行"
+          }
+        }
+      }
+    },
     "Safari on iPad" : {
       "comment" : "Choice under User Agent in the developer tools' menus: the page is told it's in Safari on an iPad.",
       "localizations" : {
@@ -13804,6 +13826,17 @@
         }
       }
     },
+    "Show All (%lld)" : {
+      "comment" : "Row under two rows of extensions in Site Controls: shows every one of them. The number is how many there are.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部显示（%lld）"
+          }
+        }
+      }
+    },
     "Show All Downloads" : {
       "comment" : "Last row of the downloads panel, opened on one download: shows the rest of the list.",
       "localizations" : {
@@ -13811,6 +13844,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示所有下载"
+          }
+        }
+      }
+    },
+    "Show All Extensions" : {
+      "comment" : "Tooltip of the +N at the end of the folded Extensions strip in Site Controls: opens the section.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示所有扩展"
           }
         }
       }
@@ -13833,6 +13877,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示历史记录"
+          }
+        }
+      }
+    },
+    "Show Less" : {
+      "comment" : "Row under the extensions in Site Controls once they all show: back to two rows of them.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收起"
           }
         }
       }
