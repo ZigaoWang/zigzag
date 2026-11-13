@@ -195,19 +195,56 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
     /// The watcher's own look at the page, from Zigzag's script world.
     private static let stateCall = "window.__zigzagPasswordState ? window.__zigzagPasswordState() : null"
 
+    /// A strong password from "Use Strong Password" is kept as a login of its own with no username the moment it's
+    /// filled (`Autofill.fillGenerated`), never over the one saved for the account, so a change the site turns down,
+    /// or a reload before the form is sent, loses nothing. Once the site has taken the form it settles: the account's
+    /// saved login (`username`'s) takes the new password and the stand-in goes, or, for a new account, the stand-in
+    /// is given the username. With no username to go by, the stand-in stays as it is. True when `password` was one.
+    static func settleGenerated(origin: Origin, username: String, password: SecretString, in store: PasswordStore) async -> Bool {
+        let saved = (try? await store.credentials(for: origin)) ?? []
+        var generated: Credential?
+        for candidate in saved where candidate.username.isEmpty {
+            if let stored = try? await store.password(for: candidate.id), stored.matches(password) { generated = candidate; break }
+        }
+        guard let generated else { return false }
+        guard !username.isEmpty else {
+            try? await store.markUsed(generated.id)
+            return true
+        }
+        if var account = saved.first(where: { $0.id != generated.id && $0.username.caseInsensitiveCompare(username) == .orderedSame }) {
+            account.modified = Date()
+            do {
+                try await store.update(account, password: password)
+                try? await store.markUsed(account.id)
+                try? await store.delete(generated.id)
+            } catch {
+                // Not updated: the stand-in keeps the new password, so it isn't lost.
+            }
+        } else {
+            var named = generated
+            named.username = username
+            named.modified = Date()
+            try? await store.update(named)
+        }
+        return true
+    }
+
     /// Saves nothing by itself: decides whether to ask, and what.
     private func consider(origin: Origin, username: String, password: SecretString, isChange: Bool, in tab: Tab) async {
         let store = PasswordStore.shared
         guard await !store.neverSaves(on: origin) else { return }
-        let saved = (try? await store.credentials(for: origin)) ?? []
-        // A strong password filled here was saved without a username; the sign-up form now supplies it.
-        if !username.isEmpty, let generated = saved.first(where: { $0.username.isEmpty }),
-           let stored = try? await store.password(for: generated.id), stored.matches(password) {
-            var named = generated
-            named.username = username
-            try? await store.update(named)
+        // A strong password Zigzag filled here, now that the site has taken it.
+        if await Self.settleGenerated(origin: origin, username: username, password: password, in: store) {
+            // A change form with no username, on a site with one account saved: that one is offered the new
+            // password, for you to say so, as a typed one would be. The stand-in keeps it meanwhile.
+            let named = ((try? await store.credentials(for: origin)) ?? []).filter { !$0.username.isEmpty }
+            if isChange, username.isEmpty, named.count == 1, let account = named.first {
+                if let current = try? await store.password(for: account.id), current.matches(password) { return }
+                SavePasswordPrompt.show(.update(account), origin: origin, password: password, in: tab)
+            }
             return
         }
+        let saved = (try? await store.credentials(for: origin)) ?? []
         // A change form often has no username; if there's one login for the site, it's that one.
         // Email addresses are the same login whatever their capitals ("Sam@x.com" is "sam@x.com").
         let target = saved.first { $0.username.caseInsensitiveCompare(username) == .orderedSame }

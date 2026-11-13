@@ -15,6 +15,7 @@
 		038B1D66977B38EB772C0ECD /* HistoryClustersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF7284017D3B3ADB15E236C1 /* HistoryClustersTests.swift */; };
 		045ED3408AB26EF379758FB3 /* MiniPlayerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31C428612569D93D17E6153 /* MiniPlayerTests.swift */; };
 		0617A9798A9371758CAD4DE8 /* chrome-bookmarks-work.json in Resources */ = {isa = PBXBuildFile; fileRef = BD3E507FE9CD5CD3025750FE /* chrome-bookmarks-work.json */; };
+		0671150B02144B3F6A0545B2 /* StrongPasswordTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 298850B8A3EE1B52397F62B3 /* StrongPasswordTests.swift */; };
 		06764E70C4314CFF3889E818 /* BridgeProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC407157FA36197709110D6E /* BridgeProxy.swift */; };
 		07B8E8D78400474F39A969F4 /* Readability-readerable.js in Resources */ = {isa = PBXBuildFile; fileRef = 5F60DCC2C5651A80DAADE8E8 /* Readability-readerable.js */; };
 		083569CB2712C1AD02A4775E /* SidebarSlideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBBEADFD52A2AF79DAA47E0 /* SidebarSlideTests.swift */; };
@@ -568,6 +569,7 @@
 		289F60BB400BACFDF97EA0E6 /* NativeAudioOut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAudioOut.swift; sourceTree = "<group>"; };
 		2904F433A0EC465A91389CF8 /* MCPBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPBrowser.swift; sourceTree = "<group>"; };
 		2968B96D6FBCB24867769B54 /* dark-pages.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "dark-pages.js"; sourceTree = "<group>"; };
+		298850B8A3EE1B52397F62B3 /* StrongPasswordTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrongPasswordTests.swift; sourceTree = "<group>"; };
 		2C1C41B2C9BBE721DA739A7A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2C1EF45053176602E3D8A4C1 /* UserScriptsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserScriptsTests.swift; sourceTree = "<group>"; };
 		2D8E0E7DB1C952078DABEE2B /* MiniLinkWake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniLinkWake.swift; sourceTree = "<group>"; };
@@ -1546,6 +1548,7 @@
 				87D85B5B031BEAE510CBFC57 /* SpaceSwitcherTests.swift */,
 				B13E82E7DA1A290559EC8C20 /* SplitDropTests.swift */,
 				FAB383D1A0A96BBBED89873A /* SplitRowAlignmentTests.swift */,
+				298850B8A3EE1B52397F62B3 /* StrongPasswordTests.swift */,
 				84DC4BF1B68F50F24CC6EF1E /* SystemPasswordsTests.swift */,
 				E18895E549507CE748D20047 /* TabDropIndexTests.swift */,
 				C07FFC0A0F58B379C40EE66C /* TabMuteTests.swift */,
@@ -2259,6 +2262,7 @@
 				1AB813A270FF9CA633D5E2F7 /* SpaceSwitcherTests.swift in Sources */,
 				40D4C0EB780B16A242E6E1E6 /* SplitDropTests.swift in Sources */,
 				8FE22A2F18661ACD22105921 /* SplitRowAlignmentTests.swift in Sources */,
+				0671150B02144B3F6A0545B2 /* StrongPasswordTests.swift in Sources */,
 				7E8182058C1A204FEFEC999B /* SystemPasswordsTests.swift in Sources */,
 				686B2764EE4C4C1D72AF1B54 /* TabDropIndexTests.swift in Sources */,
 				28E294D56D1D8EBE737612AF /* TabMuteTests.swift in Sources */,

@@ -353,8 +353,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         String(localized: "This page changed before Zigzag could fill it. Click the field again.", comment: "Toast when a login or strong password was picked but the page went to another site, or its tab was no longer in front.")
     }
 
-    /// Fills a new strong password into the form's new-password fields, and saves it right away, so it's never
-    /// lost if the sign-up's submit goes unnoticed. The username is added when the form is sent.
+    /// Fills a new strong password into the form's new-password fields, and saves it right away as a login of its
+    /// own, so it's never lost if the sign-up's submit goes unnoticed or the page reloads. It replaces the account's
+    /// saved password, or gets the username, only once the site has taken the form.
     private func fillGenerated() {
         // As the other fills do: only into the page the menu was for, still on that site, in the tab you're looking at.
         guard let target else { hide(); return }
@@ -378,12 +379,12 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 return
             }
             let password = candidates[index]
-            let username = result?["username"] as? String
             do {
-                // With no username on the form, nothing says which login this is: it's kept as a new one, never over
-                // another saved without a name (an account made earlier), whose password would be lost.
-                let named = !(username ?? "").isEmpty
-                try await PasswordStore.shared.save(origin: origin, username: username ?? "", password: password, replacingExisting: named)
+                // Kept at once, so a reload or a submit that goes unnoticed never loses it, but as a login of its own
+                // with no username, never over the account's saved one: if the site turns the change down, the old
+                // password is still there. It takes the account's place once the site has taken the form
+                // (`PasswordCapture.settleGenerated`).
+                try await PasswordStore.shared.save(origin: origin, username: "", password: password, replacingExisting: false)
                 if let controller { Toast.show(String(localized: "Strong password saved for \(origin.displayName)", comment: "Toast after a strong password was filled and saved. The placeholder is a site, like github.com."), symbol: "key", duration: 2, in: controller) }
             } catch {
                 if let controller { Toast.show(String(localized: "Couldn’t save the new password. Copy it before you leave this page.", comment: "Toast when a strong password was filled but couldn't be saved."), symbol: "exclamationmark.triangle", duration: 4, in: controller) }
