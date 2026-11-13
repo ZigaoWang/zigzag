@@ -10,6 +10,9 @@ final class SidebarContainer: NSView {
     /// and the grain, so sliding it out never strips them.
     var gradient: (end: NSColor, angle: Double)? { didSet { refresh() } }
     var grain: Double = 0 { didSet { refresh() } }
+    /// The window's own glass, while its space is see-through: floating, the sidebar is the same glass over the page,
+    /// so it's the same color slid out as docked. Nil: a solid space, the page blurred under its color.
+    var windowGlass: WindowGlass? { didSet { if windowGlass != oldValue { refresh() } } }
     private let gradientLayer = CAGradientLayer()
     private let grainLayer = CALayer()
     /// Floating, the page under it is frosted, so it shows as soft color and never reads through the sidebar's own
@@ -177,16 +180,30 @@ final class SidebarContainer: NSView {
             return made
         }()
         glass.isHidden = false
+        // Tinted as the window's glass is, so the docked sidebar and the slid-out one are the same color.
+        glass.tintColor = windowGlass?.tint
         glass.frame = bounds
     }
 
-    /// The space's color as it lies over the glass: thinned to the floating cover, or thinner if it already is
-    /// (see-through spaces).
+    /// Floating as glass, Liquid Glass where the Mac has it, unless the window's see-through glass is the frosting:
+    /// then the frosting, as the docked sidebar shows.
+    static func usesLiquidGlass(isGlass: Bool, windowGlass: WindowGlass?, hasClearGlass: Bool = SpaceInfo.hasClearGlass) -> Bool {
+        isGlass && hasClearGlass && windowGlass?.isClear != false
+    }
+
+    /// The space's color as it lies over the glass: at the floating cover, see-through spaces too. Docked, a
+    /// see-through space's thinner wash lies over the desktop; slid out it lies over the page, mostly darker and
+    /// grayer than the desktop, and as thin there it read as a grayed version of the space.
     private func overGlass(_ color: NSColor) -> CGColor {
         let solid = cgColor(color)
         guard isGlass else { return solid }
         let cover = effectiveAppearance.isDark ? Tokens.Frame.floatingCoverDark : Tokens.Frame.floatingCover
-        return solid.copy(alpha: min(solid.alpha, cover)) ?? solid
+        return solid.copy(alpha: Self.floatingAlpha(of: solid.alpha, cover: cover)) ?? solid
+    }
+
+    /// How thick a color of `alpha` lies over the floating glass: the cover, however thin the space's own wash.
+    static func floatingAlpha(of alpha: CGFloat, cover: CGFloat) -> CGFloat {
+        alpha > 0 ? cover : 0
     }
 
     private func refresh() {
@@ -194,7 +211,8 @@ final class SidebarContainer: NSView {
             sidebar.layer?.cornerRadius = isFloating ? Tokens.Radius.card : 0
             // As glass the color lies once, in the backdrop: twice would thicken it.
             sidebar.layer?.backgroundColor = isFloating && !isGlass ? cgColor(tint) : nil
-            let liquid = isGlass && SpaceInfo.hasClearGlass
+            // The window's own kind of glass: Liquid Glass, or the frosting where the space chose it.
+            let liquid = Self.usesLiquidGlass(isGlass: isGlass, windowGlass: windowGlass)
             showLiquidGlass(liquid)
             frost.isHidden = !isFloating || liquid || (!isGlass && cgColor(tint).alpha > 0.99)
             frost.layer?.cornerRadius = Tokens.Radius.card

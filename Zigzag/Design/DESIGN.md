@@ -81,7 +81,7 @@ line around them; the tab you're on is a light card of the color (`Chrome.card`,
 with an edge only just there and a shadow-sm, seen at a glance on any color. Hover is a gentler wash (`Chrome.hover`).
 No bevels, no puffy shadows, no boxes.
 
-No glass gimmicks: in the browser, see-through spaces frost the desktop under the frame, and the sidebar that slides out over the page is glass, the page blurred under the space's color at 70% by day and 76% at night (`Frame.floatingCover`), Liquid Glass where the Mac has it. Those are the only blurs (brand moments keep their `GlassSurface`, under Materials). With Reduce Transparency, or Low Power Mode, the sliding sidebar is the space's solid color.
+No glass gimmicks: in the browser, see-through spaces frost the desktop under the frame, and the sidebar that slides out over the page is glass, the page blurred under the space's color at 88% by day and 90% at night (`Frame.floatingCover`), see-through spaces too, so it's the same color slid out as shown; Liquid Glass where the Mac has it, tinted as the window's own glass is, or the frosting when the space chose it. Those are the only blurs (brand moments keep their `GlassSurface`, under Materials). With Reduce Transparency, or Low Power Mode, the sliding sidebar is the space's solid color.
 
 ## Size scale
 

@@ -1304,9 +1304,10 @@ enum Tokens {
         static let panelDarkLightness = 0.27
         static let panelDarkChroma = 0.04
         /// The floating sidebar: how much of its glass the space's color covers, by day and at night. Enough that
-        /// the space's inks keep their contrast over any page, thin enough that the page shows through as soft color.
-        static let floatingCover: CGFloat = 0.7
-        static let floatingCoverDark: CGFloat = 0.76
+        /// it's the same color as the docked sidebar over any page, and its inks keep their contrast; the page still
+        /// shows through as soft color.
+        static let floatingCover: CGFloat = 0.88
+        static let floatingCoverDark: CGFloat = 0.9
         /// A page's quiet column (Settings' sections, Passwords' list): halfway between the frame and the white page.
         static let washLightness = 0.962
         static let washChroma = 0.016

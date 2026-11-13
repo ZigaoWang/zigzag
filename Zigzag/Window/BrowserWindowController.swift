@@ -578,6 +578,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.sidebarContainer.tint = color
         root.sidebarContainer.gradient = end.map { ($0, space.gradientAngle) }
         root.sidebarContainer.grain = tabManager.isPrivate ? 0 : space.grain ?? 0
+        root.sidebarContainer.windowGlass = root.windowGlass
     }
 
     private func showSelectedTab() {

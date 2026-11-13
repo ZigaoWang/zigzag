@@ -65,6 +65,8 @@ class SpaceFrameView: ColorView {
     /// wash, so the color goes in the glass). Before macOS 26 the frosted glass stands in.
     func setGlass(_ on: Bool, clear: Bool = false, tint: NSColor? = nil) {
         glassWanted = on
+        let liquid = clear && SpaceInfo.hasClearGlass
+        windowGlass = on ? WindowGlass(isClear: liquid, tint: liquid ? tint : nil) : nil
         defer { refreshGlassOcclusion() }
         if #available(macOS 26.0, *), clear {
             glassView.isHidden = true
@@ -98,6 +100,9 @@ class SpaceFrameView: ColorView {
         glassView.material = .sidebar
         if on { glassView.frame = glassFrame }
     }
+
+    /// The glass the window shows through now, nil while it's solid: what the floating sidebar's glass matches.
+    private(set) var windowGlass: WindowGlass?
 
     /// Where the glass needs to be: only what you can see through. The whole frame, unless something opaque covers
     /// part of it for good.
@@ -239,4 +244,11 @@ class SpaceFrameView: ColorView {
         Tokens.Motion.withoutAnimation { grainLayer.frame = bounds; gradientLayer.frame = bounds }
         refreshGlassFrame()
     }
+}
+
+/// The glass a see-through window shows the desktop through: Liquid Glass tinted with the space's color, or the
+/// frosting (no tint: the color washes over it).
+struct WindowGlass: Equatable {
+    var isClear: Bool
+    var tint: NSColor?
 }
