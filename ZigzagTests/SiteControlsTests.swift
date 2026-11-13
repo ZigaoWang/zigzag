@@ -162,6 +162,51 @@ struct SiteControlsPermissionTests {
         }
     }
 
+    /// Open apps is a permission like the others (#192): no row until the site asks, Always Open on its question
+    /// lets in that one app, and Allow or Block chosen for the site covers every app.
+    @Test func openAppsIsAPermission() throws {
+        try withDefaults {
+            #expect(SitePermissions.appDecision(origin: site, scheme: "itms-apps") == nil)
+            SitePermissions.noteAsked(.apps, origin: site, isPrivate: false)
+            #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.apps])
+            #expect(SitePermissions.choice(.apps, origin: site) == .ask)
+            // A private window asks too, so it has the row.
+            #expect(SitePermissions.shown(origin: site, isPrivate: true) == [.apps])
+
+            SitePermissions.allowOpeningApp(origin: site, scheme: "zoommtg")
+            #expect(SitePermissions.opensApp(origin: site, scheme: "zoommtg"))
+            #expect(SitePermissions.appDecision(origin: site, scheme: "itms-apps") == nil)
+            #expect(SitePermissions.choice(.apps, origin: site) == .allow)
+
+            SitePermissions.setChoice(.block, for: .apps, origin: site)
+            #expect(SitePermissions.appDecision(origin: site, scheme: "zoommtg") == false)
+            #expect(SitePermissions.appDecision(origin: site, scheme: "itms-apps") == false)
+            // One key for the site, the app it was told Always Open to gone.
+            #expect(SitePermissions.choices(origin: site) == ["apps": false])
+
+            SitePermissions.setChoice(.allow, for: .apps, origin: site)
+            #expect(SitePermissions.opensApp(origin: site, scheme: "itms-apps"))
+            SitePermissions.setChoice(.ask, for: .apps, origin: site)
+            #expect(SitePermissions.appDecision(origin: site, scheme: "zoommtg") == nil)
+            #expect(!SitePermissions.hasDecision(.apps, origin: site))
+            // Another origin on the host has its own.
+            SitePermissions.setChoice(.allow, for: .apps, origin: "http://meet.example.com")
+            #expect(SitePermissions.appDecision(origin: site, scheme: "zoommtg") == nil)
+        }
+    }
+
+    /// A frame from another site on the page is held back by the page's Block, and never let in by its Allow.
+    @Test func aFrameFromElsewhereOnlyFollowsBlock() throws {
+        try withDefaults {
+            SitePermissions.setChoice(.allow, for: .apps, origin: site)
+            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: false) == true)
+            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: true) == nil)
+            SitePermissions.setChoice(.block, for: .apps, origin: site)
+            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: true) == false)
+            #expect(ExternalLinks.decision(page: nil, scheme: "zoommtg", foreign: false) == nil)
+        }
+    }
+
     @Test func resetReturnsTheSiteToNoRows() throws {
         try withDefaults {
             let other = "https://other.example.com"

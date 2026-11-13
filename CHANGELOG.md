@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Open apps is a site permission like the camera's. When a page wants to open an app, like the App Store or Zoom, Zigzag asks with Open (this time), Always Open (that app, from now on) and Don’t Open. Once a site has asked, Permissions in its Site Controls and Settings › Privacy › Sites have an Open apps row with Ask, Allow and Block, and Block keeps every app closed for that site. Addresses you type or open yourself still open their app right away. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#192](https://github.com/ZigaoWang/zigzag/issues/192))
+
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.

@@ -206,9 +206,18 @@ enum SitePermissions {
 
     static func setNotifications(_ allowed: Bool?, origin: String) { all["\(origin)|notifications"] = allowed }
 
-    /// Whether a site may open links for another app (zoommtg:, wemeet:) without asking: yes once you've said Open.
-    static func opensApp(origin: String, scheme: String) -> Bool { all["\(origin)|app:\(scheme)"] == true }
+    /// Whether a site may open links for another app (zoommtg:, itms-apps:): Allow or Block kept for the site, chosen
+    /// in Site Controls or Settings, comes first; else yes for an app it was told Always Open to on its question;
+    /// else nil, asked each time.
+    static func appDecision(origin: String, scheme: String) -> Bool? {
+        let now = all
+        if let site = now["\(origin)|apps"] { return site }
+        return now["\(origin)|app:\(scheme)"] == true ? true : nil
+    }
 
+    static func opensApp(origin: String, scheme: String) -> Bool { appDecision(origin: origin, scheme: scheme) == true }
+
+    /// Always Open on a site's question: that one app, for that site.
     static func allowOpeningApp(origin: String, scheme: String) { all["\(origin)|app:\(scheme)"] = true }
 
     /// Pop-ups a site opens on its own: allowed once you've said Always Allow, blocked (nil) otherwise.
@@ -238,8 +247,11 @@ enum SitePermissions {
     static func hasAsked(_ permission: SitePermission, origin: String) -> Bool { asked.contains("\(origin)|\(permission.rawValue)") }
 
     /// The answers a permission is kept under on a site's page: its own, and those of frames from elsewhere on it.
+    /// Apps to open also count the one app a site was told Always Open to ("origin|app:zoommtg").
     private static func keys(for permission: SitePermission, on origin: String) -> [String] {
-        keys(permission.kinds, on: origin)
+        let own = keys(permission.kinds, on: origin)
+        guard permission == .apps else { return own }
+        return own + all.keys.filter { $0.hasPrefix(origin + "|app:") }
     }
 
     /// Whether anything is kept for `permission` on the site's page.
@@ -265,6 +277,7 @@ enum SitePermissions {
         }
         all = now
         if permission == .notifications, choice != .allow { WebNotifications.shared.removeAll(origin: origin) }
+        if permission == .apps { ExternalLinks.forgetAnswers(origin: origin) }
     }
 
     /// The permissions Site Controls has a row for on this site: once it asked this session, or once something is
@@ -282,6 +295,7 @@ enum SitePermissions {
         forgetEverything(origin: origin)
         asked = asked.filter { !$0.hasPrefix(origin + "|") }
         WebNotifications.shared.removeAll(origin: origin)
+        ExternalLinks.forgetAnswers(origin: origin)
     }
 
     #if DEBUG
@@ -308,9 +322,9 @@ enum SitePermissions {
                                                 title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
                                                 answered: { notifications(origin: origin, tab: tab).map { $0 ? .allow : .deny } })
         switch answer {
-        case .allow, .deny:
-            tab?.permissionAnswers.note(answer == .allow, key: origin, kind: "notifications")
-            return answer == .allow
+        case .allow, .always, .deny:
+            tab?.permissionAnswers.note(answer != .deny, key: origin, kind: "notifications")
+            return answer != .deny
         case .notNow:
             return nil
         }
@@ -339,9 +353,9 @@ enum SitePermissions {
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
                                                 answered: { key.flatMap { location(key: $0, tab: tab) }.map { $0 ? .allow : .deny } })
         switch answer {
-        case .allow, .deny:
-            if let key { tab?.permissionAnswers.note(answer == .allow, key: key, kind: "location") }
-            return answer == .allow ? .grant : .deny
+        case .allow, .always, .deny:
+            if let key { tab?.permissionAnswers.note(answer != .deny, key: key, kind: "location") }
+            return answer != .deny ? .grant : .deny
         case .notNow:
             return .deny
         }
@@ -369,9 +383,9 @@ enum SitePermissions {
                                                 answered: { key.flatMap { decision(key: $0, type: type, tab: tab) }.map { $0 ? .allow : .deny } })
         // Only a clicked answer holds for the page; Esc, or the window closing, is "not now".
         switch answer {
-        case .allow, .deny:
-            if let key { tab?.permissionAnswers.note(answer == .allow, key: key, kind: kind(type)) }
-            return answer == .allow ? .grant : .deny
+        case .allow, .always, .deny:
+            if let key { tab?.permissionAnswers.note(answer != .deny, key: key, kind: kind(type)) }
+            return answer != .deny ? .grant : .deny
         case .notNow:
             return .deny
         }
@@ -381,7 +395,7 @@ enum SitePermissions {
 /// What a site can ask for, as Site Controls has a row for each. Calls ask for the camera and microphone at once and
 /// are answered as one.
 enum SitePermission: String, CaseIterable {
-    case cameraAndMicrophone, location, notifications, popups
+    case cameraAndMicrophone, location, notifications, popups, apps
 
     /// The kinds of answer kept for it.
     var kinds: [String] {
@@ -390,15 +404,16 @@ enum SitePermission: String, CaseIterable {
         case .location: ["location"]
         case .notifications: ["notifications"]
         case .popups: ["popups"]
+        case .apps: ["apps"]
         }
     }
 
     /// The one kind a choice made in Site Controls is kept as.
     var primaryKind: String { self == .cameraAndMicrophone ? "cameraAndMicrophone" : rawValue }
 
-    /// A private window asks for the camera and location (and keeps nothing); it never shows notifications or opens
-    /// pop-ups on its own.
-    var inPrivate: Bool { self == .cameraAndMicrophone || self == .location }
+    /// A private window asks for the camera, location and apps to open (and keeps nothing); it never shows
+    /// notifications or opens pop-ups on its own.
+    var inPrivate: Bool { self == .cameraAndMicrophone || self == .location || self == .apps }
 
     var title: String {
         switch self {
@@ -406,6 +421,7 @@ enum SitePermission: String, CaseIterable {
         case .location: String(localized: "Location", comment: "Row in the site panel's This Site group.")
         case .notifications: String(localized: "Notifications", comment: "Row in the site panel's This Site group.")
         case .popups: String(localized: "Pop-ups", comment: "Row in the site panel's This Site group.")
+        case .apps: String(localized: "Open apps", comment: "Row in the site panel's This Site group: whether the site's links may open apps on this Mac, like Zoom or the App Store.")
         }
     }
 }
@@ -491,7 +507,8 @@ final class PermissionPrompt: FloatingPanelView {
     private weak var controller: PromptHost?
     private var tabsToken: SignalToken?
 
-    enum Answer { case allow, deny, notNow }
+    /// `always` only comes from a question that offers it (`alwaysTitle`): Allow, kept for the site.
+    enum Answer { case allow, always, deny, notNow }
 
     private static var queue: [ObjectIdentifier: Task<Answer, Never>] = [:]
     /// The question on screen in each window, so it can follow the sidebar.
@@ -528,8 +545,10 @@ final class PermissionPrompt: FloatingPanelView {
     /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
     /// `tab` is the tab whose page asked; without one, it's the tab in front when the question comes up.
     /// `host` is how the site is named in the question; `origin`, when given, is the site it's for (`SiteOrigin`).
+    /// `alwaysTitle` adds a third answer between the two, Allow kept for the site (`Answer.always`).
     static func ask(host: String, origin: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil, allowTitle: String = String(localized: "Allow", comment: "Button on a site's permission question."),
+                    alwaysTitle: String? = nil,
                     denyTitle: String = String(localized: "Don’t Allow", comment: "Button on a site's permission question."), answered: @escaping () -> Answer? = { nil }) async -> Answer {
         let key = ObjectIdentifier(controller)
         let before = queue[key]
@@ -537,18 +556,23 @@ final class PermissionPrompt: FloatingPanelView {
             _ = await before?.value
             if let known = answered() { return known }
             return await show(host: host, request: title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English."), symbol: symbol, icon: icon, allowTitle: allowTitle,
-                              denyTitle: denyTitle, origin: origin, in: controller, tab: tab)
+                              alwaysTitle: alwaysTitle, denyTitle: denyTitle, origin: origin, in: controller, tab: tab)
         }
         queue[key] = task
         let answer = await task.value
-        Diagnostics.note("Asked: \(title ?? "Use \(what)")", site: host, answer == .allow ? "allowed" : answer == .deny ? "not allowed" : "put off",
-                         isPrivate: controller.promptIsPrivate)
+        let said = switch answer {
+        case .allow: "allowed"
+        case .always: "always allowed"
+        case .deny: "not allowed"
+        case .notNow: "put off"
+        }
+        Diagnostics.note("Asked: \(title ?? "Use \(what)")", site: host, said, isPrivate: controller.promptIsPrivate)
         if queue[key] == task { queue[key] = nil }
         return answer
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, allowTitle: String,
-                             denyTitle: String, origin: String?, in controller: PromptHost, tab: Tab?) async -> Answer {
+                             alwaysTitle: String?, denyTitle: String, origin: String?, in controller: PromptHost, tab: Tab?) async -> Answer {
         // Never under What's New, where it couldn't be seen: it waits until the notes close.
         await withCheckedContinuation { continuation in
             WhatsNewSheet.afterClosing(in: controller.window) { continuation.resume() }
@@ -586,10 +610,21 @@ final class PermissionPrompt: FloatingPanelView {
                 guard let prompt, prompt.acceptsAllow else { return }
                 prompt.finish(.allow)
             }
-            for button in [deny, allow] as [InteractiveView] { prompt.addSubview(button) }
+            // Kept for the site: plain, between the two, so the filled answer at the right stays the one-time one.
+            var row: [PillButton] = [deny]
+            if let alwaysTitle {
+                let always = PillButton(title: alwaysTitle, style: .plain)
+                always.onClick = { [weak prompt] _ in
+                    guard let prompt, prompt.acceptsAllow else { return }
+                    prompt.finish(.always)
+                }
+                row.append(always)
+            }
+            row.append(allow)
+            for button in row { prompt.addSubview(button) }
             // Side by side at one width, as a Mac dialog sets its answers.
-            let width = max(deny.fittingWidth, allow.fittingWidth, Tokens.Dialog.minButtonWidth)
-            prompt.buttons = [(deny, width), (allow, width)]
+            let width = max(row.map(\.fittingWidth).max() ?? 0, Tokens.Dialog.minButtonWidth)
+            prompt.buttons = row.map { ($0 as InteractiveView, width) }
             prompt.setAccessibilityLabel(String(localized: "\(host): \(request)?", comment: "VoiceOver label of a site's permission question: the site, then its request, like “zoom.us: Use your camera?”."))
             prompt.answer = { continuation.resume(returning: $0) }
             prompt.askingTab = asking
@@ -722,7 +757,7 @@ final class PermissionPrompt: FloatingPanelView {
     /// first half second.
     static func debugAnswer(_ answer: Answer, in host: PromptHost) {
         guard let prompt = shown[ObjectIdentifier(host)], !prompt.isHidden else { return }
-        if answer == .allow, !prompt.acceptsAllow { return }
+        if answer == .allow || answer == .always, !prompt.acceptsAllow { return }
         prompt.finish(answer)
     }
 

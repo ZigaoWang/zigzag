@@ -2588,6 +2588,17 @@
         }
       }
     },
+    "Always Open" : {
+      "comment" : "Button on a page's question to open an app: opens it, and the site may open this app without asking from now on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终打开"
+          }
+        }
+      }
+    },
     "Always Translate" : {
       "comment" : "A heading in Settings › Translation.",
       "localizations" : {
@@ -9717,7 +9728,7 @@
       }
     },
     "Open" : {
-      "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the page.\nButton on a page's question to open an app.",
+      "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the page.\nButton on a page's question to open an app: opens it this time.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10009,6 +10020,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开一个新标签页"
+          }
+        }
+      }
+    },
+    "Open apps" : {
+      "comment" : "Row in the site panel's This Site group: whether the site's links may open apps on this Mac, like Zoom or the App Store.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 App"
           }
         }
       }
