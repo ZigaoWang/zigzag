@@ -465,7 +465,7 @@ struct FaviconDecodeTests {
 
     @Test func anIconIsReadOffTheMainThread() async {
         let data = png(width: 64, CGColor(red: 1, green: 0, blue: 0, alpha: 1))
-        let read = await Task.detached { FaviconStore.decode(data, side: 16) }.value
+        let read = await FaviconStore.decode(data, side: 16)
         #expect(read?.blank == false)
         #expect(read?.normalized.size == NSSize(width: 16, height: 16))
         #expect(read?.normalized.representations.first?.pixelsWide == 64)
@@ -473,11 +473,11 @@ struct FaviconDecodeTests {
 
     @Test func anIconThatDrawsNothingIsBlank() async {
         let data = png(width: 32, nil)
-        #expect(await Task.detached { FaviconStore.decode(data, side: 16)?.blank }.value == true)
+        #expect(await FaviconStore.decode(data, side: 16)?.blank == true)
     }
 
-    @Test func whatIsntAPictureIsNoIcon() {
-        #expect(FaviconStore.decode(Data("<html>not found</html>".utf8), side: 16) == nil)
+    @Test func whatIsntAPictureIsNoIcon() async {
+        #expect(await FaviconStore.decode(Data("<html>not found</html>".utf8), side: 16) == nil)
     }
 }
 

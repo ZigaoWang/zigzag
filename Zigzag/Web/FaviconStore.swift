@@ -284,17 +284,20 @@ final class FaviconStore {
             return
         }
         let rest = Array(candidates.dropFirst())
-        if next.scheme == "data", let data = try? Data(contentsOf: next), let image = NSImage(data: data), image.isValid {
-            found(image, rest: rest)
-            return
-        }
         let side = Tokens.Metric.favicon
         Task {
-            let result = try? await session.data(from: next)
-            let ok = ((result?.1 as? HTTPURLResponse)?.statusCode ?? 200) < 400
-            // Decoded, drawn to its square and looked at off the main thread: many tabs loading at once each fetch one.
-            let data = ok ? result?.0 : nil
-            let read = await Task.detached(priority: .utility) { data.flatMap { Self.decode($0, side: side) } }.value
+            let data: Data?
+            if next.scheme == "data" {
+                // The page's own bytes, read like any icon.
+                data = SafePictures.bytes(ofDataURL: next.absoluteString)
+            } else {
+                let result = try? await session.data(from: next)
+                let ok = ((result?.1 as? HTTPURLResponse)?.statusCode ?? 200) < 400
+                data = ok ? result?.0 : nil
+            }
+            // Read by the picture helper, then drawn to its square and looked at off the main thread: many tabs
+            // loading at once each fetch one.
+            let read: Decoded? = if let data { await Self.decode(data, side: side) } else { nil }
             if let read {
                 found(read.image, rest: rest, read: read)
             } else {
@@ -310,10 +313,18 @@ final class FaviconStore {
         let blank: Bool
     }
 
-    nonisolated static func decode(_ data: Data, side: CGFloat) -> Decoded? {
-        guard let image = NSImage(data: data), image.isValid, image.size.width > 0 else { return nil }
-        let normalized = normalize(image, side: side)
-        return Decoded(image: image, normalized: normalized, blank: isBlankSquare(normalized))
+    /// The most pixels across an icon is kept at (`normalize`), and so the most the picture helper is asked for.
+    nonisolated static let maxPixels = 128
+
+    /// What a site sent, read by the sandboxed picture helper (never here: a site picks these bytes), then squared.
+    /// Nil for what isn't an allowed picture, or when the helper can't read it: the site has no icon then.
+    nonisolated static func decode(_ data: Data, side: CGFloat, using pictures: SafePictures = .shared) async -> Decoded? {
+        guard let picture = await pictures.decode(data, maxSide: maxPixels) else { return nil }
+        return await Task.detached(priority: .utility) {
+            let image = picture.nsImage
+            let normalized = normalize(image, side: side)
+            return Decoded(image: image, normalized: normalized, blank: isBlankSquare(normalized))
+        }.value
     }
 
 
@@ -382,8 +393,8 @@ final class FaviconStore {
     /// `side`: the points the icon is drawn at. Draws into its own bitmap, so it's safe off the main thread.
     nonisolated private static func normalize(_ image: NSImage, side points: CGFloat) -> NSImage {
         let native = image.representations.map(\.pixelsWide).max() ?? 0
-        // Drawings (SVG, PDF) have no pixels of their own and render sharp at any size.
-        let side = native <= 0 ? 128 : min(max(native, 16), 128)
+        // A drawing (an SVG the helper drew at the most it's asked for) is kept at that.
+        let side = native <= 0 ? maxPixels : min(max(native, 16), maxPixels)
         guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8,
                                          samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
                                          bytesPerRow: 0, bitsPerPixel: 0) else { return image }
