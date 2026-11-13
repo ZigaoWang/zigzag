@@ -367,11 +367,16 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   Page Size's button is a phone, a tablet or a laptop by the size chosen (a tablet: short side 500 or more, squarer
   than 1.55 and under 1400 long), with the size after it (`PageSizeReadout`) while the page has a size of its own:
   the listed size's name in `textSecondary`, then the width and height as two fields at the label size in
-  tabular figures with "×" between, then "at 86%" in `textTertiary` while it's shown smaller. A field shows the
+  tabular figures with "×" between, then its pixel ratio ("3×") while it has one and "at 86%" while it's shown
+  smaller, both in `textTertiary`. A field shows the
   bar's hover fill under the pointer and `fieldFill` while you type; Return sets it, Esc leaves it, ↑ and ↓ step it
   by 1, ⇧ by 10, Tab goes on to the height, and a side stays within `PageSizes.limits`. Pressed anywhere else, the
   readout (with the hover fill a button has) opens Page Size's menu. Where room is short the name goes first,
-  then the readout.
+  then the readout. Page Size's menus, there and in View › Developer: Fill the Window and the listed sizes, then
+  what you do with a size, then Pixel Ratio under its heading (As the Device, with the device's ratio after it when
+  it's a listed one, then 1×, 2× and 3×), which needs a size of its own like Rotate Page. A ratio chosen goes with
+  the size: another size keeps it, filling the window again drops it. A size you add takes the Mac's ratio unless
+  Add Size is given one, whatever its name.
   ⋯ is filled (`ellipsis.circle.fill`) while something chosen under it is in effect (JavaScript, images or styles
   off, another user agent, outlines, or what a button that gave way into it holds), so no choice is one nothing
   shows. Its menu: what gave way, what's on or off, User Agent under

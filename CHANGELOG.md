@@ -21,6 +21,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Restart to Update says it couldn't check for updates when Zigzag can't install the update right then, instead of doing nothing.
 - Find on page marks the matches in text that shows up as you open a section, like an accordion or Show more, not only in text a page adds.
 
+### New
+- A page in Developer Mode at a phone's or a tablet's size has that device's pixel ratio, so it reads its `devicePixelRatio` and picks its images as it would there: 3× for an iPhone 16, 2.625× for a Pixel 7. Pixel Ratio in Page Size's menu chooses 1×, 2× or 3× instead, the size beside Page Size says it, and Add Size takes a ratio for a device of your own. ([#141](https://github.com/ZigaoWang/zigzag/issues/141))
+
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
