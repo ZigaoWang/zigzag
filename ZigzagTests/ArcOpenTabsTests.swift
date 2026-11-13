@@ -1,0 +1,105 @@
+import Foundation
+import Testing
+@testable import Zigzag
+
+/// Each of Arc's spaces' open tabs (its unpinned container, Today) come over in Arc's order as tabs that wait to
+/// load, split views side by side; pinned pages stay pins and archived tabs stay behind (#210).
+@MainActor struct ArcOpenTabsTests {
+    private func tab(_ id: String, _ url: String, title: String? = nil, saved: String? = nil, parent: String? = nil) -> [String: Any] {
+        var tab: [String: Any] = ["savedURL": url]
+        if let saved { tab["savedTitle"] = saved }
+        var node: [String: Any] = ["id": id, "data": ["tab": tab], "childrenIds": [String]()]
+        if let title { node["title"] = title }
+        if let parent { node["parentID"] = parent }
+        return node
+    }
+
+    /// Two spaces, each with pins and open tabs: one with a split view, a renamed tab, a file that isn't on the web,
+    /// pages in a list, and a tab that names the container without being in its list.
+    private func sidebar(wrapped: Bool = false) throws -> Data {
+        let items: [[String: Any]] = [
+            ["id": "pinA", "childrenIds": ["p1"], "data": ["itemContainer": [:]]],
+            tab("p1", "https://example.com/pinned"),
+            ["id": "openA", "childrenIds": ["o1", "split", "o2", "file", "folder"], "data": ["itemContainer": [:]]],
+            tab("o1", "https://example.com/1", saved: "One"),
+            ["id": "split", "data": ["splitView": [:]], "childrenIds": ["s1", "s2"]],
+            tab("s1", "https://example.com/left", saved: "Left"),
+            tab("s2", "https://example.com/right", saved: "Right"),
+            tab("o2", "https://example.com/2", title: "Mine", saved: "Two"),
+            tab("file", "file:///Users/someone/notes.txt"),
+            ["id": "folder", "data": ["list": [:]], "childrenIds": ["f1"]],
+            tab("f1", "https://example.com/inside"),
+            tab("late", "https://example.com/late", parent: "openA"),
+            ["id": "pinB", "childrenIds": [String](), "data": ["itemContainer": [:]]],
+            ["id": "openB", "childrenIds": ["b1"], "data": ["itemContainer": [:]]],
+            tab("b1", "https://example.org/b"),
+            // Archived: under no container Arc still shows.
+            tab("old", "https://example.com/archived", parent: "gone"),
+        ]
+        func space(_ id: String, _ title: String, _ pinned: String, _ open: String) -> [String: Any] {
+            let ids: [Any] = wrapped ? [["unpinned": ["_0": [:]]], open, ["pinned": ["_0": [:]]], pinned] : ["unpinned", open, "pinned", pinned]
+            return ["id": id, "title": title, "containerIDs": ids]
+        }
+        let spaces: [Any] = ["a", space("a", "Home", "pinA", "openA"), "b", space("b", "Work", "pinB", "openB")]
+        let list: [Any] = wrapped ? items.flatMap { [$0["id"]!, ["value": $0]] } : items
+        let root: [String: Any] = ["sidebar": ["containers": [["global": [:]], ["spaces": spaces, "items": list]]]]
+        return try JSONSerialization.data(withJSONObject: root)
+    }
+
+    @Test func openTabsInArcsOrder() throws {
+        for wrapped in [false, true] {
+            let parsed = try ArcImporter.readSidebar(sidebar(wrapped: wrapped))
+            #expect(parsed.spaces.map(\.name) == ["Home", "Work"])
+            // Pinned pages stay pins, never open tabs too.
+            #expect(parsed.spaces[0].bookmarks.map(\.url.lastPathComponent) == ["pinned"])
+            let home = parsed.openTabs[parsed.spaces[0].id] ?? []
+            #expect(home.map { $0.pages.map(\.url.lastPathComponent) } == [["1"], ["left", "right"], ["2"], ["inside"], ["late"]])
+            #expect(home.first?.pages.first?.title == "One")
+            #expect(home.first?.pages.first?.customTitle == nil)
+            // A tab renamed in Arc keeps its name, over the page's own title.
+            #expect(home.count > 2 && home[2].pages[0].title == "Two" && home[2].pages[0].customTitle == "Mine")
+            #expect(parsed.openTabs[parsed.spaces[1].id]?.map { $0.pages.map { $0.url.host() } } == [["example.org"]])
+            // Archived tabs and files on the Mac don't come over.
+            let all = parsed.openTabs.values.flatMap { $0.flatMap(\.pages) }.map(\.url.absoluteString)
+            #expect(!all.contains { $0.contains("archived") || $0.hasPrefix("file:") })
+        }
+    }
+
+    /// A sidebar from before open tabs were read still gives its spaces and pins, with no open tabs.
+    @Test func noUnpinnedContainer() throws {
+        let root: [String: Any] = ["sidebar": ["containers": [["global": [:]], [
+            "spaces": ["a", ["id": "a", "title": "Home", "containerIDs": ["pinned", "pinA"]]],
+            "items": [["id": "pinA", "childrenIds": ["p1"], "data": ["itemContainer": [:]]], tab("p1", "https://example.com/pinned")],
+        ]]]]
+        let parsed = try ArcImporter.readSidebar(JSONSerialization.data(withJSONObject: root))
+        #expect(parsed.spaces.first?.bookmarks.count == 1)
+        #expect(parsed.openTabs.isEmpty)
+    }
+
+    @Test func splitViewsOfMoreThanTwo() {
+        let ids = (0..<5).map { _ in UUID() }
+        #expect(ArcImporter.splitPair(Array(ids.prefix(2)))?.count == 2)
+        #expect(ArcImporter.splitPair(Array(ids.prefix(3)))?.count == 3)
+        // Four at most, as a group holds.
+        #expect(ArcImporter.splitPair(ids).map { Set($0.ids) } == Set(ids.prefix(4)))
+    }
+
+    /// They open as tabs that wait to load, after what's there, and importing again adds nothing twice.
+    @Test func openWithoutLoadingAndOnlyOnce() throws {
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        manager.adopt([Tab(url: URL(string: "https://example.com/1")!, spaceID: space)], in: space)
+        defer { manager.allTabs.forEach { $0.close() }; manager.invalidate() }
+        let parsed = try ArcImporter.readSidebar(sidebar())
+        let rows = parsed.openTabs[parsed.spaces[0].id] ?? []
+        #expect(ArcImporter.open([(space, rows)], in: manager) == 5)
+        let tabs = manager.tabs(in: space)
+        #expect(tabs.map { $0.url?.lastPathComponent ?? "" } == ["1", "left", "right", "2", "inside", "late"])
+        #expect(tabs.allSatisfy { !$0.isLoaded })
+        #expect(tabs.first { $0.url?.lastPathComponent == "2" }?.customTitle == "Mine")
+        let left = try #require(tabs.first { $0.url?.lastPathComponent == "left" })
+        #expect(manager.partner(of: left)?.url?.lastPathComponent == "right")
+        #expect(ArcImporter.open([(space, rows)], in: manager) == 0)
+        #expect(manager.tabs(in: space).count == 6)
+    }
+}

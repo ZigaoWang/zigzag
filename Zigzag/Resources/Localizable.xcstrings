@@ -1202,7 +1202,7 @@
       }
     },
     "%lld open tabs" : {
-      "comment" : "Under a space's name in Settings › Spaces.",
+      "comment" : "Item in the list of what came over, in the Import window: Arc's open tabs.\nUnder a space's name in Settings › Spaces.",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -10165,6 +10165,17 @@
         }
       }
     },
+    "Open Tabs" : {
+      "comment" : "Choice in the Import window: bring the tabs open in each of Arc's spaces over, not pinned ones.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开的标签页"
+          }
+        }
+      }
+    },
     "Open Top Left" : {
       "comment" : "Shown over the top left quarter of the page while a tab is dragged there, to open it there in a split view.",
       "localizations" : {
@@ -14541,13 +14552,13 @@
         }
       }
     },
-    "Spaces and Tabs" : {
-      "comment" : "Choice in the Import window: bring Arc's spaces and tabs over.",
+    "Spaces and Pinned Tabs" : {
+      "comment" : "Choice in the Import window: bring Arc's spaces, pinned tabs and favorites over.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "空间和标签页"
+            "value" : "空间和固定标签页"
           }
         }
       }

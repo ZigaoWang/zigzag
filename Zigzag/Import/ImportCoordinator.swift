@@ -32,7 +32,7 @@ enum ImportCoordinator {
         var offers: Choice {
             switch kind {
             // Only Chrome and its kin share a store with Zigzag: Firefox's and Safari's extensions come from their own.
-            case .chromium(let browser) where browser.name == "Arc": [.passwords, .bookmarks, .history, .tabs, .signIns, .extensions]
+            case .chromium(let browser) where browser.name == "Arc": [.passwords, .bookmarks, .history, .tabs, .openTabs, .signIns, .extensions]
             // Passwords and most sign-ins need the browser's Keychain item; without one known, they stay behind.
             case .chromium(let browser) where browser.safeStorage == nil: [.bookmarks, .history, .extensions]
             case .chromium: [.passwords, .bookmarks, .history, .signIns, .extensions]
@@ -58,6 +58,8 @@ enum ImportCoordinator {
         static let signIns = Choice(rawValue: 16)
         /// Its extensions from the Chrome Web Store, added here from the store after one question.
         static let extensions = Choice(rawValue: 32)
+        /// Each of Arc's spaces' open tabs (Today's, not pinned), which wait to load until clicked.
+        static let openTabs = Choice(rawValue: 64)
 
         /// What trying again after these problems should run: just the parts that failed, or everything.
         static func retrying(_ problems: [ImportProblem], else all: Choice) -> Choice {
@@ -271,6 +273,8 @@ enum ImportCoordinator {
         var bookmarks = 0
         var history = 0
         var spaces = 0
+        /// Open tabs that came over (Arc's).
+        var tabs = 0
         /// Sites whose sign-ins came over.
         var signedInSites = 0
         /// Extensions added from the Chrome Web Store.
@@ -282,7 +286,7 @@ enum ImportCoordinator {
         var notes: [String] = []
 
         /// Something came over: anything counted above.
-        var broughtAny: Bool { passwords + updatedPasswords + bookmarks + history + spaces + signedInSites + extensions > 0 }
+        var broughtAny: Bool { passwords + updatedPasswords + bookmarks + history + spaces + tabs + signedInSites + extensions > 0 }
 
         /// "Imported 214 passwords and 86 bookmarks from Arc."
         var sentence: String {
@@ -290,6 +294,7 @@ enum ImportCoordinator {
             if passwords > 0 { parts.append(String(localized: "\(passwords) passwords", comment: "Item in a list of what a browser holds or what came over, in the Import window.")) }
             if bookmarks > 0 { parts.append(String(localized: "\(bookmarks) bookmarks", comment: "Item in a list of what a browser holds or what came over, in the Import window.")) }
             if spaces > 0 { parts.append(String(localized: "\(spaces) spaces", comment: "Item in the list of what came over, in the Import window.")) }
+            if tabs > 0 { parts.append(String(localized: "\(tabs) open tabs", comment: "Item in the list of what came over, in the Import window: Arc's open tabs.")) }
             if history > 0 { parts.append(String(localized: "\(history) pages of history", comment: "Item in the list of what came over, in the Import window.")) }
             if extensions > 0 { parts.append(String(localized: "\(extensions) extensions", comment: "Item in a list of what a browser holds or what came over, in the Import window.")) }
             var sentences: [String] = []
@@ -341,14 +346,16 @@ enum ImportCoordinator {
         let reading = choice.reading
         let isArc: Bool = { if case .chromium(let b) = source.kind { return b.name == "Arc" } else { return false } }()
 
-        // Arc's spaces, pinned tabs, favorites and history come through its own importer, which knows its sidebar.
+        // Arc's spaces, pinned tabs, favorites, open tabs and history come through its own importer, which knows its
+        // sidebar.
         var arcReading = reading
-        // Only the parts you chose: the sidebar for spaces and bookmarks, history for history.
+        // Only the parts you chose: the sidebar for spaces, bookmarks and open tabs, history for history.
         if isArc {
-            if choice.contains(.tabs) || choice.contains(.bookmarks) {
-                let result = ArcImporter.importSidebar(into: profile.id).result
+            if !choice.isDisjoint(with: [.tabs, .bookmarks, .openTabs]) {
+                let result = ArcImporter.importSidebar(into: profile.id, openTabs: choice.contains(.openTabs)).result
                 summary.spaces = result.spaces
                 summary.bookmarks = result.bookmarks
+                summary.tabs = result.tabs
                 summary.problems += result.problems
             }
             if choice.contains(.history) {

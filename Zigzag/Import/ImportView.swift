@@ -126,7 +126,8 @@ final class ImportView: NSView {
         for (choice, name) in [(ImportCoordinator.Choice.passwords, String(localized: "Passwords", comment: "Choice in the Import window: bring passwords over.")),
                                (.bookmarks, String(localized: "Bookmarks", comment: "Choice in the Import window: bring bookmarks over.")),
                                (.history, String(localized: "History", comment: "Choice in the Import window: bring browsing history over.")),
-                               (.tabs, String(localized: "Spaces and Tabs", comment: "Choice in the Import window: bring Arc's spaces and tabs over.")),
+                               (.tabs, String(localized: "Spaces and Pinned Tabs", comment: "Choice in the Import window: bring Arc's spaces, pinned tabs and favorites over.")),
+                               (.openTabs, String(localized: "Open Tabs", comment: "Choice in the Import window: bring the tabs open in each of Arc's spaces over, not pinned ones.")),
                                (.signIns, String(localized: "Sign-ins", comment: "Choice in the Import window: bring over the sites you're signed in to.")),
                                (.extensions, String(localized: "Extensions", comment: "Choice in the Import window: bring extensions over from the Chrome Web Store."))] {
             let box = ChoicePill(title: name)
@@ -167,7 +168,7 @@ final class ImportView: NSView {
 
     @objc private func choicesChanged() {
         let anyArc = rows.contains { $0.isChosen && $0.source.offers.contains(.tabs) }
-        choiceButtons.first { $0.0 == .tabs }?.1.isHidden = !anyArc
+        for pair in choiceButtons where pair.0 == .tabs || pair.0 == .openTabs { pair.1.isHidden = !anyArc }
         // Safari's stay behind (they need Full Disk Access), so Sign-ins shows only for a browser that has them.
         let anySignIns = rows.contains { $0.isChosen && $0.source.offers.contains(.signIns) }
         // A browser whose Keychain item isn't known (Comet) brings no passwords; alone, it offers none.

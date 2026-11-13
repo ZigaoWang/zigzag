@@ -7,6 +7,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Screen sharing in a web meeting can share a single window, not only a whole screen. When a site asks to share your screen, Zigzag offers Share Window… and Share Screen…, as Safari does, and macOS's picker comes up for the one you chose. ([#211](https://github.com/ZigaoWang/zigzag/issues/211))
+### New
+- Importing from Arc brings each space's open tabs too, in Arc's order, with split views side by side. They wait to load until you click them, so hundreds of tabs don't all load at once, and importing again doesn't open a tab twice. Open Tabs, beside Spaces and Pinned Tabs in the Import window, leaves them behind. Thanks to [alextend](https://github.com/alextend). ([#210](https://github.com/ZigaoWang/zigzag/issues/210))
 
 ## [0.9.0] - 2026-11-12
 

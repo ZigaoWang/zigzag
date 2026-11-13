@@ -1037,7 +1037,8 @@ private final class BringPicker: StepContent {
         for (choice, name) in [(ImportCoordinator.Choice.passwords, String(localized: "Passwords", comment: "Choice in the Import window: bring passwords over.")),
                                (.bookmarks, String(localized: "Bookmarks", comment: "Choice in the Import window: bring bookmarks over.")),
                                (.history, String(localized: "History", comment: "Choice in the Import window: bring browsing history over.")),
-                               (.tabs, String(localized: "Spaces and Tabs", comment: "Choice in the Import window: bring Arc's spaces and tabs over."))] {
+                               (.tabs, String(localized: "Spaces and Pinned Tabs", comment: "Choice in the Import window: bring Arc's spaces, pinned tabs and favorites over.")),
+                               (.openTabs, String(localized: "Open Tabs", comment: "Choice in the Import window: bring the tabs open in each of Arc's spaces over, not pinned ones."))] {
             let pill = DataToggle(name)
             pill.onChange = { [weak self] in self?.refresh() }
             addSubview(pill)
