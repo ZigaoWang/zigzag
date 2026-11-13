@@ -88,22 +88,31 @@ struct DeveloperMoreTests {
     }
 
     @Test func whatIsOnOrOffIsCheckedWhileItIs() {
+        let all = DeveloperBarTools.parts.count
+        func underMore(_ state: DeveloperState, shown: Int = all) -> Bool {
+            DeveloperTool.hasChoiceInEffect(among: DeveloperBarTools.toolsUnderMore(shown: shown), in: state)
+        }
         var state = DeveloperState()
         #expect(!DeveloperTool.javaScript.isChecked(in: state) && !DeveloperTool.outlines.isChecked(in: state))
-        #expect(!DeveloperBarTools.hasHiddenChoice(state))
+        #expect(!underMore(state) && !underMore(state, shown: 0))
         state.javaScriptOff = true
-        #expect(DeveloperTool.javaScript.isChecked(in: state) && DeveloperBarTools.hasHiddenChoice(state))
+        #expect(DeveloperTool.javaScript.isChecked(in: state) && underMore(state))
         state = DeveloperState()
         state.outlines = true
-        #expect(DeveloperTool.outlines.isChecked(in: state) && DeveloperBarTools.hasHiddenChoice(state))
+        #expect(DeveloperTool.outlines.isChecked(in: state) && underMore(state))
         state = DeveloperState()
         state.userAgent = .chrome
-        #expect(DeveloperBarTools.hasHiddenChoice(state))
-        // What a button above the page shows for itself isn't hidden.
+        #expect(underMore(state))
+        // What a button above the page shows for itself isn't under ⋯, until the button gives way into it.
         state = DeveloperState()
         state.appearance = .dark
+        #expect(!underMore(state) && underMore(state, shown: 0))
+        state = DeveloperState()
         state.size = CGSize(width: 393, height: 852)
-        #expect(!DeveloperBarTools.hasHiddenChoice(state))
+        #expect(!underMore(state) && underMore(state, shown: 0))
+        state = DeveloperState()
+        state.printStyles = true
+        #expect(!underMore(state) && underMore(state, shown: 0))
     }
 
     @Test func theOutlineIsOneStylePutInAndTakenOutByName() {

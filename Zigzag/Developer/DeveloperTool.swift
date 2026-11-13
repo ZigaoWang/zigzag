@@ -127,6 +127,16 @@ enum DeveloperTool: String, CaseIterable {
     /// or something to do.
     var isChoice: Bool { appearance != nil || userAgent != nil || self == .sizeFill }
 
+    /// The choice of its kind that leaves the page as any page: following the Mac, Zigzag's own user agent, filling
+    /// the window.
+    var isDefaultChoice: Bool { self == .appearanceFollowsMac || self == .userAgentZigzag || self == .sizeFill }
+
+    /// Whether something among `tools` is in effect for a page with these choices: a choice other than the one any
+    /// page has, or something turned on.
+    static func hasChoiceInEffect(among tools: [DeveloperTool], in state: DeveloperState) -> Bool {
+        tools.contains { $0.isDefaultChoice ? !$0.isChecked(in: state) : !$0.isChoice && $0.isChecked(in: state) }
+    }
+
     /// Whether the tool is one that's on or chosen now, for the check beside it.
     func isChecked(in state: DeveloperState) -> Bool {
         if let appearance { return state.appearance == appearance }
