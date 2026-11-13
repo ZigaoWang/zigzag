@@ -401,6 +401,17 @@ struct SitePanelRowsTests {
         #expect(!SitePanelRows.rows(extensionPage).contains(.cookieBanners))
     }
 
+    /// Developer Mode (#141): on any web page, the last row of This Site, after the ones every page may have.
+    @Test func developerModeIsTheLastRow() {
+        var c = Context()
+        c.fullScreen = true
+        c.foreignLanguage = true
+        c.developerMode = true
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .fullScreenFills, .alwaysTranslate, .developerMode])
+        c.developerMode = false
+        #expect(!SitePanelRows.rows(c).contains(.developerMode))
+    }
+
     @Test func noZoomOverReaderOrAPDF() {
         var c = Context()
         c.coveredPage = true

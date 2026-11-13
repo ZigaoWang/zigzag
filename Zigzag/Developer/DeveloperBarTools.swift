@@ -178,7 +178,7 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
 
     /// `short`: under a heading that already says what it's about.
     private func entry(_ tool: DeveloperTool, short: Bool = false) -> MenuPanel.Entry {
-        let title = tool == .site ? DeveloperTool.siteTitle(listed: DevelopmentSites.covers(tab?.url)) : short ? tool.shortTitle : tool.title
+        let title = tool == .site ? DeveloperTool.siteShortTitle(listed: DevelopmentSites.covers(tab?.url)) : short ? tool.shortTitle : tool.title
         let state = tab?.developerInEffect ?? DeveloperState()
         return .item(.init(title: title, symbol: tool.symbol, isChecked: tab?.isDevelopment == true && tool.isChecked(in: state),
                            isEnabled: tool.isOffered(for: tab, isPrivate: isPrivate) && tool.applies(in: state),

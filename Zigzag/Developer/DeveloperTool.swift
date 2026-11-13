@@ -3,7 +3,7 @@ import AppKit
 /// One of the developer tools (#141), said once: its name, its symbol, what it does and the words that find it. The
 /// menu bar, the command bar and Site Controls all take it from here, so a tool has one name wherever it shows.
 enum DeveloperTool: String, CaseIterable {
-    /// Puts the site you're on on the list of development sites, or takes it off.
+    /// Turns Developer Mode on for the site you're on, or off: the list of sites in Settings › Developer.
     case site
     case clearCache = "clear-cache"
     case clearCookies = "clear-cookies"
@@ -153,15 +153,29 @@ enum DeveloperTool: String, CaseIterable {
         }
     }
 
-    /// Listing a site is named for what it will do, as Pin Tab and Unpin Tab are.
+    /// Developer Mode for the site is named for what it will do, as Pin Tab and Unpin Tab are. In the menu bar it
+    /// says which site; where you're already looking at the site (the command bar, Site Controls' ⋯, the tools
+    /// above the page) it's shorter (`siteShortTitle`).
     static func siteTitle(listed: Bool) -> String {
-        listed ? String(localized: "Remove This Site from Development Sites", comment: "View › Developer menu item and command, on a site that's on the list in Settings › Developer: takes it off, and the developer tools go from it.")
-               : String(localized: "Add This Site to Development Sites", comment: "View › Developer menu item and command, on a site that isn't on the list in Settings › Developer: puts it on, and the developer tools show on it.")
+        listed ? String(localized: "Turn Off Developer Mode for This Site", comment: "View › Developer menu item, on a site in Developer Mode: turns it off for the site, and the developer tools go from it.")
+               : String(localized: "Turn On Developer Mode for This Site", comment: "View › Developer menu item, on a site that isn't in Developer Mode: turns it on for the site, and the developer tools show on it.")
     }
+
+    static func siteShortTitle(listed: Bool) -> String {
+        listed ? String(localized: "Turn Off Developer Mode", comment: "A command in the command bar and an item in the ⋯ menus of Site Controls and of the developer tools above the page, on a site in Developer Mode: turns it off for the site.")
+               : String(localized: "Turn On Developer Mode", comment: "A command in the command bar and an item in the ⋯ menu of Site Controls, on a site that isn't in Developer Mode: turns it on for the site, and the developer tools show on it.")
+    }
+
+    /// The name of the state, as the Site Controls switch, the row's tooltip and VoiceOver say it.
+    static var modeName: String { String(localized: "Developer Mode", comment: "The name of a site's state in which it has the developer tools, as in Arc: the switch in Site Controls, the tooltip of the mark on a tab's row, and the main switch in Settings › Developer.") }
+
+    /// Developer Mode's one mark, wherever it shows: a tab's row, a favorite, the bar above the page, Site Controls,
+    /// the toasts and Settings.
+    static let modeSymbol = "hammer"
 
     var symbol: String {
         switch self {
-        case .site: "hammer"
+        case .site: Self.modeSymbol
         case .clearCache: "arrow.clockwise"
         case .clearCookies: "trash"
         case .console: "terminal"
@@ -228,7 +242,7 @@ enum DeveloperTool: String, CaseIterable {
     /// The words the command bar finds it by, beside its name.
     var keywords: [String] {
         switch self {
-        case .site: ["developer", "tools", "devtools", "development", "site", "localhost"]
+        case .site: ["developer", "mode", "tools", "devtools", "development", "site", "localhost", "turn", "on", "off"]
         case .clearCache: ["clear", "cache", "site", "reload", "refresh", "developer"]
         case .clearCookies: ["clear", "cookies", "site", "sign", "out", "logout", "developer"]
         case .console: ["javascript", "console", "errors", "log", "developer", "devtools", "inspector"]
@@ -264,7 +278,7 @@ enum DeveloperTool: String, CaseIterable {
     }
 
     /// Its shortcut as Zigzag ships it; none for most.
-    /// ⌥⇧⌘D for listing the site: never a key a text field uses (⌃D deletes forward in every one of them, the
+    /// ⌥⇧⌘D for Developer Mode on the site: never a key a text field uses (⌃D deletes forward in every one of them, the
     /// address and a page's own fields included), and free in the menu bar and in macOS.
     /// ⌥⇧⌘M for Toggle Page Size: Chrome's device toolbar is ⇧⌘M, which is Mute Tab here, and ⌥⌘M is the system's
     /// Minimize All.
@@ -293,8 +307,8 @@ enum DeveloperTool: String, CaseIterable {
         self.init(rawValue: String(commandID.dropFirst(Self.commandPrefix.count)))
     }
 
-    /// Whether the tool is offered for the page you're on. Listing a site: with Developer tools on, for a web page,
-    /// and not in a private window. Every other tool: on a development tab; clearing has nothing to clear in a
+    /// Whether the tool is offered for the page you're on. Developer Mode for the site: with the main switch on, for
+    /// any web page, and not in a private window. Every other tool: on a development tab; clearing has nothing to clear in a
     /// private window, which keeps nothing.
     /// A page's own size is for a page shown on its own: not in a split, whose panes share the window as they are.
     static func isOffered(_ tool: DeveloperTool, isOn: Bool, isDevelopment: Bool, url: URL?, isPrivate: Bool, inSplit: Bool = false) -> Bool {

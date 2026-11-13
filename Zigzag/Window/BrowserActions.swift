@@ -289,18 +289,28 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     // MARK: Developer tools (#141)
 
-    /// View › Developer › Add This Site to Development Sites, or Remove: the list in Settings › Developer. It says
-    /// what it did, by the name on the list: taking a site off takes off what covered it, which may be its parent
-    /// domain.
+    /// View › Developer › Turn On Developer Mode for This Site, or Turn Off (⌥⇧⌘D), and the same in the command bar
+    /// and Site Controls: the list in Settings › Developer. It takes effect at once (the tools come or go on every
+    /// tab of the site) and says what it did, with Undo, by the name on the list: turning it off takes off what
+    /// covered the site, which may be its parent domain.
     @objc func toggleDevelopmentSite(_ sender: Any?) {
         guard let tab = selectedTab, DeveloperTool.site.isOffered(for: tab, isPrivate: tabManager.isPrivate) else { return }
-        if let listed = DevelopmentSites.entry(covering: tab.url) {
-            DevelopmentSites.set(false, for: tab.url)
-            Toast.show(String(localized: "\(listed) is no longer a development site", comment: "Toast after a site is taken off the list in Settings › Developer. The site is a host, like localhost."), symbol: "hammer", in: self)
-        } else if let name = DevelopmentSites.name(for: tab.url) {
-            DevelopmentSites.set(true, for: tab.url)
-            Toast.show(String(localized: "\(name) is a development site", comment: "Toast after a site is put on the list in Settings › Developer. The site is a host, like localhost."), symbol: "hammer", in: self)
-        }
+        setDeveloperMode(for: tab.url, on: !DevelopmentSites.covers(tab.url))
+    }
+
+    /// Developer Mode on or off for the site of a page at `url`, with the toast that says so. Nothing when it's
+    /// that way already.
+    func setDeveloperMode(for url: URL?, on: Bool) {
+        guard DeveloperTools.isOn, DevelopmentSites.isOffered(for: url, isPrivate: tabManager.isPrivate),
+              DevelopmentSites.covers(url) != on, let change = DevelopmentSites.toggle(for: url) else { return }
+        Toast.show(Self.developerModeToast(change), symbol: DeveloperTool.modeSymbol,
+                   action: (String(localized: "Undo", comment: "Button in a toast: undoes what the toast says happened."), { DevelopmentSites.undo(change) }), duration: 4, in: self)
+    }
+
+    /// What the toast after turning Developer Mode on or off says.
+    static func developerModeToast(_ change: DevelopmentSites.Change) -> String {
+        change.isOn ? String(localized: "Developer Mode on for \(change.site)", comment: "Toast after Developer Mode is turned on for a site. The site is a host, like example.com or localhost.")
+            : String(localized: "Developer Mode off for \(change.site)", comment: "Toast after Developer Mode is turned off for a site. The site is a host, like example.com or localhost.")
     }
 
     @objc func pageAppearanceFollowsMac(_ sender: Any?) { chooseForDevelopment { $0.appearance = .followsMac } }

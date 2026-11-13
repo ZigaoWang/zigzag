@@ -1,8 +1,10 @@
 import Foundation
 
-/// Developer tools (#141): tools for the people who build websites, on the sites they build. A tab showing a page on
-/// the development list (`DevelopmentSites`) is a development tab (`Tab.isDevelopment`); everything the tools add
-/// is there only for such a tab. Settings › Developer turns all of it off, and then nothing here does anything.
+/// Developer Mode (#141), as Arc calls it: tools for the people who build websites, on the sites they turn it on
+/// for. A site in Developer Mode is one on the list (`DevelopmentSites`), turned on from Site Controls, the command
+/// bar or View › Developer (⌥⇧⌘D) for any web page; a tab showing one is a development tab (`Tab.isDevelopment`),
+/// with a hammer on its row, and everything the tools add is there only for such a tab. Settings › Developer's
+/// main switch turns all of it off, and then nothing here does anything.
 enum DeveloperTools {
     /// Where the choices are kept; tests use their own.
     static var defaults: UserDefaults = .standard
@@ -64,8 +66,8 @@ enum DeveloperTools {
     static func applies(to url: URL?) -> Bool { isOn && DevelopmentSites.covers(url) }
 }
 
-/// The sites you develop on, listed in Settings › Developer: `localhost` and `127.0.0.1` to begin with, and any you
-/// add (a name that points at this Mac, a staging site). A site is a host without "www.", whatever its port, and
+/// The sites in Developer Mode, listed in Settings › Developer: `localhost` and `127.0.0.1` to begin with, and any
+/// you turn it on for (a name that points at this Mac, a staging site, any site on the web). A site is a host without "www.", whatever its port, and
 /// covers its subdomains, as the other choices for a site do. Not changed from a page in a private window, so a
 /// private visit never ends up in the list; a private window's tabs still follow it.
 enum DevelopmentSites {
@@ -108,36 +110,40 @@ enum DevelopmentSites {
     /// The name a page's site would be listed under.
     static func name(for url: URL?) -> String? { site(of: url) }
 
-    /// Whether putting the page's site on the list is offered: for a web page, and not in a private window.
+    /// Whether Developer Mode can be turned on or off for the page's site: any web page, and not in a private
+    /// window, which keeps nothing about the sites it visits. A private window's tabs still follow the list.
     static func isOffered(for url: URL?, isPrivate: Bool) -> Bool {
         !isPrivate && site(of: url) != nil
     }
 
-    /// Whether a page looks like one being built rather than a site on the web: on this Mac, on the local network
-    /// (a private address, a `.local`, `.test`, `.internal` or `.localhost` name), or served from a port of its own.
-    /// Site Controls offers its Developer tools switch on these and on listed sites only, so the controls of every
-    /// other site stay as they were.
-    static func looksLikeDevelopment(_ url: URL?) -> Bool {
-        guard let url, ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let host = url.host()?.lowercased() else { return false }
-        if ErrorPage.isOnThisMac(url) { return true }
-        let name = host.hasSuffix(".") ? String(host.dropLast()) : host
-        if [".local", ".test", ".internal", ".localhost", ".lan", ".home.arpa"].contains(where: { name.hasSuffix($0) }) { return true }
-        let octets = name.split(separator: ".", omittingEmptySubsequences: false).compactMap { UInt8($0) }
-        if octets.count == 4, name.split(separator: ".").count == 4 {
-            switch (octets[0], octets[1]) {
-            case (10, _), (192, 168), (169, 254): return true
-            case (172, let b) where (16...31).contains(b): return true
-            default: break
-            }
-        }
-        if let port = url.port, port != (url.scheme?.lowercased() == "https" ? 443 : 80) { return true }
-        return false
+    /// What turning Developer Mode on or off for a page's site did: the site, which way, and the list as it was
+    /// before, so the toast that says so can take it back (`undo`).
+    struct Change: Equatable {
+        var isOn: Bool
+        /// The site as the toast names it: the page's own on, the listed entry that covered it off (which may be
+        /// its parent domain).
+        var site: String
+        var before: [String]
     }
 
-    /// Whether a site's controls offer its Developer tools switch: listing it is offered, and it's listed already
-    /// or looks like one being built.
-    static func isSwitchOffered(for url: URL?, isPrivate: Bool) -> Bool {
-        isOffered(for: url, isPrivate: isPrivate) && (covers(url) || looksLikeDevelopment(url))
+    /// Developer Mode for this page's site, the other way from how it is: on if nothing covers it, off if
+    /// something does. Nil for a page with no site to develop on.
+    @discardableResult
+    static func toggle(for url: URL?) -> Change? {
+        let before = sites
+        if let listed = entry(covering: url) {
+            set(false, for: url)
+            return Change(isOn: false, site: listed, before: before)
+        }
+        guard let name = name(for: url) else { return nil }
+        set(true, for: url)
+        return Change(isOn: true, site: name, before: before)
+    }
+
+    /// Takes back a change made by `toggle`: the list is as it was.
+    static func undo(_ change: Change) {
+        guard sites != change.before else { return }
+        sites = change.before
     }
 
     /// Puts the page's site on the list, or takes it off. Off takes away whatever covered it, its parent domain

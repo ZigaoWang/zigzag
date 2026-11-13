@@ -81,10 +81,10 @@ struct DeveloperToolTests {
         #expect(!CommandRanker.contextActions(context).contains { $0.id.hasPrefix(DeveloperTool.commandPrefix) })
         context.developerTools = [.site, .clearCache]
         let ids = CommandRanker.contextActions(context).map(\.id)
-        // Listing the site is named for what it will do.
-        #expect(CommandRanker.contextActions(context).first { $0.id == "developer:site" }?.title == DeveloperTool.siteTitle(listed: false))
+        // Developer Mode for the site is named for what it will do.
+        #expect(CommandRanker.contextActions(context).first { $0.id == "developer:site" }?.title == DeveloperTool.siteShortTitle(listed: false))
         context.isDevelopmentSite = true
-        #expect(CommandRanker.contextActions(context).first { $0.id == "developer:site" }?.title == DeveloperTool.siteTitle(listed: true))
+        #expect(CommandRanker.contextActions(context).first { $0.id == "developer:site" }?.title == DeveloperTool.siteShortTitle(listed: true))
         #expect(DeveloperTool.siteTitle(listed: true) != DeveloperTool.siteTitle(listed: false))
         #expect(ids.contains("developer:site") && ids.contains("developer:clear-cache") && !ids.contains("developer:clear-cookies"))
         // In a private window too, where the spaces' commands are left out.

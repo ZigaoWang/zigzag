@@ -31,22 +31,63 @@ struct DevelopmentSitesTests {
         }
     }
 
-    /// Site Controls offers the switch on a page being built, never on every site on the web.
-    @Test func theSwitchIsOfferedOnlyWhereAPageLooksBeingBuilt() {
+    /// Developer Mode can be turned on for any web page, as in Arc; never from a private window, which keeps
+    /// nothing about the sites it visits, and never for a page with no site.
+    @Test func developerModeIsOfferedOnEveryWebPage() {
         withDefaults {
-            for local in ["http://localhost:3000/", "http://127.0.0.1/", "https://myapp.test/", "http://printer.local/",
-                          "http://192.168.1.20:8080/", "http://10.0.0.5/", "http://172.20.1.1/", "https://example.com:8443/",
-                          "http://app.internal/", "http://box.lan/"] {
-                #expect(DevelopmentSites.isSwitchOffered(for: url(local), isPrivate: false), "\(local)")
+            for page in ["http://localhost:3000/", "https://example.com/", "https://github.com/", "http://192.168.1.20:8080/", "https://staging.example.com/"] {
+                #expect(DevelopmentSites.isOffered(for: url(page), isPrivate: false), "\(page)")
+                #expect(!DevelopmentSites.isOffered(for: url(page), isPrivate: true), "\(page)")
             }
-            for web in ["https://example.com/", "http://example.com:80/", "https://github.com/", "http://172.32.0.1/",
-                        "https://192.168.1.20.nip.io/", "https://10.0.0.5.example.com/"] {
-                #expect(!DevelopmentSites.isSwitchOffered(for: url(web), isPrivate: false), "\(web)")
+            for page in ["file:///Users/me/index.html", "zigzag://settings", "about:blank"] {
+                #expect(!DevelopmentSites.isOffered(for: url(page), isPrivate: false), "\(page)")
             }
-            // Listed, any site has it, so it can be taken off there; never in a private window.
-            DevelopmentSites.add("staging.example.com")
-            #expect(DevelopmentSites.isSwitchOffered(for: url("https://staging.example.com/"), isPrivate: false))
-            #expect(!DevelopmentSites.isSwitchOffered(for: url("http://localhost:3000/"), isPrivate: true))
+            #expect(!DevelopmentSites.isOffered(for: nil, isPrivate: false))
+        }
+    }
+
+    /// Turning it on lists the page's own site, off takes off whatever covered it, and either is said by name.
+    @Test func turningDeveloperModeOnAndOffForASite() {
+        withDefaults {
+            let page = url("https://www.example.com/docs?x=1")
+            let on = DevelopmentSites.toggle(for: page)
+            #expect(on == DevelopmentSites.Change(isOn: true, site: "example.com", before: ["127.0.0.1", "localhost"]))
+            #expect(DevelopmentSites.covers(page))
+            #expect(DeveloperTools.applies(to: url("https://app.example.com/")))
+            #expect(BrowserWindowController.developerModeToast(on!) == "Developer Mode on for example.com")
+            let off = DevelopmentSites.toggle(for: url("https://app.example.com/"))
+            #expect(off?.isOn == false && off?.site == "example.com")
+            #expect(!DevelopmentSites.covers(page))
+            #expect(BrowserWindowController.developerModeToast(off!) == "Developer Mode off for example.com")
+            #expect(DevelopmentSites.toggle(for: url("file:///tmp/index.html")) == nil)
+            #expect(DevelopmentSites.toggle(for: nil) == nil)
+        }
+    }
+
+    /// Undo puts the list back as it was, the sites a parent took the place of too.
+    @Test func undoPutsTheListBackAsItWas() {
+        withDefaults {
+            DevelopmentSites.add("app.example.com")
+            DevelopmentSites.add("api.example.com")
+            let parent = DevelopmentSites.Change(isOn: true, site: "example.com", before: DevelopmentSites.sites)
+            DevelopmentSites.add("example.com")
+            #expect(DevelopmentSites.sites == ["127.0.0.1", "example.com", "localhost"])
+            DevelopmentSites.undo(parent)
+            #expect(DevelopmentSites.sites == ["127.0.0.1", "api.example.com", "app.example.com", "localhost"])
+            // Off, then undone: on again, and the tab follows.
+            let tab = Tab(url: url("http://localhost:5173/"), spaceID: UUID())
+            let off = DevelopmentSites.toggle(for: tab.url)
+            tab.refreshDevelopment()
+            #expect(!tab.isDevelopment)
+            DevelopmentSites.undo(off!)
+            tab.refreshDevelopment()
+            #expect(tab.isDevelopment)
+            // Nothing changed since: nothing is written or announced.
+            var heard = 0
+            let token = DeveloperTools.changed.observe { heard += 1 }
+            DevelopmentSites.undo(off!)
+            #expect(heard == 0)
+            token.cancel()
         }
     }
 
