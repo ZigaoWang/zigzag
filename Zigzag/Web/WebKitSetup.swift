@@ -44,6 +44,8 @@ enum WebKitSetup {
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.upgradeKnownHostsToHTTPS = true
         configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        // The WebKit feature flags changed in Settings › Developer (#173), after Zigzag's own preferences above.
+        FeatureFlags.apply(to: configuration.preferences)
         if #available(macOS 15.4, *), configuration.webExtensionController == nil {
             configuration.webExtensionController = profile.extensions.controller
         }
