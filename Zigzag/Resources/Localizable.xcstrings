@@ -3635,6 +3635,28 @@
         }
       }
     },
+    "Changed" : {
+      "comment" : "Beside the switch of a WebKit feature flag in Settings › Developer that you changed from WebKit's default.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已更改"
+          }
+        }
+      }
+    },
+    "Changes apply to pages you open or reload." : {
+      "comment" : "Under Feature Flags in Settings › Developer, beside Reload All Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改会应用到之后打开或重新载入的页面。"
+          }
+        }
+      }
+    },
     "Charcoal" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor.",
       "localizations" : {
@@ -6006,6 +6028,17 @@
         }
       }
     },
+    "Every flag you changed goes back to WebKit’s default, for pages you open or reload." : {
+      "comment" : "Message of the sheet that puts every WebKit feature flag back to its default.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你更改过的每个功能标志都会恢复为 WebKit 的默认设置，对之后打开或重新载入的页面生效。"
+          }
+        }
+      }
+    },
     "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, pinned tabs and passwords stay." : {
       "comment" : "Message of the sheet that asks before clearing all of History.",
       "localizations" : {
@@ -6252,6 +6285,17 @@
         }
       }
     },
+    "Feature Flags" : {
+      "comment" : "A heading in Settings › Developer, as Safari's Develop menu names them: WebKit's switches for new and experimental features.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "功能标志"
+          }
+        }
+      }
+    },
     "File" : {
       "comment" : "A menu in the menu bar.",
       "localizations" : {
@@ -6347,6 +6391,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "查找上一个"
+          }
+        }
+      }
+    },
+    "Find a flag" : {
+      "comment" : "Placeholder of the search field beside Feature Flags in Settings › Developer: finds a WebKit feature flag by its name or key.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查找功能标志"
           }
         }
       }
@@ -7425,6 +7480,17 @@
         }
       }
     },
+    "Internal" : {
+      "comment" : "A heading in Settings › Developer › Feature Flags: tools for debugging WebKit itself.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内部"
+          }
+        }
+      }
+    },
     "Into" : {
       "comment" : "Label in the Import window, with more than one profile, before the choice of the profile that what's imported goes into.",
       "localizations" : {
@@ -8226,6 +8292,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "抹茶"
+          }
+        }
+      }
+    },
+    "Mature" : {
+      "comment" : "A heading in Settings › Developer › Feature Flags: WebKit features on by default and in use for more than a year.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "成熟"
           }
         }
       }
@@ -9140,6 +9217,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "还没有扩展"
+          }
+        }
+      }
+    },
+    "No flags match “%@”." : {
+      "comment" : "In Settings › Developer › Feature Flags when its search finds nothing; what was typed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有与“%@”匹配的功能标志。"
           }
         }
       }
@@ -11259,6 +11347,17 @@
         }
       }
     },
+    "Preview" : {
+      "comment" : "A heading in Settings › Developer › Feature Flags, as Safari has it: WebKit features on in Safari Technology Preview, not ready to ship.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "预览"
+          }
+        }
+      }
+    },
     "Previous" : {
       "comment" : "Tooltip of the find bar's button that goes to the previous match.",
       "localizations" : {
@@ -11842,6 +11941,17 @@
         }
       }
     },
+    "Reload All Tabs" : {
+      "comment" : "Button in Settings › Developer › Feature Flags: reloads every open web page, so changed flags take effect.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新载入所有标签页"
+          }
+        }
+      }
+    },
     "Reload Ignoring Cache" : {
       "comment" : "View menu item.",
       "localizations" : {
@@ -12315,6 +12425,17 @@
         }
       }
     },
+    "Reset all feature flags?" : {
+      "comment" : "Title of the sheet that puts every WebKit feature flag back to its default, in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要重置所有功能标志吗？"
+          }
+        }
+      }
+    },
     "Reset all shortcuts?" : {
       "comment" : "Title of the sheet that puts every shortcut back.",
       "localizations" : {
@@ -12333,6 +12454,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要重置为单个网站所做的选择吗？"
+          }
+        }
+      }
+    },
+    "Reset to Defaults" : {
+      "comment" : "Button beside Feature Flags in Settings › Developer: every WebKit feature flag you changed goes back to WebKit's default. Also the button of the sheet that asks first.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复默认设置"
           }
         }
       }
@@ -14312,6 +14444,17 @@
         }
       }
     },
+    "Stable" : {
+      "comment" : "A heading in Settings › Developer › Feature Flags, as Safari has it: WebKit features that are on by default and ready.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "稳定"
+          }
+        }
+      }
+    },
     "Stack Vertically" : {
       "comment" : "Menu bar item: stacks the split view's two pages one above the other.\nTooltip of a button in the strip on top of each page of a split view: stacks the two pages one above the other.\nView menu item.",
       "localizations" : {
@@ -14727,6 +14870,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "告诉我们哪些好用、哪些不好用，以及你想要什么。电子邮件会直接发给开发者。GitHub Issues 是公开的，请不要写入任何个人信息。"
+          }
+        }
+      }
+    },
+    "Testable" : {
+      "comment" : "A heading in Settings › Developer › Feature Flags, as Safari has it: WebKit features ready to test, not ready to ship.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可测试"
           }
         }
       }
@@ -16332,6 +16486,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已取消固定"
+          }
+        }
+      }
+    },
+    "Unstable" : {
+      "comment" : "A heading in Settings › Developer › Feature Flags: WebKit features still being built, which can break pages.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不稳定"
           }
         }
       }
@@ -18265,6 +18430,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "关闭扩展"
+          }
+        }
+      }
+    },
+    "featureflags.developer" : {
+      "comment" : "A heading in Settings › Developer › Feature Flags, as Safari has it: WebKit's tools for people who build websites.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Developer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发者"
+          }
+        }
+      }
+    },
+    "featureflags.showAll" : {
+      "comment" : "A folding heading under the feature flags in Settings › Developer: shows WebKit's mature, unstable and internal flags too.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Show All"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部显示"
           }
         }
       }

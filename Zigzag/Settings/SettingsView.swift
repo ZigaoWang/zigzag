@@ -755,6 +755,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let localServersGroup = FormGroup()
     private let addSiteButton = PillButton(title: String(localized: "Add Site…", comment: "Button beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site."))
     private var developerToken: SignalToken?
+    /// Settings › Developer › Feature Flags (#173): WebKit's flags, a group for each status, made the first time the
+    /// group shows. There only while Developer Mode is on and WebKit lists them.
+    private var flagGroups: [FeatureFlags.Status: FormGroup] = [:]
+    /// Each flag's row, switch and "Changed", by key, to follow a change made anywhere.
+    private var flagControls: [String: (flag: FeatureFlags.Flag, row: FormRow, toggle: Toggle, changed: Label)] = [:]
+    private let flagSearch = FilledField.search(String(localized: "Find a flag", comment: "Placeholder of the search field beside Feature Flags in Settings › Developer: finds a WebKit feature flag by its name or key."))
+    private let flagsReset = PillButton(title: String(localized: "Reset to Defaults", comment: "Button beside Feature Flags in Settings › Developer: every WebKit feature flag you changed goes back to WebKit's default. Also the button of the sheet that asks first."))
+    private let flagsReload = PillButton(title: String(localized: "Reload All Tabs", comment: "Button in Settings › Developer › Feature Flags: reloads every open web page, so changed flags take effect."))
+    /// Mature, unstable and internal flags, folded away until wanted.
+    private let flagsMore = DisclosureRow(title: String(localized: "featureflags.showAll", defaultValue: "Show All",
+                                                        comment: "A folding heading under the feature flags in Settings › Developer: shows WebKit's mature, unstable and internal flags too."))
+    private var flagsShowAll = false
+    private var flagsToken: SignalToken?
     private var shortcutsToken: SignalToken?
     private let tabsGroup = FormGroup()
     private let searchGroup = FormGroup()
@@ -1120,6 +1133,26 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         reloadDevelopmentSites()
         reloadPageSizes()
+        flagSearch.isOutlined = true
+        flagSearch.isPill = true
+        flagSearch.field.delegate = self
+        flagsReset.onClick = { [weak self] _ in
+            self?.confirm(title: String(localized: "Reset all feature flags?", comment: "Title of the sheet that puts every WebKit feature flag back to its default, in Settings › Developer."),
+                          message: String(localized: "Every flag you changed goes back to WebKit’s default, for pages you open or reload.",
+                                          comment: "Message of the sheet that puts every WebKit feature flag back to its default."),
+                          action: String(localized: "Reset to Defaults", comment: "Button beside Feature Flags in Settings › Developer: every WebKit feature flag you changed goes back to WebKit's default. Also the button of the sheet that asks first.")) {
+                FeatureFlags.reset()
+            }
+        }
+        flagsReload.onClick = { _ in FeatureFlags.reloadAllTabs() }
+        flagsMore.onClick = { [weak self] _ in
+            guard let self else { return }
+            self.flagsShowAll.toggle()
+            self.flagsMore.isOpen = self.flagsShowAll
+            self.layoutDocument()
+        }
+        // Changed here, in another window's Settings or by Reset to Defaults: the switches and their marks follow.
+        flagsToken = FeatureFlags.changed.observe { [weak self] in self?.refreshFlags() }
         // The menu bar gained or lost items (Developer tools turned on or off): the list of shortcuts is of what's there.
         shortcutsToken = Shortcuts.changed.observe { [weak self] in
             guard let self, self.pane == .shortcuts || self.isSearching else { return }
@@ -2151,6 +2184,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     func controlTextDidChange(_ obj: Notification) {
         if (obj.object as? NSTextField) === settingSearch.field { searchChanged() }
+        if (obj.object as? NSTextField) === flagSearch.field { layoutDocument() }
     }
 
     // MARK: Finding a setting
@@ -2169,6 +2203,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// Escape empties the search, and the section you were on comes back.
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        if control === flagSearch.field, selector == #selector(cancelOperation(_:)), !flagSearch.stringValue.isEmpty {
+            flagSearch.stringValue = ""
+            layoutDocument()
+            return true
+        }
         guard control === settingSearch.field, selector == #selector(cancelOperation(_:)), isSearching else { return false }
         settingSearch.stringValue = ""
         searchChanged()
@@ -2187,6 +2226,29 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         searchChanged()
     }
 
+    /// flags find <text> | all | top: Settings › Developer › Feature Flags searched, Show All opened, or scrolled to.
+    func debugFlags(_ arg: String) {
+        let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+        switch f.first ?? "" {
+        case "find":
+            flagSearch.stringValue = f.count > 1 ? f[1] : ""
+            layoutDocument()
+        case "all":
+            flagsShowAll = true
+            layoutDocument()
+        default: break
+        }
+        if let heading = documentView.subviews.compactMap({ $0 as? Label }).first(where: { $0.stringValue == Self.featureFlagsHeading }) {
+            documentView.scroll(NSPoint(x: 0, y: max(0, heading.frame.minY - Tokens.Space.x4)))
+        }
+    }
+
+    /// The rows the feature flags show: each key, with whether its switch is on and "Changed" shows.
+    var debugFlagRows: [String] {
+        flagControls.values.filter { !$0.row.isHidden && $0.row.superview?.superview != nil }
+            .map { "\($0.flag.key) \($0.toggle.isOn ? "on" : "off")\($0.changed.isHidden ? "" : " changed")" }.sorted()
+    }
+
     /// What a scripted check reads: the section and profile shown, the column as it's built, the headings of the
     /// section's groups, and whether Zigzag saves and fills passwords in that profile.
     /// How many times the page has been laid out, for a check that it isn't laid out more than it needs.
@@ -2194,7 +2256,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     var debugState: [String: Any] {
         let profile = profile
-        return ["layouts": debugLayouts, "inOtherProfiles": otherProfilesGroup.rows.count,
+        return ["layouts": debugLayouts, "flags": debugFlagRows, "flagsAvailable": FeatureFlags.isAvailable, "inOtherProfiles": otherProfilesGroup.rows.count,
                 "pane": pane.rawValue, "profile": Library.shared.directory.profile(profile.id)?.name ?? "",
                 "column": items.map(\.pane.rawValue), "grouped": columnHasProfiles,
                 "menu": profilePicker.superview === column ? "column" : profilePicker.superview === header ? "header" : "none",
@@ -2216,6 +2278,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private static var localServersHeading: String { String(localized: "Local Servers", comment: "A heading in Settings › Developer: development servers running on this Mac.") }
     private static var pageSizesHeading: String { String(localized: "Page Sizes", comment: "A heading in Settings › Developer: the sizes the developer tools offer for a page.") }
     private static var developmentSitesHeading: String { String(localized: "Sites in Developer Mode", comment: "A heading in Settings › Developer: the sites the developer tools show on.") }
+    private static var featureFlagsHeading: String { String(localized: "Feature Flags", comment: "A heading in Settings › Developer, as Safari's Develop menu names them: WebKit's switches for new and experimental features.") }
     private static var scriptsHeading: String { String(localized: "Scripts", comment: "A heading in Settings › Automation: what AppleScript and Shortcuts may do in Zigzag.") }
     private static var spacesHeading: String { String(localized: "Your Spaces", comment: "A heading in Settings › Spaces.") }
     private static var profilesHeading: String { String(localized: "Your Profiles", comment: "A heading in Settings › Profiles.") }
@@ -2426,6 +2489,70 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             note(String(localized: "A site covers every port and its subdomains: localhost is localhost:3000 and app.localhost too.", comment: "Under the list in Settings › Developer."))
             section(Self.pageSizesHeading, pageSizesGroup, accessory: addSizeButton)
             section(Self.localServersHeading, localServersGroup)
+            guard DeveloperTools.isOn, let flags = FeatureFlags.flags, !flags.isEmpty else { break }
+            // Feature Flags (#173): its name set as a heading over the groups by status, with Reset to Defaults and
+            // its own search at its right; a line saying when a change takes effect, with Reload All Tabs; then
+            // WebKit's flags, the ones for its own engineers folded under Show All.
+            let h = Tokens.Page.controlHeight
+            let heading = made(Self.featureFlagsHeading) { Label(Self.featureFlagsHeading, font: Tokens.Font.heading(), color: Tokens.Color.textPrimary) }
+            var right = pad + contentWidth - Tokens.Page.groupPad
+            let searchWidth = min(Tokens.Page.searchWidth - Tokens.Space.x10, max(0, contentWidth / 3))
+            flagSearch.frame = NSRect(x: right - searchWidth, y: y, width: searchWidth, height: h)
+            place(flagSearch)
+            right = flagSearch.frame.minX - Tokens.Space.x2
+            if FeatureFlags.hasOverrides {
+                let rw = flagsReset.fittingWidth
+                flagsReset.frame = NSRect(x: right - rw, y: y, width: rw, height: h)
+                place(flagsReset)
+                right = flagsReset.frame.minX - Tokens.Space.x2
+            }
+            heading.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y + round((h - heading.lineHeight) / 2),
+                                   width: max(0, right - pad - Tokens.Page.groupPad), height: heading.lineHeight)
+            place(heading)
+            y += h + Tokens.Space.x3
+            let lw = flagsReload.fittingWidth
+            flagsReload.frame = NSRect(x: pad + contentWidth - Tokens.Page.groupPad - lw, y: y, width: lw, height: h)
+            place(flagsReload)
+            let hint = explanation(String(localized: "Changes apply to pages you open or reload.", comment: "Under Feature Flags in Settings › Developer, beside Reload All Tabs."))
+            let hintWidth = max(0, contentWidth - Tokens.Page.groupPad * 2 - lw - Tokens.Space.x4) + Label.inset * 2
+            let hintHeight = ceil(hint.sizeThatFits(NSSize(width: hintWidth, height: 400)).height)
+            let lineHeight = ceil(hint.font.map { NSLayoutManager().defaultLineHeight(for: $0) } ?? hintHeight)
+            hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y + round((h - lineHeight) / 2), width: hintWidth, height: hintHeight)
+            place(hint)
+            y = max(y + h, hint.frame.maxY)
+            // A search goes through every flag, folded or not.
+            let words = flagSearch.stringValue.split(whereSeparator: \.isWhitespace).map(String.init)
+            var found = false
+            func statuses(_ list: [FeatureFlags.Status]) {
+                for status in list where flags.contains(where: { $0.status == status }) {
+                    let group = flagGroup(status, flags)
+                    guard group.filter(words) > 0 else { continue }
+                    found = true
+                    section(status.title, group)
+                }
+            }
+            statuses(FeatureFlags.Status.listed)
+            if !words.isEmpty {
+                statuses(FeatureFlags.Status.more)
+                if !found {
+                    let typed = words.joined(separator: " ")
+                    let none = made("noflags " + typed) {
+                        Label(String(localized: "No flags match “\(typed)”.", comment: "In Settings › Developer › Feature Flags when its search finds nothing; what was typed."),
+                              font: Tokens.Font.row(), color: Tokens.Color.textSecondary)
+                    }
+                    y += Tokens.Space.x4
+                    none.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y, width: contentWidth - Tokens.Page.groupPad, height: none.lineHeight)
+                    place(none)
+                    y = none.frame.maxY + Tokens.Page.groupGap
+                }
+            } else if flags.contains(where: { FeatureFlags.Status.more.contains($0.status) }) {
+                if !found { y += Tokens.Space.x4 }
+                flagsMore.isOpen = flagsShowAll
+                flagsMore.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y - Tokens.Space.x2, width: flagsMore.fittingWidth, height: h)
+                place(flagsMore)
+                y = flagsMore.frame.maxY + Tokens.Space.x2
+                if flagsShowAll { statuses(FeatureFlags.Status.more) } else { y += Tokens.Page.groupGap - Tokens.Space.x2 }
+            }
         case .extensions:
             // With nothing installed, the empty row already offers Get Extensions; once said is enough.
             getExtensionsButton.isHidden = !hasExtensions
@@ -2940,6 +3067,45 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             remove.onClick = { _ in PageSizes.remove(size) }
             pageSizesGroup.add(FormRow(title: size.name, detail: size.dimensions, control: remove))
         }
+    }
+
+    /// The rows of WebKit's flags of one status, each with its switch and, once changed, a quiet "Changed" before it.
+    /// Made the first time they show.
+    private func flagGroup(_ status: FeatureFlags.Status, _ flags: [FeatureFlags.Flag]) -> FormGroup {
+        if let group = flagGroups[status] { return group }
+        let group = FormGroup()
+        for flag in FeatureFlags.flags(status, in: flags, matching: []) {
+            let toggle = Toggle(isOn: FeatureFlags.isOn(flag))
+            toggle.onChange = { on in FeatureFlags.set(on, for: flag) }
+            toggle.setAccessibilityLabel(flag.name)
+            let changed = Label(String(localized: "Changed", comment: "Beside the switch of a WebKit feature flag in Settings › Developer that you changed from WebKit's default."),
+                                font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
+            changed.isHidden = !FeatureFlags.isChanged(flag)
+            let control = NSStackView(views: [changed, toggle])
+            control.spacing = Tokens.Space.x3
+            control.alignment = .centerY
+            // WebKit's own words, never translated. A line that only says the name again isn't shown.
+            let row = FormRow(title: flag.name, detail: flag.details == flag.name ? nil : flag.details, control: control)
+            row.keywords = flag.key
+            flagControls[flag.key] = (flag, row, toggle, changed)
+            group.add(row)
+        }
+        flagGroups[status] = group
+        return group
+    }
+
+    /// A flag changed, here or elsewhere: each switch shows what's in effect, and "Changed" where it isn't WebKit's default.
+    private func refreshFlags() {
+        for (flag, row, toggle, changed) in flagControls.values {
+            let on = FeatureFlags.isOn(flag)
+            if toggle.isOn != on { toggle.isOn = on }
+            let unchanged = !FeatureFlags.isChanged(flag)
+            if changed.isHidden != unchanged {
+                changed.isHidden = unchanged
+                row.needsLayout = true
+            }
+        }
+        if pane == .developer, !isSearching { layoutDocument() }
     }
 
     /// Settings › Developer's list: each site you develop on, with Remove.

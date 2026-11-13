@@ -1911,6 +1911,15 @@ enum DebugBridge {
             if f.count == 2 { Task { await WebsiteData.clear(f[0] == "cache" ? .cache : .cookies, site: f[1], in: controller.tabManager.profile.store); debugLog("cleared \(f[0]) for \(f[1])") } }
         case "cmd": controller.commandBar.runAction(arg)
         case "settingsfind": controller.tabManager.selectedTab?.settingsView?.debugFind(arg)
+        // flags find <text> | all | top: Settings › Developer › Feature Flags in the tab in front. flagset <key> on|off|default,
+        // flagsreset: a WebKit feature flag changed, or all of them back to WebKit's (#173).
+        case "flags": controller.tabManager.selectedTab?.settingsView?.debugFlags(arg)
+        case "flagset":
+            let f = arg.split(separator: " ").map(String.init)
+            if f.count == 2, let flag = FeatureFlags.flags?.first(where: { $0.key == f[0] }) {
+                FeatureFlags.set(f[1] == "default" ? flag.defaultValue : f[1] == "on", for: flag)
+            }
+        case "flagsreset": FeatureFlags.reset()
         case "settingsstate":
             // settingsstate <path>: what the Settings tab in front shows (JSON).
             guard let state = controller.tabManager.selectedTab?.settingsView?.debugState,

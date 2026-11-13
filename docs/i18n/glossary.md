@@ -108,6 +108,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Developer tools | 开发者工具 | 开发工具 | Safari's and Chrome's word for them, beside 开发者 for the Developer menu and section. |
 | Developer Mode | 开发者模式 | 开发模式, 开发人员模式 | As macOS and Arc name it: a site's state with the developer tools, and the main switch in Settings › Developer. |
 | Development site | 开发网站 | 开发站点, 本地网站 | A site you build, listed in Settings › Developer: 网站 as everywhere else in Zigzag, and not 本地, since a listed site needn't be on this Mac. |
+| Feature Flags (WebKit's, in Settings › Developer) | 功能标志 | 功能开关, 实验性功能 | Safari's Develop › Feature Flags. Each flag's own name and line are WebKit's and stay in English; only Zigzag's words around them are translated. |
 
 ## How it reads
 

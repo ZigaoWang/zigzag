@@ -1078,6 +1078,9 @@ final class DisclosureRow: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Its name and the chevron after it, and no more.
+    var fittingWidth: CGFloat { ceil(label.textWidth) + Tokens.Space.x1 + Tokens.Space.x4 }
+
     override func layout() {
         super.layout()
         let h = label.lineHeight
