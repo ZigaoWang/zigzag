@@ -549,7 +549,7 @@ enum DebugBridge {
         case "sideframes":
             let r = controller.root, close = controller.window?.standardWindowButton(.closeButton)
             debugLog("sideframes right=\(r.sidebarOnRight) sidebar=\(r.sidebarContainer.frame) card=\(r.cardFrame) bar=\(r.showsTopBar ? r.topBarFrame : .zero) "
-                     + "lights=\(close.map { $0.convert($0.bounds, to: nil) } ?? .zero) hidden=\(close?.isHidden ?? true) room=\(r.lightsRoom)")
+                     + "lights=\(close.map { $0.convert($0.bounds, to: nil) } ?? .zero) hidden=\(close?.isHidden ?? true)")
         case "reveal": controller.root.holdReveal = arg == "hold"; controller.root.reveal(true)
         case "unreveal": controller.root.holdReveal = false; controller.root.reveal(false)
         // edgepointer <x> <y>|off: the pointer counts as there for the sidebar's edge (top-down, left of the window
