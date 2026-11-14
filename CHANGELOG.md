@@ -10,7 +10,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Right-clicking selected text that's a web address but not a link, like example.com in a post, offers Open and Open in New Tab, as Chrome's Go to does. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#234](https://github.com/ZigaoWang/zigzag/issues/234))
 
 ### Fixed
-- Text and icons in panels, prompts and toasts sit exactly centered, with even spacing.
+- Text across Zigzag sits exactly in the middle of its buttons, fields and rows, measured by its capital letters, with icons lined up beside it and even spacing: the sidebar, panels, prompts, toasts, Settings, History and the other windows. Some of it sat up to a point low.
 - Clear, above the tabs in the sidebar, treats a split view as one: it stays while you've used any of its pages lately and closes whole, never leaving half of it behind, and a split with a playing page or a pinned page in it stays. A tab with tabs nested under it stays or goes with them, folded ones included. A tab you left a few minutes ago no longer counts as one you haven't used in a while.
 - Pointing at Clear, or reaching it with Tab, dims the tabs it would close and says what it will do, like Close 3 tabs you haven't used in a while or Close the last 2 tabs, leaving the space empty. After each click, what the next one would close shows as soon as the closed tabs have gone. A split's row dims as one, both pages, and fades with age as its newest page does.
 - A paused video in the mini player no longer shows the page's own video controls over the card's, on sites that use the browser's built-in controls. ([#230](https://github.com/ZigaoWang/zigzag/issues/230))
@@ -23,8 +23,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Favorites show which are open, as tabs do: a favorite whose page isn't loaded is faded back until you point at it, one that's open has its fine edge, and the one you're on has the selected tab's card.
 - A favorite that moved on from its page shows it, as a pinned tab does with Original / Current page: the tile shows the icon of the page it's on now with the favorite's own icon small on its corner, pointing at it names both, and Back to Favorite's Page in its menu takes it back, in a split favorite too.
 - A tab's or pinned tab's title no longer moves or gets cut shorter when the pointer brings up its close or back button: the button shows over the title's faded end.
-- The titles in the sidebar's rows, the address, Clear and the ⌘ number keys sit in the middle of their row by their capitals, level with the icons, where they were half a point low.
-- Settings, History and Zigzag's other windows have text and controls exactly centered and aligned.
 
 ## [0.9.0] - 2026-11-14
 
