@@ -112,102 +112,156 @@ nonisolated struct HTTPRequestReader: Sendable {
         return value
     }
 
+    /// A request whose head has been read and whose body is still coming: kept so neither is read again each
+    /// time more bytes arrive.
+    private struct Pending: Sendable {
+        var method: String
+        var path: String
+        var headers: [String: String]
+        /// Where the body starts, counted from the front of the buffer.
+        var bodyOffset: Int
+        var chunks: Dechunker?
+    }
+    private var pending: Pending?
+
     mutating func next() -> Outcome {
-        guard let headerEnd = buffer.range(of: Data("\r\n\r\n".utf8)) else {
-            return buffer.count > Self.maxHeaderBytes ? .failure(431) : .incomplete
-        }
-        guard headerEnd.lowerBound <= Self.maxHeaderBytes,
-              let head = String(data: buffer[buffer.startIndex..<headerEnd.lowerBound], encoding: .utf8) else { return .failure(431) }
-        var lines = head.components(separatedBy: "\r\n")
-        let start = lines.removeFirst().split(separator: " ", omittingEmptySubsequences: true).map(String.init)
-        guard start.count == 3, start[2].hasPrefix("HTTP/1."), !start[0].isEmpty,
-              start[0].allSatisfy({ $0.isLetter && $0.isUppercase }) else { return .failure(400) }
-        guard lines.count <= Self.maxHeaderCount else { return .failure(431) }
-        var headers: [String: String] = [:]
-        for line in lines {
-            guard let colon = line.firstIndex(of: ":") else { return .failure(400) }
-            // No space before the colon (RFC 9112 5.1): a name with one is how requests get read two ways.
-            let name = line[..<colon].lowercased()
-            guard !name.isEmpty, name.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "!#$%&'*+-.^_`|~".contains($0)) }) else {
-                return .failure(400)
+        if pending == nil {
+            switch readHead() {
+            case .some(.success(let head)): pending = head
+            case .some(.failure(let refused)): return .failure(refused.status)
+            case .none: return buffer.count > Self.maxHeaderBytes ? .failure(431) : .incomplete
             }
-            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
-            // The headers that say where the body ends are read once: two of them could disagree.
-            if ["content-length", "transfer-encoding"].contains(name), headers[name] != nil { return .failure(400) }
-            headers[name] = value
         }
-        let target = start[1]
-        let path = String(target.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false).first ?? "")
-        let bodyStart = headerEnd.upperBound
-        var body = Data()
-        var consumed: Int
-        if let encoding = headers["transfer-encoding"] {
-            // Only chunked, alone, and never with a Content-Length beside it.
-            guard encoding.lowercased() == "chunked", headers["content-length"] == nil else { return .failure(400) }
-            switch Self.dechunk(buffer[bodyStart...]) {
-            case .incomplete: return buffer.endIndex - bodyStart > Self.maxBodyBytes + 64 * 1024 ? .failure(413) : .incomplete
-            case .invalid: return .failure(400)
-            case .tooLarge: return .failure(413)
-            case .done(let data, let length):
-                body = data
-                consumed = bodyStart + length
+        guard var request = pending else { return .incomplete }
+        let bodyStart = buffer.startIndex + request.bodyOffset
+        let body: Data
+        let consumed: Int
+        if var chunks = request.chunks {
+            let outcome = chunks.read(buffer, from: bodyStart)
+            request.chunks = chunks
+            pending = request
+            switch outcome {
+            case .incomplete: return buffer.endIndex - bodyStart > Self.maxBodyBytes + 64 * 1024 ? fail(413) : .incomplete
+            case .invalid: return fail(400)
+            case .tooLarge: return fail(413)
+            case .done(let length):
+                body = chunks.body
+                consumed = request.bodyOffset + length
             }
         } else {
             let length: Int
-            if let value = headers["content-length"] {
-                guard let parsed = Self.size(Substring(value), radix: 10) else { return .failure(400) }
+            if let value = request.headers["content-length"] {
+                guard let parsed = Self.size(Substring(value), radix: 10) else { return fail(400) }
                 length = parsed
             } else {
                 length = 0
             }
             // Refused before a byte of it is waited for.
-            guard length <= Self.maxBodyBytes else { return .failure(413) }
+            guard length <= Self.maxBodyBytes else { return fail(413) }
             guard buffer.endIndex - bodyStart >= length else { return .incomplete }
             body = Data(buffer[bodyStart..<(bodyStart + length)])
-            consumed = bodyStart + length
+            consumed = request.bodyOffset + length
         }
-        consumed -= buffer.startIndex
+        pending = nil
         buffer = Data(buffer.dropFirst(consumed))
-        return .request(HTTPRequest(method: start[0], path: path, headers: headers, body: body))
+        return .request(HTTPRequest(method: request.method, path: request.path, headers: request.headers, body: body))
     }
 
-    private enum Chunked { case incomplete, invalid, tooLarge, done(Data, Int) }
+    /// A refusal ends the connection, so nothing more of this request is read.
+    private mutating func fail(_ status: Int) -> Outcome {
+        pending = nil
+        return .failure(status)
+    }
+
+    /// The request line and headers, once they're all here; nil while they aren't.
+    private func readHead() -> Result<Pending, HeadFailure>? {
+        guard let headerEnd = buffer.range(of: Data("\r\n\r\n".utf8)) else { return nil }
+        guard headerEnd.lowerBound - buffer.startIndex <= Self.maxHeaderBytes,
+              let head = String(data: buffer[buffer.startIndex..<headerEnd.lowerBound], encoding: .utf8) else { return .failure(HeadFailure(431)) }
+        var lines = head.components(separatedBy: "\r\n")
+        let start = lines.removeFirst().split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        guard start.count == 3, start[2].hasPrefix("HTTP/1."), !start[0].isEmpty,
+              start[0].allSatisfy({ $0.isLetter && $0.isUppercase }) else { return .failure(HeadFailure(400)) }
+        guard lines.count <= Self.maxHeaderCount else { return .failure(HeadFailure(431)) }
+        var headers: [String: String] = [:]
+        for line in lines {
+            guard let colon = line.firstIndex(of: ":") else { return .failure(HeadFailure(400)) }
+            // No space before the colon (RFC 9112 5.1): a name with one is how requests get read two ways.
+            let name = line[..<colon].lowercased()
+            guard !name.isEmpty, name.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "!#$%&'*+-.^_`|~".contains($0)) }) else {
+                return .failure(HeadFailure(400))
+            }
+            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            // The headers that say where the body ends are read once: two of them could disagree.
+            if ["content-length", "transfer-encoding"].contains(name), headers[name] != nil { return .failure(HeadFailure(400)) }
+            headers[name] = value
+        }
+        let path = String(start[1].split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false).first ?? "")
+        var chunks: Dechunker?
+        if let encoding = headers["transfer-encoding"] {
+            // Only chunked, alone, and never with a Content-Length beside it.
+            guard encoding.lowercased() == "chunked", headers["content-length"] == nil else { return .failure(HeadFailure(400)) }
+            chunks = Dechunker()
+        }
+        return .success(Pending(method: start[0], path: path, headers: headers,
+                                bodyOffset: headerEnd.upperBound - buffer.startIndex, chunks: chunks))
+    }
+
+    private struct HeadFailure: Error {
+        let status: Int
+        init(_ status: Int) { self.status = status }
+    }
+
     /// The longest a chunk's size line (its size and any extensions) or a trailer line may be.
     static let maxChunkLineBytes = 1024
+    /// The most trailer lines a chunked body may end with.
+    static let maxTrailerCount = maxHeaderCount
 
-    private static func dechunk(_ bytes: Data) -> Chunked {
-        var index = bytes.startIndex
-        var body = Data()
-        let crlf = Data("\r\n".utf8)
-        while true {
-            // A chunk's size line is short: one that runs on without ending isn't one.
-            guard let lineEnd = bytes.range(of: crlf, in: index..<bytes.endIndex) else {
-                return bytes.endIndex - index > maxChunkLineBytes ? .invalid : .incomplete
-            }
-            guard lineEnd.lowerBound - index <= maxChunkLineBytes,
-                  let line = String(data: bytes[index..<lineEnd.lowerBound], encoding: .ascii),
-                  let digits = line.split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false).first,
-                  let size = Self.size(Substring(digits.trimmingCharacters(in: .whitespaces)), radix: 16)
-            else { return .invalid }
-            index = lineEnd.upperBound
-            if size == 0 {
-                // Trailers, if any, end with an empty line.
-                guard let end = bytes.range(of: Data("\r\n".utf8), in: index..<bytes.endIndex) else { return .incomplete }
-                var cursor = end
-                while cursor.lowerBound != index {
-                    index = cursor.upperBound
-                    guard let next = bytes.range(of: crlf, in: index..<bytes.endIndex) else { return .incomplete }
-                    cursor = next
+    /// Reads a chunked body as it comes, picking up where the last bytes left off: each byte is looked at about
+    /// once, however finely the body is cut into chunks or packets.
+    struct Dechunker: Sendable {
+        enum Outcome: Equatable { case incomplete, invalid, tooLarge, done(length: Int) }
+        /// How far into the framing has been read, counted from the body's start.
+        private(set) var offset = 0
+        private(set) var body = Data()
+        /// Set once the last chunk is in: how many trailer lines have been read since.
+        private var trailers: Int?
+
+        mutating func read(_ bytes: Data, from bodyStart: Int) -> Outcome {
+            let crlf = Data("\r\n".utf8)
+            while true {
+                let index = bodyStart + offset
+                // A size line or trailer line is short: one that runs on without ending isn't one.
+                guard let lineEnd = bytes.range(of: crlf, in: index..<bytes.endIndex) else {
+                    return bytes.endIndex - index > maxChunkLineBytes ? .invalid : .incomplete
                 }
-                return .done(body, cursor.upperBound - bytes.startIndex)
+                guard lineEnd.lowerBound - index <= maxChunkLineBytes else { return .invalid }
+                if let count = trailers {
+                    // Trailers, if any, end with an empty line.
+                    if lineEnd.lowerBound == index { return .done(length: lineEnd.upperBound - bodyStart) }
+                    guard count < maxTrailerCount else { return .invalid }
+                    trailers = count + 1
+                    offset = lineEnd.upperBound - bodyStart
+                    continue
+                }
+                guard let line = String(data: bytes[index..<lineEnd.lowerBound], encoding: .ascii),
+                      let digits = line.split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false).first,
+                      let size = HTTPRequestReader.size(Substring(digits.trimmingCharacters(in: .whitespaces)), radix: 16)
+                else { return .invalid }
+                let data = lineEnd.upperBound
+                if size == 0 {
+                    trailers = 0
+                    offset = data - bodyStart
+                    continue
+                }
+                // Compared without adding, so a size near Int.max can't overflow into a small one.
+                guard size <= maxBodyBytes - body.count else { return .tooLarge }
+                // The size line is read again when the rest comes: it's short.
+                guard bytes.endIndex - data >= size + 2 else { return .incomplete }
+                guard bytes[(data + size)..<(data + size + 2)] == crlf else { return .invalid }
+                body.append(bytes[data..<(data + size)])
+                offset = data + size + 2 - bodyStart
             }
-            // Compared without adding, so a size near Int.max can't overflow into a small one.
-            guard size <= maxBodyBytes - body.count else { return .tooLarge }
-            guard bytes.endIndex - index >= size + 2 else { return .incomplete }
-            body.append(bytes[index..<(index + size)])
-            index += size
-            guard bytes[index..<(index + 2)] == crlf else { return .invalid }
-            index += 2
         }
     }
 }

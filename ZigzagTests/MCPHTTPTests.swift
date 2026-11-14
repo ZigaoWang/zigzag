@@ -46,3 +46,39 @@ struct MCPHTTPTests {
         #expect(fits && !more)
     }
 }
+
+extension MCPHTTPTests {
+    /// A body cut into one-byte chunks and sent a packet at a time is read once, not again on every packet.
+    @Test func chunkedBodiesAreReadAsTheyCome() {
+        var reader = HTTPRequestReader()
+        reader.append(Data("POST /mcp HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n".utf8))
+        let count = 200_000
+        let started = Date()
+        for _ in 0..<count {
+            reader.append(Data("1\r\nx\r\n".utf8))
+            #expect(reader.next() == .incomplete)
+        }
+        reader.append(Data("0\r\nX-Note: fine\r\n\r\nGET".utf8))
+        guard case .request(let request) = reader.next() else { Issue.record("no request"); return }
+        #expect(request.body == Data(repeating: UInt8(ascii: "x"), count: count))
+        #expect(Date().timeIntervalSince(started) < 10)
+        // What followed stays for the next request.
+        #expect(reader.buffer == Data("GET".utf8))
+    }
+
+    @Test func trailerLinesAreLimited() {
+        var long = HTTPRequestReader()
+        long.append(Data(("POST /mcp HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\nX-A: " + String(repeating: "a", count: HTTPRequestReader.maxChunkLineBytes) + "\r\n\r\n").utf8))
+        #expect(long.next() == .failure(400))
+        var endless = HTTPRequestReader()
+        endless.append(Data(("POST /mcp HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n" + String(repeating: "a", count: HTTPRequestReader.maxChunkLineBytes + 1)).utf8))
+        #expect(endless.next() == .failure(400))
+        var many = HTTPRequestReader()
+        many.append(Data(("POST /mcp HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n" + String(repeating: "X-A: 1\r\n", count: HTTPRequestReader.maxTrailerCount + 1) + "\r\n").utf8))
+        #expect(many.next() == .failure(400))
+        var some = HTTPRequestReader()
+        some.append(Data(("POST /mcp HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n2\r\n{}\r\n0\r\n" + String(repeating: "X-A: 1\r\n", count: 3) + "\r\n").utf8))
+        guard case .request(let request) = some.next() else { Issue.record("no request"); return }
+        #expect(request.body == Data("{}".utf8))
+    }
+}
