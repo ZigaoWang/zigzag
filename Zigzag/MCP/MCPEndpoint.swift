@@ -48,23 +48,27 @@ nonisolated struct MCPToolResult: Sendable, Equatable {
     var content: [JSON]
     var structured: JSON?
     var isError = false
+    /// Carries what pages wrote (a title, an address, text, fields), so `markedAsPageContent` sets it apart. Zigzag's
+    /// own words (`text`, `error`) don't.
+    var fromPages = true
 
-    static func text(_ text: String) -> MCPToolResult { MCPToolResult(content: [["type": "text", "text": .string(text)]]) }
+    /// Zigzag's own words, never set apart as a page's.
+    static func text(_ text: String) -> MCPToolResult { MCPToolResult(content: [["type": "text", "text": .string(text)]], fromPages: false) }
 
     static func data(_ value: JSON) -> MCPToolResult {
         MCPToolResult(content: [["type": "text", "text": .string(value.text)]], structured: value)
     }
 
     static func error(_ message: String) -> MCPToolResult {
-        MCPToolResult(content: [["type": "text", "text": .string(message)]], isError: true)
+        MCPToolResult(content: [["type": "text", "text": .string(message)]], isError: true, fromPages: false)
     }
 
     /// The same result with its text set apart as the website's: titles, page text, links and fields are written
     /// by whoever made the page, and a page can word them as orders to the model. Each text goes between two lines
-    /// with a fresh random tag the page can't know in advance, so it can't close the block early. Errors are
-    /// Zigzag's own words and stay as they are.
+    /// with a fresh random tag the page can't know in advance, so it can't close the block early. Errors and other
+    /// results in Zigzag's own words (`fromPages` false) stay as they are.
     func markedAsPageContent(tag: String = UUID().uuidString.lowercased()) -> MCPToolResult {
-        guard !isError else { return self }
+        guard !isError, fromPages else { return self }
         var marked = self
         marked.content = content.map { item in
             guard item["type"] == "text", let text = item["text"]?.string, var object = item.object else { return item }

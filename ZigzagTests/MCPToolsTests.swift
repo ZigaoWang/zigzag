@@ -317,6 +317,8 @@ extension MCPToolsTests {
         #expect(fresh != again)
         let error = MCPToolResult.error("No open tab has id 4.")
         #expect(error.markedAsPageContent() == error)
+        let own = MCPToolResult.text("Zigzag's own words")
+        #expect(own.markedAsPageContent() == own)
         let picture = MCPToolResult(content: [["type": "image", "data": "AAAA", "mimeType": "image/png"]])
         #expect(picture.markedAsPageContent() == picture)
     }
