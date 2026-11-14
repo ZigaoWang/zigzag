@@ -742,4 +742,12 @@ extension ExtensionBridgeTests {
         #expect(await BridgeDownloads.matching("^(a+)+$", in: names, timeout: 0.3) == nil)
         #expect(Date().timeIntervalSince(started) < 5)
     }
+
+    /// An extension's lines in extensions.log stay one line each, and short.
+    @Test func extensionLogLinesStayShort() {
+        #expect(ExtensionLog.entry("socket to example.com closed") == "socket to example.com closed")
+        #expect(ExtensionLog.entry("name\n2026-01-01 Zigzag: fake line\r\u{2028}x") == "name 2026-01-01 Zigzag: fake line  x")
+        let long = ExtensionLog.entry(String(repeating: "é", count: 10_000))
+        #expect(long.unicodeScalars.count == ExtensionLog.lineLimit + 1 && long.hasSuffix("…"))
+    }
 }

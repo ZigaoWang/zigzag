@@ -1759,8 +1759,22 @@ enum ExtensionLog {
     nonisolated(unsafe) private static var last: (line: String, at: Date)?
     /// The file stays small: past this size it starts over.
     nonisolated private static let limit = 1_000_000
+    /// The longest one line may be. Lines carry what extensions name (their own names, hosts, errors), so one can't
+    /// fill the file, or start lines of its own that read as Zigzag's.
+    nonisolated static let lineLimit = 500
+
+    /// The line as written: on one line, control characters made spaces, and cut at `lineLimit`.
+    nonisolated static func entry(_ line: String) -> String {
+        var scalars = String.UnicodeScalarView()
+        for scalar in line.unicodeScalars {
+            guard scalars.count < lineLimit else { return String(scalars) + "…" }
+            scalars.append(scalar.properties.generalCategory == .control || scalar == "\u{2028}" || scalar == "\u{2029}" ? " " : scalar)
+        }
+        return String(scalars)
+    }
 
     nonisolated static func write(_ line: String) {
+        let line = entry(line)
         let now = Date()
         queue.async {
             if let last, last.line == line, now.timeIntervalSince(last.at) < 60 { return }
