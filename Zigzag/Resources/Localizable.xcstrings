@@ -4767,7 +4767,7 @@
       }
     },
     "Copy" : {
-      "comment" : "Button that copies something to the clipboard.\nButton under Details on the page Zigzag shows when a page can't load: copies the error.\nEdit menu item.",
+      "comment" : "Button that copies something to the clipboard.\nButton under Details on the page Zigzag shows when a page can't load: copies the error.\nContext menu item in the PDF viewer: copies the selected text.\nEdit menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6471,7 +6471,7 @@
       }
     },
     "Fit Width" : {
-      "comment" : "Context menu item in the PDF viewer: scales the pages to fit the window’s width.",
+      "comment" : "Context menu item in the PDF viewer: scales the pages to fit the window's width.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -18432,7 +18432,7 @@
       }
     },
     "Zoom In" : {
-      "comment" : "Hidden View menu item, named in Settings › Shortcuts.\nToolbar button tooltip in the PDF viewer.\nTooltip of the + button on the Zoom row of the site panel.\nView menu item.",
+      "comment" : "Context menu item in the PDF viewer.\nHidden View menu item, named in Settings › Shortcuts.\nToolbar button tooltip in the PDF viewer.\nTooltip of the + button on the Zoom row of the site panel.\nView menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -18443,7 +18443,7 @@
       }
     },
     "Zoom Out" : {
-      "comment" : "Toolbar button tooltip in the PDF viewer.\nTooltip of the − button on the Zoom row of the site panel.\nView menu item.",
+      "comment" : "Context menu item in the PDF viewer.\nToolbar button tooltip in the PDF viewer.\nTooltip of the − button on the Zoom row of the site panel.\nView menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
