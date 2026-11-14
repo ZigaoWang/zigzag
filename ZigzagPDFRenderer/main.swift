@@ -132,10 +132,10 @@ final class Renderer: NSObject, PDFRendering, @unchecked Sendable {
         }
     }
 
-    func strings(reply: @escaping @Sendable ([String]?, Bool) -> Void) {
+    func strings(reply: @escaping @Sendable (RemotePDFStrings?, Bool) -> Void) {
         run(PDFLimits.stringsTime) { [self] in
             guard let document else { reply(nil, false); return }
-            reply((0..<sizes.count).map { index in document.page(at: index).map(Self.string(of:)) ?? "" }, true)
+            reply(RemotePDFStrings((0..<sizes.count).map { index in document.page(at: index).map(Self.string(of:)) ?? "" }), true)
         }
     }
 

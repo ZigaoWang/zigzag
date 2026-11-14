@@ -111,24 +111,28 @@ final class SafePDF {
         let tile: RemotePDFTile? = await ask(PDFLimits.renderTime, .picture) { proxy, reply in
             proxy.render(page: page, x: rect.minX, y: rect.minY, width: rect.width, height: rect.height, scale: scale, dark: dark, reply: reply)
         }
+        guard let tile else { return nil }
+        // Pixels that don't add up are no answer the helper gives: something else is answering, and the PDF fails.
+        guard tile.isWellFormed else { reject(); return nil }
         // At most the size asked for (a pixel more for rounding), checked before it's taken as pixels.
-        guard let tile, tile.isWellFormed, tile.width <= width + 1, tile.height <= height + 1 else { return nil }
+        guard tile.width <= width + 1, tile.height <= height + 1 else { return nil }
         return Self.image(from: tile)
     }
 
     func text(page: Int) async -> PageText? {
         guard let info, info.pageSizes.indices.contains(page) else { return nil }
         let text: RemotePageText? = await ask(PDFLimits.textTime, .text) { proxy, reply in proxy.text(page: page, reply: reply) }
-        guard let text, text.isWellFormed(pages: info.pageSizes.count) else { return nil }
+        guard let text else { return nil }
+        guard text.isWellFormed(pages: info.pageSizes.count) else { reject(); return nil }
         return Self.pageText(from: text)
     }
 
     /// Every page's text, for find.
     func strings() async -> [String]? {
         guard let info else { return nil }
-        let strings: [String]? = await ask(PDFLimits.stringsTime, .find) { proxy, reply in proxy.strings(reply: reply) }
-        guard let strings, strings.count == info.pageSizes.count,
-              strings.allSatisfy({ ($0 as NSString).length <= PDFLimits.maxPageText }) else { return nil }
+        let reply: RemotePDFStrings? = await ask(PDFLimits.stringsTime, .find) { proxy, reply in proxy.strings(reply: reply) }
+        guard let reply else { return nil }
+        guard reply.isWellFormed(pages: info.pageSizes.count), let strings = reply.strings else { reject(); return nil }
         return strings
     }
 
@@ -200,11 +204,13 @@ final class SafePDF {
         /// The connection broke: the helper went (`interrupted`), or couldn't be reached at all.
         case broken(interrupted: Bool)
         case timedOut
+        /// The answer wasn't of the one class asked for: the helper isn't answering as it does.
+        case wrongClass
     }
 
     /// One request, in its turn: this PDF's one request in the helper (`gate`), then a turn there. Opens the PDF in
     /// the helper first when it isn't there.
-    private func ask<T: Sendable>(_ limit: TimeInterval, _ priority: Gate.Priority,
+    private func ask<T: NSObject & Sendable>(_ limit: TimeInterval, _ priority: Gate.Priority,
                                   _ request: @escaping @Sendable (PDFRendering, @escaping @Sendable (T?, Bool) -> Void) -> Void) async -> T? {
         let opens = priority == .open
         var sent = 0
@@ -241,12 +247,15 @@ final class SafePDF {
                 // The helper ends itself over it, taking every other PDF's requests with it.
                 fail(harmful: true)
                 return nil
+            case .wrongClass:
+                reject()
+                return nil
             }
         }
         return nil
     }
 
-    private func send<T: Sendable>(_ limit: TimeInterval,
+    private func send<T: NSObject & Sendable>(_ limit: TimeInterval,
                                    _ request: @escaping @Sendable (PDFRendering, @escaping @Sendable (T?, Bool) -> Void) -> Void) async -> Outcome<T> {
         let link = currentLink()
         let once = AnswerOnce()
@@ -256,11 +265,30 @@ final class SafePDF {
                 if once.claim() { continuation.resume(returning: outcome) }
             }
             DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + wait) { finish(.timedOut) }
-            link.send({ proxy in request(proxy) { value, held in finish(.answered(value, held: held)) } },
+            link.send({ proxy in
+                request(proxy) { value, held in
+                    // Exactly the class asked for, read from the object itself: the reply's type is only what the
+                    // helper was meant to send.
+                    if let value, !Self.isExactly(value, T.self) { finish(.wrongClass); return }
+                    finish(.answered(value, held: held))
+                }
+            },
                       failed: { interrupted in finish(.broken(interrupted: interrupted)) })
         }
         if case .broken = outcome { drop(link) }
         return outcome
+    }
+
+    /// Whether `object` is of `type` itself, asked of the object at run time rather than taken from its static type.
+    nonisolated static func isExactly(_ object: AnyObject, _ type: AnyClass) -> Bool {
+        guard let actual: AnyClass = object_getClass(object) else { return false }
+        return ObjectIdentifier(actual) == ObjectIdentifier(type)
+    }
+
+    /// The helper answered with something it never sends: this PDF fails, and asks nothing more of it.
+    private func reject() {
+        Diagnostics.note("PDF helper sent a malformed reply")
+        fail(harmful: false)
     }
 
     private func currentLink() -> PDFLink {
@@ -360,8 +388,17 @@ nonisolated protocol PDFLink: AnyObject, Sendable {
 nonisolated final class XPCPDFLink: PDFLink, @unchecked Sendable {
     private let connection: NSXPCConnection
 
-    init(serviceName: String) {
-        connection = NSXPCConnection(serviceName: serviceName)
+    convenience init(serviceName: String) {
+        self.init(NSXPCConnection(serviceName: serviceName))
+    }
+
+    /// A helper reached by an endpoint rather than by name: tests' stand-ins.
+    convenience init(endpoint: NSXPCListenerEndpoint) {
+        self.init(NSXPCConnection(listenerEndpoint: endpoint))
+    }
+
+    private init(_ connection: NSXPCConnection) {
+        self.connection = connection
         connection.remoteObjectInterface = PDFService.interface()
         connection.resume()
     }
@@ -371,7 +408,8 @@ nonisolated final class XPCPDFLink: PDFLink, @unchecked Sendable {
 
     func send(_ request: @escaping @Sendable (PDFRendering) -> Void, failed: @escaping @Sendable (Bool) -> Void) {
         // Interrupted (the helper crashed or ended itself) or invalid (it can't be found): every request waiting on
-        // it hears so here.
+        // it hears so here. So does one whose reply wasn't the one class allowed for it (`NSXPCConnectionReplyInvalid`),
+        // which XPC drops before it gets here: that PDF fails.
         guard let proxy = connection.remoteObjectProxyWithErrorHandler({ error in
             failed((error as NSError).code == NSXPCConnectionInterrupted)
         }) as? PDFRendering else { failed(false); return }

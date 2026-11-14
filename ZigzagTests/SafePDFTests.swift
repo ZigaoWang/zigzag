@@ -638,6 +638,62 @@ import WebKit
         #expect(await PDFViewerView.load(base.appendingPathComponent("missing"), from: webView, userAgent: nil) == nil)
     }
 
+    // MARK: A helper that answers out of turn
+
+    /// A helper taken over by a PDF can send anything back. Over a real XPC connection: whatever isn't the one class
+    /// each reply carries (another class, an array of arrays where find's strings go) fails that PDF alone, and
+    /// the app goes on.
+    @Test(arguments: LooseReply.allCases) @MainActor func aReplyOfTheWrongShapeFailsThatPDFAlone(_ reply: LooseReply) async throws {
+        let helper = LoosePDFHelper(reply)
+        defer { helper.stop() }
+        var failed = false
+        let document = SafePDF(data: Data("%PDF-loose-\(UUID().uuidString)".utf8)) { XPCPDFLink(endpoint: helper.endpoint) }
+        document.onFail = { failed = true }
+        let info = await document.open()
+        switch reply {
+        case .openWithData, .openWithArray:
+            #expect(info == nil)
+        case .renderWithText:
+            #expect(info != nil)
+            #expect(await document.render(page: 0, rect: CGRect(x: 0, y: 0, width: 10, height: 10), scale: 1, dark: false) == nil)
+        case .stringsAsArrays, .stringsWrapperOfArrays, .stringsWithData, .textMalformed:
+            #expect(info != nil)
+            #expect(await document.strings() == nil)
+        }
+        #expect(document.hasFailed && failed, "\(reply)")
+        // Nothing else is asked of it, and other PDFs go on.
+        #expect(await document.text(page: 0) == nil)
+        let other = SafePDF(data: Data("%PDF-fake".utf8)) { FakePDFLink(FakePDFHelper()) }
+        #expect(await other.open() != nil)
+        #expect(await other.strings() == [""])
+    }
+
+    /// The reply's static type is only what the helper was meant to send: each answer's class is checked on the
+    /// object itself before anything uses it, even where XPC isn't between them.
+    @Test @MainActor func anAnswerOfAnotherClassIsNeverUsed() async throws {
+        let open = SafePDF(data: Data("%PDF-loose-\(UUID().uuidString)".utf8)) { MisclassedPDFLink(.openWithData) }
+        #expect(await open.open() == nil)
+        #expect(open.hasFailed)
+        let render = SafePDF(data: Data("%PDF-loose-\(UUID().uuidString)".utf8)) { MisclassedPDFLink(.renderWithText) }
+        _ = try #require(await render.open())
+        #expect(await render.render(page: 0, rect: CGRect(x: 0, y: 0, width: 10, height: 10), scale: 1, dark: false) == nil)
+        #expect(render.hasFailed)
+        let find = SafePDF(data: Data("%PDF-loose-\(UUID().uuidString)".utf8)) { MisclassedPDFLink(.stringsWithData) }
+        _ = try #require(await find.open())
+        #expect(await find.strings() == nil)
+        #expect(find.hasFailed)
+        #expect(SafePDF.isExactly(RemotePDFStrings([]), RemotePDFStrings.self))
+        #expect(!SafePDF.isExactly(NSData(), RemotePDFStrings.self))
+    }
+
+    /// Text that doesn't add up (a box past the end of the string) is no answer either: the PDF fails.
+    @Test @MainActor func malformedTextFailsThePDF() async throws {
+        let document = SafePDF(data: Data("%PDF-loose-\(UUID().uuidString)".utf8)) { MisclassedPDFLink(.textMalformed) }
+        _ = try #require(await document.open())
+        #expect(await document.text(page: 0) == nil)
+        #expect(document.hasFailed)
+    }
+
     /// Nothing in the app reads a PDF's bytes: no PDFKit, no CoreGraphics PDF reader, no AppKit PDF picture. The
     /// helper does all of it. The one exception is the full-page screenshot, which reads the PDF WebKit itself makes
     /// of the page, never a site's.
@@ -717,10 +773,10 @@ nonisolated private final class FakePDFHelper: NSObject, PDFRendering, @unchecke
         run("text") { reply(RemotePageText(string: "", boxes: Data(), links: []), true) }
     }
 
-    func strings(reply: @escaping @Sendable ([String]?, Bool) -> Void) {
+    func strings(reply: @escaping @Sendable (RemotePDFStrings?, Bool) -> Void) {
         run("strings") { [stringsTime] in
             Thread.sleep(forTimeInterval: stringsTime)
-            reply([""], true)
+            reply(RemotePDFStrings([""]), true)
         }
     }
 }
@@ -729,6 +785,111 @@ nonisolated private final class FakePDFLink: PDFLink, @unchecked Sendable {
     private let helper: FakePDFHelper
     init(_ helper: FakePDFHelper) { self.helper = helper }
     func send(_ request: @escaping @Sendable (PDFRendering) -> Void, failed: @escaping @Sendable (Bool) -> Void) { request(helper) }
+    func invalidate() {}
+}
+
+/// What a taken-over helper sends back instead of the real answer.
+nonisolated enum LooseReply: CaseIterable, Sendable {
+    case openWithData, openWithArray, renderWithText, stringsAsArrays, stringsWrapperOfArrays, stringsWithData
+    /// Only in process: a page's text whose boxes don't match its string.
+    case textMalformed
+
+    static var allCases: [LooseReply] { [.openWithData, .openWithArray, .renderWithText, .stringsAsArrays, .stringsWrapperOfArrays, .stringsWithData] }
+}
+
+/// The helper's requests as a helper that answers anything would see them: the same messages, any object back.
+@objc(ZigzagTestsLoosePDFRendering) nonisolated protocol LoosePDFRendering {
+    func open(_ data: Data, reply: @escaping @Sendable (NSObject?) -> Void)
+    func render(page: Int, x: Double, y: Double, width: Double, height: Double, scale: Double, dark: Bool,
+                reply: @escaping @Sendable (NSObject?, Bool) -> Void)
+    func text(page: Int, reply: @escaping @Sendable (NSObject?, Bool) -> Void)
+    func strings(reply: @escaping @Sendable (NSObject?, Bool) -> Void)
+}
+
+/// Sent as a `RemotePDFStrings`, holding an array of arrays where its strings go.
+@objc(ZigzagTestsStringsOfArrays) nonisolated private final class StringsOfArrays: NSObject, NSSecureCoding {
+    static var supportsSecureCoding: Bool { true }
+    override init() {}
+    init?(coder: NSCoder) { nil }
+    override var classForCoder: AnyClass { RemotePDFStrings.self }
+    func encode(with coder: NSCoder) { coder.encode([["a"]] as NSArray, forKey: "strings") }
+}
+
+/// A helper that answers one request with what it shouldn't, and the rest as the real one would.
+nonisolated private final class LooseAnswers: NSObject, LoosePDFRendering, @unchecked Sendable {
+    let reply: LooseReply
+    init(_ reply: LooseReply) { self.reply = reply }
+
+    func open(_ data: Data, reply: @escaping @Sendable (NSObject?) -> Void) {
+        switch self.reply {
+        case .openWithData: reply(NSData(data: Data(count: 64)))
+        case .openWithArray: reply([[NSData()]] as NSArray)
+        default:
+            let sizes = [300.0, 400.0].withUnsafeBytes { Data($0) }
+            reply(RemotePDFInfo(pageCount: 1, sizes: sizes, title: nil, outline: [], allowsCopying: true))
+        }
+    }
+
+    func render(page: Int, x: Double, y: Double, width: Double, height: Double, scale: Double, dark: Bool,
+                reply: @escaping @Sendable (NSObject?, Bool) -> Void) {
+        reply(RemotePageText(string: "", boxes: Data(), links: []), true)
+    }
+
+    func text(page: Int, reply: @escaping @Sendable (NSObject?, Bool) -> Void) {
+        if self.reply == .textMalformed {
+            reply(RemotePageText(string: "abc", boxes: Data(count: 16), links: []), true)
+        } else {
+            reply(RemotePageText(string: "", boxes: Data(), links: []), true)
+        }
+    }
+
+    func strings(reply: @escaping @Sendable (NSObject?, Bool) -> Void) {
+        switch self.reply {
+        case .stringsWrapperOfArrays: reply(StringsOfArrays(), true)
+        case .stringsWithData: reply(NSData(), true)
+        default: reply([["a"]] as NSArray, true)
+        }
+    }
+}
+
+/// A stand-in helper over a real XPC connection, in this process.
+nonisolated private final class LoosePDFHelper: NSObject, NSXPCListenerDelegate, @unchecked Sendable {
+    private let listener = NSXPCListener.anonymous()
+    private let answers: LooseAnswers
+
+    init(_ reply: LooseReply) {
+        answers = LooseAnswers(reply)
+        super.init()
+        listener.delegate = self
+        listener.resume()
+    }
+
+    var endpoint: NSXPCListenerEndpoint { listener.endpoint }
+    func stop() { listener.invalidate() }
+
+    func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
+        // The real interface, with anything let through on this side: only Zigzag's side holds the line.
+        let interface = PDFService.interface()
+        let anything = NSSet(array: [NSArray.self, NSString.self, NSData.self, RemotePDFInfo.self, RemotePDFTile.self,
+                                     RemotePageText.self, RemotePDFStrings.self, StringsOfArrays.self]) as! Set<AnyHashable>
+        for selector in [#selector(PDFRendering.open(_:reply:)), #selector(PDFRendering.render(page:x:y:width:height:scale:dark:reply:)),
+                         #selector(PDFRendering.text(page:reply:)), #selector(PDFRendering.strings(reply:))] {
+            interface.setClasses(anything, for: selector, argumentIndex: 0, ofReply: true)
+        }
+        connection.exportedInterface = interface
+        connection.exportedObject = answers
+        connection.resume()
+        return true
+    }
+}
+
+/// The loose helper called straight, as if its answers had the classes the requests name.
+nonisolated private final class MisclassedPDFLink: PDFLink, @unchecked Sendable {
+    private let answers: LooseAnswers
+    init(_ reply: LooseReply) { answers = LooseAnswers(reply) }
+    func send(_ request: @escaping @Sendable (PDFRendering) -> Void, failed: @escaping @Sendable (Bool) -> Void) {
+        request(unsafeBitCast(answers as AnyObject, to: PDFRendering.self))
+    }
     func invalidate() {}
 }
 

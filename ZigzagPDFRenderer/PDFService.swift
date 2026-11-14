@@ -22,23 +22,24 @@ import Foundation
     /// A page's text, where each of its characters is, and its links.
     func text(page: Int, reply: @escaping @Sendable (RemotePageText?, Bool) -> Void)
     /// Every page's text, without positions: what find searches.
-    func strings(reply: @escaping @Sendable ([String]?, Bool) -> Void)
+    func strings(reply: @escaping @Sendable (RemotePDFStrings?, Bool) -> Void)
 }
 
 nonisolated enum PDFService {
     /// The helper's bundle identifier, which is also its service name.
     static let name = "wang.zigao.zigzag.pdfrenderer"
 
-    /// The interface both ends use: each reply may carry its own class and nothing else.
+    /// The interface both ends use: each reply carries its own one class and nothing else at the top. What's inside
+    /// it names its own classes as it's read (`init(coder:)`), so nothing else gets in anywhere.
     static func interface() -> NSXPCInterface {
         let interface = NSXPCInterface(with: PDFRendering.self)
-        func allow(_ classes: [AnyClass], _ selector: Selector) {
-            interface.setClasses(NSSet(array: classes) as! Set<AnyHashable>, for: selector, argumentIndex: 0, ofReply: true)
+        func allow(_ only: AnyClass, _ selector: Selector) {
+            interface.setClasses(NSSet(object: only) as! Set<AnyHashable>, for: selector, argumentIndex: 0, ofReply: true)
         }
-        allow([RemotePDFInfo.self, RemoteOutlineEntry.self, NSArray.self, NSString.self, NSData.self], #selector(PDFRendering.open(_:reply:)))
-        allow([RemotePDFTile.self, NSData.self], #selector(PDFRendering.render(page:x:y:width:height:scale:dark:reply:)))
-        allow([RemotePageText.self, RemoteLink.self, NSArray.self, NSString.self, NSData.self], #selector(PDFRendering.text(page:reply:)))
-        allow([NSArray.self, NSString.self], #selector(PDFRendering.strings(reply:)))
+        allow(RemotePDFInfo.self, #selector(PDFRendering.open(_:reply:)))
+        allow(RemotePDFTile.self, #selector(PDFRendering.render(page:x:y:width:height:scale:dark:reply:)))
+        allow(RemotePageText.self, #selector(PDFRendering.text(page:reply:)))
+        allow(RemotePDFStrings.self, #selector(PDFRendering.strings(reply:)))
         return interface
     }
 }
@@ -95,7 +96,7 @@ nonisolated enum PDFLimits {
 
     init?(coder: NSCoder) {
         guard let sizes = coder.decodeObject(of: NSData.self, forKey: "sizes") as Data?,
-              let outline = coder.decodeObject(of: [NSArray.self, RemoteOutlineEntry.self], forKey: "outline") as? [RemoteOutlineEntry] else { return nil }
+              let outline = coder.decodeArrayOfObjects(ofClass: RemoteOutlineEntry.self, forKey: "outline") else { return nil }
         pageCount = coder.decodeInteger(forKey: "pageCount")
         self.sizes = sizes
         title = coder.decodeObject(of: NSString.self, forKey: "title") as String?
@@ -219,7 +220,7 @@ nonisolated enum PDFLimits {
     init?(coder: NSCoder) {
         guard let string = coder.decodeObject(of: NSString.self, forKey: "string") as String?,
               let boxes = coder.decodeObject(of: NSData.self, forKey: "boxes") as Data?,
-              let links = coder.decodeObject(of: [NSArray.self, RemoteLink.self], forKey: "links") as? [RemoteLink] else { return nil }
+              let links = coder.decodeArrayOfObjects(ofClass: RemoteLink.self, forKey: "links") else { return nil }
         self.string = string
         self.boxes = boxes
         self.links = links
@@ -282,5 +283,28 @@ nonisolated enum PDFLimits {
     func isWellFormed(pages: Int) -> Bool {
         [x, y, width, height].allSatisfy(\.isFinite) && width >= 0 && height >= 0 && (url?.utf8.count ?? 0) <= 8192
             && (-1..<pages).contains(page) && (pageY.isNaN || pageY.isFinite) && (url != nil || page >= 0)
+    }
+}
+
+/// Every page's text, without positions, for find: one string a page. Read as an array of strings and nothing else;
+/// anything else sent (an array inside it, another class) leaves `strings` nil, which isn't well formed.
+@objc(ZigzagRemotePDFStrings) nonisolated final class RemotePDFStrings: NSObject, NSSecureCoding, @unchecked Sendable {
+    let strings: [String]?
+
+    init(_ strings: [String]) { self.strings = strings }
+
+    static var supportsSecureCoding: Bool { true }
+
+    func encode(with coder: NSCoder) {
+        coder.encode((strings ?? []) as NSArray, forKey: "strings")
+    }
+
+    init?(coder: NSCoder) {
+        strings = coder.decodeArrayOfObjects(ofClass: NSString.self, forKey: "strings")?.map { $0 as String }
+    }
+
+    func isWellFormed(pages: Int) -> Bool {
+        guard let strings else { return false }
+        return strings.count == pages && strings.allSatisfy { ($0 as NSString).length <= PDFLimits.maxPageText }
     }
 }
