@@ -94,3 +94,16 @@ struct ReaderTests {
         #expect(first.webView.configuration.defaultWebpagePreferences.allowsContentJavaScript == false)
     }
 }
+
+/// Reader pressed while it waits for a loading page calls the wait off only on that tab; on another, it's for that one.
+@MainActor
+struct ReaderWaitTests {
+    @Test func onlyTheSameTabCallsTheWaitOff() {
+        let space = UUID()
+        let waiting = Tab(url: URL(string: "https://example.com/slow"), spaceID: space)
+        let other = Tab(url: URL(string: "https://example.org/"), spaceID: space)
+        #expect(BrowserWindowController.readerPressCancelsWait(waitingFor: waiting, selected: waiting))
+        #expect(!BrowserWindowController.readerPressCancelsWait(waitingFor: waiting, selected: other))
+        #expect(!BrowserWindowController.readerPressCancelsWait(waitingFor: nil, selected: other))
+    }
+}

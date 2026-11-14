@@ -1651,11 +1651,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Reader pressed while the page is still loading: it opens once the load is done (#233).
     private var readerWait: SignalToken?
     private var readerWaitLimit: DispatchWorkItem?
+    /// The tab Reader is waiting for.
+    private weak var readerWaitTab: Tab?
 
     func toggleReader() {
         if reader != nil { closeReader(); return }
-        // Pressed again while it waits: it doesn't open after all.
-        if readerWait != nil { endReaderWait(); return }
+        // Pressed again while it waits, on the same tab: it doesn't open after all. On another tab, the wait for the
+        // first is over (it's no longer in front) and Reader is for this one.
+        if readerWait != nil {
+            let same = Self.readerPressCancelsWait(waitingFor: readerWaitTab, selected: tabManager.selectedTab)
+            endReaderWait()
+            if same { return }
+        }
         guard let tab = tabManager.selectedTab, let webView = tab.webView, tab.url != nil else { return }
         // Mid-load the page may not be there yet to read, or be the one you're leaving: Reader waits for it, and
         // the page stays as it is meanwhile. A page that never quite finishes (a stalled picture) is read anyway.
@@ -1672,10 +1679,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 self.openReader(in: tab)
             }
             readerWaitLimit = limit
+            readerWaitTab = tab
             DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: limit)
             return
         }
         openReader(in: tab)
+    }
+
+    /// Reader pressed while it waits for a page: only on that same tab does the press call it off.
+    static func readerPressCancelsWait(waitingFor: Tab?, selected: Tab?) -> Bool {
+        waitingFor != nil && waitingFor === selected
     }
 
     private func endReaderWait() {
@@ -1683,6 +1696,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         readerWait = nil
         readerWaitLimit?.cancel()
         readerWaitLimit = nil
+        readerWaitTab = nil
     }
 
     private func openReader(in tab: Tab) {
