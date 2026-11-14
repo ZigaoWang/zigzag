@@ -79,8 +79,49 @@ Either one holds your key. Treat it as you would a password: paste it only into 
 | `click` | Clicks an element, found by a CSS selector or by the text it shows. |
 | `type` | Types into a field, or picks an option in a menu on the page. |
 | `scroll` | Scrolls the page, or a part of it, up or down. |
+| `wait_for` | Waits until some text shows or goes, an element shows or goes, or the page finishes loading. |
+| `press_key` | Presses a key in the page, like Enter, Escape, Tab or an arrow, with Shift, Alt, Ctrl or Meta if wanted. |
 
 A tool given no tab acts on the tab in front of you. There is no tool that runs an app's own JavaScript in a page.
+
+### Waiting for a page
+
+A page that fills itself in after it loads (search results, a list that comes from the server, a message after
+you save) isn't done when `navigate` or `click` answers. `wait_for` waits for one thing:
+
+| Argument | Waits until |
+|---|---|
+| `text` | The text shows on the page. Case and spacing don't matter. |
+| `text_gone` | The text is no longer on the page. |
+| `selector` | An element matching the CSS selector is there and visible. |
+| `selector_gone` | No visible element matches the selector. |
+| `load: true` | The page has finished loading. |
+
+`timeout_ms` is how long to wait: 5000 (five seconds) unless the app says otherwise, and never more than 30000.
+The page itself watches for the change, so waiting costs nothing while nothing happens. The answer says what
+matched and how long it took, or, when the time runs out, what it was waiting for.
+
+A wait ends early, with an error, when the tab closes, goes to sleep or loads another page (a page that only
+changes its address as you use it, like many web apps, doesn't count), and when you press Stop or turn the
+setting off.
+
+### Pressing keys
+
+`press_key` presses one key: Enter, Escape, Tab, Backspace, Delete, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
+Home, End, PageUp, PageDown, Space, or a single character. Modifiers come in `modifiers` (`shift`, `alt`, `ctrl`,
+`meta`) or in the key, like `Shift+Tab` or `Meta+a`. With a `selector`, that element gets the focus first, as
+`type` finds a field; without one, the key goes to whatever has the focus.
+
+Zigzag presses the key as your keyboard would, so the page can't tell it apart from you: Enter submits a form, Tab
+moves to the next field, arrows move the caret or the selection, and Escape closes what the page closes with it.
+This works in a tab that isn't showing and in a window behind others, without bringing anything forward.
+
+Keys only ever reach the page. A key the page doesn't use stops there, so Meta (⌘) and Ctrl combinations never
+run Zigzag's own shortcuts: ⌘W doesn't close the tab, ⌘Q doesn't quit, and ⌘V doesn't paste what's on your
+clipboard. `press_key` won't type a character, Space, Backspace or Delete into a password field, or into a frame
+inside the page where Zigzag can't see whether the field is one. To put text in a field, `type` is quicker; with an
+input method on (Pinyin, for example), a character key may go to the input method rather than straight into the
+field.
 
 ### What an app can never do
 
@@ -128,6 +169,9 @@ every app, and frees every tab you stopped.
 - **A tool says the tab was stopped.** You (or someone at your Mac) pressed Stop on that tab. Ask the app to use
   another tab, or turn the setting off and on to free it.
 - **`screenshot` fails.** The tab has to be on screen. Ask the app to switch to it with `activate_tab` first.
+- **`wait_for` times out.** What it waited for never happened in time: the text may be spelled differently on the
+  page, or the element may be there but hidden. Ask the app to read the page with `read_page`, or to wait longer
+  with `timeout_ms`.
 
 ## Scripts
 
