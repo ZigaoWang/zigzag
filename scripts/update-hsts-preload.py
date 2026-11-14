@@ -26,7 +26,8 @@ def main():
             continue
         name = entry["name"].lower().strip(".")
         (covers if entry.get("include_subdomains") else alone).add(name)
-    lines = sorted(covers) + ["=" + name for name in sorted(alone - covers)]
+    # One list sorted byte by byte, which Zigzag searches in place without reading it into memory.
+    lines = sorted(list(covers) + ["=" + name for name in alone - covers], key=lambda line: line.encode("utf-8"))
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"{len(covers)} with subdomains, {len(alone - covers)} alone")
 

@@ -75,12 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
         // Copies an import read through, if Zigzag stopped before removing them: they can hold passwords.
         DispatchQueue.global(qos: .utility).async { ImportScratch.removeLeftovers() }
-        // The lists every page soon needs (the Public Suffix List for whose site it is, the HSTS preload list for a
-        // certificate warning), read off the main thread a moment after launch rather than on it at first use.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            DispatchQueue.global(qos: .utility).async { _ = PublicSuffix.isLoaded }
-            StrictTransport.warm()
-        }
+        // The Public Suffix List, which the first page's address needs for whose site it is, read off the main thread
+        // right away, so it's ready before that address is shown. (The HSTS preload list is searched in place.)
+        DispatchQueue.global(qos: .userInitiated).async { _ = PublicSuffix.isLoaded }
         ContentBlocker.prepare()
         // A page stuck working hard (an extension in a loop, usually) gets named, with a way out.
         EnergyWatch.shared.start()

@@ -97,6 +97,14 @@ struct CertificateTrustTests {
 
     @Test func knowsThePreloadList() {
         #expect(StrictTransport.isPreloadLoaded)
+        // Searched in place: every line is found, and nothing between them.
+        let list = Data("=alone.example\nb.example\ncovers.example\nz.example\n".utf8)
+        for line in ["=alone.example", "b.example", "covers.example", "z.example"] { #expect(StrictTransport.listed(line, in: list)) }
+        for line in ["a.example", "alone.example", "c.example", "covers.exampl", "covers.examplex", "zz.example", "=b.example", ""] {
+            #expect(!StrictTransport.listed(line, in: list))
+        }
+        #expect(StrictTransport.isPreloaded("www.google.com") || StrictTransport.isPreloaded("accounts.google.com"))
+        #expect(!StrictTransport.isPreloaded("not-a-real-site-zigzag.example"))
         // A name that covers its subdomains, and one that covers itself only.
         #expect(StrictTransport.isKnown("github.com", in: nil))
         #expect(StrictTransport.isKnown("gist.github.com", in: nil))

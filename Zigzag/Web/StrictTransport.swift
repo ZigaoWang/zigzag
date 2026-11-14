@@ -11,35 +11,53 @@ import WebKit
 /// profile's are kept on disk across launches until the header's max-age runs out or its site data is cleared; a
 /// private window's stay in memory and go with it.
 @MainActor enum StrictTransport {
-    /// The preload list: names whose subdomains are covered too, and names covered alone (written `=name`).
-    private struct Preload: Sendable {
-        var withSubdomains: Set<String> = []
-        var alone: Set<String> = []
-    }
-
-    nonisolated private static let preload: Preload = {
-        var list = Preload()
+    /// The preload list, one name a line, sorted byte by byte: a name whose subdomains are covered too, or `=name` for
+    /// one covered alone. It's searched where it lies in the app, mapped rather than read, so the 95,000 names cost
+    /// next to no memory and nothing at launch; a look-up reads a few dozen lines.
+    nonisolated private static let preload: Data = {
         guard let url = Bundle.main.url(forResource: "hsts_preload", withExtension: "txt"),
-              let text = try? String(contentsOf: url, encoding: .utf8) else { return list }
-        for line in text.split(whereSeparator: \.isNewline) {
-            let name = line.trimmingCharacters(in: .whitespaces).lowercased()
-            if name.isEmpty || name.hasPrefix("//") { continue }
-            if name.hasPrefix("=") { list.alone.insert(String(name.dropFirst())) } else { list.withSubdomains.insert(name) }
-        }
-        return list
+              let data = try? Data(contentsOf: url, options: .alwaysMapped) else { return Data() }
+        return data
     }()
 
     /// Whether the preload list is there.
-    nonisolated static var isPreloadLoaded: Bool { !preload.withSubdomains.isEmpty }
+    nonisolated static var isPreloadLoaded: Bool { !preload.isEmpty }
 
     /// Whether `host` is on the preload list: itself, or under a name that covers its subdomains.
     nonisolated static func isPreloaded(_ host: String) -> Bool {
         let host = host.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
         guard !host.isEmpty, !isAddress(host) else { return false }
-        if preload.alone.contains(host) { return true }
+        if listed("=" + host) { return true }
         let labels = host.split(separator: ".")
-        for start in labels.indices where preload.withSubdomains.contains(labels[start...].joined(separator: ".")) { return true }
+        for start in labels.indices where listed(labels[start...].joined(separator: ".")) { return true }
         return false
+    }
+
+    /// Whether `line` is one of the preload list's lines: a binary search over its bytes, each step moving to the
+    /// start of the line it lands in.
+    nonisolated static func listed(_ line: String, in list: Data = preload) -> Bool {
+        let key = Array(line.utf8)
+        guard !key.isEmpty else { return false }
+        return list.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) -> Bool in
+            var low = 0, high = bytes.count
+            while low < high {
+                var start = (low + high) / 2
+                while start > low && bytes[start - 1] != 0x0A { start -= 1 }
+                var end = start
+                while end < bytes.count && bytes[end] != 0x0A { end += 1 }
+                var order = 0, index = 0
+                while order == 0 {
+                    let atEnd = start + index >= end, keyDone = index >= key.count
+                    if atEnd || keyDone { order = atEnd && keyDone ? 0 : (atEnd ? -1 : 1); break }
+                    let a = bytes[start + index], b = key[index]
+                    order = a == b ? 0 : (a < b ? -1 : 1)
+                    index += 1
+                }
+                if order == 0 { return true }
+                if order < 0 { low = end + 1 } else { high = start }
+            }
+            return false
+        }
     }
 
     /// What a Strict-Transport-Security header says, or nil when it isn't a valid one.
@@ -128,11 +146,6 @@ import WebKit
         if scope == "default" { return Paths.support.appendingPathComponent(fileName) }
         guard let id = UUID(uuidString: scope) else { return nil }
         return Profiles.folder(of: id).appendingPathComponent(fileName)
-    }
-
-    /// The preload list read off the main thread, shortly after launch, so the first certificate warning doesn't.
-    nonisolated static func warm() {
-        DispatchQueue.global(qos: .utility).async { _ = isPreloadLoaded }
     }
 
     /// The hosts known in `store`: its profile's file starts being read the first time.
