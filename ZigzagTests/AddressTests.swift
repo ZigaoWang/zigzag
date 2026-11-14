@@ -327,6 +327,34 @@ struct AddressTests {
         withExtendedLifetime(windows) {}
     }
 
+    /// A popup stays inside its window: from a sidebar's address near the window's left edge, it moves toward the
+    /// page, along the address while that's enough, past its end when the popup is wider than that.
+    @Test func aPopupStaysInsideTheWindow() {
+        let room = NSRect(x: 0, y: 0, width: 1280, height: 800)
+        let margin = ExtensionPopups.windowMargin
+        func popup(_ x: CGFloat, _ width: CGFloat) -> ClosedRange<CGFloat> { (x - width / 2)...(x + width / 2) }
+        func inside(_ span: ClosedRange<CGFloat>) -> Bool { span.lowerBound >= room.minX + margin - 0.5 && span.upperBound <= room.maxX - margin + 0.5 }
+        // Room for it centered: the anchor's middle.
+        let page = NSRect(x: 600, y: 10, width: 26, height: 26)
+        #expect(ExtensionPopups.pointingX(anchor: page, reach: page, width: 360, room: room) == page.midX)
+        // A narrow popup under the sidebar's address moves right along the address.
+        let address = NSRect(x: 6, y: 40, width: 228, height: 30)
+        let narrow = ExtensionPopups.pointingX(anchor: address, reach: address, width: 300, room: room)
+        #expect(inside(popup(narrow, 300)) && address.contains(NSPoint(x: narrow, y: address.midY)))
+        // One wider than twice the address goes past its end, inside the window.
+        let wide = ExtensionPopups.pointingX(anchor: address, reach: address, width: 500, room: room)
+        #expect(inside(popup(wide, 500)) && wide > address.maxX - Tokens.Space.x3)
+        // A pinned button near the edge points along the address it's in.
+        let pin = NSRect(x: 150, y: 44, width: 22, height: 22)
+        let fromPin = ExtensionPopups.pointingX(anchor: pin, reach: address, width: 380, room: room)
+        #expect(inside(popup(fromPin, 380)) && fromPin > pin.midX && fromPin <= address.maxX)
+        // At the right edge, it moves left.
+        let right = NSRect(x: 1250, y: 10, width: 26, height: 26)
+        #expect(inside(popup(ExtensionPopups.pointingX(anchor: right, reach: right, width: 360, room: room), 360)))
+        // Wider than the window, it can't fit anyway: as near the window's middle as the address reaches.
+        #expect(ExtensionPopups.pointingX(anchor: address, reach: address, width: 2000, room: room) == address.maxX - Tokens.Space.x3)
+    }
+
     @Test func keepingDropsOnlyWhatIsNoLongerKept() {
         #expect(ExtensionPins(ids: ["a", "b", "c"]).keeping { $0 != "b" }.ids == ["a", "c"])
     }

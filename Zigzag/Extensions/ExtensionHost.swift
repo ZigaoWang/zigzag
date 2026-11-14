@@ -9,6 +9,43 @@ enum ExtensionPopups {
     static func makingWay<Key: Hashable>(for opening: Key, in window: ObjectIdentifier?, among shown: [Key: ObjectIdentifier?]) -> [Key] {
         shown.compactMap { key, place in key != opening && place == window ? key : nil }
     }
+
+    /// How far in from the window's edges a popup keeps.
+    static let windowMargin = Tokens.Space.x2
+
+    /// Where a popup `width` wide points, in the same terms as `anchor` and `room`, so the whole popup stays inside
+    /// `room` (the window), `margin` in from its sides: the anchor's middle when it fits there; otherwise moved
+    /// toward the page as far as it has to, along `reach` (the anchor itself, or for a pinned button the address it
+    /// sits in) while that's enough. A popup wider than a sidebar's address, which is near the window's edge, points
+    /// just past the address's end rather than hang out of the window. One wider than the window goes in its middle.
+    static func pointingX(anchor: NSRect, reach: NSRect, width: CGFloat, room: NSRect, margin: CGFloat = windowMargin) -> CGFloat {
+        let least = room.minX + margin + width / 2, most = room.maxX - margin - width / 2
+        let wanted = least <= most ? min(max(anchor.midX, least), most) : room.midX
+        // The arrow keeps a little in from the reach's ends, where the corners round off.
+        let inset = min(reach.width / 2, Tokens.Space.x3)
+        let along = min(max(wanted, reach.minX + inset), reach.maxX - inset)
+        let fits = least > most || (along >= least - 0.5 && along <= most + 0.5)
+        return fits ? along : wanted
+    }
+
+    /// Where to show a popup `width` wide from, given its anchor (`rect` in `view`): `rect` itself when the popup
+    /// fits the window centered on it; otherwise a sliver at the point `pointingX` picks, on `view` while that's
+    /// within it, or on the window's content past its end (a popover keeps its arrow within the view it's shown
+    /// from). `reach` defaults to `rect`.
+    @MainActor
+    static func positioning(_ rect: NSRect, in view: NSView, reach: NSRect? = nil, width: CGFloat) -> (view: NSView, rect: NSRect) {
+        guard width > 0, let content = view.window?.contentView else { return (view, rect) }
+        let inWindow = view.convert(rect, to: nil), reachInWindow = view.convert(reach ?? rect, to: nil)
+        let room = content.convert(content.bounds, to: nil)
+        let x = pointingX(anchor: inWindow, reach: reachInWindow, width: width, room: room)
+        guard abs(x - inWindow.midX) > 0.5 else { return (view, rect) }
+        let sliver = NSRect(x: x - 0.5, y: inWindow.minY, width: 1, height: inWindow.height)
+        let onView = view.convert(sliver, from: nil)
+        if onView.minX >= view.bounds.minX, onView.maxX <= view.bounds.maxX {
+            return (view, NSRect(x: onView.minX, y: rect.minY, width: onView.width, height: rect.height))
+        }
+        return (content, content.convert(sliver, from: nil))
+    }
 }
 
 /// Extensions' items in a page's right-click menu. WebKit adds them to the page's menu by itself, for the extensions
@@ -233,7 +270,10 @@ final class ExtensionHost: NSObject {
     func repositionPinPopups(of controller: BrowserWindowController) {
         for popup in openPopups.values where popup.fromPin && popup.window === controller.window && popup.popover.isShown {
             let anchor = controller.popupAnchor(forPin: popup.extensionID)
-            if anchor.view === controller.sidebar.address { popup.popover.positioningRect = anchor.rect }
+            if anchor.view === controller.sidebar.address {
+                let place = keptInWindow(popup.popover, anchor.rect, of: anchor.view)
+                if place.view === anchor.view { popup.popover.positioningRect = place.rect }
+            }
         }
     }
 
@@ -756,6 +796,50 @@ final class ExtensionHost: NSObject {
     let popupsChanged = Signal<Void>()
     /// Watches each open popup closing, to end what it started (endCapturesWhenClosed).
     private var popupCloseObservers: [ObjectIdentifier: [NSObjectProtocol]] = [:]
+    /// Each popup's size, watched: a popup's page sizes it after it shows, and a wider one moves to stay in the window.
+    private var popupSizeWatches: [ObjectIdentifier: NSKeyValueObservation] = [:]
+
+    /// Where `popover` shows from so it stays inside the window: `rect` on `view`, narrowed toward the page where
+    /// the popup is too wide to sit centered on it (a sidebar's address, near the window's edge). A pinned button's
+    /// popup may point anywhere along the address the button sits in.
+    private func keptInWindow(_ popover: NSPopover, _ rect: NSRect, of view: NSView) -> (view: NSView, rect: NSRect) {
+        let reach = view is AddressView ? view.bounds : rect
+        return ExtensionPopups.positioning(rect, in: view, reach: reach.union(rect), width: popover.contentSize.width)
+    }
+
+    /// Shows `popover` from `rect` on `view`, inside the window, and keeps it there as its page resizes it. Its size
+    /// is known once it's shown: it's moved then, before it's drawn.
+    private func show(_ popover: NSPopover, from rect: NSRect, of view: NSView) {
+        popover.show(relativeTo: rect, of: view, preferredEdge: .maxY)
+        let key = ObjectIdentifier(popover)
+        popupPlaces[key] = PopupAnchor(view: view, rect: rect, shownOn: view)
+        keepInWindow(popover)
+        popupSizeWatches[key] = popover.observe(\.contentSize, options: [.new]) { [weak self] popover, _ in
+            MainActor.assumeIsolated { self?.keepInWindow(popover) }
+        }
+    }
+
+    /// Where a popup was asked to show from, and the view it's shown from now.
+    private struct PopupAnchor {
+        weak var view: NSView?
+        var rect: NSRect
+        weak var shownOn: NSView?
+    }
+    private var popupPlaces: [ObjectIdentifier: PopupAnchor] = [:]
+
+    private func keepInWindow(_ popover: NSPopover) {
+        let key = ObjectIdentifier(popover)
+        guard popover.isShown, let anchor = popupPlaces[key], let view = anchor.view, view.window != nil else { return }
+        let place = keptInWindow(popover, anchor.rect, of: view)
+        if place.view === anchor.shownOn {
+            if place.rect != popover.positioningRect { popover.positioningRect = place.rect }
+        } else {
+            // It needs the window's room past its anchor's end, or no longer does: shown again from there.
+            popover.show(relativeTo: place.rect, of: place.view, preferredEdge: .maxY)
+            popupPlaces[key]?.shownOn = place.view
+        }
+    }
+
     /// Extensions whose popup opened a window of their own before the popup was even shown (Sound Booster).
     private var popupReplacedByWindow: [String: Date] = [:]
 
@@ -1287,7 +1371,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         // One popup to a window: another extension's steps aside, however this one was asked for.
         closeOtherPopups(than: popover, in: place.view.window)
         endCapturesWhenClosed(popover, action: action, extensionID: context.uniqueIdentifier, window: place.view.window, fromPin: fromPin)
-        popover.show(relativeTo: place.rect, of: place.view, preferredEdge: .maxY)
+        show(popover, from: place.rect, of: place.view)
         popupsChanged.send()
         completionHandler(nil)
     }
@@ -1310,6 +1394,8 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
                 // WebKit shows the same popover again for a new opening; a late notice for the last one is passed over.
                 guard popover?.isShown != true else { return }
                 self?.popupCloseObservers.removeValue(forKey: key)?.forEach(NotificationCenter.default.removeObserver)
+                self?.popupSizeWatches[key] = nil
+                self?.popupPlaces[key] = nil
                 self?.openPopups[key] = nil
                 self?.popupsChanged.send()
                 guard let page else { return }
