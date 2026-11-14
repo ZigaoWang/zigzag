@@ -1590,6 +1590,8 @@ extension Tab: WKNavigationDelegate {
                                               window: host?.hostWindow)
         let outcome = await DownloadHandoff.perform(rule, request: handoff)
         if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+        // A tab opened just for this link has nothing left to show.
+        closeIfOnlyADownload(webView)
         return true
     }
 
