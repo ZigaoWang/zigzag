@@ -2034,6 +2034,8 @@ final class MenuPanel: FloatingPanelView {
 final class StatusLabel: NSView {
     private let check = NSImageView()
     private let label: Label
+    /// The colour it was last told to say itself in; nil is its window's accent.
+    private var tint: NSColor?
 
     init(_ text: String, symbol: String = "checkmark.circle.fill") {
         label = Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
@@ -2044,9 +2046,18 @@ final class StatusLabel: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Says something else, in another colour: one line can be a calm state at rest and a warning when it matters.
+    func say(_ text: String, symbol: String, color: NSColor? = nil) {
+        label.stringValue = text
+        check.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.body)
+        tint = color
+        check.contentTintColor = color ?? Brand.Theme.for(self).accent
+        needsLayout = true
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        check.contentTintColor = Brand.Theme.for(self).accent
+        check.contentTintColor = tint ?? Brand.Theme.for(self).accent
     }
 
     override var intrinsicContentSize: NSSize { NSSize(width: 16 + Tokens.Space.x2 + label.inkWidth + Label.inset, height: Tokens.Space.x7Height) }

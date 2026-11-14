@@ -5205,13 +5205,24 @@
         }
       }
     },
-    "Cookies go only to a service on this Mac. Take {cookies} and {cookie_header} out of the parameters, or point the endpoint at 127.0.0.1." : {
-      "comment" : "Tooltip on the endpoint field of a JSON-RPC download rule that would send the site's cookies to another machine.",
+    "Cookies leave this Mac" : {
+      "comment" : "Beside an icon, under the parameters of a JSON-RPC download rule whose endpoint isn't on this Mac: the site's cookies would go to another machine.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cookie 只会发送给这台 Mac 上的服务。请从参数中去掉 {cookies} 和 {cookie_header}，或者把端点指向 127.0.0.1。"
+            "value" : "Cookie 会离开这台 Mac"
+          }
+        }
+      }
+    },
+    "Cookies stay on this Mac" : {
+      "comment" : "Beside an icon, under the parameters of a JSON-RPC download rule whose endpoint is on this Mac: the site's cookies would go no further than it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cookie 留在这台 Mac 上"
           }
         }
       }
@@ -14584,6 +14595,17 @@
         }
       }
     },
+    "Send Anyway" : {
+      "comment" : "Button of the sheet that asks before saving a download rule that sends the site's cookies to another machine.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍然发送"
+          }
+        }
+      }
+    },
     "Send Feedback" : {
       "comment" : "Title of the Send Feedback sheet.",
       "localizations" : {
@@ -14602,6 +14624,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "发送反馈…"
+          }
+        }
+      }
+    },
+    "Send the site’s cookies off this Mac?" : {
+      "comment" : "Title of the sheet that asks before saving a download rule which would send the site's cookies to another machine.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要把网站的 Cookie 发送到其他机器吗？"
           }
         }
       }
@@ -16963,17 +16996,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "该网站的证书不是由你的 Mac 信任的机构颁发的。你自己网络上的网站（比如路由器）常常是这样。"
-          }
-        }
-      }
-    },
-    "The site’s cookies go only to a service on this Mac. An endpoint on another machine can’t be given {cookies} or {cookie_header}." : {
-      "comment" : "Under the parameters of a JSON-RPC download rule, about cookies and where they may be sent.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "网站的 Cookie 只会发送给这台 Mac 上的服务。其他机器上的端点无法使用 {cookies} 或 {cookie_header}。"
           }
         }
       }
@@ -21266,6 +21288,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "© %1$@ Zigao Wang. %2$@."
+          }
+        }
+      }
+    },
+    "“%@” sends them to %@." : {
+      "comment" : "Message of the sheet that asks before saving a download rule that sends the site's cookies to another machine. The placeholders are the rule's name and the machine its endpoint is on.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” sends them to %2$@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@”会把它们发送到 %2$@。"
           }
         }
       }

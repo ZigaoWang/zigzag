@@ -83,9 +83,10 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         action.textFields.contains { $0.contains("{cookies}") }
     }
 
-    /// Whether this rule would send the site's cookies to a service another machine could be answering at.
-    /// `{cookies}` and `{cookie_header}` carry the site's own sign-in, so a JSON-RPC rule may ask for them only on
-    /// this Mac: the endpoint is written by hand, and only a service here can be trusted with them.
+    /// Whether this rule would send the site's cookies to a service another machine could be answering at. `{cookies}`
+    /// and `{cookie_header}` carry the site's own sign-in, so a JSON-RPC endpoint that isn't on this Mac is worth
+    /// saying out loud — but it's a thing you may mean (a NAS, a build box), so this only raises the warning; it
+    /// doesn't refuse the rule.
     var sendsCookiesOffThisMac: Bool {
         action.kind == .jsonRPC && needsCookies && !action.endpointIsLocal
     }
@@ -239,9 +240,6 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         case .jsonRPC: [rpcEndpoint, rpcMethod, rpcParameters]
         }
     }
-
-    /// The tokens that stand for the site's own sign-in. They are only filled in for a service on this Mac.
-    static let cookieTokens = ["{cookies}", "{cookie_header}"]
 
     /// Whether the service answers on this Mac. Any other host — a name, an address on the network — is a machine
     /// that is not this one, whatever it's called, so only these three count.

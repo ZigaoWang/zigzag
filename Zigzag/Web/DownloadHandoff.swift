@@ -45,10 +45,11 @@ enum DownloadHandoff {
                                    mime: request.mime, space: request.space)
         let secret = rule.action.kind == .jsonRPC ? (HandoffSecrets.secret(for: rule.id) ?? "") : ""
         var cookieFile: URL?
-        // The site's own sign-in goes out only to a service on this Mac. The editor refuses to save a rule that asks
-        // for it anywhere else; this is the same rule again, where the handoff runs, so an endpoint edited by hand
-        // can't send them off this Mac either.
-        if rule.needsCookies, !rule.sendsCookiesOffThisMac {
+        // The site's own sign-in goes wherever the rule says, a service on another machine included: the endpoint is
+        // yours to write, and the editor warns when a rule would send cookies off this Mac. Blocking it here would put
+        // a boundary on something you may well mean — a NAS, a build box — where the only real boundary is the one
+        // that keeps a page from turning a URL into a command line.
+        if rule.needsCookies {
             let cookies = await cookies(from: request.dataStore, for: request.url)
             values.cookieHeader = HandoffCookies.header(cookies)
             if rule.usesCookieFile, let file = try? HandoffCookies.writeFile(cookies) {
