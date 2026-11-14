@@ -439,7 +439,8 @@ final class SidebarListView: NSView {
                     continue
                 }
                 configure(view, for: item)
-                if view === drag?.view { continue }
+                // The space's name is placed by `pinHeader`, at the top while the list is scrolled.
+                if view === drag?.view || item == .header { continue }
                 if view.frame != frame {
                     if animated { moves.append((view, frame)) } else { view.frame = frame }
                 }
@@ -634,7 +635,10 @@ final class SidebarListView: NSView {
         clip.postsFrameChangedNotifications = true
         for name in [NSView.boundsDidChangeNotification, NSView.frameDidChangeNotification] {
             scrollObservers.append(NotificationCenter.default.addObserver(forName: name, object: clip, queue: nil) { [weak self] _ in
-                MainActor.assumeIsolated { self?.fillNear() }
+                MainActor.assumeIsolated {
+                    self?.fillNear()
+                    self?.pinHeader()
+                }
             })
         }
     }
@@ -1331,7 +1335,7 @@ final class SidebarListView: NSView {
     func debugRows() -> [(String, NSRect)] {
         guard let manager else { return [] }
         return rows.compactMap { item, view in
-            guard view.superview === self, !view.isHidden, let window else { return nil }
+            guard view.superview === self || item == .header, !view.isHidden, let window else { return nil }
             let name: String
             switch item {
             case .tab(let id): name = "tab:" + (manager.tab(with: id).map { tab in manager.panes(of: tab) }?.map(\.displayTitle).joined(separator: "|") ?? "")
@@ -1385,11 +1389,56 @@ final class SidebarListView: NSView {
     }
 
 
-    /// The space's name scrolls with the list like any row: a block of flat color pinned over the grain and
-    /// gradient read as a smudge, and the line under the favorites already marks where the list begins.
+    /// The space's name stays at the top while the list scrolls, as Arc keeps it, so you always know which space
+    /// you're in. Rows going up pass under it cut off at its lower edge, never seen through it, and with no block of
+    /// color behind it (flat color over the sidebar's grain and gradient read as a smudge): scrolled, the name stands
+    /// in the scroll view, over the list, and the list shows nothing above its lower edge. At the top it's the list's
+    /// first row again, and pulled down past the top it comes along with the rows.
     func pinHeader() {
-        guard let header = rows[.header] as? SpaceHeaderView else { return }
-        Tokens.Motion.withoutAnimation { header.layer?.backgroundColor = nil }
+        guard let header = rows[.header], let scroll = enclosingScrollView, let slot = shownFrames[.header] else {
+            layer?.mask = nil
+            return
+        }
+        let top = scroll.contentView.bounds.minY
+        let height = slot.height
+        Tokens.Motion.withoutAnimation {
+            header.layer?.backgroundColor = nil
+            if Self.pinnedHeaderOffset(scrolled: top) > 0 {
+                if header.superview !== scroll { scroll.addSubview(header, positioned: .above, relativeTo: scroll.contentView) }
+                header.frame = convert(NSRect(x: slot.minX, y: top, width: bounds.width - slot.minX, height: height), to: scroll)
+                clipRows(above: top + height)
+            } else {
+                if header.superview !== self { addSubview(header) }
+                header.frame = NSRect(x: slot.minX, y: slot.minY, width: bounds.width - slot.minX, height: height)
+                layer?.mask = nil
+            }
+        }
+    }
+
+    /// How far below its own place the space's name is drawn, with the list scrolled `scrolled` points down: as far as
+    /// the list has gone up, so it stays at the top; none at the top, or pulled down past it.
+    nonisolated static func pinnedHeaderOffset(scrolled: CGFloat) -> CGFloat { scrolled > 0.5 ? scrolled : 0 }
+
+    /// How tall the space's name is, for the hairline under it while the list is scrolled.
+    var headerHeight: CGFloat { shownFrames[.header]?.height ?? SpaceHeaderView.rowHeight }
+
+    /// Hides what's above `y` (in the list's terms), under the pinned name.
+    private let rowClip = CALayer()
+    private func clipRows(above y: CGFloat) {
+        // A layer of its own to mask, not one AppKit shares out from the scroll view.
+        if !wantsLayer { wantsLayer = true }
+        guard let layer else { return }
+        rowClip.backgroundColor = NSColor.black.cgColor
+        let height = max(0, bounds.height - y)
+        // The list is flipped, and AppKit draws its layer that way round: the mask runs from the top too.
+        rowClip.frame = isFlipped || layer.isGeometryFlipped ? CGRect(x: 0, y: y, width: bounds.width, height: height)
+            : CGRect(x: 0, y: 0, width: bounds.width, height: height)
+        if layer.mask !== rowClip { layer.mask = rowClip }
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        pinHeader()
     }
 
     // MARK: Folding bookmarks

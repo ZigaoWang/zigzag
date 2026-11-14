@@ -224,3 +224,17 @@ struct SidebarSideTests {
         #expect(sidebar.sidebarButton.symbol == "sidebar.left")
     }
 }
+
+/// The space's name stays at the top of the list while it scrolls, as Arc keeps it.
+struct PinnedSpaceNameTests {
+    @Test func atTheTopTheNameIsTheFirstRow() {
+        #expect(SidebarListView.pinnedHeaderOffset(scrolled: 0) == 0)
+        // Pulled down past the top, it comes along with the rows.
+        #expect(SidebarListView.pinnedHeaderOffset(scrolled: -40) == 0)
+    }
+
+    @Test func scrolledTheNameStaysAtTheTop() {
+        #expect(SidebarListView.pinnedHeaderOffset(scrolled: 1) == 1)
+        #expect(SidebarListView.pinnedHeaderOffset(scrolled: 320) == 320)
+    }
+}

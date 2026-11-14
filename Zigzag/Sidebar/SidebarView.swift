@@ -811,7 +811,7 @@ final class SidebarView: NSView {
             dots.forEach { $0.isHidden = isPrivate }
         }
     }
-    /// A hairline on the list's top edge, only while the list is scrolled under it, as a scroll edge does on the Mac.
+    /// A hairline under the space's name, only while the list is scrolled under it, as a scroll edge does on the Mac.
     private let topSeparator = ColorView(color: Tokens.Color.separator)
     /// Width reserved on the left of the top row for the traffic lights.
     var trafficLightsWidth: CGFloat = 52 { didSet { needsLayout = true } }
@@ -955,6 +955,12 @@ final class SidebarView: NSView {
     }
 
     private func updateTopSeparator() {
+        // Under the space's name, which stays at the top while the list scrolls under it.
+        let pad = Tokens.Sidebar.edge
+        let y = scrollView.frame.minY + list.headerHeight
+        if topSeparator.frame.minY != y || topSeparator.frame.width != bounds.width - pad * 4 {
+            topSeparator.frame = NSRect(x: pad * 2, y: y, width: bounds.width - pad * 4, height: Tokens.Metric.hairline)
+        }
         let shows = scrollView.contentView.bounds.minY > 1
         if (topSeparator.alphaValue > 0) != shows {
             Tokens.Motion.animate(Tokens.Motion.feedback) { self.topSeparator.animator().alphaValue = shows ? 1 : 0 }
@@ -1028,7 +1034,6 @@ final class SidebarView: NSView {
         nowPlaying.frame = frames.nowPlaying
         let listBottom = frames.listBottom
         scrollView.frame = NSRect(x: pad + swipeOffset, y: listTop, width: width - pad * 2, height: listBottom - listTop)
-        topSeparator.frame = NSRect(x: pad * 2, y: listTop - Tokens.Metric.hairline, width: width - pad * 4, height: Tokens.Metric.hairline)
         updateTopSeparator()
         if list.frame.width != scrollView.contentSize.width {
             list.setFrameSize(NSSize(width: scrollView.contentSize.width, height: max(list.frame.height, scrollView.contentSize.height)))
@@ -1043,7 +1048,7 @@ final class SidebarView: NSView {
     }
 
     /// Tabs running on below the bottom of a list fade out there. Only the bottom: the top holds the space's name,
-    /// pinned while you scroll, and a hairline already says there's more above.
+    /// pinned while you scroll, and the hairline under it already says there's more above.
     private static func fade(_ mask: CAGradientLayer, for scrollView: NSScrollView, list: NSView) {
         let bounds = scrollView.bounds
         let clip = scrollView.contentView.bounds
