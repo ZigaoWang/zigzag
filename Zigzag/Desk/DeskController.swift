@@ -875,7 +875,7 @@ final class DeskController {
         searchIcon.frame = NSRect(x: Tokens.Space.x3, y: (h - icon) / 2, width: icon, height: icon)
         let textHeight = ceil(searchField.intrinsicContentSize.height)
         let x = searchIcon.frame.maxX + Tokens.Space.x2
-        searchField.frame = NSRect(x: x, y: (h - textHeight) / 2, width: width - x - Tokens.Space.x3, height: textHeight)
+        searchField.frame = NSRect(x: x, y: searchField.centeredY(in: h), width: width - x - Tokens.Space.x3, height: textHeight)
         scrollView.frame = NSRect(x: 0, y: backdrop.isFlipped ? Self.searchArea : 0, width: b.width, height: b.height - Self.searchArea)
     }
 
