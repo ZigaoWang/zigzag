@@ -384,7 +384,8 @@ final class SidebarListView: NSView {
     }
 
     func reload(animated: Bool) {
-        defer { followMarks() }
+        // The space's name back where it belongs, whatever the reload did to its row (made again at a new size).
+        defer { followMarks(); pinHeader() }
         guard drag == nil else { return }
         items = buildItems()
         apply(items: items, animated: animated)
@@ -674,7 +675,9 @@ final class SidebarListView: NSView {
         super.resizeSubviews(withOldSize: oldSize)
         guard oldSize.width != bounds.width else { return }
         let layout = frames(for: items)
-        for (item, frame) in layout {
+        // The space's name is placed by `pinHeader`: scrolled, it stands in the scroll view, where the list's own
+        // frame for it would be the wrong place.
+        for (item, frame) in layout where item != .header {
             if let view = rows[item], view !== drag?.view { view.frame = frame }
         }
         drag?.view.frame.size.width = bounds.width
@@ -683,6 +686,7 @@ final class SidebarListView: NSView {
             shownFrames = Dictionary(layout, uniquingKeysWith: { a, _ in a })
         }
         fillNear()
+        pinHeader()
     }
 
     // MARK: Folders
