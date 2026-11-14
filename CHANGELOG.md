@@ -5,21 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- Open in from Zigzag Mini, into a window that had just opened with its command bar, closes the bar instead of leaving it over the page.
-- Pop-up windows center their window buttons in the bar at the top, fill to the bottom edge without a strip of the bar's color, and mark a page that isn't secure with the open padlock the address uses.
-- With Protect IP address from WebRTC on, Site Controls no longer counts WebRTC as blocked on every site or offers Reset Permissions for it. Permissions still has the WebRTC row, so a site can be allowed before a call, under a line saying the site hasn't asked for anything when it hasn't. ([#229](https://github.com/ZigaoWang/zigzag/issues/229))
-- Pausing from the mini player keeps the sidebar's Now Playing card, showing Play, for as long as the video is in the mini player, and the mini player shows its play button while paused, with the pointer away. The card's play button and the mini player's now play and pause the same way.
-- The Now Playing card fades out a long title at its end, as sidebar rows do, instead of cutting it with an ellipsis, and Open Downloads Folder lines up with the file names above it in the Downloads panel.
-- Show All Tabs turns dark or light with the rest of Zigzag while it's open, instead of keeping the light color behind white text. Its cards show each page as it looks now, not a picture taken before light or dark changed.
-- The space editor shows a space that follows your Mac at the shade the sidebar has, light by day and deep at night, and moves with it when light or dark changes while the editor is open.
-- In Settings › Zigzag Mini, the New Zigzag Mini row is as tall as its one line of text needs, with its keys in the middle of it.
-- On the History page, Clear History lines up with the times under it, a sitting on one site no longer says how many pages twice, and pages visited after midnight show as Tonight while it's still night.
-- Enter Full Screen in Settings › Shortcuts shows the Globe key with F, as the menu bar does, instead of F alone.
-- Switches that are off stand out from the page in dark mode, on a lighter gray track as macOS draws them, instead of nearly vanishing into it.
-- Menus in a group of settings are the same width, so they line up down the page, like Sidebar size, Favorites per row and Dark pages in Appearance.
-- General no longer offers Restore from before the last update when there was no update, as after Zigzag first starts with a new data folder.
-
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
@@ -42,6 +27,19 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - Favorites show which are open, as tabs do: a favorite whose page isn't loaded is faded back until you point at it, one that's open has its fine edge, and the one you're on has the selected tab's card.
 - A favorite that moved on from its page shows it, as a pinned tab does with Original / Current page: the tile shows the icon of the page it's on now with the favorite's own icon small on its corner, pointing at it names both, and Back to Favorite's Page in its menu takes it back, in a split favorite too.
 - A tab's or pinned tab's title no longer moves or gets cut shorter when the pointer brings up its close or back button: the button shows over the title's faded end.
+- Open in from Zigzag Mini, into a window that had just opened with its command bar, closes the bar instead of leaving it over the page.
+- Pop-up windows center their window buttons in the bar at the top, fill to the bottom edge without a strip of the bar's color, and mark a page that isn't secure with the open padlock the address uses.
+- With Protect IP address from WebRTC on, Site Controls no longer counts WebRTC as blocked on every site or offers Reset Permissions for it. Permissions still has the WebRTC row, so a site can be allowed before a call, under a line saying the site hasn't asked for anything when it hasn't. ([#229](https://github.com/ZigaoWang/zigzag/issues/229))
+- Pausing from the mini player keeps the sidebar's Now Playing card, showing Play, for as long as the video is in the mini player, and the mini player shows its play button while paused, with the pointer away. The card's play button and the mini player's now play and pause the same way.
+- The Now Playing card fades out a long title at its end, as sidebar rows do, instead of cutting it with an ellipsis, and Open Downloads Folder lines up with the file names above it in the Downloads panel.
+- Show All Tabs turns dark or light with the rest of Zigzag while it's open, instead of keeping the light color behind white text. Its cards show each page as it looks now, not a picture taken before light or dark changed.
+- The space editor shows a space that follows your Mac at the shade the sidebar has, light by day and deep at night, and moves with it when light or dark changes while the editor is open.
+- In Settings › Zigzag Mini, the New Zigzag Mini row is as tall as its one line of text needs, with its keys in the middle of it.
+- On the History page, Clear History lines up with the times under it, a sitting on one site no longer says how many pages twice, and pages visited after midnight show as Tonight while it's still night.
+- Enter Full Screen in Settings › Shortcuts shows the Globe key with F, as the menu bar does, instead of F alone.
+- Switches that are off stand out from the page in dark mode, on a lighter gray track as macOS draws them, instead of nearly vanishing into it.
+- Menus in a group of settings are the same width, so they line up down the page, like Sidebar size, Favorites per row and Dark pages in Appearance.
+- General no longer offers Restore from before the last update when there was no update, as after Zigzag first starts with a new data folder.
 
 - A one-page PDF stays in the middle with Two Pages on, instead of sitting alone on the right like a book's first page.
 - A strong password from Use Strong Password stays in Passwords until a newer one for the same account takes its place, however long the site takes to confirm it. Unconfirmed ones are no longer deleted after two weeks.
