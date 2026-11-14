@@ -69,6 +69,27 @@ import WebKit
         return Data(out.utf8)
     }
 
+    /// A one-page PDF written by hand with a text field to fill in.
+    static func formPDF() -> Data {
+        let objects = [
+            "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [4 0 R] >> >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Annots [4 0 R] >>",
+            "<< /Type /Annot /Subtype /Widget /FT /Tx /T (Name) /Rect [20 120 280 150] /P 3 0 R >>",
+        ]
+        var out = "%PDF-1.4\n"
+        var offsets: [Int] = []
+        for (index, object) in objects.enumerated() {
+            offsets.append(out.utf8.count)
+            out += "\(index + 1) 0 obj\n\(object)\nendobj\n"
+        }
+        let xref = out.utf8.count
+        out += "xref\n0 \(objects.count + 1)\n0000000000 65535 f \n"
+        for offset in offsets { out += String(format: "%010d 00000 n \n", offset) }
+        out += "trailer\n<< /Size \(objects.count + 1) /Root 1 0 R >>\nstartxref\n\(xref)\n%%EOF\n"
+        return Data(out.utf8)
+    }
+
     static func pixel(_ image: CGImage, x: Int, y: Int) -> [UInt8] {
         let context = CGContext(data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
@@ -77,6 +98,12 @@ import WebKit
     }
 
     // MARK: What the helper answers
+
+    /// A form to fill in goes back to WebKit's viewer, where its fields can be typed into.
+    @Test @MainActor func aFormToFillInIsHandedBack() async throws {
+        #expect(await SafePDF(data: Self.formPDF()).open() == nil)
+        #expect(await SafePDF(data: Self.pdf(pages: 1)).open() != nil)
+    }
 
     @Test @MainActor func aPDFOpensWithItsPagesTitleAndContents() async throws {
         let document = SafePDF(data: Self.pdf(pages: 3))

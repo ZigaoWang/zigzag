@@ -32,6 +32,9 @@ final class Renderer: NSObject, PDFRendering, @unchecked Sendable {
             sizes.reserveCapacity(document.pageCount)
             for index in 0..<document.pageCount {
                 guard let page = document.page(at: index) else { reply(nil); return }
+                // A form to fill in: Zigzag's viewer only shows its fields, so it's left to WebKit's viewer, where they
+                // can be typed into. Declining is how the viewer hands a PDF back.
+                if page.annotations.contains(where: { $0.type?.hasSuffix("Widget") == true }) { reply(nil); return }
                 let size = Self.shownBox(of: page).size
                 let side = 1.0...PDFLimits.maxPageSide
                 guard side.contains(size.width), side.contains(size.height) else { reply(nil); return }
