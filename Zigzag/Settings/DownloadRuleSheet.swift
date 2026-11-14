@@ -25,10 +25,8 @@ enum DownloadRuleSheet {
         let match = DropdownButton()
         match.options = DownloadRule.Match.allCases.map { DropdownButton.Option(title: $0.title) }
         match.selectedIndex = DownloadRule.Match.allCases.firstIndex(of: source.match) ?? 1
-        let caseSensitive = DropdownButton()
-        caseSensitive.options = [DropdownButton.Option(title: String(localized: "Off", comment: "A choice in a download rule: the address's case doesn't matter.")),
-                                 DropdownButton.Option(title: String(localized: "On", comment: "A choice in a download rule: the address's case matters."))]
-        caseSensitive.selectedIndex = source.isCaseSensitive ? 1 : 0
+        let matchCase = Toggle(isOn: source.isCaseSensitive)
+        matchCase.setAccessibilityLabel(String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."))
 
         // The action's own fields, one set per kind.
         var actionRows: [FormSheet.Row] = []
@@ -125,7 +123,7 @@ enum DownloadRuleSheet {
             FormSheet.Row(label: String(localized: "Applies to", comment: "Label of the choice of what a download rule catches, in its sheet."), view: applies),
             FormSheet.Row(label: String(localized: "Match", comment: "Label of the choice of how a download rule matches an address, in its sheet."), view: match),
             FormSheet.Row(label: String(localized: "Address", comment: "Label of the address pattern in a download rule's sheet."), view: pattern),
-            FormSheet.Row(label: String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."), view: caseSensitive),
+            FormSheet.Row(label: String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."), view: matchCase),
         ]
         let rows = matchRows + actionRows + [tokens]
 
@@ -148,7 +146,7 @@ enum DownloadRuleSheet {
             rule.applies = DownloadRule.Applies.allCases[applies.selectedIndex]
             rule.match = DownloadRule.Match.allCases[match.selectedIndex]
             rule.pattern = pattern.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            rule.isCaseSensitive = caseSensitive.selectedIndex == 1
+            rule.isCaseSensitive = matchCase.isOn
             rule.action = action
             return rule
         }
@@ -159,9 +157,10 @@ enum DownloadRuleSheet {
             guard rule.isValidPattern else { return false }
             return rule.action.isComplete
         }
-        for picker in [applies, match, caseSensitive] + [stylePicker].compactMap({ $0 }) {
+        for picker in [applies, match] + [stylePicker].compactMap({ $0 }) {
             picker.onSelect = { _ in sheetRef?.revalidate() }
         }
+        matchCase.onChange = { _ in sheetRef?.revalidate() }
 
         let sheet = FormSheet.show(in: host,
                                    title: existing == nil ? String(localized: "Add Download Rule", comment: "Title of the sheet that makes a download rule.")

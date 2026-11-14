@@ -270,8 +270,10 @@ final class FormSheet: NSView, NSTextFieldDelegate {
                 let lh = ceil(label.intrinsicContentSize.height)
                 label.frame = NSRect(x: pad, y: y + round((height - lh) / 2), width: labelWidth, height: lh)
                 // A control keeps its own width at the row's end, as Settings' rows do; anything else fills the row.
-                let fitting = (row.view as? DropdownButton)?.intrinsicContentSize.width
-                let width = min(fitting ?? inner - labelWidth, inner - labelWidth)
+                // A switch is a control too: stretched across the row it would draw a switch as wide as the form.
+                let own = (row.view as? DropdownButton)?.intrinsicContentSize.width
+                    ?? (row.view is Toggle ? row.view.intrinsicContentSize.width : nil)
+                let width = min(own ?? inner - labelWidth, inner - labelWidth)
                 row.view.frame = NSRect(x: pad + inner - width, y: y, width: width, height: height)
             } else {
                 row.view.frame = NSRect(x: pad, y: y, width: inner, height: height)
