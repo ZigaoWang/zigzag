@@ -501,13 +501,14 @@ final class DownloadsPanelView: FloatingPanelView {
         let h = title.lineHeight
         let x = inset + CardRow.inset - 2 - Label.inset
         let end = clearButton.isHidden ? more.frame.minX : clearButton.frame.minX
-        title.frame = NSRect(x: x, y: more.frame.midY - h / 2, width: max(0, end - x - Tokens.Space.x2), height: h)
+        // Its capitals level with More's dots.
+        title.frame = NSRect(x: x, y: more.frame.minY + title.centeredY(in: more.frame.height), width: max(0, end - x - Tokens.Space.x2), height: h)
         var y = header
         if rows.isEmpty {
             let icon = Tokens.Space.x8
             emptyIcon.frame = NSRect(x: (bounds.width - icon) / 2, y: y + Tokens.Space.x2, width: icon, height: icon)
             // One quiet line, no picture.
-            emptyNote.frame = NSRect(x: x, y: y + (emptyHeight - emptyNote.lineHeight) / 2, width: bounds.width - x - Tokens.Space.x3, height: emptyNote.lineHeight)
+            emptyNote.frame = NSRect(x: x, y: y + emptyNote.centeredY(in: emptyHeight), width: bounds.width - x - Tokens.Space.x3, height: emptyNote.lineHeight)
             y += emptyHeight
         }
         for row in rows {
