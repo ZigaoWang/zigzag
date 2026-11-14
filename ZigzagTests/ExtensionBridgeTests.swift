@@ -714,19 +714,25 @@ struct ExtensionNumberTests {
 }
 
 extension ExtensionBridgeTests {
-    /// A background's WebSocket reaches only a site the extension has access to; wss://host counts as https://host.
+    /// A background's WebSocket reaches this Mac, a site its manifest's host_permissions name, or an optional one
+    /// once granted; wss://host counts as https://host.
     @Test func backgroundSocketsNeedHostAccess() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
-        try Data(#"{"manifest_version":3,"name":"Synthetic","version":"1.0","host_permissions":["https://push.example/*"]}"#.utf8)
+        try Data(#"{"manifest_version":3,"name":"Synthetic","version":"1.0","host_permissions":["https://named.example/*"],"optional_host_permissions":["https://push.example/*"]}"#.utf8)
             .write(to: folder.appendingPathComponent("manifest.json"))
         let context = WKWebExtensionContext(for: try await WKWebExtension(resourceBaseURL: folder))
+        #expect(WebSocketBridge.allows(URL(string: "wss://named.example/socket")!, context: context))
         #expect(!WebSocketBridge.allows(URL(string: "wss://push.example/socket")!, context: context))
         context.setPermissionStatus(.grantedExplicitly, for: try WKWebExtension.MatchPattern(string: "https://push.example/*"))
         #expect(WebSocketBridge.allows(URL(string: "wss://push.example/socket")!, context: context))
+        for text in ["ws://localhost:8080/", "ws://127.0.0.1:1234/x", "ws://127.5.6.7/", "ws://[::1]:9000/", "wss://LOCALHOST./"] {
+            #expect(WebSocketBridge.allows(URL(string: text)!, context: context))
+        }
         for text in ["ws://push.example/socket", "wss://other.example/socket", "wss://push.example.evil.test/",
-                     "wss://name:synthetic@push.example/", "https://push.example/socket"] {
+                     "wss://name:synthetic@push.example/", "https://push.example/socket", "ws://128.0.0.1/",
+                     "ws://localhost.evil.test/", "ws://127.0.0.1.evil.test/", "ws://user:pw@localhost/", "http://localhost/"] {
             #expect(!WebSocketBridge.allows(URL(string: text)!, context: context))
         }
     }

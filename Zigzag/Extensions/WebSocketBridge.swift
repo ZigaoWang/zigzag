@@ -80,14 +80,28 @@ import WebKit
         }
     }
 
-    /// A socket needs host access to its site, as a page fetch does: `wss://host` is checked as `https://host`.
+    /// Where a background's socket may go. Chrome asks no host access for one; Zigzag keeps to what the extension
+    /// could reach anyway: this Mac (a companion app's local server), a site its manifest's host_permissions name,
+    /// or one it was granted since (an optional one). `wss://host` is matched as `https://host`.
     static func allows(_ url: URL, context: WKWebExtensionContext) -> Bool {
-        guard let scheme = url.scheme?.lowercased(), ["ws", "wss"].contains(scheme), url.host() != nil,
+        guard let scheme = url.scheme?.lowercased(), ["ws", "wss"].contains(scheme), let host = url.host(), !host.isEmpty,
               url.user == nil, url.password == nil,
               var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return false }
+        if isLoopback(host) { return true }
         parts.scheme = scheme == "wss" ? "https" : "http"
         guard let web = parts.url else { return false }
-        return context.hasAccess(to: web)
+        return context.hasAccess(to: web) || context.webExtension.requestedPermissionMatchPatterns.contains { $0.matches(web) }
+    }
+
+    /// localhost, 127.0.0.0/8 or ::1: this Mac.
+    nonisolated static func isLoopback(_ host: String) -> Bool {
+        var name = host.lowercased()
+        if name.hasPrefix("["), name.hasSuffix("]") { name = String(name.dropFirst().dropLast()) }
+        if name.hasSuffix(".") { name.removeLast() }
+        if name == "localhost" || name == "::1" || name == "0:0:0:0:0:0:0:1" { return true }
+        let octets = name.split(separator: ".", omittingEmptySubsequences: false)
+        guard octets.count == 4, octets.allSatisfy({ !$0.isEmpty && $0.count <= 3 && $0.allSatisfy(\.isASCII) && UInt8($0) != nil }) else { return false }
+        return octets[0] == "127"
     }
 
     private func receive() {
