@@ -391,7 +391,7 @@ final class PaneAddressView: InteractiveView {
         siteControls.isHidden = !button
         let side = Self.buttonSide
         siteControls.frame = NSRect(x: bounds.width - Self.buttonInset - side, y: (bounds.height - side) / 2, width: side, height: side)
-        label.frame = NSRect(x: Self.padding - Label.inset, y: (bounds.height - h) / 2,
+        label.frame = NSRect(x: Self.padding - Label.inset, y: label.centeredY(in: bounds.height),
                              width: max(0, bounds.width - Self.padding * 2 - (button ? Self.buttonRoom : 0) + Label.inset * 2), height: h)
         // An address too long for the strip shows its host alone, cut so its domain stays whole (#189): cut in the
         // middle, "gemini.goo…/app" would hide whose site it is.

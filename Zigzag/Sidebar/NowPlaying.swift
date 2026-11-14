@@ -79,7 +79,7 @@ final class NowPlayingView: InteractiveView {
         let play = NSRect(x: mute.minX - Self.buttonGap - b, y: y, width: b, height: b)
         let x = icon.frame.maxX + SidebarRowView.titleOffset
         let h = ceil(title.intrinsicContentSize.height)
-        let titleFrame = NSRect(x: x, y: (bounds.height - h) / 2, width: max(0, play.minX - x - SidebarRowView.buttonEdge), height: h)
+        let titleFrame = NSRect(x: x, y: title.centeredY(in: bounds.height), width: max(0, play.minX - x - SidebarRowView.buttonEdge), height: h)
         muteButton.frame = mute
         playButton.frame = play
         title.frame = titleFrame

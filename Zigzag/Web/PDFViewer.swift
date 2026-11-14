@@ -706,9 +706,9 @@ private final class PageNumberButton: InteractiveView, NSTextFieldDelegate {
     override func layout() {
         super.layout()
         let h = label.lineHeight
-        label.frame = NSRect(x: 0, y: (bounds.height - h) / 2, width: bounds.width, height: h)
+        label.frame = NSRect(x: 0, y: label.centeredY(in: bounds.height), width: bounds.width, height: h)
         let fh = ceil(field.intrinsicContentSize.height)
-        field.frame = NSRect(x: Tokens.Space.x1, y: (bounds.height - fh) / 2, width: bounds.width - Tokens.Space.x2, height: fh)
+        field.frame = NSRect(x: Tokens.Space.x1, y: field.centeredY(in: bounds.height), width: bounds.width - Tokens.Space.x2, height: fh)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -775,7 +775,7 @@ private final class ContentsRow: InteractiveView {
         super.layout()
         let x = CardRow.inset - Label.inset + CGFloat(min(level, 4)) * Tokens.Space.x3
         let h = label.lineHeight
-        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: max(0, bounds.width - x - CardRow.inset), height: h)
+        label.frame = NSRect(x: x, y: label.centeredY(in: bounds.height), width: max(0, bounds.width - x - CardRow.inset), height: h)
     }
 
     override func stateDidChange(animated: Bool) {

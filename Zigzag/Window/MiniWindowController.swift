@@ -1023,7 +1023,7 @@ final class MiniSpaceChip: InteractiveView {
         picture.frame = NSRect(x: Self.pad, y: round((bounds.height - Self.side) / 2), width: Self.side, height: Self.side)
         let x = Self.pad + pictureRoom
         let h = label.lineHeight
-        label.frame = NSRect(x: x - Label.inset, y: round((bounds.height - h) / 2), width: max(0, bounds.width - Self.pad - x + Label.inset * 2), height: h)
+        label.frame = NSRect(x: x - Label.inset, y: label.centeredY(in: bounds.height), width: max(0, bounds.width - Self.pad - x + Label.inset * 2), height: h)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -1104,7 +1104,7 @@ final class MiniTitleView: InteractiveView {
             x = mark.frame.maxX + Tokens.Space.x1
         }
         let h = label.lineHeight
-        label.frame = NSRect(x: x - Label.inset, y: round((bounds.height - h) / 2), width: max(0, bounds.width - Self.pad - x + Label.inset * 2), height: h)
+        label.frame = NSRect(x: x - Label.inset, y: label.centeredY(in: bounds.height), width: max(0, bounds.width - Self.pad - x + Label.inset * 2), height: h)
     }
 
     override func stateDidChange(animated: Bool) {
