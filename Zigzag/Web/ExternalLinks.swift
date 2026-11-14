@@ -28,7 +28,8 @@ enum ExternalLinks {
         /// dismissed the last question (claude.ai asks on load, and its Open Claude button asks again) must not be
         /// what silences this one. Only a click on a link (`linkClick`) undoes Don't Open: a click is also what a
         /// page's own script rides on while you press anything.
-        mutating func mayAsk(_ key: String, clickedHere: Bool, linkClick: Bool, now: Date = Date()) -> Bool {
+        /// `page`: the site of the page it's on, whose frames share its few seconds' gap (by default, the key's site).
+        mutating func mayAsk(_ key: String, page: String? = nil, clickedHere: Bool, linkClick: Bool, now: Date = Date()) -> Bool {
             guard !asking.contains(key) else { return false }
             if clickedHere {
                 if linkClick { declined.remove(key) } else if declined.contains(key) { return false }
@@ -36,15 +37,18 @@ enum ExternalLinks {
                 return true
             }
             guard !declined.contains(key), putOff[key].map({ now > $0 }) ?? true else { return false }
-            // Asking on its own, from any site or frame: never while another question is up, and not again for a
-            // few seconds, so frames from many sites can't line up question after question.
-            guard asking.isEmpty, lastOnItsOwn.map({ now.timeIntervalSince($0) >= Self.unaskedGap }) ?? true else { return false }
-            lastOnItsOwn = now
+            // Asking on its own, from any site or frame: never while another question is up, and not again from the
+            // same page's site for a few seconds, so frames from many sites on it can't line up question after
+            // question. Another site (another tab's meeting page) isn't held up by this one.
+            let site = page ?? String(key.prefix { $0 != "|" })
+            guard asking.isEmpty, lastOnItsOwn[site].map({ now.timeIntervalSince($0) >= Self.unaskedGap }) ?? true else { return false }
+            if lastOnItsOwn.count > 200 { lastOnItsOwn = lastOnItsOwn.filter { now.timeIntervalSince($0.value) < Self.unaskedGap } }
+            lastOnItsOwn[site] = now
             return true
         }
 
-        /// When a question last went up without a click of yours.
-        var lastOnItsOwn: Date?
+        /// When a question last went up without a click of yours, by the site of the page it was on.
+        var lastOnItsOwn: [String: Date] = [:]
         static let unaskedGap: TimeInterval = 10
     }
     private static var asked = Asked()
@@ -116,7 +120,7 @@ enum ExternalLinks {
             break
         }
         guard let controller, webView.window != nil,
-              asked.mayAsk(key, clickedHere: clickedHere, linkClick: linkClick ?? isClick) else { return }
+              asked.mayAsk(key, page: pageOrigin ?? pageHost, clickedHere: clickedHere, linkClick: linkClick ?? isClick) else { return }
         let name = appName(app)
         // Private windows, popups included, never remember the answer.
         let isPrivate = !webView.configuration.websiteDataStore.isPersistent

@@ -111,24 +111,37 @@ struct ExternalLinkAskingTests {
         #expect(asked.putOff[key] == nil)
     }
 
-    /// Questions nobody clicked for, from frames of many sites, come one at a time and a few seconds apart.
+    /// Questions nobody clicked for, from frames of many sites on one page, come one at a time and a few seconds apart.
     @Test func questionsOnTheirOwnAreSpacedAcrossFrames() {
         var asked = ExternalLinks.Asked()
         let now = Date()
-        let first = asked.mayAsk("https://a.example|zoommtg", clickedHere: false, linkClick: false, now: now)
+        let page = "https://a.example"
+        let first = asked.mayAsk("https://a.example|zoommtg", page: page, clickedHere: false, linkClick: false, now: now)
         #expect(first)
         asked.asking.insert("https://a.example|zoommtg")
-        let whileUp = asked.mayAsk("https://b.example|zoommtg", clickedHere: false, linkClick: false, now: now.addingTimeInterval(1))
+        let whileUp = asked.mayAsk("https://b.example|zoommtg", page: page, clickedHere: false, linkClick: false, now: now.addingTimeInterval(1))
         #expect(!whileUp)
         asked.asking.removeAll()
-        let tooSoon = asked.mayAsk("https://c.example|steam", clickedHere: false, linkClick: false, now: now.addingTimeInterval(2))
+        let tooSoon = asked.mayAsk("https://c.example|steam", page: page, clickedHere: false, linkClick: false, now: now.addingTimeInterval(2))
         #expect(!tooSoon)
         // Your own click always asks.
-        let clicked = asked.mayAsk("https://d.example|zoommtg", clickedHere: true, linkClick: true, now: now.addingTimeInterval(3))
+        let clicked = asked.mayAsk("https://d.example|zoommtg", page: page, clickedHere: true, linkClick: true, now: now.addingTimeInterval(3))
         #expect(clicked)
-        let later = asked.mayAsk("https://e.example|zoommtg", clickedHere: false, linkClick: false,
+        let later = asked.mayAsk("https://e.example|zoommtg", page: page, clickedHere: false, linkClick: false,
                                  now: now.addingTimeInterval(ExternalLinks.Asked.unaskedGap + 1))
         #expect(later)
+    }
+
+    /// The gap is a page's site's: another site (another tab's meeting) asks at once.
+    @Test func theGapIsPerSite() {
+        var asked = ExternalLinks.Asked()
+        let now = Date()
+        let zoom = asked.mayAsk("https://zoom.us|zoommtg", page: "https://zoom.us", clickedHere: false, linkClick: false, now: now)
+        #expect(zoom)
+        let teams = asked.mayAsk("https://teams.example|msteams", page: "https://teams.example", clickedHere: false, linkClick: false, now: now.addingTimeInterval(1))
+        #expect(teams)
+        let zoomAgain = asked.mayAsk("https://zoom.us|zoommtg", page: "https://zoom.us", clickedHere: false, linkClick: false, now: now.addingTimeInterval(2))
+        #expect(!zoomAgain)
     }
 
     /// Don't Open holds against a page's script riding on a click; only a link you click asks again.
