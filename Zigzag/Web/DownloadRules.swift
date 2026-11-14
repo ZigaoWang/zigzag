@@ -33,17 +33,6 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
             case .any: String(localized: "Any address", comment: "How a download rule matches an address: the catch-all, for every address.")
             }
         }
-
-        /// The short form a rule's row shows beside its name.
-        var shortTitle: String {
-            switch self {
-            case .startsWith: String(localized: "starts with", comment: "A rule's kind, in its row in Settings › Downloads.")
-            case .contains: String(localized: "contains", comment: "A rule's kind, in its row in Settings › Downloads.")
-            case .endsWith: String(localized: "ends with", comment: "A rule's kind, in its row in Settings › Downloads.")
-            case .regex: String(localized: "matches", comment: "A rule's kind, in its row in Settings › Downloads, before a regular expression.")
-            case .any: String(localized: "any address", comment: "A rule's kind, in its row in Settings › Downloads: the catch-all.")
-            }
-        }
     }
 
     var id = UUID()
@@ -97,12 +86,40 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     /// What the row says it does, in a few words.
     var actionSummary: String { action.summary }
 
-    /// What the row says it catches.
-    var matchSummary: String {
+    /// The rule in a sentence, as its row in Settings › Downloads says it: "Files ending in .torrent go to
+    /// rTorrent". The name is your own, so a rule you named reads with it.
+    var summarySentence: String {
+        let goes = name.isEmpty ? action.summary : name
+        if match == .any {
+            return applies == .downloads
+                ? String(localized: "Everything you download goes to \(goes)",
+                         comment: "A download rule in a sentence: it catches every address. The placeholder is the rule's name — where the link goes.")
+                : String(localized: "Every link and download goes to \(goes)",
+                         comment: "A download rule in a sentence: it catches every address. The placeholder is the rule's name — where the link goes.")
+        }
+        let files = applies == .downloads
+            ? String(localized: "Files", comment: "The subject of a download rule's sentence, for a rule that catches downloads but not links.")
+            : String(localized: "Files and links", comment: "The subject of a download rule's sentence, for a rule that catches links as well as downloads.")
+        let catches: String
         switch match {
-        case .any: return Match.any.shortTitle
-        case .regex: return "\(Match.regex.shortTitle) \(pattern)"
-        default: return "\(match.shortTitle) \(pattern)"
+        case .startsWith:
+            catches = String(localized: "\(files) starting with \(pattern)", comment: "Part of a download rule's sentence: what it catches. The first placeholder is “Files” or “Files and links”, the second the beginning of the address.")
+        case .contains:
+            catches = String(localized: "\(files) whose address contains \(pattern)", comment: "Part of a download rule's sentence: what it catches. The first placeholder is “Files” or “Files and links”, the second the text looked for in the address.")
+        case .endsWith:
+            catches = String(localized: "\(files) ending in \(pattern)", comment: "Part of a download rule's sentence: what it catches. The first placeholder is “Files” or “Files and links”, the second the end of the address, such as .torrent.")
+        case .regex:
+            catches = String(localized: "\(files) matching \(pattern)", comment: "Part of a download rule's sentence: what it catches by regular expression. The first placeholder is “Files” or “Files and links”, the second the expression.")
+        case .any:
+            catches = files
+        }
+        switch action.kind {
+        case .jsonRPC:
+            return String(localized: "\(catches) go to \(goes)", comment: "A download rule in a sentence: what it catches, then the service it sends it to. The placeholders are the two parts, as in “Files ending in .torrent” and “rTorrent”.")
+        case .openApp, .openURL:
+            return String(localized: "\(catches) open in \(goes)", comment: "A download rule in a sentence: what it catches, then the app it opens in. The placeholders are the two parts.")
+        case .runScript:
+            return String(localized: "\(catches) are handed to \(goes)", comment: "A download rule in a sentence: what it catches, then the script it is given to. The placeholders are the two parts.")
         }
     }
 

@@ -2851,7 +2851,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             controls.distribution = .fill
             controls.alignment = .centerY
             let row = FormRow(title: rule.name.isEmpty ? String(localized: "Untitled Rule", comment: "A download rule with no name yet.") : rule.name,
-                              detail: "\(rule.matchSummary) · \(rule.actionSummary)", control: controls)
+                              detail: rule.summarySentence, control: controls)
             row.keywords = "\(rule.pattern) \(rule.action.textFields.joined(separator: " "))"
             downloadRulesGroup.add(row)
             // The sites this rule has a standing answer on, grouped by what was answered — handed off, left to the
@@ -2927,7 +2927,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         let values = HandoffValues(link: url, filename: DownloadTokens.filename(for: url, suggested: ""), space: "")
         let preview = rule.action.textFields.first.map { DownloadTokens.expand($0, with: values) } ?? ""
-        row.detailText = preview.isEmpty ? rule.actionSummary : "\(rule.actionSummary)\n\(preview)"
+        row.detailText = preview.isEmpty ? rule.summarySentence : "\(rule.summarySentence)\n\(preview)"
     }
 
     /// Add Rule: a plain action, or a preset that fills the fields for aria2, Motrix, rTorrent, yt-dlp, mpv or IINA.
