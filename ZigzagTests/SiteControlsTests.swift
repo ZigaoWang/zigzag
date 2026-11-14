@@ -260,27 +260,31 @@ struct SiteControlsPermissionTests {
     /// A frame from another site on the page is held back by the page's Block, and never let in by its Allow.
     @Test func aFrameFromElsewhereOnlyFollowsBlock() throws {
         try withDefaults {
+            // A site-wide Allow covers every app the page opens, as the row always meant.
             SitePermissions.setChoice(.allow, for: .apps, origin: site)
-            let allowed = SitePermissions.action(PermissionSubject.app("zoommtg"), origin: site)
-            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: false, stored: allowed) == "allow")
-            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: true, stored: allowed) == nil)
+            #expect(SitePermissions.action(PermissionSubject.apps, origin: site) == "allow")
+            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: false, stored: "allow") == "allow")
+            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: true, stored: "allow") == nil)
+            // Always Open on one app is kept under that app's own key.
+            SitePermissions.allowOpeningApp(origin: site, scheme: "zoommtg")
+            #expect(SitePermissions.action(PermissionSubject.app(scheme: "zoommtg"), origin: site) == "allow")
             SitePermissions.setChoice(.block, for: .apps, origin: site)
-            let blocked = SitePermissions.action(PermissionSubject.app("zoommtg"), origin: site)
+            let blocked = SitePermissions.action(PermissionSubject.apps, origin: site)
             #expect(blocked == "deny")
             #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: true, stored: blocked) == "deny")
-            #expect(ExternalLinks.decision(page: nil, scheme: "zoommtg", foreign: false, stored: allowed) == nil)
+            #expect(ExternalLinks.decision(page: nil, scheme: "zoommtg", foreign: false, stored: "allow") == nil)
         }
     }
 
     /// A page with no site (about:blank its opener wrote) is held by the opener's Block, never let in by its Allow.
     @Test func aPageWithNoSiteKeepsItsOpenersBlock() throws {
         try withDefaults {
-            #expect(ExternalLinks.decision(page: nil, standIns: [site], scheme: "zoommtg", foreign: false) == nil)
+            #expect(ExternalLinks.storedAppAction(pageOrigin: nil, standIns: [site], origin: nil, scheme: "zoommtg", foreign: false, tab: nil) == nil)
             SitePermissions.setChoice(.allow, for: .apps, origin: site)
-            #expect(ExternalLinks.decision(page: nil, standIns: [site], scheme: "zoommtg", foreign: false) == nil)
+            #expect(ExternalLinks.storedAppAction(pageOrigin: nil, standIns: [site], origin: nil, scheme: "zoommtg", foreign: false, tab: nil) == nil)
             SitePermissions.setChoice(.block, for: .apps, origin: site)
-            #expect(ExternalLinks.decision(page: nil, standIns: [site], scheme: "zoommtg", foreign: false) == false)
-            #expect(ExternalLinks.decision(page: nil, standIns: [], scheme: "zoommtg", foreign: false) == nil)
+            #expect(ExternalLinks.storedAppAction(pageOrigin: nil, standIns: [site], origin: nil, scheme: "zoommtg", foreign: false, tab: nil) == "deny")
+            #expect(ExternalLinks.storedAppAction(pageOrigin: nil, standIns: [], origin: nil, scheme: "zoommtg", foreign: false, tab: nil) == nil)
         }
     }
 
