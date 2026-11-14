@@ -393,6 +393,55 @@ enum SettingsIcon {
     }
 }
 
+// MARK: - A row that can be dragged
+
+/// A group row that can be picked up and dropped at another place in its list. Settings' lists hold `FormRow`s, which
+/// are plain views that can't be grabbed, so the row rides inside this one: the whole row is the drag surface, except
+/// its own controls, which keep their clicks (`InteractiveView`'s hit test).
+final class DraggableRow: InteractiveView, SettingsSizedRow, SettingsSearchable {
+    /// The row it carries.
+    let row: NSView
+    var searchText: String { (row as? SettingsSearchable)?.searchText ?? "" }
+    /// True while the row is carried: it draws as a card above the others, as a carried space's row does.
+    var isLifted = false { didSet { stateDidChange(animated: false) } }
+    init(_ row: NSView) {
+        self.row = row
+        super.init(frame: row.frame)
+        addSubview(row)
+        setAccessibilityRole(.row)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+
+    func height(for width: CGFloat) -> CGFloat {
+        (row as? FormRow)?.height(for: width)
+            ?? (row as? SettingsSizedRow)?.height(for: width)
+            ?? row.frame.height
+    }
+
+    override func layout() {
+        super.layout()
+        row.frame = bounds
+    }
+
+    override func resetCursorRects() { if isLifted { addCursorRect(bounds, cursor: .closedHand) } }
+
+    override func stateDidChange(animated: Bool) {
+        // At rest it reads like every other row in Settings: no fill of its own. Carried, it's a card above the
+        // others, solid at once so nothing shows through it.
+        layer?.backgroundColor = isLifted ? cgColor(Tokens.Color.surfaceGroup) : nil
+        layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
+        layer?.shadowOpacity = isLifted ? 1 : 0
+        layer?.shadowRadius = Tokens.Shadow.panelRadius / 2
+        layer?.shadowOffset = Tokens.Shadow.panelOffset(flipped: isFlipped)
+        layer?.borderWidth = isLifted ? Tokens.Metric.hairline : 0
+        layer?.borderColor = cgColor(Tokens.Color.surfaceGroupEdge)
+        window?.invalidateCursorRects(for: self)
+    }
+}
+
 // MARK: - Spaces list
 
 /// A space in Settings: its color (click to change), its name (edit in place), delete on hover, drag to reorder.
@@ -998,6 +1047,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let getExtensionsButton = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens the Chrome Web Store."))
     private let loadUnpackedButton = PillButton(title: String(localized: "Install from Folder…", comment: "Button in Settings › Extensions: installs an extension from a folder on this Mac, one you're building or one that came with an app."))
     private var spaceRows: [SpaceSettingsRow] = []
+    /// The download rules' rows, top to bottom, each with the rule it stands for: dragging one moves that rule.
+    private var downloadRuleRows: [(id: UUID, row: DraggableRow)] = []
     private var token: SignalToken?
     private var extensionsToken: SignalToken?
     private var engineToken: SignalToken?
@@ -2651,6 +2702,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .downloads:
             section(nil, downloadPlaceGroup)
             section(Self.downloadRulesHeading, downloadRulesGroup, accessory: addDownloadRuleButton)
+            // Said once, under the list, and only when there's an order to change.
+            if downloadRuleRows.count > 1 {
+                note(String(localized: "Drag a rule to change its order.", comment: "Hint under the download rules in Settings › Downloads."))
+            }
             section(Self.downloadTestHeading, downloadTestGroup)
         case .general, .appearance, .tabs, .search, .mini, .automation:
             for (title, group) in groups(of: pane) { section(title, group) }
@@ -2802,9 +2857,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     // MARK: Download rules
 
-    /// The rules, top to bottom. Each row switches one on or off, moves it, changes it, or deletes it.
+    /// The rules, top to bottom. Each row switches one on or off, can be dragged to another place in the list,
+    /// changes it, or deletes it.
     private func reloadDownloadRules() {
         downloadRulesGroup.removeAllRows()
+        downloadRuleRows = []
         updateDownloadRuleTest()
         let rules = DownloadRulesStore.shared.rules
         guard !rules.isEmpty else {
@@ -2815,19 +2872,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             downloadRulesGroup.add(empty)
             return
         }
-        for (index, rule) in rules.enumerated() {
+        for rule in rules {
             let toggle = Toggle(isOn: rule.isEnabled)
             toggle.onChange = { isOn in DownloadRulesStore.shared.setEnabled(isOn, for: rule.id) }
             toggle.setAccessibilityLabel(String(localized: "Turn \(rule.name) on or off", comment: "A download rule's switch for VoiceOver. The placeholder is the rule's name."))
 
-            let up = IconButton(symbol: "chevron.up", size: .compact,
-                                toolTip: String(localized: "Move Up", comment: "Tooltip of the button that moves a download rule up the list."))
-            up.isEnabled = index > 0
-            up.onClick = { _ in DownloadRulesStore.shared.move(from: index, to: index - 1) }
-            let down = IconButton(symbol: "chevron.down", size: .compact,
-                                  toolTip: String(localized: "Move Down", comment: "Tooltip of the button that moves a download rule down the list."))
-            down.isEnabled = index < rules.count - 1
-            down.onClick = { _ in DownloadRulesStore.shared.move(from: index, to: index + 1) }
             let edit = IconButton(symbol: "slider.horizontal.3", size: .compact,
                                   toolTip: String(localized: "Change Rule", comment: "Tooltip of the button that changes a download rule."))
             edit.onClick = { [weak self] _ in
@@ -2845,15 +2894,21 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 }
             }
 
-            let controls = NSStackView(views: [toggle, up, down, edit, remove])
+            let controls = NSStackView(views: [toggle, edit, remove])
             controls.orientation = .horizontal
             controls.spacing = Tokens.Space.x1
             controls.distribution = .fill
             controls.alignment = .centerY
-            let row = FormRow(title: rule.name.isEmpty ? String(localized: "Untitled Rule", comment: "A download rule with no name yet.") : rule.name,
-                              detail: rule.summarySentence, control: controls)
-            row.keywords = "\(rule.pattern) \(rule.action.textFields.joined(separator: " "))"
+            let content = FormRow(title: rule.name.isEmpty ? String(localized: "Untitled Rule", comment: "A download rule with no name yet.") : rule.name,
+                                  detail: rule.summarySentence, control: controls)
+            content.keywords = "\(rule.pattern) \(rule.action.textFields.joined(separator: " "))"
+            let row = DraggableRow(content)
+            row.onDragStart = { [weak self, weak row] event in
+                guard let self, let row else { return false }
+                return self.beginDownloadRuleDrag(row, event: event)
+            }
             downloadRulesGroup.add(row)
+            downloadRuleRows.append((rule.id, row))
             // The sites this rule has a standing answer on, grouped by what was answered — handed off, left to the
             // browser, or refused — so a site the rule was refused on doesn't read like one it was handed off on.
             // Each can be forgotten on its own, so one site is asked again without touching the others.
@@ -3169,6 +3224,46 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         for row in spaceRows {
             row.isHovered = row.window != nil && row.bounds.contains(row.convert(mouse, from: nil))
         }
+    }
+
+    // MARK: Reordering download rules
+
+    /// A download rule drags the way a space does: the rule stays where it is, faint, a see-through copy follows the
+    /// pointer, and a line shows where it will land. Nothing else moves until it's dropped.
+    private func beginDownloadRuleDrag(_ row: DraggableRow, event: NSEvent) -> Bool {
+        guard let window, let startIndex = downloadRuleRows.firstIndex(where: { $0.row === row }) else { return false }
+        // Lifted for its picture: its own solid card, so the copy reads off the list.
+        row.isLifted = true
+        let copy = CarriedCopy(of: row, picture: CarriedCopy.picture(of: row), grabbedAt: window.convertPoint(toScreen: event.locationInWindow),
+                               ground: nil, radius: Tokens.Radius.row)
+        row.isLifted = false
+        row.alphaValue = CarriedCopy.faint
+        copy.lift()
+        let line = InsertionLineView()
+        line.isHidden = true
+        downloadRulesGroup.addSubview(line)
+        let others = downloadRuleRows.filter { $0.row !== row }
+        var target = startIndex
+        let released = CarriedCopy.track(in: window) { event in
+            copy.follow(window.convertPoint(toScreen: event.locationInWindow))
+            self.documentView.autoscroll(with: event)
+            // Its new place: after every other rule whose middle is above the pointer.
+            let y = self.downloadRulesGroup.convert(event.locationInWindow, from: nil).y
+            target = others.filter { $0.row.frame.midY < y }.count
+            line.isHidden = target == startIndex
+            let edge = target < others.count ? others[target].row.frame.minY : others.last?.row.frame.maxY ?? 0
+            Tokens.Motion.withoutAnimation { line.frame = NSRect(x: 0, y: round(edge) - 3, width: self.downloadRulesGroup.bounds.width, height: 6) }
+        }
+        line.removeFromSuperview()
+        let ruleID = downloadRuleRows[startIndex].id
+        if released != nil, target != startIndex {
+            // The store's own signal rebuilds the list, with the rule in its new place.
+            DownloadRulesStore.shared.move(from: startIndex, to: target)
+        }
+        layoutSubtreeIfNeeded()
+        row.alphaValue = 1
+        copy.land(on: downloadRuleRows.first { $0.id == ruleID }?.row)
+        return true
     }
 
     // MARK: Actions

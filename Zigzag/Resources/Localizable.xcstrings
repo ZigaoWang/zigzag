@@ -6272,6 +6272,17 @@
         }
       }
     },
+    "Drag a rule to change its order." : {
+      "comment" : "Hint under the download rules in Settings › Downloads.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖移规则即可更改顺序。"
+          }
+        }
+      }
+    },
     "Drag a space to change its order." : {
       "comment" : "Hint under Your Spaces in Settings › Spaces.",
       "localizations" : {
