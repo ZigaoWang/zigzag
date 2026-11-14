@@ -63,14 +63,16 @@ jobs:
           path: Zigzag-Dev.zip
           if-no-files-found: error
 
-      - name: Run the download rule tests
+      - name: Run the tests that cover this work
         continue-on-error: true
         run: |
           set -o pipefail
           xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag \
             -destination 'platform=macOS' -derivedDataPath test-build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            -only-testing:ZigzagTests/DownloadRuleTests | tee test.log
+            -only-testing:ZigzagTests/DownloadRuleTests \
+            -only-testing:ZigzagTests/SitePermissionsPolicyTests \
+            -only-testing:ZigzagTests/SiteControlsTests | tee test.log
 
       - uses: actions/upload-artifact@v4
         if: always()
