@@ -7,6 +7,7 @@
 //
 // Which sites have a choice of their own is never in here, where the page could read it: Zigzag's script in a world of
 // its own (PageFullScreen.choiceSource) works out the choice for this page's site and says only that, page or screen.
+// Like WebKit's own, it fills only on a click or key of yours, and a frame only where it's allowed full screen.
 (() => {
   const KEY = Symbol.for('zigzag.fullscreen');
   if (window[KEY]) return;
@@ -21,10 +22,18 @@
   const call = Function.prototype.call.bind(Function.prototype.call);
   const own = (o, n) => (o ? Object.getOwnPropertyDescriptor(o, n) : undefined);
   const listen = EventTarget.prototype.addEventListener, send = EventTarget.prototype.dispatchEvent, NativeEvent = Event;
+  const userActivation = own(window.Navigator && Navigator.prototype, 'userActivation');
+  const activeNow = own(window.UserActivation && UserActivation.prototype, 'isActive');
+  const frameAllows = own(window.HTMLIFrameElement && HTMLIFrameElement.prototype, 'allowFullscreen');
+  const frameAllow = own(window.HTMLIFrameElement && HTMLIFrameElement.prototype, 'allow');
 
   // The choice for this page's site, from Zigzag's own world: the setting until it says.
   let fills = config.fill === 'page';
   const fillsPage = () => fills;
+  // A click or key of yours just now, as WebKit's full screen asks for.
+  const activated = () => {
+    try { return userActivation && activeNow ? !!call(activeNow.get, call(userActivation.get, navigator)) : true; } catch (e) { return false; }
+  };
 
   const E = Element.prototype, D = Document.prototype, V = window.HTMLVideoElement && HTMLVideoElement.prototype;
   const native = {
@@ -35,7 +44,22 @@
     videoEnter: V && V.webkitEnterFullscreen, videoEnterS: V && V.webkitEnterFullScreen,
     videoExit: V && V.webkitExitFullscreen, videoExitS: V && V.webkitExitFullScreen,
     videoDisplaying: own(V, 'webkitDisplayingFullscreen'), videoMode: own(V, 'webkitPresentationMode'),
+    enabled: own(D, 'fullscreenEnabled') || own(D, 'webkitFullscreenEnabled'),
   };
+  // Whether this document may be in full screen at all: a frame only with allowfullscreen, as WebKit has it.
+  const enabled = () => {
+    try { return native.enabled ? !!call(native.enabled.get, document) : true; } catch (e) { return false; }
+  };
+  // Whether a frame on this page was let have full screen (allowfullscreen, or allow="fullscreen").
+  const frameMayFill = (frame) => {
+    try {
+      if (frame.tagName !== 'IFRAME') return false;
+      if (frameAllows && call(frameAllows.get, frame)) return true;
+      const allow = frameAllow ? String(call(frameAllow.get, frame) || '') : '';
+      return /(^|;)\s*fullscreen(\s|;|$)/i.test(allow) && !/fullscreen\s+'none'/i.test(allow);
+    } catch (e) { return false; }
+  };
+  const mayFill = () => fillsPage() && enabled() && activated();
   const nativeElement = () => {
     try { return (native.element ? native.element.get.call(document) : native.webkitElement && native.webkitElement.get.call(document)) || null; } catch (e) { return null; }
   };
@@ -178,7 +202,8 @@
   const later = (work) => new Promise((resolve) => setTimeout(() => { work(); resolve(); }, 0));
   const requested = function (fallback) {
     return function (...args) {
-      if (!fillsPage()) return fallback ? fallback.apply(this, args) : Promise.reject(new TypeError('Not supported'));
+      // Not to fill the page, or not asked by you, or a frame not allowed full screen: WebKit's own answer.
+      if (!mayFill()) return fallback ? fallback.apply(this, args) : Promise.reject(new TypeError('Not supported'));
       const el = this;
       return later(() => { if (el.isConnected) enter(el, false); });
     };
@@ -221,7 +246,7 @@
   define(D, 'fullscreen', getter(function () { return !!seen(this) || !!(native.fullscreen && native.fullscreen.get.call(this)); }));
   if (V) {
     const videoEnter = (fallback) => function (...args) {
-      if (!fillsPage()) return fallback ? fallback.apply(this, args) : undefined;
+      if (!mayFill()) return fallback ? fallback.apply(this, args) : undefined;
       if (this.isConnected) enter(this, true);
     };
     const videoExit = (fallback) => function (...args) {
@@ -278,7 +303,9 @@
     }
     const frame = frameFor(event.source);
     if (!frame) return;
-    if (type === 'enter' && fillsPage()) enter(frame, false);
+    // A frame fills the page only if it was let have full screen, on a click or key of yours (which reaches the
+    // pages around it too): its message alone is anyone's to send.
+    if (type === 'enter' && mayFill() && frameMayFill(frame)) enter(frame, false);
     if (type === 'exit' && current === frame) leave({ fromChild: true });
   });
 

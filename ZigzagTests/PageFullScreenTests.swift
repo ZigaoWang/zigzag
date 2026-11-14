@@ -128,6 +128,37 @@ struct PageFullScreenTests {
         #expect(values[2] as? String == "player")
     }
 
+    @Test func fillingThePageNeedsAClick() async throws {
+        let webView = await load(Self.page, fill: .page)
+        // Asked with no click or key of yours: WebKit's answer, which refuses, and the page isn't filled.
+        _ = try? await webView.runOwnScript("try { await document.getElementById('player').requestFullscreen(); } catch (e) {} await new Promise(r => setTimeout(r, 10)); return 0",
+                                            asFunction: true, world: .page)
+        #expect(try await page("return document.getElementById('player').hasAttribute('data-zigzag-fullscreen')", in: webView) as? Bool == false)
+        _ = try? await webView.runOwnScript("document.querySelector('video').webkitEnterFullscreen()", world: .page)
+        #expect(try await page("return document.querySelector('video').hasAttribute('data-zigzag-fullscreen')", in: webView) as? Bool == false)
+    }
+
+    @Test func aFrameWithoutAllowFullscreenCantFillThePage() async throws {
+        let inner = "<html><body style='margin:0'><div id='p' style='width:200px;height:100px'>video</div></body></html>"
+        let html = """
+        <html><body style="margin:0"><iframe id="f" style="width:300px;height:150px" srcdoc="\(inner.replacingOccurrences(of: "'", with: "&#39;"))"></iframe></body></html>
+        """
+        let webView = await load(html, fill: .page)
+        let result = try await page("""
+        const f = document.getElementById('f');
+        await new Promise(r => { if (f.contentDocument && f.contentDocument.readyState === 'complete') r(); else f.onload = r; });
+        try { await f.contentDocument.getElementById('p').requestFullscreen.call(f.contentDocument.getElementById('p')); } catch (e) {}
+        // Its message alone, as any frame could send it, doesn't either.
+        f.contentWindow.parent.postMessage({ __zigzagFullScreen: 'enter' }, '*');
+        f.contentWindow.eval("parent.postMessage({ __zigzagFullScreen: 'enter' }, '*')");
+        await new Promise(r => setTimeout(r, 50));
+        return [f.hasAttribute('data-zigzag-fullscreen'), document.fullscreenElement === f]
+        """, in: webView) as? [Any]
+        let values = try #require(result)
+        #expect(values[0] as? Bool == false)
+        #expect(values[1] as? Bool == false)
+    }
+
     private final class Loading: NSObject, WKNavigationDelegate {
         var done: CheckedContinuation<Void, Never>?
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
