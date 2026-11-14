@@ -64,10 +64,12 @@ final class PDFViewerView: NSView {
         get { UserDefaults.standard.bool(forKey: "pdfTwoPages") }
         set { UserDefaults.standard.set(newValue, forKey: "pdfTwoPages") }
     }
-    private static var darkPages: Bool {
-        get { UserDefaults.standard.bool(forKey: "pdfDarkPages") }
-        set { UserDefaults.standard.set(newValue, forKey: "pdfDarkPages") }
-    }
+    /// The moon in the bar, pressed for this PDF: dark or light whatever dark pages would have it, until it's closed.
+    private var chosenDark: Bool?
+    /// Dark pages' setting or a site's choice changed.
+    private var darkPagesToken: SignalToken?
+    /// Whether the pages are drawn dark now, so a change is crossfaded only when there is one.
+    private var shownDark: Bool?
 
     /// Shown at once, blank while the PDF loads; `show(_:info:)` puts the pages in.
     init(url: URL, isPrivate: Bool, profile: UUID = Profile.defaultID) {
@@ -131,7 +133,7 @@ final class PDFViewerView: NSView {
         }
         pageButton.onJump = { [weak self] number in self?.jump(toPage: number) }
         pageButton.onDone = { [weak self] in guard let self else { return }; self.window?.makeFirstResponder(self.pdfView) }
-        NotificationCenter.default.addObserver(self, selector: #selector(followDarkPages), name: Self.darkPagesChanged, object: nil)
+        darkPagesToken = DarkPages.changed.observe { [weak self] in self?.followDarkPages() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -171,8 +173,10 @@ final class PDFViewerView: NSView {
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         // Layers keep the color they were given: light or dark, they take it again.
-        layer?.backgroundColor = cgColor(Self.around(dark: Self.darkPages))
+        layer?.backgroundColor = cgColor(Self.around(dark: shownDark ?? false))
         sidebar.layer?.backgroundColor = cgColor(Self.backdrop)
+        // The window turned light or dark (its space, the Mac): the pages follow, as dark pages say.
+        followDarkPages()
     }
 
     override func layout() {
@@ -276,15 +280,26 @@ final class PDFViewerView: NSView {
         twoPagesButton.showsFillAtRest = Self.twoPages
     }
 
-    /// Dark pages are one setting: every open PDF, in any window, follows it.
-    private static let darkPagesChanged = Notification.Name("ZigzagPDFDarkPagesChanged")
-
-    private func toggleDarkPages() {
-        Self.darkPages.toggle()
-        NotificationCenter.default.post(name: Self.darkPagesChanged, object: nil)
+    /// Whether the pages are drawn dark: as dark pages would have a web page at this address (Settings › Appearance ›
+    /// Dark pages, the site's own choice) in the window it's in, light or dark, never the Mac's look behind it; the
+    /// moon pressed for this PDF over all of that.
+    static func isDark(chosen: Bool?, mode: DarkPages.Mode, windowIsDark: Bool, site: Bool?) -> Bool {
+        if let chosen { return chosen }
+        return DarkPages.wants(mode: mode, systemIsDark: windowIsDark, site: site)
     }
 
-    @objc private func followDarkPages() {
+    private var isDark: Bool {
+        Self.isDark(chosen: chosenDark, mode: DarkPages.mode, windowIsDark: effectiveAppearance.isDark, site: DarkPages.choice(for: url))
+    }
+
+    /// The moon: this PDF dark, or light, the other way from how it's shown.
+    private func toggleDarkPages() {
+        chosenDark = !isDark
+        followDarkPages()
+    }
+
+    private func followDarkPages() {
+        guard isDark != shownDark else { return }
         // A soft crossfade from the pages as they were, rather than a flash, where you can see it: the old look stays
         // until the new one is drawn.
         guard window != nil, pdfView.document != nil, let image = pdfView.snapshot() else {
@@ -306,7 +321,8 @@ final class PDFViewerView: NSView {
     /// Dark pages: each page drawn dark by the helper (soft dark paper, light ink, its colors kept), and no page
     /// shadows, which would glow.
     private func applyDarkPages() {
-        let dark = Self.darkPages
+        let dark = isDark
+        shownDark = dark
         darkButton.showsFillAtRest = dark
         darkButton.symbol = dark ? "moon.fill" : "moon"
         pdfView.isDark = dark

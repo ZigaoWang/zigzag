@@ -4,6 +4,27 @@ import Testing
 import WebKit
 @testable import Zigzag
 
+/// A PDF's pages are dark as a web page would be in the window it's in: dark pages' setting and the site's choice,
+/// with the window's own look, never the Mac's behind it; the moon pressed for that PDF over all of it.
+@MainActor
+struct PDFDarkPagesTests {
+    @Test func darkFollowsTheWindowAndDarkPages() {
+        // Dark pages off (the default): light in a light window and a dark one.
+        #expect(!PDFViewerView.isDark(chosen: nil, mode: .off, windowIsDark: false, site: nil))
+        #expect(!PDFViewerView.isDark(chosen: nil, mode: .off, windowIsDark: true, site: nil))
+        // "When the Mac is dark": as the window is, so a light window on a dark Mac stays light.
+        #expect(!PDFViewerView.isDark(chosen: nil, mode: .system, windowIsDark: false, site: nil))
+        #expect(PDFViewerView.isDark(chosen: nil, mode: .system, windowIsDark: true, site: nil))
+        #expect(PDFViewerView.isDark(chosen: nil, mode: .always, windowIsDark: false, site: nil))
+        // The site's own choice over the setting.
+        #expect(!PDFViewerView.isDark(chosen: nil, mode: .always, windowIsDark: true, site: false))
+        #expect(PDFViewerView.isDark(chosen: nil, mode: .off, windowIsDark: false, site: true))
+        // The moon, for this PDF, over everything.
+        #expect(PDFViewerView.isDark(chosen: true, mode: .off, windowIsDark: false, site: false))
+        #expect(!PDFViewerView.isDark(chosen: false, mode: .always, windowIsDark: true, site: true))
+    }
+}
+
 /// Edit › Select All (⌘A) on a PDF from the web, in WebKit's own viewer (#219). WebKit's viewer takes it only once
 /// its plugin has the page's focus, which a click gives it; a PDF just opened has none, so ⌘A selected nothing.
 @MainActor
