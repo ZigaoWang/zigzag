@@ -20,9 +20,16 @@ import WebKit
     /// The extension asked to close: the connection ending is expected, not an error.
     private var closeRequested: URLSessionWebSocketTask.CloseCode?
     private let onClose: () -> Void
+    /// The profile's proxies (set by an extension through chrome.proxy), so a socket leaves as the profile's pages do.
+    private let proxies: [ProxyConfiguration]
+    /// Whether the extension may reach this address now: checked when the socket opens.
+    private let mayConnect: (URL) -> Bool
 
-    init(port: WKWebExtension.MessagePort, extensionID: String, onClose: @escaping () -> Void) {
+    init(port: WKWebExtension.MessagePort, extensionID: String, proxies: [ProxyConfiguration] = [],
+         mayConnect: @escaping (URL) -> Bool, onClose: @escaping () -> Void) {
         self.port = port
+        self.proxies = proxies
+        self.mayConnect = mayConnect
         // What Chrome sends for an extension's background, so servers that check it see what they expect.
         origin = "chrome-extension://\(extensionID)"
         self.onClose = onClose
@@ -36,7 +43,7 @@ import WebKit
         switch op {
         case "open":
             guard let text = message["url"] as? String, let url = URL(string: text),
-                  ["ws", "wss"].contains(url.scheme?.lowercased() ?? "") else {
+                  ["ws", "wss"].contains(url.scheme?.lowercased() ?? ""), mayConnect(url) else {
                 send(["ev": "error"])
                 finish(code: .protocolError, tellExtension: true)
                 return
@@ -47,7 +54,9 @@ import WebKit
             if let protocols = message["protocols"] as? [String], !protocols.isEmpty {
                 request.setValue(protocols.joined(separator: ", "), forHTTPHeaderField: "Sec-WebSocket-Protocol")
             }
-            let session = URLSession(configuration: .ephemeral, delegate: self, delegateQueue: .main)
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.proxyConfigurations = proxies
+            let session = URLSession(configuration: configuration, delegate: self, delegateQueue: .main)
             self.session = session
             let task = session.webSocketTask(with: request)
             self.task = task
@@ -69,6 +78,16 @@ import WebKit
         default:
             break
         }
+    }
+
+    /// A socket needs host access to its site, as a page fetch does: `wss://host` is checked as `https://host`.
+    static func allows(_ url: URL, context: WKWebExtensionContext) -> Bool {
+        guard let scheme = url.scheme?.lowercased(), ["ws", "wss"].contains(scheme), url.host() != nil,
+              url.user == nil, url.password == nil,
+              var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return false }
+        parts.scheme = scheme == "wss" ? "https" : "http"
+        guard let web = parts.url else { return false }
+        return context.hasAccess(to: web)
     }
 
     private func receive() {

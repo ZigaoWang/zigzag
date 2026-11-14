@@ -1282,7 +1282,11 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
                 return
             }
             let key = ObjectIdentifier(port)
-            socketBridges[key] = WebSocketBridge(port: port, extensionID: extensionContext.uniqueIdentifier) { [weak self] in
+            socketBridges[key] = WebSocketBridge(port: port, extensionID: extensionContext.uniqueIdentifier,
+                                                 proxies: profile.store.proxyConfigurations,
+                                                 mayConnect: { [weak extensionContext] url in
+                                                     extensionContext.map { WebSocketBridge.allows(url, context: $0) } ?? false
+                                                 }) { [weak self] in
                 self?.socketBridges[key] = nil
             }
             completionHandler(nil)

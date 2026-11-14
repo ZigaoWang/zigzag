@@ -712,3 +712,22 @@ struct ExtensionNumberTests {
         #expect(Library.place(0, among: 0) == 0)
     }
 }
+
+extension ExtensionBridgeTests {
+    /// A background's WebSocket reaches only a site the extension has access to; wss://host counts as https://host.
+    @Test func backgroundSocketsNeedHostAccess() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Synthetic","version":"1.0","host_permissions":["https://push.example/*"]}"#.utf8)
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        let context = WKWebExtensionContext(for: try await WKWebExtension(resourceBaseURL: folder))
+        #expect(!WebSocketBridge.allows(URL(string: "wss://push.example/socket")!, context: context))
+        context.setPermissionStatus(.grantedExplicitly, for: try WKWebExtension.MatchPattern(string: "https://push.example/*"))
+        #expect(WebSocketBridge.allows(URL(string: "wss://push.example/socket")!, context: context))
+        for text in ["ws://push.example/socket", "wss://other.example/socket", "wss://push.example.evil.test/",
+                     "wss://name:synthetic@push.example/", "https://push.example/socket"] {
+            #expect(!WebSocketBridge.allows(URL(string: text)!, context: context))
+        }
+    }
+}
