@@ -9,7 +9,8 @@ nonisolated struct MCPBrowserRunner: MCPToolRunner {
     func call(_ name: String, arguments: [String: JSON], client: MCPClient) async -> MCPToolResult {
         switch MCPCommand.parse(name, arguments) {
         case .failure(let error): return .error(error.message)
-        case .success(let command): return await MCPBrowser.run(command, client: client)
+        // Everything a tool gives back carries what pages wrote: titles, text, links, fields.
+        case .success(let command): return await MCPBrowser.run(command, client: client).markedAsPageContent()
         }
     }
 }
@@ -22,7 +23,9 @@ enum MCPBrowser {
         // Turned off while the request was on its way: nothing happens.
         guard MCPService.isOn else { return .error("Zigzag's MCP server was turned off in Settings.") }
         switch command {
-        case .listTabs: return .data(["tabs": .array(listTabs())])
+        case .listTabs:
+            if case .success(let front) = locate(nil) { noteListing(front.tab, by: client) }
+            return .data(["tabs": .array(listTabs())])
         case .openTab(let url, let background): return await openTab(url, background: background, client: client)
         default: break
         }
@@ -206,6 +209,12 @@ enum MCPBrowser {
             if let tab = Scripting.tab(withID: id, in: Scripting.tabs(of: controller.tabManager), uuid: \.id) { return .success(Found(tab: tab, controller: controller)) }
         }
         return .failure(.init("No open tab has id \(id). Use list_tabs for the tabs there are now."))
+    }
+
+    /// list_tabs shows on the bar like any other tool: over the tab in front, unless no tool may use that one.
+    static func noteListing(_ front: Tab, by client: MCPClient, control: AgentControl = .shared) {
+        guard MCPSafety.refusal(url: front.url, isPrivate: front.isPrivate, stopped: control.isStopped(front.id), needsPage: false) == nil else { return }
+        control.touch(front, by: client)
     }
 
     static func listTabs() -> [JSON] {
