@@ -111,12 +111,17 @@ nonisolated enum PDFLimits {
         }
     }
 
-    var isWellFormed: Bool {
+    var isWellFormed: Bool { checkedPageSizes() != nil }
+
+    /// The pages' sizes, read once, if everything sent is within the limits; nil otherwise.
+    func checkedPageSizes() -> [CGSize]? {
         guard (1...PDFLimits.maxPages).contains(pageCount), sizes.count == pageCount * 16,
-              outline.count <= PDFLimits.maxOutline, (title?.count ?? 0) <= PDFLimits.maxTitle else { return false }
+              outline.count <= PDFLimits.maxOutline, (title?.count ?? 0) <= PDFLimits.maxTitle else { return nil }
         let side = 1.0...PDFLimits.maxPageSide
-        return pageSizes.allSatisfy { side.contains($0.width) && side.contains($0.height) }
-            && outline.allSatisfy { $0.isWellFormed(pages: pageCount) }
+        let pageSizes = self.pageSizes
+        guard pageSizes.allSatisfy({ side.contains($0.width) && side.contains($0.height) }),
+              outline.allSatisfy({ $0.isWellFormed(pages: pageCount) }) else { return nil }
+        return pageSizes
     }
 }
 
@@ -222,8 +227,16 @@ nonisolated enum PDFLimits {
 
     func isWellFormed(pages: Int) -> Bool {
         let units = (string as NSString).length
-        return units <= PDFLimits.maxPageText && boxes.count == units * 16 && links.count <= PDFLimits.maxLinks
-            && links.allSatisfy { $0.isWellFormed(pages: pages) }
+        guard units <= PDFLimits.maxPageText, boxes.count == units * 16, links.count <= PDFLimits.maxLinks,
+              links.allSatisfy({ $0.isWellFormed(pages: pages) }) else { return false }
+        // Every box a real place: NaN or infinity would reach the layers that mark text, which refuse them.
+        return boxes.withUnsafeBytes { raw in
+            let values = raw.bindMemory(to: Float32.self)
+            return stride(from: 0, to: values.count, by: 4).allSatisfy { index in
+                values[index].isFinite && values[index + 1].isFinite && values[index + 2].isFinite && values[index + 3].isFinite
+                    && values[index + 2] >= 0 && values[index + 3] >= 0
+            }
+        }
     }
 }
 
