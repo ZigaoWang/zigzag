@@ -193,3 +193,78 @@ struct CertificateTrustTests {
         #expect(plain.value == SitePanel.notSecure && plain.reason == nil)
     }
 }
+
+/// What a certificate warning says is wrong: WebKit gives one code for most failures, so the certificate is read.
+@MainActor
+struct CertificateProblemTests {
+    private static let now = Date(timeIntervalSince1970: 1_800_000_000)
+    private static let day: TimeInterval = 86_400
+
+    private func facts(names: [String] = ["example.com"], from: TimeInterval = -30, until: TimeInterval = 30, selfSigned: Bool = false,
+                       trusted: Bool? = true) -> ErrorPage.CertificateFacts {
+        ErrorPage.CertificateFacts(validFrom: Self.now.addingTimeInterval(from * Self.day), validUntil: Self.now.addingTimeInterval(until * Self.day),
+                                   names: names, selfSigned: selfSigned, issuerTrusted: trusted)
+    }
+
+    private func problem(_ facts: ErrorPage.CertificateFacts, host: String = "example.com") -> ErrorPage.CertificateProblem {
+        ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: facts, host: host, now: Self.now)
+    }
+
+    @Test func eachProblemIsToldApart() {
+        // expired.badssl.com: the right address, a trusted issuer, past its date.
+        #expect(problem(facts(until: -2)) == .expired(Self.now.addingTimeInterval(-2 * Self.day)))
+        #expect(problem(facts(from: 3)) == .notYetValid(Self.now.addingTimeInterval(3 * Self.day)))
+        // wrong.host.badssl.com: made out to *.badssl.com, which covers one part only.
+        #expect(problem(facts(names: ["*.badssl.com", "badssl.com"]), host: "wrong.host.badssl.com") == .wrongHost("*.badssl.com"))
+        // self-signed.badssl.com and untrusted-root.badssl.com.
+        #expect(problem(facts(selfSigned: true, trusted: false)) == .selfSigned)
+        #expect(problem(facts(trusted: false)) == .untrustedIssuer)
+        // Nothing found wrong in it: it can't be trusted, and that's all that's said.
+        #expect(problem(facts()) == .unknown)
+        // An address it isn't for comes before its dates.
+        #expect(problem(facts(names: ["other.example"], until: -2)) == .wrongHost("other.example"))
+    }
+
+    @Test func withoutTheCertificateTheCodeDecides() {
+        #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateHasBadDate, facts: nil, host: "a.example") == .expired(nil))
+        #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateNotYetValid, facts: nil, host: "a.example") == .notYetValid(nil))
+        #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateHasUnknownRoot, facts: nil, host: "a.example") == .untrustedIssuer)
+        #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: nil, host: "a.example") == .unknown)
+        // Not knowing why, it doesn't blame the address.
+        #expect(!ErrorPage.certificateReason(.unknown).contains("different address"))
+    }
+
+    @Test func namesCoverTheirHosts() {
+        #expect(ErrorPage.certificateNames(["Example.COM."], cover: "example.com"))
+        #expect(ErrorPage.certificateNames(["*.badssl.com"], cover: "expired.badssl.com"))
+        #expect(!ErrorPage.certificateNames(["*.badssl.com"], cover: "wrong.host.badssl.com"))
+        #expect(!ErrorPage.certificateNames(["*.badssl.com"], cover: "badssl.com"))
+        #expect(!ErrorPage.certificateNames(["*.com"], cover: "example.com"))
+        #expect(!ErrorPage.certificateNames(["example.com"], cover: "example.com.evil.example"))
+    }
+
+    /// A made-up self-signed certificate for router.example and *.router.example, valid until 2126.
+    static let routerCertificate = "MIIBuDCCAV2gAwIBAgIUPrec49i1x+2YGiJypUG4pmJW6OUwCgYIKoZIzj0EAwIwGTEXMBUGA1UEAwwOcm91dGVyLmV4YW1wbGUwIBcNMjYxMTE0MTgwNjI1WhgPMjEyNjEwMjExODA2MjVaMBkxFzAVBgNVBAMMDnJvdXRlci5leGFtcGxlMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEbLEEz9qdxFzCf3pJ12sWRzP0f6v/2u/QcNU/eCRJtIDXgxFUEOtNBGf/rknU5mquto4fXMbceSynCsa00DO+4aOBgDB+MB0GA1UdDgQWBBQy4SrtvuTIzFlDDFyArbn0IOG4YzAfBgNVHSMEGDAWgBQy4SrtvuTIzFlDDFyArbn0IOG4YzAPBgNVHRMBAf8EBTADAQH/MCsGA1UdEQQkMCKCDnJvdXRlci5leGFtcGxlghAqLnJvdXRlci5leGFtcGxlMAoGCCqGSM49BAMCA0kAMEYCIQC21V1N7QvFT70kTfiFqnn6wl6HyMbVA7Cl0EsACf0hkwIhALMb256boj0ZFZmSloeA+TuyWQ0++J3FPoA+VdB9ApAV"
+
+    @Test func aCertificateIsRead() throws {
+        let data = try #require(Data(base64Encoded: Self.routerCertificate))
+        let certificate = try #require(SecCertificateCreateWithData(nil, data as CFData))
+        #expect(CertificateDetails.dnsNames(of: certificate) == ["router.example", "*.router.example"])
+        let facts = try #require(ErrorPage.certificateFacts(of: [certificate]))
+        #expect(facts.selfSigned && facts.issuerTrusted == false)
+        #expect(facts.names == ["router.example", "*.router.example"])
+        let until = try #require(facts.validUntil)
+        #expect(Calendar(identifier: .gregorian).component(.year, from: until) == 2126)
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: facts, host: "nas.router.example", now: now) == .selfSigned)
+        #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: facts, host: "192.168.1.1", now: now) == .wrongHost("router.example"))
+        // Its trust, as WebKit hands it over with the error, reads the same, and the warning says so.
+        var trust: SecTrust?
+        SecTrustCreateWithCertificates(certificate, SecPolicyCreateSSL(true, "router.example" as CFString), &trust)
+        let error = NSError(domain: NSURLErrorDomain, code: NSURLErrorServerCertificateUntrusted,
+                            userInfo: [NSURLErrorFailingURLPeerTrustErrorKey: try #require(trust)])
+        #expect(ErrorPage.certificateFacts(of: error) == facts)
+        let page = ErrorPage.html(error: error, url: URL(string: "https://router.example/")!, canGoBack: false, proceedLink: nil, style: "", nonce: "n")
+        #expect(page.contains(ErrorPage.escape(ErrorPage.certificateReason(.selfSigned))))
+    }
+}

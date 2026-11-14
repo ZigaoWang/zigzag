@@ -94,4 +94,19 @@ nonisolated struct CertificateDetails: Equatable, Sendable {
         }
         return found
     }
+
+    /// The host names a certificate is made out to (its subject alternative names that are names, not addresses).
+    static func dnsNames(of certificate: SecCertificate) -> [String] {
+        let oid = kSecOIDSubjectAltName
+        guard let values = SecCertificateCopyValues(certificate, [oid] as CFArray, nil) as? [String: Any],
+              let entry = values[oid as String] as? [String: Any],
+              let parts = entry[kSecPropertyKeyValue as String] as? [[String: Any]] else { return [] }
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.*_")
+        return parts.compactMap { part -> String? in
+            guard let label = part[kSecPropertyKeyLabel as String] as? String, label.localizedCaseInsensitiveContains("DNS"),
+                  let value = part[kSecPropertyKeyValue as String] as? String, !value.isEmpty,
+                  value.unicodeScalars.allSatisfy(allowed.contains) else { return nil }
+            return value
+        }
+    }
 }

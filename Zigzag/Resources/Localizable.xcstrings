@@ -15867,6 +15867,39 @@
         }
       }
     },
+    "The site signed its certificate itself, so nobody your Mac trusts vouches for it. Sites on your own network, like a router, often look like this." : {
+      "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it: it's self-signed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该网站的证书是它自己签发的，没有你的 Mac 信任的机构为它担保。你自己网络上的网站（比如路由器）常常是这样。"
+          }
+        }
+      }
+    },
+    "The site’s certificate can’t be trusted. Someone could be pretending to be this site." : {
+      "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it, when it isn't known why.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该网站的证书不可信。可能有人在冒充这个网站。"
+          }
+        }
+      }
+    },
+    "The site’s certificate expired on %@. The site may not have renewed it, or your Mac’s date and time are wrong." : {
+      "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it. The placeholder is the day it expired, like November 14, 2026.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该网站的证书已于 %@ 过期。可能是网站没有续期，或者你 Mac 的日期和时间不正确。"
+          }
+        }
+      }
+    },
     "The site’s certificate has expired, or your Mac’s date and time are wrong." : {
       "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.",
       "localizations" : {
@@ -15878,13 +15911,35 @@
         }
       }
     },
-    "The site’s certificate is for a different address, or can’t be trusted. Someone could be pretending to be this site." : {
+    "The site’s certificate is for a different address, %@. Someone could be pretending to be this site." : {
+      "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it. The placeholder is the address the certificate is for, like *.example.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该网站的证书属于另一个地址：%@。可能有人在冒充这个网站。"
+          }
+        }
+      }
+    },
+    "The site’s certificate is for a different address. Someone could be pretending to be this site." : {
       "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "该网站的证书属于另一个地址，或者不可信。可能有人在冒充这个网站。"
+            "value" : "该网站的证书属于另一个地址。可能有人在冒充这个网站。"
+          }
+        }
+      }
+    },
+    "The site’s certificate isn’t valid until %@. Check your Mac’s date and time." : {
+      "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it. The placeholder is the first day it's valid, like November 14, 2026.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该网站的证书要到 %@ 才生效。请检查你 Mac 的日期和时间。"
           }
         }
       }

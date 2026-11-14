@@ -258,12 +258,132 @@ enum ErrorPage {
         }
     }
 
-    private static func certificateReason(_ code: Int) -> String {
+    /// What's wrong with a certificate WebKit turned down, for the words under Details. WebKit says only that it
+    /// couldn't be trusted (one error code for most cases), so the certificate is looked at here (`certificateFacts`).
+    enum CertificateProblem: Equatable {
+        /// Ran out, on this day (when it's known).
+        case expired(Date?)
+        /// Not valid until this day.
+        case notYetValid(Date?)
+        /// Made out to another address, the first it names.
+        case wrongHost(String?)
+        /// Signed by the site itself.
+        case selfSigned
+        /// Signed by someone your Mac doesn't trust.
+        case untrustedIssuer
+        case unknown
+    }
+
+    /// What can be told of a site's certificate from the trust WebKit checked it with.
+    struct CertificateFacts: Equatable {
+        var validFrom: Date?
+        var validUntil: Date?
+        /// The addresses it's for: its DNS names, or its common name when it has none.
+        var names: [String]
+        /// Issued by itself, with nothing above it.
+        var selfSigned: Bool
+        /// Whether macOS trusts the certificates above it, its dates and its address aside; nil when it can't be told.
+        var issuerTrusted: Bool?
+    }
+
+    /// The problem, from what was found in the certificate, or with nothing found, from WebKit's code alone. An
+    /// address it isn't for comes first: that's what someone pretending to be the site looks like. Then its dates (a
+    /// site that forgot to renew, or a Mac whose clock is off), then who signed it.
+    nonisolated static func certificateProblem(code: Int, facts: CertificateFacts?, host: String?, now: Date = Date()) -> CertificateProblem {
+        if let facts {
+            if let host, !host.isEmpty, !facts.names.isEmpty, !certificateNames(facts.names, cover: host) {
+                return .wrongHost(facts.names.first)
+            }
+            if let until = facts.validUntil, until < now { return .expired(until) }
+            if let from = facts.validFrom, from > now { return .notYetValid(from) }
+            if facts.selfSigned { return .selfSigned }
+            if facts.issuerTrusted == false { return .untrustedIssuer }
+        }
         switch code {
-        case NSURLErrorServerCertificateHasBadDate: String(localized: "The site’s certificate has expired, or your Mac’s date and time are wrong.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.")
-        case NSURLErrorServerCertificateNotYetValid: String(localized: "The site’s certificate isn’t valid yet. Check your Mac’s date and time.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.")
-        case NSURLErrorServerCertificateHasUnknownRoot: String(localized: "The site’s certificate wasn’t issued by anyone your Mac trusts. Sites on your own network, like a router, often look like this.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.")
-        default: String(localized: "The site’s certificate is for a different address, or can’t be trusted. Someone could be pretending to be this site.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.")
+        case NSURLErrorServerCertificateHasBadDate: return .expired(nil)
+        case NSURLErrorServerCertificateNotYetValid: return .notYetValid(nil)
+        case NSURLErrorServerCertificateHasUnknownRoot: return .untrustedIssuer
+        default: return .unknown
+        }
+    }
+
+    /// Whether a certificate made out to `names` is for `host`: one of them is it, or a wildcard (`*.example.com`)
+    /// stands for its first part, and one part only. Case and a trailing dot don't matter.
+    nonisolated static func certificateNames(_ names: [String], cover host: String) -> Bool {
+        func clean(_ name: String) -> String {
+            var name = name.lowercased().trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "[]")))
+            if name.hasSuffix(".") { name.removeLast() }
+            return name
+        }
+        let host = clean(host)
+        return names.map(clean).contains { name in
+            if name == host { return true }
+            guard name.hasPrefix("*."), let dot = host.firstIndex(of: "."), dot != host.startIndex else { return false }
+            let rest = String(host[host.index(after: dot)...])
+            return rest == String(name.dropFirst(2)) && rest.contains(".")
+        }
+    }
+
+    /// Reads the certificate out of a certificate error: from the trust WebKit gives with it, or the chain.
+    static func certificateFacts(of error: NSError) -> CertificateFacts? {
+        let key = NSURLErrorFailingURLPeerTrustErrorKey
+        let value = error.userInfo[key] ?? (error.userInfo[NSUnderlyingErrorKey] as? NSError)?.userInfo[key]
+        if let value, CFGetTypeID(value as CFTypeRef) == SecTrustGetTypeID(),
+           let chain = SecTrustCopyCertificateChain(value as! SecTrust) as? [SecCertificate] {
+            return certificateFacts(of: chain)
+        }
+        if let chain = error.userInfo["NSErrorPeerCertificateChainKey"] as? [SecCertificate] { return certificateFacts(of: chain) }
+        return nil
+    }
+
+    /// The site's certificate's dates, names and signer, from its chain (the site's own first). Who signed it is
+    /// checked again here, on this Mac only and on a day the certificate was valid, so an expired one from an
+    /// authority your Mac trusts reads as trusted.
+    nonisolated static func certificateFacts(of chain: [SecCertificate]) -> CertificateFacts? {
+        guard let leaf = chain.first else { return nil }
+        let summary = CertificateDetails.summary(leaf)
+        var names = CertificateDetails.dnsNames(of: leaf)
+        if names.isEmpty, !summary.name.isEmpty, !summary.name.contains(" ") { names = [summary.name] }
+        var issuerTrusted: Bool?
+        var check: SecTrust?
+        if SecTrustCreateWithCertificates(chain as CFArray, SecPolicyCreateBasicX509(), &check) == errSecSuccess, let check {
+            SecTrustSetNetworkFetchAllowed(check, false)
+            if let from = summary.validFrom, let until = summary.validUntil, from < until {
+                SecTrustSetVerifyDate(check, from.addingTimeInterval(until.timeIntervalSince(from) / 2) as CFDate)
+            }
+            issuerTrusted = SecTrustEvaluateWithError(check, nil)
+        }
+        return CertificateFacts(validFrom: summary.validFrom, validUntil: summary.validUntil, names: names,
+                                selfSigned: summary.isSelfSigned && chain.count == 1, issuerTrusted: issuerTrusted)
+    }
+
+    private static let certificateDates: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        formatter.timeStyle = .none
+        return formatter
+    }()
+
+    static func certificateReason(_ problem: CertificateProblem) -> String {
+        switch problem {
+        case .expired(let date?):
+            String(localized: "The site’s certificate expired on \(certificateDates.string(from: date)). The site may not have renewed it, or your Mac’s date and time are wrong.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it. The placeholder is the day it expired, like November 14, 2026.")
+        case .expired(nil):
+            String(localized: "The site’s certificate has expired, or your Mac’s date and time are wrong.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.")
+        case .notYetValid(let date?):
+            String(localized: "The site’s certificate isn’t valid until \(certificateDates.string(from: date)). Check your Mac’s date and time.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it. The placeholder is the first day it's valid, like November 14, 2026.")
+        case .notYetValid(nil):
+            String(localized: "The site’s certificate isn’t valid yet. Check your Mac’s date and time.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.")
+        case .wrongHost(let name?):
+            String(localized: "The site’s certificate is for a different address, \(name). Someone could be pretending to be this site.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it. The placeholder is the address the certificate is for, like *.example.com.")
+        case .wrongHost(nil):
+            String(localized: "The site’s certificate is for a different address. Someone could be pretending to be this site.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.")
+        case .selfSigned:
+            String(localized: "The site signed its certificate itself, so nobody your Mac trusts vouches for it. Sites on your own network, like a router, often look like this.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it: it's self-signed.")
+        case .untrustedIssuer:
+            String(localized: "The site’s certificate wasn’t issued by anyone your Mac trusts. Sites on your own network, like a router, often look like this.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.")
+        case .unknown:
+            String(localized: "The site’s certificate can’t be trusted. Someone could be pretending to be this site.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it, when it isn't known why.")
         }
     }
 
@@ -289,7 +409,8 @@ enum ErrorPage {
             #"<button class="button\#(i == 0 ? " prominent" : "")" data-action="\#(name(of: action))">\#(escape(self.title(of: action)))</button>"#
         }.joined()
         let noWay = kind == .certificate && proceedLink == nil ? noWayPast.map { #"<p class="why">\#(escape($0.text))</p>"# } ?? "" : ""
-        let reason = kind == .certificate ? #"<p class="why">\#(escape(certificateReason(error.code)))</p>"# + noWay : ""
+        let problem = kind == .certificate ? certificateProblem(code: error.code, facts: certificateFacts(of: error), host: url.host()) : nil
+        let reason = problem.map { #"<p class="why">\#(escape(certificateReason($0)))</p>"# + noWay } ?? ""
         let anyway = proceedLink.map {
             #"<a class="anyway" href="\#(escape($0.absoluteString))">\#(escape(String(localized: "Visit this site anyway", comment: "Link on the page Zigzag shows for a site whose certificate can't be trusted, under Show details.")))</a>"#
         } ?? ""
