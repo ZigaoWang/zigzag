@@ -76,13 +76,13 @@ final class CommandRowView: InteractiveView {
             let kw = returnKey.width, kh = Tokens.Metric.keyCapHeight
             returnKey.frame = NSRect(x: right - kw, y: round((bounds.height - kh) / 2), width: kw, height: kh)
             let w = action.textWidth
-            action.frame = NSRect(x: returnKey.frame.minX - Tokens.Space.x2 - w, y: (bounds.height - action.lineHeight) / 2, width: w, height: action.lineHeight)
+            action.frame = NSRect(x: returnKey.frame.minX - Tokens.Space.x2 - w, y: action.centeredY(in: bounds.height), width: w, height: action.lineHeight)
             right = action.frame.minX - Tokens.Space.x4
         }
         let x = Self.titleX - Label.inset
         let available = right - x
         let titleWidth = min(title.textWidth, detail.stringValue.isEmpty ? available : available * 0.62)
-        title.frame = NSRect(x: x, y: round((bounds.height - title.lineHeight) / 2), width: max(0, titleWidth), height: title.lineHeight)
+        title.frame = NSRect(x: x, y: title.centeredY(in: bounds.height), width: max(0, titleWidth), height: title.lineHeight)
         // On the title's baseline, though a size smaller.
         let lift = (title.font?.ascender ?? 0) - (detail.font?.ascender ?? 0)
         let detailX = title.frame.maxX + Tokens.Space.x2
@@ -477,7 +477,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             let cw = ceil(chipLabel.inkWidth) + Label.inset * 2
             chip.frame = NSRect(x: fieldX - Label.inset, y: round((fieldHeight - ch) / 2), width: cw, height: ch)
             chip.layer?.cornerRadius = 0
-            chipLabel.frame = NSRect(x: 0, y: (ch - chipLabel.lineHeight) / 2, width: cw, height: chipLabel.lineHeight)
+            chipLabel.frame = NSRect(x: 0, y: chipLabel.centeredY(in: ch), width: cw, height: chipLabel.lineHeight)
             chipLabel.alignment = .left
             let ruleHeight = round(font.pointSize * 0.9)
             chipRule.frame = NSRect(x: chip.frame.maxX + Tokens.Space.x2, y: round((fieldHeight - ruleHeight) / 2),
@@ -490,12 +490,13 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             let kw = hintKey.width, kh = Tokens.Metric.keyCapHeight
             hintKey.frame = NSRect(x: fieldRight - kw, y: round((fieldHeight - kh) / 2), width: kw, height: kh)
             let hw = hint.textWidth + 4
-            hint.frame = NSRect(x: hintKey.frame.minX - Tokens.Space.x2 - hw, y: (fieldHeight - hint.lineHeight) / 2, width: hw, height: hint.lineHeight)
+            hint.frame = NSRect(x: hintKey.frame.minX - Tokens.Space.x2 - hw, y: hint.centeredY(in: fieldHeight), width: hw, height: hint.lineHeight)
             fieldRight = hint.frame.minX - Tokens.Space.x3
         }
         // A little taller and wider than the text, which the field keeps inside, so selections draw whole.
         let textInset = field.textInset, boxHeight = textHeight + textInset * 4
-        field.frame = NSRect(x: fieldX - textInset, y: (fieldHeight - boxHeight) / 2, width: max(40, fieldRight - fieldX) + textInset * 2, height: boxHeight)
+        // The text's capitals in the middle, as the chip's and every label's are: the box is the text's line, grown evenly.
+        field.frame = NSRect(x: fieldX - textInset, y: field.centeredY(in: fieldHeight) - textInset * 2, width: max(40, fieldRight - fieldX) + textInset * 2, height: boxHeight)
         // A hairline between what you type and what it finds, held in from the edges like the rows.
         divider.frame = NSRect(x: Tokens.Space.x3, y: fieldHeight - Tokens.Metric.hairline, width: b.width - Tokens.Space.x3 * 2, height: Tokens.Metric.hairline)
         // No rule between what you type and what it finds: the space between them is enough.

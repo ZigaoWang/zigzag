@@ -20,7 +20,7 @@ final class LinkStatusController {
             let h = self.label.lineHeight
             // The text field draws its text Label.inset in from its edges: set it that much wider, so the ink sits
             // the same padding from each end.
-            self.label.frame = NSRect(x: Self.padding - Label.inset, y: (self.pill.bounds.height - h) / 2,
+            self.label.frame = NSRect(x: Self.padding - Label.inset, y: self.label.centeredY(in: self.pill.bounds.height),
                                       width: self.pill.bounds.width - Self.padding * 2 + Label.inset * 2, height: h)
         }
     }

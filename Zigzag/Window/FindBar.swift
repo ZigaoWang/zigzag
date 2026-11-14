@@ -137,12 +137,12 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         [previousButton, nextButton, doneButton].forEach { $0.radius = button / 2 }
         let countWidth = countLabel.textWidth
         let countHeight = countLabel.lineHeight
-        countLabel.frame = NSRect(x: previousButton.frame.minX - Tokens.Space.x1 - countWidth, y: (b.height - countHeight) / 2, width: countWidth, height: countHeight)
+        countLabel.frame = NSRect(x: previousButton.frame.minX - Tokens.Space.x1 - countWidth, y: countLabel.centeredY(in: b.height), width: countWidth, height: countHeight)
         let side = Tokens.Metric.favicon
         glass.frame = NSRect(x: Tokens.Space.x3 + 2, y: (b.height - side) / 2, width: side, height: side)
         let fieldHeight = ceil(field.intrinsicContentSize.height)
         let x = glass.frame.maxX + Tokens.Space.x1 + 2
-        field.frame = NSRect(x: x, y: (b.height - fieldHeight) / 2, width: max(0, countLabel.frame.minX - x - Tokens.Space.x2), height: fieldHeight)
+        field.frame = NSRect(x: x, y: field.centeredY(in: b.height), width: max(0, countLabel.frame.minX - x - Tokens.Space.x2), height: fieldHeight)
     }
 
     /// ⌘F: opens the bar, or puts you back in it; pressed again while you're typing in it, closes it.
@@ -752,7 +752,8 @@ final class ToastView: FloatingPanelView {
         let h = label.usesSingleLineMode ? label.lineHeight : bounds.height - Tokens.Space.x4
         // The text field draws its text Label.inset in from its edges: set it that much wider, so the ink sits
         // exactly where the padding ends, the same both ends.
-        label.frame = NSRect(x: x - Label.inset, y: (bounds.height - h) / 2, width: textWidth + Label.inset * 2, height: h)
+        label.frame = NSRect(x: x - Label.inset, y: label.usesSingleLineMode ? label.centeredY(in: bounds.height) : (bounds.height - h) / 2,
+                             width: textWidth + Label.inset * 2, height: h)
     }
 }
 
