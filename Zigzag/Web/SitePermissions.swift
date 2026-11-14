@@ -126,6 +126,20 @@ enum SitePermissions {
 
     static func remember(_ action: String?, subject: String, origin: String) { stored["\(origin)|\(subject)"] = action }
 
+    /// Writes down what a question was answered. "Always" is kept for the site, under `origin` and `subject`; anything
+    /// else, and everything a private window answers, holds for `tab`'s page only. A private window keeps nothing at
+    /// all, whatever the answer says, which is why it must say so here rather than be trusted to have masked it.
+    /// Returns whether the answer allows what was asked (`action` other than "deny").
+    @discardableResult
+    static func rememberAnswer(_ answer: PermissionAnswer, subject: String, origin: String, tab: Tab?, isPrivate: Bool) -> Bool {
+        if answer.remember, !isPrivate {
+            remember(answer.action, subject: subject, origin: origin)
+        } else if let tab {
+            tab.permissionAnswers.note(answer.action != "deny", key: origin, kind: subject)
+        }
+        return answer.action != "deny"
+    }
+
     static func actions(origin: String) -> [String: String] {
         var found: [String: String] = [:]
         for (key, action) in stored where key.hasPrefix(origin + "|") {
@@ -425,6 +439,11 @@ enum SitePermissions {
         origin.map(SiteOrigin.label) ?? String(localized: "This page", comment: "Stands for the site in a question when the page has no host.")
     }
 
+    /// Why a question's duration control is greyed when there is no site to keep an answer under.
+    private static var noSiteNote: String {
+        String(localized: "This page has no site to remember the answer for.", comment: "Tooltip of the disabled duration dropdown on a permission question asked by a page with no site, like a local file.")
+    }
+
     /// The site's notification answer on `tab`'s page: Allow or Block kept for the site, else the answer given on
     /// this page.
     static func notifications(origin: String, tab: Tab?) -> Bool? {
@@ -443,9 +462,7 @@ enum SitePermissions {
                                                                 page: tab?.permissionAnswers.answer(key: origin, kind: "notifications"))
                                                 })
         guard let answer else { return nil }
-        let allowed = answer.action != "deny"
-        tab?.permissionAnswers.note(allowed, key: origin, kind: "notifications")
-        return allowed
+        return rememberAnswer(answer, subject: PermissionSubject.notifications, origin: origin, tab: tab, isPrivate: isPrivate)
     }
 
     /// The location answer for `key` on `tab`'s page: Allow or Block kept, else the answer given on this page.
@@ -469,7 +486,7 @@ enum SitePermissions {
         let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: "your location",
                                                 symbol: "location.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
-                                                actions: [.deny, .allow], canRemember: true,
+                                                actions: [.deny, .allow], canRemember: key != nil, rememberNote: noSiteNote,
                                                 answered: {
                                                     key.flatMap { key in
                                                         knownAnswer(site: location(origin: key),
@@ -477,9 +494,8 @@ enum SitePermissions {
                                                     }
                                                 })
         guard let answer else { return .deny }
-        let allowed = answer.action != "deny"
-        if let key { tab?.permissionAnswers.note(allowed, key: key, kind: "location") }
-        return allowed ? .grant : .deny
+        guard let key else { return answer.action == "deny" ? .deny : .grant }
+        return rememberAnswer(answer, subject: PermissionSubject.location, origin: key, tab: tab, isPrivate: isPrivate) ? .grant : .deny
     }
 
     static func request(origin securityOrigin: WKSecurityOrigin, type: WKMediaCaptureType, window: NSWindow?, isPrivate: Bool,
@@ -521,16 +537,22 @@ enum SitePermissions {
             // after the first has gone.
             let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: what,
                                                     symbol: type == .microphone ? "mic.fill" : "video.fill", in: controller, tab: tab, title: title,
-                                                    actions: [.deny, .allow], canRemember: true,
-                                                    answered: { key.flatMap { decision(key: $0, type: type, tab: tab) }.map { PermissionAnswer(action: $0 ? "allow" : "deny", remember: true) } })
+                                                    actions: [.deny, .allow], canRemember: key != nil, rememberNote: key == nil ? noSiteNote : nil,
+                                                    answered: {
+                                                        key.flatMap { key in
+                                                            knownAnswer(site: decision(origin: key, type: type),
+                                                                        page: tab?.permissionAnswers.answer(key: key, kind: kind(type)))
+                                                        }
+                                                    })
             // Only a clicked answer holds for the page; Esc, or the window closing, is "not now".
             guard let answer else { return .deny }
-            let isAllowed = answer.action != "deny"
-            if let key { tab?.permissionAnswers.note(isAllowed, key: key, kind: kind(type)) }
+            let isAllowed = key.map { rememberAnswer(answer, subject: PermissionSubject.media(type), origin: $0, tab: tab, isPrivate: isPrivate) }
+                ?? (answer.action != "deny")
             // No to one is no to the call: the other isn't asked.
             if !isAllowed { return .deny }
             allowed = allowed && isAllowed
-        }        return allowed ? .grant : .deny
+        }
+        return allowed ? .grant : .deny
     }
 
     /// Screen sharing (getDisplayMedia): asked every time, as Safari does, and nothing kept. Don't Allow, Share
@@ -540,7 +562,7 @@ enum SitePermissions {
         let site = SiteOrigin.of(securityOrigin)
         let answer = await PermissionPrompt.ask(host: askerName(site), origin: site, what: "your screen", symbol: "rectangle.on.rectangle",
                                                 in: controller, tab: tab, title: DisplayCaptureChoice.title,
-                                                actions: [.deny, .alternate("screen", DisplayCaptureChoice.screen.buttonTitle), .allow], canRemember: false)
+                                                actions: DisplayCaptureChoice.actions, canRemember: false)
         return DisplayCaptureChoice(answer)
     }
 }
@@ -561,6 +583,13 @@ enum DisplayCaptureChoice: Int, CaseIterable {
     }
 
     static var title: String { String(localized: "Share your screen", comment: "Title of the prompt when a site asks to share the screen.") }
+
+    /// Don't Allow, Share Screen…, then Share Window… filled, as Safari offers them.
+    static var actions: [PermissionAction] {
+        [.deny,
+         .alternate("screen", screen.buttonTitle),
+         PermissionAction(id: "allow", title: window.buttonTitle, isDeny: false, isProminent: true)]
+    }
 
     var buttonTitle: String {
         switch self {
