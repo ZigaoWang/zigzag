@@ -420,7 +420,7 @@ final class ExtensionHost: NSObject {
         var state = profile.installs.state(id)
         // A record from before the bridge's permissions were kept in it: what it was always given, taken once.
         if var known = state, let granted = known.grantedPermissions, known.bridgeRecorded != true {
-            known.grantedPermissions = Self.migratedGrants(Set(granted), declared: declared).sorted()
+            known.grantedPermissions = Self.migratedGrants(Set(granted), declared: ExtensionStore.isUnpacked(id) ? [] : declared).sorted()
             known.bridgeRecorded = true
             profile.installs.save(known, for: id)
             state = known
@@ -452,15 +452,17 @@ final class ExtensionHost: NSObject {
     static func askedPermissions(requested: Set<String>, declared: Set<String>) -> Set<String> {
         requested.subtracting(zigzagGranted)
             .union(declared.intersection(zigzagGranted))
-            .union(declared.intersection(ExtensionBridgeScript.permissions))
+            .union(declared.intersection(ExtensionBridgeScript.granted))
     }
 
     /// A record from before the bridge's permissions were kept: those its manifest asks for are added, as they were
     /// always given, and Zigzag's own two, recorded then whatever was asked, stay only as the manifest asks.
+    /// `declared` is the manifest the person approved: a store package's, kept in Zigzag's own folder. A folder's can
+    /// have changed since, so for one nothing is added and what it asks for beyond the record is asked about.
     static func migratedGrants(_ granted: Set<String>, declared: Set<String>) -> Set<String> {
         granted.subtracting(zigzagGranted)
             .union(declared.intersection(zigzagGranted))
-            .union(declared.intersection(ExtensionBridgeScript.permissions))
+            .union(declared.intersection(ExtensionBridgeScript.granted))
     }
 
     /// Asked once per load, when a window is there to ask in. Not allowed, the extension runs without it, and is asked
@@ -1106,15 +1108,16 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         // What Chrome grants quietly is granted; the rest only if you allow it, asked only in answer to something you
         // just did with the extension, as Chrome requires. Allowed is kept; not allowed holds until Zigzag quits.
         let (asked, quiet) = Self.sort(permissions)
-        let finish = { (granted: Set<WKWebExtension.Permission>) in
+        // What the person allowed is recorded as theirs, Zigzag's own two (native messaging, scripting) included.
+        let finish = { (granted: Set<WKWebExtension.Permission>, approved: Bool) in
             completionHandler(granted, nil)
-            DispatchQueue.main.async { self.saveGrants(of: extensionContext) }
+            DispatchQueue.main.async { self.saveGrants(of: extensionContext, approving: approved ? Set(granted.map(\.rawValue)) : []) }
         }
-        guard !asked.isEmpty else { finish(permissions); return }
+        guard !asked.isEmpty else { finish(permissions, false); return }
         guard hasRecentGesture(extensionContext.uniqueIdentifier), !ExtensionSheet.isShowing,
               let window = WindowManager.shared.keyController.flatMap({ $0.tabManager.isPrivate ? nil : $0 }) ?? openWindows.first else {
             ExtensionLog.write("\(extensionContext.webExtension.displayName ?? "extension") asked for \(asked.map(\.rawValue).sorted()) without a click; not granted")
-            finish(quiet)
+            finish(quiet, false)
             return
         }
         let ext = extensionContext.webExtension
@@ -1127,7 +1130,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             report: ExtensionReport(requesting: Set(asked.map(\.rawValue)), id: extensionContext.uniqueIdentifier),
             confirm: String(localized: "Allow", comment: "Button in the sheet shown when an extension asks for more access: gives it."),
             cancel: String(localized: "Don’t Allow", comment: "Button in the sheet shown when an extension asks for more access: refuses it."))
-        ExtensionSheet.present(content, in: window, onConfirm: { finish(permissions) }, onCancel: { finish(quiet) })
+        ExtensionSheet.present(content, in: window, onConfirm: { finish(permissions, true) }, onCancel: { finish(quiet, false) })
     }
 
     /// The permissions asked for that need your say, and those granted without asking.

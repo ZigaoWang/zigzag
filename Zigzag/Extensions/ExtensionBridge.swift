@@ -178,6 +178,9 @@ nonisolated struct BridgeError: Error {
 enum ExtensionBridgeScript {
     /// The permissions whose APIs the bridge answers, so the install sheet doesn't list them as missing.
     static let permissions: Set<String> = ["history", "topSites", "bookmarks", "downloads", "downloads.open", "notifications", "idle", "tts", "power", "offscreen", "identity", "sidePanel", "tabCapture", "system.display", "userScripts", "proxy", "webRequestAuthProvider"]
+    /// What the bridge grants and records from the manifest, as WebKit leaves them out: its own permissions, and
+    /// Manifest V2's webRequestBlocking, which answers sign-ins (BridgeWebRequest) though blocking itself won't work.
+    static let granted: Set<String> = permissions.union(["webRequestBlocking"])
 
     static let source: String = {
         guard let url = Bundle.main.url(forResource: "bridge", withExtension: "js"),

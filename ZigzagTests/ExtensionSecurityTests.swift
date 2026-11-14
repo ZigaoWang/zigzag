@@ -465,3 +465,14 @@ extension ExtensionSecurityTests {
         }
     }
 }
+
+// MARK: Packages and updates
+
+extension ExtensionSecurityTests {
+    /// Manifest V2's webRequestBlocking is recorded, so its sign-in answers keep working; a folder's record from
+    /// before takes nothing more from its files on disk.
+    @Test func blockingIsRecordedAndFoldersMigrateFromTheRecord() {
+        #expect(ExtensionHost.askedPermissions(requested: ["webRequest"], declared: ["webRequest", "webRequestBlocking"]).contains("webRequestBlocking"))
+        #expect(ExtensionHost.migratedGrants(["storage", "nativeMessaging"], declared: []) == ["storage"])
+    }
+}
