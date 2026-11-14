@@ -406,6 +406,15 @@ nonisolated enum IconAddress {
         return !addresses.isEmpty && addresses.allSatisfy(isPublic)
     }
 
+    /// The same by the address as written alone, never by what DNS answers: behind a proxy in fake-IP mode (Clash,
+    /// common in China) every name resolves into 198.18.0.0/15, so checking what it resolves to refused every site.
+    /// For a fetch whose answer is only ever read as a picture (a site's icon), a public-looking name is enough.
+    static func mayFetchByName(_ url: URL) -> Bool {
+        guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let host = url.host(percentEncoded: false), isPublicName(host) else { return false }
+        if let literal = bytes(of: host) { return isPublic(literal) }
+        return true
+    }
+
     /// Whether a page is itself on this Mac or its network, by its name or address alone (never by what the name
     /// resolves to, which its site picks): localhost, a .local name, 192.168.1.1. Its own icons may be there too.
     static func isLocal(_ url: URL) -> Bool {

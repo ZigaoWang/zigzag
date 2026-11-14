@@ -39,7 +39,9 @@ final class FaviconStore {
     nonisolated static func mayFetch(_ icon: URL, for page: URL) async -> Bool {
         guard ["http", "https"].contains(icon.scheme?.lowercased() ?? "") else { return false }
         if IconAddress.isLocal(page) { return true }
-        return await IconAddress.mayFetch(icon)
+        // By its address as written, not by DNS: behind a proxy in fake-IP mode every site resolves to a private
+        // address, which refused every icon (`IconAddress.mayFetchByName`).
+        return IconAddress.mayFetchByName(icon)
     }
 
     /// An icon's bytes, checked by `mayFetch` here and at every redirect, and at most `maxIconBytes` of them.

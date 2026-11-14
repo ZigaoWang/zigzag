@@ -197,3 +197,15 @@ struct FaviconSourceTests {
         #expect(await FaviconStore.download(URL(string: "https://93.184.216.34/fine.ico")!, for: page, configuration: configuration())?.count == 4_000)
     }
 }
+
+extension FaviconRankTests {
+    /// Behind a proxy in fake-IP mode every name resolves to 198.18.x.x; icons by name still load, while addresses
+    /// written as private ones are still refused.
+    @Test func iconsAreJudgedByTheirAddressAsWrittenNotByDNS() {
+        #expect(IconAddress.mayFetchByName(URL(string: "https://github.githubassets.com/favicon.svg")!))
+        #expect(IconAddress.mayFetchByName(URL(string: "https://www.theguardian.com/favicon.ico")!))
+        #expect(!IconAddress.mayFetchByName(URL(string: "http://198.18.0.16/i.png")!))
+        #expect(!IconAddress.mayFetchByName(URL(string: "http://localhost/i.png")!))
+        #expect(!IconAddress.mayFetchByName(URL(string: "file:///etc/hosts")!))
+    }
+}
