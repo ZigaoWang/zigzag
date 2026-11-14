@@ -1010,7 +1010,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func showPageSize() {
         let tab = tabManager.selectedTab
-        let state = tab.flatMap { tabManager.split(for: $0) } == nil ? tab?.developerInEffect : nil
+        let state = tab.flatMap { tabManager.shownSplit(for: $0) } == nil ? tab?.developerInEffect : nil
         let size = state?.size
         // The list is read once for each change, not for each frame the bar says the size in.
         shownListedSize = PageSizes.named(size)
@@ -1026,7 +1026,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Whether a tab has the tools in the bar above its page: Site Controls shows them where it doesn’t.
     func showsDeveloperBarTools(for tab: Tab?) -> Bool {
         DeveloperBarTools.shows(isDevelopment: tab?.isDevelopment == true, showsInBar: DeveloperTools.showsInBar,
-                             inSplit: tab.flatMap { tabManager.split(for: $0) } != nil)
+                             inSplit: tab.flatMap { tabManager.shownSplit(for: $0) } != nil)
     }
 
     /// Puts the selected tab in the page card, or the pages of its split or tile group side by side, each in a card.
@@ -1037,17 +1037,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // A link address belongs to the page it was pointed at in: a different page, a different space, it goes.
         linkStatus.show(nil, in: root.cardFrame)
         let tab = tabManager.selectedTab
-        let pair = tab.flatMap { tabManager.split(for: $0) }
-        let pages = pair.map { $0.ids.compactMap { tabManager.tab(with: $0) } } ?? []
+        let pair = tab.flatMap { tabManager.shownSplit(for: $0) }
+        let pages = tab.flatMap { pair != nil ? tabManager.panes(of: $0) : nil } ?? []
         let cards = root.paneCards
         // The zoom lasts while its group is on screen as it was; anything else (a swap, a move, another layout) puts
         // the pane back.
         // Going to another pane of it (a click on its part of the row) puts the zoomed one back too.
         if paneZoom.isZoomed, paneZoom.tabID != tab?.id { paneZoom.clear() }
-        let zoomed = paneZoom.index(in: pages.count == pair?.count ? pair?.ids : nil, places: pair?.shape.regions)
+        let zoomed = paneZoom.index(in: pair?.ids, places: pair?.shape.regions)
         // Site Controls opened from a pane's strip sits under it: when the panes move (the split parts, a pane goes,
         // swaps or zooms), it would be left over nothing.
-        let layout = pages.count == pair?.count ? "\(pair?.ids ?? []) \(String(describing: pair?.shape)) \(zoomed ?? -1)" : ""
+        let layout = pair.map { "\($0.ids) \(String(describing: $0.shape)) \(zoomed ?? -1)" } ?? ""
         if layout != shownPaneLayout {
             shownPaneLayout = layout
             if SitePanel.isOpen(in: window), SitePanel.shown?.isFromPane == true { SitePanel.closeCurrent() }
@@ -1056,7 +1056,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             refreshZoomEsc()
             sidebar.list.zoomedTabID = paneZoom.tabID
         }
-        if let tab, let pair, pages.count == pair.count {
+        if let tab, let pair {
             root.setTiles(pair.shape, animated: true)
             root.setZoomedPane(zoomed, animated: true)
             root.isEmpty = false

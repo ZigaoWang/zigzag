@@ -330,7 +330,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func userAgentFirefox(_ sender: Any?) { chooseForDevelopment { $0.userAgent = .firefox } }
 
     /// Whether the page you're on is one of a split's: a page's own size isn't for those.
-    private var selectedIsInSplit: Bool { selectedTab.flatMap { tabManager.split(for: $0) } != nil }
+    /// Whether the page you're on is shown in a split, where it has no size of its own.
+    private var selectedIsInSplit: Bool { selectedTab.flatMap { tabManager.shownSplit(for: $0) } != nil }
 
     /// View › Developer › Page Size › Toggle Page Size (⌥⇧⌘M): the last size the page had, or a phone's, and back.
     @objc func togglePageSize(_ sender: Any?) {

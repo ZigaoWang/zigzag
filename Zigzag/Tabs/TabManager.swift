@@ -1447,6 +1447,14 @@ final class TabManager {
         splits.first { $0.contains(tab.id) }
     }
 
+    /// The split `tab` is shown in, as the window shows it: its panes side by side, each with its strip. Nil when it's
+    /// in none, or in one some of whose tabs can't be found, which shows `tab` on its own (`panes(of:)`). What a page
+    /// shown on its own has (its size, its tools above it) goes by this.
+    func shownSplit(for tab: Tab) -> SplitPair? {
+        guard let pair = split(for: tab), panes(of: tab).count == pair.ids.count else { return nil }
+        return pair
+    }
+
     /// The other page of a split of two. Nil in a tile group of more, whose pages are `partners(of:)`: what goes for
     /// a pair (pinning both, a pinned page beside a tab) doesn't for those.
     func partner(of tab: Tab) -> Tab? {

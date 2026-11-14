@@ -338,7 +338,7 @@ enum CommandRanker {
         // What the menus have enabled: offered here, and with something to do for the page's choices as they are.
         let state = tab.developerInEffect
         c.developerTools = DeveloperTool.allCases.filter {
-            $0.isOffered(for: tab, isPrivate: manager.isPrivate, inSplit: manager.split(for: tab) != nil) && $0.applies(in: state)
+            $0.isOffered(for: tab, isPrivate: manager.isPrivate, inSplit: manager.shownSplit(for: tab) != nil) && $0.applies(in: state)
         }
         c.isDevelopmentSite = DevelopmentSites.covers(tab.url)
         c.pageSizes = PageSizes.all

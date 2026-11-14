@@ -256,6 +256,19 @@ struct PageSizeTests {
         #expect(DeveloperTool.isOffered(.console, isOn: true, isDevelopment: true, url: nil, isPrivate: false, inSplit: true))
     }
 
+    @Test func aPageIsInASplitAsTheWindowShowsIt() {
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        let tabs = (0..<2).map { _ in manager.newTab(url: nil, spaceID: space, select: false) }
+        defer { tabs.forEach { $0.close() }; manager.invalidate() }
+        #expect(manager.shownSplit(for: tabs[0]) == nil)
+        guard let pair = TabManager.SplitPair(ids: tabs.map(\.id), shape: TileShape(regions: [.left, .right])) else { Issue.record("no pair"); return }
+        manager.restoreSplit(pair)
+        // Every pane there: shown as the split it is, so neither page has a size of its own.
+        #expect(manager.shownSplit(for: tabs[0]) == pair && manager.shownSplit(for: tabs[1]) == pair)
+        #expect(manager.panes(of: tabs[0]).count == pair.ids.count)
+    }
+
     @Test func sizesKeptThatNoPageCanBeAreLeftOut() throws {
         try withDefaults {
             let kept = [PageSizes.Size(name: "Fine", width: 400, height: 800), PageSizes.Size(name: "Huge", width: 90_000, height: 800),
