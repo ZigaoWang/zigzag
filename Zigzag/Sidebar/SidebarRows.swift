@@ -1283,9 +1283,9 @@ final class SpaceHeaderView: InteractiveView {
     }
 }
 
-/// The quiet "Tabs" label above today's tabs, with generous room above it in place of a line. Clear sits at its end,
-/// as in Arc: on a line of its own, apart from New Tab and the pinned tabs it leaves alone, and only while the
-/// pointer is over the list and there are tabs to clear.
+/// The quiet "Tabs" label above today's tabs, with generous room above it in place of a line. Clear sits at the end
+/// of this row, as in Arc, level with the label: apart from New Tab below and the pinned tabs above, which it leaves
+/// alone, and shown only while the pointer is over the list and there are tabs to clear.
 final class SeparatorRowView: NSView {
     private let label = Label(String(localized: "Tabs", comment: "The quiet label above today's tabs in the sidebar, below the pinned tabs."), font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     let clearButton = ClearTabsButton()
@@ -1354,7 +1354,7 @@ final class SeparatorRowView: NSView {
         // the icons and the space's name.
         let h = label.lineHeight
         let mid = bounds.height - Tokens.Space.x3
-        // Its capitals' middle on the line, as Clear's are in its capsule.
+        // Its capitals centered on `mid`, the line Clear's capsule is centered on, so the two read level.
         let capsY = mid - h / 2 - Label.capsBelowMiddle(of: label.font ?? Tokens.Font.sidebarLabel(), lineHeight: h)
         let scale = window?.backingScaleFactor ?? 2
         label.frame = NSRect(x: SidebarRowView.inset - Label.inset, y: (capsY * scale).rounded() / scale, width: label.inkWidth + Label.inset * 2, height: h)
