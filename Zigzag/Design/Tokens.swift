@@ -1372,16 +1372,19 @@ enum Tokens {
     /// space's accent when on. The track never lights up; on and off differ by the knob's place and color.
     enum Switch {
         private static func ink(_ alpha: CGFloat) -> NSColor { Color.hex(0x000000, alpha: alpha) }
-        static let track = Color.dynamic(light: ink(0.075), dark: ink(0.32),
-            highLight: ink(0.16), highDark: ink(0.45))
-        static let trackHover = Color.dynamic(light: ink(0.095), dark: ink(0.36),
-            highLight: ink(0.19), highDark: ink(0.5))
-        static let trackPressed = Color.dynamic(light: ink(0.115), dark: ink(0.4),
-            highLight: ink(0.22), highDark: ink(0.55))
-        static let edge = Color.dynamic(light: ink(0.06), dark: Color.hex(0xFFFFFF, alpha: 0.06),
-            highLight: ink(0.4), highDark: Color.hex(0xFFFFFF, alpha: 0.3))
+        private static func light(_ alpha: CGFloat) -> NSColor { Color.hex(0xFFFFFF, alpha: alpha) }
+        /// Off: a step darker than the page by day; at night a lighter gray than the page, as macOS's own off switch
+        /// is, since a track darker than a dark page all but disappears.
+        static let track = Color.dynamic(light: ink(0.075), dark: light(0.16),
+            highLight: ink(0.16), highDark: light(0.26))
+        static let trackHover = Color.dynamic(light: ink(0.095), dark: light(0.19),
+            highLight: ink(0.19), highDark: light(0.3))
+        static let trackPressed = Color.dynamic(light: ink(0.115), dark: light(0.22),
+            highLight: ink(0.22), highDark: light(0.34))
+        static let edge = Color.dynamic(light: ink(0.06), dark: light(0.08),
+            highLight: ink(0.4), highDark: light(0.35))
         /// The shade under the track's upper lip, fading out by `recessDepth` of its height.
-        static let recess = Color.dynamic(light: ink(0.07), dark: ink(0.25))
+        static let recess = Color.dynamic(light: ink(0.07), dark: ink(0.18))
         static let recessDepth: CGFloat = 0.55
         static let knob = Color.dynamic(light: Color.hex(0xFBFAF8), dark: Color.hex(0xE9E7E4))
         /// On: white on the accent-filled track, in both modes.

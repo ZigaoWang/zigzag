@@ -36,10 +36,10 @@ struct ContrastTokensTests {
         ("Color.keyCapFill", Tokens.Color.keyCapFill, 0x000000, 0.04, 0xFFFFFF, 0.07),
         ("Color.keyCapEdge", Tokens.Color.keyCapEdge, 0x000000, 0.1, 0xFFFFFF, 0.1),
         ("Color.progress", Tokens.Color.progress, 0x000000, 0.28, 0xFFFFFF, 0.32),
-        ("Switch.track", Tokens.Switch.track, 0x000000, 0.075, 0x000000, 0.32),
-        ("Switch.trackHover", Tokens.Switch.trackHover, 0x000000, 0.095, 0x000000, 0.36),
-        ("Switch.trackPressed", Tokens.Switch.trackPressed, 0x000000, 0.115, 0x000000, 0.4),
-        ("Switch.edge", Tokens.Switch.edge, 0x000000, 0.06, 0xFFFFFF, 0.06),
+        ("Switch.track", Tokens.Switch.track, 0x000000, 0.075, 0xFFFFFF, 0.16),
+        ("Switch.trackHover", Tokens.Switch.trackHover, 0x000000, 0.095, 0xFFFFFF, 0.19),
+        ("Switch.trackPressed", Tokens.Switch.trackPressed, 0x000000, 0.115, 0xFFFFFF, 0.22),
+        ("Switch.edge", Tokens.Switch.edge, 0x000000, 0.06, 0xFFFFFF, 0.08),
         ("Switch.knobEdge", Tokens.Switch.knobEdge, 0x000000, 0.11, 0x000000, 0.3),
         ("Chrome.card", Tokens.Chrome.card, 0xFFFFFF, 0.96, 0xFFFFFF, 0.18),
         ("Chrome.cardHover", Tokens.Chrome.cardHover, 0xFFFFFF, 1, 0xFFFFFF, 0.21),
@@ -131,6 +131,17 @@ struct ContrastTokensTests {
                     #expect(after >= before, "\(color.name) \(dark ? "dark" : "light")")
                 }
             }
+        }
+    }
+
+    /// An off switch stands out from the page it's on, at night as by day: at night its track is a lighter gray than
+    /// the page, as macOS's own is, never a darker one that sinks into it.
+    @Test func offSwitchStandsOutAtNight() {
+        for ground in [Tokens.Color.surface, Tokens.Color.formBackground, Tokens.Color.panelBackground] {
+            let page = resolved(ground, dark: true, high: false)
+            let track = over(resolved(Tokens.Switch.track, dark: true, high: false), page)
+            #expect(track.brightnessComponent > page.brightnessComponent)
+            #expect(Brand.contrast(track, page) >= 1.3, "\(String(format: "%.2f", Brand.contrast(track, page))):1")
         }
     }
 
