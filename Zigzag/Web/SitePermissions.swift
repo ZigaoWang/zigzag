@@ -170,6 +170,12 @@ enum SitePermissions {
 
     private static func action(for allowed: Bool?) -> String? { allowed.map { $0 ? "allow" : "deny" } }
 
+    /// An answer found while a question waited: a site's persistent answer wins; a page's answer is only this time.
+    static func knownAnswer(site: Bool?, page: Bool?) -> PermissionAnswer? {
+        if let site { return PermissionAnswer(action: site ? "allow" : "deny", remember: true) }
+        return page.map { PermissionAnswer(action: $0 ? "allow" : "deny", remember: false) }
+    }
+
     /// The keys for these kinds on a site's own page: its own answers and those of frames from elsewhere on it.
     private static func keys(_ kinds: [String], on origin: String) -> [String] {
         let suffixes = kinds.map { "|" + $0 }
@@ -382,7 +388,10 @@ enum SitePermissions {
         let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
                                                 title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
                                                 actions: [.deny, .allow], canRemember: true,
-                                                answered: { notifications(origin: origin, tab: tab).map { PermissionAnswer(action: $0 ? "allow" : "deny", remember: true) } })
+                                                answered: {
+                                                    knownAnswer(site: notifications(origin: origin),
+                                                                page: tab?.permissionAnswers.answer(key: origin, kind: "notifications"))
+                                                })
         guard let answer else { return nil }
         let allowed = answer.action != "deny"
         tab?.permissionAnswers.note(allowed, key: origin, kind: "notifications")
@@ -411,7 +420,12 @@ enum SitePermissions {
                                                 symbol: "location.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
                                                 actions: [.deny, .allow], canRemember: true,
-                                                answered: { key.flatMap { location(key: $0, tab: tab) }.map { PermissionAnswer(action: $0 ? "allow" : "deny", remember: true) } })
+                                                answered: {
+                                                    key.flatMap { key in
+                                                        knownAnswer(site: location(origin: key),
+                                                                    page: tab?.permissionAnswers.answer(key: key, kind: "location"))
+                                                    }
+                                                })
         guard let answer else { return .deny }
         let allowed = answer.action != "deny"
         if let key { tab?.permissionAnswers.note(allowed, key: key, kind: "location") }
@@ -438,7 +452,12 @@ enum SitePermissions {
         let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: what,
                                                 symbol: type == .microphone ? "mic.fill" : "video.fill", in: controller, tab: tab, title: title,
                                                 actions: [.deny, .allow], canRemember: true,
-                                                answered: { key.flatMap { decision(key: $0, type: type, tab: tab) }.map { PermissionAnswer(action: $0 ? "allow" : "deny", remember: true) } })
+                                                answered: {
+                                                    key.flatMap { key in
+                                                        knownAnswer(site: decision(origin: key, type: type),
+                                                                    page: tab?.permissionAnswers.answer(key: key, kind: kind(type)))
+                                                    }
+                                                })
         // Only a clicked answer holds for the page; Esc, or the window closing, is "not now".
         guard let answer else { return .deny }
         let allowed = answer.action != "deny"
@@ -453,7 +472,7 @@ enum SitePermissions {
         let site = SiteOrigin.of(securityOrigin)
         let answer = await PermissionPrompt.ask(host: askerName(site), origin: site, what: "your screen", symbol: "rectangle.on.rectangle",
                                                 in: controller, tab: tab, title: DisplayCaptureChoice.title,
-                                                actions: [.deny, .alternate("screen", "Share Screen…"), .allow], canRemember: false)
+                                                actions: [.deny, .alternate("screen", DisplayCaptureChoice.screen.buttonTitle), .allow], canRemember: false)
         return DisplayCaptureChoice(answer)
     }
 }
@@ -656,11 +675,15 @@ final class PermissionPrompt: FloatingPanelView {
                     answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         let key = ObjectIdentifier(controller)
         let before = queue[key]
+        // A private window never offers or returns Always, including an answer found while this question waited.
+        let remembers = canRemember && !controller.promptIsPrivate
         let task = Task<PermissionAnswer?, Never> { @MainActor in
             _ = await before?.value
-            if let known = answered() { return known }
+            if let known = answered() {
+                return PermissionAnswer(action: known.action, remember: known.remember && remembers)
+            }
             return await show(host: host, request: title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English."),
-                              symbol: symbol, icon: icon, actions: actions, canRemember: canRemember, origin: origin, in: controller, tab: tab)
+                              symbol: symbol, icon: icon, actions: actions, canRemember: remembers, origin: origin, in: controller, tab: tab)
         }
         queue[key] = task
         let answer = await task.value
@@ -822,6 +845,8 @@ final class PermissionPrompt: FloatingPanelView {
     required init?(coder: NSCoder) { fatalError() }
 
     private func finish(_ choice: PermissionAnswer?) {
+        // The hidden duration control also guards debug answers: a private or one-time question never returns Always.
+        let choice = choice.map { PermissionAnswer(action: $0.action, remember: $0.remember && !duration.isHidden) }
         stopListening()
         let answer = self.answer
         self.answer = nil
