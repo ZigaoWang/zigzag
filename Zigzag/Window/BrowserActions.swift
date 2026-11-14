@@ -90,17 +90,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         // A PDF prints as itself, page for page.
         if !(peekController?.isVisible ?? false), !isReaderOpen, let pdf = selectedTab?.pdfViewer { pdf.print(); return }
         guard let webView = printableWebView, let window else { return }
-        let info = NSPrintInfo.shared.copy() as! NSPrintInfo
-        info.horizontalPagination = .fit
-        info.verticalPagination = .automatic
-        info.isHorizontallyCentered = false
-        info.isVerticallyCentered = false
-        info.topMargin = 36; info.bottomMargin = 36; info.leftMargin = 36; info.rightMargin = 36
-        let operation = webView.printOperation(with: info)
-        operation.view?.frame = webView.bounds
-        operation.showsPrintPanel = true
-        operation.showsProgressPanel = true
-        operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+        PagePrinting.print(webView, in: window, completion: {})
     }
 
     @objc func exportAsPDF(_ sender: Any?) {

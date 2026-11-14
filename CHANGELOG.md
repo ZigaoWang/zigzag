@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Web apps hear their keyboard shortcuts before Zigzag's menus, as in Safari and Chrome: ⌘A and ⌘B in Google Docs, ⌘K in Slack, Linear and Notion, ⌘[ to indent, and the rest. Only the browser's own keys stay Zigzag's whatever the page wants (new and closed tabs, windows, the address, reload, spaces, quitting), and shortcuts you changed in Settings › Shortcuts stay the browser's on their new keys. ([#219](https://github.com/ZigaoWang/zigzag/issues/219))
+- A page's own Print button works, as in Safari: a school report card's or a receipt's Print brings up the print panel on the window, as ⌘P does, and the page waits until you've printed or canceled.
 
 ## [0.9.0] - 2026-11-12
 
