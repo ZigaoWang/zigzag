@@ -915,8 +915,9 @@ final class Tab: NSObject {
         let changedPage = url != self.url
         self.url = url
         self.navigatedSinceSave = true
-        // A page that changes its address without loading (YouTube, GitHub, Gmail) goes in history too.
-        if changedPage, !wv.isLoading { self.recordHistory(url, title: nil) }
+        // A page that changes its address without loading (YouTube, GitHub, Gmail) goes in history too, but not as a
+        // visit: the page did it, and could do it a hundred times to rank itself first when you type.
+        if changedPage, !wv.isLoading { self.recordHistory(url, title: nil, countsVisit: false) }
         // Its language too, once the new page has drawn: it never finishes loading to be read then (#218).
         if changedPage, !wv.isLoading { self.checkLanguage(of: wv, after: 1.5) }
         // Another site: never the last site's icon. Its own if it's known, otherwise none until the page offers one.
@@ -1104,12 +1105,17 @@ final class Tab: NSObject {
     /// Only showing an error page ("Can't find…") for where it tried to go: there's no page to go back to.
     var showsErrorPage: Bool { url != nil && url == errorShownFor }
 
-    private func recordHistory(_ url: URL, title: String?) {
+    /// `countsVisit`: false for an address the page changed itself without loading, which is kept (with when you were
+    /// there) but adds nothing to how high it ranks when you type.
+    private func recordHistory(_ url: URL, title: String?, countsVisit: Bool = true) {
         // Zigzag's own pages (History, Settings) aren't visits, and neither is a page that failed to load.
         guard !isPrivate, url != lastRecorded, url != errorShownFor, !HistoryPage.isInternal(url) else { return }
         lastRecorded = url
-        profile.history.recordVisit(url: url, title: title)
+        profile.history.recordVisit(url: url, title: title, count: Self.visitCount(countsVisit: countsVisit))
     }
+
+    /// What a page counts for in History's ranking: a load is a visit; an address the page changed itself, none.
+    static func visitCount(countsVisit: Bool) -> Int { countsVisit ? 1 : 0 }
 
     // MARK: Observation
 

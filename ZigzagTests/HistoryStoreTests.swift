@@ -27,6 +27,26 @@ struct HistoryStoreTests {
         #expect(names.contains { $0.hasPrefix("History.sqlite.damaged-") })
     }
 
+    /// An address a page changes itself, without loading, is kept in History but isn't a visit: a page that does it
+    /// a hundred times doesn't rank itself over the pages you went to.
+    @Test func anAddressAPageChangesItselfIsNoVisit() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-history-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = HistoryStore(path: folder.appendingPathComponent("History.sqlite").path)
+        #expect(Tab.visitCount(countsVisit: true) == 1)
+        #expect(Tab.visitCount(countsVisit: false) == 0)
+        store.recordVisit(url: URL(string: "https://bank.example/")!, title: "Bank", at: Date(), count: Tab.visitCount(countsVisit: true))
+        store.recordVisit(url: URL(string: "https://bank.example/")!, title: "Bank", at: Date(), count: Tab.visitCount(countsVisit: true))
+        for n in 0..<50 {
+            let pushed = URL(string: "https://bankk.example/\(n % 2)")!
+            store.recordVisit(url: pushed, title: "Bank", at: Date(), count: Tab.visitCount(countsVisit: n == 0))
+        }
+        let found = store.search("bank")
+        #expect(found.first?.url.host() == "bank.example")
+        #expect(found.first { $0.url.host() == "bankk.example" && $0.url.path == "/1" }?.visitCount == 0)
+    }
+
     /// Each profile's history is a file of its own: what's visited in one isn't found in, or removed from, another.
     @Test func twoProfilesHistoriesStayApart() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-history-\(UUID().uuidString)", isDirectory: true)
