@@ -403,6 +403,8 @@ enum DebugBridge {
         case "mpstate":
             if let data = try? JSONSerialization.data(withJSONObject: player.debugState, options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "mphover": player.card?.debugHover(arg != "off")
+        // mpoff: Turn Off Mini Player, from its menu.
+        case "mpoff": player.turnOff()
         // mppointer on|off: the pointer counts as on the card (for the sidebar's hover previews).
         case "mppointer": player.debugPointerOnCard = arg != "off"
         case "mppress": player.card?.debugPress(arg)

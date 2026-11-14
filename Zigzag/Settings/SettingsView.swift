@@ -1309,10 +1309,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         energyRow.keywords = String(localized: "sleep asleep memory energy keep awake active exclude site", comment: "Words that find the Put busy background tabs to sleep setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(energyRow)
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
-        let videoRow = FormRow(title: String(localized: "Keep videos playing when you switch tabs", comment: "A setting in Settings › Tabs."),
-                               detail: String(localized: "A playing video follows you in a small player.", comment: "Explanation under “Keep videos playing when you switch tabs” in Settings › Tabs."),
+        let videoRow = FormRow(title: String(localized: "Show a mini player when you switch tabs", comment: "A setting in Settings › Tabs."),
+                               detail: String(localized: "A video you’re watching follows you in a small player over the page. Its right-click menu can turn this off too.", comment: "Explanation under “Show a mini player when you switch tabs” in Settings › Tabs."),
                                control: pipToggle)
-        videoRow.keywords = String(localized: "mini player picture in picture pip floating", comment: "Words that find the Keep videos playing setting with Find a setting in Settings. Not shown.")
+        videoRow.keywords = String(localized: "mini player picture in picture pip floating", comment: "Words that find the Show a mini player setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(videoRow)
         fullScreenFill.options = PageFullScreen.Fill.allCases.map { fill in
             let title = switch fill {

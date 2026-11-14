@@ -7,7 +7,7 @@ import WebKit
 /// page, moved into the card and scaled so only its video shows: nothing is copied or reloaded, the page keeps its
 /// layout (its size never changes, so it never reflows), and sound simply carries on. It drags anywhere on screen;
 /// minimized, it goes and the video plays on in its tab, out of sight. One per window, in private windows too, kept across spaces.
-/// Settings › Tabs › Keep videos playing when you switch tabs turns it off.
+/// Settings › Tabs › Show a mini player when you switch tabs turns it off, as does Turn Off Mini Player in its menu.
 final class MiniPlayer {
     private weak var controller: BrowserWindowController?
     private var model = MiniPlayerModel()
@@ -202,6 +202,44 @@ final class MiniPlayer {
         apply(model.minimize())
     }
 
+    /// Right-click on the card: its buttons by name, and turning the mini player off.
+    private func menu() -> NSMenu? {
+        guard let card, tab != nil else { return nil }
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(SidebarMenus.Item(String(localized: "Back to \(card.siteName)", comment: "Tooltip of the mini player's site name: goes back to the tab its video is from. The placeholder is a domain, like youtube.com.")) { [weak self] in
+            self?.returnToTab()
+        })
+        menu.addItem(SidebarMenus.Item(card.isPlaying ? String(localized: "Pause", comment: "Tooltip of the mini player's play button while the video plays.")
+                                       : String(localized: "Play", comment: "Tooltip of the mini player's play button while the video is paused.")) { [weak self] in
+            self?.command("toggle")
+        })
+        menu.addItem(.separator())
+        menu.addItem(SidebarMenus.Item(String(localized: "Minimize", comment: "Tooltip of the mini player's button that hides it; the video keeps playing in its tab.")) { [weak self] in
+            self?.minimize()
+        })
+        menu.addItem(SidebarMenus.Item(String(localized: "Close", comment: "Tooltip of the mini player's close button: stops the video and closes the player.")) { [weak self] in
+            self?.close()
+        })
+        menu.addItem(.separator())
+        menu.addItem(SidebarMenus.Item(String(localized: "Turn Off Mini Player", comment: "Item in the mini player's right-click menu: videos stop following you into a mini player when you switch tabs (Settings › Tabs).")) { [weak self] in
+            self?.turnOff()
+        })
+        return menu
+    }
+
+    /// Videos stop following you out of their tabs, as with the setting off. This one plays on in its tab, out of
+    /// sight, as minimized; a toast says where the setting is, and takes it back.
+    func turnOff() {
+        PictureInPicture.followsTabs = false
+        minimize()
+        guard let controller else { return }
+        Toast.show(String(localized: "Mini player is off. Turn it on again in Settings › Tabs.", comment: "Toast after turning off the mini player from its menu. Settings › Tabs is where its setting is."),
+                   symbol: "pip.remove",
+                   action: (String(localized: "Undo", comment: "Button in a toast: takes back what was just done."), { PictureInPicture.followsTabs = true }),
+                   duration: 5, in: controller)
+    }
+
     private func apply(_ steps: [MiniPlayerModel.Step]) {
         for step in steps {
             switch step {
@@ -248,6 +286,7 @@ final class MiniPlayer {
         card.onResized = { [weak self] in self?.resized() }
         // A tab's hover preview never stays over the card you're on.
         card.onPointer = { [weak self] in self?.controller?.previews.hide() }
+        card.onMenu = { [weak self] in self?.menu() }
         self.card = card
         let panel = MiniPlayerPanel(card: card)
         self.panel = panel
@@ -747,6 +786,10 @@ final class MiniPlayerView: NSView {
     var onResized: (() -> Void)?
     /// The pointer came onto the card, or pressed on it.
     var onPointer: (() -> Void)?
+    /// Its right-click menu (VoiceOver's Show Menu too).
+    var onMenu: (() -> NSMenu?)?
+    /// Playing, as its play button shows.
+    private(set) var isPlaying = true
     /// Where it may be dragged, for the pointer at a point: the room on that point's screen.
     var dragArea: (NSPoint) -> NSRect = { _ in .infinite }
 
@@ -926,6 +969,7 @@ final class MiniPlayerView: NSView {
     /// The video's state: play or pause, its time, and whether it can be skipped through at all (not a live stream).
     func update(_ video: PageVideo) {
         let playing = video.isPlaying
+        isPlaying = playing
         let symbol = playing ? "pause.fill" : "play.fill"
         if playButton.symbol != symbol {
             let tip = playing ? String(localized: "Pause", comment: "Tooltip of the mini player's play button while the video plays.")
@@ -1090,6 +1134,14 @@ final class MiniPlayerView: NSView {
     }
 
     override func cancelOperation(_ sender: Any?) { onClose?() }
+
+    override func menu(for event: NSEvent) -> NSMenu? { onMenu?() }
+
+    override func accessibilityPerformShowMenu() -> Bool {
+        guard let menu = onMenu?() else { return false }
+        menu.popUp(positioning: nil, at: NSPoint(x: bounds.midX, y: bounds.midY), in: self)
+        return true
+    }
 
     /// ⌘W (File › Close Tab) closes the card while it has the keyboard, not the tab under it.
     @objc func closeTab(_ sender: Any?) { onClose?() }

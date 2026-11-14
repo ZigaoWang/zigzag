@@ -9,6 +9,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The Now Playing card at the bottom of the sidebar can be hidden: point at it and click the close button at its end, or right-click it for Hide. The tab keeps playing, and the card comes back when that tab moves on to another page, or for another tab that starts playing. The card is laid out as a tab's row now, the same height, columns and buttons, and follows Settings › Appearance › Sidebar size. ([#223](https://github.com/ZigaoWang/zigzag/issues/223))
 - The mini player grows out of the video as you leave its tab, where it used to show up all at once in its corner once it had landed. With no video's place to grow from, it comes out of its own corner. ([#224](https://github.com/ZigaoWang/zigzag/issues/224))
 - The mini player's buttons all light up under the pointer and give when pressed, as Zigzag's other buttons do, with the same wash as its site name, clear over any video. ([#224](https://github.com/ZigaoWang/zigzag/issues/224))
+- The mini player can be turned off from its own right-click menu with Turn Off Mini Player; the video keeps playing in its tab, and a toast says where to turn it on again, with Undo. The setting in Settings › Tabs is now called Show a mini player when you switch tabs. Right-clicking the player also has Back to the site, Play or Pause, Minimize and Close. ([#224](https://github.com/ZigaoWang/zigzag/issues/224))
 
 ## [0.9.0] - 2026-11-12
 

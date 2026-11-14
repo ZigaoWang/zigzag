@@ -1771,17 +1771,6 @@
         }
       }
     },
-    "A playing video follows you in a small player." : {
-      "comment" : "Explanation under “Keep videos playing when you switch tabs” in Settings › Tabs.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在播放的视频会在小播放器里跟着你。"
-          }
-        }
-      }
-    },
     "A profile has its own extensions, sign-ins, history and favorites. Spaces on the same profile share them." : {
       "comment" : "Under the title of the sheet that makes a profile.",
       "localizations" : {
@@ -1872,6 +1861,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "没在用却一直占用大量资源的标签页会休眠，再次打开时唤醒。要让某个网站的标签页保持唤醒，请在它的网站设置中打开“标签页保持唤醒”。"
+          }
+        }
+      }
+    },
+    "A video you’re watching follows you in a small player over the page. Its right-click menu can turn this off too." : {
+      "comment" : "Explanation under “Show a mini player when you switch tabs” in Settings › Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你正在看的视频会在页面上方的小播放器里跟着你。也可以在小播放器的右键菜单里关闭。"
           }
         }
       }
@@ -7918,17 +7918,6 @@
         }
       }
     },
-    "Keep videos playing when you switch tabs" : {
-      "comment" : "A setting in Settings › Tabs.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "切换标签页时继续播放视频"
-          }
-        }
-      }
-    },
     "Keeping your Mac awake" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
       "localizations" : {
@@ -8389,6 +8378,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "中"
+          }
+        }
+      }
+    },
+    "Mini player is off. Turn it on again in Settings › Tabs." : {
+      "comment" : "Toast after turning off the mini player from its menu. Settings › Tabs is where its setting is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小播放器已关闭。可以在“设置 › 标签页”里重新打开。"
           }
         }
       }
@@ -14101,6 +14101,17 @@
         }
       }
     },
+    "Show a mini player when you switch tabs" : {
+      "comment" : "A setting in Settings › Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换标签页时显示小播放器"
+          }
+        }
+      }
+    },
     "Show in Finder" : {
       "comment" : "Button in the Import window: show the exported passwords file in Finder.\nButton in the toast after Install as App: shows the new app in Finder.\nButton on an installed app's row in Settings › General: shows the app itself, selected in its folder in Finder.\nFile menu item of an installed app's window: shows the app itself, selected in its folder in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
       "localizations" : {
@@ -16469,6 +16480,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "为此网站关闭开发者模式"
+          }
+        }
+      }
+    },
+    "Turn Off Mini Player" : {
+      "comment" : "Item in the mini player's right-click menu: videos stop following you into a mini player when you switch tabs (Settings › Tabs).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭小播放器"
           }
         }
       }
@@ -19331,7 +19353,7 @@
       }
     },
     "mini player picture in picture pip floating" : {
-      "comment" : "Words that find the Keep videos playing setting with Find a setting in Settings. Not shown.",
+      "comment" : "Words that find the Show a mini player setting with Find a setting in Settings. Not shown.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
