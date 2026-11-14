@@ -5,31 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- A strong password from Use Strong Password stays in Passwords until a newer one for the same account takes its place, however long the site takes to confirm it. Unconfirmed ones are no longer deleted after two weeks.
-- Fill from My Card fills the name, email and address fields around the one you're in on pages without a form, and in fields inside a page's own components. When nothing on the page can take your card, it says so.
-- In the password menu, the arrow keys move between rows as soon as it opens. Only Return waits a moment.
-- Install from Folder… and the extensions that come with apps show their sheet in the window Settings is in, never in another window, and no longer do nothing when Settings is the only window.
-- An extension can open its side panel when you click in a page and its script on that page passes the click on, as in Chrome.
-- An extension's background can connect to an app on your Mac, or to a site its manifest names, as in Chrome.
-- An extension installed from a folder keeps the companion-app access it had.
-- An AI app's long tool call is no longer cut off when many other connections open meanwhile.
-- When another app holds the AI apps' port, Zigzag replaces the key only if an AI app may have been given it, not on every launch.
-- A file you go to always downloads, however soon after another: a link you pasted that redirects to the file, a "your download starts in 5 seconds" page, or a pop-up that opens straight to it. A page starting download after download on its own is still held back, and now a toast says so instead of nothing happening.
-- Asking for the camera or microphone no longer asks to use WebRTC first and reloads the page: WebRTC is only offered when a site starts a call.
-- Protect IP address from WebRTC covers pop-up windows too, each with its site's own choice, and a call started in one asks in the window that opened it.
-- Long titles in the sidebar fade out at their end, the same at rest and with the pointer over the row, instead of switching from "…" to a fade.
-- Clear's tooltip says "Close all 2 tabs" while you're on a favorite or pinned page, since none of the tabs is yours, and names a split view as one, like Close the other split view.
-- Reader pressed on another tab while it waits for a page to load opens for that tab, instead of only calling off the wait.
-- Open on selected text keeps the parentheses that belong to the address, like en.wikipedia.org/wiki/Mercury_(planet).
-- A site's question to open an app no longer has to wait because another site asked a few seconds earlier.
-- Dark Pages can read a page's style sheets behind an HTTP proxy that looks up addresses itself.
-- The offer to translate a page stays with the page it was made for: opening another tab, or going to another page, takes it away, so an English page no longer says it's in Chinese because the tab before it was. A page that says which language it's in is taken at its word unless most of its text is clearly in another, so an English article quoting some Chinese stays English. The offer and the find bar beside it are now the same height, on one line.
-- A certificate warning says what's actually wrong under Details: that the certificate expired, and on which day, isn't valid yet, is for a different address, is signed by the site itself, or comes from an issuer your Mac doesn't trust. An expired certificate used to be described as one for a different address.
-- PDFs are dark only where web pages would be: with Dark pages in Settings › Appearance or the site's Dark page choice, following the window's own light or dark look. A PDF no longer opens dark in a light window. The moon in the PDF's bar still switches that PDF.
-- Site Controls opened from the sidebar lines up exactly with the address above it, on both sides, so the favorite under it no longer peeks out at its corner.
-- The SHA-256 fingerprint on the certificate page breaks into even lines of pairs, each ending on its colon, so no line starts with one.
-
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
@@ -53,6 +28,30 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - A favorite that moved on from its page shows it, as a pinned tab does with Original / Current page: the tile shows the icon of the page it's on now with the favorite's own icon small on its corner, pointing at it names both, and Back to Favorite's Page in its menu takes it back, in a split favorite too.
 - A tab's or pinned tab's title no longer moves or gets cut shorter when the pointer brings up its close or back button: the button shows over the title's faded end.
 
+- A one-page PDF stays in the middle with Two Pages on, instead of sitting alone on the right like a book's first page.
+- A strong password from Use Strong Password stays in Passwords until a newer one for the same account takes its place, however long the site takes to confirm it. Unconfirmed ones are no longer deleted after two weeks.
+- Fill from My Card fills the name, email and address fields around the one you're in on pages without a form, and in fields inside a page's own components. When nothing on the page can take your card, it says so.
+- In the password menu, the arrow keys move between rows as soon as it opens. Only Return waits a moment.
+- Install from Folder… and the extensions that come with apps show their sheet in the window Settings is in, never in another window, and no longer do nothing when Settings is the only window.
+- An extension can open its side panel when you click in a page and its script on that page passes the click on, as in Chrome.
+- An extension's background can connect to an app on your Mac, or to a site its manifest names, as in Chrome.
+- An extension installed from a folder keeps the companion-app access it had.
+- An AI app's long tool call is no longer cut off when many other connections open meanwhile.
+- When another app holds the AI apps' port, Zigzag replaces the key only if an AI app may have been given it, not on every launch.
+- A file you go to always downloads, however soon after another: a link you pasted that redirects to the file, a "your download starts in 5 seconds" page, or a pop-up that opens straight to it. A page starting download after download on its own is still held back, and now a toast says so instead of nothing happening.
+- Asking for the camera or microphone no longer asks to use WebRTC first and reloads the page: WebRTC is only offered when a site starts a call.
+- Protect IP address from WebRTC covers pop-up windows too, each with its site's own choice, and a call started in one asks in the window that opened it.
+- Long titles in the sidebar fade out at their end, the same at rest and with the pointer over the row, instead of switching from "…" to a fade.
+- Clear's tooltip says "Close all 2 tabs" while you're on a favorite or pinned page, since none of the tabs is yours, and names a split view as one, like Close the other split view.
+- Reader pressed on another tab while it waits for a page to load opens for that tab, instead of only calling off the wait.
+- Open on selected text keeps the parentheses that belong to the address, like en.wikipedia.org/wiki/Mercury_(planet).
+- A site's question to open an app no longer has to wait because another site asked a few seconds earlier.
+- Dark Pages can read a page's style sheets behind an HTTP proxy that looks up addresses itself.
+- The offer to translate a page stays with the page it was made for: opening another tab, or going to another page, takes it away, so an English page no longer says it's in Chinese because the tab before it was. A page that says which language it's in is taken at its word unless most of its text is clearly in another, so an English article quoting some Chinese stays English. The offer and the find bar beside it are now the same height, on one line.
+- A certificate warning says what's actually wrong under Details: that the certificate expired, and on which day, isn't valid yet, is for a different address, is signed by the site itself, or comes from an issuer your Mac doesn't trust. An expired certificate used to be described as one for a different address.
+- PDFs are dark only where web pages would be: with Dark pages in Settings › Appearance or the site's Dark page choice, following the window's own light or dark look. A PDF no longer opens dark in a light window. The moon in the PDF's bar still switches that PDF.
+- Site Controls opened from the sidebar lines up exactly with the address above it, on both sides, so the favorite under it no longer peeks out at its corner.
+- The SHA-256 fingerprint on the certificate page breaks into even lines of pairs, each ending on its colon, so no line starts with one.
 ## [0.9.0] - 2026-11-14
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, Site Controls is rebuilt, and pictures and PDFs from websites are read in sandboxed helpers.
