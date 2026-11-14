@@ -411,8 +411,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 // Kept at once, so a reload or a submit that goes unnoticed never loses it, but as a pending login of
                 // its own, never over the account's saved one: if the site turns the change down, the old password is
                 // still there. It takes the account's place once the site has taken the form, and another made for
-                // the same form replaces it (`PasswordCapture.filledGenerated`).
-                try await PasswordCapture.shared.filledGenerated(password, origin: origin, username: username, in: webView.owner)
+                // the same form on the same page replaces it (`PasswordCapture.filledGenerated`).
+                try await PasswordCapture.shared.filledGenerated(password, origin: origin, username: username,
+                                                                 sameForm: result?["sameForm"] as? Bool == true, in: webView.owner)
                 if let controller { Toast.show(String(localized: "Strong password saved for \(origin.displayName)", comment: "Toast after a strong password was filled and saved. The placeholder is a site, like github.com."), symbol: "key", duration: 2, in: controller) }
             } catch {
                 if let controller { Toast.show(String(localized: "Couldn’t save the new password. Copy it before you leave this page.", comment: "Toast when a strong password was filled but couldn't be saved."), symbol: "exclamationmark.triangle", duration: 4, in: controller) }
