@@ -279,6 +279,23 @@ struct ExtensionSecurityTests {
         #expect(use.hasGesture(id, now: start.addingTimeInterval(11)))
     }
 
+    /// A click in a page carries over to sidePanel.open only through the extension's content script in that page:
+    /// its message follows the click, the call comes within a second, and the page is the one clicked.
+    @Test func aPageClickCarriesOverThroughAContentScript() {
+        let start = Date()
+        var use = ExtensionUse()
+        let soon = start.addingTimeInterval(0.3)
+        // No click in a page at all: a message alone opens nothing.
+        #expect(!use.carriesPageGesture(messageHosts: ["docs.example.com"], messageAt: start, now: soon))
+        use.pageGesture(on: "Docs.Example.com", at: start)
+        #expect(use.carriesPageGesture(messageHosts: ["docs.example.com"], messageAt: start.addingTimeInterval(0.1), now: soon))
+        // Another page's content script, a message from before the click, or a call too long after: no.
+        #expect(!use.carriesPageGesture(messageHosts: ["other.example.com"], messageAt: start.addingTimeInterval(0.1), now: soon))
+        #expect(!use.carriesPageGesture(messageHosts: ["docs.example.com"], messageAt: start.addingTimeInterval(-2), now: soon))
+        #expect(!use.carriesPageGesture(messageHosts: ["docs.example.com"], messageAt: start.addingTimeInterval(0.1),
+                                        now: start.addingTimeInterval(ExtensionUse.pageGestureWindow + 0.1)))
+    }
+
     @Test func captureFollowsSiteSettings() {
         let url = URL(string: "https://www.music.example/song")!
         #expect(BridgeTabCapture.siteAllows(url, offSites: [], hasAccess: true, allSites: false))

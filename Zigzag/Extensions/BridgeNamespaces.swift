@@ -1285,9 +1285,15 @@ final class BridgeSidePanel: BridgeNamespace {
             return ["openPanelOnActionClick": opensOnClick.contains(extensionID)]
         case "open":
             // Chrome lets a panel open only in answer to something you did with this extension: its button, its menu
-            // item or shortcut, or a click in its own pages. A click or key in some web page, or on another
-            // extension, isn't one.
-            guard host.hasRecentGesture(extensionID) else {
+            // item or shortcut, or a click in its own pages. A click or key in a web page counts only when the
+            // extension's own content script there passed it on, the call following its message a moment after
+            // (bridge.js says when that message came, and from which page). A click on another extension never does.
+            let carried = args.indices.contains(1) ? (args[1] as? [String: Any])?["contentMessage"] as? [String: Any] : nil
+            let message = carried.flatMap { message -> (hosts: [String], age: TimeInterval)? in
+                guard let hosts = message["hosts"] as? [String], let age = (message["age"] as? NSNumber)?.doubleValue else { return nil }
+                return (hosts, age / 1000)
+            }
+            guard host.hasRecentGesture(extensionID) || host.hasCarriedPageGesture(extensionID, contentMessage: message) else {
                 throw BridgeError("`sidePanel.open()` may only be called in response to a user gesture.")
             }
             let tab = args.object(0)["tabId"] as? Int

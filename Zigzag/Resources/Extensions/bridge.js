@@ -355,12 +355,34 @@
     onSignInChanged: event('identity.onSignInChanged'),
   });
 
+  // Chrome lets a click in a page open the panel when the extension's content script there passes it on to the
+  // background. The last message from one of its content scripts, and the page it came from, go with open(); Zigzag
+  // checks that you clicked or typed in that page a moment before (BridgeSidePanel). Listened to before the
+  // extension's own listeners, so it's known by the time they call open().
+  let contentMessage = null;
+  if (asked.has('sidePanel')) {
+    const ownOrigin = globalThis.location ? String(globalThis.location.origin) : '';
+    const note = (sender) => {
+      if (!sender || sender.id !== api.runtime.id || !sender.tab) return;
+      const hosts = [sender.url, sender.origin, sender.tab.url].flatMap((address) => {
+        if (typeof address !== 'string' || (ownOrigin && address.startsWith(ownOrigin))) return [];
+        try { const url = new URL(address); return /^https?:$/.test(url.protocol) ? [url.hostname] : []; } catch (e) { return []; }
+      });
+      if (hosts.length) contentMessage = { hosts, at: Date.now() };
+    };
+    try { if (api.runtime.onMessage) api.runtime.onMessage.addListener((message, sender) => { note(sender); return undefined; }); } catch (e) {}
+  }
+  const openPanel = method('sidePanel', 'open', {
+    before: (args) => [args[0] === undefined ? {} : args[0],
+      contentMessage ? { contentMessage: { hosts: contentMessage.hosts, age: Math.max(0, Date.now() - contentMessage.at) } } : {}],
+  });
+
   install('sidePanel', {
     setOptions: method('sidePanel', 'setOptions'),
     getOptions: method('sidePanel', 'getOptions'),
     setPanelBehavior: method('sidePanel', 'setPanelBehavior'),
     getPanelBehavior: method('sidePanel', 'getPanelBehavior'),
-    open: method('sidePanel', 'open'),
+    open: openPanel,
     close: method('sidePanel', 'close'),
     onOpened: event('sidePanel.onOpened'),
     onClosed: event('sidePanel.onClosed'),

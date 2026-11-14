@@ -279,8 +279,13 @@ final class ExtensionHost: NSObject {
     private func watchGestures() {
         gestureMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             // A key held down repeats on its own: only the press counts.
-            if let self, ExtensionUse.isGesture(event.type, isRepeat: event.type == .keyDown && event.isARepeat),
-               let id = self.extensionPage(under: event) { self.use.touched(id) }
+            if let self, ExtensionUse.isGesture(event.type, isRepeat: event.type == .keyDown && event.isARepeat) {
+                if let id = self.extensionPage(under: event) {
+                    self.use.touched(id)
+                } else if let tab = self.webPage(under: event) {
+                    self.use.pageGesture(on: tab.webView?.url?.host() ?? tab.url?.host())
+                }
+            }
             return event
         }
         menuObserver = NotificationCenter.default.addObserver(forName: NSMenu.willSendActionNotification, object: nil, queue: .main) { [weak self] note in
@@ -294,12 +299,33 @@ final class ExtensionHost: NSObject {
         }
     }
 
-    private func extensionPage(under event: NSEvent) -> String? {
+    private func webView(under event: NSEvent) -> WKWebView? {
         guard let window = event.window else { return nil }
         var view: NSView? = event.type == .keyDown ? window.firstResponder as? NSView : window.contentView?.hitTest(event.locationInWindow)
         while let current = view, !(current is WKWebView) { view = current.superview }
+        return view as? WKWebView
+    }
+
+    /// The web page in one of this profile's tabs that the click or key landed in. Private tabs are left out: no
+    /// extension hears of them.
+    private func webPage(under event: NSEvent) -> Tab? {
+        guard let page = webView(under: event) as? BrowserWebView, page.configuration.websiteDataStore === profile.store,
+              let tab = page.owner, !tab.isPrivate else { return nil }
+        return tab
+    }
+
+    /// A click or key in a web page counts for an extension when its content script there told its background
+    /// about it (`ExtensionUse.carriesPageGesture`).
+    func hasCarriedPageGesture(_ id: String, contentMessage: (hosts: [String], age: TimeInterval)?) -> Bool {
+        guard let contentMessage else { return false }
+        let now = Date()
+        return use.carriesPageGesture(messageHosts: contentMessage.hosts, messageAt: now.addingTimeInterval(-contentMessage.age), now: now)
+    }
+
+    private func extensionPage(under event: NSEvent) -> String? {
+        let view = webView(under: event)
         // The same extension can be open in another profile at the same address: only this profile's page counts here.
-        guard let page = view as? WKWebView, page.configuration.websiteDataStore === profile.store,
+        guard let page = view, page.configuration.websiteDataStore === profile.store,
               let url = page.url, url.scheme == "webkit-extension", let id = url.host(), context(for: id) != nil else { return nil }
         return id
     }
@@ -994,8 +1020,28 @@ struct ExtensionUse {
     /// How long after you use it an extension may start capturing the tab, without its popup or window open.
     static let captureWindow: TimeInterval = 15
 
+    /// How long a click or key in a web page counts for an extension whose content script there messaged its
+    /// background about it, as Chrome carries the page's activation over.
+    static let pageGestureWindow: TimeInterval = 1
+
     private(set) var invocations: [String: Invocation] = [:]
     private var gestures: [String: Date] = [:]
+    /// The last click or key in a web page, and the host of the page it landed in.
+    private var lastPageGesture: (host: String?, at: Date)?
+
+    mutating func pageGesture(on host: String?, at date: Date = Date()) { lastPageGesture = (host?.lowercased(), date) }
+
+    /// Whether a call made in answer to a content script's message (from a page at one of `messageHosts`, sent at
+    /// `messageAt`) carries a click or key you made in that page: one under `pageGestureWindow` ago, on the same
+    /// host, with the message sent after it. A page's script can't make the click, only send the message.
+    func carriesPageGesture(messageHosts: [String], messageAt: Date, now: Date = Date()) -> Bool {
+        guard let gesture = lastPageGesture, let host = gesture.host, !host.isEmpty else { return false }
+        let since = now.timeIntervalSince(gesture.at)
+        guard since >= 0, since < Self.pageGestureWindow else { return false }
+        // The message answers the click: sent after it (a little slack for the two clocks), and not in the future.
+        guard messageAt >= gesture.at.addingTimeInterval(-0.05), messageAt <= now.addingTimeInterval(0.05) else { return false }
+        return messageHosts.contains { $0.lowercased() == host }
+    }
 
     mutating func invoked(_ id: String, tabID: UUID, origin: String?, at date: Date = Date()) {
         invocations[id] = Invocation(tabID: tabID, origin: origin, at: date)
