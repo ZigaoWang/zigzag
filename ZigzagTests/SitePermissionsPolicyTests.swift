@@ -176,9 +176,9 @@ import WebKit
     }
 
     @Test func aStoredAllowSkipsTheQuestionAndABlockStopsIt() {
-        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: "allow", canRemember: true) == .open)
-        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: "deny", canRemember: true) == .block)
-        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: nil, canRemember: true) == .ask)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: "allow") == .open)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: "deny") == .block)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: nil) == .ask)
     }
 
     @Test func aForeignFrameNeverSeesThePagesAllow() {
