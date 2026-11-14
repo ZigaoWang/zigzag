@@ -5,10 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- Web apps hear their keyboard shortcuts before Zigzag's menus, as in Safari and Chrome: ⌘A and ⌘B in Google Docs, ⌘K in Slack, Linear and Notion, ⌘[ to indent, and the rest. Only the browser's own keys stay Zigzag's whatever the page wants (new and closed tabs, windows, the address, reload, spaces, quitting), and shortcuts you changed in Settings › Shortcuts stay the browser's on their new keys. ([#219](https://github.com/ZigaoWang/zigzag/issues/219))
-- A page's own Print button works, as in Safari: a school report card's or a receipt's Print brings up the print panel on the window, as ⌘P does, and the page waits until you've printed or canceled.
-
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
@@ -73,6 +69,8 @@ Split view with up to four pages, sites installed as apps of their own, the side
 - In Change Icon, the first choice shows the site's own icon, so it's clear that it puts the site's icon back.
 
 ### Fixed
+- Web apps hear their keyboard shortcuts before Zigzag's menus, as in Safari and Chrome: ⌘A and ⌘B in Google Docs, ⌘K in Slack, Linear and Notion, ⌘[ to indent, and the rest. Only the browser's own keys stay Zigzag's whatever the page wants (new and closed tabs, windows, the address, reload, spaces, quitting), and shortcuts you changed in Settings › Shortcuts stay the browser's on their new keys. ([#219](https://github.com/ZigaoWang/zigzag/issues/219))
+- A page's own Print button works, as in Safari: a school report card's or a receipt's Print brings up the print panel on the window, as ⌘P does, and the page waits until you've printed or canceled.
 - Zigzag Mini has Site Controls, the same button as by a browser window's address, at the right of its strip before Keep on Top, so you can turn Dark page on or off for a site, set its zoom, ad blocking or permissions, and clear its data, without opening the page in a browser window first. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#225](https://github.com/ZigaoWang/zigzag/issues/225))
 - Site Controls' Certificate page scrolls when its details are taller than the window has room for, its back button and title staying at the top; choosing another certificate in the chain no longer leaves its details cut off at the panel's edge. ([#220](https://github.com/ZigaoWang/zigzag/issues/220))
 - A quick move to the window's edge, with the desktop or another display beside it, brings the hidden sidebar out in one slide. It could run on past the edge and send the sidebar back before your hand came back, or go out too far for the window to notice it at all; now the pointer has a moment to come back, and the sidebar stays out. ([#206](https://github.com/ZigaoWang/zigzag/issues/206))
