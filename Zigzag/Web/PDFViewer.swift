@@ -1,21 +1,24 @@
 import AppKit
-import PDFKit
 import WebKit
 import os
 
-/// PDFs on your Mac in Zigzag's own viewer: Apple's PDFKit (Preview's engine) for the pages, with our controls in a
-/// pill at the bottom: the pages or contents down the side, where you are (click it to jump), zoom, two pages side
-/// by side, dark pages, and saving. It reopens a PDF where you left off.
+/// PDFs in Zigzag's own viewer, from the web or your Mac: the pages, with our controls in a pill at the bottom: the
+/// pages or contents down the side, where you are (click it to jump), zoom, two pages side by side, dark pages, and
+/// saving. It reopens a PDF where you left off.
 ///
-/// Only files: PDFKit reads a PDF in Zigzag itself, outside WebKit's sandbox, so a PDF from the web stays in WebKit's
-/// own viewer, which reads it in the page's sandboxed process. Downloaded, it opens here (`opens`).
+/// The PDF is never read here: Zigzag runs outside WebKit's sandbox, so the sandboxed PDF helper opens it
+/// (`SafePDF`), and the pages are drawn from what it sends back (`ZigzagPDFView`). Zigzag only holds the bytes, to
+/// send them there and to save them as they came. If the helper can't read a PDF, or fails on it, WebKit's own
+/// viewer shows it instead.
 ///
-/// WebKit still loads the file underneath, so Back, Forward, history and reopening after a restart work as for any
-/// page. The viewer covers WebKit's own, a quiet blank while it loads; if that fails, WebKit's viewer simply shows.
+/// WebKit still loads the PDF underneath, so Back, Forward, history, printing and reopening after a restart work as
+/// for any page. The viewer fetches the same file with the page's cookies (PDFs behind a sign-in) and covers
+/// WebKit's own, a quiet blank while it loads.
 @MainActor
-final class PDFViewerView: NSView, PDFViewDelegate {
+final class PDFViewerView: NSView {
     let url: URL
     private(set) var data: Data?
+    private(set) var document: SafePDF?
     /// The title the PDF gives itself, once it's loaded and if it has one.
     var documentTitle: String?
     private let isPrivate: Bool
@@ -26,7 +29,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
 
     private let sidebar = NSView()
     private let sidebarEdge = ColorView(color: Tokens.Color.separator)
-    private let thumbnails = PDFThumbnailView()
+    private let thumbnails = PDFThumbnailsView()
     private let sidebarSwitch = SlidingSwitch([.text(String(localized: "Pages", comment: "Switch in the PDF viewer's sidebar: shows the pages as thumbnails.")), .text(String(localized: "Contents", comment: "Switch in the PDF viewer's sidebar: shows the document's table of contents."))])
     private let contents = PDFContentsView()
 
@@ -44,6 +47,8 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     /// Links in the PDF open like links on a page: web links here, other apps' links through `onExternalLink`.
     var onOpenLink: ((URL) -> Void)?
     var onExternalLink: ((URL) -> Void)?
+    /// The helper failed on this PDF after it showed: WebKit's viewer takes over.
+    var onFail: (() -> Void)?
     /// Swipes to go back or forward, handed to the page underneath with which way the pages can still scroll.
     var onSwipe: ((NSEvent, (left: Bool, right: Bool)) -> Bool)? {
         get { pdfView.onSwipe }
@@ -63,7 +68,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         set { UserDefaults.standard.set(newValue, forKey: "pdfDarkPages") }
     }
 
-    /// Shown at once, blank while the PDF loads; `show(_:data:)` puts the pages in.
+    /// Shown at once, blank while the PDF loads; `show(_:info:)` puts the pages in.
     init(url: URL, isPrivate: Bool, profile: UUID = Profile.defaultID) {
         self.url = url
         self.isPrivate = isPrivate
@@ -72,12 +77,12 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         wantsLayer = true
         layer?.backgroundColor = cgColor(Self.backdrop)
 
-        pdfView.autoScales = true
-        pdfView.displaysPageBreaks = true
-        pdfView.pageShadowsEnabled = true
-        pdfView.delegate = self
-        pdfView.backgroundColor = Self.backdrop
+        pdfView.backdrop = Self.backdrop
+        pdfView.bottomInset = Self.barHeight + Tokens.Space.x4
         pdfView.alphaValue = 0
+        pdfView.onPageChanged = { [weak self] in self?.pageChanged() }
+        pdfView.onOpenURL = { [weak self] url in self?.openLink(url) }
+        pdfView.onThumbnail = { [weak self] page in self?.thumbnails.thumbnailArrived(page) }
         addSubview(pdfView)
 
         spinner.style = .spinning
@@ -92,11 +97,12 @@ final class PDFViewerView: NSView, PDFViewDelegate {
 
         sidebar.wantsLayer = true
         sidebar.layer?.backgroundColor = cgColor(Self.backdrop)
-        thumbnails.pdfView = pdfView
-        thumbnails.thumbnailSize = NSSize(width: Self.sidebarWidth - 64, height: (Self.sidebarWidth - 64) * 1.3)
-        thumbnails.backgroundColor = Self.backdrop
+        thumbnails.onPick = { [weak self] page in self?.jump(toPage: page + 1) }
         contents.isHidden = true
-        contents.onPick = { [weak self] destination in self?.glide(to: destination) }
+        contents.onPick = { [weak self] item in
+            guard let self, let page = item.page else { return }
+            self.pdfView.go(toPage: page, y: item.y, animated: true)
+        }
         sidebarSwitch.onChange = { [weak self] index in
             self?.thumbnails.isHidden = index != 0
             self?.contents.isHidden = index != 1
@@ -127,34 +133,37 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         }
         pageButton.onJump = { [weak self] number in self?.jump(toPage: number) }
         pageButton.onDone = { [weak self] in guard let self else { return }; self.window?.makeFirstResponder(self.pdfView) }
-        NotificationCenter.default.addObserver(self, selector: #selector(pageChanged), name: .PDFViewPageChanged, object: pdfView)
         NotificationCenter.default.addObserver(self, selector: #selector(followDarkPages), name: Self.darkPagesChanged, object: nil)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// The pages are here: on the page you left off at, faded in over the blank.
-    func show(_ document: PDFDocument, data: Data) {
-        self.data = data
+    /// The pages are here: on the page you left off at, faded in over the blank once they're drawn.
+    func show(_ document: SafePDF, info: SafePDF.Info) {
+        self.document = document
+        data = document.data
+        document.onFail = { [weak self] in self?.onFail?() }
         spinner.stopAnimation(nil)
         // Sized first, so the pages are scaled for the window they're in and open at their top.
         layoutSubtreeIfNeeded()
-        applyTwoPages()
+        pdfView.twoUp = Self.twoPages
+        twoPagesButton.showsFillAtRest = Self.twoPages
         // Dark from its first draw, if that's how you read PDFs.
-        (document as? DarkableDocument)?.isDark = Self.darkPages
-        pdfView.document = document
-        contents.outline = document.outlineRoot
+        applyDarkPages()
+        let saved = Self.place(for: url).flatMap { $0 < info.pageSizes.count ? $0 : nil } ?? 0
+        pdfView.show(document, info: info, startPage: saved)
+        thumbnails.pages = pdfView
+        contents.outline = info.outline
         // The Pages and Contents switch only when there are contents to show.
         sidebarSwitch.isHidden = !contents.hasEntries
-        pdfView.layoutDocumentView()
-        let saved = Self.place(for: url).flatMap { $0 < document.pageCount ? $0 : nil } ?? 0
-        if let page = document.page(at: saved) { pdfView.go(to: page) }
-        applyDarkPages()
         pageChanged()
         bar.isHidden = false
         needsLayout = true
-        Tokens.Motion.animate(Tokens.Motion.Curve(duration: Tokens.Motion.large), evenFromKeyboard: true) {
-            self.pdfView.animator().alphaValue = 1
+        pdfView.whenShown { [weak self] in
+            guard let self else { return }
+            Tokens.Motion.animate(Tokens.Motion.Curve(duration: Tokens.Motion.large), evenFromKeyboard: true) {
+                self.pdfView.animator().alphaValue = 1
+            }
         }
         bar.present(arrival: .pop)
     }
@@ -194,7 +203,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     }
 
     private var barWidth: CGFloat {
-        Tokens.Space.x2 * 2 + Tokens.Metric.iconButton * 6 + pageButton.fittingWidth(pages: pdfView.document?.pageCount ?? 0) + Tokens.Space.x1 * 2
+        Tokens.Space.x2 * 2 + Tokens.Metric.iconButton * 6 + pageButton.fittingWidth(pages: pdfView.pageCount) + Tokens.Space.x1 * 2
     }
 
     private func layoutBar() {
@@ -203,69 +212,45 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         func place(_ view: NSView, _ width: CGFloat) { view.frame = NSRect(x: x, y: y, width: width, height: b); x += width }
         place(sidebarButton, b)
         x += Tokens.Space.x1
-        place(pageButton, pageButton.fittingWidth(pages: pdfView.document?.pageCount ?? 0))
+        place(pageButton, pageButton.fittingWidth(pages: pdfView.pageCount))
         x += Tokens.Space.x1
         [zoomOutButton, zoomInButton, twoPagesButton, darkButton, saveButton].forEach { place($0, b) }
     }
 
-    @objc private func pageChanged() {
-        // The page at the top of the view: PDFKit's own idea of it lags behind a smooth scroll.
-        let top = NSPoint(x: pdfView.bounds.midX, y: pdfView.isFlipped ? 40 : pdfView.bounds.maxY - 40)
-        guard let document = pdfView.document, let page = pdfView.page(for: top, nearest: true) ?? pdfView.currentPage else { return }
-        let index = document.index(for: page)
-        pageButton.set(page: index + 1, of: document.pageCount)
-        contents.markCurrent(page)
+    private var shownPage = -1
+
+    private func pageChanged() {
+        guard pdfView.pageCount > 0 else { return }
+        let index = pdfView.currentPage
+        guard index != shownPage else { return }
+        shownPage = index
+        pageButton.set(page: index + 1, of: pdfView.pageCount)
+        contents.markCurrent(index)
+        thumbnails.markCurrent(index)
         rememberPlace(index)
     }
 
     /// What's on screen, for the tab's picture in the switcher and all-tabs view.
     func snapshot() -> NSImage? {
-        guard pdfView.document != nil, let rep = pdfView.bitmapImageRepForCachingDisplay(in: pdfView.bounds) else { return nil }
-        pdfView.cacheDisplay(in: pdfView.bounds, to: rep)
-        let image = NSImage(size: pdfView.bounds.size)
-        image.addRepresentation(rep)
-        return image
+        guard pdfView.document != nil else { return nil }
+        return pdfView.snapshot()
     }
 
     // MARK: Moving around
 
-    /// Scrolls to a page or a heading in one smooth move, rather than a cut.
-    private func glide(to destination: PDFDestination) {
-        guard let page = destination.page else { return }
-        guard !Tokens.Motion.reduceMotion, let documentView = pdfView.documentView, let clip = documentView.enclosingScrollView?.contentView else {
-            pdfView.go(to: destination)
-            return
-        }
-        // Where the heading sits on its page, or the page's top, in the scrolling view's own terms.
-        let box = page.bounds(for: pdfView.displayBox)
-        var point = destination.point
-        if point.y == kPDFDestinationUnspecifiedValue || point.y > box.maxY { point.y = box.maxY }
-        if point.x == kPDFDestinationUnspecifiedValue { point.x = box.minX }
-        let inView = pdfView.convert(point, from: page)
-        let inDocument = documentView.convert(inView, from: pdfView)
-        let margin: CGFloat = 12
-        var origin = clip.bounds.origin
-        origin.y = documentView.isFlipped ? inDocument.y - margin : inDocument.y - clip.bounds.height + margin
-        let maxY = max(0, documentView.frame.height - clip.bounds.height)
-        origin.y = min(max(origin.y, 0), maxY)
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = Tokens.Motion.snappy.duration
-            context.timingFunction = Tokens.Motion.drawer
-            clip.animator().setBoundsOrigin(origin)
-        } completionHandler: { [weak self, weak clip] in
-            MainActor.assumeIsolated {
-                guard let self, let clip else { return }
-                clip.enclosingScrollView?.reflectScrolledClipView(clip)
-                // Landed: the page count follows what's now at the top.
-                self.pageChanged()
-            }
-        }
+    private func jump(toPage number: Int) {
+        guard pdfView.pageCount > 0 else { return }
+        pdfView.go(toPage: min(max(number, 1), pdfView.pageCount) - 1, y: nil, animated: true)
+        window?.makeFirstResponder(pdfView)
     }
 
-    private func jump(toPage number: Int) {
-        guard let document = pdfView.document, let page = document.page(at: min(max(number, 1), document.pageCount) - 1) else { return }
-        glide(to: PDFDestination(page: page, at: NSPoint(x: kPDFDestinationUnspecifiedValue, y: kPDFDestinationUnspecifiedValue)))
-        window?.makeFirstResponder(pdfView)
+    /// Never a file on your Mac: a local PDF's relative links would otherwise reach the files beside it.
+    private func openLink(_ url: URL) {
+        switch Reader.route(for: url) {
+        case .browse: onOpenLink?(url)
+        case .externalApp: onExternalLink?(url)
+        case .ignore: break
+        }
     }
 
     private func toggleSidebar() {
@@ -289,16 +274,8 @@ final class PDFViewerView: NSView, PDFViewDelegate {
 
     private func toggleTwoPages() {
         Self.twoPages.toggle()
-        applyTwoPages()
-    }
-
-    private func applyTwoPages() {
-        let page = pdfView.currentPage
-        pdfView.displayMode = Self.twoPages ? .twoUpContinuous : .singlePageContinuous
-        pdfView.displaysAsBook = Self.twoPages
-        pdfView.autoScales = true
+        pdfView.twoUp = Self.twoPages
         twoPagesButton.showsFillAtRest = Self.twoPages
-        if let page { pdfView.go(to: page) }
     }
 
     /// Dark pages are one setting: every open PDF, in any window, follows it.
@@ -310,52 +287,36 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     }
 
     @objc private func followDarkPages() {
-        // A soft crossfade from the pages as they were, rather than a flash, where you can see it.
-        guard window != nil, pdfView.document != nil, let rep = pdfView.bitmapImageRepForCachingDisplay(in: pdfView.bounds) else {
+        // A soft crossfade from the pages as they were, rather than a flash, where you can see it: the old look stays
+        // until the new one is drawn.
+        guard window != nil, pdfView.document != nil, let image = pdfView.snapshot() else {
             applyDarkPages()
             return
         }
-        pdfView.cacheDisplay(in: pdfView.bounds, to: rep)
-        let image = NSImage(size: pdfView.bounds.size)
-        image.addRepresentation(rep)
         let still = NSImageView(frame: pdfView.frame)
         still.image = image
         still.imageScaling = .scaleAxesIndependently
         addSubview(still, positioned: .above, relativeTo: pdfView)
         applyDarkPages()
-        Tokens.Motion.animate(Tokens.Motion.change, evenFromKeyboard: true, { still.animator().alphaValue = 0 }, completion: { still.removeFromSuperview() })
+        pdfView.whenShown {
+            Tokens.Motion.animate(Tokens.Motion.change, evenFromKeyboard: true, { still.animator().alphaValue = 0 }, completion: { still.removeFromSuperview() })
+        }
     }
 
     private static func around(dark: Bool) -> NSColor { dark ? Tokens.Color.pdfBackdropDarkPages : backdrop }
 
-    /// Dark pages: each page drawn dark by `DarkablePage` (soft dark paper, light ink, its colors kept), and no
-    /// page shadows, which would glow.
+    /// Dark pages: each page drawn dark by the helper (soft dark paper, light ink, its colors kept), and no page
+    /// shadows, which would glow.
     private func applyDarkPages() {
         let dark = Self.darkPages
         darkButton.showsFillAtRest = dark
         darkButton.symbol = dark ? "moon.fill" : "moon"
-        // Set on this document alone: its pages read it while PDFKit draws them, off the main thread too.
-        let darkable = pdfView.document as? DarkableDocument
-        let changed = darkable.map { $0.isDark != dark } ?? false
-        darkable?.isDark = dark
-        pdfView.pageShadowsEnabled = !dark
+        pdfView.isDark = dark
+        pdfView.pageShadows = !dark
         let around = Self.around(dark: dark)
-        pdfView.backgroundColor = around
+        pdfView.backdrop = around
         layer?.backgroundColor = cgColor(around)
-        // PDFKit keeps pages it has drawn: the document goes back in, on the same spot at the same zoom, so
-        // every page and thumbnail draws again in its new colors.
-        guard changed, let document = pdfView.document, let clip = pdfView.documentView?.enclosingScrollView?.contentView else { return }
-        let autoScales = pdfView.autoScales, scale = pdfView.scaleFactor, origin = clip.bounds.origin
-        pdfView.document = nil
-        pdfView.document = document
-        pdfView.scaleFactor = scale
-        pdfView.autoScales = autoScales
-        pdfView.layoutDocumentView()
-        if let newClip = pdfView.documentView?.enclosingScrollView?.contentView {
-            newClip.scroll(to: origin)
-            newClip.enclosingScrollView?.reflectScrolledClipView(newClip)
-        }
-        pageChanged()
+        thumbnails.reload()
     }
 
     // MARK: Remembering your place
@@ -415,18 +376,15 @@ final class PDFViewerView: NSView, PDFViewDelegate {
 
     // MARK: Actions
 
-    func zoomIn() { pdfView.zoomIn(nil) }
-    func zoomOut() { pdfView.zoomOut(nil) }
+    func zoomIn() { pdfView.zoomIn() }
+    func zoomOut() { pdfView.zoomOut() }
     /// The pages at their printed size, as in Preview (it still opens fitting the window).
-    func actualSize() {
-        pdfView.autoScales = false
-        pdfView.scaleFactor = 1
-    }
+    func actualSize() { pdfView.actualSize() }
 
     /// Downloaded like any file: into Downloads (or where you choose, with that setting), with the usual flight into
     /// the Downloads button, which opens to show it. The tab stays on the web copy you were reading; opening the file
     /// from Downloads opens it on the same page. A PDF that's already a file on your Mac has nothing to download: Save
-    /// As asks where a copy goes.
+    /// As asks where a copy goes. Either way, the bytes as they came, untouched.
     func save() {
         guard let data, let window else { return }
         let name = url.lastPathComponent.lowercased().hasSuffix(".pdf") ? url.lastPathComponent : "Document.pdf"
@@ -445,7 +403,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
             }
             return
         }
-        let page = pdfView.currentPage.flatMap { pdfView.document?.index(for: $0) } ?? 0
+        let page = pdfView.currentPage
         Task { @MainActor [weak self] in
             guard let self else { return }
             do {
@@ -465,88 +423,175 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         UserDefaults.standard.set(all, forKey: placesKey)
     }
 
-    /// Printed from the file itself: paper is never dark.
-    func print() {
-        guard let window, let data, let operation = PDFDocument(data: data)?.printOperation(for: NSPrintInfo.shared, scalingMode: .pageScaleDownToFit, autoRotate: true) else { return }
-        operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
-    }
-
     // MARK: Find
 
-    private var matches: [PDFSelection] = []
+    private var matches: [(page: Int, range: NSRange)] = []
     private var matchIndex = 0
     private var matchedQuery = ""
+    private var finding = 0
 
-    /// Finds `query`, moving to the next (or previous) match. Returns where you are and how many there are.
-    func find(_ query: String, backwards: Bool, fromStart: Bool) -> (place: Int, count: Int) {
-        guard let document = pdfView.document, !query.isEmpty else { clearFind(); return (0, 0) }
+    /// Finds `query`, moving to the next (or previous) match. Returns where you are and how many there are; nil when
+    /// a newer search came while this one waited for the PDF's text.
+    func find(_ query: String, backwards: Bool, fromStart: Bool) async -> (place: Int, count: Int)? {
+        finding += 1
+        let search = finding
+        guard pdfView.document != nil, !query.isEmpty else { clearFind(); return (0, 0) }
         if query != matchedQuery || fromStart {
-            matches = document.findString(query, withOptions: [.caseInsensitive, .diacriticInsensitive])
+            let found = await pdfView.matches(of: query)
+            guard search == finding else { return nil }
+            matches = found
             matchedQuery = query
-            matchIndex = backwards ? matches.count - 1 : 0
+            matchIndex = backwards ? found.count - 1 : 0
         } else if !matches.isEmpty {
             matchIndex = (matchIndex + (backwards ? -1 : 1) + matches.count) % matches.count
         }
-        guard matches.indices.contains(matchIndex) else { pdfView.highlightedSelections = nil; return (0, 0) }
-        let current = matches[matchIndex]
-        pdfView.highlightedSelections = matches
-        pdfView.setCurrentSelection(current, animate: true)
-        pdfView.go(to: current)
+        guard matches.indices.contains(matchIndex) else { pdfView.showMatches([], current: nil); return (0, 0) }
+        pdfView.showMatches(matches, current: matchIndex)
         return (matchIndex + 1, matches.count)
     }
 
     func clearFind() {
+        finding += 1
         matches = []
         matchedQuery = ""
-        pdfView.highlightedSelections = nil
-        pdfView.clearSelection()
+        pdfView.clearFind()
     }
 
-    // MARK: PDFViewDelegate
-
-    nonisolated func pdfViewWillClick(onLink sender: PDFView, with url: URL) {
-        // Never a file on your Mac: a local PDF's relative links would otherwise reach the files beside it.
-        MainActor.assumeIsolated {
-            switch Reader.route(for: url) {
-            case .browse: onOpenLink?(url)
-            case .externalApp: onExternalLink?(url)
-            case .ignore: break
-            }
+    #if DEBUG
+    /// DebugBridge's `pdf` command: the bar's buttons, a page, or a search, from a test copy.
+    func debug(_ command: String) {
+        let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
+        switch parts.first ?? "" {
+        case "in": zoomIn()
+        case "out": zoomOut()
+        case "actual": actualSize()
+        case "dark": toggleDarkPages()
+        case "twoup": toggleTwoPages()
+        case "sidebar": toggleSidebar()
+        case "page": jump(toPage: Int(parts.last ?? "") ?? 1)
+        case "find": Task { _ = await find(parts.count > 1 ? parts[1] : "", backwards: false, fromStart: true) }
+        default: break
         }
     }
+    #endif
 
     // MARK: Loading
 
-    /// Whether a PDF at `url` opens in this viewer: only a file on your Mac, never one from the web.
-    nonisolated static func opens(_ url: URL) -> Bool { url.isFileURL }
+    /// Fetches the PDF the way the page did: its cookies and the browser's user agent, so a PDF behind a sign-in
+    /// comes too; a file on your Mac is read as it is. Nil when it can't (WebKit's own viewer shows then). Only the
+    /// bytes: the helper is what reads them (`open`).
+    static func load(_ url: URL, from webView: WKWebView, userAgent: String?) async -> Data? {
+        if url.isFileURL {
+            return try? await Task.detached { try Data(contentsOf: url) }.value
+        }
+        guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return nil }
+        // WebKit's own copy first, once it has all of it: no second download, and nothing a fetch of our own could
+        // get differently (a link that works once).
+        if let data = await mainResourceData(of: webView, at: url) { return data }
+        // Only the cookies a link from another site would carry too: a "Strict" one, held back from the page's own
+        // load when another site sent you there, isn't sent behind its back now.
+        let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
+            .filter { $0.sameSitePolicy != .sameSiteStrict }
+        let configuration = URLSessionConfiguration.ephemeral
+        let storage = HTTPCookieStorage()
+        cookies.forEach { storage.setCookie($0) }
+        configuration.httpCookieStorage = storage
+        let session = URLSession(configuration: configuration)
+        defer { session.finishTasksAndInvalidate() }
+        var request = URLRequest(url: url)
+        if let userAgent { request.setValue(userAgent, forHTTPHeaderField: "User-Agent") }
+        guard let (body, response) = try? await session.data(for: request),
+              ((response as? HTTPURLResponse)?.statusCode ?? 200) < 400, body.count <= SafePDF.maxInputBytes else { return nil }
+        return body
+    }
 
-    /// Reads a PDF file for the viewer. Nil for anything that isn't a file on your Mac (WebKit's own viewer shows
-    /// that), or a file that can't be opened.
-    static func load(_ url: URL) async -> (PDFDocument, Data)? {
-        guard opens(url), let data = try? await Task.detached(operation: { try Data(contentsOf: url) }).value else { return nil }
-        // Its pages come as `DarkablePage`, so dark pages can draw them. One behind a password is left to WebKit,
-        // which asks for it.
-        guard let document = DarkableDocument(data: data), !document.isLocked, document.pageCount > 0 else { return nil }
-        return (document, data)
+    /// The bytes WebKit loaded for the page, once it's done loading them (WebKit's own unpublished call, as Safari
+    /// has it). Nil if it can't say, or they aren't a PDF's: the viewer fetches the file itself then.
+    private static func mainResourceData(of webView: WKWebView, at url: URL) async -> Data? {
+        let selector = NSSelectorFromString("_getMainResourceDataWithCompletionHandler:")
+        guard webView.responds(to: selector) else { return nil }
+        while webView.isLoading, webView.url == url, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        guard webView.url == url, !Task.isCancelled else { return nil }
+        typealias Call = @convention(c) (AnyObject, Selector, @escaping @convention(block) (NSData?, NSError?) -> Void) -> Void
+        let call = unsafeBitCast(webView.method(for: selector), to: Call.self)
+        let data: Data? = await withCheckedContinuation { continuation in
+            let once = OSAllocatedUnfairLock(initialState: false)
+            call(webView, selector) { data, _ in
+                guard once.withLock({ done in defer { done = true }; return !done }) else { return }
+                continuation.resume(returning: data as Data?)
+            }
+        }
+        guard let data, data.count <= SafePDF.maxInputBytes, data.prefix(1024).range(of: Data("%PDF-".utf8)) != nil else { return nil }
+        return data
+    }
+
+    /// The PDF opened in the helper. Nil when the helper can't read it (not a PDF, behind a password, or it failed):
+    /// WebKit's viewer, which asks for a password, shows it instead.
+    static func open(_ data: Data) async -> (SafePDF, SafePDF.Info)? {
+        let document = SafePDF(data: data)
+        guard let info = await document.open() else { return nil }
+        return (document, info)
     }
 }
 
-/// PDFKit's view with Zigzag's swipe to go back and forward.
-final class ZigzagPDFView: PDFView {
-    var onSwipe: ((NSEvent, (left: Bool, right: Bool)) -> Bool)?
+/// The PDF's own table of contents, indented by level. Click a heading to go there; the one you're reading is marked.
+private final class PDFContentsView: NSView {
+    private let scroll = NSScrollView()
+    private let stack = FlippedView()
+    private var rows: [(row: ContentsRow, page: Int?)] = []
+    var onPick: ((SafePDF.OutlineItem) -> Void)?
+    var hasEntries: Bool { !rows.isEmpty }
 
-    /// PDFKit's own scroll view inside takes the trackpad's scrolls, so they never reach this view: the window hands
-    /// each scroll over the pages here first (`BrowserWindow.sendEvent`), so the swipe sees every gesture begin and
-    /// end. Zoomed in, a sideways swipe pans until the pages reach their edge, and only then goes back or forward.
-    func takesSwipe(_ event: NSEvent) -> Bool {
-        onSwipe?(event, sidewaysRoom) == true
+    var outline: [SafePDF.OutlineItem] = [] {
+        didSet { rebuild() }
     }
 
-    /// Whether the pages can scroll further left or right.
-    private var sidewaysRoom: (left: Bool, right: Bool) {
-        guard let documentView, let clip = documentView.enclosingScrollView?.contentView else { return (false, false) }
-        let shown = clip.bounds, all = documentView.frame
-        return (shown.minX > all.minX + 0.5, shown.maxX < all.maxX - 0.5)
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.scrollerStyle = .overlay
+        scroll.autohidesScrollers = true
+        scroll.documentView = stack
+        addSubview(scroll)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+
+    private func rebuild() {
+        rows.forEach { $0.row.removeFromSuperview() }
+        rows = []
+        for item in outline {
+            let row = ContentsRow(title: item.title, level: item.level)
+            row.onClick = { [weak self] _ in self?.onPick?(item) }
+            stack.addSubview(row)
+            rows.append((row, item.page))
+        }
+        needsLayout = true
+    }
+
+    /// The section you're reading: the first heading on this page, or the last one before it.
+    func markCurrent(_ index: Int) {
+        let placed = rows.compactMap { row, page in page.map { (row, $0) } }
+        let current = placed.first { $0.1 == index }?.0 ?? placed.last { $0.1 < index }?.0
+        rows.forEach { $0.row.isSelected = $0.row === current }
+    }
+
+    override func layout() {
+        super.layout()
+        scroll.frame = bounds
+        // The sidebar's rhythm: rows 8pt in from the edges, a hairline apart.
+        let pad = Tokens.Metric.sidebarPadding
+        var y = Tokens.Space.x1
+        for (row, _) in rows {
+            row.frame = NSRect(x: pad, y: y, width: bounds.width - pad * 2, height: Tokens.Metric.rowHeight)
+            y += Tokens.Metric.rowHeight + Tokens.Metric.rowGap
+        }
+        stack.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(y + Tokens.Space.x2, bounds.height))
     }
 }
 
@@ -634,72 +679,6 @@ private final class PageNumberButton: InteractiveView, NSTextFieldDelegate {
     func controlTextDidEndEditing(_ obj: Notification) { endTyping() }
 }
 
-/// The PDF's own table of contents, indented by level. Click a heading to go there; the one you're reading is marked.
-private final class PDFContentsView: NSView {
-    private let scroll = NSScrollView()
-    private let stack = FlippedView()
-    private var rows: [(row: ContentsRow, page: PDFPage?)] = []
-    var onPick: ((PDFDestination) -> Void)?
-    var hasEntries: Bool { !rows.isEmpty }
-
-    var outline: PDFOutline? {
-        didSet { rebuild() }
-    }
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        scroll.drawsBackground = false
-        scroll.hasVerticalScroller = true
-        scroll.scrollerStyle = .overlay
-        scroll.autohidesScrollers = true
-        scroll.documentView = stack
-        addSubview(scroll)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override var isFlipped: Bool { true }
-
-    private func rebuild() {
-        rows.forEach { $0.row.removeFromSuperview() }
-        rows = []
-        func add(_ item: PDFOutline, level: Int) {
-            for i in 0..<item.numberOfChildren {
-                guard let child = item.child(at: i) else { continue }
-                let destination = child.destination
-                let row = ContentsRow(title: child.label ?? "", level: level)
-                row.onClick = { [weak self] _ in if let destination { self?.onPick?(destination) } }
-                stack.addSubview(row)
-                rows.append((row, destination?.page))
-                add(child, level: level + 1)
-            }
-        }
-        if let outline { add(outline, level: 0) }
-        needsLayout = true
-    }
-
-    /// The section you're reading: the first heading on this page, or the last one before it.
-    func markCurrent(_ page: PDFPage) {
-        guard let document = page.document else { return }
-        let index = document.index(for: page)
-        let placed = rows.compactMap { row, rowPage in rowPage.map { (row, document.index(for: $0)) } }
-        let current = placed.first { $0.1 == index }?.0 ?? placed.last { $0.1 < index }?.0
-        rows.forEach { $0.row.isSelected = $0.row === current }
-    }
-
-    override func layout() {
-        super.layout()
-        scroll.frame = bounds
-        // The sidebar's rhythm: rows 8pt in from the edges, a hairline apart.
-        let pad = Tokens.Metric.sidebarPadding
-        var y = Tokens.Space.x1
-        for (row, _) in rows {
-            row.frame = NSRect(x: pad, y: y, width: bounds.width - pad * 2, height: Tokens.Metric.rowHeight)
-            y += Tokens.Metric.rowHeight + Tokens.Metric.rowGap
-        }
-        stack.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(y + Tokens.Space.x2, bounds.height))
-    }
-}
 
 private final class ContentsRow: InteractiveView {
     private let label: Label
@@ -730,39 +709,5 @@ private final class ContentsRow: InteractiveView {
     override func stateDidChange(animated: Bool) {
         applyRowStyle(animated: animated)
         label.textColor = level == 0 || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
-    }
-}
-
-/// A PDF page that can draw itself dark for reading at night, in vectors, so text stays as sharp as ever:
-/// the page as usual, its brightness flipped against a soft grey (white paper to #1C1C1E, black ink to #E3E3E3),
-/// then the page again in color blending, which puts back each color's own hue and strength on the new brightness.
-/// A diagram's blue box stays blue, only darker; nothing turns into its opposite.
-/// A document whose pages are `DarkablePage`, and whether they draw dark. Locked, since PDFKit draws pages on
-/// its own threads while the setting changes on the main one.
-nonisolated final class DarkableDocument: PDFDocument {
-    private let dark = OSAllocatedUnfairLock(initialState: false)
-    var isDark: Bool {
-        get { dark.withLock { $0 } }
-        set { dark.withLock { $0 = newValue } }
-    }
-
-    override var pageClass: AnyClass { DarkablePage.self }
-}
-
-nonisolated final class DarkablePage: PDFPage {
-    override func draw(with box: PDFDisplayBox, to context: CGContext) {
-        guard (document as? DarkableDocument)?.isDark == true else { super.draw(with: box, to: context); return }
-        let area = context.boundingBoxOfClipPath
-        context.saveGState()
-        // Paper first, so a page with no background of its own darkens too.
-        context.setFillColor(CGColor(gray: 1, alpha: 1))
-        context.fill(area)
-        super.draw(with: box, to: context)
-        context.setBlendMode(.difference)
-        context.setFillColor(CGColor(gray: 0.89, alpha: 1))
-        context.fill(area)
-        context.setBlendMode(.color)
-        super.draw(with: box, to: context)
-        context.restoreGState()
     }
 }

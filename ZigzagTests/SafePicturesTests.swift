@@ -2,8 +2,7 @@ import AppKit
 import Testing
 @testable import Zigzag
 
-/// Pictures from the web are read by the sandboxed picture helper, never in Zigzag; PDFs from the web never reach
-/// PDFKit in Zigzag.
+/// Pictures from the web are read by the sandboxed picture helper, never in Zigzag (PDFs: SafePDFTests).
 struct SafePicturesTests {
     // MARK: Pictures to read
 
@@ -332,21 +331,5 @@ struct SafePicturesTests {
         #expect(SafePictures.bytes(ofDataURL: "data:image/png;base64,iVBORw0KGgo=") == Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))
         #expect(SafePictures.bytes(ofDataURL: "data:image/svg+xml,%3Csvg%3E") == Data("<svg>".utf8))
         #expect(SafePictures.bytes(ofDataURL: "https://example.com/a.png") == nil)
-    }
-
-    // MARK: PDFs
-
-    @Test @MainActor func aPDFFromTheWebNeverOpensInPDFKit() async throws {
-        #expect(!PDFViewerView.opens(URL(string: "https://example.com/paper.pdf")!))
-        #expect(!PDFViewerView.opens(URL(string: "http://example.com/download?id=3")!))
-        #expect(PDFViewerView.opens(URL(fileURLWithPath: "/tmp/paper.pdf")))
-        // Not even fetched: nothing comes back for an address on the web.
-        #expect(await PDFViewerView.load(URL(string: "https://example.com/paper.pdf")!) == nil)
-        // A PDF file on your Mac still opens in Zigzag's viewer.
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".pdf")
-        try Self.pdf().write(to: file)
-        defer { try? FileManager.default.removeItem(at: file) }
-        let loaded = try #require(await PDFViewerView.load(file))
-        #expect(loaded.0.pageCount == 1)
     }
 }

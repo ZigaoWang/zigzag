@@ -538,6 +538,8 @@ enum DebugBridge {
         switch name {
         case "open": if let url = URL(string: arg) { controller.open(url, disposition: .foregroundTab, allowSwitch: false) }
         case "bg": if let url = URL(string: arg) { controller.open(url, disposition: .backgroundTab, allowSwitch: false) }
+        // pdf in|out|actual|dark|twoup|sidebar|page <n>|find <text>: the PDF viewer's own controls, on the tab in front.
+        case "pdf": controller.selectedTab?.pdfViewer?.debug(arg)
         // child <url>: a link opened in a background tab from the tab you're on, as ⌘-click does.
         case "child": if let url = URL(string: arg), let tab = controller.tabManager.selectedTab { controller.tab(tab, openURL: url, disposition: .backgroundTab) }
         // nest on|off: Settings › Tabs › Open ⌘-clicked links under their tab.

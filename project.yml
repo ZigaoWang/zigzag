@@ -77,10 +77,16 @@ targets:
         buildPhase: resources
       # What Zigzag and its picture helper say to each other.
       - path: ZigzagImageDecoder/PictureService.swift
+      # What Zigzag and its PDF helper say to each other.
+      - path: ZigzagPDFRenderer/PDFService.swift
     dependencies:
       - package: Sparkle
       # Reads the pictures websites send (site icons and the like) in a sandbox of its own: Contents/XPCServices.
       - target: ZigzagImageDecoder
+        embed: true
+        codeSign: true
+      # Opens the PDFs the viewer shows, from the web or your Mac, in a sandbox of its own: Contents/XPCServices.
+      - target: ZigzagPDFRenderer
         embed: true
         codeSign: true
       # The small app each site installed as an app runs (File › Install as App…): copied out of here into the
@@ -190,6 +196,28 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: wang.zigao.zigzag.imagedecoder
         CODE_SIGN_ENTITLEMENTS: ZigzagImageDecoder/ZigzagImageDecoder.entitlements
+        SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
+        SKIP_INSTALL: YES
+  # Zigzag's PDF helper (ZigzagPDFRenderer/main.swift): the App Sandbox with no network and no files.
+  ZigzagPDFRenderer:
+    type: xpc-service
+    platform: macOS
+    sources:
+      - path: ZigzagPDFRenderer
+        excludes: ["*.entitlements"]
+    info:
+      path: ZigzagPDFRenderer/Info.plist
+      properties:
+        CFBundleDisplayName: Zigzag PDF Renderer
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        XPCService:
+          ServiceType: Application
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: wang.zigao.zigzag.pdfrenderer
+        CODE_SIGN_ENTITLEMENTS: ZigzagPDFRenderer/ZigzagPDFRenderer.entitlements
         SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
         SKIP_INSTALL: YES
   ZigzagTests:

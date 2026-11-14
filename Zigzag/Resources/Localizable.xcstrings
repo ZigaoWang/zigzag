@@ -6470,6 +6470,17 @@
         }
       }
     },
+    "Fit Width" : {
+      "comment" : "Context menu item in the PDF viewer: scales the pages to fit the window’s width.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "适合宽度"
+          }
+        }
+      }
+    },
     "Fixed" : {
       "comment" : "Heading in What’s New: what this version fixes.",
       "localizations" : {
@@ -10634,6 +10645,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "牛血红"
+          }
+        }
+      }
+    },
+    "PDF" : {
+      "comment" : "VoiceOver label of the pages in the PDF viewer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF"
           }
         }
       }

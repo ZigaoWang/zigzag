@@ -87,9 +87,17 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func printPage(_ sender: Any?) {
-        // A PDF prints as itself, page for page.
-        if !(peekController?.isVisible ?? false), !isReaderOpen, let pdf = selectedTab?.pdfViewer { pdf.print(); return }
         guard let webView = printableWebView, let window else { return }
+        // A PDF prints as itself, page for page, from WebKit's copy underneath Zigzag's viewer: WebKit reads it in
+        // the page's sandboxed process, and paper is never dark.
+        if webView === selectedWebView, selectedTab?.showsPDF == true {
+            let operation = webView.printOperation(with: NSPrintInfo.shared.copy() as! NSPrintInfo)
+            operation.view?.frame = webView.bounds
+            operation.showsPrintPanel = true
+            operation.showsProgressPanel = true
+            operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+            return
+        }
         PagePrinting.print(webView, in: window, completion: {})
     }
 

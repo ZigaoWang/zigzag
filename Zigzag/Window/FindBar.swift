@@ -267,12 +267,15 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
             pdfSearch?.cancel()
             let query = query
             let work = DispatchWorkItem { [weak self, weak pdf] in
-                guard let self, let pdf else { return }
-                let found = pdf.find(query, backwards: backwards, fromStart: fromStart)
-                self.showCount(query.isEmpty ? "" : found.count == 0 ? Self.noMatches
-                    : found.count == 1 ? Self.matches(found.count) : Self.place(found.place, of: found.count))
-                self.countLabel.textColor = found.count > 0 ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
-                self.layoutPanel()
+                // The helper has the PDF's text: the count comes once it's answered, unless you've typed on since.
+                Task { @MainActor [weak self, weak pdf] in
+                    guard let pdf, let found = await pdf.find(query, backwards: backwards, fromStart: fromStart),
+                          let self, self.query == query, self.searchedPDF === pdf else { return }
+                    self.showCount(query.isEmpty ? "" : found.count == 0 ? Self.noMatches
+                        : found.count == 1 ? Self.matches(found.count) : Self.place(found.place, of: found.count))
+                    self.countLabel.textColor = found.count > 0 ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
+                    self.layoutPanel()
+                }
             }
             pdfSearch = work
             // Typing waits; Return and the arrows move at once.

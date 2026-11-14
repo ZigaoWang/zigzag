@@ -1,6 +1,5 @@
 import AppKit
 import WebKit
-import PDFKit
 
 /// What a tab asks of the window that shows it.
 protocol TabHost: AnyObject {
@@ -103,7 +102,7 @@ final class Tab: NSObject {
     private(set) var canGoBack = false
     private(set) var canGoForward = false
     private(set) var isClosed = false
-    /// A PDF file on your Mac shows in Zigzag's own viewer, over WebKit's; nil for any other page.
+    /// A PDF shows in Zigzag's own viewer, over WebKit's; nil for any other page.
     private(set) var pdfViewer: PDFViewerView?
     /// The page is a PDF, in either viewer: saved as itself, not as a web archive.
     private(set) var showsPDF = false
@@ -116,6 +115,8 @@ final class Tab: NSObject {
     /// address (Reload); and a form's reply, sent by POST, is never fetched a second time, so WebKit's viewer shows it.
     private var pdfFreshLoad = false
     private var pageIsGet = true
+    /// The main frame's last response was a PDF, at this address: known before the page can be asked.
+    private var pdfResponseURL: URL?
     /// Settings, over the page while the tab is at zigzag://settings; nil for any other page.
     private(set) var settingsView: SettingsView?
     /// The profile Settings was asked to show before this tab had its page: shown once it has.
@@ -1411,6 +1412,8 @@ extension Tab: WKNavigationDelegate {
             return .cancel
         }
         let mime = (response.mimeType ?? "").lowercased()
+        // A PDF on its way: Zigzag's viewer covers the page as soon as it commits, before WebKit's own shows.
+        if navigationResponse.isForMainFrame { pdfResponseURL = mime == "application/pdf" ? response.url : nil }
         let disposition = ((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? "").lowercased()
         // A web page is shown, always. WebKit can briefly say it can't show HTML (a response handed over by a
         // service worker, as YouTube's first load does), and a page saved as "youtube.com.html" is never right.
@@ -1756,9 +1759,8 @@ extension Tab: WKUIDelegate {
 
 extension Tab {
     /// Whether the page is a PDF, asked of the document itself so Back, Forward and restored tabs are caught too.
-    /// A PDF file on your Mac gets Zigzag's viewer; one from the web stays in WebKit's (`PDFViewerView.opens`);
-    /// anything else drops it. `fresh`: a new load of the page (Reload, or going to the same address again), which
-    /// reads the PDF again even if it's showing.
+    /// A PDF gets Zigzag's viewer, read in the sandboxed PDF helper; anything else drops it. `fresh`: a new load of
+    /// the page (Reload, or going to the same address again), which fetches the PDF again even if it's showing.
     func checkForPDF(_ webView: WKWebView, fresh: Bool = false) {
         guard let url = webView.url, !url.absoluteString.hasPrefix("blob:"), url.scheme != "data" else {
             showsPDF = false
@@ -1766,56 +1768,73 @@ extension Tab {
             setPDFViewer(nil)
             return
         }
-        webView.evaluateJavaScript("[document.contentType]") { [weak self, weak webView] result, _ in
+        // The response said PDF: the viewer goes up now, while WebKit still loads it (the page can't be asked till then).
+        if pdfResponseURL == url { showPDF(url, in: webView, userAgent: nil, fresh: fresh) }
+        webView.evaluateJavaScript("[document.contentType, navigator.userAgent]") { [weak self, weak webView] result, _ in
             MainActor.assumeIsolated {
                 guard let self, let webView, webView === self.webView, webView.url == url else { return }
                 let values = result as? [String]
-                self.showsPDF = values?.first == "application/pdf"
-                (webView as? BrowserWebView)?.isPDF = self.showsPDF
-                guard self.showsPDF else {
+                // While a PDF still loads, WebKit's page may not say so yet: the response already did.
+                guard values?.first == "application/pdf" || self.pdfResponseURL == url else {
+                    self.showsPDF = false
+                    (webView as? BrowserWebView)?.isPDF = false
                     if self.pdfViewer != nil { self.setPDFViewer(nil) }
                     return
                 }
-                let showing = self.pdfViewer?.url == url
-                // A PDF has no page title, so the last page's would linger: it's named by its file until it says more.
-                if !showing {
-                    let file = url.lastPathComponent
-                    self.title = file.isEmpty || file == "/" ? (url.host() ?? "") : (file.removingPercentEncoding ?? file)
-                    self.changed.send(.title)
-                }
-                // From the web, in peek, a form's reply, or one ours couldn't open: WebKit's own viewer shows it.
-                guard PDFViewerView.opens(url), !self.isPeek, self.pageIsGet, !self.pdfFailed.contains(url) else {
-                    if self.pdfViewer != nil { self.setPDFViewer(nil) }
-                    return
-                }
-                guard fresh || !showing else { return }
-                // A quiet blank over WebKit's own viewer at once, so it never shows before ours.
-                let viewer = PDFViewerView(url: url, isPrivate: self.isPrivate, profile: self.profile.id)
-                viewer.onOpenLink = { [weak self] link in self?.load(link, by: .page) }
-                viewer.onExternalLink = { [weak webView] link in
-                    if let webView { ExternalLinks.open(link, isMainFrame: true, isClick: true, from: webView) }
-                }
-                viewer.onSwipe = { [weak webView] event, room in (webView as? BrowserWebView)?.handleSwipe(event, room: room) ?? false }
-                self.setPDFViewer(viewer)
-                self.pdfTask = Task { @MainActor [weak self, weak webView, weak viewer] in
-                    guard let webView else { return }
-                    let loaded = await PDFViewerView.load(url)
-                    guard !Task.isCancelled, let self, let viewer, self.pdfViewer === viewer, self.webView === webView, webView.url == url else { return }
-                    // Couldn't fetch or open it: WebKit's viewer underneath shows instead, and stays.
-                    guard let (document, data) = loaded else {
-                        self.pdfFailed.insert(url)
-                        self.setPDFViewer(nil)
-                        return
-                    }
-                    viewer.show(document, data: data)
-                    // The PDF's own title, when it has one, rather than its file name.
-                    if let name = document.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String,
-                       !name.trimmingCharacters(in: .whitespaces).isEmpty {
-                        viewer.documentTitle = name
-                        self.title = name
-                        self.changed.send(.title)
-                    }
-                }
+                self.showPDF(url, in: webView, userAgent: values?.count == 2 ? values?[1] : nil, fresh: fresh && self.pdfResponseURL != url)
+            }
+        }
+    }
+
+    /// The page at `url` is a PDF: Zigzag's viewer over it, unless it's showing already (and this isn't a new load).
+    private func showPDF(_ url: URL, in webView: WKWebView, userAgent: String?, fresh: Bool) {
+        self.showsPDF = true
+        (webView as? BrowserWebView)?.isPDF = true
+        let showing = self.pdfViewer?.url == url
+        // A PDF has no page title, so the last page's would linger: it's named by its file until it says more.
+        if !showing {
+            let file = url.lastPathComponent
+            self.title = file.isEmpty || file == "/" ? (url.host() ?? "") : (file.removingPercentEncoding ?? file)
+            self.changed.send(.title)
+        }
+        // In peek, a form's reply, or one ours couldn't open: WebKit's own viewer shows it.
+        guard !self.isPeek, self.pageIsGet, !self.pdfFailed.contains(url) else {
+            if self.pdfViewer != nil { self.setPDFViewer(nil) }
+            return
+        }
+        guard fresh || !showing else { return }
+        // A quiet blank over WebKit's own viewer at once, so it never shows before ours.
+        let viewer = PDFViewerView(url: url, isPrivate: self.isPrivate, profile: self.profile.id)
+        viewer.onOpenLink = { [weak self] link in self?.load(link, by: .page) }
+        viewer.onExternalLink = { [weak webView] link in
+            if let webView { ExternalLinks.open(link, isMainFrame: true, isClick: true, from: webView) }
+        }
+        viewer.onSwipe = { [weak webView] event, room in (webView as? BrowserWebView)?.handleSwipe(event, room: room) ?? false }
+        // The helper failed on it later (crashed on it, or took too long): WebKit's viewer underneath shows it.
+        viewer.onFail = { [weak self, weak viewer] in
+            guard let self, let viewer, self.pdfViewer === viewer else { return }
+            self.pdfFailed.insert(url)
+            self.setPDFViewer(nil)
+        }
+        self.setPDFViewer(viewer)
+        self.pdfTask = Task { @MainActor [weak self, weak webView, weak viewer] in
+            guard let webView else { return }
+            let data = await PDFViewerView.load(url, from: webView, userAgent: userAgent)
+            var opened: (SafePDF, SafePDF.Info)?
+            if let data { opened = await PDFViewerView.open(data) }
+            guard !Task.isCancelled, let self, let viewer, self.pdfViewer === viewer, self.webView === webView, webView.url == url else { return }
+            // Couldn't fetch or open it: WebKit's viewer underneath shows instead, and stays.
+            guard let (document, info) = opened else {
+                self.pdfFailed.insert(url)
+                self.setPDFViewer(nil)
+                return
+            }
+            viewer.show(document, info: info)
+            // The PDF's own title, when it has one, rather than its file name.
+            if let name = info.title {
+                viewer.documentTitle = name
+                self.title = name
+                self.changed.send(.title)
             }
         }
     }
