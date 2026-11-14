@@ -607,15 +607,6 @@ final class Label: NSTextField {
     /// Height of one line in this label's font.
     var lineHeight: CGFloat { ceil(intrinsicContentSize.height) }
 
-    /// Where to put this label, one line tall, so its capital letters sit in the middle of `height`, on the screen's
-    /// pixels: centering the line box instead leaves the letters up to a point low (the system font draws its caps
-    /// below the middle of its line, more so as it grows), which reads as more room above the text than below.
-    func centeredY(in height: CGFloat) -> CGFloat {
-        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-        let y = (height - lineHeight) / 2 - Self.capsBelowMiddle(of: font ?? Tokens.Font.body(), lineHeight: lineHeight)
-        return (y * scale).rounded() / scale
-    }
-
     private static var capsOffsets: [String: CGFloat] = [:]
 
     /// How far below the middle of a label's line its capital letters' middle is drawn, measured once per font by
@@ -643,6 +634,21 @@ final class Label: NSTextField {
         }
         capsOffsets[key] = offset
         return offset
+    }
+}
+
+extension NSTextField {
+    /// Where to put this text, one line tall, so its capital letters sit in the middle of `height`, on the screen's
+    /// pixels: centering the line box instead leaves the letters up to a point low (the system font draws its caps
+    /// below the middle of its line, more so as it grows), which reads as more room above the text than below. A
+    /// field is placed the same way as a label, so its text never moves when one stands in for the other.
+    func centeredY(in height: CGFloat) -> CGFloat {
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        let lineHeight = ceil(intrinsicContentSize.height)
+        // In a flipped view y runs down, so the text goes up by the offset; in a plain one, y runs up.
+        let below = Label.capsBelowMiddle(of: font ?? Tokens.Font.body(), lineHeight: lineHeight)
+        let y = (height - lineHeight) / 2 + ((superview?.isFlipped ?? true) ? -below : below)
+        return (y * scale).rounded() / scale
     }
 }
 
@@ -774,7 +780,7 @@ final class PrimaryButton: InteractiveView {
         super.layout()
         layer?.cornerRadius = bounds.height / 2
         let h = label.lineHeight
-        label.frame = NSRect(x: Tokens.Space.x4 + labelOffset, y: (bounds.height - h) / 2, width: bounds.width - Tokens.Space.x8, height: h)
+        label.frame = NSRect(x: Tokens.Space.x4 + labelOffset, y: label.centeredY(in: bounds.height), width: bounds.width - Tokens.Space.x8, height: h)
         label.alignment = .center
     }
 
@@ -856,7 +862,7 @@ final class TextButton: InteractiveView {
         }
         let h = label.lineHeight
         label.alignment = .center
-        label.frame = NSRect(x: labelOffset, y: (bounds.height - h) / 2, width: bounds.width, height: h)
+        label.frame = NSRect(x: labelOffset, y: label.centeredY(in: bounds.height), width: bounds.width, height: h)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -977,7 +983,7 @@ final class FilledField: NSView {
             symbolView.frame = NSRect(x: isPill ? Tokens.Space.x3 : Tokens.Space.x2, y: round((bounds.height - side) / 2), width: side, height: side)
             x = symbolView.frame.maxX + Tokens.Space.x1
         }
-        field.frame = NSRect(x: x, y: round((bounds.height - h) / 2), width: bounds.width - x - Tokens.Space.x3, height: h)
+        field.frame = NSRect(x: x, y: field.centeredY(in: bounds.height), width: bounds.width - x - Tokens.Space.x3, height: h)
     }
 }
 
@@ -1018,7 +1024,7 @@ final class ChoicePill: InteractiveView {
         let side = Tokens.Space.x3
         check.frame = NSRect(x: Tokens.Space.x2, y: (bounds.height - side) / 2, width: side, height: side)
         let h = label.lineHeight
-        label.frame = NSRect(x: check.frame.maxX + Tokens.Space.x1 - Label.inset, y: (bounds.height - h) / 2, width: label.inkWidth + Label.inset * 2, height: h)
+        label.frame = NSRect(x: check.frame.maxX + Tokens.Space.x1 - Label.inset, y: label.centeredY(in: bounds.height), width: label.inkWidth + Label.inset * 2, height: h)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -1218,7 +1224,7 @@ final class DropdownButton: InteractiveView {
             x = icon.frame.maxX + Tokens.Space.x2
         }
         chevron.frame = NSRect(x: bounds.width - Self.textInset - 10, y: (bounds.height - 14) / 2, width: 10, height: 14)
-        label.frame = NSRect(x: x - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: max(0, chevron.frame.minX - x - Tokens.Space.x1), height: label.lineHeight)
+        label.frame = NSRect(x: x - Label.inset, y: label.centeredY(in: bounds.height), width: max(0, chevron.frame.minX - x - Tokens.Space.x1), height: label.lineHeight)
         // A choice cut short (a long profile name) shows whole under the pointer (#189).
         if !showsPictureOnly { toolTip = label.frame.width < label.textWidth - Tokens.Space.x1 ? current?.title : nil }
     }
@@ -1772,11 +1778,11 @@ final class MenuPanel: FloatingPanelView {
             var end = check.frame.minX
             if !keys.isHidden {
                 let width = keys.inkWidth + 2
-                keys.frame = NSRect(x: bounds.width - MenuPanel.rowInset - width - Label.inset, y: (bounds.height - keys.lineHeight) / 2,
+                keys.frame = NSRect(x: bounds.width - MenuPanel.rowInset - width - Label.inset, y: keys.centeredY(in: bounds.height),
                                     width: width + Label.inset * 2, height: keys.lineHeight)
                 end = min(end, keys.frame.minX + Label.inset)
             }
-            label.frame = NSRect(x: x - Label.inset, y: (bounds.height - label.lineHeight) / 2,
+            label.frame = NSRect(x: x - Label.inset, y: label.centeredY(in: bounds.height),
                                  width: max(0, end - Tokens.Space.x2 - x + Label.inset * 2), height: label.lineHeight)
         }
 
@@ -1815,7 +1821,7 @@ final class StatusLabel: NSView {
     override func layout() {
         super.layout()
         check.frame = NSRect(x: 0, y: (bounds.height - 16) / 2, width: 16, height: 16)
-        label.frame = NSRect(x: 16 + Tokens.Space.x2 - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
+        label.frame = NSRect(x: 16 + Tokens.Space.x2 - Label.inset, y: label.centeredY(in: bounds.height), width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
     }
 }
 
@@ -1903,7 +1909,7 @@ final class SlidingSwitch: NSView {
         for (i, label) in labels.enumerated() {
             let r = segment(i)
             label.alignment = .center
-            label.frame = NSRect(x: r.minX, y: (r.midY - label.lineHeight / 2).rounded(), width: r.width, height: label.lineHeight)
+            label.frame = NSRect(x: r.minX, y: r.minY + label.centeredY(in: r.height), width: r.width, height: label.lineHeight)
         }
         for (i, icon) in icons.enumerated() { icon.frame = segment(i) }
         for (i, element) in segments.enumerated() { element.setAccessibilityFrameInParentSpace(segment(i)) }

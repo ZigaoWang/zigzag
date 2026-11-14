@@ -72,10 +72,10 @@ class CardRow: InteractiveView {
             x = iconView.frame.maxX + Self.inset - Label.inset
         }
         let detailWidth = detail.stringValue.isEmpty ? 0 : detail.inkWidth + Label.inset * 2
-        detail.frame = NSRect(x: bounds.width - Self.inset + Label.inset - detailWidth, y: (bounds.height - detail.lineHeight) / 2,
+        detail.frame = NSRect(x: bounds.width - Self.inset + Label.inset - detailWidth, y: detail.centeredY(in: bounds.height),
                               width: detailWidth, height: detail.lineHeight)
         let end = detailWidth > 0 ? detail.frame.minX - Tokens.Space.x2 : bounds.width - Self.inset
-        title.frame = NSRect(x: x, y: (bounds.height - title.lineHeight) / 2, width: max(0, end - x), height: title.lineHeight)
+        title.frame = NSRect(x: x, y: title.centeredY(in: bounds.height), width: max(0, end - x), height: title.lineHeight)
     }
 
     override func stateDidChange(animated: Bool) {
