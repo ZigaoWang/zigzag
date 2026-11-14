@@ -82,6 +82,18 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         return controller
     }
 
+    /// A page's pop-up opened later, from the question about it (or from its remembered destination): a small window
+    /// of its own showing `url`, on the page's own data store where one is given, so it is still signed in.
+    static func viewer(url: URL, configuration: WKWebViewConfiguration?, parent: NSWindow?) -> PopupWindowController {
+        let controller = PopupWindowController(configuration: configuration ?? WKWebViewConfiguration(),
+                                               pageSize: Tokens.Metric.popupDefaultSize, origin: nil, parent: parent)
+        Self.open.insert(controller)
+        controller.webView.load(URLRequest(url: url))
+        controller.showWindow(nil)
+        if #available(macOS 15.4, *), !controller.isPrivate { ExtensionCenter.popupOpened(controller) }
+        return controller
+    }
+
     private init(configuration: WKWebViewConfiguration, pageSize: NSSize, origin: NSPoint?, parent: NSWindow?, opener: Tab? = nil) {
         // Preferences of its own, never its opener's: its WebRTC switch is set for each page it goes to.
         WebKitSetup.separatePreferences(of: configuration)
@@ -246,8 +258,22 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        guard PopupNotice.allows(navigationAction, from: webView.url, isPrivate: isPrivate),
-              Tab.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
+        guard Tab.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
+        // A pop-up a page inside this one opened on its own: only a remembered destination opens it, or it asks.
+        if !PopupNotice.isUserInitiated(navigationAction) {
+            let parent = WindowManager.shared.controller(for: parentWindow)
+            if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(webView.url)) {
+                switch stored {
+                case "deny": return nil
+                case "mini": return PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: window, opener: opener)
+                default:
+                    if let url = navigationAction.request.url, let parent { PopupNotice.open(url, action: stored, from: nil, in: parent) }
+                    return nil
+                }
+            }
+            PopupNotice.ask(navigationAction, from: webView.url, isPrivate: isPrivate, tab: nil, in: parent)
+            return nil
+        }
         // A plain link (a help page, the terms) opens as a tab in the browser window, brought forward, as a
         // browser would; only another sized window.open() is a popup of its own.
         let sized = windowFeatures.width != nil || windowFeatures.height != nil || windowFeatures.toolbarsVisibility?.boolValue == false

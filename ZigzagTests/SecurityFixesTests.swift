@@ -411,24 +411,6 @@ struct PageNoticeTests {
         #expect(Toast.acceptsAction(shownAt: shown, now: shown.addingTimeInterval(0.6)))
     }
 
-    @Test func aBlockedPopupIsSaidOnceInAWhile() {
-        let key = "test-\(UUID().uuidString)|https://example.com", now = Date()
-        #expect(PopupNotice.shouldNotice(key, now: now))
-        #expect(!PopupNotice.shouldNotice(key, now: now.addingTimeInterval(1)))
-        #expect(!PopupNotice.shouldNotice(key, now: now.addingTimeInterval(PopupNotice.noticeInterval - 1)))
-        #expect(PopupNotice.shouldNotice("test-\(UUID().uuidString)|https://other.example", now: now.addingTimeInterval(1)))
-        #expect(PopupNotice.shouldNotice(key, now: now.addingTimeInterval(PopupNotice.noticeInterval + 1)))
-    }
-
-    @Test func onlyWebPopupsAreOffered() throws {
-        let page = try #require(URL(string: "https://pay.example/checkout"))
-        #expect(PopupNotice.offered(page) == (true, page))
-        #expect(PopupNotice.offered(nil) == (true, nil))
-        #expect(PopupNotice.offered(URL(string: "about:blank")) == (true, nil))
-        #expect(PopupNotice.offered(URL(string: "javascript:alert(1)")) == (false, nil))
-        #expect(PopupNotice.offered(URL(string: "data:text/html,hi")) == (false, nil))
-    }
-
     @Test func iconsComeOnlyFromPublicAddresses() {
         for address in ["127.0.0.1", "127.1.2.3", "10.0.0.1", "172.16.0.1", "172.31.255.255", "192.168.1.1", "169.254.169.254",
                         "0.0.0.0", "100.64.0.1", "224.0.0.1", "255.255.255.255", "::1", "::", "[::1]", "fe80::1", "fc00::1",

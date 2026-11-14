@@ -61,7 +61,7 @@ enum WebKitSetup {
         configuration.applicationNameForUserAgent = applicationNameForUserAgent
         configuration.preferences.isElementFullscreenEnabled = true
         configuration.preferences.isFraudulentWebsiteWarningEnabled = true
-        // Zigzag decides which pop-ups open (PopupNotice.allows), so a site you've allowed gets real ones.
+        // Zigzag decides which pop-ups open (PopupNotice), so a site you've allowed gets real ones.
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
         #if DEBUG

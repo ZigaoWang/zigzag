@@ -185,4 +185,22 @@ import WebKit
         #expect(ExternalLinks.decision(page: "https://zoom.us", scheme: "zoommtg", foreign: true, stored: "allow") == nil)
         #expect(ExternalLinks.decision(page: "https://zoom.us", scheme: "zoommtg", foreign: true, stored: "deny") == "deny")
     }
+
+    @Test func aStoredPopupDestinationIsUsedWithoutAsking() throws {
+        try withDefaults { _ in
+            SitePermissions.remember("newTab", subject: PermissionSubject.popups, origin: "https://example.com")
+            #expect(PopupNotice.storedAction(origin: "https://example.com") == "newTab")
+            #expect(PopupNotice.storedAction(origin: nil) == nil)
+            #expect(PopupNotice.storedAction(origin: "https://other.example") == nil)
+        }
+    }
+
+    @Test func everyPopupActionIsADistinctStandingAnswer() throws {
+        try withDefaults { _ in
+            for action in ["mini", "thisTab", "newTab", "deny"] {
+                SitePermissions.remember(action, subject: PermissionSubject.popups, origin: "https://example.com")
+                #expect(PopupNotice.storedAction(origin: "https://example.com") == action)
+            }
+        }
+    }
 }
