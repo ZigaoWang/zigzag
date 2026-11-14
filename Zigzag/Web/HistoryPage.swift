@@ -371,7 +371,8 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 .remove svg { width: 10px; height: 10px; }
 .remove:hover { background: var(--hover); color: var(--text); }
 .remove:active { background: var(--pressed); }
-.session-head .remove { align-self: center; }
+/* As far from the count as a row's × is from its time (the rows' column gap), so counts and times end on one edge. */
+.session-head .remove { align-self: center; margin-left: calc(10px - var(--space-2)); }
 .session-head:not(:hover):not(:focus-within) .remove { opacity: 0; }
 @media (max-width: 520px) { .session-head .count { display: none; } .session-head .remove { margin-left: auto; } }
 
