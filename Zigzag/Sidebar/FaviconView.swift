@@ -41,13 +41,29 @@ final class FaviconView: NSView {
         didSet {
             // Drawn again only if the color it resolves to changed (`layoutBadge`).
             guard oldValue !== developerBadge else { return }
-            Tokens.Motion.withoutAnimation { badge.isHidden = developerBadge == nil }
+            Tokens.Motion.withoutAnimation { badge.isHidden = developerBadge == nil && originalIcon == nil }
+            renderedOriginal = nil
             needsLayout = true
         }
     }
     private let badge = CALayer()
     private let badgeCut = CAShapeLayer()
     private var renderedBadge: (side: CGFloat, scale: CGFloat, color: CGColor)?
+
+    /// A favorite whose page moved on from the one it was saved with: the saved page's icon, small on the corner the
+    /// Developer Mode chip uses, the icon cut away round it by the same gap, as an icon wears its app's badge. The
+    /// chip, when there's one too, keeps the corner. Nil: none.
+    var originalIcon: NSImage? {
+        didSet {
+            guard oldValue !== originalIcon else { return }
+            renderedOriginal = nil
+            Tokens.Motion.withoutAnimation { badge.isHidden = developerBadge == nil && originalIcon == nil }
+            needsLayout = true
+        }
+    }
+    private var renderedOriginal: (side: CGFloat, scale: CGFloat, image: NSImage)?
+    /// The globe a site without an icon shows, for a badge.
+    static var globeIcon: NSImage { globe }
 
     /// Where the chip sits for an icon of `side` points (x right, y up, from the icon's bottom-left), its side a share
     /// of the icon's and reaching a little past the icon's corner.
@@ -128,24 +144,63 @@ final class FaviconView: NSView {
     /// The chip on its corner, drawn again only when its size, the screen or its color changes; and the gap cut out
     /// of the icon round it (the rest of the cut reaching well past the sleeping ring).
     private func layoutBadge() {
-        guard let color = developerBadge, bounds.width > 0 else { body.mask = nil; return }
+        guard developerBadge != nil || originalIcon != nil, bounds.width > 0 else { body.mask = nil; return }
         let frame = Self.badgeFrame(side: bounds.width)
         badge.frame = frame
         let gap = Tokens.Sidebar.developerBadgeGap
         let reach = bounds.insetBy(dx: -bounds.width, dy: -bounds.height)
         let path = CGMutablePath()
         path.addRect(reach)
-        path.addEllipse(in: frame.insetBy(dx: -gap, dy: -gap))
+        let round = developerBadge == nil ? Self.originalRadius(side: frame.width) + gap : frame.width / 2 + gap
+        path.addRoundedRect(in: frame.insetBy(dx: -gap, dy: -gap), cornerWidth: round, cornerHeight: round)
         badgeCut.frame = body.bounds
         badgeCut.path = path
         if body.mask !== badgeCut { body.mask = badgeCut }
         let scale = window?.backingScaleFactor ?? 2
+        guard let color = developerBadge else {
+            guard let original = originalIcon else { return }
+            if let last = renderedOriginal, last.side == frame.width, last.scale == scale, last.image === original { return }
+            renderedOriginal = (frame.width, scale, original)
+            renderedBadge = nil
+            badge.contents = Self.renderOriginal(original, side: frame.width, scale: scale, appearance: effectiveAppearance)
+            badge.contentsScale = scale
+            return
+        }
+        renderedOriginal = nil
         var resolved = color.cgColor
         effectiveAppearance.performAsCurrentDrawingAppearance { resolved = color.cgColor }
         if let last = renderedBadge, last.side == frame.width, last.scale == scale, last.color == resolved { return }
         renderedBadge = (frame.width, scale, resolved)
         badge.contents = Self.renderBadge(side: frame.width, scale: scale, color: resolved)
         badge.contentsScale = scale
+    }
+
+    /// A site's icon on a badge is rounded off as it is at full size, a little more for its small size.
+    private static func originalRadius(side: CGFloat) -> CGFloat { max(1.5, side * 0.22) }
+
+    /// The saved page's icon for the corner, at exactly the pixels it fills, rounded as a site's icon is; a symbol
+    /// (the globe, an icon you chose) in the quiet ink.
+    private static func renderOriginal(_ image: NSImage, side: CGFloat, scale: CGFloat, appearance: NSAppearance) -> CGImage? {
+        let pixels = Int((side * scale).rounded())
+        guard pixels > 0, let context = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
+                                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        let rect = CGRect(x: 0, y: 0, width: pixels, height: pixels)
+        let radius = originalRadius(side: side) * scale
+        let drawn = image.isTemplate ? tinted(image, Tokens.Color.textSecondary, appearance: appearance) : image
+        context.interpolationQuality = .high
+        if !image.isTemplate {
+            context.addPath(CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil))
+            context.clip()
+        }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        appearance.performAsCurrentDrawingAppearance {
+            drawn.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: false,
+                       hints: [.interpolation: NSNumber(value: NSImageInterpolation.high.rawValue)])
+        }
+        NSGraphicsContext.restoreGraphicsState()
+        return context.makeImage()
     }
 
     /// The chip: a disc of `color` with the hammer cut out of it, at exactly the pixels it fills.
@@ -176,7 +231,8 @@ final class FaviconView: NSView {
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         refreshColors()
-        if developerBadge != nil { needsLayout = true }
+        renderedOriginal = nil
+        if developerBadge != nil || originalIcon != nil { needsLayout = true }
     }
 
     /// The ring an even gap out from the icon, clear of its corners, its dashes dividing the circle exactly.
@@ -198,7 +254,7 @@ final class FaviconView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if developerBadge != nil { needsLayout = true }
+        if developerBadge != nil || originalIcon != nil { needsLayout = true }
         imageLayer.contentsScale = window?.backingScaleFactor ?? 2
         if isLoading { startSpinning() }
     }

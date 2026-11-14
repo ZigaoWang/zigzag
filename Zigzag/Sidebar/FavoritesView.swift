@@ -244,7 +244,7 @@ final class FavoritesView: NSView {
             guard let id = tile.bookmark?.id else { continue }
             let ids = [id] + tile.partners.map(\.id)
             tile.isSelected = selectedID.map(ids.contains) ?? false
-            tile.track(tabs[id], partners: tile.partners.compactMap { tabs[$0.id] })
+            tile.track(tabs[id], partners: tile.partners.map { tabs[$0.id] })
             tile.refreshIcon()
         }
     }
@@ -374,9 +374,45 @@ final class FavoriteTile: InteractiveView {
             dropHalf.isHidden = splitSide == nil
         }
     }
-    /// Its page is loaded in the background: a fine edge, so you can tell at a glance which are. Not for a page put
-    /// to sleep or not loaded yet since Zigzag reopened: that looks like a favorite never opened (#205).
+    /// Its page is loaded in the background: a fine edge and its icon at full strength, so you can tell at a glance
+    /// which are. Not for a page put to sleep or not loaded yet since Zigzag reopened: that looks like a favorite never
+    /// opened, its icon faded back (#205).
     private(set) var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
+
+    /// How a favorite's tile looks, in the tab rows' terms: the one you're on has the selected tab's card; one whose
+    /// page is loaded has the open edge, its icons at full strength; one that isn't running is faded back, as a tab
+    /// left alone fades in the list, until the pointer comes to it.
+    enum Look: Equatable { case closed, open, selected }
+
+    static func look(selected: Bool, loaded: [Bool]) -> Look {
+        selected ? .selected : TabRowView.showsOpenEdge(pinned: true, loaded: loaded) ? .open : .closed
+    }
+
+    /// How strong a tile's icons are drawn.
+    static func iconAlpha(_ look: Look, hovered: Bool) -> CGFloat {
+        look == .closed && !hovered ? Tokens.Opacity.fadedFloor : 1
+    }
+
+    /// Whether a favorite's open page has moved on from the address it was saved with, as a pinned tab's row tells
+    /// (`TabManager.isAway`): not where it was saved, nor where that address lands on its own (a redirect).
+    static func isAway(current: URL?, saved: URL, landing: URL?) -> Bool {
+        guard let current else { return false }
+        let here = TabManager.normalize(current)
+        return here != TabManager.normalize(saved) && here != landing.map(TabManager.normalize)
+    }
+
+    /// What pointing at one of its pages says: its name, and while it's away the page it shows now, as the pinned
+    /// row reads "Original / Current page".
+    static func pageName(saved: String, away current: String?) -> String {
+        guard let current, !current.isEmpty else { return saved }
+        return String(localized: "\(saved) — \(current)", comment: "Tooltip of a favorite whose page moved on from the one it was saved with: the favorite's name, then the page it shows now.")
+    }
+
+    /// Which of its pages, in order, have moved on from their saved address.
+    private(set) var awayParts: [Bool] = []
+
+    /// Every page's open tab, in order (nil for one that isn't open).
+    private var livePages: [Tab?] { [tab] + partners.indices.map { partnerTabs.indices.contains($0) ? partnerTabs[$0].tab : nil } }
     override var pressSinks: Bool { get { true } set {} }
     var iconImage: NSImage? { icon.image }
     var partnerIconImages: [NSImage?] { Array(pageIcons.dropFirst().prefix(partners.count).map(\.image)) }
@@ -531,8 +567,27 @@ final class FavoriteTile: InteractiveView {
         for (i, view) in extraIcons.enumerated() { view.isHidden = i >= partners.count - 1 }
     }
 
-    /// Its pages' names, in order.
-    private var name: String { Words.list(([bookmark] + partners.map { Optional($0) }).compactMap { $0?.title }) }
+    /// Its pages' names, in order; a page that moved on, with the page it shows now.
+    private var name: String {
+        guard let bookmark else { return "" }
+        let live = livePages
+        return Words.list(([bookmark] + partners).enumerated().map { i, page in
+            let away = awayParts.indices.contains(i) && awayParts[i]
+            return Self.pageName(saved: page.title, away: away ? live[i]?.displayTitle : nil)
+        })
+    }
+
+    private func refreshAway() {
+        guard let bookmark else { awayParts = []; return }
+        let live = livePages
+        let away = ([bookmark] + partners).enumerated().map { i, page in
+            live[i].map { Self.isAway(current: $0.url, saved: page.url, landing: $0.pinnedLanding) } ?? false
+        }
+        guard away != awayParts else { return }
+        awayParts = away
+        setAccessibilityLabel(name)
+        refreshIcon()
+    }
 
     private func describe() {
         let name = self.name
@@ -549,19 +604,19 @@ final class FavoriteTile: InteractiveView {
 
     /// Follows the favorite's page (and a split or group favorite's other pages), so the tile shows the loading ribbon
     /// while it loads, like a tab does, and its open edge only while one of them is loaded.
-    func track(_ tab: Tab?, partners: [Tab] = []) {
-        if partners.map(ObjectIdentifier.init) != partnerTabs.compactMap({ $0.tab.map(ObjectIdentifier.init) }) {
+    func track(_ tab: Tab?, partners: [Tab?] = []) {
+        if partners.map({ $0.map(ObjectIdentifier.init) }) != partnerTabs.map({ $0.tab.map(ObjectIdentifier.init) }) {
             partnerTabs = partners.map { WeakTab(tab: $0) }
-            partnerTokens = partners.map { page in
+            partnerTokens = partners.compactMap { $0 }.map { page in
                 page.changed.observe { [weak self] change in
-                    if change == .webView { self?.refreshLoading() }
+                    if change == .webView || change == .url || change == .title || change == .favicon || change == .loading { self?.refreshLoading() }
                 }
             }
         }
         guard tab !== self.tab else { refreshLoading(); return }
         self.tab = tab
         tabToken = tab?.changed.observe { [weak self] change in
-            if change == .loading || change == .favicon || change == .webView { self?.refreshLoading() }
+            if change == .loading || change == .favicon || change == .webView || change == .url || change == .title { self?.refreshLoading() }
             if change == .audio || change == .webView { self?.refreshAudio() }
             if change == .developer { self?.refreshDeveloperMode() }
         }
@@ -571,19 +626,23 @@ final class FavoriteTile: InteractiveView {
     }
 
     private func refreshLoading() {
-        icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
-        isOpen = TabRowView.showsOpenEdge(pinned: true, loaded: ([tab] + partnerTabs.map(\.tab)).compactMap { $0?.isLoaded })
+        let live = livePages
+        for (page, view) in zip(live, pageIcons) { view.isLoading = (page?.isLoading ?? false) && !(page?.isSuspended ?? true) }
+        isOpen = TabRowView.showsOpenEdge(pinned: true, loaded: live.compactMap { $0?.isLoaded })
+        refreshAway()
         let name = self.name
         // A favorite has no hover card, so one whose page isn't running says why in its tooltip: asleep, and what
-        // that freed, or not loaded since Zigzag reopened. It looks like a favorite never opened: no edge, no ring.
+        // that freed, or not loaded since Zigzag reopened. It looks like a favorite never opened: no edge, its icon
+        // faded back.
         let notes = [inDeveloperMode ? TabRowView.developerTip(for: tab?.url) : nil, tab?.notLoadedNote].compactMap { $0 }
         toolTip = ([name].filter { !$0.isEmpty } + notes).joined(separator: "\n")
-        if let image = tab?.displayIcon, !(tab?.isLoading ?? false) { icon.image = image; needsLayout = true }
+        if awayParts.first != true, let image = tab?.displayIcon, !(tab?.isLoading ?? false) { icon.image = image; needsLayout = true }
+        refreshAwayIcons()
     }
 
     func refreshIcon() {
         guard let bookmark else { return }
-        for (partner, view) in zip(partners, pageIcons.dropFirst()) {
+        for (i, (partner, view)) in zip(partners, pageIcons.dropFirst()).enumerated() where !isAway(part: i + 1) {
             if let image = partner.displayIcon {
                 view.image = image
             } else {
@@ -592,12 +651,32 @@ final class FavoriteTile: InteractiveView {
                 FaviconStore.shared.prefetch(for: partner.url)
             }
         }
-        if let image = bookmark.displayIcon {
+        if isAway(part: 0) {
+            // The page it's on now: `refreshAwayIcons`.
+        } else if let image = bookmark.displayIcon {
             icon.image = image
             needsLayout = true
         } else {
             if icon.image.map(IconChoice.isPageIcon) == true { icon.image = nil; needsLayout = true }
             FaviconStore.shared.prefetch(for: bookmark.url)
+        }
+        refreshAwayIcons()
+    }
+
+    private func isAway(part: Int) -> Bool { awayParts.indices.contains(part) && awayParts[part] }
+
+    /// A page that moved on shows the icon of the page it's on now, as its pinned row does, with the icon it was
+    /// saved with small on the corner, the way an icon wears its app's badge, so the tile still says which favorite
+    /// it is. Pointing at it names both; its menu goes back.
+    private func refreshAwayIcons() {
+        guard let bookmark else { return }
+        let live = livePages
+        for (i, (page, view)) in zip([bookmark] + partners, pageIcons).enumerated() {
+            let away = isAway(part: i)
+            view.originalIcon = away ? page.displayIcon ?? FaviconView.globeIcon : nil
+            guard away, let now = live[i] else { continue }
+            // While it loads, the last icon stays under the loader rather than the globe flashing.
+            if now.favicon != nil || !now.isLoading, view.image !== now.favicon { view.image = now.favicon; needsLayout = true }
         }
     }
 
@@ -672,6 +751,8 @@ final class FavoriteTile: InteractiveView {
             return
         }
         closeButton.isHidden = !(isOpen && isHovered) || number != nil
+        let alpha = Self.iconAlpha(Self.look(selected: isSelected, loaded: [isOpen]), hovered: isHovered)
+        for view in pageIcons where view.alphaValue != alpha { view.alphaValue = alpha }
         // A soft tile of the space's own color, a step lighter under the pointer; a fine edge while its page is open,
         // so you can tell which are loaded. The one you're on is the selected tab's card.
         let fill = isSelected ? (isHovered ? Tokens.Chrome.cardHover : Tokens.Chrome.card)

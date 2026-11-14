@@ -117,3 +117,87 @@ struct BookmarkTitleTests {
         #expect(TabManager.bookmarkTitle("Results - Google Search", url: URL(string: "https://google.com/?q=x")!) == "Results - Google Search")
     }
 }
+
+/// A favorite's tile shows what a tab row shows: the one you're on, open or not, and a page that moved on from the one
+/// it was saved with, as a pinned tab's row does.
+@MainActor struct FavoriteTileStateTests {
+    private let saved = URL(string: "https://mail.example.com/inbox")!
+
+    @Test func theTileYouAreOnIsSelectedWhateverElse() {
+        #expect(FavoriteTile.look(selected: true, loaded: [true]) == .selected)
+        #expect(FavoriteTile.look(selected: true, loaded: []) == .selected)
+    }
+
+    @Test func aTileIsOpenOnlyWhileOneOfItsPagesIsLoaded() {
+        #expect(FavoriteTile.look(selected: false, loaded: [true]) == .open)
+        // A split favorite with one page loaded is open, as its pinned row is.
+        #expect(FavoriteTile.look(selected: false, loaded: [false, true]) == .open)
+        // Never opened, asleep, or not loaded since Zigzag reopened: all closed alike.
+        #expect(FavoriteTile.look(selected: false, loaded: []) == .closed)
+        #expect(FavoriteTile.look(selected: false, loaded: [false]) == .closed)
+        #expect(FavoriteTile.look(selected: false, loaded: [false, false]) == .closed)
+    }
+
+    @Test func aClosedTileIsFadedUntilThePointerComes() {
+        #expect(FavoriteTile.iconAlpha(.closed, hovered: false) == Tokens.Opacity.fadedFloor)
+        #expect(FavoriteTile.iconAlpha(.closed, hovered: true) == 1)
+        #expect(FavoriteTile.iconAlpha(.open, hovered: false) == 1)
+        #expect(FavoriteTile.iconAlpha(.selected, hovered: false) == 1)
+    }
+
+    @Test func onItsSavedPageItIsNotAway() {
+        #expect(!FavoriteTile.isAway(current: saved, saved: saved, landing: nil))
+        // The same address written another way: http, www, a slash or a fragment.
+        #expect(!FavoriteTile.isAway(current: URL(string: "http://www.mail.example.com/inbox/#top")!, saved: saved, landing: nil))
+        // Not open: nothing to be away from.
+        #expect(!FavoriteTile.isAway(current: nil, saved: saved, landing: nil))
+    }
+
+    @Test func whereItsAddressLandsOnItsOwnIsNotAway() {
+        let landing = URL(string: "https://accounts.example.com/signin")!
+        #expect(!FavoriteTile.isAway(current: landing, saved: saved, landing: landing))
+    }
+
+    @Test func anotherPageIsAway() {
+        let other = URL(string: "https://video.example.com/watch")!
+        #expect(FavoriteTile.isAway(current: other, saved: saved, landing: nil))
+        #expect(FavoriteTile.isAway(current: other, saved: saved, landing: URL(string: "https://accounts.example.com/")!))
+    }
+
+    @Test func pointingAtAnAwayTileNamesBothPages() {
+        #expect(FavoriteTile.pageName(saved: "Mail", away: nil) == "Mail")
+        #expect(FavoriteTile.pageName(saved: "Mail", away: "") == "Mail")
+        #expect(FavoriteTile.pageName(saved: "Mail", away: "Video") == "Mail — Video")
+    }
+
+    @Test func anAwayTileNamesBothPagesInItsTooltip() {
+        let favorite = Bookmark(url: saved, title: "Mail")
+        let tile = FavoriteTile(bookmark: favorite)
+        // The tile holds its pages weakly, as the tab manager owns them.
+        let home = Tab(url: saved, title: "Inbox", spaceID: UUID())
+        tile.track(home)
+        #expect(tile.awayParts == [false])
+        #expect(tile.toolTip?.components(separatedBy: "\n").first == "Mail")
+        let away = Tab(url: URL(string: "https://video.example.com/watch")!, title: "Video", spaceID: UUID())
+        tile.track(away)
+        #expect(tile.awayParts == [true])
+        #expect(tile.toolTip?.components(separatedBy: "\n").first == "Mail — Video")
+        // Unloaded (closed), nothing is away.
+        tile.track(nil)
+        #expect(tile.awayParts == [false])
+        _ = (home, away)
+    }
+
+    @Test func aSplitFavoriteTellsWhichOfItsPagesMovedOn() {
+        let left = Bookmark(url: saved, title: "Mail"), right = Bookmark(url: URL(string: "https://notes.example.com/")!, title: "Notes")
+        let tile = FavoriteTile(bookmark: left, partners: [right])
+        let notes = Tab(url: right.url, title: "Notes", spaceID: UUID())
+        tile.track(nil, partners: [notes])
+        #expect(tile.awayParts == [false, false])
+        let video = Tab(url: URL(string: "https://video.example.com/")!, title: "Video", spaceID: UUID())
+        tile.track(nil, partners: [video])
+        #expect(tile.awayParts == [false, true])
+        #expect(tile.accessibilityLabel()?.contains("Notes — Video") == true)
+        _ = (notes, video)
+    }
+}

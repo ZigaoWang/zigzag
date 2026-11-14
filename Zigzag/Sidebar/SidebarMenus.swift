@@ -349,6 +349,11 @@ enum SidebarMenus {
         }
         // A split favorite: its two pages go and come as one, and can be parted into two favorites.
         if let pair = Library.shared.pinnedSplit(containing: favorite.id) {
+            // A page of it that moved on goes back, as a favorite of one page does.
+            let away = pair.ids.filter(manager.isAway)
+            if !away.isEmpty {
+                menu.addItem(Item(String(localized: "Back to Favorite’s Page", comment: "Item in a favorite's context menu. Goes back to the page the favorite was saved with.")) { away.forEach(manager.resetBookmarkTab) })
+            }
             menu.addItem(Item(String(localized: "Separate Tabs", comment: "Item in a favorite's context menu. Parts a split favorite into two favorites.")) { controller.separateFavoriteSplitWithUndo(favorite.id) })
             if !manager.isPrivate { menu.addItem(Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite back into a pinned tab.")) { controller.unfavoriteWithUndo(favorite.id, to: 0) }) }
             menu.addItem(.separator())
