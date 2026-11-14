@@ -262,3 +262,20 @@ struct WebAppTests {
         #expect(FileManager.default.isExecutableFile(atPath: WebAppInstaller.launcher.path))
     }
 }
+
+extension WebAppTests {
+    /// An app found only by its bundle id comes back only if its id is the one Zigzag gives its web address on one
+    /// of your profiles: another address in its marker, or one that isn't a web address, matches none.
+    @Test func recoveredAppsMustBeZigzagsOwn() {
+        let other = UUID()
+        let site = URL(string: "https://mail.example/")!
+        let id = WebApps.makeID(url: site, profileID: profile)
+        #expect(WebApps.profile(madeID: id, url: site, among: [other, profile]) == profile)
+        #expect(WebApps.profile(madeID: id, url: site, among: [other]) == nil)
+        #expect(WebApps.profile(madeID: id, url: URL(string: "https://evil.example/")!, among: [profile]) == nil)
+        for text in ["file:///Applications/Calculator.app", "javascript:alert(1)", "zigzag://settings", "data:text/html,hi"] {
+            let url = URL(string: text)!
+            #expect(WebApps.profile(madeID: WebApps.makeID(url: url, profileID: profile), url: url, among: [profile]) == nil, "\(text)")
+        }
+    }
+}

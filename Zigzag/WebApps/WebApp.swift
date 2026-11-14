@@ -71,6 +71,13 @@ nonisolated enum WebApps {
         var url: URL
     }
 
+    /// Of `profiles`, the one an app with this id and address was made on: an id is the profile and address it was
+    /// made from, so an app whose marker was given another address, or one not on a web address, matches none.
+    static func profile(madeID id: String, url: URL, among profiles: [UUID]) -> UUID? {
+        guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host() != nil else { return nil }
+        return profiles.first { makeID(url: url, profileID: $0) == id }
+    }
+
     /// The same site on the same profile is the same app: installing it again replaces it.
     static func makeID(url: URL, profileID: UUID) -> String {
         let digest = SHA256.hash(data: Data("\(profileID.uuidString.lowercased())|\(url.absoluteString)".utf8))
@@ -205,22 +212,28 @@ final class WebAppStore {
         guard let (action, id) = WebAppLink.parse(link) else { return }
         switch action {
         case .open:
-            guard let app = shared.app(id) ?? shared.recover(id) else { return }
+            // Only a web address: a record or app that says otherwise isn't one Zigzag made.
+            guard let app = shared.app(id) ?? shared.recover(id), ["http", "https"].contains(app.url.scheme?.lowercased() ?? "") else { return }
             WebAppWindowController.show(app, from: sender)
         case .close:
             WebAppWindowController.controller(for: id)?.window?.close()
         }
     }
 
-    /// An app Zigzag made whose record is gone (the list was lost): read back from the app itself, on the first profile.
+    /// An app Zigzag made whose record is gone (the list was lost): read back from the app itself, on the profile it
+    /// was made for. Its id has to be the one Zigzag gives that address on one of your profiles.
     func recover(_ id: String) -> WebApp? {
         let host = Bundle.main.bundleIdentifier ?? ""
         guard let bundle = NSWorkspace.shared.urlForApplication(withBundleIdentifier: WebApps.bundleIdentifier(host: host, id: id)),
               WebApps.isMadeByZigzag(bundle, id: id, host: host),
               let data = try? Data(contentsOf: bundle.appendingPathComponent("Contents/Resources/\(WebApps.markerName)")),
-              let marker = try? JSONDecoder().decode(WebApps.Marker.self, from: data),
-              let space = Library.shared.spaces.first else { return nil }
-        let app = WebApp(id: id, name: marker.name, url: marker.url, profileID: Library.shared.profileID(ofSpace: space.id), spaceID: space.id,
+              let marker = try? JSONDecoder().decode(WebApps.Marker.self, from: data) else { return nil }
+        let spaces = Library.shared.spaces
+        var profiles: [UUID] = []
+        for space in spaces where !profiles.contains(Library.shared.profileID(ofSpace: space.id)) { profiles.append(Library.shared.profileID(ofSpace: space.id)) }
+        guard let profile = WebApps.profile(madeID: id, url: marker.url, among: profiles),
+              let space = spaces.first(where: { Library.shared.profileID(ofSpace: $0.id) == profile }) else { return nil }
+        let app = WebApp(id: id, name: marker.name, url: marker.url, profileID: profile, spaceID: space.id,
                          bundlePath: bundle.path, created: Date())
         save(app)
         return app
