@@ -606,6 +606,44 @@ final class Label: NSTextField {
 
     /// Height of one line in this label's font.
     var lineHeight: CGFloat { ceil(intrinsicContentSize.height) }
+
+    /// Where to put this label, one line tall, so its capital letters sit in the middle of `height`, on the screen's
+    /// pixels: centering the line box instead leaves the letters up to a point low (the system font draws its caps
+    /// below the middle of its line, more so as it grows), which reads as more room above the text than below.
+    func centeredY(in height: CGFloat) -> CGFloat {
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        let y = (height - lineHeight) / 2 - Self.capsBelowMiddle(of: font ?? Tokens.Font.body(), lineHeight: lineHeight)
+        return (y * scale).rounded() / scale
+    }
+
+    private static var capsOffsets: [String: CGFloat] = [:]
+
+    /// How far below the middle of a label's line its capital letters' middle is drawn, measured once per font by
+    /// drawing a few capitals (the cell's own insets and the font's metrics both play in, so it's measured, not worked out).
+    static func capsBelowMiddle(of font: NSFont, lineHeight: CGFloat) -> CGFloat {
+        let key = "\(font.fontName)-\(font.pointSize)-\(lineHeight)"
+        if let known = capsOffsets[key] { return known }
+        let probe = NSTextField(labelWithString: "HOEX")
+        probe.font = font
+        probe.frame = NSRect(x: 0, y: 0, width: ceil(probe.intrinsicContentSize.width) + 4, height: lineHeight)
+        let scale: CGFloat = 4
+        var offset: CGFloat = 0
+        if let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(probe.frame.width * scale), pixelsHigh: Int(lineHeight * scale),
+                                      bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                      bytesPerRow: 0, bitsPerPixel: 0) {
+            rep.size = probe.frame.size
+            probe.cacheDisplay(in: probe.bounds, to: rep)
+            var top = -1, bottom = -1
+            for y in 0..<rep.pixelsHigh {
+                var inked = false
+                for x in 0..<rep.pixelsWide where (rep.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.5 { inked = true; break }
+                if inked { if top < 0 { top = y }; bottom = y }
+            }
+            if top >= 0 { offset = (CGFloat(top) + CGFloat(bottom + 1)) / 2 / scale - lineHeight / 2 }
+        }
+        capsOffsets[key] = offset
+        return offset
+    }
 }
 
 /// A view that paints a single flat color from a dynamic NSColor, following appearance changes.

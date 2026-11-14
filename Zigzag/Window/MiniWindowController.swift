@@ -1166,7 +1166,7 @@ final class MiniOpenButton: InteractiveView {
         let h = label.lineHeight
         let keysInk = keys.isHidden ? 0 : keys.inkWidth + 2
         let keysRoom = keys.isHidden ? 0 : keysInk + Tokens.Space.x1 + 2
-        label.frame = NSRect(x: Self.pad - Label.inset, y: round((bounds.height - h) / 2),
+        label.frame = NSRect(x: Self.pad - Label.inset, y: label.centeredY(in: bounds.height),
                              width: max(0, bounds.width - Self.pad * 2 - keysRoom + Label.inset * 2), height: h)
         keys.frame = NSRect(x: bounds.width - Self.pad - keysInk - Label.inset, y: label.frame.minY, width: keysInk + Label.inset * 2, height: h)
     }

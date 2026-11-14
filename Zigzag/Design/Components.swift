@@ -315,7 +315,7 @@ final class PillButton: InteractiveView {
             iconView.frame = NSRect(x: x, y: (bounds.height - side) / 2, width: side, height: side)
             x = iconView.frame.maxX + Tokens.Space.x1 + 2
         }
-        label.frame = NSRect(x: x - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
+        label.frame = NSRect(x: x - Label.inset, y: label.centeredY(in: bounds.height), width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
     }
 
     override func stateDidChange(animated: Bool) {
