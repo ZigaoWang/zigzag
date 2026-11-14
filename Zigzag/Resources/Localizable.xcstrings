@@ -9758,7 +9758,7 @@
       }
     },
     "Not secure" : {
-      "comment" : "How a page loaded over plain http, or with a certificate you chose to trust anyway, is marked, in the site panel and the address bar's tooltip.\nVoiceOver label of the warning before the address in a pop-up window.",
+      "comment" : "How a page loaded over plain http, or with a certificate you chose to trust anyway, is marked, in the site panel and the address bar's tooltip.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

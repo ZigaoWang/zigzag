@@ -330,8 +330,7 @@ final class BrowserWindow: NSWindow {
 
     /// Moves the system buttons into our top row. AppKit re-lays them out on resize, so this runs often.
     func layoutTrafficLights() {
-        guard let origin = trafficLightOrigin, let close = standardWindowButton(.closeButton),
-              let titlebar = close.superview else { return }
+        guard let origin = trafficLightOrigin else { return }
         // In full screen AppKit shows them in the title bar that slides down with the menu bar, flashing them in
         // the wrong place; they stay hidden there, and the sidebar's buttons move into their space.
         // In full screen they belong to the title bar that slides down with the menu bar, where AppKit puts them,
@@ -340,28 +339,7 @@ final class BrowserWindow: NSWindow {
             buttons.forEach { if $0.isHidden { $0.isHidden = false } }
             return
         }
-        let height = close.frame.height
-        // Measured once, from AppKit's own layout: read later, mid-move, it can come out wrong and bunch the buttons up.
-        if buttonSpacing == nil, let mini = standardWindowButton(.miniaturizeButton), mini.frame.minX > close.frame.minX {
-            buttonSpacing = mini.frame.minX - close.frame.minX
-        }
-        let spacing = buttonSpacing ?? 20
-        // Grow the titlebar so the buttons can sit lower than AppKit's default. Its top is pinned every time, not only
-        // when the height changes: a resize from code moves the window's top without touching the height.
-        if let container = titlebar.superview {
-            let wanted = origin.y + height + Tokens.Space.x1
-            var frame = container.frame
-            frame.size.height = wanted
-            frame.origin.y = (contentView?.frame.height ?? frame.maxY) - wanted
-            if container.frame != frame { container.frame = frame }
-        }
-        for (index, button) in buttons.enumerated() {
-            let x = origin.x + CGFloat(index) * spacing
-            let y = titlebar.frame.height - origin.y - height
-            if button.frame.origin != NSPoint(x: x, y: y) {
-                button.setFrameOrigin(NSPoint(x: x, y: y))
-            }
-        }
+        buttonSpacing = placeTrafficLights(at: origin, spacing: buttonSpacing)
     }
 
     /// A picture of the three buttons, so they can travel with the sidebar while it slides.
@@ -390,6 +368,38 @@ final class BrowserWindow: NSWindow {
 }
 
 extension NSWindow {
+    /// Puts the system buttons with the close button's top left at `origin` (window coordinates from the top left).
+    /// `spacing` is measured once, from AppKit's own layout, and kept by the caller (returned): read later, mid-move,
+    /// it can come out wrong and bunch the buttons up. Moving the buttons can call back in, so it's never inout.
+    @discardableResult
+    func placeTrafficLights(at origin: NSPoint, spacing known: CGFloat?) -> CGFloat? {
+        guard let close = standardWindowButton(.closeButton), let titlebar = close.superview else { return known }
+        let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap { standardWindowButton($0) }
+        let height = close.frame.height
+        var spacing = known
+        if spacing == nil, let mini = standardWindowButton(.miniaturizeButton), mini.frame.minX > close.frame.minX {
+            spacing = mini.frame.minX - close.frame.minX
+        }
+        let step = spacing ?? 20
+        // Grow the titlebar so the buttons can sit lower than AppKit's default. Its top is pinned every time, not only
+        // when the height changes: a resize from code moves the window's top without touching the height.
+        if let container = titlebar.superview {
+            let wanted = origin.y + height + Tokens.Space.x1
+            var frame = container.frame
+            frame.size.height = wanted
+            frame.origin.y = (contentView?.frame.height ?? frame.maxY) - wanted
+            if container.frame != frame { container.frame = frame }
+        }
+        for (index, button) in buttons.enumerated() {
+            let x = origin.x + CGFloat(index) * step
+            let y = titlebar.frame.height - origin.y - height
+            if button.frame.origin != NSPoint(x: x, y: y) {
+                button.setFrameOrigin(NSPoint(x: x, y: y))
+            }
+        }
+        return spacing
+    }
+
     /// A press on chrome that stands in for the title bar (the sidebar, the bar above the page): a drag moves the
     /// window, and a double-click zooms it, or does whatever the Mac's title bar double-click is set to do.
     func titleBarMouseDown(_ event: NSEvent) {

@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Open in from Zigzag Mini, into a window that had just opened with its command bar, closes the bar instead of leaving it over the page.
+- Pop-up windows center their window buttons in the bar at the top, fill to the bottom edge without a strip of the bar's color, and mark a page that isn't secure with the open padlock the address uses.
 
 ## [0.9.1] - 2026-11-15
 

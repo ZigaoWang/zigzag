@@ -93,6 +93,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         // From a full-screen window, a sign-in popup opens over it in the same Space, not off in another one.
         if parent?.styleMask.contains(.fullScreen) == true { window.collectionBehavior.insert(.fullScreenAuxiliary) }
         window.setFrameOrigin(origin)
+        window.placeTrafficLights()
         super.init(window: window)
         parentWindow = parent
         window.delegate = self
@@ -133,7 +134,11 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                 KeepOnTop.refresh(self.pinButton, for: self.window)
             }
         }
-        holder.frame = NSRect(x: 0, y: Self.headerHeight, width: size.width, height: size.height - Self.headerHeight)
+        // From the content view's own size, not the one asked for: the window may come out a point taller (AppKit
+        // rounding its frame to the screen's pixels), and the page fills it to the bottom edge, with no strip of the
+        // header's color under it.
+        let area = content.bounds
+        holder.frame = NSRect(x: 0, y: Self.headerHeight, width: area.width, height: max(0, area.height - Self.headerHeight))
         holder.autoresizingMask = [.width, .height]
         webView.uiDelegate = self
         webView.navigationDelegate = self
@@ -358,9 +363,38 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 }
 
-/// The popup's window: it lets extensions' shortcuts have the keys first, as the browser window does.
+/// The popup's window: it lets extensions' shortcuts have the keys first, as the browser window does, and keeps its
+/// traffic lights on the header's middle, as the browser window and Zigzag Mini keep theirs on their top rows.
 private final class PopupWindow: NSWindow {
     var commandHandler: ((NSEvent) -> Bool)?
+    private var buttonSpacing: CGFloat?
+    private var isPlacing = false
+
+    override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
+        super.init(contentRect: contentRect, styleMask: style, backing: backingStoreType, defer: flag)
+        // AppKit puts the buttons back whenever it relays the title bar; they go back where they belong.
+        let views = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap { standardWindowButton($0) }
+            + [standardWindowButton(.closeButton)?.superview?.superview].compactMap { $0 }
+        for view in views {
+            view.postsFrameChangedNotifications = true
+            NotificationCenter.default.addObserver(self, selector: #selector(buttonsMoved), name: NSView.frameDidChangeNotification, object: view)
+        }
+    }
+
+    /// Centered on the header, as far in from the left as the browser window's.
+    func placeTrafficLights() {
+        guard !styleMask.contains(.fullScreen), let close = standardWindowButton(.closeButton) else { return }
+        let origin = NSPoint(x: Tokens.Sidebar.lightsX, y: round((PopupWindowController.headerHeight - close.frame.height) / 2))
+        buttonSpacing = placeTrafficLights(at: origin, spacing: buttonSpacing)
+    }
+
+    @objc private func buttonsMoved() {
+        guard !isPlacing else { return }
+        isPlacing = true
+        placeTrafficLights()
+        isPlacing = false
+        DispatchQueue.main.async { [weak self] in self?.placeTrafficLights() }
+    }
 
     override func sendEvent(_ event: NSEvent) {
         if event.type == .keyDown, commandHandler?(event) == true { return }
@@ -404,9 +438,10 @@ final class PopupHeaderView: NSView {
         let site = Self.site(of: url)
         label.stringValue = site ?? AddressView.name(of: url)
         lock.isHidden = site == nil
-        lock.image = Tokens.Symbol.image(secure ? "lock" : "exclamationmark.triangle", size: Tokens.Symbol.inline)
+        // The open padlock the address bar and Site Controls mark a page that isn't secure with.
+        lock.image = Tokens.Symbol.image(secure ? "lock" : SitePanel.notSecureSymbol, size: Tokens.Symbol.inline)
         lock.setAccessibilityLabel(secure ? String(localized: "Secure connection", comment: "VoiceOver label of the lock before the address in a pop-up window.")
-                                           : String(localized: "Not secure", comment: "VoiceOver label of the warning before the address in a pop-up window."))
+                                           : SitePanel.notSecure)
         needsLayout = true
     }
 
