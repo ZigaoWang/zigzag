@@ -360,6 +360,8 @@ final class KeyCap: NSView {
         layer?.cornerRadius = Tokens.Radius.small
         layer?.cornerCurve = .continuous
         layer?.borderWidth = Tokens.Metric.hairline
+        // The Globe key is drawn as the globe, as the menu bar draws it, rather than as an emoji.
+        let symbol = symbol ?? (key == Shortcuts.globe ? "globe" : nil)
         label.stringValue = key
         label.alignment = .center
         iconView.image = symbol.map { Tokens.Symbol.image($0, size: Tokens.Symbol.inline) }

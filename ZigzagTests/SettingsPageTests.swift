@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Testing
 @testable import Zigzag
 
@@ -186,5 +186,13 @@ struct SettingsSearchTests {
         #expect(settings.debugFound.contains("Allow JavaScript from Apple Events"))
         settings.debugFind("mcp guide")
         #expect(settings.debugFound.contains("How it works"))
+    }
+
+    /// A shortcut with the Globe key, as macOS gives Enter Full Screen, shows the Globe first, never a lone letter.
+    @Test func globeKeyShowsInAShortcut() {
+        let fullScreen = Shortcuts.Combo(key: "f", modifiers: NSEvent.ModifierFlags.function.rawValue)
+        #expect(Shortcuts.caps(fullScreen) == [Shortcuts.globe, "F"])
+        let both = Shortcuts.Combo(key: "f", modifiers: NSEvent.ModifierFlags([.function, .control, .command]).rawValue)
+        #expect(Shortcuts.caps(both) == [Shortcuts.globe, "⌃", "⌘", "F"])
     }
 }

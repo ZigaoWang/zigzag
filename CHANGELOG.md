@@ -15,6 +15,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The space editor shows a space that follows your Mac at the shade the sidebar has, light by day and deep at night, and moves with it when light or dark changes while the editor is open.
 - In Settings › Zigzag Mini, the New Zigzag Mini row is as tall as its one line of text needs, with its keys in the middle of it.
 - On the History page, Clear History lines up with the times under it, a sitting on one site no longer says how many pages twice, and pages visited after midnight show as Tonight while it's still night.
+- Enter Full Screen in Settings › Shortcuts shows the Globe key with F, as the menu bar does, instead of F alone.
 
 ## [0.9.1] - 2026-11-15
 

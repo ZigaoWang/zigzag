@@ -3451,7 +3451,7 @@ final class KeyCaps: NSView {
 final class ShortcutRow: InteractiveView, SettingsSearchable {
     /// By name, and by its keys whichever way you type them: "⌘L", "⌘ L", or "command L".
     var searchText: String {
-        let names = ["⌘": "command cmd", "⇧": "shift", "⌥": "option alt", "⌃": "control ctrl"]
+        let names = ["⌘": "command cmd", "⇧": "shift", "⌥": "option alt", "⌃": "control ctrl", Shortcuts.globe: "fn globe"]
         let spoken = keys.map { names[$0] ?? $0 }.joined(separator: " ")
         let shortcut = String(localized: "shortcut", comment: "A word that finds keyboard shortcuts with Find a setting in Settings. Not shown.")
         return title.stringValue + " " + shortcut + " " + keys.joined() + " " + keys.joined(separator: " ") + " " + spoken

@@ -159,12 +159,17 @@ enum Shortcuts {
         changed.send(())
     }
 
+    /// The Globe (fn) key, in text as macOS writes it; a keycap draws it as the globe symbol.
+    static let globe = "\u{1F310}\u{FE0E}"
+
     /// The keys to draw for a combo, modifiers first in the order macOS shows them.
     static func caps(_ combo: Combo) -> [String] {
         guard !combo.key.isEmpty else { return [] }
         var keys: [String] = []
         let m = combo.flags
         let shiftedLetter = combo.key.uppercased() == combo.key && combo.key.lowercased() != combo.key
+        // The Globe key, first, as the menu bar shows it: macOS gives Enter Full Screen 🌐F.
+        if m.contains(.function) { keys.append(globe) }
         if m.contains(.control) { keys.append("⌃") }
         if m.contains(.option) { keys.append("⌥") }
         if m.contains(.shift) || shiftedLetter { keys.append("⇧") }
