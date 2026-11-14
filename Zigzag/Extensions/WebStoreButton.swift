@@ -70,6 +70,12 @@ enum WebStoreButton {
         return isStore(scheme: url.scheme ?? "", host: host, port: url.port ?? 0, isMainFrame: true)
     }
 
+    /// Whether the store's page may hear about, add or remove extensions: the store itself, in the tab's page, and
+    /// never in a private window, where extensions don't run and the answers would be the everyday profile's.
+    static func answers(scheme: String, host: String, port: Int, isMainFrame: Bool, page: URL?, isPrivate: Bool) -> Bool {
+        !isPrivate && isStore(scheme: scheme, host: host, port: port, isMainFrame: isMainFrame) && isStore(page)
+    }
+
     /// Chrome's word for an extension's state in a profile.
     static func status(installed: Bool, enabled: Bool) -> String {
         installed ? (enabled ? "enabled" : "disabled") : "installable"
@@ -91,10 +97,10 @@ enum WebStoreButton {
 
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) async -> (Any?, String?) {
             let security = message.frameInfo.securityOrigin
-            guard message.name == WebStoreButton.messageName,
-                  WebStoreButton.isStore(scheme: security.protocol, host: security.host, port: security.port, isMainFrame: message.frameInfo.isMainFrame),
-                  let webView = message.webView as? BrowserWebView, WebStoreButton.isStore(webView.url),
-                  let tab = webView.owner, let request = Request(message.body) else { return (nil, nil) }
+            guard message.name == WebStoreButton.messageName, let webView = message.webView as? BrowserWebView, let tab = webView.owner,
+                  WebStoreButton.answers(scheme: security.protocol, host: security.host, port: security.port, isMainFrame: message.frameInfo.isMainFrame,
+                                         page: webView.url, isPrivate: tab.isPrivate || (tab.host as? BrowserWindowController)?.tabManager.isPrivate == true),
+                  let request = Request(message.body) else { return (nil, nil) }
             guard #available(macOS 15.4, *) else { return (nil, nil) }
             let profile = tab.profile
             let installs = profile.installs

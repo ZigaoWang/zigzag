@@ -165,3 +165,14 @@ struct WebStoreButtonTests {
         #expect(context.evaluateScript("__buttons.every((b) => b.span.firstChild === b.span.original)")?.toBool() == true)
     }
 }
+
+extension WebStoreButtonTests {
+    /// In a private window the store hears nothing about your extensions and can't add one.
+    @Test func privateWindowsGetNoAnswer() {
+        let page = URL(string: "https://chromewebstore.google.com/detail/abc")
+        #expect(WebStoreButton.answers(scheme: "https", host: "chromewebstore.google.com", port: 0, isMainFrame: true, page: page, isPrivate: false))
+        #expect(!WebStoreButton.answers(scheme: "https", host: "chromewebstore.google.com", port: 0, isMainFrame: true, page: page, isPrivate: true))
+        #expect(!WebStoreButton.answers(scheme: "https", host: "chromewebstore.google.com", port: 0, isMainFrame: true,
+                                        page: URL(string: "https://evil.example/"), isPrivate: false))
+    }
+}
