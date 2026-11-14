@@ -40,6 +40,8 @@ final class SitePanel: FloatingPanelView {
     func describes(_ other: Tab?) -> Bool { other === tab || other == nil && isBlank }
     /// Opened from a split pane's strip, under its address: it belongs to where that strip is.
     private(set) var isFromPane = false
+    /// Under the sidebar's address, as wide as it and edge to edge with it: a window growing or shrinking leaves it there.
+    private var isAlongAddress = false
 
     private let icon = FaviconView()
     private let siteName = Label("", font: Tokens.Font.voice(20), color: Tokens.Color.textPrimary)
@@ -260,7 +262,11 @@ final class SitePanel: FloatingPanelView {
         }
         var x = aboveThePage || pane ? anchorFrame.maxX - panel.width : anchorFrame.minX
         if pane { x = min(x, overlay.bounds.width - inset - panel.width) }
-        panel.frame.origin = NSPoint(x: max(inset, x), y: anchorFrame.maxY + 4)
+        // Under the sidebar's address, edge to edge with it, both sides: the window's inset put it a little right of
+        // the field, with the favorite under it peeking out at its corner.
+        let alongAddress = !aboveThePage && !pane && anchorFrame.minX >= 0
+        panel.isAlongAddress = alongAddress
+        panel.frame.origin = NSPoint(x: SitePanelSizing.x(x, alongAddress: alongAddress, inset: inset), y: anchorFrame.maxY + 4)
         // Never past the window's bottom: what doesn't fit scrolls.
         panel.maxHeight = SitePanelSizing.maxHeight(overlayHeight: overlay.bounds.height, top: panel.frame.minY)
         panel.frame.size = NSSize(width: panel.width, height: panel.fittedHeight)
@@ -537,9 +543,11 @@ final class SitePanel: FloatingPanelView {
         guard let superview, maxHeight < .greatestFiniteMagnitude else { return }
         // Narrower now: as narrow as it must be, and back inside the window's right edge, as it opened.
         let inset = Tokens.Metric.cardInset
-        width = max(Self.minimumWidth, min(Self.width, superview.bounds.width - inset * 2))
-        frame.origin.x = max(inset, min(frame.minX, superview.bounds.width - inset - width))
-        frame.size.width = width
+        if !isAlongAddress {
+            width = max(Self.minimumWidth, min(Self.width, superview.bounds.width - inset * 2))
+            frame.origin.x = max(inset, min(frame.minX, superview.bounds.width - inset - width))
+            frame.size.width = width
+        }
         maxHeight = SitePanelSizing.maxHeight(overlayHeight: superview.bounds.height, top: frame.minY)
         resize()
     }
@@ -1787,6 +1795,13 @@ final class PanelPageHeader: NSView {
 /// How tall Site Controls is, and how much of a page scrolls (#220): never past the window's bottom, a page's header
 /// kept at the top, and the rest of the page under it scrolling when it doesn't fit.
 enum SitePanelSizing {
+    /// Where the panel's left edge goes. Under the sidebar's address (`alongAddress`), at the field's own edge, so the
+    /// two line up both sides and nothing under the panel shows past its corner; with that address off screen (the
+    /// sidebar hidden), kept in from the window's edge by `inset`, as anything else is.
+    static func x(_ x: CGFloat, alongAddress: Bool, inset: CGFloat) -> CGFloat {
+        alongAddress && x >= 0 ? x : max(inset, x)
+    }
+
     /// The tallest the panel can be from `top` in a window's overlay `overlayHeight` tall: down to the window's bottom
     /// inset, and never so short that a page can't show a few rows.
     static func maxHeight(overlayHeight: CGFloat, top: CGFloat) -> CGFloat {

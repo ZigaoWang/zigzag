@@ -527,6 +527,17 @@ struct SitePanelRowsTests {
 
 /// How tall Site Controls gets, and when a page scrolls under its header (#220).
 struct SitePanelSizingTests {
+    /// Under the sidebar's address the panel starts where the field does (6 pt in), not at the window's 8 pt inset,
+    /// so its edges line up with the field's and nothing under it shows past its corner.
+    @Test func underTheAddressItLinesUpWithTheField() {
+        let inset = Tokens.Metric.cardInset
+        #expect(SitePanelSizing.x(6, alongAddress: true, inset: inset) == 6)
+        #expect(SitePanelSizing.x(1_200, alongAddress: true, inset: inset) == 1_200)
+        // The address off screen (the sidebar hidden), or anything else: kept in from the window's edge.
+        #expect(SitePanelSizing.x(-240, alongAddress: true, inset: inset) == inset)
+        #expect(SitePanelSizing.x(6, alongAddress: false, inset: inset) == inset)
+    }
+
     @Test func aPageThatFitsDoesntScroll() {
         let fit = SitePanelSizing.fit(band: 52, body: 300, maxHeight: 700)
         #expect(fit.height == 352)
