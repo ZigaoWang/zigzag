@@ -200,7 +200,7 @@ final class ExtensionSheet: FloatingPanelView {
         if destinationButton.superview != nil {
             let h = Tokens.Page.controlHeight
             let menuWidth = min(destinationButton.intrinsicContentSize.width, inner - destinationLabel.textWidth - Tokens.Space.x3)
-            place(destinationLabel, NSRect(x: pad - Label.inset, y: y + round((h - destinationLabel.lineHeight) / 2), width: inner - menuWidth, height: destinationLabel.lineHeight))
+            place(destinationLabel, NSRect(x: pad - Label.inset, y: y + destinationLabel.centeredY(in: h), width: inner - menuWidth, height: destinationLabel.lineHeight))
             place(destinationButton, NSRect(x: pad + inner - menuWidth, y: y, width: menuWidth, height: h))
             y += h + Tokens.Space.x4
         }

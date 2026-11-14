@@ -290,8 +290,8 @@ final class SavePasswordPrompt: FloatingPanelView {
         // The username, editable before saving.
         usernameBox.frame = NSRect(x: pad, y: header.frame.maxY + Tokens.Dialog.gap, width: inner, height: fieldHeight)
         let fh = ceil(usernameField.intrinsicContentSize.height)
-        usernameField.frame = NSRect(x: Tokens.Space.x3, y: (fieldHeight - fh) / 2, width: inner - Tokens.Space.x3 * 2, height: fh)
-        usernameText.frame = NSRect(x: Tokens.Space.x3, y: (fieldHeight - usernameText.lineHeight) / 2, width: inner - Tokens.Space.x3 * 2, height: usernameText.lineHeight)
+        usernameField.frame = NSRect(x: Tokens.Space.x3, y: usernameField.centeredY(in: fieldHeight), width: inner - Tokens.Space.x3 * 2, height: fh)
+        usernameText.frame = NSRect(x: Tokens.Space.x3, y: usernameText.centeredY(in: fieldHeight), width: inner - Tokens.Space.x3 * 2, height: usernameText.lineHeight)
         // Never at the left; Not Now and Save at the right.
         let y = usernameBox.frame.maxY + Tokens.Dialog.gap
         buttons.frame = NSRect(x: pad, y: y, width: inner, height: buttonHeight)
