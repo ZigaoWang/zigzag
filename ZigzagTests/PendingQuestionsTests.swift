@@ -53,4 +53,16 @@ import Testing
         PendingQuestions.enqueue(question)
         #expect(PendingQuestions.count(tabID: tabID) == 1)
     }
+
+    /// A window that shows one page and has no sidebar (Zigzag Mini, a web app) hangs the glow on its own edge, on the
+    /// side `sidebarOnRight` puts the sidebar, and runs it the page's whole height — where the sidebar's dot would be.
+    @Test func theEdgeGlowSitsOnTheWindowEdgeTheSidebarIsOn() {
+        let page = NSRect(x: 0, y: 20, width: 800, height: 600)
+        let left = AttentionEdge.frame(forPage: page, sidebarOnRight: false)
+        let right = AttentionEdge.frame(forPage: page, sidebarOnRight: true)
+        #expect(left.minX - page.minX <= Tokens.Metric.hairline, "the hairline is on the window's leading edge")
+        #expect(page.maxX - right.minX <= Tokens.Metric.hairline, "or on its trailing edge, with the sidebar there")
+        #expect(left.minX < page.midX && right.minX > page.midX, "the two sides are opposite ones")
+        #expect(left.minY == page.minY && left.height == page.height, "the page's whole height, either way")
+    }
 }
