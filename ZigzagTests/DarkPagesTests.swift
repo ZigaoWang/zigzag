@@ -331,4 +331,27 @@ struct DarkPagesTests {
             DarkPages.mode = .always
         }
     }
+
+    /// Zigzag Mini's page (#225) is a tab's like any other: with no choice for its site it follows the setting, and
+    /// the choice made in its Site Controls applies to it at once.
+    @Test func zigzagMinisPageFollowsTheSettingAndItsSitesChoice() {
+        withDefaults {
+            DarkPages.mode = .always
+            let tab = Tab(url: URL(string: "http://localhost:1/"), spaceID: UUID())
+            tab.isPeek = true
+            let webView = tab.ensureWebView()
+            defer { tab.close() }
+            #expect(DarkPages.choice(for: tab.url) == nil)
+            #expect(webView.appearance?.name == .darkAqua)
+            // Dark Reader and its proxy, not the plain script.
+            #expect(webView.configuration.userContentController.userScripts.filter(DarkPages.isOurs).count == 2)
+            DarkPages.setSiteChoice(.off, for: tab.url)
+            #expect(webView.appearance?.name == .aqua)
+            DarkPages.mode = .off
+            DarkPages.setSiteChoice(.on, for: tab.url)
+            #expect(webView.appearance?.name == .darkAqua)
+            DarkPages.setSiteChoice(.automatic, for: tab.url)
+            #expect(webView.appearance?.name == .aqua)
+        }
+    }
 }
