@@ -530,9 +530,9 @@ final class ExtensionHost: NSObject {
         }
     }
 
-    /// A site and its subdomains, over http and https.
+    /// A site and its subdomains, over http and https, with a trailing dot too (bank.com. is bank.com).
     static func patterns(for site: String) -> [WKWebExtension.MatchPattern] {
-        ["*://\(site)/*", "*://*.\(site)/*"].compactMap { try? WKWebExtension.MatchPattern(string: $0) }
+        ["*://\(site)/*", "*://*.\(site)/*", "*://\(site)./*", "*://*.\(site)./*"].compactMap { try? WKWebExtension.MatchPattern(string: $0) }
     }
 
     /// Records what the extension is granted. WebKit keeps the bridge's permissions among the granted ones, so they're

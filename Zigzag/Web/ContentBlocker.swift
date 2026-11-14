@@ -28,7 +28,9 @@ enum ContentBlocker {
     }
 
     static func site(of url: URL?) -> String? {
-        guard let host = url?.host()?.lowercased(), !host.isEmpty else { return nil }
+        guard var host = url?.host()?.lowercased(), !host.isEmpty else { return nil }
+        // A trailing dot (bank.com.) names the same site.
+        if host.hasSuffix("."), host.count > 1 { host.removeLast() }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
 
