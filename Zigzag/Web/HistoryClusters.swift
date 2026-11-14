@@ -60,6 +60,11 @@ nonisolated enum HistoryClusters {
         default: .lateNight
         }
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: start), to: calendar.startOfDay(for: now)).day ?? 0
+        // Visited after midnight while it's still that night: it's tonight, not last night, until the morning.
+        if days <= 0, part == .lateNight, calendar.component(.hour, from: now) < 5 {
+            return String(localized: "history.session.tonightAfterMidnight", defaultValue: "Tonight",
+                          comment: "Name of a History session that began after midnight, seen while it's still night (before 5 AM). In English it's still tonight; say it as your language says these hours.")
+        }
         // Each name whole, so a language can put the day and the time of day in its own order.
         switch days {
         case ...0:

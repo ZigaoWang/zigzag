@@ -19277,6 +19277,24 @@
         }
       }
     },
+    "history.session.tonightAfterMidnight" : {
+      "comment" : "Name of a History session that began after midnight, seen while it's still night (before 5 AM). In English it's still tonight; say it as your language says these hours.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tonight"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天凌晨"
+          }
+        }
+      }
+    },
     "import.extension-failure" : {
       "comment" : "Import window, one extension that couldn't be added: its name, then why, like “Not in the Chrome Web Store any more.”",
       "extractionState" : "extracted_with_value",

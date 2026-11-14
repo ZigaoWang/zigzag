@@ -14,6 +14,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Show All Tabs turns dark or light with the rest of Zigzag while it's open, instead of keeping the light color behind white text. Its cards show each page as it looks now, not a picture taken before light or dark changed.
 - The space editor shows a space that follows your Mac at the shade the sidebar has, light by day and deep at night, and moves with it when light or dark changes while the editor is open.
 - In Settings › Zigzag Mini, the New Zigzag Mini row is as tall as its one line of text needs, with its keys in the middle of it.
+- On the History page, Clear History lines up with the times under it, a sitting on one site no longer says how many pages twice, and pages visited after midnight show as Tonight while it's still night.
 
 ## [0.9.1] - 2026-11-15
 

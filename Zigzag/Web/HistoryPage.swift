@@ -356,7 +356,8 @@ enum HistoryPage {
 %STYLE%
 /* History's own: sessions of pages, in one grid, under the shared header. */
 main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
-.clear { position: relative; }
+/* Its right edge on the rows' times, past their × column (20px and the 10px gap), the edge the eye follows down. */
+.clear { position: relative; margin-right: 30px; }
 
 #list { padding: 4px calc(var(--gutter) - var(--row-inset)) 48px; }
 /* A session: one sitting, from the first page to a break. Sessions are set apart by room and a quiet label, never a
@@ -538,9 +539,10 @@ function sessionElement(session) {
   const section = el('section', 'session');
   const items = session.clusters.flatMap((c) => c.items);
   const head = el('div', 'session-head');
-  // The heading names the day and part of it; the times are on the rows under it, so it doesn't repeat them.
+  // The heading names the day and part of it; the times are on the rows under it, so it doesn't repeat them. Its
+  // count only when there's more than one row: one site's row already says how many pages it holds.
   head.append(el('h2', null, session.title),
-              el('span', 'count', pages(items.length)),
+              el('span', 'count', session.clusters.length > 1 ? pages(items.length) : ''),
               removeButton(words.removeSession, () => forget(items.map((i) => i.url), session)));
   const rows = el('div', 'rows');
   for (const c of session.clusters) rows.append(c.items.length > 1 ? clusterElement(c, session) : page(c.items[0], session));

@@ -79,6 +79,15 @@ struct HistoryClustersTests {
         #expect(title(date(12, 1, month: 12, year: 2025)) == "Friday late night, December 12, 2025")
     }
 
+    /// Pages visited after midnight, looked at while it's still night, are tonight's; by morning they're last night's.
+    @Test func afterMidnightIsTonightUntilMorning() {
+        let title = { (start: Date, now: Date) in HistoryClusters.title(startingAt: start, now: now, calendar: calendar) }
+        #expect(title(date(31, 2, 54), date(31, 2, 57)) == "Tonight")
+        #expect(title(date(31, 0, 10), date(31, 4, 59)) == "Tonight")
+        #expect(title(date(31, 2, 54), date(31, 5)) == "Late last night")
+        #expect(title(date(30, 22), date(31, 2, 57)) == "Last night")
+    }
+
     /// A session's heading names the day and the part of it, never a time: each row under it shows its own.
     @Test func headingsLeaveTimesToTheRows() throws {
         let script = HistoryPage.template
@@ -87,5 +96,7 @@ struct HistoryClustersTests {
         #expect(body.contains("session.title"))
         #expect(!body.contains("span("))
         #expect(!body.contains("timeOf("))
+        // One site's row already counts its pages: the heading counts them only over more than one row.
+        #expect(body.contains("session.clusters.length > 1 ? pages(items.length) : ''"))
     }
 }
