@@ -1308,8 +1308,14 @@ private final class BringPicker: StepContent {
     }
 
     override func preferredHeight(for width: CGFloat) -> CGFloat {
-        let list = rows.isEmpty ? 40 : rows.map { $0.height(for: width) }.reduce(0, +)
+        let list = rows.isEmpty ? emptyHeight(for: width) : rows.map { $0.height(for: width) }.reduce(0, +)
         return list + linkHeight + (hint.stringValue.isEmpty ? 0 : hint.lineHeight + Tokens.Space.x3)
+    }
+
+    /// The note that nothing was found: its own lines' height, so the card around it keeps the same room above
+    /// and below it.
+    private func emptyHeight(for width: CGFloat) -> CGFloat {
+        ceil(empty.sizeThatFits(NSSize(width: width, height: .greatestFiniteMagnitude)).height)
     }
 
     /// Room for the file link under the list, while it shows.
@@ -1334,9 +1340,17 @@ private final class BringPicker: StepContent {
         let room = bounds.height - linkHeight - (hint.stringValue.isEmpty ? 0 : hint.lineHeight + Tokens.Space.x3)
         scroll.frame = NSRect(x: pad, y: 0, width: width, height: min(ry, max(room, 0)))
         list.frame = NSRect(x: 0, y: 0, width: width, height: ry)
-        if rows.isEmpty { empty.frame = NSRect(x: pad, y: 0, width: width, height: 40) }
+        if rows.isEmpty {
+            // Its capitals, not its line box, in the middle of the card's equal padding (a wrapped note's lines
+            // lean the same way).
+            let height = emptyHeight(for: width), font = empty.font ?? Tokens.Font.body()
+            let line = ceil(font.ascender - font.descender + font.leading)
+            let scale = window?.backingScaleFactor ?? 2
+            let up = (Label.capsBelowMiddle(of: font, lineHeight: line) * scale).rounded() / scale
+            empty.frame = NSRect(x: pad, y: -up, width: width, height: height)
+        }
         // Right under the list, lined up with its text.
-        let below = rows.isEmpty ? 40 : scroll.frame.maxY
+        let below = rows.isEmpty ? emptyHeight(for: width) : scroll.frame.maxY
         if !signIns.isHidden {
             // Its own strip a little below the list: about the import, not one more browser in it.
             signIns.frame = NSRect(x: pad, y: below + Tokens.Space.x3, width: width, height: OptionRow.height)

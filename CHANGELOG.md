@@ -10,6 +10,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - VoiceOver reads Zigzag's own buttons, switches, menus and rows by name, like Back, Downloads or a tab's title, and says which tab is current. They came through as pictures named after their icons, and some had no name at all.
 - What's New opens over the page, below the bar above it, instead of across the address and the developer tools.
 - An extension's popup opened from the sidebar stays inside the window, instead of hanging past its left edge.
+- In onboarding, the note that no other browsers were found sits in the middle of its card.
 
 ## [0.9.1] - 2026-11-15
 
