@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://zigzagbrowser.com/download"><b>Download for Mac</b></a><br>
   <sub>or <code>brew install --cask zigaowang/tap/zigzag</code></sub><br>
-  <sub>Free. macOS 15.4 or later. In beta.</sub>
+  <sub>Free and open source. macOS 15.4 or later.</sub>
 </p>
 
 <p align="center">
@@ -16,6 +16,21 @@
   Your tabs in a sidebar, grouped into spaces. A native Mac app in Swift on WebKit,<br>
   18 MB installed, with no account and no telemetry.
 </p>
+
+## Why I built it
+
+Hi, I'm Zigao, a high school student in Shanghai. I used Arc every day. When The Browser Company said it's shutting
+Arc down on December 22, I really didn't want to go back to tabs along the top, and the alternatives I tried were
+either Chromium forks or browsers built around AI. So I made my own, and I've used it as my main browser ever since.
+
+**Why WebKit and not Chromium?** I actually started by forking Helium. The source was about 100 GB and every build
+took 3 to 4 hours on my Mac, which isn't something I can keep up by myself. WebKit already comes with macOS, it's
+lighter on battery and memory, and Apple ships its security fixes with macOS updates. You still get Chrome
+extensions, installed straight from the Chrome Web Store.
+
+**Why not Zen or Orion?** I tried both before starting this, and they're good. Zen runs on Firefox, so it uses Firefox
+extensions and doesn't feel like a Mac app to me. Orion is closer, but it isn't open source. I wanted something
+that works like Arc, feels native, is open source, and runs my Chrome extensions.
 
 ## Coming from Arc
 
@@ -60,7 +75,7 @@ Zigzag connects to on its own.
 | **Windows** | Drag a tab to another window and it moves as it is, without loading again. The sidebar sits on the left or the right. |
 | **Web apps** | Install as App makes a site an app of its own, in your Applications folder, the Dock and ⌘Tab, with a toolbar in the site's color. |
 | **Peek** | Shift-click a link to read it over the page you're on. |
-| **Mini player** | Leave a tab while its video plays and the video follows you in a small player. Resize it from any edge, snap it to a corner, or drag it out of the window to keep it over other apps. |
+| **Mini player** | Leave a tab while its video plays and the video follows you in a small player. Resize it from any edge and put it anywhere, even outside the window over other apps. Turn it off from its menu if you'd rather not have it. |
 | **All tabs** | ⇧⌘\ shows every space at once. Type to filter, drag a tab to another space. |
 | **Clear** | Closes the tabs you've drifted away from and keeps the ones you're working with. Undo brings them back. |
 | **Zigzag Mini** | ⌃⌘N opens a small window for one quick page, and ⌘O moves it into your browser window. Links from other apps can open in it, like Little Arc, and Open in Zigzag Mini moves a tab into one. |
@@ -78,7 +93,7 @@ Zigzag connects to on its own.
 
 ## What's missing
 
-Zigzag is a beta. It's my everyday browser, but you'll find bugs. Things Arc users will notice:
+It's my everyday browser, but Zigzag is young and you'll find bugs. Things Arc users will notice:
 
 - No sync between Macs or to iPhone. Passwords sync through iCloud Keychain; spaces and tabs don't.
 - Space icons don't come over from Arc; pick them again in Zigzag. Space colors come over as the nearest Zigzag color.
@@ -89,7 +104,7 @@ Zigzag is a beta. It's my everyday browser, but you'll find bugs. Things Arc use
 
 ## How it's built
 
-Zigzag is about 90,000 lines of Swift 6 and AppKit around `WKWebView`. There's no Chromium and no Electron: the
+Zigzag is about 105,000 lines of Swift 6 and AppKit around `WKWebView`. There's no Chromium and no Electron: the
 engine is the WebKit that ships with macOS, which is why the app is small and why engine security fixes arrive
 with macOS updates rather than from me.
 
@@ -97,6 +112,7 @@ with macOS updates rather than from me.
 |---|---|
 | **Pages** | One `WKWebView` per tab. Tabs you haven't used in a while can be suspended: the web view is released and the tab keeps its snapshot and state, then reloads when you come back. Private windows use a non-persistent data store. |
 | **Extensions** | WebKit's web extension support (`WKWebExtensionController`, the reason for the macOS 15.4 minimum). Zigzag downloads the CRX3 package from the Chrome Web Store, checks its signatures, and loads it. Chrome APIs WebKit doesn't have (history, bookmarks, downloads, notifications, side panels, offscreen pages, web sign-in, tab audio, new tab pages, user scripts, proxies and more) are answered by Zigzag itself through a small bridge, checked against each extension's own permissions. A search engine an extension gives (`search_provider`) joins the choices in Settings, used only once you pick it. Native messaging connects the helper apps of 1Password and other extensions. |
+| **Sandboxing** | Pictures and PDFs from websites are read in two sandboxed XPC helpers with no network and no file access, so a malformed image or PDF can't reach your passwords or profiles. The PDF viewer draws the pages the helper renders; the app never opens a site's PDF itself. |
 | **Ad blocking** | EasyList, EasyPrivacy and EasyList China converted ahead of time with SafariConverterLib into content rule lists (`WKContentRuleListStore`), compiled once and cached. uBlock Origin's lists, downloaded as they expire, are matched by Ghostery's adblocker engine in its own JavaScript context, and each page gets the scriptlets and hiding rules its site needs as it starts to load. |
 | **Dark pages** | Dark Reader's dynamic theme and its site fixes, bundled, in a script world of its own. Pages are told the window is dark first, so a site with its own dark theme uses it and is left alone. |
 | **Cookie pop-ups** | DuckDuckGo's Autoconsent and its rules, bundled, in a script world of its own. |
@@ -108,7 +124,7 @@ with macOS updates rather than from me.
 
 The source is organized by feature: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`,
 `CommandBar`, `Desk` (every tab at once), `Peek`, `Settings`, `Window` and `Design` (Zigzag's own drawn controls
-and design tokens). Over 1,200 tests cover importing, passwords, extensions, address handling, history and the
+and design tokens). Over 1,700 tests cover importing, passwords, extensions, address handling, history and the
 security fixes.
 
 ## Privacy
