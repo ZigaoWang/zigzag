@@ -94,13 +94,38 @@ struct PageFullScreenTests {
         let source = PageFullScreen.source(config: config)
         #expect(source.hasPrefix(PageFullScreen.scriptMark))
         #expect(!source.contains("__CONFIG__"))
-        #expect(source.contains(#"{"fill":"page","page":["a.com","youtube.com"],"screen":["b.org"]}"#))
+        // The page's own script has the setting only: which sites have a choice is never in the page's world.
+        #expect(source.contains(#"{"fill":"page"}"#))
+        #expect(!source.contains("youtube.com") && !source.contains("b.org"))
+        let choices = PageFullScreen.choiceSource(config: config)
+        #expect(choices.contains(#"{"fill":"page","page":["a.com","youtube.com"],"screen":["b.org"]}"#))
         let script = PageFullScreen.script(config: config)
         #expect(PageFullScreen.isOurs(script))
         #expect(!script.isForMainFrameOnly)
         #expect(script.injectionTime == .atDocumentStart)
+        #expect(PageFullScreen.isOurs(PageFullScreen.choiceScript(config: config)))
         #expect(!PageFullScreen.isOurs(WKUserScript(source: "1", injectionTime: .atDocumentStart, forMainFrameOnly: true)))
-        #expect(PageFullScreen.applyCall(config).contains(#"Symbol.for('zigzag.fullscreen')"#))
+        #expect(PageFullScreen.applyCall(config).contains("__zigzagFullScreenChoice"))
+    }
+
+    @Test func thePageCantReadTheSitesChoices() async throws {
+        let webView = await load(Self.page, fill: .screen, sites: ["videos.test", "secret.example"])
+        let seen = try await page("""
+        const seen = [];
+        const some = Array.prototype.some, endsWith = String.prototype.endsWith;
+        Array.prototype.some = function (...a) { seen.push(JSON.stringify(this)); return some.apply(this, a); };
+        String.prototype.endsWith = function (...a) { seen.push(String(a[0])); return endsWith.apply(this, a); };
+        await document.getElementById('player').requestFullscreen();
+        await new Promise(r => setTimeout(r, 10));
+        dispatchEvent(new Event('zigzag-fullscreen-ask'));
+        Array.prototype.some = some; String.prototype.endsWith = endsWith;
+        return [seen.join(' '), typeof window.__zigzagFullScreenChoice, document.fullscreenElement && document.fullscreenElement.id]
+        """, in: webView) as? [Any]
+        let values = try #require(seen)
+        #expect(!(values[0] as? String ?? "").contains("secret.example"))
+        #expect(values[1] as? String == "undefined")
+        // The page's own choice still holds.
+        #expect(values[2] as? String == "player")
     }
 
     private final class Loading: NSObject, WKNavigationDelegate {
@@ -129,7 +154,9 @@ struct PageFullScreenTests {
     private func load(_ html: String, fill: PageFullScreen.Fill, sites: Set<String> = [], heard: Heard? = nil) async -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.preferences.isElementFullscreenEnabled = true
-        configuration.userContentController.addUserScript(PageFullScreen.script(config: PageFullScreen.config(fill: fill, pageSites: sites, screenSites: [])))
+        let config = PageFullScreen.config(fill: fill, pageSites: sites, screenSites: [])
+        configuration.userContentController.addUserScript(PageFullScreen.choiceScript(config: config))
+        configuration.userContentController.addUserScript(PageFullScreen.script(config: config))
         if let heard { configuration.userContentController.add(heard, contentWorld: .page, name: PageFullScreen.messageName) }
         let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 700), configuration: configuration)
         let loading = Loading()
@@ -250,7 +277,7 @@ struct PageFullScreenTests {
         try await page("await document.getElementById('player').requestFullscreen()", in: webView)
         #expect(try await page("return document.fullscreenElement && document.fullscreenElement.id", in: webView) as? String == "player")
         // The choice taken back: the page leaves, and the next request is WebKit's again.
-        _ = try await webView.evaluateJavaScript(PageFullScreen.applyCall(PageFullScreen.config(fill: .screen, pageSites: [], screenSites: [])), in: nil, contentWorld: .page)
+        _ = try await webView.evaluateJavaScript(PageFullScreen.applyCall(PageFullScreen.config(fill: .screen, pageSites: [], screenSites: [])), in: nil, contentWorld: PageFullScreen.world)
         #expect(try await page("return document.getElementById('player').hasAttribute('data-zigzag-fullscreen')", in: webView) as? Bool == false)
     }
 

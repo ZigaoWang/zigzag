@@ -28,20 +28,47 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
     private var authorized: Bool?
     private var started = false
 
-    /// The page script, knowing every site's answer up front so `Notification.permission` is right before the
-    /// page's own scripts run. Added per web view, since a private window's answer is always no.
+    /// The page script, and beside it, in a world of Zigzag's own, the answers sites were given, so
+    /// `Notification.permission` is right before the page's own scripts run. Only the page's own answer reaches it:
+    /// the list says which sites you've allowed, and no page reads it. Added per web view, since a private window's
+    /// answer is always no.
     static func attach(to configuration: WKWebViewConfiguration, isPrivate: Bool) {
         let controller = configuration.userContentController
         guard !controller.userScripts.contains(where: { $0.source.hasPrefix(marker) }) else { return }
         let decisions = isPrivate ? [:] : SitePermissions.notificationDecisions
-        let json = (try? JSONSerialization.data(withJSONObject: decisions)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-        let source = marker + "\n" + shim.replacingOccurrences(of: "__DECISIONS__", with: json)
-            .replacingOccurrences(of: "__PRIVATE__", with: isPrivate ? "true" : "false")
-        controller.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page))
+        controller.addUserScript(WKUserScript(source: answerSource(decisions: decisions), injectionTime: .atDocumentStart, forMainFrameOnly: false, in: world))
+        controller.addUserScript(WKUserScript(source: pageSource(isPrivate: isPrivate), injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page))
         controller.addScriptMessageHandler(shared, contentWorld: .page, name: messageName)
     }
 
     private static let marker = "/* zigzag notifications */"
+    /// Where the sites' answers are kept in a page, apart from the page's own world.
+    static let world = WKContentWorld.world(name: "zigzag-notifications")
+
+    /// The page's stand-in for `window.Notification`.
+    static func pageSource(isPrivate: Bool) -> String {
+        marker + "\n" + shim.replacingOccurrences(of: "__PRIVATE__", with: isPrivate ? "true" : "false")
+    }
+
+    /// Tells the page script the answer for its own origin, as an event (granted, denied or default), when it asks.
+    static func answerSource(decisions: [String: Bool]) -> String {
+        let json = (try? JSONSerialization.data(withJSONObject: decisions)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        return marker + """
+
+        (() => {
+          if (window.__zigzagNotificationAnswers) return;
+          window.__zigzagNotificationAnswers = true;
+          const decisions = \(json);
+          const answer = () => {
+            const origin = location.origin;
+            const state = Object.prototype.hasOwnProperty.call(decisions, origin) ? (decisions[origin] ? 'granted' : 'denied') : 'default';
+            try { window.dispatchEvent(new Event('zigzag-notification-' + state)); } catch (e) {}
+          };
+          window.addEventListener('zigzag-notification-ask', answer, true);
+          answer();
+        })();
+        """
+    }
 
     // MARK: Messages
 
@@ -290,15 +317,19 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
       // A frame written with document.open() (Cloudflare's Turnstile does) gets a new document in the same window,
       // and WebKit runs this again there: what's set up already stays, since setting it up again throws.
       if (window.__zigzagNotification) return;
-      const decisions = __DECISIONS__;
       const isPrivate = __PRIVATE__;
       const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
       let sameSite = window === window.top;
       if (!sameSite) { try { sameSite = window.top.location.origin === location.origin; } catch (e) {} }
       const usable = sameSite && (location.protocol === 'https:' || (location.protocol === 'http:' && local));
-      // Answers are kept per origin (scheme, host and port), as location.origin spells it.
-      const origin = location.origin;
-      let permission = !usable || isPrivate ? 'denied' : (origin in decisions ? (decisions[origin] ? 'granted' : 'denied') : 'default');
+      // Answers are kept per origin (scheme, host and port), and only this origin's is told here, from Zigzag's own
+      // world, before the page's scripts run (WebNotifications.answerSource).
+      let permission = !usable || isPrivate ? 'denied' : 'default';
+      const listen = EventTarget.prototype.addEventListener, tell = EventTarget.prototype.dispatchEvent, NativeEvent = Event;
+      for (const state of ['granted', 'denied', 'default']) {
+        listen.call(window, 'zigzag-notification-' + state, () => { if (usable && !isPrivate) permission = state; }, true);
+      }
+      tell.call(window, new NativeEvent('zigzag-notification-ask'));
       // A question only follows a click or a key: a page can't ask the moment it opens.
       let lastGesture = 0;
       for (const type of ['pointerdown', 'keydown', 'click']) window.addEventListener(type, (e) => { if (e.isTrusted) lastGesture = Date.now(); }, true);

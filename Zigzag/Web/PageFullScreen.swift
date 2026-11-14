@@ -97,10 +97,52 @@ enum PageFullScreen {
     /// The first line of the page script, to tell it from a web view's other scripts.
     static let scriptMark = "/* zigzag page full screen */\n"
 
-    /// The choices as the page script reads them: the setting and the sites with a choice of their own. The page
-    /// decides for the site it's on (a frame for the site of the page around it), so one script serves every page.
+    /// The choices as the choice script reads them: the setting and the sites with a choice of their own. It decides
+    /// for the site the page is on (a frame for the site of the page around it), so one script serves every page.
     static func config(fill: Fill, pageSites: Set<String>, screenSites: Set<String>) -> [String: Any] {
         ["fill": fill.rawValue, "page": pageSites.sorted(), "screen": screenSites.sorted()]
+    }
+
+    /// What the page's own script is given: the setting only. Which sites have a choice of their own is a list of
+    /// sites you've been to, and stays in Zigzag's own world, out of every page's reach.
+    static func pageConfig(_ config: [String: Any]) -> [String: Any] {
+        ["fill": config["fill"] ?? Fill.screen.rawValue]
+    }
+
+    /// The world the choice script runs in, apart from the page's.
+    static let world = WKContentWorld.world(name: "zigzag-fullscreen")
+
+    /// Works out the choice for the page's site in Zigzag's own world, and tells the page script only that: an
+    /// event of "page" or "screen", now, when it asks, and when the choices change.
+    static func choiceSource(config: [String: Any]) -> String {
+        scriptMark + """
+        (() => {
+          if (window.__zigzagFullScreenChoice) return;
+          let config = \(json(config));
+          const isTop = window === window.top;
+          const siteOf = (host) => (host || '').toLowerCase().replace(/^www\\./, '');
+          const topHost = () => {
+            if (isTop) return location.hostname;
+            try { const a = location.ancestorOrigins; if (a && a.length) return new URL(a[a.length - 1]).hostname; } catch (e) {}
+            try { return window.top.location.hostname; } catch (e) { return location.hostname; }
+          };
+          const covers = (list, site) => (list || []).some((s) => site === s || site.endsWith('.' + s));
+          const fills = () => {
+            const site = siteOf(topHost());
+            if (covers(config.page, site)) return true;
+            if (covers(config.screen, site)) return false;
+            return config.fill === 'page';
+          };
+          const answer = () => { try { window.dispatchEvent(new Event(fills() ? 'zigzag-fullscreen-page' : 'zigzag-fullscreen-screen')); } catch (e) {} };
+          window.addEventListener('zigzag-fullscreen-ask', answer, true);
+          window.__zigzagFullScreenChoice = { set(next) { config = next; answer(); } };
+          answer();
+        })();
+        """
+    }
+
+    static func choiceScript(config: [String: Any] = config) -> WKUserScript {
+        WKUserScript(source: choiceSource(config: config), injectionTime: .atDocumentStart, forMainFrameOnly: false, in: world)
     }
 
     static var config: [String: Any] { config(fill: fill, pageSites: pageSites, screenSites: screenSites) }
@@ -114,9 +156,9 @@ enum PageFullScreen {
         return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
     }()
 
-    /// The page script with these choices in it.
+    /// The page script with the setting in it (never the sites' own choices).
     static func source(config: [String: Any]) -> String {
-        scriptMark + template.replacingOccurrences(of: "__CONFIG__", with: json(config))
+        scriptMark + template.replacingOccurrences(of: "__CONFIG__", with: json(pageConfig(config)))
     }
 
     /// In the page's own world, where a site's player asks for full screen, and in every frame, for embedded players.
@@ -126,9 +168,10 @@ enum PageFullScreen {
 
     static func isOurs(_ script: WKUserScript) -> Bool { (script.source as NSString).hasPrefix(scriptMark) }
 
-    /// What the page runs to hear of changed choices, or to leave its full screen (Esc in Zigzag's window).
+    /// What each frame's choice script runs (in `world`) to hear of changed choices; and what the page runs to leave
+    /// its full screen (Esc in Zigzag's window).
     static func applyCall(_ config: [String: Any]) -> String {
-        "window[Symbol.for('zigzag.fullscreen')]?.apply(\(json(config)))"
+        "window.__zigzagFullScreenChoice && window.__zigzagFullScreenChoice.set(\(json(config)))"
     }
 
     static let exitCall = "window[Symbol.for('zigzag.fullscreen')]?.exit() ?? false"
@@ -174,7 +217,9 @@ enum PageFullScreen {
     /// Puts the script with the choices as they are now in place of the one there, for pages loaded from now on.
     private static func install(in controller: WKUserContentController) {
         OwnScripts.remove(from: controller, where: isOurs)
-        controller.addUserScript(script())
+        let config = config
+        controller.addUserScript(choiceScript(config: config))
+        controller.addUserScript(script(config: config))
     }
 
     /// The choices changed: pages open now follow at once, pages loaded later start with them.
@@ -184,7 +229,10 @@ enum PageFullScreen {
         for webView in webViews.allObjects {
             let controller = webView.configuration.userContentController
             if controllers.insert(ObjectIdentifier(controller)).inserted { install(in: controller) }
-            webView.runOwnScript(applyCall(config), world: .page)
+            // Each frame's choice script hears it itself: nothing passes the choices from frame to frame.
+            for frame in [nil] + PageFrames.shared.frames(in: webView) {
+                webView.runOwnScript(applyCall(config), in: frame, world: world)
+            }
         }
         changed.send()
     }

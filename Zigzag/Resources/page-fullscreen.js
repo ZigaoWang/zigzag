@@ -4,33 +4,29 @@
 // page is told it's in full screen as it would be (fullscreenElement, fullscreenchange), its own :fullscreen styles
 // are matched through a mark, and Esc leaves. A frame asks the page around it to fill the page with the frame, all
 // the way up. Otherwise everything is WebKit's own.
+//
+// Which sites have a choice of their own is never in here, where the page could read it: Zigzag's script in a world of
+// its own (PageFullScreen.choiceSource) works out the choice for this page's site and says only that, page or screen.
 (() => {
   const KEY = Symbol.for('zigzag.fullscreen');
   if (window[KEY]) return;
-  let config = __CONFIG__;
+  const config = __CONFIG__;
   const MARK = 'data-zigzag-fullscreen';
   const ANCESTOR = 'data-zigzag-fullscreen-ancestor';
   const PAGE = 'data-zigzag-fullscreen-page';
   const MESSAGE = '__zigzagFullScreen';
   const isTop = window === window.top;
 
-  // Whose choice it is: the site of the tab's page, for a frame as for the page.
-  const siteOf = (host) => (host || '').toLowerCase().replace(/^www\./, '');
-  const topHost = () => {
-    if (isTop) return location.hostname;
-    try { const a = location.ancestorOrigins; if (a && a.length) return new URL(a[a.length - 1]).hostname; } catch (e) {}
-    try { return window.top.location.hostname; } catch (e) { return location.hostname; }
-  };
-  const covers = (list, site) => (list || []).some((s) => site === s || site.endsWith('.' + s));
-  const fillsPage = () => {
-    const site = siteOf(topHost());
-    if (covers(config.page, site)) return true;
-    if (covers(config.screen, site)) return false;
-    return config.fill === 'page';
-  };
+  // What's needed from the page's own objects, taken before its scripts run, so none it redefines is called.
+  const call = Function.prototype.call.bind(Function.prototype.call);
+  const own = (o, n) => (o ? Object.getOwnPropertyDescriptor(o, n) : undefined);
+  const listen = EventTarget.prototype.addEventListener, send = EventTarget.prototype.dispatchEvent, NativeEvent = Event;
+
+  // The choice for this page's site, from Zigzag's own world: the setting until it says.
+  let fills = config.fill === 'page';
+  const fillsPage = () => fills;
 
   const E = Element.prototype, D = Document.prototype, V = window.HTMLVideoElement && HTMLVideoElement.prototype;
-  const own = (o, n) => (o ? Object.getOwnPropertyDescriptor(o, n) : undefined);
   const native = {
     request: E.requestFullscreen, webkitRequest: E.webkitRequestFullscreen, webkitRequestS: E.webkitRequestFullScreen,
     exit: D.exitFullscreen, webkitExit: D.webkitExitFullscreen, webkitCancel: D.webkitCancelFullScreen,
@@ -278,7 +274,6 @@
     const type = data[MESSAGE];
     if (event.source === window.parent && !isTop) {
       if (type === 'exit' && current) leave({ fromParent: true });
-      if (type === 'config' && data.config) apply(data.config);
       return;
     }
     const frame = frameFor(event.source);
@@ -287,16 +282,18 @@
     if (type === 'exit' && current === frame) leave({ fromChild: true });
   });
 
-  // From Zigzag: the choices changed, passed down to every frame; or Esc pressed in its window.
-  const apply = (next) => {
-    config = next;
-    for (const f of document.querySelectorAll('iframe, frame')) post(f.contentWindow, 'config', { config: next });
-    if (current && !fillsPage()) leave();
+  // From Zigzag's own world: the choice for this page's site, now and whenever it changes.
+  const choose = (next) => {
+    fills = next;
+    if (current && !fills) leave();
   };
+  call(listen, window, 'zigzag-fullscreen-page', () => choose(true), true);
+  call(listen, window, 'zigzag-fullscreen-screen', () => choose(false), true);
+  call(send, window, new NativeEvent('zigzag-fullscreen-ask'));
   // A page that starts is never in full screen, whatever the one before it was.
   report();
   Object.defineProperty(window, KEY, {
-    value: Object.freeze({ apply, exit: () => { if (current) { leave(); return true; } return false; }, get active() { return !!current; } }),
+    value: Object.freeze({ exit: () => { if (current) { leave(); return true; } return false; }, get active() { return !!current; } }),
     enumerable: false, configurable: false, writable: false,
   });
 })();

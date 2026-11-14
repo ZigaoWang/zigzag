@@ -47,4 +47,30 @@ struct WebNotificationsTests {
         let kind = try await webView.evaluateJavaScript("typeof frames[0].Notification + ' ' + typeof frames[0].__zigzagNotification") as? String
         #expect(kind == "function function")
     }
+
+    /// The page knows its own answer before its scripts run, and nothing of any other site's: the answers say which
+    /// sites you've allowed, and stay in Zigzag's own world.
+    @Test func aPageKnowsOnlyItsOwnAnswer() async throws {
+        let decisions = ["https://example.com": true, "https://secret.example": true, "https://blocked.example": false]
+        #expect(!WebNotifications.pageSource(isPrivate: false).contains("secret.example"))
+        let configuration = WKWebViewConfiguration()
+        let controller = configuration.userContentController
+        controller.addUserScript(WKUserScript(source: WebNotifications.answerSource(decisions: decisions), injectionTime: .atDocumentStart,
+                                              forMainFrameOnly: false, in: WebNotifications.world))
+        controller.addUserScript(WKUserScript(source: WebNotifications.pageSource(isPrivate: false), injectionTime: .atDocumentStart,
+                                              forMainFrameOnly: false, in: .page))
+        controller.addScriptMessageHandler(WebNotifications.shared, contentWorld: .page, name: WebNotifications.messageName)
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+        let loading = Loading()
+        webView.navigationDelegate = loading
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString("<script>window.first = Notification.permission;</script>", baseURL: URL(string: "https://example.com/"))
+        }
+        let seen = try await webView.evaluateJavaScript("[window.first, typeof window.__zigzagNotificationAnswers, document.documentElement.outerHTML.includes('secret')]") as? [Any]
+        #expect(seen?[0] as? String == "granted")
+        #expect(seen?[1] as? String == "undefined")
+        #expect(seen?[2] as? Bool == false)
+        withExtendedLifetime(loading) {}
+    }
 }
