@@ -5,6 +5,10 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- The hidden sidebar no longer flickers as it slides out or back: it could show for one frame where it was headed, out or gone, before sliding there, which looked like it opened, closed and opened again. ([#206](https://github.com/ZigaoWang/zigzag/issues/206))
+- A page's button that opens an app, like claude.ai's Open Claude after signing in, always asks when you click it, even right after an earlier question from the page was put off.
+
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.

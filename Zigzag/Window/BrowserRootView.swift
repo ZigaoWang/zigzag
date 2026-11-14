@@ -1097,10 +1097,13 @@ final class BrowserRootView: SpaceFrameView {
         // The page card resizes with AppKit's animator; the sidebar slides on the render server.
         let targetSidebar = visible ? sidebarFrame
             : Self.mirrored(NSRect(x: -sidebarWidth, y: 0, width: sidebarWidth, height: bounds.height), in: bounds, if: sidebarOnRight)
-        Tokens.Motion.withoutAnimation { sidebarContainer.frame = targetSidebar }
-        // A drawer: out in `drawerIn`, back in `drawerOut`, on the drawer curve, the page and bar with it.
+        // The move and the slide that covers it reach the screen together (`Self.together`).
         let curve = visible ? Tokens.Motion.edgeSlide : Tokens.Motion.edgeTuck
-        let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: oldSidebar.minX - targetSidebar.minX, curve: curve, fromKeyboard: true)
+        let duration = Self.together {
+            Tokens.Motion.withoutAnimation { sidebarContainer.frame = targetSidebar }
+            // A drawer: out in `drawerIn`, back in `drawerOut`, on the drawer curve, the page and bar with it.
+            return Tokens.Motion.slide(sidebarContainer, fromOffsetX: oldSidebar.minX - targetSidebar.minX, curve: curve, fromKeyboard: true)
+        }
         if showsTopBar, duration > 0 {
             topBarSlideFrame = (topBarSlideFrame ?? oldBar).union(topBarFrame)
             placeTopBar()
@@ -1357,19 +1360,35 @@ final class BrowserRootView: SpaceFrameView {
         edgeReveal.shown(show, at: ProcessInfo.processInfo.systemUptime, settling: slide)
         watchPointer(show)
         let target = sidebarFrame
-        Tokens.Motion.withoutAnimation { sidebarContainer.frame = target }
         // Frames are final at once; only the drawing slides, the card whole (its glass, color, shadow and rows) as one
         // layer, with nothing laid out on the way. The real traffic lights can't follow, so a picture of them rides
         // inside the sidebar until the slide ends.
         let offset = old.minX - target.minX
         if Tokens.Motion.reduceMotion {
-            Self.crossfadeReveal(sidebarContainer, show: show, from: offset)
+            Self.together {
+                Tokens.Motion.withoutAnimation { sidebarContainer.frame = target }
+                Self.crossfadeReveal(sidebarContainer, show: show, from: offset)
+            }
             onSlide?(0, curve.timing)
             return
         }
         sidebarContainer.layer?.removeAnimation(forKey: Self.revealFadeKey)
-        let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: offset, curve: curve)
+        let duration = Self.together {
+            Tokens.Motion.withoutAnimation { sidebarContainer.frame = target }
+            return Tokens.Motion.slide(sidebarContainer, fromOffsetX: offset, curve: curve)
+        }
         onSlide?(duration, curve.timing)
+    }
+
+    /// Changes that must reach the screen in one go: a view moved to where it's headed and the slide that shows it
+    /// traveling there. `withoutAnimation` commits on its own, so without an outer transaction the move reached the
+    /// screen a frame before its slide, and the sidebar showed for one frame where it was going (out or gone) before
+    /// sliding: the flash of it opening, closing and opening again.
+    @discardableResult
+    static func together<T>(_ changes: () -> T) -> T {
+        CATransaction.begin()
+        defer { CATransaction.commit() }
+        return changes()
     }
 
     static let revealFadeKey = "revealFade"
