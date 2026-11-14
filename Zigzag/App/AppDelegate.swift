@@ -75,6 +75,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
         // Copies an import read through, if Zigzag stopped before removing them: they can hold passwords.
         DispatchQueue.global(qos: .utility).async { ImportScratch.removeLeftovers() }
+        // The lists every page soon needs (the Public Suffix List for whose site it is, the HSTS preload list for a
+        // certificate warning), read off the main thread a moment after launch rather than on it at first use.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            DispatchQueue.global(qos: .utility).async { _ = PublicSuffix.isLoaded }
+            StrictTransport.warm()
+        }
         ContentBlocker.prepare()
         // A page stuck working hard (an extension in a loop, usually) gets named, with a way out.
         EnergyWatch.shared.start()
@@ -246,6 +252,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         TabArchive.flush()
         HistoryStore.finishWriting()
         FaviconStore.finishWriting()
+        StrictTransport.finishWriting()
         // Undo ends with Zigzag, and the icons clearing history set aside for it go now (or at the next start).
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
         // Password managers' helpers end with Zigzag, so none are left running.

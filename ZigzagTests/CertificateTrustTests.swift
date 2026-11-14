@@ -132,6 +132,28 @@ struct CertificateTrustTests {
         #expect(!FileManager.default.fileExists(atPath: file.path))
     }
 
+    /// A page's many responses each sending the header (its frames, its pictures) make one write, a moment later.
+    @Test func manyHSTSHeadersMakeOneWrite() throws {
+        let store = WKWebsiteDataStore.default()
+        StrictTransport.forget(in: store)
+        StrictTransport.settle()
+        let file = try #require(StrictTransport.file("default"))
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+        for index in 0..<20 {
+            StrictTransport.note("frame\(index).example", policy: .init(maxAge: 600, includesSubdomains: false), in: store)
+        }
+        // Known at once, written only once the moment has passed (or Zigzag quits).
+        #expect(StrictTransport.isKnown("frame7.example", in: store))
+        StrictTransport.disk.sync {}
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+        StrictTransport.settle()
+        #expect(FileManager.default.fileExists(atPath: file.path))
+        StrictTransport.reload()
+        #expect(StrictTransport.isKnown("frame19.example", in: store))
+        StrictTransport.forget(in: store)
+        StrictTransport.settle()
+    }
+
     @Test func clearingSiteDataForgetsExceptions() {
         let store = WKWebsiteDataStore.nonPersistent()
         CertificateExceptions.allow("nas.example.com", certificate: Data([1]), in: store)
