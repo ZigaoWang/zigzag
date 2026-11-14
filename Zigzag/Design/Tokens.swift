@@ -82,8 +82,10 @@ enum Tokens {
         /// With the sidebar hidden, the strip just inside the window's edge where the pointer brings it out.
         static let edgeRevealWidth: CGFloat = Space.x2
         /// How far out past that edge the pointer still counts as at it: room to overshoot onto the desktop or the
-        /// next display, and no more, so a pointer on its way somewhere else leaves the sidebar be.
-        static let edgeRevealReach: CGFloat = Space.x8
+        /// next display, as a hand reaching for the edge does with another screen beside the window (a report: a
+        /// slow move stopping 54pt over left the sidebar hidden at 32), and no more, so a pointer on its way well into
+        /// the other screen leaves the sidebar be.
+        static let edgeRevealReach: CGFloat = Space.x16 + Space.x4
         static let resizeHandleWidth: CGFloat = Space.x2
         static let hairline: CGFloat = 1
         /// Keyboard focus: the ring's width, and its gap outside the control.

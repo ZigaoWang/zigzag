@@ -1541,7 +1541,9 @@ struct SidebarEdgeReveal: Equatable {
     }
 
     private(set) var phase = Phase.hidden
-    static let grace: TimeInterval = 0.1
+    /// How long the pointer at the edge waits before the sidebar comes out: just long enough that brushing past it
+    /// and straight back leaves it be, and short enough that reaching for it feels immediate.
+    static let grace: TimeInterval = 0.06
     /// How long a pointer that ran out past the edge's reach has to come back to it.
     static let comeBack: TimeInterval = 0.4
     /// Points a second toward the edge: a move at least this quick into it means it, as a flick.

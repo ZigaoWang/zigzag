@@ -222,8 +222,9 @@ struct SidebarEdgeRevealTests {
         edge.met(at: 1.03, speed: 0)
         edge.met(at: 1.06, speed: 0)
         #expect(edge.phase == .deciding(since: 1, flick: true))
-        #expect(edge.decide(at: NSPoint(x: 0, y: 400), time: 1.09, in: zone()) == nil)
-        #expect(edge.decide(at: NSPoint(x: 0, y: 400), time: 1.1, in: zone()) == true)
+        // The wait counts from the first moment, not the last coalesced move.
+        #expect(edge.decide(at: NSPoint(x: 0, y: 400), time: 1 + SidebarEdgeReveal.grace - 0.01, in: zone()) == nil)
+        #expect(edge.decide(at: NSPoint(x: 0, y: 400), time: 1 + SidebarEdgeReveal.grace, in: zone()) == true)
     }
 }
 
@@ -372,7 +373,8 @@ struct SidebarEdgeEventTests {
             // To the page: at once.
             let page = replay([(0, 40), (0.3, 4), (1, 4), (1.05, 600)], zone: zone)
             #expect(page.map(\.0) == ["out", "in"])
-            if page.count == 2 { #expect(page[1].1 - 1 < 0.15) }
+            // Within a look at the pointer (every tenth of a second while it's on the sidebar) and the hide's delay.
+            if page.count == 2 { #expect(page[1].1 - 1 < 0.1 + Tokens.Motion.edgeHideDelay + 0.05, "\(page)") }
             // On to the next display: a moment later, as long as a quick move has to come back.
             let display = replay([(0, 40), (0.3, 4), (1, 4), (1.05, -600)], zone: zone)
             #expect(display.map(\.0) == ["out", "in"])
