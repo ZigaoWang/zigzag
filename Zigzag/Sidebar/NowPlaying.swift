@@ -7,7 +7,7 @@ import AppKit
 final class NowPlayingView: InteractiveView {
     private let icon = FaviconView()
     private let title = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
-    let playButton = TabRowView.rowButton("pause", toolTip: String(localized: "Pause", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."))
+    let playButton = TabRowView.rowButton("pause.fill", toolTip: String(localized: "Pause", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."))
     let muteButton = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."))
     /// Last, where a tab row's close is. Always there: a button that appeared on hover would push play and mute aside
     /// just as the pointer reached them, and a click meant for mute would hide the card.
@@ -62,7 +62,7 @@ final class NowPlayingView: InteractiveView {
         icon.image = tab.displayIcon
         title.stringValue = tab.displayTitle
         setAccessibilityLabel(String(localized: "Now playing: \(tab.displayTitle)", comment: "Accessibility label of the sidebar's Now Playing control. The placeholder is the playing tab's title."))
-        playButton.symbol = isPaused ? "play" : "pause"
+        playButton.symbol = isPaused ? "play.fill" : "pause.fill"
         playButton.toolTip = isPaused ? String(localized: "Play", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.") : String(localized: "Pause", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")
         muteButton.symbol = tab.isMuted ? "speaker.slash" : "speaker.wave.2"
         muteButton.toolTip = tab.isMuted ? String(localized: "Unmute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.") : String(localized: "Mute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")
