@@ -288,6 +288,99 @@ class InteractiveView: NSView {
         return super.isAccessibilitySelectorAllowed(selector)
     }
 
+    // MARK: Accessibility
+
+    /// What VoiceOver can act on. A control drawn on this view is one element with its role, name and state, and
+    /// its pictures and words are its own, not read on their own: the icon of a button would otherwise come through
+    /// as an image named after its symbol. A plain view used as a panel or a row of controls stays out of the way,
+    /// so the controls in it are reached one by one.
+    static let controlRoles: Set<NSAccessibility.Role> = [.button, .checkBox, .radioButton, .popUpButton, .menuButton,
+                                                           .disclosureTriangle, .row, .cell, .slider, .incrementor, .link, .menuItem]
+    /// Roles that hold other elements: one becomes an element of its own only with a name to say (a toolbar).
+    private static let containerRoles: Set<NSAccessibility.Role> = [.group, .toolbar, .list, .radioGroup, .sheet, .menu]
+
+    /// Set by `setAccessibilityElement`, which outranks the role.
+    private var elementChoice: Bool?
+
+    override func setAccessibilityElement(_ isElement: Bool) {
+        elementChoice = isElement
+        super.setAccessibilityElement(isElement)
+    }
+
+    /// Something you press: a control's role, or no role of its own but a click to answer.
+    var isAccessibilityControl: Bool {
+        guard let role = super.accessibilityRole(), role != .unknown else { return onClick != nil }
+        return Self.controlRoles.contains(role)
+    }
+
+    override func isAccessibilityElement() -> Bool {
+        if let elementChoice { return elementChoice }
+        if isAccessibilityControl { return true }
+        guard let role = super.accessibilityRole(), Self.containerRoles.contains(role) else { return false }
+        return !(super.accessibilityLabel() ?? "").isEmpty
+    }
+
+    /// A clickable view that never said what it is reads as a button.
+    override func accessibilityRole() -> NSAccessibility.Role? {
+        let own = super.accessibilityRole()
+        guard own == nil || own == .unknown, onClick != nil else { return own }
+        return .button
+    }
+
+    /// Its name: the one it was given; otherwise its tooltip, without the shortcut it ends with; otherwise the words
+    /// it shows.
+    override func accessibilityLabel() -> String? {
+        if let own = super.accessibilityLabel(), !own.isEmpty { return own }
+        guard isAccessibilityControl else { return super.accessibilityLabel() }
+        if let tip = toolTip, !tip.isEmpty { return IconButton.withoutShortcut(tip) }
+        let words = Self.shownWords(in: self)
+        return words.isEmpty ? nil : words.joined(separator: ", ")
+    }
+
+    /// The words in a control's own labels, leading to trailing, not those of a control inside it.
+    private static func shownWords(in view: NSView) -> [String] {
+        view.subviews.filter { !$0.isHidden }.flatMap { child -> [String] in
+            if child is InteractiveView { return [] }
+            if let field = child as? NSTextField, !field.isEditable {
+                let text = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                return text.isEmpty ? [] : [text]
+            }
+            return shownWords(in: child)
+        }
+    }
+
+    /// A control's pictures and words: said by the control, never on their own.
+    static func isDecoration(_ element: Any) -> Bool {
+        // AppKit hands a control's cell to VoiceOver in its place.
+        if let cell = element as? NSCell { return cell.controlView.map(isDecoration) ?? (cell is NSImageCell) }
+        if element is NSImageView { return true }
+        if let field = element as? NSTextField, !field.isEditable { return true }
+        return false
+    }
+
+    /// One element that speaks for itself (a control, or a line of text drawn on this): its pictures and words are
+    /// its own. A group keeps its children.
+    private var isDrawnControlElement: Bool {
+        guard isAccessibilityElement() else { return false }
+        return !(super.accessibilityRole().map(Self.containerRoles.contains) ?? false)
+    }
+
+    override func accessibilityChildren() -> [Any]? {
+        let children = super.accessibilityChildren()
+        guard isDrawnControlElement else { return children }
+        return children?.filter { !Self.isDecoration($0) }
+    }
+
+    /// VoiceOver under the pointer lands on the control, not on its icon or words.
+    nonisolated override func accessibilityHitTest(_ point: NSPoint) -> Any? {
+        nonisolated(unsafe) var found: Any?
+        MainActor.assumeIsolated {
+            let hit = super.accessibilityHitTest(point)
+            found = isDrawnControlElement && hit.map(Self.isDecoration) == true ? self : hit
+        }
+        return found
+    }
+
     // MARK: Keyboard
 
     /// True while this control has keyboard focus.
@@ -475,6 +568,8 @@ final class IconButton: InteractiveView {
         layer?.cornerCurve = .continuous
         imageView.image = Tokens.Symbol.image(symbol, size: symbolSize)
         imageView.imageScaling = .scaleNone
+        // The button says what it does; its symbol's own name ("split view horizontally left") is never read.
+        imageView.setAccessibilityElement(false)
         addSubview(imageView)
         self.toolTip = toolTip
         setAccessibilityRole(.button)
@@ -958,11 +1053,6 @@ final class TextButton: InteractiveView {
         label.alphaValue = isEnabled || showsFillAtRest ? 1 : Tokens.Opacity.disabled
     }
 
-    override func accessibilityPerformPress() -> Bool {
-        guard isEnabled, let event = NSApp.currentEvent else { return false }
-        onClick?(event)
-        return true
-    }
 }
 
 /// A text field on a soft fill, ringed in the accent while typing: the one look for fields in panels and windows.
@@ -1985,6 +2075,8 @@ final class SlidingSwitch: NSView {
                 addSubview(icon)
             }
         }
+        // One group VoiceOver steps into, its segments the radio buttons in it.
+        setAccessibilityElement(true)
         setAccessibilityRole(.radioGroup)
         // One radio button per choice for VoiceOver, each chosen with a press.
         segments = items.enumerated().map { i, item in

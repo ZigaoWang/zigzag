@@ -135,6 +135,11 @@ final class SitePanel: FloatingPanelView {
     private var width: CGFloat = SitePanel.width
     private var pad: CGFloat { width < Self.width ? Tokens.Space.x3 : Tokens.Space.x4 }
 
+    #if DEBUG
+    /// The panel for `tab`, outside any window: for tests.
+    static func forTesting(tab: Tab) -> SitePanel? { SitePanel(controller: nil, tab: tab) }
+    #endif
+
     private init?(controller: BrowserWindowController?, mini: MiniWindowController? = nil, tab asked: Tab?) {
         // With no page (a new tab), it still opens: your extensions are always one click away.
         guard let tab = asked ?? controller.map({ $0.tabManager.selectedTab ?? Tab(url: nil, spaceID: $0.tabManager.currentSpaceID) }) else { return nil }

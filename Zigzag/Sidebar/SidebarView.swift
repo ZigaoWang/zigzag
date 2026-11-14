@@ -373,6 +373,8 @@ final class AddressView: InteractiveView {
         _ = drop
         setAccessibilityRole(.button)
         setAccessibilityHelp(String(localized: "Opens the command bar", comment: "Accessibility help of the address in the sidebar."))
+        // Named before its first page: what it says on a new tab.
+        setAccessibilityLabel(String(localized: "Search or enter address", comment: "Placeholder of the address in the sidebar, on a new tab."))
     }
 
     required init?(coder: NSCoder) { fatalError() }

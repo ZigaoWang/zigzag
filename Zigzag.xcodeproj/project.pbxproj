@@ -252,6 +252,7 @@
 		8A3C09720A513455A8558735 /* HostText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 332AF8C9FDBEACF03ABEAA6B /* HostText.swift */; };
 		8A420D8CE1121ED2499E5BEA /* TampermonkeyBetaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E86A4321EAFCD34A963267AF /* TampermonkeyBetaTests.swift */; };
 		8B3741625A4E5D67BD974F41 /* WebNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = C21F72054D6913E7D8AD017F /* WebNotifications.swift */; };
+		8BC4954D2DEB077F618E9167 /* AccessibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60823191217F3C0F87144EA5 /* AccessibilityTests.swift */; };
 		8BCB7AC803E4BEF7AE6B163F /* PDFService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E59FDCE08F5D924D2BB0AA3A /* PDFService.swift */; };
 		8BE0DCBEBFC4E933AA1C0531 /* BlockedScriptStandInsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D5275896F347F531AE3C184 /* BlockedScriptStandInsTests.swift */; };
 		8C7416CD981D4B2160DB8AA4 /* darkreader.info.json in Resources */ = {isa = PBXBuildFile; fileRef = 1EC914DFACAD0B1C40DF98C9 /* darkreader.info.json */; };
@@ -688,6 +689,7 @@
 		5F25B6A15B8EF24B0520F26F /* ExtensionSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionSearchTests.swift; sourceTree = "<group>"; };
 		5F60DCC2C5651A80DAADE8E8 /* Readability-readerable.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "Readability-readerable.js"; sourceTree = "<group>"; };
 		5F8354F7B6CC6E2193B1CDAC /* PageSizeHandle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageSizeHandle.swift; sourceTree = "<group>"; };
+		60823191217F3C0F87144EA5 /* AccessibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityTests.swift; sourceTree = "<group>"; };
 		60AEE03EBEB4A7817E6E100A /* MiniWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniWindowController.swift; sourceTree = "<group>"; };
 		62205A849DC72ED60ABA5EB7 /* MCPService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPService.swift; sourceTree = "<group>"; };
 		62342912C2566D4F242E9B14 /* GuidedTour.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedTour.swift; sourceTree = "<group>"; };
@@ -1505,6 +1507,7 @@
 		DF27ED16EF9BB28D19F995E5 /* ZigzagTests */ = {
 			isa = PBXGroup;
 			children = (
+				60823191217F3C0F87144EA5 /* AccessibilityTests.swift */,
 				DD7578DF496E9D885F5A6548 /* AddressDropTests.swift */,
 				AFA72586980E3DDF9FDA59A8 /* AddressTests.swift */,
 				8D4C44C0E24339E50B51709A /* AdFiltersTests.swift */,
@@ -2279,6 +2282,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8BC4954D2DEB077F618E9167 /* AccessibilityTests.swift in Sources */,
 				DC8FE3DC9CACD4BE5F67F667 /* AdFiltersTests.swift in Sources */,
 				F561CDCA7B229704A348D99E /* AddressDropTests.swift in Sources */,
 				1482F4A584F73FF91CA61BE4 /* AddressTests.swift in Sources */,

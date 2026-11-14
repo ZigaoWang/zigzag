@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Zigzag uses about 9 MB less memory: the list of sites that only allow secure connections is read in place when a certificate warning needs it, instead of loaded at launch.
+- VoiceOver reads Zigzag's own buttons, switches, menus and rows by name, like Back, Downloads or a tab's title, and says which tab is current. They came through as pictures named after their icons, and some had no name at all.
 
 ## [0.9.1] - 2026-11-15
 
