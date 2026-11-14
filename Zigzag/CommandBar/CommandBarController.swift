@@ -183,6 +183,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     /// The key event of the last delete command, so the change it makes is known to take away, not type.
     private weak var deleteEvent: NSEvent?
     private(set) var isVisible = false
+    /// Opened for an empty window's first page: no tab was showing under it.
+    private(set) var isForEmptyWindow = false
     private var mouseAtOpen = NSPoint.zero
     /// Searching one site: its chip sits in front of the field, and Return searches there.
     private var scope: SiteSearch?
@@ -273,6 +275,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             field.stringValue = ""
             setScope(nil)
         }
+        if !isVisible || mode != self.mode { isForEmptyWindow = mode == .newTab && host.commandBarTab == nil }
         self.mode = mode
         fetcher.isPrivate = host.commandBarIsPrivate
         mouseAtOpen = NSEvent.mouseLocation
@@ -349,6 +352,12 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             host?.commandBarDidHide()
         }
         if restoringFocus { host.commandBarRestoreFocus() }
+    }
+
+    /// A page came to the window some other way (moved in from Zigzag Mini, dragged from another window): the bar the
+    /// empty window opened with goes, so it isn't left over the page.
+    func pageArrived() {
+        if isVisible, isForEmptyWindow { dismiss(restoringFocus: false) }
     }
 
     func reposition() {

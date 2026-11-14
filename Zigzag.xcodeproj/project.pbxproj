@@ -126,6 +126,7 @@
 		41236E9E7BE28A49C8AF9479 /* InlineCompletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51954CD51F2344D8639115AB /* InlineCompletion.swift */; };
 		4134CF49BF66BCD0D556E83A /* FeatureFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = B71143EF545E30577114E8C1 /* FeatureFlags.swift */; };
 		42063F16B43AFD46A8BFB368 /* PageSizeHandleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5FB9C4A851B146B5E9733F8 /* PageSizeHandleTests.swift */; };
+		4221724C27C4C4914E06EC6F /* CommandBarArrivalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81837EFAFB38045CBC0FB8CB /* CommandBarArrivalTests.swift */; };
 		42A440F3B55A86FCC2AD9490 /* THIRD_PARTY_NOTICES.md in Resources */ = {isa = PBXBuildFile; fileRef = FA29F3657E11FE3895D8BAC3 /* THIRD_PARTY_NOTICES.md */; };
 		446D65DE01EEE5807B4F7EE2 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C71865A2409825CF2E77AF7 /* main.swift */; };
 		4489417AC1F72B028FA0998A /* ProfileSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77B2EE3B0C5A70C2E6A8A77 /* ProfileSheets.swift */; };
@@ -744,6 +745,7 @@
 		8055982B8B54C35C4214DBB3 /* ClearWordingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearWordingTests.swift; sourceTree = "<group>"; };
 		8056AFCD49228FC19D70CCBD /* OwnWindowTabsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnWindowTabsTests.swift; sourceTree = "<group>"; };
 		81370CCCA627CE0FAFB02E03 /* ExtensionImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionImport.swift; sourceTree = "<group>"; };
+		81837EFAFB38045CBC0FB8CB /* CommandBarArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarArrivalTests.swift; sourceTree = "<group>"; };
 		818D2FEE410E6D64CD17AADD /* logins.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = logins.json; sourceTree = "<group>"; };
 		81C684CBB391686C907F7D7C /* MCPHTTP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPHTTP.swift; sourceTree = "<group>"; };
 		81FB8E290856C58E182C447B /* TopBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopBarView.swift; sourceTree = "<group>"; };
@@ -1518,6 +1520,7 @@
 				7069B71082962459B24D179F /* ChromiumExtensionsTests.swift */,
 				8055982B8B54C35C4214DBB3 /* ClearWordingTests.swift */,
 				F18C84CC63265389A43E642F /* CommandActionTests.swift */,
+				81837EFAFB38045CBC0FB8CB /* CommandBarArrivalTests.swift */,
 				CE6475CD75E987F5A8B0D182 /* CommandBarHistoryTests.swift */,
 				97B89F5BC1A42191D2C02C66 /* CommandBarRankingTests.swift */,
 				5D3D982B142CB7CC9AA89B6A /* ContrastTokensTests.swift */,
@@ -2292,6 +2295,7 @@
 				95116D4DAA8CC50801C588B5 /* ChromiumExtensionsTests.swift in Sources */,
 				8377230ECD7E9BB931B97A7B /* ClearWordingTests.swift in Sources */,
 				54665D76641D0469C5A31D12 /* CommandActionTests.swift in Sources */,
+				4221724C27C4C4914E06EC6F /* CommandBarArrivalTests.swift in Sources */,
 				23B86800C5070366304E8423 /* CommandBarHistoryTests.swift in Sources */,
 				AD66AB1C32F3990847A89971 /* CommandBarRankingTests.swift in Sources */,
 				87F8E37BD3315332966A7421 /* ContrastTokensTests.swift in Sources */,

@@ -338,6 +338,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             updateNowPlaying()
             miniPlayer.tabsChanged()
         case .selection:
+            if tabManager.selectedTab != nil { commandBar.pageArrived() }
             showSelectedTab()
             // An AI app's bar goes with the tab it's using.
             AgentControl.shared.refresh(self)
