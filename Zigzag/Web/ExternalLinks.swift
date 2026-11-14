@@ -93,7 +93,7 @@ enum ExternalLinks {
         // Always Open is kept for secure pages only. Choices are kept per origin, so one for https://zoom.us is not
         // one for http://zoom.us or https://zoom.us:8443.
         let pageOrigin = SiteOrigin.of(webView.url)
-        let canRemember = !foreign && webView.url?.scheme?.lowercased() == "https"
+        let canRemember = canRemember(url: webView.url, foreign: foreign)
         let host = foreign ? askerHost : pageHost
         let origin = foreign ? asker.flatMap { SiteOrigin.of($0) } : pageOrigin
         let key = "\(origin ?? host)|\(scheme)"
@@ -109,7 +109,7 @@ enum ExternalLinks {
         }
         let clickedHere = isClick && isMainFrame && webView.window != nil
         let everydayClick = isEverydayClick(clickedHere: clickedHere, linkClick: linkClick ?? isClick, sourceIsMainFrame: sourceIsMainFrame, fromPDF: fromPDF)
-        switch verdict(byYou: byYou, decision: decision(), clickedHere: everydayClick, scheme: scheme) {
+        switch verdict(byYou: byYou, clickedHere: everydayClick, scheme: scheme, stored: decision().map { $0 ? "allow" : "deny" }, canRemember: canRemember) {
         case .block:
             Diagnostics.note("Blocked opening an app", site: host, "\(scheme):", isPrivate: !webView.configuration.websiteDataStore.isPersistent)
             return
@@ -141,20 +141,17 @@ enum ExternalLinks {
                                                     tab: tab, title: String(localized: "Open \(name)", comment: "A page's question to open an app, without its question mark. The placeholder is the app's name, like “zoom.us”."),
                                                     actions: [.deny, .allow], canRemember: saves,
                                                     answered: { decision().map { PermissionAnswer(action: $0 ? "allow" : "deny", remember: true) } })
-            asking.remove(key)
+            asked.asking.remove(key)
             guard let answer else {
-                putOff[key] = Date().addingTimeInterval(60)
+                asked.putOff[key] = Date().addingTimeInterval(60)
                 return
             }
-            switch answer.action {
-            case "allow":
-                if answer.remember, saves, let origin { SitePermissions.allowOpeningApp(origin: origin, scheme: scheme) }
-                NSWorkspace.shared.open(url)
-            case "deny":
-                declined.insert(key)
-            default:
-                break
+            // This time holds on the page that asked, until it navigates; Always is kept for the site, and only
+            // where it could be kept (https, no foreign frame, not a private window).
+            if let origin {
+                SitePermissions.rememberAnswer(answer, subject: PermissionSubject.app(scheme), origin: origin, tab: tab, isPrivate: isPrivate)
             }
+            if answer.action == "allow" { NSWorkspace.shared.open(url) }
         }
     }
 
@@ -163,18 +160,28 @@ enum ExternalLinks {
     /// Whether a link for another app opens, asks first or goes nowhere. The site's Block always holds, even for an
     /// address you typed: `byYou` only spares you the question. Mail, phone and FaceTime open at once for a link you
     /// clicked in the page in front (`clickedHere`); from anywhere else (a hidden frame, a background tab, a script)
-    /// they ask like any other app.
-    static func verdict(byYou: Bool, decision: Bool?, clickedHere: Bool, scheme: String) -> Verdict {
-        if decision == false { return .block }
-        if byYou || decision == true || (clickedHere && everyday.contains(scheme)) { return .open }
+    /// they ask like any other app. `stored` is the site's kept answer, `canRemember` whether one could be kept here
+    /// at all — an allow is honoured only where it could have been kept, so an answer left over from somewhere less
+    /// safe is asked again rather than trusted.
+    static func verdict(byYou: Bool, clickedHere: Bool, scheme: String, stored: String?, canRemember: Bool) -> Verdict {
+        if stored == "deny" { return .block }
+        if stored == "allow", canRemember { return .open }
+        if byYou || (clickedHere && everyday.contains(scheme)) { return .open }
         return .ask
+    }
+
+    /// Whether an app answer can be kept for the page at `url`: only a secure page, and never a frame from another
+    /// site (its answer would be the page's to give, not the frame's).
+    static func canRemember(url: URL?, foreign: Bool) -> Bool {
+        !foreign && url?.scheme?.lowercased() == "https"
     }
 
     /// What's kept for the page at `page` opening `scheme`'s app: its Allow or Block, or the app it was told Always
     /// Open to; nil asks. A frame from another site on the page (`foreign`) is held by Block only, never let in.
-    static func decision(page: String?, scheme: String, foreign: Bool) -> Bool? {
-        guard let page, let found = SitePermissions.appDecision(origin: page, scheme: scheme) else { return nil }
-        return foreign ? (found ? nil : false) : found
+    static func decision(page: String?, scheme: String, foreign: Bool, stored: String?) -> String? {
+        guard let page, let stored else { return nil }
+        if stored == "deny" { return "deny" }
+        return foreign ? nil : stored
     }
 
     /// Whether mail, phone and FaceTime may open at once: only for a link you clicked in the page in front itself,

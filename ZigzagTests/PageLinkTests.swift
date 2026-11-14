@@ -25,15 +25,15 @@ struct PageLinkTests {
 
     @Test func blockAlwaysHolds() {
         // Block holds even for an address you typed: being yours only spares the question.
-        #expect(ExternalLinks.verdict(byYou: true, decision: false, clickedHere: true, scheme: "zoommtg") == .block)
-        #expect(ExternalLinks.verdict(byYou: false, decision: false, clickedHere: true, scheme: "mailto") == .block)
-        #expect(ExternalLinks.verdict(byYou: true, decision: nil, clickedHere: false, scheme: "smb") == .open)
+        #expect(ExternalLinks.verdict(byYou: true, clickedHere: true, scheme: "zoommtg", stored: "deny", canRemember: true) == .block)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: true, scheme: "mailto", stored: "deny", canRemember: true) == .block)
+        #expect(ExternalLinks.verdict(byYou: true, clickedHere: false, scheme: "smb", stored: nil, canRemember: false) == .open)
         // From a page, an app asks, unless the site was told it may.
-        #expect(ExternalLinks.verdict(byYou: false, decision: nil, clickedHere: false, scheme: "smb") == .ask)
-        #expect(ExternalLinks.verdict(byYou: false, decision: nil, clickedHere: true, scheme: "smb") == .ask)
-        #expect(ExternalLinks.verdict(byYou: false, decision: true, clickedHere: false, scheme: "smb") == .open)
-        #expect(ExternalLinks.verdict(byYou: false, decision: nil, clickedHere: true, scheme: "mailto") == .open)
-        #expect(ExternalLinks.verdict(byYou: false, decision: nil, clickedHere: false, scheme: "mailto") == .ask)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "smb", stored: nil, canRemember: false) == .ask)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: true, scheme: "smb", stored: nil, canRemember: false) == .ask)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "smb", stored: "allow", canRemember: true) == .open)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: true, scheme: "mailto", stored: nil, canRemember: true) == .open)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "mailto", stored: nil, canRemember: true) == .ask)
     }
 
     @Test func everydayAppsOpenOnlyForALinkClickInThePage() {

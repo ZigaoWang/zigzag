@@ -202,11 +202,14 @@ struct SiteControlsPermissionTests {
     @Test func aFrameFromElsewhereOnlyFollowsBlock() throws {
         try withDefaults {
             SitePermissions.setChoice(.allow, for: .apps, origin: site)
-            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: false) == true)
-            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: true) == nil)
+            let allowed = SitePermissions.action(PermissionSubject.app("zoommtg"), origin: site)
+            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: false, stored: allowed) == "allow")
+            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: true, stored: allowed) == nil)
             SitePermissions.setChoice(.block, for: .apps, origin: site)
-            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: true) == false)
-            #expect(ExternalLinks.decision(page: nil, scheme: "zoommtg", foreign: false) == nil)
+            let blocked = SitePermissions.action(PermissionSubject.app("zoommtg"), origin: site)
+            #expect(blocked == "deny")
+            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: true, stored: blocked) == "deny")
+            #expect(ExternalLinks.decision(page: nil, scheme: "zoommtg", foreign: false, stored: allowed) == nil)
         }
     }
 
