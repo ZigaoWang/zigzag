@@ -53,6 +53,12 @@ always prominent in the accent; anything between them plain. So:
 `SitePermissions` for the origin. A stored answer is never asked again until it is forgotten in Site Controls or
 Settings.
 
+The page store holds the answer as an **action id**, not a yes or no, so a question whose answers are not just yes and
+no holds for the page too: a handoff rule answered "Open in Browser" this time is not asked again for a download the
+same page starts, and a pop-up answered "Mini" this time opens in the viewer again. A handoff rule's page answer is
+keyed by the rule as well as the origin (`handoff:<rule UUID>`), so two rules on one page keep their own answers. Yes
+and no still read as `"allow"` and `"deny"`, which is what the camera, microphone, location and notification paths use.
+
 ## The question
 
 The prompt becomes a **permission banner**: the same in-window overlay view (`FloatingPanelView`) it is today, so it

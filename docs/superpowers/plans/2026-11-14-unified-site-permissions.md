@@ -259,7 +259,7 @@ git commit -m "feat: one prompt for every site permission"
 
 **Interfaces:**
 - Consumes: Task 2's `PermissionPrompt.ask`.
-- Produces: `SitePermissions.request(origin:type:window:isPrivate:tab:) async -> WKPermissionDecision` unchanged in name, now writing `PermissionAnswer.remember` into the store, and the page answer when `remember == false`.
+- Produces: `SitePermissions.request(origin:type:window:isPrivate:tab:) async -> WKPermissionDecision` unchanged in name, now writing `PermissionAnswer.remember` into the store, and the page answer when `remember == false`; `SitePermissions.rememberAnswer(_ answer: PermissionAnswer, subject: String, origin: String, tab: Tab?, isPrivate: Bool) -> Bool` (stores only when `remember`, never from a tab that is private, whatever `isPrivate` says; returns whether the action is not `"deny"`); `DisplayCaptureChoice.actions: [PermissionAction]`; `PagePermissionAnswers` now stores action ids — `note(_ action: String, key:kind:)` and `action(key:kind:) -> String?` — with the Bool `note(_ allowed:key:kind:)` / `answer(key:kind:)` kept as its façade.
 
 - [ ] **Step 1: Write failing tests for the answer mapping**
 
@@ -421,7 +421,7 @@ git commit -m "feat: ask where a pop-up should open, and remember it"
   - `DownloadHandoff.Request` gains `var pageOrigin: String?`.
   - `enum HandoffGate: Equatable { case handOff, browser, cancel, ask }`
   - `DownloadHandoff.gate(stored: String?, isPrivate: Bool) -> HandoffGate` (`"handOff"` → `.handOff`, `"browser"` → `.browser`, `"deny"` → `.cancel`, private or nil → `.ask`)
-  - `DownloadHandoff.decide(_ rule: DownloadRule, request: Request) async -> HandoffGate` (asks when `.ask`, stores when the answer says remember)
+  - `DownloadHandoff.decide(_ rule: DownloadRule, request: Request, tab: Tab? = nil) async -> HandoffGate` (asks when `.ask`, stores when the answer says remember). A "this time" answer is kept in `tab.permissionAnswers` under the rule's own key (`handoff:<rule UUID>`, see Task 3) and is read back before asking, so a link and the download it starts are asked once, not twice.
 
 - [ ] **Step 1: Write failing tests**
 

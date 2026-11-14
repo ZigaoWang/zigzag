@@ -48,23 +48,26 @@ enum SiteOrigin {
 
 /// Answers given to a site's question, kept for the page that asked only: its tab, until it loads another page or
 /// reloads. That's what Ask means, as in Safari: asked again on every visit, never "asked once, then allowed for good".
-/// Allow and Block are what's kept for the site, chosen in Site Controls or Settings › Privacy.
+/// Allow and Block are what's kept for the site, chosen in Site Controls or Settings › Privacy. Kept as action ids, so
+/// a question whose answers aren't just yes or no (a handoff rule's "browser" or "handOff") holds for the page too.
 struct PagePermissionAnswers {
-    private var answers: [String: Bool] = [:]
-    /// Answers that name an action rather than yes or no: where a handoff goes, and how long it lasts. Kept apart from
-    /// the yes-or-no answers so the older questions read exactly as they did.
-    private var actions: [String: String] = [:]
+    private var answers: [String: String] = [:]
 
     /// `key` is what the answer is for (`SitePermissions.answerKey`), `kind` what was asked ("camera", "location"…).
-    mutating func note(_ allowed: Bool, key: String, kind: String) { answers["\(key)|\(kind)"] = allowed }
+    mutating func note(_ allowed: Bool, key: String, kind: String) { note(allowed ? "allow" : "deny", key: key, kind: kind) }
+
+    /// The action chosen, as its own id. `key` is what the answer is for (`SitePermissions.answerKey`), `kind` what was
+    /// asked ("camera", "location", "handoff:<rule UUID>"…).
+    mutating func note(_ action: String, key: String, kind: String) { answers["\(key)|\(kind)"] = action }
 
     /// The answer given for `kind` on this page, if any. The camera and the microphone are separate permissions: an
     /// answer given to both at once, from before the split, is not read as either.
-    func answer(key: String, kind: String) -> Bool? { answers["\(key)|\(kind)"] }
+    func answer(key: String, kind: String) -> Bool? { answers["\(key)|\(kind)"].map { $0 == "allow" } }
 
-    /// An answer that names what to do, for a question with more than two answers, such as a handoff's.
-    mutating func note(_ action: String, key: String, kind: String) { actions["\(key)|\(kind)"] = action }
-    func action(key: String, kind: String) -> String? { actions["\(key)|\(kind)"] }
+    /// The action chosen, as its own id: a handoff's target, or an allow or deny.
+    func action(key: String, kind: String) -> String? { answers["\(key)|\(kind)"] }
+
+    mutating func forget() { answers = [:] }
 
     mutating func forget() { answers = [:]; actions = [:] }
 
@@ -132,10 +135,12 @@ enum SitePermissions {
     /// Returns whether the answer allows what was asked (`action` other than "deny").
     @discardableResult
     static func rememberAnswer(_ answer: PermissionAnswer, subject: String, origin: String, tab: Tab?, isPrivate: Bool) -> Bool {
-        if answer.remember, !isPrivate {
+        // The tab knows best: a caller that forgets to pass its own privacy is still not allowed to store.
+        let keepsNothing = isPrivate || (tab?.isPrivate ?? false)
+        if answer.remember, !keepsNothing {
             remember(answer.action, subject: subject, origin: origin)
         } else if let tab {
-            tab.permissionAnswers.note(answer.action != "deny", key: origin, kind: subject)
+            tab.permissionAnswers.note(answer.action, key: origin, kind: subject)
         }
         return answer.action != "deny"
     }
@@ -486,7 +491,7 @@ enum SitePermissions {
         let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: "your location",
                                                 symbol: "location.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
-                                                actions: [.deny, .allow], canRemember: key != nil, rememberNote: noSiteNote,
+                                                actions: [.deny, .allow], canRemember: key != nil, rememberNote: key == nil ? noSiteNote : nil,
                                                 answered: {
                                                     key.flatMap { key in
                                                         knownAnswer(site: location(origin: key),
@@ -552,8 +557,7 @@ enum SitePermissions {
             if !isAllowed { return .deny }
             allowed = allowed && isAllowed
         }
-        return allowed ? .grant : .deny
-    }
+        return allowed ? .grant : .deny    }
 
     /// Screen sharing (getDisplayMedia): asked every time, as Safari does, and nothing kept. Don't Allow, Share
     /// Screen…, then Share Window… filled, as Safari offers them; either share hands over to macOS's own picker (ScreenCaptureKit's) for a window or a display, where you pick which.

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WebKit
 @testable import Zigzag
 
 @Suite(.serialized) struct SitePermissionsPolicyTests {
@@ -74,8 +75,29 @@ import Testing
         }
     }
 
-    @Test func alwaysStoresADenyToo() throws {
+    /// "This time" holds for the page that asked, and a private tab keeps nothing even when its caller forgets to say
+    /// it is private.
+    @Test func thisTimeHoldsForThePageAndAPrivateTabKeepsNothing() throws {
         try withDefaults { _ in
+            let rule = UUID()
+            let tab = Tab(url: URL(string: "https://a.com"), spaceID: UUID())
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "browser", remember: false),
+                                               subject: PermissionSubject.handoff(rule), origin: "https://a.com",
+                                               tab: tab, isPrivate: false)
+            #expect(tab.permissionAnswers.action(key: "https://a.com", kind: "handoff:\(rule.uuidString)") == "browser")
+            #expect(SitePermissions.action(PermissionSubject.handoff(rule), origin: "https://a.com") == nil)
+
+            let privateTab = Tab(url: URL(string: "https://a.com"), spaceID: UUID())
+            privateTab.privateStore = WKWebsiteDataStore.nonPersistent()
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "allow", remember: true),
+                                               subject: PermissionSubject.location, origin: "https://a.com",
+                                               tab: privateTab, isPrivate: false)
+            #expect(SitePermissions.action(PermissionSubject.location, origin: "https://a.com") == nil)
+            #expect(privateTab.permissionAnswers.answer(key: "https://a.com", kind: "location") == true)
+        }
+    }
+
+    @Test func alwaysStoresADenyToo() throws {        try withDefaults { _ in
             let remembers = SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: true),
                                                            subject: PermissionSubject.media(.camera), origin: "https://a.com",
                                                            tab: nil, isPrivate: false)
@@ -102,6 +124,38 @@ import Testing
     @Test func screenSharingOffersThreeActionsAndKeepsNothing() {
         #expect(DisplayCaptureChoice.actions.map(\.id) == ["deny", "screen", "allow"])
         #expect(DisplayCaptureChoice.actions.last?.isProminent == true)
+    }
+
+    /// The screen-sharing buttons reach the three ways WebKit can answer, and nothing else is a yes.
+    @Test func screenSharingMapsItsActions() {
+        #expect(DisplayCaptureChoice(PermissionAnswer(action: "screen", remember: false)) == .screen)
+        #expect(DisplayCaptureChoice(PermissionAnswer(action: "allow", remember: false)) == .window)
+        #expect(DisplayCaptureChoice(PermissionAnswer(action: "deny", remember: false)) == .deny)
+        #expect(DisplayCaptureChoice(nil) == .deny)
+    }
+
+    /// A page answer keeps the action it was given, not just yes or no: a handoff rule's "browser" has to survive
+    /// so the same page is not asked twice.
+    @Test func aPageAnswerKeepsItsActionAndItsYesOrNo() {
+        var page = PagePermissionAnswers()
+        let kind = "handoff:\(UUID().uuidString)"
+        page.note("browser", key: "https://a.com", kind: kind)
+        #expect(page.action(key: "https://a.com", kind: kind) == "browser")
+        #expect(page.answer(key: "https://a.com", kind: kind) == false)
+        #expect(page.action(key: "https://a.com", kind: "handoff:other") == nil)
+
+        page.note(true, key: "https://a.com", kind: "location")
+        #expect(page.action(key: "https://a.com", kind: "location") == "allow")
+        #expect(page.answer(key: "https://a.com", kind: "location") == true)
+
+        // One answer to camera and microphone at once answers either of them.
+        page.note("deny", key: "https://a.com", kind: "cameraAndMicrophone")
+        #expect(page.answer(key: "https://a.com", kind: "camera") == false)
+        #expect(page.answer(key: "https://a.com", kind: "microphone") == false)
+
+        page.forget()
+        #expect(page.isEmpty)
+        #expect(page.action(key: "https://a.com", kind: kind) == nil)
     }
 
     @Test func deletingARuleForgetsItsHandoffAnswers() throws {
