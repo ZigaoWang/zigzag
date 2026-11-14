@@ -779,12 +779,7 @@ final class MiniPlayerView: NSView {
     private static func overlayButton(_ symbol: String, side: CGFloat, glyph: CGFloat, tip: String) -> IconButton {
         let button = IconButton(symbol: symbol, size: side, symbolSize: glyph, toolTip: tip)
         button.glyph = overlayGlyph(symbol, size: glyph)
-        button.tint = .white
-        button.radius = side / 2
-        button.layer?.shadowColor = .black
-        button.layer?.shadowOpacity = 0.6
-        button.layer?.shadowRadius = 4
-        button.layer?.shadowOffset = .zero
+        button.isOverMedia = true
         return button
     }
 
@@ -1335,7 +1330,8 @@ final class MiniPlayerSiteButton: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        let fill: NSColor? = isPressed ? NSColor.white.withAlphaComponent(0.26) : isHovered ? NSColor.white.withAlphaComponent(0.16) : nil
+        // The card's other buttons' washes (`IconButton.isOverMedia`).
+        let fill: NSColor? = isPressed ? Tokens.Color.mediaPressed : isHovered ? Tokens.Color.mediaHover : nil
         layer?.set(backgroundColor: fill?.cgColor, animated: animated && !isHovered)
     }
 }

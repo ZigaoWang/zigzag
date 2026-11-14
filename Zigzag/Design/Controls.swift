@@ -520,7 +520,32 @@ final class IconButton: InteractiveView {
     /// on any color, rather than the frame's white washes.
     var isOnPage = false { didSet { if isOnPage != oldValue { stateDidChange(animated: false) } } }
 
+    /// Over a playing video (the mini player): a white glyph on a soft shadow, a round target, and white washes for
+    /// hover and press (`Color.mediaHover`, `mediaPressed`) that show over any picture. The glyph's shadow goes
+    /// while the wash is under it, so the wash isn't ringed by it.
+    var isOverMedia = false {
+        didSet {
+            guard isOverMedia != oldValue else { return }
+            if isOverMedia {
+                tint = .white
+                radius = bounds.width / 2
+                layer?.shadowColor = .black
+                layer?.shadowRadius = 4
+                layer?.shadowOffset = .zero
+            }
+            stateDidChange(animated: false)
+        }
+    }
+
     override func stateDidChange(animated: Bool) {
+        if isOverMedia {
+            let fill: NSColor? = !isEnabled ? nil : isPressed ? Tokens.Color.mediaPressed : isHovered ? Tokens.Color.mediaHover : nil
+            layer?.set(backgroundColor: fill?.cgColor, animated: animated && !isHovered)
+            Tokens.Motion.withoutAnimation { layer?.shadowOpacity = fill == nil ? 0.6 : 0 }
+            imageView.contentTintColor = image == nil ? tint : nil
+            imageView.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
+            return
+        }
         if selectsAsCard {
             applyRowStyle(animated: animated)
             imageView.contentTintColor = image == nil ? (isSelected ? Tokens.Color.textPrimary : tint) : nil

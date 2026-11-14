@@ -515,4 +515,27 @@ struct MiniPlayerTests {
         #expect(model.lost(a) == [.end(a)])
         #expect(model.tab == nil)
     }
+
+    @Test func withNoVideoToGrowFromItComesOutOfItsOwnCorner() {
+        let area = CGRect(x: 0, y: 0, width: 1440, height: 900)
+        #expect(MiniPlayerLayout.growPoint(of: CGRect(x: 1080, y: 680, width: 340, height: 190), in: area) == CGPoint(x: 1, y: 1))
+        #expect(MiniPlayerLayout.growPoint(of: CGRect(x: 20, y: 680, width: 340, height: 190), in: area) == CGPoint(x: 0, y: 1))
+        #expect(MiniPlayerLayout.growPoint(of: CGRect(x: 20, y: 20, width: 340, height: 190), in: area) == CGPoint(x: 0, y: 0))
+        #expect(MiniPlayerLayout.growPoint(of: CGRect(x: 1080, y: 20, width: 340, height: 190), in: area) == CGPoint(x: 1, y: 0))
+    }
+
+    @MainActor @Test func itsButtonsTakeTheSameWashesAsItsSiteName() {
+        let button = IconButton(symbol: "xmark", size: 28, symbolSize: 13)
+        button.isOverMedia = true
+        #expect(button.layer?.backgroundColor == nil)
+        #expect(button.layer?.cornerRadius == 14)
+        button.isHovered = true
+        #expect(button.layer?.backgroundColor == Tokens.Color.mediaHover.cgColor)
+        #expect(button.layer?.shadowOpacity == 0)
+        button.isPressed = true
+        #expect(button.layer?.backgroundColor == Tokens.Color.mediaPressed.cgColor)
+        button.isPressed = false
+        button.isHovered = false
+        #expect(button.layer?.shadowOpacity == 0.6)
+    }
 }

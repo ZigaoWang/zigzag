@@ -1204,6 +1204,10 @@ enum Tokens {
             highLight: hex(0x000000, alpha: 0.09), highDark: hex(0xFFFFFF, alpha: 0.11))
         static let pressedFill = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.10),
             highLight: hex(0x000000, alpha: 0.15), highDark: hex(0xFFFFFF, alpha: 0.17))
+        /// A button's hover and press over a playing video (the mini player's controls): white washes strong enough
+        /// to show over the dimmed picture, whatever its colors.
+        static let mediaHover = NSColor.white.withAlphaComponent(0.16)
+        static let mediaPressed = NSColor.white.withAlphaComponent(0.26)
         /// A chosen row on a panel or a page: a clear neutral fill with a 1px edge (`selectedEdge`) and a shadow-sm
         /// (`liftShadow`). The sidebar's own rows sit on the frame and use `Tokens.Chrome` instead.
         static let selectedFill = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.11),
