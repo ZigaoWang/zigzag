@@ -321,6 +321,19 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
         }
     }
 
+    /// The name the rule it makes carries: the service or the app itself, so the rule reads as a sentence —
+    /// "Files ending in .torrent go to rTorrent". The menu entry says more ("Send to rTorrent").
+    var ruleName: String {
+        switch self {
+        case .aria2: "aria2"
+        case .motrix: "Motrix"
+        case .rTorrent: "rTorrent"
+        case .ytdlp: "yt-dlp"
+        case .mpv: "mpv"
+        case .iina: "IINA"
+        }
+    }
+
     /// The rule a preset starts from: a media site for the players, a magnet or link for the downloaders.
     var rule: DownloadRule {
         switch self {
@@ -331,7 +344,7 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
             action.rpcParameters = """
             [["{link}"], {"header": ["Cookie: {cookie_header}", "Referer: {referrer}"], "out": "{filename}"}]
             """
-            return DownloadRule(name: title, applies: .linksAndDownloads, match: .any, action: action)
+            return DownloadRule(name: ruleName, applies: .linksAndDownloads, match: .any, action: action)
         case .rTorrent:
             var action = DownloadRuleAction(kind: .jsonRPC)
             action.rpcEndpoint = "http://127.0.0.1:8080/RPC2"
@@ -340,21 +353,21 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
             ["", "{link}"]
             """
             action.rpcStyle = .xmlrpc
-            return DownloadRule(name: title, applies: .linksAndDownloads, match: .any, action: action)
+            return DownloadRule(name: ruleName, applies: .linksAndDownloads, match: .any, action: action)
         case .ytdlp:
             var action = DownloadRuleAction(kind: .runScript)
             // Through env, so it's found under either Homebrew prefix, and anywhere else on PATH.
             action.scriptPath = "/usr/bin/env"
             action.arguments = ["yt-dlp", "--no-playlist", "--cookies", "{cookies}", "{link}"]
-            return DownloadRule(name: title, applies: .linksAndDownloads, match: .any, action: action)
+            return DownloadRule(name: ruleName, applies: .linksAndDownloads, match: .any, action: action)
         case .mpv:
             var action = DownloadRuleAction(kind: .openURL)
             action.urlTemplate = "mpv://{encoded_link}"
-            return DownloadRule(name: title, applies: .linksAndDownloads, match: .contains, pattern: "youtube.com/watch", action: action)
+            return DownloadRule(name: ruleName, applies: .linksAndDownloads, match: .contains, pattern: "youtube.com/watch", action: action)
         case .iina:
             var action = DownloadRuleAction(kind: .openURL)
             action.urlTemplate = "iina://weblink?url={encoded_link}"
-            return DownloadRule(name: title, applies: .linksAndDownloads, match: .contains, pattern: "youtube.com/watch", action: action)
+            return DownloadRule(name: ruleName, applies: .linksAndDownloads, match: .contains, pattern: "youtube.com/watch", action: action)
         }
     }
 }
