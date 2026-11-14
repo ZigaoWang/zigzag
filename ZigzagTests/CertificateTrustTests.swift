@@ -267,4 +267,15 @@ struct CertificateProblemTests {
         let page = ErrorPage.html(error: error, url: URL(string: "https://router.example/")!, canGoBack: false, proceedLink: nil, style: "", nonce: "n")
         #expect(page.contains(ErrorPage.escape(ErrorPage.certificateReason(.selfSigned))))
     }
+
+    @Test func aFingerprintBreaksAfterItsColons() {
+        let fingerprint = (0..<32).map { String(format: "%02X", $0 * 7 % 256) }.joined(separator: ":")
+        let lines = CertificateDetails.fingerprintLines(fingerprint, perLine: 8).components(separatedBy: "\n")
+        #expect(lines.count == 4)
+        #expect(lines.allSatisfy { !$0.hasPrefix(":") })
+        #expect(lines.dropLast().allSatisfy { $0.hasSuffix(":") && $0.split(separator: ":").count == 8 })
+        #expect(lines.joined() == fingerprint)
+        #expect(CertificateDetails.fingerprintLines(fingerprint, perLine: 32) == fingerprint)
+        #expect(CertificateDetails.fingerprintLines(fingerprint, perLine: 16).components(separatedBy: "\n").count == 2)
+    }
 }

@@ -109,4 +109,15 @@ nonisolated struct CertificateDetails: Equatable, Sendable {
             return value
         }
     }
+
+    /// The SHA-256 fingerprint as the certificate page shows it: `perLine` pairs to a line, each line but the last
+    /// ending on its colon, so no line starts with one.
+    static func fingerprintLines(_ fingerprint: String, perLine: Int) -> String {
+        let pairs = fingerprint.split(separator: ":")
+        guard perLine > 0, pairs.count > perLine else { return fingerprint }
+        return stride(from: 0, to: pairs.count, by: perLine).map { start in
+            let line = pairs[start..<min(start + perLine, pairs.count)].joined(separator: ":")
+            return start + perLine < pairs.count ? line + ":" : line
+        }.joined(separator: "\n")
+    }
 }

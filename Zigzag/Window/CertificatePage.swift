@@ -23,6 +23,8 @@ final class CertificatePage: NSView {
     private let chainLabel = Label.section(String(localized: "Chain", comment: "Section label over the certificates from the site's up to the root, on the certificate page of the site panel."))
     private var chainRows: [ChainRow] = []
     private var fields: [(name: Label, value: Label)] = []
+    /// The SHA-256 field's label and the fingerprint in it, broken into lines to fit the width it's laid out at.
+    private var fingerprint: (label: Label, value: String)?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -91,6 +93,7 @@ final class CertificatePage: NSView {
         selected = index
         for (i, row) in chainRows.enumerated() { row.isSelected = i == index }
         fields.forEach { $0.name.removeFromSuperview(); $0.value.removeFromSuperview() }
+        fingerprint = nil
         let certificate = details.chain[index]
         var pairs: [(String, String)] = []
         pairs.append((String(localized: "Issued to", comment: "On the certificate page of the site panel: whom the certificate was issued to."),
@@ -112,12 +115,13 @@ final class CertificatePage: NSView {
         fields = pairs.map { name, value in
             let nameLabel = Label(name, font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
             let valueLabel = Self.wrapping(Tokens.Font.body(), color: Tokens.Color.textPrimary)
-            if name == "SHA-256" {
-                // Pairs of figures, broken anywhere: it reads as a block, not a line cut short.
-                valueLabel.font = Tokens.Font.small()
-                valueLabel.lineBreakMode = .byCharWrapping
-            }
             valueLabel.stringValue = value
+            if name == "SHA-256" {
+                // A block of pairs, the same number on each line, broken only after a colon (`fingerprintLines`, as
+                // many as fit, set in `arrange`), its figures all as wide.
+                valueLabel.font = Tokens.Font.figures(Tokens.TypeSize.small)
+                fingerprint = (valueLabel, value)
+            }
             addSubview(nameLabel)
             addSubview(valueLabel)
             return (nameLabel, valueLabel)
@@ -169,6 +173,16 @@ final class CertificatePage: NSView {
                 place(row, NSRect(x: pad - PanelLinkRow.outset, y: y, width: inner + PanelLinkRow.outset * 2, height: ChainRow.height))
                 y += ChainRow.height
             }
+        }
+        if let fingerprint {
+            // As many pairs to a line as fit, halving from 16 (two lines) down, so the lines come out even.
+            // A pair at its widest: the figures are all as wide, the letters A to F not quite.
+            let font = fingerprint.label.font ?? Tokens.Font.small()
+            let widest = "0123456789ABCDEF".map { (String($0) as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+            let pair = widest * 2 + (":" as NSString).size(withAttributes: [.font: font]).width
+            let perLine = [16, 8, 4, 2].first { CGFloat($0) * pair <= inner - 1 } ?? 1
+            let text = CertificateDetails.fingerprintLines(fingerprint.value, perLine: perLine)
+            if fingerprint.label.stringValue != text { fingerprint.label.stringValue = text }
         }
         if !fields.isEmpty {
             y += Tokens.Space.x4
