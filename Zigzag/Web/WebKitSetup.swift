@@ -252,7 +252,7 @@ final class PageErrors: NSObject, WKScriptMessageHandler {
         }).observe({ type: 'resource', buffered: true });
       } catch (e) {}
     })();
-    """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
+    """, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page)
 
     /// How many errors a message the page describes stands for: one for an error or a failed promise, none for a
     /// request that failed.
@@ -300,16 +300,33 @@ final class PageErrors: NSObject, WKScriptMessageHandler {
         }
     }
 
+    /// The most of a page's error text that goes into Diagnostics (and from there a problem report).
+    static let maxText = 300
+
+    /// What's kept of a page's word for an error: its first line's start, without characters that could pass for
+    /// Zigzag's own lines in a report (line breaks, controls, marks that reorder text). The page's message is any
+    /// text it likes, so it's the page's, never more.
+    static func noteText(_ text: String) -> String {
+        var kept = String.UnicodeScalarView()
+        for scalar in text.unicodeScalars {
+            guard kept.count < maxText else { break }
+            switch scalar.properties.generalCategory {
+            case .control, .format, .lineSeparator, .paragraphSeparator, .surrogate, .unassigned, .privateUse: kept.append(" ")
+            default: kept.append(scalar)
+            }
+        }
+        return String(kept).trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Only the page's own document, the one the tab shows, is listened to: a frame in it (an ad) puts nothing in
+    /// Diagnostics, and nor does anything that isn't one of the script's own kinds.
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard let body = message.body as? [String: Any], let kind = body["kind"] as? String, let text = body["text"] as? String,
-              let webView = message.webView else { return }
+        guard message.frameInfo.isMainFrame, let body = message.body as? [String: Any], let kind = body["kind"] as? String,
+              ["error", "rejection", "http"].contains(kind), let text = body["text"] as? String, let webView = message.webView else { return }
         (webView as? BrowserWebView)?.owner?.countPageErrors(Self.errors(in: body))
-        let origin = message.frameInfo.securityOrigin
         let title = kind == "http" ? "Request failed" : kind == "rejection" ? "Page error (promise)" : "Page error"
-        // An error in a frame (a sign-in, a payment) says which frame, beside the page it's in.
-        let page = webView.url?.host()
-        let frame = message.frameInfo.isMainFrame || origin.host == page ? "" : " in a frame from \(origin.host)"
-        Diagnostics.note(title, site: page ?? origin.host, text + frame, isPrivate: !webView.configuration.websiteDataStore.isPersistent)
+        Diagnostics.note(title, site: webView.url?.host() ?? message.frameInfo.securityOrigin.host, Self.noteText(text),
+                         isPrivate: !webView.configuration.websiteDataStore.isPersistent)
     }
 }
 

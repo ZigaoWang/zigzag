@@ -116,4 +116,40 @@ struct PageErrorCountTests {
             #expect(badges().map(\.text) == ["99+"])
         }
     }
+
+    private final class Loading: NSObject, WKNavigationDelegate {
+        var done: CheckedContinuation<Void, Never>?
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
+    }
+
+    /// What a page says went wrong goes into Diagnostics only from the page itself, never a frame in it, cut short and
+    /// on one line, whatever the page sends.
+    @Test func onlyThePageItselfIsHeardAndBriefly() async throws {
+        #expect(PageErrors.script.isForMainFrameOnly)
+        let long = String(repeating: "x", count: 5000)
+        #expect(PageErrors.noteText("one\ntwo\u{202E}three").contains("\n") == false)
+        #expect(PageErrors.noteText("one\ntwo\u{202E}three") == "one two three")
+        #expect(PageErrors.noteText(long).count == PageErrors.maxText)
+
+        let mark = UUID().uuidString
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController.add(PageErrors.shared, contentWorld: .page, name: PageErrors.messageName)
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 300), configuration: configuration)
+        let loading = Loading()
+        webView.navigationDelegate = loading
+        let post = "window.webkit.messageHandlers.\(PageErrors.messageName).postMessage"
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString("""
+            <iframe srcdoc="<script>\(post)({kind: 'error', text: 'frame-\(mark)'})</script>"></iframe>
+            <script>\(post)({kind: 'note', text: 'odd-\(mark)'}); \(post)({kind: 'error', text: 'page-\(mark)\\n\(long)'});</script>
+            """, baseURL: URL(string: "https://errors.example/"))
+        }
+        try await Task.sleep(for: .milliseconds(200))
+        let mine = Diagnostics.events.compactMap(\.detail).filter { $0.contains(mark) }
+        #expect(mine.count == 1)
+        #expect(mine.first?.hasPrefix("page-\(mark) x") == true)
+        #expect((mine.first?.count ?? 0) <= PageErrors.maxText)
+        withExtendedLifetime(loading) {}
+    }
 }
