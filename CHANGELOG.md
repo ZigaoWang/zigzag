@@ -19,6 +19,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Translating a Chinese Wikipedia page translates it once, as Simplified Chinese, then says it's translated. Text in Traditional Chinese on it, like the language variant menu, no longer starts a second translation that brings up macOS's Download Languages sheet, and neither does the site's next page in Traditional. The download sheet now only comes up when you ask to translate a page whose language isn't on your Mac yet. ([#231](https://github.com/ZigaoWang/zigzag/issues/231))
 - The Apple Store's checkout shows one Apple Pay mark in its payment options, instead of the Apple Pay logo drawn over the Apple logo and Pay. ([#235](https://github.com/ZigaoWang/zigzag/issues/235))
 - Security hardening for pages, pop-ups, links, downloads, the address and secure connections.
+- The space's name stays at the top of the sidebar while you scroll the pinned tabs and tabs under it, as Arc keeps it, with the fine line under it while the list is scrolled. Rows pass under it rather than showing through.
+- Favorites show which are open, as tabs do: a favorite whose page isn't loaded is faded back until you point at it, one that's open has its fine edge, and the one you're on has the selected tab's card.
+- A favorite that moved on from its page shows it, as a pinned tab does with Original / Current page: the tile shows the icon of the page it's on now with the favorite's own icon small on its corner, pointing at it names both, and Back to Favorite's Page in its menu takes it back, in a split favorite too.
+- A tab's or pinned tab's title no longer moves or gets cut shorter when the pointer brings up its close or back button: the button shows over the title's faded end.
+- The titles in the sidebar's rows, the address, Clear and the ⌘ number keys sit in the middle of their row by their capitals, level with the icons, where they were half a point low.
 
 ## [0.9.0] - 2026-11-14
 
