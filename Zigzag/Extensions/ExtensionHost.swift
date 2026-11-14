@@ -1841,8 +1841,11 @@ enum ExtensionLog {
     /// The line as written: on one line, control characters made spaces, and cut at `lineLimit`.
     nonisolated static func entry(_ line: String) -> String {
         var scalars = String.UnicodeScalarView()
+        // Counted as they go: a String's scalar count is walked from the start each time it's asked.
+        var count = 0
         for scalar in line.unicodeScalars {
-            guard scalars.count < lineLimit else { return String(scalars) + "…" }
+            guard count < lineLimit else { return String(scalars) + "…" }
+            count += 1
             scalars.append(scalar.properties.generalCategory == .control || scalar == "\u{2028}" || scalar == "\u{2029}" ? " " : scalar)
         }
         return String(scalars)
