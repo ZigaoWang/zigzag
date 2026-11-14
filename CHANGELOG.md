@@ -16,6 +16,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Security fixes from a private report: pictures from websites are read in a sandboxed helper and web PDFs stay in WebKit's sandboxed viewer, user scripts run apart from the extension that installed them, ad blocking only runs scriptlets this version knows, a page can't open another app without asking, a certificate you visit anyway shows as not secure, Stop really cuts off AI apps, and extension packages and permissions are checked more strictly.
 - Clicks, scrolls and the pointer over Site Controls and Zigzag's other panels stay in the panel: the tabs under it no longer light up, a sideways scroll no longer switches spaces behind it, and pressing on the panel never drags the window. ([#216](https://github.com/ZigaoWang/zigzag/issues/216))
 - Rows in Site Controls, like the certificate chain's, sit a little apart, so the chosen one and the one under the pointer no longer run together.
+- Importing from Arc brings only what you choose: Spaces and Pinned Tabs, Bookmarks and Open Tabs each bring their own part, open tabs without their spaces go to a space of the same name or the one you're in, and tabs you closed in Arc stay closed. ([#210](https://github.com/ZigaoWang/zigzag/issues/210))
+- Each tab translates on its own, in Peek too: starting a translation in another tab no longer stops the first, its notice shows only while you're on that page, and a page that can't be translated goes back to its own text instead of staying half done. ([#218](https://github.com/ZigaoWang/zigzag/issues/218))
+- An extension that sends a message to a tab gets the first answer, instead of waiting forever when a user script on the page is listening but never answers.
 
 ## [0.9.0] - 2026-11-12
 
