@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import WebKit
+import os
 @testable import Zigzag
 
 /// Rules that keep pages and extensions inside their lines: which native helpers an extension may start, which
@@ -436,6 +437,28 @@ struct PageNoticeTests {
             #expect(await !IconAddress.mayFetch(url), "\(text)")
         }
         #expect(await IconAddress.mayFetch(try #require(URL(string: "https://8.8.8.8/icon.png"))))
+    }
+
+    /// Many files asked for at once from one host wait on one lookup, not one each.
+    @Test func oneLookupAHostAtATime() async {
+        let host = "coalesce-\(UUID().uuidString).example"
+        let count = OSAllocatedUnfairLock(initialState: 0)
+        let resolver: @Sendable (String) -> [[UInt8]] = { _ in
+            count.withLock { $0 += 1 }
+            Thread.sleep(forTimeInterval: 0.2)
+            return [[8, 8, 8, 8]]
+        }
+        let answers = await withTaskGroup(of: [[UInt8]].self) { group in
+            for _ in 0..<8 { group.addTask { await IconAddress.addresses(of: host, resolver: resolver) } }
+            var all: [[[UInt8]]] = []
+            for await found in group { all.append(found) }
+            return all
+        }
+        #expect(answers.count == 8 && answers.allSatisfy { $0 == [[8, 8, 8, 8]] })
+        #expect(count.withLock { $0 } == 1)
+        // Kept: asked again, no new lookup.
+        _ = await IconAddress.addresses(of: host, resolver: resolver)
+        #expect(count.withLock { $0 } == 1)
     }
 
     @Test func popupHeaderNamesASiteOnlyWhenThereIsOne() {

@@ -1,4 +1,5 @@
 import AppKit
+import Network
 import WebKit
 
 /// Dark pages: a page without a dark look of its own is drawn dark, one that has its own is left alone.
@@ -658,20 +659,26 @@ enum DarkPages {
     /// Whether something a page's Dark Reader can't fetch itself may be fetched for it: only from the web, never this
     /// Mac or its network, by the address as written (in any of its spellings) and by every address its name
     /// resolves to (`IconAddress.mayFetchForPage`). Checked again for every redirect.
-    nonisolated static func fetchable(_ url: URL?) async -> Bool {
+    /// `proxied`: the fetch goes through the profile's own proxy.
+    nonisolated static func fetchable(_ url: URL?, proxied: Bool = false) async -> Bool {
         guard let url else { return false }
-        return await IconAddress.mayFetchForPage(url)
+        return await IconAddress.mayFetchForPage(url, proxied: proxied ? true : nil)
     }
 
     /// Follows a redirect only to where the fetch itself could have gone.
     nonisolated private final class Redirects: NSObject, URLSessionTaskDelegate, Sendable {
+        let proxied: Bool
+        init(proxied: Bool) { self.proxied = proxied }
+
         func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                         newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
             guard let url = request.url else { completionHandler(nil); return }
-            Task { completionHandler(await DarkPages.fetchable(url) ? request : nil) }
+            let proxied = proxied
+            Task { completionHandler(await DarkPages.fetchable(url, proxied: proxied) ? request : nil) }
         }
     }
-    nonisolated private static let redirects = Redirects()
+    nonisolated private static let redirects = Redirects(proxied: false)
+    nonisolated private static let proxiedRedirects = Redirects(proxied: true)
 
     /// Only style sheets and pictures, which is all Dark Reader reads.
     nonisolated static func fetchableType(_ type: String) -> Bool {
@@ -681,21 +688,29 @@ enum DarkPages {
 
     nonisolated static let maxFetchBytes = 5 * 1024 * 1024
 
-    nonisolated private static let session: URLSession = {
+    nonisolated private static func configuration(proxies: [ProxyConfiguration] = []) -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpShouldSetCookies = false
         configuration.httpCookieAcceptPolicy = .never
         configuration.timeoutIntervalForRequest = 10
         configuration.timeoutIntervalForResource = 15
         configuration.httpMaximumConnectionsPerHost = 2
-        return URLSession(configuration: configuration)
-    }()
+        configuration.proxyConfigurations = proxies
+        return configuration
+    }
+
+    nonisolated private static let session = URLSession(configuration: configuration())
 
     /// A style sheet or picture, as its type and its bytes in base64, or nil: neither, too big, or not there.
-    nonisolated static func fetch(_ url: URL) async -> [String: String]? {
+    /// `proxies`: the profile's own (an extension's), which the fetch goes through as the page's requests do.
+    nonisolated static func fetch(_ url: URL, proxies: [ProxyConfiguration] = []) async -> [String: String]? {
         var request = URLRequest(url: url)
         request.setValue("text/css,image/*,*/*;q=0.1", forHTTPHeaderField: "Accept")
-        guard await fetchable(url), let (data, response) = try? await session.data(for: request, delegate: redirects), let http = response as? HTTPURLResponse,
+        let proxied = !proxies.isEmpty
+        guard await fetchable(url, proxied: proxied) else { return nil }
+        let session = proxied ? URLSession(configuration: configuration(proxies: proxies)) : session
+        defer { if proxied { session.finishTasksAndInvalidate() } }
+        guard let (data, response) = try? await session.data(for: request, delegate: proxied ? proxiedRedirects : redirects), let http = response as? HTTPURLResponse,
               (200..<300).contains(http.statusCode), data.count <= maxFetchBytes else { return nil }
         let type = http.value(forHTTPHeaderField: "Content-Type") ?? ""
         guard fetchableType(type) else { return nil }
@@ -710,8 +725,9 @@ enum DarkPages {
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
             guard let webView = message.webView, nativeScope(of: webView.configuration.websiteDataStore) != nil,
                   let href = message.body as? String, let url = URL(string: href) else { replyHandler(nil, nil); return }
+            let proxies = webView.configuration.websiteDataStore.proxyConfigurations
             Task {
-                let got = await DarkPages.fetch(url)
+                let got = await DarkPages.fetch(url, proxies: proxies)
                 replyHandler(got, nil)
             }
         }

@@ -464,35 +464,56 @@ nonisolated enum IconAddress {
     /// For a fetch whose answer goes back to the page (a style sheet Dark Pages reads for it): by every address the
     /// name resolves to, as `mayFetch`, except that an address in the range a proxy's fake-IP mode hands out
     /// (198.18.0.0/15, never a device on your network) stands for the site on the web it does for the proxy.
-    static func mayFetchForPage(_ url: URL) async -> Bool {
+    ///
+    /// `proxied` says whether the fetch goes through a proxy (the profile's own, set by an extension); nil asks the
+    /// system's settings alone.
+    static func mayFetchForPage(_ url: URL, proxied: Bool? = nil) async -> Bool {
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let host = url.host(percentEncoded: false), isPublicName(host) else { return false }
         if let literal = bytes(of: host) { return isPublic(literal) }
         let addresses = await addresses(of: host)
-        // Nothing resolves on this Mac when only an HTTP proxy reaches the web (it looks names up itself): judged by
-        // the name, as an icon is, rather than refusing every style sheet.
-        guard !addresses.isEmpty else { return mayFetchByName(url) }
+        // Nothing resolves on this Mac when only a proxy reaches the web (it looks names up itself): judged by the
+        // name, as an icon is, rather than refusing every style sheet. Only then: without a proxy, a name that
+        // resolves to nothing now could resolve to this Mac's network the next moment (a site rebinding its name).
+        guard !addresses.isEmpty else {
+            let behindProxy = proxied ?? ProxyCheck.anyProxy(for: url)
+            return behindProxy && mayFetchByName(url)
+        }
         return addresses.allSatisfy { isPublic($0) || isFakeIP($0) }
     }
 
     /// Lookups wait on the network, so they run on a queue of their own, never the threads Swift's tasks share; a
-    /// page asks for many files from one host, so an answer is kept a minute.
+    /// page asks for many files from one host, so an answer is kept a minute, and the files asked for at once wait
+    /// on one lookup.
     private static let lookups = DispatchQueue(label: "app.zigzag.icon-address", qos: .utility, attributes: .concurrent)
     private static let answers = OSAllocatedUnfairLock(initialState: [String: (addresses: [[UInt8]], at: Date)]())
+    private static let underWay = OSAllocatedUnfairLock(initialState: [String: Task<[[UInt8]], Never>]())
     static let answerLifetime: TimeInterval = 60
 
-    /// Every address `host` resolves to, from a lookup in the last minute or a new one.
-    static func addresses(of host: String, now: Date = Date()) async -> [[UInt8]] {
+    /// Every address `host` resolves to, from a lookup in the last minute, one under way, or a new one.
+    static func addresses(of host: String, now: Date = Date(), resolver: (@Sendable (String) -> [[UInt8]])? = nil) async -> [[UInt8]] {
         let key = host.lowercased()
         if let kept = answers.withLock({ $0[key] }), now.timeIntervalSince(kept.at) < answerLifetime { return kept.addresses }
-        let found = await withCheckedContinuation { (done: CheckedContinuation<[[UInt8]], Never>) in
-            lookups.async { done.resume(returning: resolve(key)) }
+        let lookup = underWay.withLock { flights -> Task<[[UInt8]], Never> in
+            if let running = flights[key] { return running }
+            let task = Task.detached {
+                let found = await withCheckedContinuation { (done: CheckedContinuation<[[UInt8]], Never>) in
+                    Self.lookups.async { done.resume(returning: (resolver ?? resolve)(key)) }
+                }
+                answers.withLock { cache in
+                    if cache.count > 256 { cache = cache.filter { now.timeIntervalSince($0.value.at) < answerLifetime } }
+                    cache[key] = (found, now)
+                }
+                underWay.withLock { _ = $0.removeValue(forKey: key) }
+                return found
+            }
+            flights[key] = task
+            return task
         }
-        answers.withLock { cache in
-            if cache.count > 256 { cache = cache.filter { now.timeIntervalSince($0.value.at) < answerLifetime } }
-            cache[key] = (found, now)
-        }
-        return found
+        return await lookup.value
     }
+
+    /// Forgets every answer kept: for tests.
+    static func forgetAnswers() { answers.withLock { $0 = [:] } }
 
     private static func isFakeIP(_ a: [UInt8]) -> Bool { a.count == 4 && a[0] == 198 && (18...19).contains(a[1]) }
 
