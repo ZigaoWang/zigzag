@@ -327,6 +327,19 @@ struct SidebarEdgeEventTests {
         }
     }
 
+    /// A window filling the screen, as in a report (2026-11-14): the pointer rests on the screen's own edge, nudges
+    /// a little, then goes onto the sidebar's tabs. The sidebar comes out once and stays.
+    @Test func restingOnTheScreensEdgeThenOntoTheTabsBringsItOutOnce() {
+        for zone in zones {
+            let rest = replay([(0, 300), (0.3, 0), (3, 0)], zone: zone, until: 3)
+            #expect(rest.map(\.0) == ["out"], "rest \(rest)")
+            let nudge = replay([(0, 300), (0.3, 0), (0.8, 0), (0.9, 3), (1.0, 0), (1.2, 14), (1.5, 14), (1.6, 170), (3, 170)], zone: zone, until: 3)
+            #expect(nudge.map(\.0) == ["out"], "nudge \(nudge)")
+            let along = replay([(0, 300), (0.3, 0), (1.0, 0), (1.1, 6), (1.3, 6), (1.4, 0), (2, 0), (2.2, 120), (3, 120)], zone: zone, until: 3)
+            #expect(along.map(\.0) == ["out"], "along \(along)")
+        }
+    }
+
     @Test func aMoveThatLeavesStraightPastTheReachAndComesBackBringsItOut() {
         for zone in zones {
             // So quick the window hears it leave already further out than the edge reaches.

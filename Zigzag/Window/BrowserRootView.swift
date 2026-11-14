@@ -1,3 +1,4 @@
+import os
 import AppKit
 
 /// Holds the sidebar. Docked it is invisible chrome; floating it becomes a card of glass with its own shadow: the page
@@ -1236,8 +1237,21 @@ final class BrowserRootView: SpaceFrameView {
     /// events come, until `edgeReveal` has decided.
     private var edgeTimer: Timer?
 
+    /// The hidden sidebar's edge, step by step (met, decided, tucked away and why), in the Mac's own log, so a
+    /// flicker on someone's Mac can be read afterward: `log show --predicate 'category == "sidebar-edge"'`. Positions
+    /// and timings only, a few lines each time the sidebar comes or goes.
+    static let edgeLog = Logger(subsystem: "wang.zigao.zigzag", category: "sidebar-edge")
+    /// Whether the window's sidebar edge lies on its screen's edge, where the pointer stops (for the log).
+    private var windowMeetsScreenEdge: Bool {
+        guard let window, let screen = window.screen else { return false }
+        return sidebarOnRight ? abs(window.frame.maxX - screen.frame.maxX) < 2 : abs(window.frame.minX - screen.frame.minX) < 2
+    }
+
     private func pointerAtEdge(at time: TimeInterval, speed: CGFloat) {
         guard !sidebarVisible, !sidebarRevealed, blocksEdgeReveal?() != true else { return }
+        if case .hidden = edgeReveal.phase, let p = pointer {
+            Self.edgeLog.notice("met x=\(Int(p.x), privacy: .public) y=\(Int(p.y), privacy: .public) speed=\(Int(speed), privacy: .public) w=\(Int(self.bounds.width), privacy: .public) screenEdge=\(self.windowMeetsScreenEdge, privacy: .public)")
+        }
         edgeReveal.met(at: time, speed: speed)
         guard edgeTimer == nil else { return }
         let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
@@ -1258,6 +1272,7 @@ final class BrowserRootView: SpaceFrameView {
             open = false
         }
         guard let open else { return }
+        Self.edgeLog.notice("decided \(open ? "open" : "stay hidden", privacy: .public) at x=\(Int(self.pointer?.x ?? -1), privacy: .public)")
         edgeTimer?.invalidate()
         edgeTimer = nil
         if open { reveal(true) } else { edgeReveal.dismiss() }
@@ -1319,6 +1334,8 @@ final class BrowserRootView: SpaceFrameView {
         let wasLeaving = edgeReveal.isLeaving
         let held = isHeld || NSEvent.pressedMouseButtons != 0
         if edgeReveal.follow(at: point, time: ProcessInfo.processInfo.systemUptime, in: edgeZone, held: held) {
+            let zone = edgeZone
+            Self.edgeLog.notice("tuck at x=\(Int(point.x), privacy: .public) y=\(Int(point.y), privacy: .public) keeps=\(zone.keeps(at: point), privacy: .public) past=\(zone.isPast(point), privacy: .public) sidebar=\(Int(zone.sidebar.minX), privacy: .public)-\(Int(zone.sidebar.maxX), privacy: .public) active=\(NSApp.isActive, privacy: .public)")
             reveal(false)
         } else if edgeReveal.isLeaving != wasLeaving {
             pacePointer()
@@ -1328,6 +1345,7 @@ final class BrowserRootView: SpaceFrameView {
     func reveal(_ show: Bool) {
         guard !sidebarVisible, show != sidebarRevealed else { return }
         if !show && isHeld { return }
+        Self.edgeLog.notice("reveal \(show ? "out" : "in", privacy: .public)")
         let old = sidebarContainer.frame
         #if DEBUG
         revealMeter.begin(show ? "out" : "in", in: self)
