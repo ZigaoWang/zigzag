@@ -110,6 +110,22 @@ nonisolated struct CertificateDetails: Equatable, Sendable {
         }
     }
 
+    /// The IP addresses a certificate is made out to (its subject alternative names that are addresses), as the
+    /// system writes them: "192.168.1.1", or an IPv6 one in full.
+    static func ipAddresses(of certificate: SecCertificate) -> [String] {
+        let oid = kSecOIDSubjectAltName
+        guard let values = SecCertificateCopyValues(certificate, [oid] as CFArray, nil) as? [String: Any],
+              let entry = values[oid as String] as? [String: Any],
+              let parts = entry[kSecPropertyKeyValue as String] as? [[String: Any]] else { return [] }
+        let allowed = CharacterSet(charactersIn: "0123456789abcdefABCDEF.:")
+        return parts.compactMap { part -> String? in
+            guard let label = part[kSecPropertyKeyLabel as String] as? String, label.localizedCaseInsensitiveContains("IP"),
+                  let value = part[kSecPropertyKeyValue as String] as? String, !value.isEmpty,
+                  value.unicodeScalars.allSatisfy(allowed.contains) else { return nil }
+            return value
+        }
+    }
+
     /// The SHA-256 fingerprint as the certificate page shows it: `perLine` pairs to a line, each line but the last
     /// ending on its colon, so no line starts with one.
     static func fingerprintLines(_ fingerprint: String, perLine: Int) -> String {

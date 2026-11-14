@@ -67,14 +67,45 @@ enum ErrorPage {
         // whatever was before it.
         let canGoBack = webView.url == nil ? false : webView.url == url ? webView.canGoBack : true
         let proxy = blamesProxy(kind, url: url) ? ProxyCheck.localProxy(for: url) : nil
+        let nonce = UUID().uuidString
         let page = html(error: error, url: url, canGoBack: canGoBack, proceedLink: proceed, noWayPast: proceed == nil ? noWayPast : nil, proxy: proxy,
-                        style: PageStyle.css(theme: Brand.Theme.for(webView)), nonce: UUID().uuidString)
+                        style: PageStyle.css(theme: Brand.Theme.for(webView)), nonce: nonce)
         if kind == .offline { OfflineRetry.wait(webView, for: url) } else { OfflineRetry.forget(webView) }
         // WebKit won't show anything at an address of an extension it doesn't have, so that page has none.
         if url.scheme == "webkit-extension" {
             webView.loadHTMLString(page, baseURL: nil)
         } else {
             webView.loadSimulatedRequest(URLRequest(url: url), responseHTML: page)
+        }
+        if kind == .certificate { checkIssuer(of: error, url: url, page: nonce, in: webView) }
+    }
+
+    /// Who signed a certificate is checked off the main thread (the system may take its time), after the page shows:
+    /// only where the answer changes what Details says, and then the reason there is filled in again.
+    private static func checkIssuer(of error: NSError, url: URL, page nonce: String, in webView: WKWebView) {
+        guard let chain = certificateChain(of: error), let facts = certificateFacts(of: chain, checkingIssuer: false) else { return }
+        var untrusted = facts
+        untrusted.issuerTrusted = false
+        let host = url.host(), code = error.code
+        let reason = certificateProblem(code: code, facts: untrusted, host: host)
+        guard reason != certificateProblem(code: code, facts: facts, host: host) else { return }
+        Task { [weak webView] in
+            let trusted = await Task.detached { issuerTrusted(chain, validFrom: facts.validFrom, validUntil: facts.validUntil) }.value
+            guard trusted == false, let webView else { return }
+            fillReason(certificateReason(reason), page: nonce, in: webView)
+        }
+    }
+
+    /// Puts `text` in the page's reason, once the page with this `nonce` is the one showing (it may still be on its
+    /// way): asked again a few times, then left.
+    private static func fillReason(_ text: String, page nonce: String, in webView: WKWebView, tries: Int = 30) {
+        let source = "const r = document.getElementById('why'); if (!r || r.dataset.page !== page) return false; r.textContent = text; return true;"
+        webView.callAsyncJavaScript(source, arguments: ["page": nonce, "text": text], in: nil, in: .page) { [weak webView] result in
+            guard (try? result.get()) as? Bool != true, tries > 1, let webView else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak webView] in
+                guard let webView else { return }
+                fillReason(text, page: nonce, in: webView, tries: tries - 1)
+            }
         }
     }
 
@@ -280,6 +311,8 @@ enum ErrorPage {
         var validUntil: Date?
         /// The addresses it's for: its DNS names, or its common name when it has none.
         var names: [String]
+        /// The IP addresses it's for (a router's, made out to 192.168.1.1).
+        var addresses: [String] = []
         /// Issued by itself, with nothing above it.
         var selfSigned: Bool
         /// Whether macOS trusts the certificates above it, its dates and its address aside; nil when it can't be told.
@@ -291,8 +324,10 @@ enum ErrorPage {
     /// site that forgot to renew, or a Mac whose clock is off), then who signed it.
     nonisolated static func certificateProblem(code: Int, facts: CertificateFacts?, host: String?, now: Date = Date()) -> CertificateProblem {
         if let facts {
-            if let host, !host.isEmpty, !facts.names.isEmpty, !certificateNames(facts.names, cover: host) {
-                return .wrongHost(facts.names.first)
+            // One the site signed itself says so before anything else: anyone could make one for any address, so
+            // the address it names tells nothing (a router's, made out to router.local and reached by its address).
+            if let host, !host.isEmpty, !facts.selfSigned, !certificate(facts, covers: host) {
+                return .wrongHost(facts.names.first ?? facts.addresses.first)
             }
             if let until = facts.validUntil, until < now { return .expired(until) }
             if let from = facts.validFrom, from > now { return .notYetValid(from) }
@@ -305,6 +340,25 @@ enum ErrorPage {
         case NSURLErrorServerCertificateHasUnknownRoot: return .untrustedIssuer
         default: return .unknown
         }
+    }
+
+    /// Whether the certificate is for `host`: an address by the IP addresses it names (or its common name, when
+    /// that's one), a name by its names. One that names nothing can't be told, and counts.
+    nonisolated static func certificate(_ facts: CertificateFacts, covers host: String) -> Bool {
+        guard !facts.names.isEmpty || !facts.addresses.isEmpty else { return true }
+        if let address = ipBytes(host) { return (facts.addresses + facts.names).contains { ipBytes($0) == address } }
+        return !facts.names.isEmpty && certificateNames(facts.names, cover: host)
+    }
+
+    /// An IP address's bytes, 4 or 16, when the text is one (an IPv6 one in brackets too).
+    nonisolated static func ipBytes(_ text: String) -> [UInt8]? {
+        var text = text.trimmingCharacters(in: .whitespaces)
+        if text.hasPrefix("["), text.hasSuffix("]") { text = String(text.dropFirst().dropLast()) }
+        var v4 = in_addr()
+        if inet_pton(AF_INET, text, &v4) == 1 { return withUnsafeBytes(of: &v4) { Array($0) } }
+        var v6 = in6_addr()
+        if inet_pton(AF_INET6, text, &v6) == 1 { return withUnsafeBytes(of: &v6) { Array($0) } }
+        return nil
     }
 
     /// Whether a certificate made out to `names` is for `host`: one of them is it, or a wildcard (`*.example.com`)
@@ -325,36 +379,46 @@ enum ErrorPage {
     }
 
     /// Reads the certificate out of a certificate error: from the trust WebKit gives with it, or the chain.
-    static func certificateFacts(of error: NSError) -> CertificateFacts? {
+    /// `checkingIssuer: false` leaves who signed it unknown, which takes the system a while to tell.
+    static func certificateFacts(of error: NSError, checkingIssuer: Bool = true) -> CertificateFacts? {
+        certificateChain(of: error).flatMap { certificateFacts(of: $0, checkingIssuer: checkingIssuer) }
+    }
+
+    /// The certificates that came with a certificate error, the site's own first.
+    static func certificateChain(of error: NSError) -> [SecCertificate]? {
         let key = NSURLErrorFailingURLPeerTrustErrorKey
         let value = error.userInfo[key] ?? (error.userInfo[NSUnderlyingErrorKey] as? NSError)?.userInfo[key]
         if let value, CFGetTypeID(value as CFTypeRef) == SecTrustGetTypeID(),
            let chain = SecTrustCopyCertificateChain(value as! SecTrust) as? [SecCertificate] {
-            return certificateFacts(of: chain)
+            return chain
         }
-        if let chain = error.userInfo["NSErrorPeerCertificateChainKey"] as? [SecCertificate] { return certificateFacts(of: chain) }
-        return nil
+        return error.userInfo["NSErrorPeerCertificateChainKey"] as? [SecCertificate]
     }
 
     /// The site's certificate's dates, names and signer, from its chain (the site's own first). Who signed it is
-    /// checked again here, on this Mac only and on a day the certificate was valid, so an expired one from an
-    /// authority your Mac trusts reads as trusted.
-    nonisolated static func certificateFacts(of chain: [SecCertificate]) -> CertificateFacts? {
+    /// checked again here (`issuerTrusted`), unless `checkingIssuer` is false.
+    nonisolated static func certificateFacts(of chain: [SecCertificate], checkingIssuer: Bool = true) -> CertificateFacts? {
         guard let leaf = chain.first else { return nil }
         let summary = CertificateDetails.summary(leaf)
         var names = CertificateDetails.dnsNames(of: leaf)
         if names.isEmpty, !summary.name.isEmpty, !summary.name.contains(" ") { names = [summary.name] }
-        var issuerTrusted: Bool?
-        var check: SecTrust?
-        if SecTrustCreateWithCertificates(chain as CFArray, SecPolicyCreateBasicX509(), &check) == errSecSuccess, let check {
-            SecTrustSetNetworkFetchAllowed(check, false)
-            if let from = summary.validFrom, let until = summary.validUntil, from < until {
-                SecTrustSetVerifyDate(check, from.addingTimeInterval(until.timeIntervalSince(from) / 2) as CFDate)
-            }
-            issuerTrusted = SecTrustEvaluateWithError(check, nil)
-        }
+        let trusted = checkingIssuer ? issuerTrusted(chain, validFrom: summary.validFrom, validUntil: summary.validUntil) : nil
         return CertificateFacts(validFrom: summary.validFrom, validUntil: summary.validUntil, names: names,
-                                selfSigned: summary.isSelfSigned && chain.count == 1, issuerTrusted: issuerTrusted)
+                                addresses: CertificateDetails.ipAddresses(of: leaf),
+                                selfSigned: summary.isSelfSigned && chain.count == 1, issuerTrusted: trusted)
+    }
+
+    /// Whether macOS trusts who signed the chain, on this Mac only (nothing fetched) and on a day the certificate was
+    /// valid, so an expired one from an authority your Mac trusts reads as trusted. It can wait on the system: never
+    /// asked on the main thread.
+    nonisolated static func issuerTrusted(_ chain: [SecCertificate], validFrom: Date?, validUntil: Date?) -> Bool? {
+        var check: SecTrust?
+        guard SecTrustCreateWithCertificates(chain as CFArray, SecPolicyCreateBasicX509(), &check) == errSecSuccess, let check else { return nil }
+        SecTrustSetNetworkFetchAllowed(check, false)
+        if let from = validFrom, let until = validUntil, from < until {
+            SecTrustSetVerifyDate(check, from.addingTimeInterval(until.timeIntervalSince(from) / 2) as CFDate)
+        }
+        return SecTrustEvaluateWithError(check, nil)
     }
 
     private static let certificateDates: DateFormatter = {
@@ -409,8 +473,9 @@ enum ErrorPage {
             #"<button class="button\#(i == 0 ? " prominent" : "")" data-action="\#(name(of: action))">\#(escape(self.title(of: action)))</button>"#
         }.joined()
         let noWay = kind == .certificate && proceedLink == nil ? noWayPast.map { #"<p class="why">\#(escape($0.text))</p>"# } ?? "" : ""
-        let problem = kind == .certificate ? certificateProblem(code: error.code, facts: certificateFacts(of: error), host: url.host()) : nil
-        let reason = problem.map { #"<p class="why">\#(escape(certificateReason($0)))</p>"# + noWay } ?? ""
+        // Who signed it is left for later (`checkIssuer`): the page never waits on it.
+        let problem = kind == .certificate ? certificateProblem(code: error.code, facts: certificateFacts(of: error, checkingIssuer: false), host: url.host()) : nil
+        let reason = problem.map { #"<p class="why" id="why" data-page="\#(escape(nonce))">\#(escape(certificateReason($0)))</p>"# + noWay } ?? ""
         let anyway = proceedLink.map {
             #"<a class="anyway" href="\#(escape($0.absoluteString))">\#(escape(String(localized: "Visit this site anyway", comment: "Link on the page Zigzag shows for a site whose certificate can't be trusted, under Show details.")))</a>"#
         } ?? ""
