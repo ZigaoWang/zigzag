@@ -1062,6 +1062,8 @@ final class Tab: NSObject {
         // Settings likewise: the picture is of what covers the page, not the empty page under it.
         if let image = pdfViewer.flatMap({ $0.window != nil ? $0.snapshot() : nil }) ?? settingsView.flatMap({ $0.window != nil ? $0.snapshot() : nil }) {
             snapshot = image
+            // In the window's look, as what covers the page draws.
+            snapshotIsDark = webView.window?.effectiveAppearance.isDark
             if keep, !isPrivate { SnapshotStore.save(image, for: id) }
             changed.send(.snapshot)
             completion?()
@@ -1129,10 +1131,14 @@ final class Tab: NSObject {
         // A moment in the window first, for it to draw.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self, weak webView] in
             guard let self, let webView, webView.window != nil else { letGo(); completion(); return }
+            // The look the page was drawn in, read while it's in the window: its own (Dark Pages sets one), or
+            // without one the window's, which it no longer has once let go.
+            let dark = webView.effectiveAppearance.isDark
             webView.takeSnapshot(with: config) { [weak self] image, _ in
                 letGo()
                 if let self, let image, !TabThumbnailView.isBlank(image) {
                     self.snapshot = image
+                    self.snapshotIsDark = dark
                     if !self.isPrivate { SnapshotStore.save(image, for: self.id) }
                     self.changed.send(.snapshot)
                 }
@@ -1153,7 +1159,13 @@ final class Tab: NSObject {
         takenDark.map { $0 != dark } ?? false
     }
 
-    func snapshotIsStale(dark: Bool) -> Bool { Self.pictureIsStale(takenDark: snapshotIsDark, dark: dark) }
+    /// Against the look the tab draws in now: a page its own (the app's light or dark, or Dark Pages'), whatever the
+    /// window's (a private window is always dark); Settings or the PDF viewer over it, the window's, `windowDark`.
+    func snapshotIsStale(windowDark: Bool) -> Bool {
+        let covered = pdfViewer != nil || settingsView != nil
+        let dark = covered ? windowDark : webView?.effectiveAppearance.isDark ?? windowDark
+        return Self.pictureIsStale(takenDark: snapshotIsDark, dark: dark)
+    }
 
     /// Saves the picture last taken in memory only, so it's there after a relaunch.
     func keepSnapshot() {

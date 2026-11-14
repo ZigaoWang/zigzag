@@ -1502,7 +1502,9 @@ enum DebugBridge {
             // Settings shows over it (JSON).
             let json = controller.tabManager.allTabs.map { tab -> [String: Any] in
                 ["title": tab.displayTitle, "url": tab.url?.absoluteString ?? "", "page": tab.webView?.url?.absoluteString ?? "",
-                 "settings": tab.settingsView != nil, "loading": tab.isLoading, "selected": tab === controller.tabManager.selectedTab]
+                 "settings": tab.settingsView != nil, "loading": tab.isLoading, "selected": tab === controller.tabManager.selectedTab,
+                 "picture": tab.snapshot != nil, "pictureDark": tab.snapshotIsDark.map { $0 ? "dark" : "light" } ?? "unknown",
+                 "pictureStale": tab.snapshotIsStale(windowDark: controller.root.effectiveAppearance.isDark)]
             }
             if let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "back": controller.tabManager.selectedTab?.goBack()
