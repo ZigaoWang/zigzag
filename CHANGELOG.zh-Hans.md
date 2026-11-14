@@ -28,7 +28,6 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - AI 应用可以等网页准备好，也可以在网页里按键。`wait_for` 会等到某段文字或某个元素出现或消失，或者网页载入完成，最多等 30 秒；标签页关闭、载入别的网页，或你点了“停止”时，就不再等。`press_key` 会像你的键盘一样按下 Return、Esc、Tab、方向键等按键，所以 Return 会提交表单，Tab 会移到下一个栏位；按键只会到网页里，不会触发 Zigzag 的快捷键，也不会在密码栏里键入。([#214](https://github.com/ZigaoWang/zigzag/issues/214))
 - 从 Arc 导入时也会带上每个空间打开的标签页，顺序和 Arc 里一样，分屏浏览的页面仍然并排。它们要等你点按才载入，几百个标签页不会一下子全部载入，再次导入也不会把同一个标签页打开两次。导入窗口里“空间和固定标签页”旁边的“打开的标签页”可以不导入它们。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
 - 边栏底部的空间图标变大了，并跟随“设置 › 外观 › 边栏大小”：“中”比以前稍大一些，“大”明显更大。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
-- 标签页延伸到边栏底部栏下面时，底部栏上方会出现一条淡淡的线，和滚动边缘一样。感谢 [alextend](https://github.com/alextend)。([#210](https://github.com/ZigaoWang/zigzag/issues/210))
 - “设置 › 隐私”（有多份个人资料时是“网站数据”）里的“网站存储的数据”，标题旁边新增了搜索，边输入边找到网站，匹配的部分会标出来，找不到时也会说明。每个网站会显示它存储了多少数据，列表可以按名称或大小排序，“全部移除…”会在确认后清除所有网站的数据，搜索时只清除显示的网站。要移除单个网站，把指针移到它那一行，点按出现的废纸篓，和其他设置行一样。 ([#207](https://github.com/ZigaoWang/zigzag/issues/207))
 - “设置 › 开发者”的最后新增“功能标志”，像 Safari 的“开发 › 功能标志”一样，列出这台 Mac 上 WebKit 提供的功能标志：每个都有开关、WebKit 给它的名字和一行说明，分在“稳定”“预览”“可测试”和“开发者”下面，“成熟”“不稳定”和“内部”收在“全部显示”里，还可以按名字或键搜索。只有你改过的功能标志会被记下，并标上“已更改”，其他的都跟随 WebKit 的默认设置；“恢复默认设置”会把它们全部还原。更改会应用到之后打开或重新载入的页面，旁边有“重新载入所有标签页”。开发者模式打开时才会显示。感谢 [micsama](https://github.com/micsama) 提出这个想法，感谢 [vandenbulckjean](https://github.com/vandenbulckjean) 做的开发者设置。([#173](https://github.com/ZigaoWang/zigzag/issues/173))
 - 发行说明跟随 App 的语言；0.9.0 及之前的几个版本有了中文发行说明。

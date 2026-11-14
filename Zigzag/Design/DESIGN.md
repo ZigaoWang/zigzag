@@ -30,8 +30,8 @@ to touch. Warm and friendly, never techy: no monospace, no capitals for effect, 
   separate warm or orange accent anywhere.
 - **Small details that work:** the space dots, the one you're in stretched into a short pill; the selected card's top edge catching the light by one pixel at night (`Chrome.rim`, `setCardRim`; by day the card is too near white for a lit edge to read at 1x, so it has none); a
   hairline under the toolbar only while the list is scrolled under it.
-- **Scroll edges in the sidebar** (`Color.separator`, 12pt in from each side): a hairline on the list's top edge only
-  while it's scrolled, and one at its foot over the bottom bar only while tabs run on under it. Nothing divides the
+- **Scroll edge in the sidebar** (`Color.separator`, 12pt in from each side): a hairline on the list's top edge only
+  while it's scrolled. Tabs running on under the bottom bar fade out instead of meeting a line. Nothing divides the
   favorites from the list; the space between them does.
 - **Edges.** The sidebar has three, and everything sits on one of them: the container edge (6pt: the address field,
   the favorites, the cards), the icon column (12pt: the traffic lights, the address's host, every icon, the

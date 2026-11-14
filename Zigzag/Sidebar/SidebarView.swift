@@ -809,9 +809,6 @@ final class SidebarView: NSView {
     }
     /// A hairline on the list's top edge, only while the list is scrolled under it, as a scroll edge does on the Mac.
     private let topSeparator = ColorView(color: Tokens.Color.separator)
-    /// A hairline at the list's foot, over the bottom bar, only while tabs run on under it, as a scroll edge does
-    /// on the Mac (#210).
-    private let bottomSeparator = ColorView(color: Tokens.Color.separator)
     /// Width reserved on the left of the top row for the traffic lights.
     var trafficLightsWidth: CGFloat = 52 { didSet { needsLayout = true } }
     /// The sidebar is on the window's right: its toggle's glyph shows that, and while the bar above the page holds the
@@ -879,10 +876,8 @@ final class SidebarView: NSView {
         addSubview(panes.right.scroll)
         topSeparator.alphaValue = 0
         addSubview(topSeparator)
-        bottomSeparator.alphaValue = 0
-        addSubview(bottomSeparator)
         NotificationCenter.default.addObserver(self, selector: #selector(listScrolled), name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
-        // Tabs opened or closed: the hairline over the bottom bar shows only while some run on under it.
+        // Tabs opened or closed: the fade at the list's foot shows only while some run on under it.
         list.postsFrameChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(listScrolled), name: NSView.frameDidChangeNotification, object: list)
 
@@ -967,22 +962,24 @@ final class SidebarView: NSView {
     /// The top row across the sidebar's width, x only: the toggle, and back, forward and reload, in that order.
     /// The toggle sits right after the traffic lights, where Arc and Safari put it, its glyph `Sidebar.lightsGap`
     /// after them (the button's own padding inside that); without them (full screen) it starts the row,
-    /// `Sidebar.edge` in. Back, forward and reload are at the trailing end, their glyphs a button apart, reload's ink
-    /// as far from the sidebar's edge as the lights' from the other. A sidebar on the right has the same row, the
+    /// `Sidebar.edge` in. Back, forward and reload are at the trailing end, their glyphs a button apart, reload centered
+    /// over the address field's Site Controls button. A sidebar on the right has the same row, the
     /// lights at its left end, as Arc's has (#166).
     /// `mirrored` (on the right, with the bar above the page holding the address and the lights): the mirror image,
-    /// the toggle at the sidebar's outer (right) end, where the bar keeps it while the sidebar is hidden, and back's
-    /// ink (when they're there) as far from the left edge as reload's is from the right one on the left.
+    /// the toggle at the sidebar's outer (right) end, where the bar keeps it while the sidebar is hidden, and back
+    /// (when they're there) where reload is on the left, mirrored.
     static func topRowFrames(width: CGFloat, trafficLightsWidth: CGFloat, onRight: Bool, mirrored: Bool = false) -> (toggle: NSRect, buttons: [NSRect]) {
         let b = toolbarButton, pad = Tokens.Sidebar.edge
         func at(_ x: CGFloat) -> NSRect { NSRect(x: x, y: 0, width: b, height: b) }
+        // Reload stands right over the Site Controls button at the address field's end, centered on it, as the lights
+        // stand over the lock at its start.
+        let controlsMid = width - pad - AddressView.buttonInset - AddressView.buttonSide / 2
+        let x = round(controlsMid - b / 2)
         if mirrored {
-            let backInk = Tokens.Symbol.inkSize("chevron.left", size: Tokens.Sidebar.glyph).width
-            let x = round(trafficLightsX + backInk / 2 - b / 2)
-            return (at(width - pad - b), (0..<3).map { at(x + CGFloat($0) * b) })
+            // Back where reload is on the left, mirrored.
+            let back = width - (x + b)
+            return (at(width - pad - b), (0..<3).map { at(back + CGFloat($0) * b) })
         }
-        let reloadInk = Tokens.Symbol.inkSize("arrow.clockwise", size: Tokens.Sidebar.glyph).width
-        let x = round(width - trafficLightsX - reloadInk / 2 - b / 2)
         let glyph = Tokens.Symbol.inkSize(toggleSymbol(onRight: onRight), size: Tokens.Sidebar.glyph).width
         let lead = trafficLightsWidth > 0 ? round(trafficLightsX + trafficLightsWidth + Tokens.Sidebar.lightsGap - (b - glyph) / 2) : pad
         return (at(lead), (0..<3).map { at(x - CGFloat(2 - $0) * b) })
@@ -1028,7 +1025,6 @@ final class SidebarView: NSView {
         let listBottom = frames.listBottom
         scrollView.frame = NSRect(x: pad + swipeOffset, y: listTop, width: width - pad * 2, height: listBottom - listTop)
         topSeparator.frame = NSRect(x: pad * 2, y: listTop - Tokens.Metric.hairline, width: width - pad * 4, height: Tokens.Metric.hairline)
-        bottomSeparator.frame = NSRect(x: pad * 2, y: listBottom, width: width - pad * 4, height: Tokens.Metric.hairline)
         updateTopSeparator()
         if list.frame.width != scrollView.contentSize.width {
             list.setFrameSize(NSSize(width: scrollView.contentSize.width, height: max(list.frame.height, scrollView.contentSize.height)))
@@ -1040,10 +1036,6 @@ final class SidebarView: NSView {
 
     private func updateBottomFade() {
         Self.fade(bottomFade, for: scrollView, list: list)
-        let under = list.contentHeight - scrollView.contentView.bounds.maxY > 1
-        if (bottomSeparator.alphaValue > 0) != under {
-            Tokens.Motion.animate(Tokens.Motion.feedback) { self.bottomSeparator.animator().alphaValue = under ? 1 : 0 }
-        }
     }
 
     /// Tabs running on below the bottom of a list fade out there. Only the bottom: the top holds the space's name,

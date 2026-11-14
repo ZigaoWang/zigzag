@@ -181,12 +181,12 @@ struct SidebarSideTests {
         func flipped(_ rect: NSRect) -> CGFloat { width - rect.maxX }
         // The toggle at the outer end, as far in as it is from the left edge on the left.
         #expect(flipped(right.toggle) == left.toggle.minX)
-        // Back, forward and reload toward the page, in reading order, a button apart, back's ink as far from the left
-        // edge as reload's from the right one on the left.
+        // Back, forward and reload toward the page, in reading order, a button apart, back where reload is on the
+        // left, mirrored; and reload on the left centered over the address field's Site Controls button.
         #expect(right.buttons[1].minX == right.buttons[0].maxX && right.buttons[2].minX == right.buttons[1].maxX)
-        let backInk = Tokens.Symbol.inkSize("chevron.left", size: Tokens.Sidebar.glyph).width
-        let reloadInk = Tokens.Symbol.inkSize("arrow.clockwise", size: Tokens.Sidebar.glyph).width
-        #expect(abs((right.buttons[0].midX - backInk / 2) - (width - left.buttons[2].midX - reloadInk / 2)) <= 1)
+        #expect(right.buttons[0].minX == width - left.buttons[2].maxX)
+        let controlsMid = width - Tokens.Sidebar.edge - AddressView.buttonInset - AddressView.buttonSide / 2
+        #expect(abs(left.buttons[2].midX - controlsMid) <= 0.5)
         #expect(right.buttons[2].maxX < right.toggle.minX && right.toggle.width == b)
     }
 
