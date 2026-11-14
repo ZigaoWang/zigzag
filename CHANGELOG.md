@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- Web apps hear their keyboard shortcuts before Zigzag's menus, as in Safari and Chrome: ⌘A and ⌘B in Google Docs, ⌘K in Slack, Linear and Notion, ⌘[ to indent, and the rest. Only the browser's own keys stay Zigzag's whatever the page wants (new and closed tabs, windows, the address, reload, spaces, quitting), and shortcuts you changed in Settings › Shortcuts stay the browser's on their new keys. ([#219](https://github.com/ZigaoWang/zigzag/issues/219))
+
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.

@@ -117,21 +117,54 @@ final class BrowserWindow: NSWindow {
                 return true
             }
         }
-        // A page's own shortcuts come first, as in Safari: ⌘A selects all in Google Docs' own editor, ⌘S commits in
-        // GitHub's editor, ⌘F searches a document, ⌘D duplicates in a design tool. When the page lets the key pass, WebKit sends it again and the menu takes it.
-        if let key = event.charactersIgnoringModifiers?.lowercased(), Self.pageFirst.contains(where: { $0.key == key && $0.mods == mods }),
-           let view = firstResponder as? NSView, Self.isInPage(view) {
+        // A page's own shortcuts come first, as in Safari and Chrome: ⌘A and ⌘B in Google Docs, ⌘K in Slack, Linear
+        // and Notion, ⌘S in GitHub's editor, ⌘D in a design tool. Only the browser's own keys (tabs, windows, the
+        // address, reload, quitting) stay Zigzag's whatever the page wants, by what they do, so a shortcut you
+        // changed in Settings › Shortcuts stays the browser's on its new keys. When the page lets a key pass, WebKit
+        // sends it again and the menu takes it.
+        if mods.contains(.command), let view = firstResponder as? NSView, Self.isInPage(view),
+           !Self.browserKeeps(event, in: NSApp.mainMenu) {
             return super.performKeyEquivalent(with: event)
         }
+
         if let menu = NSApp.mainMenu, menu.performKeyEquivalent(with: event) { return true }
         return super.performKeyEquivalent(with: event)
     }
 
-    /// Shortcuts a web app may use for its document. Tabs, windows and getting around (⌘T, ⌘W, ⌘L, ⌘R…) always stay Zigzag's.
-    private static let pageFirst: [(key: String, mods: NSEvent.ModifierFlags)] = [
-        ("a", .command), ("s", .command), ("p", .command), ("f", .command), ("g", .command), ("g", [.command, .shift]),
-        ("e", .command), ("j", .command), ("d", .command),
+    /// What the browser keeps for itself whatever a page wants: tabs, windows, spaces, the address, reload and stop,
+    /// quitting and hiding, the sidebar and the tab overview, and Zigzag's own windows. Everything else a page may use
+    /// for its document first, as in Safari and Chrome.
+    static let browserActions: Set<String> = [
+        "showSettings:", "showPasswords:", "hide:", "hideOtherApplications:", "terminate:",
+        "newTab:", "newWindow:", "newPrivateWindow:", "openLocation:", "closeTab:", "closeOtherTabs:", "performClose:",
+        "reopenClosedTab:", "selectNextTab:", "selectPreviousTab:", "selectTabByNumber:", "selectLastTab:",
+        "selectSpaceByNumber:", "showSpaceSwitcher:", "newSpace:", "reloadPage:", "reloadPageFromOrigin:", "stopLoading:",
+        "performMiniaturize:", "toggleFullScreen:", "toggleBrowserSidebar:", "toggleDeskView:", "showWebInspector:",
+        "showDownloads:", "showHistory:", "hideWebApp:", "quitWebApp:",
     ]
+
+    /// Whether the menu item these keys belong to is one the browser keeps (`browserActions`). Keys no item has are
+    /// the page's.
+    static func browserKeeps(_ event: NSEvent, in menu: NSMenu?) -> Bool {
+        guard let menu, let pressed = Shortcuts.combo(from: event) else { return false }
+        func combo(of item: NSMenuItem) -> Shortcuts.Combo? {
+            guard !item.keyEquivalent.isEmpty else { return nil }
+            var key = item.keyEquivalent
+            var flags = item.keyEquivalentModifierMask.intersection([.command, .option, .control, .shift])
+            // An uppercase letter means ⇧, as a menu reads it.
+            if key.count == 1, key.lowercased() != key { key = key.lowercased(); flags.insert(.shift) }
+            return Shortcuts.Combo(key: key, modifiers: flags.rawValue)
+        }
+        func walk(_ menu: NSMenu) -> NSMenuItem? {
+            for item in menu.items {
+                if let sub = item.submenu, let found = walk(sub) { return found }
+                if combo(of: item) == pressed { return item }
+            }
+            return nil
+        }
+        guard let item = walk(menu), let action = item.action else { return false }
+        return browserActions.contains(NSStringFromSelector(action))
+    }
 
     private static func isInPage(_ view: NSView) -> Bool {
         var view: NSView? = view
