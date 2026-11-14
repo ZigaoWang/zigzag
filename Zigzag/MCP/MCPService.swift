@@ -1,4 +1,5 @@
 import AppKit
+import CryptoKit
 
 /// Settings › Automation › Let AI apps use Zigzag: an MCP server on this Mac only, off until you turn it
 /// on. Off, nothing listens at all. On, apps that have its key can list, open, read and use your tabs.
@@ -71,11 +72,37 @@ enum MCPService {
         server.start()
     }
 
-    /// Something else listens where apps send the key: the key changes, so one it was given there opens nothing here.
-    static func replaceKeyForBusyPort(_ endpoint: MCPEndpoint, keyFile: URL = MCPKeyFile.url) {
+    /// Something else listens where apps send the key: an app connecting there hands it the key, so the key
+    /// changes and one sent there opens nothing here. Only when that key may have reached an app, though: one made
+    /// for a taken port and not yet copied from Settings can't have been sent anywhere, so a port that stays taken
+    /// launch after launch doesn't make a new key every time (and leave apps given the last one locked out for
+    /// nothing). Returns whether the key changed.
+    @discardableResult
+    static func replaceKeyForBusyPort(_ endpoint: MCPEndpoint, keyFile: URL = MCPKeyFile.url, defaults: UserDefaults = .standard) -> Bool {
+        replacedKeyForBusyPort = true
+        guard keyMayHaveReachedApps(MCPKeyFile.token(at: keyFile, creating: false), defaults: defaults) else { return false }
         let new = MCPKeyFile.reset(at: keyFile) ?? ""
         endpoint.setToken(new)
-        replacedKeyForBusyPort = true
+        defaults.set(fingerprint(new), forKey: unsharedKey)
+        return true
+    }
+
+    /// The fingerprint of the key made for a taken port, until it's copied from Settings. Only a fingerprint: the
+    /// key itself stays in its file.
+    private static let unsharedKey = "MCPKeyNotHandedOut"
+
+    /// Whether apps may have the key: unless it's the one made for a taken port and never copied since. A key
+    /// Zigzag knows nothing about (made before, or reset by hand) may have been handed out.
+    static func keyMayHaveReachedApps(_ token: String?, defaults: UserDefaults = .standard) -> Bool {
+        guard let token, !token.isEmpty else { return false }
+        return defaults.string(forKey: unsharedKey) != fingerprint(token)
+    }
+
+    /// The key is copied from Settings for an app: from now on it may be anywhere that app sends it.
+    static func noteKeyHandedOut(defaults: UserDefaults = .standard) { defaults.removeObject(forKey: unsharedKey) }
+
+    private static func fingerprint(_ token: String) -> String {
+        SHA256.hash(data: Data(token.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
     }
 
     private static func stop() {
@@ -102,8 +129,12 @@ enum MCPService {
         }
     }
 
-    /// The key apps send, made the first time it's needed.
-    static var token: String { MCPKeyFile.token(creating: true) ?? "" }
+    /// The key apps send, made the first time it's needed. Read only to copy it for an app (Settings), so reading
+    /// it counts as handing it out.
+    static var token: String {
+        noteKeyHandedOut()
+        return MCPKeyFile.token(creating: true) ?? ""
+    }
 
     static var authorizationHeader: String { "Authorization: Bearer \(token)" }
 

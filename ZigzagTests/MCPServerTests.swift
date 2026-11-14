@@ -493,10 +493,21 @@ extension MCPServerTests {
 
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("mcp-key-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: file) }
+        let suite = "mcp-key-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let old = try #require(MCPKeyFile.token(at: file, creating: true))
         let endpoint = endpoint()
-        await MCPService.replaceKeyForBusyPort(endpoint, keyFile: file)
+        #expect(MCPService.replaceKeyForBusyPort(endpoint, keyFile: file, defaults: defaults))
         let new = try #require(MCPKeyFile.token(at: file, creating: false))
-        #expect(new != Self.token)
+        #expect(new != old)
         #expect(await endpoint.handle(post(Self.initialize)).status == 401)
+        // Still taken at the next launch: the new key was never handed out, so it stays.
+        #expect(!MCPService.replaceKeyForBusyPort(endpoint, keyFile: file, defaults: defaults))
+        #expect(MCPKeyFile.token(at: file, creating: false) == new)
+        // Once it's copied for an app, a taken port replaces it again.
+        MCPService.noteKeyHandedOut(defaults: defaults)
+        #expect(MCPService.replaceKeyForBusyPort(endpoint, keyFile: file, defaults: defaults))
+        #expect(MCPKeyFile.token(at: file, creating: false) != new)
     }
 }
