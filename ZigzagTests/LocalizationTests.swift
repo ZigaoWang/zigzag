@@ -82,6 +82,31 @@ struct LocalizationTests {
         #expect(found.isEmpty, "Not localizable:\n\(found.joined(separator: "\n"))")
     }
 
+    /// Sentences are joined as their language spaces them: no space after a full-width stop, one after an English one.
+    @MainActor @Test func sentencesJoinWithoutASpaceAfterAFullWidthStop() {
+        #expect(Words.sentences("图片和视频保持原样。", "使用 Dark Reader。") == "图片和视频保持原样。使用 Dark Reader。")
+        #expect(Words.sentences("绝不替你同意！", "使用 Autoconsent。") == "绝不替你同意！使用 Autoconsent。")
+        #expect(Words.sentences("Never says yes.", "Uses Autoconsent.") == "Never says yes. Uses Autoconsent.")
+        #expect(Words.sentences("", "Uses Autoconsent.") == "Uses Autoconsent.")
+        #expect(Words.sentences("Never says yes.", nil) == "Never says yes.")
+    }
+
+    /// Two localized sentences are never glued with a plain space in code: `Words.sentences` spaces them.
+    @Test func noSentencesGluedWithASpace() {
+        let pattern = try! NSRegularExpression(pattern: #"\+\s*" "\s*\+\s*String\(localized:"#)
+        let root = Self.repo.appendingPathComponent("Zigzag")
+        let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?.compactMap { $0 as? URL } ?? []
+        var found: [String] = []
+        for url in files where url.pathExtension == "swift" {
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            for (i, line) in text.components(separatedBy: "\n").enumerated()
+            where pattern.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil {
+                found.append("\(url.lastPathComponent):\(i + 1)")
+            }
+        }
+        #expect(found.isEmpty, "Use Words.sentences:\n\(found.joined(separator: "\n"))")
+    }
+
     // MARK: Simplified Chinese
 
     /// The built app's Chinese, as String(localized:) finds it when Zigzag runs in Simplified Chinese.

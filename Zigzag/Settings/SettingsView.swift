@@ -160,7 +160,8 @@ final class FormRow: NSView, SettingsSearchable {
     private weak var deleteButton: InteractiveView?
     private var hoverArea: NSTrackingArea?
     private var isHovered = false { didSet { if oldValue != isHovered { refreshDelete() } } }
-    var searchText: String { [title.stringValue, detail.stringValue, keywords].joined(separator: " ") }
+    /// Without the word joiners a translation keeps a word on one line with (开\u{2060}启), so typing the word finds it.
+    var searchText: String { [title.stringValue, detail.stringValue, keywords].joined(separator: " ").replacingOccurrences(of: "\u{2060}", with: "") }
     /// More words "Find a setting" knows the row by, like its button's.
     var keywords = ""
     /// The line under its title, which can change while it shows (an address, what went wrong).
@@ -1260,9 +1261,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         // Dark Reader's license asks for its notice, which is in Acknowledgments; this is where people look for what
         // draws pages dark.
-        let darkDetail = String(localized: "Websites without a dark look of their own are drawn dark. Pictures and video stay as they are.",
-                                comment: "Explanation under “Dark pages” in Settings › Appearance.")
-            + " " + String(localized: "Uses Dark Reader, by Dark Reader Ltd.", comment: "After the explanation under “Dark pages” in Settings › Appearance. Dark Reader is the name of the open-source dark mode engine, Dark Reader Ltd. its maker: keep both as they are.")
+        let darkDetail = Words.sentences(String(localized: "Websites without a dark look of their own are drawn dark. Pictures and video stay as they are.",
+                                                comment: "Explanation under “Dark pages” in Settings › Appearance."),
+                                         String(localized: "Uses Dark Reader, by Dark Reader Ltd.", comment: "After the explanation under “Dark pages” in Settings › Appearance. Dark Reader is the name of the open-source dark mode engine, Dark Reader Ltd. its maker: keep both as they are."))
         let darkRow = FormRow(title: String(localized: "Dark pages", comment: "A setting in Settings › Appearance: websites without a dark look of their own are drawn dark."),
                               detail: darkDetail, control: darkPages)
         darkRow.keywords = String(localized: "dark mode light appearance night theme black invert", comment: "Words that find the Dark pages setting with Find a setting in Settings. Not shown.")
@@ -2132,9 +2133,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                   detail: detail, control: blockingToggle))
         // Autoconsent's license is in Acknowledgments; this is where people look for what answers the pop-ups.
         cookieBanners.selectedIndex = CookieBanners.Mode.allCases.firstIndex(of: CookieBanners.mode) ?? 0
-        let bannersDetail = String(localized: "Says no to the cookies a site’s pop-up asks for, or hides a pop-up that only needs hiding. Never says yes.",
-                                   comment: "Explanation under “Cookie banners” in Settings › Privacy.")
-            + " " + String(localized: "Uses Autoconsent, by DuckDuckGo.", comment: "After the explanation under “Cookie banners” in Settings › Privacy. Autoconsent is the name of DuckDuckGo's open-source library: keep both names as they are.")
+        let bannersDetail = Words.sentences(String(localized: "Says no to the cookies a site’s pop-up asks for, or hides a pop-up that only needs hiding. Never says yes.",
+                                                   comment: "Explanation under “Cookie banners” in Settings › Privacy."),
+                                            String(localized: "Uses Autoconsent, by DuckDuckGo.", comment: "After the explanation under “Cookie banners” in Settings › Privacy. Autoconsent is the name of DuckDuckGo's open-source library: keep both names as they are."))
         let bannersRow = FormRow(title: String(localized: "Cookie banners", comment: "A setting in Settings › Privacy: what Zigzag does with a site's cookie consent pop-up."),
                                  detail: bannersDetail, control: cookieBanners)
         bannersRow.keywords = String(localized: "cookies consent gdpr pop-up popup notice reject accept privacy banner", comment: "Words that find the Cookie banners setting with Find a setting in Settings. Not shown.")

@@ -197,7 +197,7 @@ final class ImportView: NSView {
         choiceLabel.isHidden = !showsChoices
         let extensionsPill = choiceButtons.first { $0.0 == .extensions }?.1
         let otherStores = extensionsPill.map { !$0.isHidden && $0.isOn } == true && rows.contains { $0.isChosen && !$0.source.offers.contains(.extensions) }
-        signInsNote.stringValue = [anySignIns ? Self.signInsText : nil, otherStores ? Self.extensionsText : nil].compactMap { $0 }.joined(separator: " ")
+        signInsNote.stringValue = [anySignIns ? Self.signInsText : nil, otherStores ? Self.extensionsText : nil].compactMap { $0 }.reduce("") { Words.sentences($0, $1) }
         emptyState.isHidden = !choosesFileFirst
         if stage == .choose {
             chooseFile.isHidden = choosesFileFirst

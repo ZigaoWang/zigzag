@@ -17,11 +17,17 @@ enum Words {
     }
 
     /// Two whole sentences, one after the other, spaced as this language spaces them (not at all after a
-    /// full-width full stop). With no second sentence, the first as it is.
+    /// full-width full stop). With no second sentence, the first as it is, and with no first, the second.
     static func sentences(_ first: String, _ second: String?) -> String {
         guard let second, !second.isEmpty else { return first }
+        guard !first.isEmpty else { return second }
+        // A full-width stop carries its own space, in any language Zigzag shows: never one more after it.
+        if let last = first.last, fullWidthStops.contains(last) { return first + second }
         return String(localized: "\(first) \(second)", comment: "Joins two sentences, one after the other. Leave out the space if your language doesn't put one between sentences.")
     }
+
+    /// The marks that end a sentence in Chinese and Japanese, with their own room after them.
+    private static let fullWidthStops: Set<Character> = ["。", "！", "？", "；", "：", "」", "』", "）", "”"]
 
     /// "Chrome, Arc and Safari": a list joined the way this language joins one ("Chrome、Arc 和 Safari").
     static func list(_ items: [String]) -> String {
