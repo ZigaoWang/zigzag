@@ -12,6 +12,10 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-15
+
+新增防止 WebRTC 泄露 IP 地址；“清除”更聪明，分屏浏览当作整体，按之前就能看到会关闭哪些；收藏会显示自己的状态，空间名称滚动时留在顶部；大量安全加固；全应用的文字和控件都对齐到像素。
+
 ### 新功能
 - “设置 › 隐私”里新增“防止 WebRTC 泄露 IP 地址”：使用代理或 VPN 时，网站无法再通过 WebRTC 得知你的真实 IP 地址。打开后，除了你允许的网站，其他网站都不能用 WebRTC：每个网站的“网站设置 › 权限”里都有 WebRTC 一行，没有 WebRTC 的网站发起通话时会询问是否“允许并重新载入”。允许之后，Meet、Zoom、Teams 和 Discord 的通话都能正常使用。默认关闭；无痕浏览窗口也遵循这个设置，但不会记住你在其中允许的网站。([#229](https://github.com/ZigaoWang/zigzag/issues/229))
 - 选中一段是网址但不是链接的文字（比如帖子里的 example.com）后右键点按，会有“打开”和“在新标签页中打开”，和 Chrome 的“转到”一样。感谢 [Lakeland97](https://github.com/Lakeland97)。([#234](https://github.com/ZigaoWang/zigzag/issues/234))

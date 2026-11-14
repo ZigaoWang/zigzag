@@ -5,6 +5,10 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-15
+
+Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
+
 ### New
 - Protect IP address from WebRTC, in Settings › Privacy, keeps sites from learning your real IP address through WebRTC while you use a proxy or VPN. When it's on, WebRTC is off except on sites you allow: Site Controls › Permissions has a WebRTC row on every site, and a site that starts a call without it asks to Allow and Reload. Calls on Meet, Zoom, Teams or Discord work once the site is allowed. It's off unless you turn it on, and a private window follows it without remembering what you allow there. ([#229](https://github.com/ZigaoWang/zigzag/issues/229))
 - Right-clicking selected text that's a web address but not a link, like example.com in a post, offers Open and Open in New Tab, as Chrome's Go to does. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#234](https://github.com/ZigaoWang/zigzag/issues/234))
@@ -1154,6 +1158,7 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 - The first public release: signed and notarized, with updates that install themselves.
 
 [Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.0...HEAD
+[0.9.1]: https://github.com/ZigaoWang/zigzag/compare/v0.9.0...HEAD
 [0.9.0]: https://github.com/ZigaoWang/zigzag/compare/v0.8.6...v0.9.0
 [0.8.6]: https://github.com/ZigaoWang/zigzag/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/ZigaoWang/zigzag/compare/v0.8.4...v0.8.5
