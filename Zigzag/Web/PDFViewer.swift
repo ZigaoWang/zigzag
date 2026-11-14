@@ -476,11 +476,15 @@ final class PDFViewerView: NSView {
     // MARK: Loading
 
     /// Fetches the PDF the way the page did: its cookies and the browser's user agent, so a PDF behind a sign-in
-    /// comes too; a file on your Mac is read as it is. Nil when it can't (WebKit's own viewer shows then). Only the
-    /// bytes: the helper is what reads them (`open`).
-    static func load(_ url: URL, from webView: WKWebView, userAgent: String?) async -> Data? {
+    /// comes too; a file on your Mac is read as it is. Nil when it can't, or it's past `limit` bytes (WebKit's own
+    /// viewer shows then). Only the bytes: the helper is what reads them (`open`).
+    static func load(_ url: URL, from webView: WKWebView, userAgent: String?, limit: Int = SafePDF.maxInputBytes) async -> Data? {
         if url.isFileURL {
-            return try? await Task.detached { try Data(contentsOf: url) }.value
+            return await Task.detached {
+                // Its size first: one past the limit is never read in.
+                guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= limit else { return nil }
+                return try? Data(contentsOf: url)
+            }.value
         }
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return nil }
         // WebKit's own copy first, once it has all of it: no second download, and nothing a fetch of our own could
@@ -494,13 +498,17 @@ final class PDFViewerView: NSView {
         let storage = HTTPCookieStorage()
         cookies.forEach { storage.setCookie($0) }
         configuration.httpCookieStorage = storage
-        let session = URLSession(configuration: configuration)
-        defer { session.finishTasksAndInvalidate() }
         var request = URLRequest(url: url)
-        if let userAgent { request.setValue(userAgent, forHTTPHeaderField: "User-Agent") }
-        guard let (body, response) = try? await session.data(for: request),
-              ((response as? HTTPURLResponse)?.statusCode ?? 200) < 400, body.count <= SafePDF.maxInputBytes else { return nil }
-        return body
+        request.setValue(Self.userAgent(userAgent, of: webView), forHTTPHeaderField: "User-Agent")
+        return await CappedDownload(limit: limit).fetch(request, configuration: configuration)
+    }
+
+    /// The user agent the page was loaded with: what it said, else what the web view sends. Never CFNetwork's own,
+    /// which bot checks turn away.
+    static func userAgent(_ said: String?, of webView: WKWebView) -> String {
+        if let said, !said.isEmpty { return said }
+        if let custom = webView.customUserAgent, !custom.isEmpty { return custom }
+        return WebKitSetup.userAgent
     }
 
     /// The bytes WebKit loaded for the page, once it's done loading them (WebKit's own unpublished call, as Safari
@@ -527,10 +535,63 @@ final class PDFViewerView: NSView {
 
     /// The PDF opened in the helper. Nil when the helper can't read it (not a PDF, behind a password, or it failed):
     /// WebKit's viewer, which asks for a password, shows it instead.
-    static func open(_ data: Data) async -> (SafePDF, SafePDF.Info)? {
-        let document = SafePDF(data: data)
+    static func open(_ data: Data, from url: URL? = nil) async -> (SafePDF, SafePDF.Info)? {
+        let document = SafePDF(data: data, source: url)
         guard let info = await document.open() else { return nil }
         return (document, info)
+    }
+}
+
+/// One download, given up as soon as it says or shows it's past `limit` bytes: nothing more of it is held.
+nonisolated private final class CappedDownload: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    private let limit: Int
+    private let lock = NSLock()
+    private var body = Data()
+    private var tooBig = false
+    private var done: CheckedContinuation<Data?, Never>?
+
+    init(limit: Int) { self.limit = limit }
+
+    func fetch(_ request: URLRequest, configuration: URLSessionConfiguration) async -> Data? {
+        let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
+        let task = session.dataTask(with: request)
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                lock.withLock { done = continuation }
+                task.resume()
+            }
+        } onCancel: { task.cancel() }
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                    completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void) {
+        let failed = ((response as? HTTPURLResponse)?.statusCode ?? 200) >= 400
+        let said = response.expectedContentLength
+        if said > limit { lock.withLock { tooBig = true } }
+        completionHandler(failed || said > limit ? .cancel : .allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        let over = lock.withLock { () -> Bool in
+            guard !tooBig else { return true }
+            if body.count + data.count > limit {
+                tooBig = true
+                body = Data()
+                return true
+            }
+            body.append(data)
+            return false
+        }
+        if over { dataTask.cancel() }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        let (continuation, result) = lock.withLock { () -> (CheckedContinuation<Data?, Never>?, Data?) in
+            defer { done = nil }
+            return (done, error == nil && !tooBig ? body : nil)
+        }
+        continuation?.resume(returning: result)
     }
 }
 

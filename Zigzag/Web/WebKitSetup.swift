@@ -15,6 +15,9 @@ enum WebKitSetup {
         return "Version/\(version) Safari/605.1.15"
     }()
 
+    /// The whole user agent a page here sends, for a request made outside a web view.
+    static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) \(applicationNameForUserAgent)"
+
     /// What a page in this profile is made with: the profile's website data and its extensions.
     static func makeConfiguration(for profile: Profile) -> WKWebViewConfiguration {
         let configuration = WKWebViewConfiguration()
