@@ -95,6 +95,20 @@ struct CertificateTrustTests {
         #expect(StrictTransport.isKnown("secure.example", in: store))
     }
 
+    /// The bundled list is searched byte by byte (`StrictTransport.listed`): it must be sorted that way, one name a
+    /// line, with no carriage return a checkout could have added (.gitattributes keeps git from it).
+    @Test func thePreloadListIsSortedByteByByte() throws {
+        let url = try #require(Bundle.main.url(forResource: "hsts_preload", withExtension: "txt"))
+        let data = try Data(contentsOf: url)
+        #expect(!data.contains(0x0D))
+        #expect(data.last == 0x0A)
+        let lines = data.split(separator: 0x0A, omittingEmptySubsequences: false).dropLast()
+        #expect(lines.count > 1_000)
+        #expect(!lines.contains { $0.isEmpty })
+        let unsorted = zip(lines, lines.dropFirst()).first { !$0.lexicographicallyPrecedes($1) }
+        #expect(unsorted == nil, "\(unsorted.map { String(decoding: $0.0, as: UTF8.self) + " ≥ " + String(decoding: $0.1, as: UTF8.self) } ?? "")")
+    }
+
     @Test func knowsThePreloadList() {
         #expect(StrictTransport.isPreloadLoaded)
         // Searched in place: every line is found, and nothing between them.
