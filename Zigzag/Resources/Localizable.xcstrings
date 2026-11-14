@@ -4597,6 +4597,17 @@
         }
       }
     },
+    "Comes inside %@ on this Mac" : {
+      "comment" : "Under the title of the sheet that asks before adding an extension that comes inside an app. The placeholder is the app, like StopTheMadness Pro.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "随 Mac 上的 %@ 一起提供"
+          }
+        }
+      }
+    },
     "Comes with %@" : {
       "comment" : "Under an extension in Settings › Extensions › From Apps on This Mac: the app on this Mac it comes inside, like StopTheMadness Pro.",
       "localizations" : {
@@ -5127,6 +5138,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未能存储截图"
+          }
+        }
+      }
+    },
+    "Couldn’t start. Port %lld is in use by another app, so Zigzag made a new key. Give your AI apps the new key." : {
+      "comment" : "Under “Server address” in Settings › Automation when another app holds the MCP server's port: Zigzag replaced the key, since an AI app connecting there may have sent the old one to that app. The placeholder is a port number.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法启动。端口 %lld 已被其他应用占用，所以 Zigzag 生成了新的密钥。请把新密钥交给你的 AI 应用。"
           }
         }
       }
@@ -6725,6 +6747,17 @@
         }
       }
     },
+    "From a folder on this Mac" : {
+      "comment" : "Under the title of the sheet that asks before adding an extension from a folder (Install from Folder in Settings › Extensions).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自这台 Mac 上的文件夹"
+          }
+        }
+      }
+    },
     "From other parts of %@" : {
       "comment" : "A quiet row in the fill-password menu: shows the logins saved for other addresses on the same site. The placeholder is a site, like example.com.",
       "localizations" : {
@@ -7029,7 +7062,7 @@
       }
     },
     "Hear the sound of tabs you use it on" : {
-      "comment" : "One thing an extension can do, in the sheet that asks before it gets more access.",
+      "comment" : "One thing an extension can do, listed in its install sheet and in Settings, and in the sheet that asks before it gets more access.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10508,6 +10541,17 @@
         }
       }
     },
+    "Open sign-in pages and get what sites send back" : {
+      "comment" : "One thing an extension can do, listed in its install sheet and in Settings: the identity permission, which opens a site's sign-in page and hands the extension the answer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开登录页面，并读取网站返回的内容"
+          }
+        }
+      }
+    },
     "Open ⌘-clicked links under their tab" : {
       "comment" : "A setting in Settings › Tabs: a link opened in a new tab goes in the sidebar nested under the tab it came from. ⌘ is the Command key.",
       "localizations" : {
@@ -11975,7 +12019,7 @@
       }
     },
     "Read what you copy" : {
-      "comment" : "One thing an extension can do, in the sheet that asks before it gets more access.",
+      "comment" : "One thing an extension can do, listed in its install sheet and in Settings, and in the sheet that asks before it gets more access.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12964,6 +13008,28 @@
         }
       }
     },
+    "Run hidden pages of its own in the background" : {
+      "comment" : "One thing an extension can do, listed in its install sheet and in Settings: the offscreen permission, for pages you never see that can play sound or use the clipboard.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在后台运行它自己的隐藏页面"
+          }
+        }
+      }
+    },
+    "Run its own scripts on the sites it can access" : {
+      "comment" : "One thing an extension can do, listed in its install sheet and in Settings: the scripting permission.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在它可访问的网站上运行它自己的脚本"
+          }
+        }
+      }
+    },
     "Run scripts you add on the sites it can access" : {
       "comment" : "One thing an extension can do, listed in its install sheet and in Settings.",
       "localizations" : {
@@ -13565,7 +13631,7 @@
       }
     },
     "See what sites load as you browse" : {
-      "comment" : "One thing an extension can do, in the sheet that asks before it gets more access: watch the requests pages make.",
+      "comment" : "One thing an extension can do, listed in its install sheet and in Settings, and in the sheet that asks before it gets more access: watch the requests pages make.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
