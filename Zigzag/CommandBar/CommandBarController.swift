@@ -113,6 +113,9 @@ protocol CommandBarHost: AnyObject {
     func commandBarAnchor(asked: NSView?) -> NSView?
     /// Over an anchor in the middle of the window (Zigzag Mini's title), the bar widens evenly both ways.
     var commandBarCentersOnAnchor: Bool { get }
+    /// Over a small field in a slim strip (Zigzag Mini's), the bar opens at that field's own size, inside the strip,
+    /// rather than at the sidebar address's height, which would hang below the strip and cover what sits beside it.
+    var commandBarFitsAnchor: Bool { get }
     /// The browser window's tabs, for open tabs among the results and for completing what you type; nil if there's none.
     var commandBarTabs: TabManager? { get }
     /// The profile whose history, favorites and open pages the bar suggests: the one of the space it's used in.
@@ -134,6 +137,7 @@ protocol CommandBarHost: AnyObject {
 
 extension CommandBarHost {
     var commandBarCentersOnAnchor: Bool { false }
+    var commandBarFitsAnchor: Bool { false }
     func commandBarOpen(_ kind: CommandResult.Kind, modifiers: NSEvent.ModifierFlags, editing: Bool) -> Bool { false }
     func commandBarDidHide() {}
 }
@@ -391,7 +395,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             let needed = textWidth + Tokens.Space.x3 * 2 - 1
             let wanted = results.isEmpty ? needed : max(needed, Tokens.Metric.commandBarWidth * 0.7)
             // A field wider than the bar (the address above the page) opens at its own width, never narrower.
-            let wide = min(max(wanted, address.width), max(Tokens.Metric.commandBarWidth, address.width), bounds.width - Tokens.Space.x2 - Tokens.Space.x4)
+            // Fitted to a strip's field, it stays that field's width until suggestions need the room.
+            let widest = host.commandBarFitsAnchor && results.isEmpty ? address.width : max(Tokens.Metric.commandBarWidth, address.width)
+            let wide = min(max(wanted, address.width), widest, bounds.width - Tokens.Space.x2 - Tokens.Space.x4)
             let start = host.commandBarCentersOnAnchor ? round(address.midX - wide / 2) : address.minX
             // A field that itself reaches nearer the edge keeps its place.
             let margin = min(Tokens.Space.x4, max(0, bounds.maxX - address.maxX))
@@ -428,7 +434,14 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     }
 
     /// Opened from the address it's the address field's own height, so clicking in changes nothing but the width.
-    private var fieldHeight: CGFloat { isAnchored ? Tokens.Sidebar.addressHeight : Tokens.Metric.commandBarFieldHeight }
+    private var fieldHeight: CGFloat {
+        guard isAnchored else { return Tokens.Metric.commandBarFieldHeight }
+        if let host, host.commandBarFitsAnchor {
+            let height = anchorFrame(in: host).height
+            if height > 0 { return height }
+        }
+        return Tokens.Sidebar.addressHeight
+    }
 
     /// Hanging from the sidebar's address, the suggestions are the sidebar's own rows in size; over the page, the
     /// larger rows of the new tab bar.

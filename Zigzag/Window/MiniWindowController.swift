@@ -716,6 +716,7 @@ extension MiniWindowController: CommandBarHost {
     /// Always over the page's site, in the middle of the strip, whatever opened it.
     func commandBarAnchor(asked: NSView?) -> NSView? { strip.anchor }
     var commandBarCentersOnAnchor: Bool { true }
+    var commandBarFitsAnchor: Bool { true }
     var commandBarTabs: TabManager? { MiniQuickOpen.tabs }
     var commandBarProfile: Profile { tab.profile }
     var commandBarTab: Tab? { tab }
@@ -912,8 +913,9 @@ final class MiniStripView: NSView {
             x += b
         }
         let left = x + Tokens.Space.x1
-        // The button's end lines up with the framed page's right edge, the frame's width in, borderless too.
-        let right = bounds.width - Tokens.Metric.miniFrame
+        // The button ends as far in from the window's right edge as the traffic lights start from its left, so the
+        // strip sits evenly between the window's rounded corners.
+        let right = bounds.width - Tokens.Sidebar.lightsX
         // Narrow, the shortcut goes first, then the space's name shortens.
         openButton.showsKeys = true
         if right - left < spaceChip.fittingWidth + b * 2 + openButton.fittingWidth + Tokens.Space.x4 { openButton.showsKeys = false }
@@ -931,8 +933,14 @@ final class MiniStripView: NSView {
         var width = min(title.fittingWidth, half * 2)
         if width < Tokens.Space.x10 { width = 0 }
         title.frame = NSRect(x: round(bounds.midX - width / 2), y: y, width: width, height: h)
-        let field = min(Tokens.Metric.miniAddressWidth, max(bounds.width - left * 2, Tokens.Metric.miniAddressWidth / 2))
-        anchor.frame = NSRect(x: round(bounds.midX - field / 2), y: y, width: field, height: h)
+        // Editing the address opens in the room between the space and Keep on Top, centered on the window where it can
+        // be, so it never covers half the space's name or crowds the buttons.
+        let fieldLeft = (spaceChip.frame.width > 0 ? spaceChip.frame.maxX : left) + Tokens.Space.x2
+        let fieldRight = pinButton.frame.minX - Tokens.Space.x2
+        let room = max(0, fieldRight - fieldLeft)
+        let field = min(Tokens.Metric.miniAddressWidth, room)
+        let fieldX = min(max(fieldLeft, round(bounds.midX - field / 2)), fieldRight - field)
+        anchor.frame = NSRect(x: fieldX, y: y, width: field, height: h)
     }
 }
 
