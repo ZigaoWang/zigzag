@@ -243,15 +243,25 @@ struct SiteControlsPermissionTests {
     }
 
     /// "Always / Don't Allow" is kept for the whole site, the key Site Controls and Settings show, so the row and the
-    /// browser agree and no other app on the site asks again; "Always Allow" stays that one app's.
+    /// browser agree and no other app on the site asks again; "Always Allow" stays that one app's. It goes through the
+    /// same `storageSubject` the question itself uses, so reverting that choice fails this test.
     @Test func anAnsweredDenyIsKeptForTheWholeSite() throws {
         try withDefaults {
             let tab = Tab(url: URL(string: site + "/"), spaceID: UUID())
-            SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: true),
-                                           subject: PermissionSubject.apps, origin: site, tab: tab, isPrivate: false)
+            let deny = PermissionAnswer(action: "deny", remember: true)
+            #expect(ExternalLinks.storageSubject(for: deny, scheme: "zoommtg") == PermissionSubject.apps)
+            #expect(ExternalLinks.storageSubject(for: PermissionAnswer(action: "allow", remember: true),
+                                                 scheme: "zoommtg") == PermissionSubject.app("zoommtg"))
+            #expect(ExternalLinks.storageSubject(for: PermissionAnswer(action: "deny", remember: false),
+                                                 scheme: "zoommtg") == PermissionSubject.app("zoommtg"))
+            SitePermissions.rememberAnswer(deny, subject: ExternalLinks.storageSubject(for: deny, scheme: "zoommtg"),
+                                           origin: site, tab: tab, isPrivate: false)
+            // The site's row, and the next app the page opens, both read the deny.
             #expect(SitePermissions.appDecision(origin: site, scheme: "zoommtg") == false)
             #expect(SitePermissions.appDecision(origin: site, scheme: "itms-apps") == false)
             #expect(SitePermissions.choice(.apps, origin: site) == .block)
+            #expect(ExternalLinks.storedAppAction(pageOrigin: site, origin: site, scheme: "itms-apps",
+                                                  foreign: false, tab: tab) == "deny")
         }
     }
 

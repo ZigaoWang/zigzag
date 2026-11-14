@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import WebKit
@@ -175,6 +176,9 @@ import WebKit
         #expect(ExternalLinks.canRemember(url: URL(string: "https://example.com"), foreign: true) == false)
     }
 
+    /// A kept answer is honoured as it stands — the site's Allow opens, its Block stops, and nothing asks again.
+    /// Whether an answer *may* be written is a separate gate (`saves`), so `verdict` never second-guesses a stored
+    /// Allow: an http origin's Allow can only have been chosen in Site Controls, and it must be respected.
     @Test func aStoredAllowSkipsTheQuestionAndABlockStopsIt() {
         #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: "allow") == .open)
         #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: "deny") == .block)
@@ -287,4 +291,65 @@ import WebKit
             #expect(SettingsView.handoffAnswerGroups([]).isEmpty)
         }
     }
+
+    /// A page's own pop-up answered "This Tab" or "New Tab" is opened by the tab that asked, through that tab's own
+    /// host: Zigzag Mini's and an installed app's windows are not `BrowserWindowController`s, and casting to one was
+    /// how their pop-ups used to vanish. A host that is not a browser window still routes correctly, and "Don't
+    /// Allow" opens nothing at all.
+    @Test func aPopUpGoesThroughTheTabThatAskedNotABrowserWindow() {
+        let host = QuestionHostStub()
+        let recorder = RecordingTabHost()
+        let tab = Tab(url: URL(string: "https://example.com/"), spaceID: UUID())
+        tab.host = recorder
+        let popup = URL(string: "https://example.com/pop-up")!
+
+        PopupNotice.open(popup, action: "thisTab", from: tab, in: host)
+        #expect(recorder.opened.map { $0.url } == [popup.absoluteString])
+        #expect(recorder.opened.map { $0.disposition } == ["currentTab"])
+
+        recorder.opened.removeAll()
+        PopupNotice.open(popup, action: "newTab", from: tab, in: host)
+        #expect(recorder.opened.map { $0.disposition } == ["foregroundTab"])
+
+        recorder.opened.removeAll()
+        PopupNotice.open(popup, action: "deny", from: tab, in: host)
+        #expect(recorder.opened.isEmpty, "a refused pop-up opens nowhere")
+    }
+}
+
+/// The tab that asked a pop-up's question, recording what its host was told to open.
+@MainActor
+private final class RecordingTabHost: TabHost {
+    var opened: [(url: String, disposition: String)] = []
+    var hostWindow: NSWindow? { nil }
+    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
+        opened.append((url.absoluteString, "\(disposition)"))
+    }
+    func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction,
+             features: WKWindowFeatures) -> WKWebView? { nil }
+    func tabDidRequestClose(_ tab: Tab) {}
+    func tabWantsToReturnToOpener(_ tab: Tab) {}
+    func tab(_ tab: Tab, hoveringLink url: URL?) {}
+    func tabWantsToBeShown(_ tab: Tab) {}
+}
+
+/// A window that can show a question but is no browser window; nothing here is touched for the two destinations
+/// that go through the tab, which is the point.
+@MainActor
+private final class QuestionHostStub: PromptHost {
+    var window: NSWindow? { nil }
+    var promptOverlay: NSView { NSView() }
+    func pageFrame(showing tab: Tab) -> NSRect? { nil }
+    var focusedPaneFrame: NSRect { .zero }
+    var promptFrontTab: Tab? { nil }
+    func promptHolds(_ tab: Tab) -> Bool { false }
+    func promptShows(_ tab: Tab) -> Bool { false }
+    var promptIsPrivate: Bool { false }
+    var promptAccent: NSColor { .controlAccentColor }
+    func observePromptTabs(_ body: @escaping () -> Void) -> SignalToken? { nil }
+    var promptPageViews: [NSView] { [] }
+    func clearForPrompt() {}
+    var promptIsCovered: Bool { false }
+    var promptAnchor: NSView? { nil }
+    func promptToast(_ text: String, symbol: String, duration: TimeInterval) {}
 }
