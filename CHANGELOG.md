@@ -18,6 +18,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Enter Full Screen in Settings › Shortcuts shows the Globe key with F, as the menu bar does, instead of F alone.
 - Switches that are off stand out from the page in dark mode, on a lighter gray track as macOS draws them, instead of nearly vanishing into it.
 - Menus in a group of settings are the same width, so they line up down the page, like Sidebar size, Favorites per row and Dark pages in Appearance.
+- General no longer offers Restore from before the last update when there was no update, as after Zigzag first starts with a new data folder.
 
 ## [0.9.1] - 2026-11-15
 

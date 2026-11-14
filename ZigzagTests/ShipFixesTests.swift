@@ -516,6 +516,28 @@ struct UpdateBackupTests {
         #expect(UpdateBackup.all(in: root).count == 1)
     }
 
+    /// A data folder with nothing in it yet makes no backup, even when another build ran last (a fresh folder, or
+    /// Zigzag installed again after its data was removed), so General never offers to restore one that holds nothing.
+    @Test func freshDataIsNeverOfferedAsABackup() throws {
+        let root = try makeRoot()
+        let suite = "zigzag-backup-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { try? FileManager.default.removeItem(at: root); defaults.removePersistentDomain(forName: suite) }
+        defaults.set("104", forKey: "LastRunBuild")
+        defaults.set("0.9.1", forKey: "LastRunVersion")
+        UpdateBackup.backUpIfUpdated(build: "105", version: "0.9.1", defaults: defaults, root: root)
+        #expect(UpdateBackup.all(in: root).isEmpty)
+        #expect(defaults.string(forKey: "LastRunBuild") == "105")
+        // An empty backup left by an earlier version isn't offered either.
+        let folder = root.appendingPathComponent("Backups", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("2026-11-15T02-00-00Z 0.9.1"), withIntermediateDirectories: true)
+        #expect(UpdateBackup.restorable(in: root) == nil)
+        let real = folder.appendingPathComponent("2026-11-14T02-00-00Z 0.9.0")
+        try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
+        try "spaces".write(to: real.appendingPathComponent("Library.json"), atomically: true, encoding: .utf8)
+        #expect(UpdateBackup.restorable(in: root)?.lastPathComponent == real.lastPathComponent)
+    }
+
     @Test func namesSortByTimeAcrossTheOldAndNewStamps() throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }

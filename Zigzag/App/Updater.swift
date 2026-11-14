@@ -134,7 +134,13 @@ nonisolated enum UpdateBackup {
         all(in: root).filter { !$0.lastPathComponent.hasSuffix(beforeRestore) }
     }
 
-    static var latest: URL? { updates().first }
+    /// The backup a restore puts back: the newest that holds your spaces. One without them (made over a data folder
+    /// that had nothing yet) has nothing to give back, so it's never offered.
+    static func restorable(in root: URL = Paths.support) -> URL? {
+        updates(in: root).first { FileManager.default.fileExists(atPath: $0.appendingPathComponent("Library.json").path) }
+    }
+
+    static var latest: URL? { restorable() }
 
     /// When the newest backup was made, from its name.
     static var latestDate: Date? {
@@ -168,8 +174,10 @@ nonisolated enum UpdateBackup {
     static func backUpIfUpdated(build: String, version: String, defaults: UserDefaults = .standard, root: URL = Paths.support) {
         let lastBuild = defaults.string(forKey: lastBuildKey)
         guard lastBuild != build else { return }
-        // A first run has no data yet; one from before builds were recorded is backed up all the same.
-        if lastBuild != nil || FileManager.default.fileExists(atPath: root.appendingPathComponent("Library.json").path) {
+        // Only what an earlier run left: a first run has no data yet, whatever build last ran (a fresh data folder,
+        // or Zigzag installed again after its data was removed), and a backup of nothing would be offered as one.
+        // A run from before builds were recorded is backed up all the same.
+        if FileManager.default.fileExists(atPath: root.appendingPathComponent("Library.json").path) {
             make(from: defaults.string(forKey: lastVersionKey), in: root)
         }
         defaults.set(build, forKey: lastBuildKey)
