@@ -611,13 +611,14 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
 /// its name in the page's address (zigzag://settings/privacy), which a tab keeps with the session: a pane can be
 /// added anywhere in the column, but a name never changes.
 enum SettingsPane: String, CaseIterable {
-    case general, appearance, tabs, spaces, profiles, search, mini, translation, passwords, privacy
+    case general, downloads, appearance, tabs, spaces, profiles, search, mini, translation, passwords, privacy
     case websiteData = "website-data"
     case extensions, shortcuts, automation, developer
 
     var title: String {
         switch self {
         case .general: String(localized: "General", comment: "A section of Settings.")
+        case .downloads: String(localized: "Downloads", comment: "A section of Settings: where files go, and rules that hand downloads and links to other apps.")
         case .appearance: String(localized: "Appearance", comment: "A section of Settings: how the window and sidebar look.")
         case .tabs: String(localized: "Tabs", comment: "A section of Settings.")
         case .spaces: String(localized: "Spaces", comment: "A section of Settings.")
@@ -638,6 +639,7 @@ enum SettingsPane: String, CaseIterable {
     /// More words "Find a setting" knows the whole section by.
     var keywords: String {
         switch self {
+        case .downloads: String(localized: "aria2 motrix torrent rtorrent yt-dlp mpv iina rule handoff script download", comment: "Words that find Settings › Downloads with Find a setting, separated by spaces. Add your language's words for them. Not shown.")
         case .automation: String(localized: "mcp ai agent automation api", comment: "Words that find Settings › Automation with Find a setting, separated by spaces. Add your language's words for them. Not shown.")
         case .developer: String(localized: "devtools web development localhost", comment: "Words that find Settings › Developer with Find a setting, separated by spaces. Add your language's words for them. Not shown.")
         default: ""
@@ -647,6 +649,7 @@ enum SettingsPane: String, CaseIterable {
     var symbol: String {
         switch self {
         case .general: "gearshape"
+        case .downloads: "arrow.down.circle"
         case .appearance: "paintbrush"
         case .tabs: "square.on.square"
         case .spaces: "square.stack"
@@ -675,7 +678,7 @@ enum SettingsPane: String, CaseIterable {
     /// finding and reading, what's kept safe, and adding to Zigzag. With more than one profile, the sections about
     /// the profile chosen there follow under their own heading.
     static func columnGroups(manyProfiles: Bool) -> (shared: [[SettingsPane]], profile: [SettingsPane]) {
-        let groups: [[SettingsPane]] = [[.general, .appearance, .tabs, .spaces, .profiles], [.search, .mini, .translation],
+        let groups: [[SettingsPane]] = [[.general, .downloads, .appearance, .tabs, .spaces, .profiles], [.search, .mini, .translation],
                                         [.passwords, .privacy], [.extensions, .shortcuts, .automation, .developer]]
         guard manyProfiles else { return (groups, []) }
         return (groups.map { $0.filter { !perProfile.contains($0) } }.filter { !$0.isEmpty }, perProfile)
@@ -767,6 +770,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private let versionGroup = FormGroup()
     private let generalGroup = FormGroup()
+    /// Settings › Downloads: where files go, and the rules that hand a download or a link to another app.
+    private let downloadPlaceGroup = FormGroup()
+    private let downloadPlaceRules = DropdownButton()
+    private let downloadRulesGroup = FormGroup()
+    private let downloadTestGroup = FormGroup()
+    private let downloadRuleTest = FilledField(placeholder: String(localized: "https://example.com/file.zip", comment: "Placeholder of the test address in Settings › Downloads: an address to see which rule takes it."))
+    private var downloadRuleTestRow: FormRow?
+    private let addDownloadRuleButton = PillButton(title: String(localized: "Add Rule…", comment: "Button beside the download rules in Settings › Downloads: opens the menu of actions and presets a new rule can start from."))
+    private var downloadRulesToken: SignalToken?
     /// Sites installed as apps, each with Remove. Only there when there's one.
     private let webAppsGroup = FormGroup()
     private var webAppsToken: SignalToken?
@@ -1088,10 +1100,37 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                      control: languagePicker))
         }
         downloadPlace.onSelect = { index in DownloadPlace.pick(index) }
-        downloadPlaceToken = DownloadPlace.changed.observe { [weak self] in self?.refreshDownloadPlace() }
+        downloadPlaceToken = DownloadPlace.changed.observe { [weak self] in
+            self?.refreshDownloadPlace()
+            self?.refreshDownloadPlaceRules()
+        }
         generalGroup.add(FormRow(title: String(localized: "Save downloads to", comment: "A setting in Settings › General."),
                                  detail: String(localized: "Or have Zigzag ask where, each time.", comment: "Explanation under “Save downloads to” in Settings › General."),
                                  control: downloadPlace))
+
+        // Downloads: where files go, and the rules that hand a download or a link to another app.
+        downloadPlaceRules.onSelect = { index in DownloadPlace.pick(index) }
+        let rulesPlaceRow = FormRow(title: String(localized: "Save downloads to", comment: "A setting in Settings › Downloads."),
+                                    detail: String(localized: "Or have Zigzag ask where, each time.", comment: "Explanation under “Save downloads to” in Settings › Downloads."),
+                                    control: downloadPlaceRules)
+        rulesPlaceRow.keywords = String(localized: "folder location downloads", comment: "Words that find the Save downloads to setting with Find a setting. Not shown.")
+        downloadPlaceGroup.add(rulesPlaceRow)
+        addDownloadRuleButton.onClick = { [weak self] _ in self?.showDownloadRuleMenu() }
+        downloadRulesToken = DownloadRulesStore.shared.changed.observe { [weak self] in
+            guard let self else { return }
+            self.reloadDownloadRules()
+            if self.pane == .downloads || self.isSearching { self.layoutDocument() }
+        }
+        refreshDownloadPlaceRules()
+        downloadRuleTest.field.delegate = self
+        let testRow = FormRow(title: String(localized: "Test an address", comment: "A setting in Settings › Downloads: a field to type an address and see which rule takes it."),
+                              detail: String(localized: "Type a link or a file’s address to see which rule takes it, and what it would do.",
+                                             comment: "Explanation under the test address in Settings › Downloads."),
+                              control: downloadRuleTest)
+        testRow.keywords = String(localized: "check preview rule test", comment: "Words that find the download rule test with Find a setting. Not shown.")
+        downloadRuleTestRow = testRow
+        downloadTestGroup.add(testRow)
+        reloadDownloadRules()
         let importButton = PillButton(title: String(localized: "Import…", comment: "Button in Settings › General that opens the Import window."))
         importButton.onClick = { _ in ImportWindowController.show() }
         generalGroup.add(FormRow(title: String(localized: "Import from another browser", comment: "A setting in Settings › General."),
@@ -2270,6 +2309,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         if (obj.object as? NSTextField) === settingSearch.field { searchChanged() }
         if (obj.object as? NSTextField) === flagSearch.field { layoutDocument() }
         if (obj.object as? NSTextField) === siteDataToolbar.search.field { siteDataList.model?.query = siteDataToolbar.search.stringValue }
+        if (obj.object as? NSTextField) === downloadRuleTest.field { updateDownloadRuleTest() }
     }
 
     // MARK: Finding a setting
@@ -2406,6 +2446,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     // The groups' headings, each said once for the page and its search.
     private static var webAppsHeading: String { String(localized: "Installed Apps", comment: "A heading in Settings › General: the sites installed as apps with File › Install as App.") }
     private static var updatesHeading: String { String(localized: "Updates", comment: "A heading in Settings › General: Zigzag's version and how it updates.") }
+    private static var downloadRulesHeading: String { String(localized: "Hand Off Downloads and Links", comment: "A heading in Settings › Downloads, over the rules that send a download or a link to another app.") }
+    private static var downloadTestHeading: String { String(localized: "Test a Rule", comment: "A heading in Settings › Downloads, over the address field that shows which rule would take it.") }
     private static var connectHeading: String { String(localized: "Connect an App", comment: "A heading in Settings › Automation: how to connect an AI app to Zigzag over MCP.") }
     private static var localServersHeading: String { String(localized: "Local Servers", comment: "A heading in Settings › Developer: development servers running on this Mac.") }
     private static var pageSizesHeading: String { String(localized: "Page Sizes", comment: "A heading in Settings › Developer: the sizes the developer tools offer for a page.") }
@@ -2451,6 +2493,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func groups(of pane: SettingsPane) -> [(title: String?, group: FormGroup)] {
         switch pane {
         case .general: [(nil, generalGroup)] + (webAppsGroup.rows.isEmpty ? [] : [(Self.webAppsHeading, webAppsGroup)]) + [(Self.updatesHeading, versionGroup)]
+        case .downloads: [(nil, downloadPlaceGroup), (Self.downloadRulesHeading, downloadRulesGroup), (Self.downloadTestHeading, downloadTestGroup)]
         case .appearance: [(nil, appearanceGroup)]
         case .tabs: [(nil, tabsGroup)]
         case .search: [(nil, searchGroup)]
@@ -2605,6 +2648,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
 
         switch pane {
+        case .downloads:
+            section(nil, downloadPlaceGroup)
+            section(Self.downloadRulesHeading, downloadRulesGroup, accessory: addDownloadRuleButton)
+            section(Self.downloadTestHeading, downloadTestGroup)
         case .general, .appearance, .tabs, .search, .mini, .automation:
             for (title, group) in groups(of: pane) { section(title, group) }
         case .spaces:
@@ -2750,6 +2797,117 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     private func refreshDownloadPlace() { DownloadPlace.configure(downloadPlace) }
+
+    private func refreshDownloadPlaceRules() { DownloadPlace.configure(downloadPlaceRules) }
+
+    // MARK: Download rules
+
+    /// The rules, top to bottom. Each row switches one on or off, moves it, changes it, or deletes it.
+    private func reloadDownloadRules() {
+        downloadRulesGroup.removeAllRows()
+        updateDownloadRuleTest()
+        let rules = DownloadRulesStore.shared.rules
+        guard !rules.isEmpty else {
+            let empty = FormRow(title: String(localized: "No rules yet", comment: "In Settings › Downloads, when no rule has been made."),
+                                detail: String(localized: "Everything else is saved by Zigzag, as before.", comment: "Under “No rules yet” in Settings › Downloads."),
+                                control: NSView())
+            empty.keywords = String(localized: "add rule aria2 motrix rtorrent mpv", comment: "Words that find the empty download rules list with Find a setting. Not shown.")
+            downloadRulesGroup.add(empty)
+            return
+        }
+        for (index, rule) in rules.enumerated() {
+            let toggle = Toggle(isOn: rule.isEnabled)
+            toggle.onChange = { isOn in DownloadRulesStore.shared.setEnabled(isOn, for: rule.id) }
+            toggle.setAccessibilityLabel(String(localized: "Turn \(rule.name) on or off", comment: "A download rule's switch for VoiceOver. The placeholder is the rule's name."))
+
+            let up = IconButton(symbol: "chevron.up", size: .compact,
+                                toolTip: String(localized: "Move Up", comment: "Tooltip of the button that moves a download rule up the list."))
+            up.isEnabled = index > 0
+            up.onClick = { _ in DownloadRulesStore.shared.move(from: index, to: index - 1) }
+            let down = IconButton(symbol: "chevron.down", size: .compact,
+                                  toolTip: String(localized: "Move Down", comment: "Tooltip of the button that moves a download rule down the list."))
+            down.isEnabled = index < rules.count - 1
+            down.onClick = { _ in DownloadRulesStore.shared.move(from: index, to: index + 1) }
+            let edit = IconButton(symbol: "slider.horizontal.3", size: .compact,
+                                  toolTip: String(localized: "Change Rule", comment: "Tooltip of the button that changes a download rule."))
+            edit.onClick = { [weak self] _ in
+                guard let self else { return }
+                DownloadRuleSheet.show(in: self, kind: rule.action.kind, rule: rule)
+            }
+            let remove = IconButton(symbol: "trash", size: .compact,
+                                    toolTip: String(localized: "Delete Rule", comment: "Tooltip of the button that deletes a download rule."))
+            remove.onClick = { [weak self] _ in
+                self?.confirm(title: String(localized: "Delete “\(rule.name)”?", comment: "Title of the sheet that deletes a download rule. The placeholder is its name."),
+                              message: String(localized: "Its addresses are saved by Zigzag again, and nothing else changes.",
+                                              comment: "Message of the sheet that deletes a download rule."),
+                              action: String(localized: "Delete", comment: "Button of the sheet that deletes a download rule.")) {
+                    DownloadRulesStore.shared.remove(id: rule.id)
+                }
+            }
+
+            let controls = NSStackView(views: [toggle, up, down, edit, remove])
+            controls.orientation = .horizontal
+            controls.spacing = Tokens.Space.x1
+            controls.distribution = .fill
+            controls.alignment = .centerY
+            let row = FormRow(title: rule.name.isEmpty ? String(localized: "Untitled Rule", comment: "A download rule with no name yet.") : rule.name,
+                              detail: "\(rule.matchSummary) · \(rule.actionSummary)", control: controls)
+            row.keywords = "\(rule.pattern) \(rule.action.textFields.joined(separator: " "))"
+            downloadRulesGroup.add(row)
+        }
+        let hint = FormRow(title: String(localized: "Rules run from the top", comment: "In Settings › Downloads, under the rules: the first match wins."),
+                           detail: String(localized: "The first rule that matches an address wins. A download no rule matches is saved by Zigzag.",
+                                          comment: "Explanation under the download rules in Settings › Downloads."),
+                           control: NSView())
+        downloadRulesGroup.add(hint)
+    }
+
+    /// The test address, as a link and then as a download: the first rule either way, and what its first field becomes.
+    private func updateDownloadRuleTest() {
+        // A result that wraps takes another line: the page's height follows it.
+        defer { if pane == .downloads, paneWidth > 0 { layoutDocument() } }
+        guard let row = downloadRuleTestRow else { return }
+        let typed = downloadRuleTest.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typed.isEmpty else {
+            row.detailText = String(localized: "Type a link or a file’s address to see which rule takes it, and what it would do.",
+                                    comment: "Explanation under the test address in Settings › Downloads.")
+            return
+        }
+        let url = URL(string: typed) ?? URL(string: "https://\(typed)")
+        guard let url, url.scheme != nil else {
+            row.detailText = String(localized: "That isn’t an address.", comment: "Under the test address in Settings › Downloads, when what was typed can't be a URL.")
+            return
+        }
+        let rules = DownloadRulesStore.shared.rules
+        guard let rule = DownloadRulesStore.firstMatch(in: rules, url: url, appliesToLinks: true)
+                ?? DownloadRulesStore.firstMatch(in: rules, url: url, appliesToLinks: false) else {
+            row.detailText = String(localized: "No rule matches, so Zigzag saves it in Downloads.", comment: "Under the test address in Settings › Downloads, when no rule takes it.")
+            return
+        }
+        let values = HandoffValues(link: url, filename: DownloadTokens.filename(for: url, suggested: ""), space: "")
+        let preview = rule.action.textFields.first.map { DownloadTokens.expand($0, with: values) } ?? ""
+        row.detailText = preview.isEmpty ? rule.actionSummary : "\(rule.actionSummary)\n\(preview)"
+    }
+
+    /// Add Rule: a plain action, or a preset that fills the fields for aria2, Motrix, rTorrent, yt-dlp, mpv or IINA.
+    private func showDownloadRuleMenu() {
+        var entries: [MenuPanel.Entry] = DownloadRuleAction.Kind.allCases.map { kind in
+            .item(MenuPanel.Item(title: kind.title, symbol: kind.symbol) { [weak self] in
+                guard let self else { return }
+                DownloadRuleSheet.show(in: self, kind: kind)
+            })
+        }
+        entries.append(.header(String(localized: "Presets", comment: "A heading in the Add Rule menu of Settings › Downloads, over the ready-made rules.")))
+        entries += DownloadPreset.allCases.map { preset in
+            .item(MenuPanel.Item(title: preset.title, symbol: preset.rule.action.kind.symbol) { [weak self] in
+                guard let self else { return }
+                DownloadRuleSheet.show(in: self, kind: preset.rule.action.kind, preset: preset)
+            })
+        }
+        MenuPanel.show(entries, from: addDownloadRuleButton) { [weak addDownloadRuleButton] in
+            addDownloadRuleButton?.isSelected = false
+        }
+    }
 
     /// An engine's icon: its site's, or for Custom with no address yet, a plain magnifying glass (never Google's).
     private static func engineIcon(_ engine: SearchEngine) -> NSImage? {
