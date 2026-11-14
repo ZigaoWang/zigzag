@@ -13441,18 +13441,6 @@
         }
       }
     },
-    "Secure" : {
-      "comment" : "On the Connection row of the site panel: the page came over https.",
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "安全"
-          }
-        }
-      }
-    },
     "Secure connection" : {
       "comment" : "In the site panel, in the welcome window’s picture of Zigzag.\nSmall, under the site's name at the top of the site panel: the page came over https. Clicking it shows the certificate.\nVoiceOver label of the lock before the address in a pop-up window.",
       "localizations" : {
@@ -13871,18 +13859,6 @@
         }
       }
     },
-    "Show All (%lld)" : {
-      "comment" : "Row under two rows of extensions in Site Controls: shows every one of them. The number is how many there are.",
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "全部显示（%lld）"
-          }
-        }
-      }
-    },
     "Show All Downloads" : {
       "comment" : "Last row of the downloads panel, opened on one download: shows the rest of the list.",
       "localizations" : {
@@ -13934,18 +13910,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示历史记录"
-          }
-        }
-      }
-    },
-    "Show Less" : {
-      "comment" : "Row under the extensions in Site Controls once they all show: back to two rows of them.",
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "收起"
           }
         }
       }
