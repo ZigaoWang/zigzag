@@ -63,6 +63,23 @@ nonisolated enum AddressText {
         return out
     }
 
+    /// `text` with every site name in it ("custom-progress-bar.com") kept whole on wrapping: a word joiner after each
+    /// of its hyphens, so a line never breaks a name into "custom-" and "progress-bar.com", which reads as two. The
+    /// line breaks around the name instead, at the spaces.
+    static func keepingHostsWhole(_ text: String) -> String {
+        guard text.contains("-") else { return text }
+        let pattern = #"[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?(?:\.[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?)+"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
+        let whole = text as NSString
+        var out = "", last = 0
+        for match in regex.matches(in: text, range: NSRange(location: 0, length: whole.length)) {
+            out += whole.substring(with: NSRange(location: last, length: match.range.location - last))
+            out += whole.substring(with: match.range).replacingOccurrences(of: "-", with: "-\u{2060}")
+            last = match.range.location + match.range.length
+        }
+        return out + whole.substring(from: last)
+    }
+
     private static func staysEscaped(_ scalar: Unicode.Scalar) -> Bool {
         if "/?#@:\\%".unicodeScalars.contains(scalar) { return true }
         if scalar.properties.isWhitespace { return true }

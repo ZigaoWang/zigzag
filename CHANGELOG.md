@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - What's New opens over the page, below the bar above it, instead of across the address and the developer tools.
 - An extension's popup opened from the sidebar stays inside the window, instead of hanging past its left edge.
 - In onboarding, the note that no other browsers were found sits in the middle of its card.
+- Install as App's name field shows it's ready for typing in light mode too, as it does in dark. In the sheet for adding an extension, a site's name no longer breaks across two lines at a hyphen.
 
 ## [0.9.1] - 2026-11-15
 

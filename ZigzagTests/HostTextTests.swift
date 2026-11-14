@@ -121,4 +121,35 @@ struct AddressTextTests {
         #expect(LinkStatusController.describe(idn) == "xn--pple-43d.com/café")
         #expect(AddressText.readable("%E2%80%8Bx%zz%") == "%E2%80%8Bx%zz%")
     }
+
+    /// A site's name in a sentence that wraps (the extension sheet's "Read and change what you see on …") never
+    /// breaks at its hyphens: "custom-" at the end of one line and "progress-bar.com" on the next read as two names.
+    @Test func aWrappedLineKeepsASitesNameWhole() {
+        let line = "Read and change what you see on custom-progress-bar.com and 5 other sites"
+        let kept = AddressText.keepingHostsWhole(line)
+        #expect(kept.replacingOccurrences(of: "\u{2060}", with: "") == line)
+        #expect(kept.contains("custom-\u{2060}progress-\u{2060}bar.com"))
+        // Hyphens in plain words, and text with no name in it, are left as they are.
+        #expect(AddressText.keepingHostsWhole("A built-in tool") == "A built-in tool")
+        #expect(AddressText.keepingHostsWhole("x-y.example and a-b") == "x-\u{2060}y.example and a-b")
+        // Laid out at every width the sheet could give it, no line ends inside the name.
+        let font = Tokens.Font.body()
+        for width in stride(from: CGFloat(160), through: 420, by: 2) {
+            let storage = NSTextStorage(string: kept, attributes: [.font: font])
+            let layout = NSLayoutManager(), container = NSTextContainer(size: NSSize(width: width, height: .greatestFiniteMagnitude))
+            container.lineFragmentPadding = 0
+            layout.addTextContainer(container)
+            storage.addLayoutManager(layout)
+            layout.ensureLayout(for: container)
+            var index = 0
+            while index < layout.numberOfGlyphs {
+                var range = NSRange()
+                layout.lineFragmentRect(forGlyphAt: index, effectiveRange: &range)
+                let text = (kept as NSString).substring(with: layout.characterRange(forGlyphRange: range, actualGlyphRange: nil))
+                    .replacingOccurrences(of: "\u{2060}", with: "")
+                #expect(!text.hasSuffix("-"), "width \(width): \(text)")
+                index = NSMaxRange(range)
+            }
+        }
+    }
 }

@@ -151,7 +151,7 @@ final class ImportExtensionsReview: NSView, ImportListItem {
         for line in report.abilities {
             let symbol = NSImageView(image: Tokens.Symbol.image(line.symbol))
             symbol.contentTintColor = Tokens.Color.icon
-            let text = NSTextField(wrappingLabelWithString: line.text)
+            let text = NSTextField(wrappingLabelWithString: AddressText.keepingHostsWhole(line.text))
             text.font = Tokens.Font.body()
             text.textColor = Tokens.Color.textPrimary
             text.isSelectable = false

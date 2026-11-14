@@ -1115,6 +1115,18 @@ final class FilledField: NSView {
 
     @objc private func editingChanged() { updateColors() }
 
+    /// The ring shows as soon as the field takes the keyboard (a sheet putting you straight into it), not only once
+    /// you type: the window's first responder is watched, since taking focus says nothing to the field's delegate.
+    private var responderWatch: NSKeyValueObservation?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        responderWatch = window?.observe(\.firstResponder, options: [.new]) { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.updateColors() }
+        }
+        updateColors()
+    }
+
     /// The page look: white with a hairline edge and a faint shadow, like the secondary button beside it, where a
     /// panel's field is a soft fill. A page's header sets it for its search.
     var isOutlined = false { didSet { updateColors(); needsLayout = true } }
