@@ -204,16 +204,54 @@ struct SiteControlsPermissionTests {
             // A site-wide Allow covers every app the page opens, as the row always meant.
             SitePermissions.setChoice(.allow, for: .apps, origin: site)
             #expect(SitePermissions.action(PermissionSubject.apps, origin: site) == "allow")
-            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: false, stored: "allow") == "allow")
-            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: true, stored: "allow") == nil)
+            #expect(ExternalLinks.decision(page: site, foreign: false, stored: "allow") == "allow")
+            #expect(ExternalLinks.decision(page: site, foreign: true, stored: "allow") == nil)
             // Always Open on one app is kept under that app's own key.
             SitePermissions.allowOpeningApp(origin: site, scheme: "zoommtg")
             #expect(SitePermissions.action(PermissionSubject.app(scheme: "zoommtg"), origin: site) == "allow")
             SitePermissions.setChoice(.block, for: .apps, origin: site)
             let blocked = SitePermissions.action(PermissionSubject.apps, origin: site)
             #expect(blocked == "deny")
-            #expect(ExternalLinks.decision(page: site, scheme: "zoommtg", foreign: true, stored: blocked) == "deny")
-            #expect(ExternalLinks.decision(page: nil, scheme: "zoommtg", foreign: false, stored: "allow") == nil)
+            #expect(ExternalLinks.decision(page: site, foreign: true, stored: blocked) == "deny")
+            #expect(ExternalLinks.decision(page: nil, foreign: false, stored: "allow") == nil)
+        }
+    }
+
+    /// The whole read a page's app link is held to: the site-wide row is read before the app's own key, so a
+    /// site-wide Allow reaches every app, and the page's own "this time" answer is read too so a page that asks again
+    /// isn't asked twice. This is the composition whose absence let the site-wide-Allow regression ship.
+    @Test func anAppLinkReadsTheSiteWideRowThenTheAppThenThePage() throws {
+        try withDefaults {
+            let tab = Tab(url: URL(string: site + "/"), spaceID: UUID())
+            SitePermissions.setChoice(.allow, for: .apps, origin: site)
+            #expect(ExternalLinks.storedAppAction(pageOrigin: site, origin: site, scheme: "zoommtg",
+                                                  foreign: false, tab: tab) == "allow")
+            #expect(ExternalLinks.storedAppAction(pageOrigin: site, origin: site, scheme: "itms-apps",
+                                                  foreign: false, tab: tab) == "allow")
+            // A foreign frame never gets the page's site-wide Allow.
+            #expect(ExternalLinks.storedAppAction(pageOrigin: site, origin: site, scheme: "zoommtg",
+                                                  foreign: true, tab: tab) == nil)
+            // The page's own answer this time, with nothing kept for the site.
+            SitePermissions.setChoice(.ask, for: .apps, origin: site)
+            SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: false),
+                                           subject: PermissionSubject.app("zoommtg"), origin: site, tab: tab, isPrivate: false)
+            #expect(ExternalLinks.storedAppAction(pageOrigin: site, origin: site, scheme: "zoommtg",
+                                                  foreign: false, tab: tab) == "deny")
+            #expect(ExternalLinks.storedAppAction(pageOrigin: site, origin: site, scheme: "itms-apps",
+                                                  foreign: false, tab: tab) == nil)
+        }
+    }
+
+    /// "Always / Don't Allow" is kept for the whole site, the key Site Controls and Settings show, so the row and the
+    /// browser agree and no other app on the site asks again; "Always Allow" stays that one app's.
+    @Test func anAnsweredDenyIsKeptForTheWholeSite() throws {
+        try withDefaults {
+            let tab = Tab(url: URL(string: site + "/"), spaceID: UUID())
+            SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: true),
+                                           subject: PermissionSubject.apps, origin: site, tab: tab, isPrivate: false)
+            #expect(SitePermissions.appDecision(origin: site, scheme: "zoommtg") == false)
+            #expect(SitePermissions.appDecision(origin: site, scheme: "itms-apps") == false)
+            #expect(SitePermissions.choice(.apps, origin: site) == .block)
         }
     }
 
