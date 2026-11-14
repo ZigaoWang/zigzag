@@ -44,10 +44,13 @@ extension WindowManager {
         return WebAppWindowController.all.first { $0.window === window }
     }
 
-    /// The window `tab` lives in, wherever it's showing.
+    /// The window `tab` lives in, wherever it's showing: the same three `promptHost(for:)` answers, found by the page
+    /// instead of by the window. An installed app's window was missing here, so a login captured in one offered to be
+    /// saved in a window that was never looked for, and the offer never came up.
     func promptHost(holding tab: Tab) -> PromptHost? {
         if let controller = controllers.first(where: { $0.tabManager.allTabs.contains { $0 === tab } }) { return controller }
-        return MiniWindowController.all.first { $0.tab === tab }
+        if let mini = MiniWindowController.all.first { $0.tab === tab } { return mini }
+        return WebAppWindowController.all.first { $0.tab === tab }
     }
 }
 
