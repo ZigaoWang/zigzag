@@ -974,7 +974,7 @@ final class PrimaryButton: InteractiveView {
         // The space's own accent unless told otherwise, as `PillButton(.prominent)`.
         let theme = Brand.Theme.for(self)
         let tint = customFill ?? (isDestructive ? Tokens.Color.destructive : theme.accent)
-        label.textColor = applyButtonLook(.primary, tint: tint, ink: customInk ?? (isDestructive ? .white : theme.onAccent))
+        label.textColor = applyButtonLook(.primary, tint: tint, ink: customInk ?? (isDestructive ? .white : customFill.map(Brand.ink(on:)) ?? theme.onAccent))
     }
 }
 

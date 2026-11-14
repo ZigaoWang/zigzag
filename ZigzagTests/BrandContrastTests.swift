@@ -82,4 +82,29 @@ struct BrandContrastTests {
             }
         }
     }
+
+    @Test func aTintedButtonsTextReadsOnItsTint() {
+        // A prominent button given a tint (a site's question, What's New) takes text that reads on that tint: the
+        // space's accent is pale at night, where white on it fell to 2.6:1.
+        for step in 0..<36 {
+            let accent = Brand.Theme(hue: Double(step) / 36).accent
+            let button = PillButton(title: "Allow", style: .prominent)
+            button.tint = accent
+            let label = button.subviews.compactMap { $0 as? Label }.first
+            for dark in [false, true] {
+                let ink = resolved(label?.textColor ?? .clear, dark: dark), fill = resolved(accent, dark: dark)
+                let ratio = Brand.contrast(ink, fill)
+                #expect(ratio >= 4.5, "hue \(step * 10)° \(dark ? "dark" : "light"): \(String(format: "%.2f", ratio)):1")
+            }
+        }
+        // Any other fill gets the better of white and a deep ink: white on a deep one, deep on a pale one.
+        for fill in [NSColor.systemBlue, .systemRed, Brand.ribbon, Brand.navy, .white, .black] {
+            for dark in [false, true] {
+                let f = resolved(fill, dark: dark), ink = resolved(Brand.ink(on: fill), dark: dark)
+                #expect(Brand.contrast(ink, f) >= Brand.contrast(.white, f) - 0.001, "\(f) \(dark)")
+            }
+        }
+        #expect(Brand.contrast(resolved(Brand.ink(on: Brand.ribbon), dark: false), Brand.ribbon) >= 4.5)
+        #expect(Brand.contrast(resolved(Brand.ink(on: Brand.navy), dark: true), Brand.navy) >= 4.5)
+    }
 }

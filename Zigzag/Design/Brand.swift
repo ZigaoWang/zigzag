@@ -46,6 +46,22 @@ enum Brand {
         let (la, lb) = (relativeLuminance(a), relativeLuminance(b))
         return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
     }
+
+    /// Text on a button filled with `fill`: white, or a deep ink of the fill's own hue, whichever reads better on it
+    /// in the appearance it's drawn in. A space's accent is deep by day and pale at night, so white text on it
+    /// would fail in dark mode; this picks as `Theme.onAccent` does, for any fill.
+    static func ink(on fill: NSColor) -> NSColor {
+        NSColor(name: nil) { appearance in
+            var ink = NSColor.white
+            appearance.performAsCurrentDrawingAppearance {
+                guard let f = fill.usingColorSpace(.sRGB) else { return }
+                let deep = color(hue: Double(f.hueComponent), saturation: f.saturationComponent < 0.05 ? 0 : 0.7, luminance: 0.012)
+                if contrast(deep, f) > contrast(.white, f) { ink = deep }
+            }
+            return ink
+        }
+    }
+
     static let navyHue: Double = 213.0 / 360
     static let ribbon = Tokens.Color.hex(0xDAE5F2)
     /// Banners are navy in both appearances; a touch deeper in dark so they sit in a dark window.
