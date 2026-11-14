@@ -525,3 +525,44 @@ struct DownloadRuleTests {
         #expect(DownloadRuleSheet.actionHoldUp(rpc) == nil)
     }
 }
+
+extension DownloadRuleTests {
+    @Test func storedHandoffAnswersMapToGates() {
+        #expect(DownloadHandoff.gate(stored: "handOff", isPrivate: false) == .handOff)
+        #expect(DownloadHandoff.gate(stored: "browser", isPrivate: false) == .browser)
+        #expect(DownloadHandoff.gate(stored: "deny", isPrivate: false) == .cancel)
+        #expect(DownloadHandoff.gate(stored: nil, isPrivate: false) == .ask)
+        #expect(DownloadHandoff.gate(stored: "handOff", isPrivate: true) == .ask)
+    }
+
+    @Test func aHandoffQuestionUsesThePageOrigin() {
+        let request = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                              referrer: URL(string: "https://site.example/page")!,
+                                              pageOrigin: "https://site.example")
+        #expect(DownloadHandoff.questionOrigin(for: request) == "https://site.example")
+    }
+
+    @Test func aHandoffQuestionFallsBackToTheReferrerThenTheTarget() {
+        let referred = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                               referrer: URL(string: "https://site.example/page")!)
+        #expect(DownloadHandoff.questionOrigin(for: referred) == "https://site.example")
+        let bare = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!)
+        #expect(DownloadHandoff.questionOrigin(for: bare) == "https://cdn.example")
+    }
+}
+
+extension DownloadRuleTests {
+    /// A handoff answered "Open in Browser" this time holds for the page, so the download the same page starts is not
+    /// asked the same question again.
+    @MainActor @Test func aHandoffAnsweredThisTimeIsNotAskedAgain() async {
+        let rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
+                                action: DownloadRuleAction(kind: .openURL))
+        let tab = Tab(url: URL(string: "https://site.example/page"), spaceID: UUID())
+        tab.permissionAnswers.note("browser", key: "https://site.example", kind: DownloadHandoff.handoffKind(rule))
+        let request = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                              referrer: URL(string: "https://site.example/page")!,
+                                              pageOrigin: "https://site.example")
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab) == .browser)
+        #expect(DownloadHandoff.handoffKind(rule) == "handoff:\(rule.id.uuidString)")
+    }
+}

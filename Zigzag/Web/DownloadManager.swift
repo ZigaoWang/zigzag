@@ -552,20 +552,27 @@ extension DownloadManager: WKDownloadDelegate {
            let url = download.originalRequest?.url,
            let rule = DownloadHandoff.firstMatch(url, appliesToLinks: false) {
             let owner = (download.webView as? BrowserWebView)?.owner
-            let handoff = DownloadHandoff.Request(url: url, referrer: download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) },
+            let referrer = download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) }
+            let handoff = DownloadHandoff.Request(url: url, referrer: referrer,
+                                                  pageOrigin: SiteOrigin.of(owner?.url ?? download.webView?.url),
                                                   filename: DownloadTokens.filename(for: url, suggested: name),
                                                   space: owner.flatMap { Library.shared.space($0.spaceID)?.name } ?? "",
                                                   dataStore: download.webView?.configuration.websiteDataStore,
                                                   isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false),
                                                   window: window, tab: owner)
-            let outcome = await DownloadHandoff.perform(rule, request: handoff)
-            if outcome == .handedOff {
-                items.removeAll { $0.download === download }
-                changed.send(nil)
-                download.cancel { _ in }
-                return nil
+            switch await DownloadHandoff.decide(rule, request: handoff, tab: owner) {
+            case .handOff:
+                let outcome = await DownloadHandoff.perform(rule, request: handoff)
+                if outcome == .handedOff {
+                    items.removeAll { $0.download === download }
+                    changed.send(nil)
+                    download.cancel { _ in }
+                    return nil
+                }
+                if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+            case .browser, .cancel, .ask:
+                break
             }
-            if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
         }
         var replacing: URL?
         var showsWhenFinished = false

@@ -2,6 +2,10 @@ import AppKit
 import Foundation
 import WebKit
 
+enum HandoffGate: Equatable {
+    case handOff, browser, cancel, ask
+}
+
 /// Runs the first rule that catches a link or a download: opens an app or a URL, runs a script, or calls a JSON-RPC or
 /// XML-RPC service. The tab's own store supplies the cookies, so a logged-in download keeps its sign-in; nothing here
 /// ever builds a shell line, so a URL with `&`, `;` or `$()` arrives as one argument.
@@ -11,6 +15,7 @@ enum DownloadHandoff {
     struct Request {
         var url: URL
         var referrer: URL?
+        var pageOrigin: String?
         var filename = ""
         var mime = ""
         var space = ""
@@ -25,9 +30,11 @@ enum DownloadHandoff {
     enum Outcome: Equatable {
         /// A rule ran. The navigation is cancelled, and any download WebKit made for it is.
         case handedOff
-        /// No rule wanted it: carry on as if there were none. Also what an Open URL rule answers when its question was
-        /// put off, so the link loads or the file saves as if the rule had never matched.
+        /// No rule wanted it, or a download was refused at the handoff question, or an Open URL rule's question was put
+        /// off: carry on in the browser, as if the rule had never matched.
         case noMatch
+        /// A link was refused at the handoff question: cancel its navigation without running the rule.
+        case cancelled
         case failed(String)
     }
 
@@ -36,10 +43,85 @@ enum DownloadHandoff {
         DownloadRulesStore.shared.firstMatch(url: url, appliesToLinks: appliesToLinks)
     }
 
+    static func gate(stored: String?, isPrivate: Bool) -> HandoffGate {
+        guard !isPrivate else { return .ask }
+        return switch stored {
+        case "handOff": .handOff
+        case "browser": .browser
+        case "deny": .cancel
+        default: .ask
+        }
+    }
+
+    /// The site that produced the handoff, never the destination when a page or referrer can name it instead.
+    static func questionOrigin(for request: Request) -> String? {
+        request.pageOrigin ?? SiteOrigin.of(request.referrer) ?? SiteOrigin.of(request.url)
+    }
+
+    /// Resolves a rule's standing answer, or asks in the page's window. No action or cookie read happens here.
+    static func decide(_ rule: DownloadRule, request: Request, tab: Tab? = nil) async -> HandoffGate {
+        let origin = questionOrigin(for: request)
+        let subject = PermissionSubject.handoff(rule.id)
+        let storedAnswer: () -> PermissionAnswer? = {
+            guard !request.isPrivate, let origin, let action = SitePermissions.action(subject, origin: origin) else { return nil }
+            return switch action {
+            case "handOff", "browser", "deny": PermissionAnswer(action: action, remember: true)
+            default: nil
+            }
+        }
+        let standing = gate(stored: storedAnswer()?.action, isPrivate: request.isPrivate)
+        guard standing == .ask else { return standing }
+        // What this page already answered for this rule, "this time": a link and the download it starts are one
+        // question, not two. A private window keeps its own answers in its tab like any other.
+        let pageKind = handoffKind(rule)
+        if let origin, let page = tab?.permissionAnswers.action(key: origin, kind: pageKind) {
+            let answered = gate(stored: page, isPrivate: false)
+            if answered != .ask { return answered }
+        }
+        // With no host of its own to ask in — a pop-up a pop-up opened has no window controller that is one — the
+        // question goes in the window in front, as opening a stray link does, so it is put rather than the rule
+        // quietly not running. That window's edge glows if it cannot show the question there.
+        let controller = tab.flatMap { WindowManager.shared.promptHost(holding: $0) }
+            ?? (request.window?.windowController as? PromptHost)
+            ?? WindowManager.shared.promptHost(for: request.window)
+            ?? WindowManager.shared.promptHost(for: NSApp.keyWindow)
+            ?? WindowManager.shared.keyController
+        // With no window open at all to ask in, the rule simply does not run: nothing may happen unseen.
+        guard let controller else { return .browser }
+        let answer = await PermissionPrompt.ask(
+            host: SitePermissions.askerName(origin), origin: origin, what: rule.name, symbol: "arrow.up.forward.app",
+            in: controller, tab: tab,
+            title: String(localized: "Hand Off \(rule.name)", comment: "A page's question before a download rule handles a link or download. The placeholder is the rule's name."),
+            actions: [.deny,
+                      .alternate("browser", String(localized: "Open in Browser", comment: "Button that lets a link or download stay in the browser instead of running a download rule.")),
+                      .alternate("handOff", String(localized: "Hand Off", comment: "Button that runs the named download rule for a link or download."))],
+            canRemember: !request.isPrivate && origin != nil,
+            answered: storedAnswer
+        )
+        guard let answer else { return .browser }
+        if answer.remember, !request.isPrivate, let origin {
+            SitePermissions.remember(answer.action, subject: subject, origin: origin)
+        } else if let origin, let tab {
+            tab.permissionAnswers.note(answer.action, key: origin, kind: pageKind)
+        }
+        return switch answer.action {
+        case "handOff": .handOff
+        case "deny": .cancel
+        default: .browser
+        }
+    }
+
+    /// The key a rule's page answer is kept under: per rule, so two rules on one page keep their own answers.
+    static func handoffKind(_ rule: DownloadRule) -> String { "handoff:\(rule.id.uuidString)" }
+
     @discardableResult
     static func route(_ url: URL, appliesToLinks: Bool, request: Request) async -> Outcome {
         guard let rule = firstMatch(url, appliesToLinks: appliesToLinks) else { return .noMatch }
-        return await perform(rule, request: request)
+        return switch await decide(rule, request: request) {
+        case .handOff: await perform(rule, request: request)
+        case .browser, .ask: .noMatch
+        case .cancel: appliesToLinks ? .cancelled : .noMatch
+        }
     }
 
     /// Runs one rule. Cookies are read only when its action names one, and the files it makes are gone by the end.

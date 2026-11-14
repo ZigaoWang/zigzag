@@ -404,17 +404,24 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         guard url.scheme?.lowercased() != HistoryPage.scheme, !Tab.isExtensionPage(url) else { return false }
         guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks) else { return false }
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? webView.url
-        let handoff = DownloadHandoff.Request(url: url, referrer: referrer,
+        let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: SiteOrigin.of(webView.url),
                                               filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
                                               mime: mime, space: "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
                                               window: parentWindow, tab: opener)
-        let outcome = await DownloadHandoff.perform(rule, request: handoff)
-        if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
-        // A rule that was matched but didn't take it leaves the pop-up's page as it was — unless the rule is set to
-        // stop the page, which keeps a link here from loading on and matching the rule again.
-        if case .noMatch = outcome { return appliesToLinks && rule.stopsThePage }
-        return true
+        switch await DownloadHandoff.decide(rule, request: handoff, tab: opener) {
+        case .handOff:
+            let outcome = await DownloadHandoff.perform(rule, request: handoff)
+            if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+            // A rule that was matched but didn't take it leaves the pop-up's page as it was — unless the rule is set
+            // to stop the page, which keeps a link here from loading on and matching the rule again.
+            if case .noMatch = outcome { return appliesToLinks && rule.stopsThePage }
+            return true
+        case .browser, .ask:
+            return appliesToLinks && rule.stopsThePage
+        case .cancel:
+            return appliesToLinks || rule.stopsThePage
+        }
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {

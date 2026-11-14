@@ -1641,21 +1641,28 @@ extension Tab: WKNavigationDelegate {
         guard !awaitsRuleLoad else { return false }
         guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks) else { return false }
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
-        let handoff = DownloadHandoff.Request(url: url, referrer: referrer,
+        let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: SiteOrigin.of(webView.url ?? self.url),
                                               filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
                                               mime: mime, space: Library.shared.space(spaceID)?.name ?? "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
                                               window: host?.hostWindow, tab: self)
-        let outcome = await DownloadHandoff.perform(rule, request: handoff)
-        if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
-        // A rule that was matched but didn't take it — an Open URL rule whose question was put off — leaves the link
-        // or the download as it was, exactly as if no rule had matched. A rule set to stop the page keeps a link from
-        // loading on even then: the page's own loads and redirects would otherwise match the rule again. A download
-        // has nowhere to go on to, so it is always left as it was.
-        if case .noMatch = outcome { return appliesToLinks && rule.stopsThePage }
-        // A tab opened just for this link has nothing left to show.
-        closeIfOnlyADownload(webView)
-        return true
+        switch await DownloadHandoff.decide(rule, request: handoff, tab: self) {
+        case .handOff:
+            let outcome = await DownloadHandoff.perform(rule, request: handoff)
+            if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+            // A rule that was matched but didn't take it — an Open URL rule whose question was put off — leaves the
+            // link or the download as it was, exactly as if no rule had matched. A rule set to stop the page keeps a
+            // link from loading on even then: the page's own loads and redirects would otherwise match the rule
+            // again. A download has nowhere to go on to, so it is always left as it was.
+            if case .noMatch = outcome { return appliesToLinks && rule.stopsThePage }
+            // A tab opened just for this link has nothing left to show.
+            closeIfOnlyADownload(webView)
+            return true
+        case .browser, .ask:
+            return appliesToLinks && rule.stopsThePage
+        case .cancel:
+            return appliesToLinks || rule.stopsThePage
+        }
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -1926,18 +1933,25 @@ extension Tab: WKUIDelegate {
     /// A new-window link a rule caught: the handoff is asynchronous, so the window is simply never made.
     private func handOffInNewWindow(_ rule: DownloadRule, url: URL, request: URLRequest, webView: WKWebView) {
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
-        let handoff = DownloadHandoff.Request(url: url, referrer: referrer,
+        let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: SiteOrigin.of(webView.url ?? self.url),
                                               filename: DownloadTokens.filename(for: url, suggested: ""),
                                               space: Library.shared.space(spaceID)?.name ?? "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
                                               window: host?.hostWindow, tab: self)
         Task { @MainActor in
-            let outcome = await DownloadHandoff.perform(rule, request: handoff)
-            if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
-            // Put off, or nowhere to open it: the link opens the new tab it was going to open anyway, since this
-            // path has already refused the window WebKit asked for — unless the rule stops the page, in which case
-            // it opens nowhere at all.
-            if case .noMatch = outcome, !rule.stopsThePage { host?.tab(self, openURL: url, disposition: .foregroundTab) }
+            switch await DownloadHandoff.decide(rule, request: handoff, tab: self) {
+            case .handOff:
+                let outcome = await DownloadHandoff.perform(rule, request: handoff)
+                if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+                // Put off, or nowhere to open it: the link opens the new tab it was going to open anyway, since this
+                // path has already refused the window WebKit asked for — unless the rule stops the page, in which
+                // case it opens nowhere at all.
+                if case .noMatch = outcome, !rule.stopsThePage { host?.tab(self, openURL: url, disposition: .foregroundTab) }
+            case .browser, .ask:
+                if !rule.stopsThePage { self.host?.tab(self, openURL: url, disposition: .foregroundTab) }
+            case .cancel:
+                break
+            }
         }
     }
 
