@@ -1431,6 +1431,11 @@ extension Tab: WKNavigationDelegate {
         // hand over a file a moment later (a download page's hidden frame).
         if let policy = downloads.decide(shouldDownload: navigationAction.shouldPerformDownload, clicked: userInitiated || ownLoad,
                                          isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true) {
+            // A rule for downloads may take it instead: then WebKit makes no download at all.
+            if policy == .download, let target = navigationAction.request.url,
+               await handOffIfWanted(target, request: navigationAction.request, appliesToLinks: false, webView: webView) {
+                return (.cancel, preferences)
+            }
             if policy == .cancel { refusedDownload(in: webView) }
             return (policy, preferences)
         }
@@ -1455,6 +1460,14 @@ extension Tab: WKNavigationDelegate {
                 }
                 return (.cancel, preferences)
             }
+        }
+
+        // A rule for links you click may take the address before anything is fetched, so a YouTube link reaches mpv
+        // or a magnet reaches rTorrent without a page loading first. Redirects, reloads, history and a page's own
+        // scripted navigation are left alone.
+        if userInitiated, navigationAction.navigationType == .linkActivated, navigationAction.targetFrame?.isMainFrame ?? true,
+           await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: true, webView: webView) {
+            return (.cancel, preferences)
         }
 
         // Schemes the web view cannot handle go to the system (mailto:, facetime:, app links). Extension pages stay here.
@@ -1598,7 +1611,7 @@ extension Tab: WKNavigationDelegate {
             pdfResponseURL = mime == "application/pdf" ? response.url : nil
             pdfResponseName = mime == "application/pdf" ? HistoryStore.suggestedName(of: response) : nil
         }
-        let disposition = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition")
+        let disposition = ((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? "").lowercased()
         let policy = downloads.decide(mimeType: mime, contentDisposition: disposition, canShowMIMEType: navigationResponse.canShowMIMEType,
                                       isMainFrame: navigationResponse.isForMainFrame)
         // WebRTC follows the page that's to show, where a redirect took it; one that isn't shown leaves the page
@@ -1610,9 +1623,21 @@ extension Tab: WKNavigationDelegate {
         if policy == .cancel, navigationResponse.isForMainFrame { refusedDownload(in: webView) }
         #if DEBUG
         if policy == .download {
-            debugLog("download chosen: mime=\(mime) canShow=\(navigationResponse.canShowMIMEType) mainFrame=\(navigationResponse.isForMainFrame) attachment=\(disposition != nil)")
+            debugLog("download chosen: mime=\(mime) canShow=\(navigationResponse.canShowMIMEType) mainFrame=\(navigationResponse.isForMainFrame) attachment=\(!disposition.isEmpty)")
         }
         #endif
+        // A server-sent file (Content-Disposition: attachment, or a type WebKit can't show) may be for another app.
+        // Cancelling here means no download row and no blank tab, so the tab that was opened just for it goes.
+        // `decide` has already held a frame's file back unless that frame was just clicked, so a `.download` here is
+        // the page's own or one a click asked for.
+        if policy == .download, let target = response.url {
+            let filename = Self.filename(from: disposition) ?? DownloadTokens.filename(for: target, suggested: "")
+            if await handOffIfWanted(target, request: URLRequest(url: target), appliesToLinks: false, webView: webView,
+                                     filename: filename, mime: mime) {
+                closeIfOnlyADownload(webView)
+                return .cancel
+            }
+        }
         return policy
     }
 
@@ -1621,6 +1646,39 @@ extension Tab: WKNavigationDelegate {
         Diagnostics.note("Download refused", site: url?.host(), "A page started another download without a click", isPrivate: isPrivate)
         guard let host = webView.window?.windowController as? PromptHost else { return }
         host.promptToast(DownloadPolicy.refusedText, symbol: "arrow.down.circle", duration: 3)
+    }
+
+    /// The name in a Content-Disposition header, extended or plain, if it has one.
+    nonisolated static func filename(from disposition: String) -> String? {
+        if let star = disposition.range(of: "filename*=") {
+            let rest = disposition[star.upperBound...]
+            let value = rest.split(separator: ";", maxSplits: 1).first.map(String.init) ?? ""
+            let encoded = value.split(separator: "'", maxSplits: 2).last.map(String.init) ?? value
+            return encoded.removingPercentEncoding ?? encoded
+        }
+        guard let plain = disposition.range(of: "filename=") else { return nil }
+        var value = disposition[plain.upperBound...].split(separator: ";", maxSplits: 1).first.map(String.init) ?? ""
+        value = value.trimmingCharacters(in: .whitespaces)
+        if value.hasPrefix("\""), value.hasSuffix("\""), value.count >= 2 { value = String(value.dropFirst().dropLast()) }
+        return value.isEmpty ? nil : value
+    }
+
+    /// Runs the first rule that catches `url`, if there is one. True means the rule took it: the navigation is
+    /// cancelled. Cookies come from this tab's own store, and the space is the one it sits in.
+    private func handOffIfWanted(_ url: URL, request: URLRequest, appliesToLinks: Bool, webView: WKWebView,
+                                 filename: String? = nil, mime: String = "") async -> Bool {
+        // Zigzag's own pages and an extension's are never a rule's to take.
+        guard url.scheme?.lowercased() != HistoryPage.scheme, !Self.isExtensionPage(url) else { return false }
+        guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks) else { return false }
+        let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
+        let handoff = DownloadHandoff.Request(url: url, referrer: referrer,
+                                              filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
+                                              mime: mime, space: Library.shared.space(spaceID)?.name ?? "",
+                                              dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
+                                              window: host?.hostWindow)
+        let outcome = await DownloadHandoff.perform(rule, request: handoff)
+        if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+        return true
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -1864,7 +1922,30 @@ extension Tab: WKUIDelegate {
             _ = BrowserWebView.takePendingDisposition(for: webView)
             return nil
         }
+        // A link a rule wants never becomes a window: it goes straight to its app, so no blank tab is left behind.
+        // Zigzag's own Open in New Window or Tab still opens: you asked for a window, not for the rule.
+        if BrowserWebView.pendingDisposition(for: webView) == nil,
+           let url = navigationAction.request.url, PopupNotice.isUserInitiated(navigationAction),
+           let rule = DownloadHandoff.firstMatch(url, appliesToLinks: true) {
+            _ = BrowserWebView.takePendingDisposition(for: webView)
+            handOffInNewWindow(rule, url: url, request: navigationAction.request, webView: webView)
+            return nil
+        }
         return host?.tab(self, createWebViewWith: configuration, for: navigationAction, features: windowFeatures)
+    }
+
+    /// A new-window link a rule caught: the handoff is asynchronous, so the window is simply never made.
+    private func handOffInNewWindow(_ rule: DownloadRule, url: URL, request: URLRequest, webView: WKWebView) {
+        let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
+        let handoff = DownloadHandoff.Request(url: url, referrer: referrer,
+                                              filename: DownloadTokens.filename(for: url, suggested: ""),
+                                              space: Library.shared.space(spaceID)?.name ?? "",
+                                              dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
+                                              window: host?.hostWindow)
+        Task { @MainActor in
+            let outcome = await DownloadHandoff.perform(rule, request: handoff)
+            if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+        }
     }
 
     func webViewDidClose(_ webView: WKWebView) {
