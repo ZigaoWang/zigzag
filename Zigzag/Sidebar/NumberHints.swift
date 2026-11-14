@@ -115,7 +115,7 @@ final class NumberHintView: NSView {
 
     override func layout() {
         super.layout()
-        label.frame = NSRect(x: -Label.inset, y: (bounds.height - label.lineHeight) / 2, width: bounds.width + Label.inset * 2, height: label.lineHeight)
+        label.frame = NSRect(x: -Label.inset, y: label.centeredY(in: bounds.height), width: bounds.width + Label.inset * 2, height: label.lineHeight)
         refreshColors()
     }
 

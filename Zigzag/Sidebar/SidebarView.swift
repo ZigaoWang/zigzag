@@ -509,8 +509,8 @@ final class AddressView: InteractiveView {
         }
         if showingChanged || pinFramesBefore != showing.map(\.button.frame) { onPinsMoved?() }
 
-        let h = ceil(label.intrinsicContentSize.height)
-        let labelFrame = NSRect(x: x - Label.inset, y: (bounds.height - h) / 2, width: right - Tokens.Space.x1 - x + Label.inset * 2, height: h)
+        let h = label.lineHeight
+        let labelFrame = NSRect(x: x - Label.inset, y: label.centeredY(in: bounds.height), width: right - Tokens.Space.x1 - x + Label.inset * 2, height: h)
         // A mark appearing starts in its place rather than flying in from the corner.
         if lock.frame.width == 0 { lock.frame = lockFrame }
         guard label.frame != labelFrame || lock.frame != lockFrame else { return }

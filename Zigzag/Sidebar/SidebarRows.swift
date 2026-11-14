@@ -49,9 +49,10 @@ class SidebarRowView: InteractiveView {
         let iconSize = Tokens.Sidebar.favicon
         icon.frame = NSRect(x: Self.inset, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
         let titleX = icon.frame.maxX + Self.titleOffset
-        let titleHeight = ceil(title.intrinsicContentSize.height)
+        let titleHeight = title.lineHeight
         let trailing = trailingAccessoryWidth > 0 ? trailingAccessoryWidth + Self.buttonEdge : Self.inset - Label.inset
-        title.frame = NSRect(x: titleX, y: (bounds.height - titleHeight) / 2, width: max(0, bounds.width - titleX - trailing), height: titleHeight)
+        // Its capitals in the middle of the row, level with the icon's middle, not its line box (which sits them low).
+        title.frame = NSRect(x: titleX, y: title.centeredY(in: bounds.height), width: max(0, bounds.width - titleX - trailing), height: titleHeight)
         if layer?.sublayers?.contains(where: { $0.name == "rim" && !$0.isHidden }) == true { setCardRim(true) }
         refreshCardShadowPath()
     }
@@ -1208,7 +1209,7 @@ final class SpaceHeaderView: InteractiveView {
         // Low in its slot, near the pinned tabs it names, with the room above it.
         let pad = Tokens.Space.x1
         // Large, low in its slot; at row size, centered in its row like the rows below it.
-        let y = !Self.isLarge ? round((bounds.height - h) / 2) : isFlipped ? bounds.height - h - pad : pad
+        let y = !Self.isLarge ? label.centeredY(in: bounds.height) : isFlipped ? bounds.height - h - pad : pad
         // Icons and the chevron center on the lowercase letters' middle (the x-height), not the text box, so they sit
         // level with the name.
         let font = Self.nameFont
@@ -1353,7 +1354,10 @@ final class SeparatorRowView: NSView {
         // the icons and the space's name.
         let h = label.lineHeight
         let mid = bounds.height - Tokens.Space.x3
-        label.frame = NSRect(x: SidebarRowView.inset - Label.inset, y: floor(mid - h / 2), width: label.inkWidth + Label.inset * 2, height: h)
+        // Its capitals' middle on the line, as Clear's are in its capsule.
+        let capsY = mid - h / 2 - Label.capsBelowMiddle(of: label.font ?? Tokens.Font.sidebarLabel(), lineHeight: h)
+        let scale = window?.backingScaleFactor ?? 2
+        label.frame = NSRect(x: SidebarRowView.inset - Label.inset, y: (capsY * scale).rounded() / scale, width: label.inkWidth + Label.inset * 2, height: h)
         let cw = clearButton.fittingWidth, ch: CGFloat = 20
         clearButton.frame = NSRect(x: bounds.width - cw, y: floor(mid - ch / 2), width: cw, height: ch)
         clearButton.layoutSubtreeIfNeeded()
@@ -1468,7 +1472,7 @@ final class ClearTabsButton: InteractiveView {
         layer?.cornerRadius = bounds.height / 2
         arrow.frame = NSRect(x: Self.pad, y: (bounds.height - Self.arrowSide) / 2, width: Self.arrowSide, height: Self.arrowSide)
         let h = label.lineHeight
-        label.frame = NSRect(x: arrow.frame.maxX + 3 - Label.inset, y: (bounds.height - h) / 2, width: label.inkWidth + Label.inset * 2, height: h)
+        label.frame = NSRect(x: arrow.frame.maxX + 3 - Label.inset, y: label.centeredY(in: bounds.height), width: label.inkWidth + Label.inset * 2, height: h)
     }
 
     override func stateDidChange(animated: Bool) {
