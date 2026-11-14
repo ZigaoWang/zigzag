@@ -56,7 +56,7 @@ enum DownloadHandoff {
         let outcome: Outcome
         switch rule.action.kind {
         case .runScript:
-            outcome = runScript(rule.action, values: values, secret: secret, window: request.window)
+            outcome = runScript(rule.action, values: values, secret: secret, request: request, rule: rule)
             // A script keeps the file until it exits; one that never started has no use for it.
             if outcome != .handedOff, let cookieFile { HandoffCookies.removeFile(cookieFile) }
         case .openApp:
@@ -74,9 +74,14 @@ enum DownloadHandoff {
 
     /// A rule that ran, but not: said over the page, and noted without the link, the cookies or the secret.
     static func report(_ outcome: Outcome, rule: DownloadRule?, request: Request) {
+        report(outcome, rule: rule, url: request.url, isPrivate: request.isPrivate, window: request.window)
+    }
+
+    /// The same, for a failure that arrives after the tab has moved on (a script that exits non-zero).
+    static func report(_ outcome: Outcome, rule: DownloadRule?, url: URL, isPrivate: Bool, window: NSWindow? = nil) {
         guard case .failed(let reason) = outcome else { return }
-        Diagnostics.note("Handoff failed", site: request.url.host(), "\(rule?.name ?? "Rule"): \(reason)", isPrivate: request.isPrivate)
-        guard let controller = WindowManager.shared.controller(for: request.window) ?? WindowManager.shared.keyController else { return }
+        Diagnostics.note("Handoff failed", site: url.host(), "\(rule?.name ?? "Rule"): \(reason)", isPrivate: isPrivate)
+        guard let controller = WindowManager.shared.controller(for: window) ?? WindowManager.shared.keyController else { return }
         Toast.show(String(localized: "Couldn’t hand off the link: \(reason)", comment: "Toast when a download rule's action fails. The placeholder is the reason, a few words."),
                    symbol: "exclamationmark.triangle", duration: 4, in: controller)
     }
@@ -132,7 +137,8 @@ enum DownloadHandoff {
 
     /// Runs the script with every token as its own argument or environment value. A `.sh` file is run by `/bin/sh`;
     /// anything else must be executable. Never `/bin/sh -c`, and never a joined command line.
-    private static func runScript(_ action: DownloadRuleAction, values: HandoffValues, secret: String, window: NSWindow?) -> Outcome {
+    private static func runScript(_ action: DownloadRuleAction, values: HandoffValues, secret: String,
+                                  request: Request, rule: DownloadRule?) -> Outcome {
         let path = (DownloadTokens.expand(action.scriptPath, with: values, secret: secret) as NSString).expandingTildeInPath
         guard FileManager.default.fileExists(atPath: path) else {
             return .failed(String(localized: "The script is no longer there.", comment: "Why a download rule failed: the script it was told to run is gone."))
@@ -146,6 +152,10 @@ enum DownloadHandoff {
             process.arguments = action.arguments.map { DownloadTokens.expand($0, with: values, secret: secret) }
         }
         var environment = ProcessInfo.processInfo.environment
+        // An app opened from the Finder inherits a bare `PATH`, so `yt-dlp` and friends installed by Homebrew or a
+        // hand-installed tool in /usr/local/bin wouldn't be found. Those two come first; the user's own `PATH` stays.
+        let inherited = environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+        environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:" + inherited
         environment["ZIGZAG_LINK"] = values.link.absoluteString
         environment["ZIGZAG_REFERRER"] = values.referrer?.absoluteString ?? ""
         environment["ZIGZAG_FILENAME"] = values.filename
@@ -156,11 +166,29 @@ enum DownloadHandoff {
         if !secret.isEmpty { environment["ZIGZAG_SECRET"] = secret }
         process.environment = environment
         process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+        let errorPipe = Pipe()
+        process.standardError = errorPipe
         process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+        let errors = ScriptErrors()
+        errorPipe.fileHandleForReading.readabilityHandler = { handle in
+            errors.append(handle.availableData)
+        }
         let cookieFile = values.cookieFile
-        process.terminationHandler = { _ in
+        let link = values.link
+        let isPrivate = request.isPrivate
+        process.terminationHandler = { finished in
+            errorPipe.fileHandleForReading.readabilityHandler = nil
+            errors.append(errorPipe.fileHandleForReading.readDataToEndOfFile())
             if !cookieFile.isEmpty { HandoffCookies.removeFile(URL(fileURLWithPath: cookieFile)) }
+            guard finished.terminationStatus != 0 else { return }
+            // The script ran and failed. Say so: a silent failure looks like a download that never happened.
+            let said = errors.text
+            let reason = said.isEmpty
+                ? String(localized: "The script exited with status \(finished.terminationStatus).", comment: "Why a download rule failed: the script finished with an error code. The placeholder is a number, like 1.")
+                : String(localized: "The script failed: \(said)", comment: "Why a download rule failed: the script exited with an error code and printed this. The placeholder is the script's own last line of error text.")
+            Task { @MainActor in
+                report(.failed(reason), rule: rule, url: link, isPrivate: isPrivate)
+            }
         }
         do {
             try process.run()
@@ -254,5 +282,31 @@ enum DownloadHandoff {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let error = object["error"] as? [String: Any] else { return nil }
         return error["message"] as? String
+    }
+}
+
+/// The tail of what a script wrote to standard error, so a failure can say what the script itself said. A pipe read on
+/// a background queue and a toast on the main one share it, hence the lock.
+private nonisolated final class ScriptErrors: @unchecked Sendable {
+    private let lock = NSLock()
+    private var data = Data()
+    private let limit = 2_000
+
+    func append(_ chunk: Data) {
+        guard !chunk.isEmpty else { return }
+        lock.lock()
+        defer { lock.unlock() }
+        data.append(chunk)
+        if data.count > limit { data = Data(data.suffix(limit)) }
+    }
+
+    var text: String {
+        lock.lock()
+        defer { lock.unlock() }
+        let last = String(decoding: data, as: UTF8.self)
+            .split(whereSeparator: { $0.isNewline })
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .last { !$0.isEmpty }
+        return last.map { String($0.prefix(300)) } ?? ""
     }
 }
