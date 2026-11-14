@@ -134,7 +134,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
 
     private func layoutPanel() {
         let b = panel.bounds
-        let button = Tokens.Metric.iconButton
+        let button = Tokens.Metric.findBarButton
         // As far in from the end as from the top and bottom, so Done's circle runs with the capsule's.
         let inset = (b.height - button) / 2
         doneButton.frame = NSRect(x: b.width - inset - button, y: inset, width: button, height: button)
