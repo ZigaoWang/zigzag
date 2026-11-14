@@ -768,6 +768,8 @@ enum Toast {
     private final class Showing {
         weak var toast: ToastView?
         var hideWork: DispatchWorkItem?
+        /// What the toast showing is about, when it's about something that can go away (an offer for a tab's page).
+        weak var owner: AnyObject?
     }
     private static var showing: [ObjectIdentifier: Showing] = [:]
 
@@ -791,10 +793,27 @@ enum Toast {
         state.toast = nil
     }
 
-    /// `closes` adds a close button, for an offer you may want gone before it goes on its own.
+    /// Takes down the toast showing in this window if it's still the one shown for `owner`: another toast that took
+    /// its place since is left be.
+    static func hide(for owner: AnyObject, in controller: BrowserWindowController) {
+        let state = state(for: controller.root.overlay)
+        guard state.owner === owner, state.toast?.dismissing == false else { return }
+        hide(in: controller)
+    }
+
+    /// What the toast showing in this window was shown for, if anything.
+    static func owner(in controller: BrowserWindowController) -> AnyObject? {
+        let state = state(for: controller.root.overlay)
+        guard let toast = state.toast, toast.superview === controller.root.overlay, !toast.dismissing else { return nil }
+        return state.owner
+    }
+
+    /// `closes` adds a close button, for an offer you may want gone before it goes on its own. `owner`: what it's
+    /// about, for `hide(for:in:)`.
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
-                     duration: TimeInterval = 1.3, closes: Bool = false, in controller: BrowserWindowController) {
+                     duration: TimeInterval = 1.3, closes: Bool = false, owner: AnyObject? = nil, in controller: BrowserWindowController) {
         show(text, symbol: symbol, action: action, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller))
+        state(for: controller.root.overlay).owner = owner
     }
 
     /// Over the page, or with the desk open, over the desk, clear of its search field.
@@ -893,6 +912,7 @@ enum Toast {
         }
         // A repeat that's still up (zoom 90% → 80%) only changes the number: it comes from a key, so nothing moves.
         state.toast = toast
+        state.owner = nil
         state.hideWork?.cancel()
         // Toasts with an action wait for the pointer to leave before going, however long it stays, so Undo never
         // slips away from under it.

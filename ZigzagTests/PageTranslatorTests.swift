@@ -391,3 +391,53 @@ struct PageTranslatorTests {
         #expect(PageTranslator.isInView(peeked, selected: tab, peeked: peeked))
     }
 }
+
+/// What a page is taken to be in, from its text and the language it says it's in, and which page an offer is for.
+struct PageLanguageChoiceTests {
+    /// An English article about Shanghai: English paragraphs, and an infobox of Chinese names, each a few characters.
+    static let englishWithChineseNames = [
+        "Shanghai is a direct-administered municipality and the most populous urban area in China.",
+        "上海市，简称沪，是中华人民共和国直辖市之一",
+        "上海直辖市人民政府位于黄浦区人民大道",
+        "沪申海上上海滩外滩陆家嘴浦东新区",
+        "The city is located on the southern estuary of the Yangtze River.",
+    ]
+
+    @Test func anEnglishPageQuotingChineseStaysEnglish() {
+        // By weight alone (a character says about a word) the Chinese names are most of it.
+        #expect(PageTranslator.pageLanguage(blocks: Self.englishWithChineseNames, declared: nil)?.languageCode == .chinese)
+        // Marked English, with a fair part of it English, it's English.
+        #expect(PageTranslator.pageLanguage(blocks: Self.englishWithChineseNames, declared: "en")?.languageCode == .english)
+        #expect(PageTranslator.pageLanguage(blocks: Self.englishWithChineseNames, declared: "en-GB")?.languageCode == .english)
+    }
+
+    @Test func textClearlyInAnotherLanguageOverridesWhatThePageSays() {
+        // #218: a Spanish page whose template says lang="en".
+        let spanish = ["Pasamos toda la semana caminando por las calles estrechas del centro, probando la comida de los mercados.",
+                       "La próxima vez queremos quedarnos más tiempo y visitar los pueblos de la costa, que todos nos recomendaron."]
+        #expect(PageTranslator.pageLanguage(blocks: spanish, declared: "en")?.languageCode == .spanish)
+        #expect(PageTranslator.pageLanguage(blocks: spanish, declared: "es")?.languageCode == .spanish)
+        // Too little text: nothing, whatever the page says, so it's looked at again once it's drawn.
+        #expect(PageTranslator.pageLanguage(blocks: ["Inicio", "Contacto"], declared: "es") == nil)
+    }
+
+    @Test func aLangThatNamesNoLanguageIsIgnored() {
+        #expect(PageTranslator.language(declared: "zh-Hans-CN")?.languageCode == .chinese)
+        #expect(PageTranslator.language(declared: " EN_us ")?.languageCode == .english)
+        for none in ["", "und", "mul", "zxx", "x-klingon", "1234", "english"] {
+            #expect(PageTranslator.language(declared: none) == nil, "\(none)")
+        }
+    }
+
+    @Test func anOfferIsForItsOwnPage() {
+        let page = URL(string: "https://zh.wikipedia.org/wiki/%E4%B8%8A%E6%B5%B7%E5%B8%82")!
+        #expect(PageTranslator.offerStands(offeredFor: page, now: page, foreign: true, translated: false))
+        // A jump within the page is the same page.
+        #expect(PageTranslator.offerStands(offeredFor: page, now: URL(string: page.absoluteString + "#history")!, foreign: true, translated: false))
+        // Another page, one found to be in your language after all, or one translated: the offer goes.
+        #expect(!PageTranslator.offerStands(offeredFor: page, now: URL(string: "https://en.wikipedia.org/wiki/Shanghai")!, foreign: true, translated: false))
+        #expect(!PageTranslator.offerStands(offeredFor: page, now: page, foreign: false, translated: false))
+        #expect(!PageTranslator.offerStands(offeredFor: page, now: page, foreign: true, translated: true))
+        #expect(!PageTranslator.offerStands(offeredFor: nil, now: page, foreign: true, translated: false))
+    }
+}

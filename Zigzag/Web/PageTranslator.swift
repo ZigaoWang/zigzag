@@ -99,22 +99,60 @@ enum PageTranslator {
 
     /// The language most of the page is in, whatever it is; nil when there's too little text to tell.
     /// Told from the page's own paragraphs, the ones showing, each read on its own and counted by how much text it
-    /// has: a Spanish page under an English menu, or one marked lang="en", is still Spanish (#218). A page that's
-    /// all menus goes by all of its text.
+    /// has, and from the language the page says it's in (`lang`), when it says one: an English page quoting some
+    /// Chinese (a name, a few words in a table) stays English. Only text that's clearly another language overrides
+    /// what the page says: a Spanish page under an English menu, marked lang="en", is still Spanish (#218). A page
+    /// that's all menus goes by all of its text.
     static func pageLanguage(of webView: WKWebView) async -> Locale.Language? {
         guard let json = try? await webView.runOwnScript(script("sample()")) as? String,
               let sample = try? JSONDecoder().decode(Sample.self, from: Data(json.utf8)) else { return nil }
-        return dominantLanguage(ofBlocks: sample.blocks) ?? dominantLanguage(of: sample.all)
+        return pageLanguage(blocks: sample.blocks, declared: sample.lang) ?? dominantLanguage(of: sample.all)
     }
 
     private struct Sample: Decodable {
         var blocks: [String]
         var all: String
+        var lang: String?
     }
 
     /// The language most of these blocks are in, by how much text each has; nil when too few can be told, or no
     /// one language has most of it.
     nonisolated static func dominantLanguage(ofBlocks blocks: [String]) -> Locale.Language? {
+        pageLanguage(blocks: blocks, declared: nil)
+    }
+
+    /// The page's language from its blocks of text and the language it says it's in (`declared`, its `lang`).
+    /// Without one, the language with most of the text, if one has. With one, that language, as long as there's
+    /// enough text to go on and a fair part of it (a quarter) is in it; text three-quarters in another language
+    /// overrides it.
+    nonisolated static func pageLanguage(blocks: [String], declared: String?) -> Locale.Language? {
+        let (amounts, total) = tally(blocks)
+        guard total >= 80 else { return nil }
+        let top = amounts.max { $0.value != $1.value ? $0.value < $1.value : $0.key.rawValue > $1.key.rawValue }
+        let topLanguage = top.map { Locale.Language(identifier: $0.key.rawValue) }
+        let topShare = top.map { Double($0.value) / Double(total) } ?? 0
+        if let said = declared.flatMap(language(declared:)) {
+            if let topLanguage, topLanguage.languageCode == said.languageCode { return topLanguage }
+            if let topLanguage, topShare >= 0.75 { return topLanguage }
+            let saidAmount = amounts.filter { Locale.Language(identifier: $0.key.rawValue).languageCode == said.languageCode }.values.reduce(0, +)
+            if Double(saidAmount) / Double(total) >= 0.25 { return said }
+        }
+        guard let topLanguage, topShare > 0.5 else { return nil }
+        return topLanguage
+    }
+
+    /// The language a page's `lang` names, by its first part ("zh" of "zh-Hans-CN"); nil for none, or for one that
+    /// names no language ("und", "mul", "zxx", a private "x-" tag).
+    nonisolated static func language(declared: String) -> Locale.Language? {
+        let tag = declared.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "_", with: "-")
+        guard let first = tag.split(separator: "-").first?.lowercased(), (2...3).contains(first.count),
+              first.allSatisfy({ $0.isASCII && $0.isLetter }), !["und", "mul", "zxx", "mis"].contains(first) else { return nil }
+        return Locale.Language(identifier: tag)
+    }
+
+    /// How much text of each language the blocks have, by how much each says, and in all; blocks too short to
+    /// tell, or told with too little confidence, aren't counted.
+    private nonisolated static func tally(_ blocks: [String]) -> (amounts: [NLLanguage: Int], total: Int) {
         var amounts: [NLLanguage: Int] = [:]
         var total = 0
         let recognizer = NLLanguageRecognizer()
@@ -128,8 +166,7 @@ enum PageTranslator {
             amounts[code, default: 0] += amount
             total += amount
         }
-        guard total >= 80, let (code, amount) = amounts.max(by: { $0.value < $1.value }), amount * 2 > total else { return nil }
-        return Locale.Language(identifier: code.rawValue)
+        return (amounts, total)
     }
 
     /// How much text this is, an ideograph, kana or hangul syllable counting as a few letters (each is about a
@@ -342,7 +379,8 @@ enum PageTranslator {
             blocks[place] += (blocks[place] ? ' ' : '') + text;
             total += text.length;
           }
-          return JSON.stringify({ blocks, all: (root.innerText || '').slice(0, 2000) });
+          const lang = document.documentElement.getAttribute('lang') || root.getAttribute('lang') || '';
+          return JSON.stringify({ blocks, all: (root.innerText || '').slice(0, 2000), lang });
         },
         collect: () => {
           nodes = walk();
@@ -416,6 +454,18 @@ struct TranslationRuns<Key: Hashable, Run: AnyObject> {
 }
 
 extension PageTranslator {
+    /// Whether an offer to translate, made for the page at `offeredFor`, still stands for the tab's page now: the same
+    /// page (a jump within it, by `#`, is the same page), still seen in another language, and not translated yet.
+    nonisolated static func offerStands(offeredFor: URL?, now: URL?, foreign: Bool, translated: Bool) -> Bool {
+        guard foreign, !translated, let offeredFor, let now else { return false }
+        func page(_ url: URL) -> String {
+            var parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            parts?.fragment = nil
+            return parts?.string ?? url.absoluteString
+        }
+        return page(offeredFor) == page(now)
+    }
+
     /// Whether a tab's translation toasts show: only while its page is the one in view, the page peeked at while
     /// Peek is open, otherwise the tab you're on.
     static func isInView(_ tab: AnyObject, selected: AnyObject?, peeked: AnyObject?) -> Bool {

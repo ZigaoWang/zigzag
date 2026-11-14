@@ -1370,6 +1370,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 updateHandoff()
                 // A pinned tab that moved on shows it right away.
                 if tab.bookmarkID != nil { sidebar.list.refreshRows() }
+                // An offer to translate the page that was here goes with it.
+                withdrawStaleTranslationOffer()
             }
             sidebar.update(tab: tab)
             paintTopBar()
@@ -1447,7 +1449,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         PageTranslator.isInView(tab, selected: tabManager.selectedTab, peeked: peek.isVisible ? peek.tab : nil)
     }
 
+    /// The page the offer to translate showing is for: it's that tab's, and that page's, and goes once either does.
+    private var translationOfferPage: URL?
+
+    /// Takes down the offer to translate when the page it was made for isn't the one in view any more: another tab
+    /// chosen, the tab gone somewhere else, or its page found to be in your language after all.
+    private func withdrawStaleTranslationOffer() {
+        guard let tab = Toast.owner(in: self) as? Tab else { return }
+        let inView = peek.isVisible ? peek.tab : tabManager.selectedTab
+        if tab !== inView || !PageTranslator.offerStands(offeredFor: translationOfferPage, now: tab.url, foreign: tab.foreignLanguage != nil, translated: tab.isTranslated) {
+            Toast.hide(for: tab, in: self)
+        }
+    }
+
     private func offerTranslation() {
+        withdrawStaleTranslationOffer()
         guard let tab = tabManager.selectedTab, let language = tab.foreignLanguage, !tab.isTranslated,
               let site = ContentBlocker.site(of: tab.url) else { return }
         // Languages you always translate, and sites you translated a moment ago, translate on their own.
@@ -1458,10 +1474,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func showTranslationOffer(_ tab: Tab, language: Locale.Language) {
+        translationOfferPage = tab.url
         Toast.show(String(localized: "This page is in \(PageTranslator.name(of: language))", comment: "Toast offering to translate a page. The language is its name, like French."), symbol: "translate",
                    action: (title: String(localized: "Translate", comment: "Button in the toast that offers to translate a page."), run: { [weak self, weak tab] in
                        if let tab { self?.translatePage(tab: tab) }
-                   }), duration: 6, closes: true, in: self)
+                   }), duration: 6, closes: true, owner: tab, in: self)
     }
 
     /// Translates the tab you're on, or `chosen` (a tab's menu in the sidebar, a page's menu, the page in Peek), or
@@ -1534,6 +1551,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Another page came into view (another tab chosen, Peek opened or put away): the toast of a translation
     /// running for the page that left goes, and the one for the page now in view, if it's translating, shows.
     func translationViewChanged() {
+        withdrawStaleTranslationOffer()
         if let shown = translationToastTab, !translationInView(shown) || translations.run(for: ObjectIdentifier(shown)) == nil {
             translationToastTab = nil
             Toast.hide(in: self)
