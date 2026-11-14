@@ -536,6 +536,11 @@ struct SitePanelSizingTests {
         // The address off screen (the sidebar hidden), or anything else: kept in from the window's edge.
         #expect(SitePanelSizing.x(-240, alongAddress: true, inset: inset) == inset)
         #expect(SitePanelSizing.x(6, alongAddress: false, inset: inset) == inset)
+        // A sidebar on the right: under its address as the window resizes (the address moves with the right edge),
+        // and never past that edge.
+        #expect(SitePanelSizing.x(1_200 - 6 - 240, alongAddress: true, inset: inset, width: 240, overlayWidth: 1_200) == 954)
+        #expect(SitePanelSizing.x(900 - 6 - 240, alongAddress: true, inset: inset, width: 240, overlayWidth: 900) == 654)
+        #expect(SitePanelSizing.x(1_250, alongAddress: true, inset: inset, width: 240, overlayWidth: 1_200) == 1_200 - inset - 240)
     }
 
     @Test func aPageThatFitsDoesntScroll() {
