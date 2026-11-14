@@ -15,6 +15,15 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - An extension installed from a folder keeps the companion-app access it had.
 - An AI app's long tool call is no longer cut off when many other connections open meanwhile.
 - When another app holds the AI apps' port, Zigzag replaces the key only if an AI app may have been given it, not on every launch.
+- A file you go to always downloads, however soon after another: a link you pasted that redirects to the file, a "your download starts in 5 seconds" page, or a pop-up that opens straight to it. A page starting download after download on its own is still held back, and now a toast says so instead of nothing happening.
+- Asking for the camera or microphone no longer asks to use WebRTC first and reloads the page: WebRTC is only offered when a site starts a call.
+- Protect IP address from WebRTC covers pop-up windows too, each with its site's own choice, and a call started in one asks in the window that opened it.
+- Long titles in the sidebar fade out at their end, the same at rest and with the pointer over the row, instead of switching from "…" to a fade.
+- Clear's tooltip says "Close all 2 tabs" while you're on a favorite or pinned page, since none of the tabs is yours, and names a split view as one, like Close the other split view.
+- Reader pressed on another tab while it waits for a page to load opens for that tab, instead of only calling off the wait.
+- Open on selected text keeps the parentheses that belong to the address, like en.wikipedia.org/wiki/Mercury_(planet).
+- A site's question to open an app no longer has to wait because another site asked a few seconds earlier.
+- Dark Pages can read a page's style sheets behind an HTTP proxy that looks up addresses itself.
 
 ## [0.9.1] - 2026-11-15
 
