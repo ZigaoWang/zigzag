@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - Protect IP address from WebRTC, in Settings › Privacy, keeps sites from learning your real IP address through WebRTC while you use a proxy or VPN. When it's on, WebRTC is off except on sites you allow: Site Controls › Permissions has a WebRTC row on every site, and a site that starts a call without it asks to Allow and Reload. Calls on Meet, Zoom, Teams or Discord work once the site is allowed. It's off unless you turn it on, and a private window follows it without remembering what you allow there. ([#229](https://github.com/ZigaoWang/zigzag/issues/229))
+- Right-clicking selected text that's a web address but not a link, like example.com in a post, offers Open and Open in New Tab, as Chrome's Go to does. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#234](https://github.com/ZigaoWang/zigzag/issues/234))
 
 ### Fixed
 - Clear, above the tabs in the sidebar, treats a split view as one: it stays while you've used any of its pages lately and closes whole, never leaving half of it behind, and a split with a playing page or a pinned page in it stays. A tab with tabs nested under it stays or goes with them, folded ones included. A tab you left a few minutes ago no longer counts as one you haven't used in a while.

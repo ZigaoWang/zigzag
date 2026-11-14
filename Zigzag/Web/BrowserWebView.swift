@@ -94,7 +94,26 @@ final class BrowserWebView: WKWebView {
 
     override func mouseDown(with event: NSEvent) {
         owner?.scrolledSinceSave = true
+        if event.modifierFlags.contains(.control) { readSelectionForMenu() }
         super.mouseDown(with: event)
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        readSelectionForMenu()
+        super.rightMouseDown(with: event)
+    }
+
+    /// The text selected as a right-click starts, for its menu (#234). Asked of the page before the click reaches
+    /// it, so the answer comes back ahead of the menu, which the page sends after handling the click.
+    private var menuSelection: String?
+
+    private func readSelectionForMenu() {
+        menuSelection = nil
+        evaluateJavaScript("getSelection().toString()", in: nil, in: .defaultClient) { [weak self] result in
+            MainActor.assumeIsolated {
+                if case .success(let text) = result { self?.menuSelection = text as? String }
+            }
+        }
     }
 
     /// When the last click in the page ended (system uptime). WebKit reports a click on the key icon in a sign-in
@@ -179,6 +198,7 @@ final class BrowserWebView: WKWebView {
                 break
             }
         }
+        addOpenSelection(to: menu)
         // Only in a browser window's page, which does the translating; not Zigzag Mini's or a web app's.
         if let owner, WindowManager.shared.controller(for: window) != nil { Self.addTranslate(to: menu, for: owner, target: self, action: #selector(translatePage(_:))) }
         Self.addAutoFill(to: menu)
@@ -187,6 +207,60 @@ final class BrowserWebView: WKWebView {
         // What the page's menu holds, with submenus and actions (AutoFill › Passwords… in a field), for scripts.
         debugLog("webmenu " + Self.debugDescribe(menu))
         #endif
+    }
+
+    static let openSelectionIdentifier = "ZigzagOpenSelection"
+
+    /// Selected text that's a web address but not a link ("example.com" in a post) gets Open and Open in New Tab at
+    /// the top of its menu, as Chrome's Go to does (#234). Only in a browser window's page.
+    private func addOpenSelection(to menu: NSMenu) {
+        guard menu.items.contains(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierSearchWeb" }),
+              !menu.items.contains(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLink" }),
+              WindowManager.shared.controller(for: window) != nil,
+              let text = selectedText(in: menu), let url = CommandRanker.url(fromSelection: text) else { return }
+        let items = [Self.openSelectionItem(String(localized: "Open", comment: "Item in a page's right-click menu over selected text that's a web address, not a link: opens it in this tab."), url: url, target: self, action: #selector(openSelection(_:))),
+                     Self.openSelectionItem(String(localized: "Open in New Tab", comment: "Item in a page's right-click menu over selected text that's a web address, not a link: opens it in a new tab."), url: url, target: self, action: #selector(openSelectionInNewTab(_:)))]
+        for (index, item) in items.enumerated() { menu.insertItem(item, at: index) }
+        if menu.items.count > items.count, !menu.items[items.count].isSeparatorItem { menu.insertItem(.separator(), at: items.count) }
+    }
+
+    private static func openSelectionItem(_ title: String, url: URL, target: AnyObject, action: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = target
+        item.representedObject = url
+        item.identifier = NSUserInterfaceItemIdentifier(openSelectionIdentifier)
+        item.toolTip = url.absoluteString
+        return item
+    }
+
+    /// The text the menu is for: the selection read as the click started, when it's still what WebKit's Look Up item
+    /// names (shortened with … when long). A click that selected a word instead has no Open.
+    private func selectedText(in menu: NSMenu) -> String? {
+        defer { menuSelection = nil }
+        guard let text = menuSelection?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+        guard let lookUp = menu.items.first(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierLookUp" }) else { return text }
+        return Self.lookUpTitle(lookUp.title, names: text) ? text : nil
+    }
+
+    /// Whether a Look Up item's title (Look Up “example.com”, or “A long sel…” cut short) is for this text.
+    nonisolated static func lookUpTitle(_ title: String, names text: String) -> Bool {
+        guard let open = title.firstIndex(of: "“"), let close = title.lastIndex(of: "”"), open < close else { return false }
+        let named = String(title[title.index(after: open)..<close]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let squeezed = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        if named == squeezed || named == text { return true }
+        guard named.hasSuffix("…") else { return false }
+        let start = named.dropLast().trimmingCharacters(in: .whitespaces)
+        return !start.isEmpty && (squeezed.hasPrefix(start) || text.hasPrefix(start))
+    }
+
+    @objc private func openSelection(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL, let owner else { return }
+        owner.load(url, by: .page)
+    }
+
+    @objc private func openSelectionInNewTab(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL, let controller = WindowManager.shared.controller(for: window) else { return }
+        controller.open(url, disposition: .backgroundTab, opener: owner, allowSwitch: false, by: .page)
     }
 
     #if DEBUG

@@ -71,6 +71,16 @@ enum CommandRanker {
         return URL(string: "https://" + trimmed)
     }
 
+    /// The web address some selected text is, when it's only that (#234): "example.com", or a whole https address,
+    /// the quotes, brackets or full stop around it in a sentence left off. Only the web: never a file or about: page.
+    static func url(fromSelection text: String) -> URL? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= 2048, !trimmed.contains(where: \.isNewline) else { return nil }
+        let bare = trimmed.trimmingCharacters(in: CharacterSet(charactersIn: "\"'“”‘’«»<>()[]{}.,;:!?。，；：！？"))
+        guard let url = url(from: bare), let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https", url.host?.isEmpty == false else { return nil }
+        return url
+    }
+
     private static let localTLDs: Set<String> = ["local", "lan", "internal", "test", "localhost", "home", "arpa", "corp", "intranet"]
 
     /// Every top-level domain IANA lists, bundled with the app.

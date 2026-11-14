@@ -16,6 +16,32 @@ struct AddressTests {
         #expect(CommandRanker.url(from: "youtube.com/@mkbhd")?.absoluteString == "https://youtube.com/@mkbhd")
     }
 
+    /// Selected text that's an address gets Open in the page's menu (#234); a sentence's punctuation around it
+    /// comes off, and only web addresses count.
+    @Test func selectedTextThatIsAnAddress() {
+        #expect(CommandRanker.url(fromSelection: " example.com ")?.absoluteString == "https://example.com")
+        #expect(CommandRanker.url(fromSelection: "(github.com/ZigaoWang/zigzag).")?.absoluteString == "https://github.com/ZigaoWang/zigzag")
+        #expect(CommandRanker.url(fromSelection: "“https://example.com/a?b=1”")?.absoluteString == "https://example.com/a?b=1")
+        #expect(CommandRanker.url(fromSelection: "localhost:3000")?.absoluteString == "http://localhost:3000")
+        #expect(CommandRanker.url(fromSelection: "node.js") == nil)
+        #expect(CommandRanker.url(fromSelection: "go to example.com") == nil)
+        #expect(CommandRanker.url(fromSelection: "example.com\nexample.org") == nil)
+        #expect(CommandRanker.url(fromSelection: "name@example.com") == nil)
+        #expect(CommandRanker.url(fromSelection: "file:///etc/hosts") == nil)
+        #expect(CommandRanker.url(fromSelection: "about:blank") == nil)
+        #expect(CommandRanker.url(fromSelection: "") == nil)
+    }
+
+    /// The selection read as the right-click started counts only while WebKit's menu is still for it: a click that
+    /// selected a word instead has no Open (#234).
+    @Test func theMenuIsForTheSelectionReadAsTheClickStarted() {
+        #expect(BrowserWebView.lookUpTitle("Look Up “example.com”", names: "example.com"))
+        #expect(BrowserWebView.lookUpTitle("Look Up “https://example.com/a-v…”", names: "https://example.com/a-very-long-path"))
+        #expect(!BrowserWebView.lookUpTitle("Look Up “Visit”", names: "example.com"))
+        #expect(!BrowserWebView.lookUpTitle("Look Up “exa…”", names: "example.org/x".replacingOccurrences(of: "exa", with: "ex")))
+        #expect(!BrowserWebView.lookUpTitle("Look Up", names: "example.com"))
+    }
+
     @Test func atMostThreeExtensionsArePinned() {
         #expect(ExtensionPins.limit == 3)
         #expect(ExtensionPins(ids: ["a", "b"]).canPin(loaded: ["a", "b"]))

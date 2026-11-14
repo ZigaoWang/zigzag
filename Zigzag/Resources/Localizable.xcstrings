@@ -10047,7 +10047,7 @@
       }
     },
     "Open" : {
-      "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the page.\nButton on a page's question to open an app: opens it this time.",
+      "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the page.\nButton on a page's question to open an app: opens it this time.\nItem in a page's right-click menu over selected text that's a web address, not a link: opens it in this tab.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10399,7 +10399,7 @@
       }
     },
     "Open in New Tab" : {
-      "comment" : "Button in the toast when Zigzag blocks a page's pop-up: opens it as a tab instead.",
+      "comment" : "Button in the toast when Zigzag blocks a page's pop-up: opens it as a tab instead.\nItem in a page's right-click menu over selected text that's a web address, not a link: opens it in a new tab.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
