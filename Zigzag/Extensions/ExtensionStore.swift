@@ -482,13 +482,37 @@ enum ExtensionStore {
             .init(name: "acceptformat", value: "crx3"),
             .init(name: "x", value: "id=\(id)&uc"),
         ]
-        guard let url = components.url, let (data, response) = try? await URLSession.shared.data(from: url) else { return .failure(.download) }
+        guard let url = components.url, let (data, response) = try? await fetch(url) else { return .failure(.download) }
         let status = (response as? HTTPURLResponse)?.statusCode
         // The store answers an ID it doesn't have with nothing at all.
         if status == 404 || status == 204 { return .failure(.notListed) }
-        guard status == 200 else { return .failure(.download) }
+        guard status == 200, let data else { return .failure(.download) }
         // Checking the signature over the whole package and unpacking it take a moment: off the main thread.
         return await Task.detached(priority: .userInitiated) { unpack(data, id: id) }.value
+    }
+
+    /// Far more than any package in the store, whose largest are a few hundred megabytes.
+    nonisolated static let maxPackageBytes = 512 << 20
+
+    /// A package's bytes, or nil once they pass `limit`: a server can't fill memory by sending without end.
+    nonisolated static func fetch(_ url: URL, limit: Int = maxPackageBytes, session: URLSession = .shared) async throws -> (Data?, URLResponse) {
+        let (bytes, response) = try await session.bytes(from: url)
+        if response.expectedContentLength > Int64(limit) { bytes.task.cancel(); return (nil, response) }
+        var data = Data()
+        if response.expectedContentLength > 0 { data.reserveCapacity(Int(response.expectedContentLength)) }
+        var chunk = [UInt8]()
+        chunk.reserveCapacity(64 * 1024)
+        for try await byte in bytes {
+            chunk.append(byte)
+            if chunk.count == 64 * 1024 {
+                guard data.count + chunk.count <= limit else { bytes.task.cancel(); return (nil, response) }
+                data.append(contentsOf: chunk)
+                chunk.removeAll(keepingCapacity: true)
+            }
+        }
+        guard data.count + chunk.count <= limit else { return (nil, response) }
+        data.append(contentsOf: chunk)
+        return (data, response)
     }
 
     nonisolated private static func unpack(_ data: Data, id: String) -> Result<(folder: URL, version: String), InstallError> {
@@ -588,8 +612,17 @@ enum ExtensionStore {
     }
 
     nonisolated private static func manifestVersion(in folder: URL) -> String? {
-        guard let version = manifest(in: folder)?["version"] as? String, !version.isEmpty, !version.contains("/") else { return nil }
+        guard let version = manifest(in: folder)?["version"] as? String, isValidVersion(version) else { return nil }
         return version
+    }
+
+    /// A version as Chrome takes it: one to four numbers of up to 65535, split by dots. It names a folder, so
+    /// nothing else (".", "..", a separator) ever gets through.
+    nonisolated static func isValidVersion(_ version: String) -> Bool {
+        let parts = version.split(separator: ".", omittingEmptySubsequences: false)
+        return (1...4).contains(parts.count) && parts.allSatisfy { part in
+            (1...5).contains(part.count) && part.allSatisfy { $0.isASCII && $0.isNumber } && (Int(part) ?? .max) <= 65535
+        }
     }
 
     private static func removeVersions(of id: String, keeping keep: [String]) {
@@ -615,8 +648,13 @@ enum ExtensionStore {
     static func updateIfNewer(_ id: String) async {
         guard #available(macOS 15.4, *), let current = package(id), let latest = await latestVersion(of: id, current: current.version),
               isVersion(latest, newerThan: current.version), latest != current.pendingVersion else { return }
-        guard case .success(let package) = await download(id), store(package, for: id),
-              let old = packageDirectory(for: id), let new = packageDirectory(for: id, version: package.version) else { return }
+        guard case .success(let package) = await download(id) else { return }
+        // The package has to be the version the store said: an older one passed off as new is never taken.
+        guard package.version == latest else {
+            try? FileManager.default.removeItem(at: package.folder)
+            return
+        }
+        guard store(package, for: id), let old = packageDirectory(for: id), let new = packageDirectory(for: id, version: package.version) else { return }
         if asksForMore(new, than: old) {
             update(id) { $0.pendingVersion = package.version }
             ExtensionCenter.noteChanged()
@@ -691,12 +729,24 @@ enum ExtensionStore {
 
     /// True when a new version requests permissions or sites the old one didn't.
     private static func asksForMore(_ new: URL, than old: URL) -> Bool {
-        func requested(_ folder: URL) -> Set<String> {
-            guard let manifest = manifest(in: folder) else { return [] }
+        guard let newManifest = manifest(in: new) else { return true }
+        return asksForMore(newManifest, than: manifest(in: old) ?? [:])
+    }
+
+    /// True when a new manifest requests permissions or sites the old one didn't, or changes what it takes over: the
+    /// search engine and home page, Zigzag's own pages, or which sites and apps may talk to it. A search engine's
+    /// address changed quietly would send what you search for somewhere else.
+    static func asksForMore(_ new: [String: Any], than old: [String: Any]) -> Bool {
+        func requested(_ manifest: [String: Any]) -> Set<String> {
             let keys = ["permissions", "host_permissions", "optional_permissions", "optional_host_permissions"]
             return Set(keys.flatMap { manifest[$0] as? [String] ?? [] })
         }
-        return !requested(new).isSubset(of: requested(old))
+        if !requested(new).isSubset(of: requested(old)) { return true }
+        for key in ["chrome_settings_overrides", "chrome_url_overrides", "externally_connectable"] {
+            guard let added = new[key] else { continue }
+            guard let before = old[key], (added as AnyObject).isEqual(before) else { return true }
+        }
+        return false
     }
 
     // MARK: Removing

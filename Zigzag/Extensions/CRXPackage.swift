@@ -177,6 +177,11 @@ nonisolated enum PackageZip {
     /// Far more than any extension: the largest in the store unpack to a few hundred megabytes.
     static let maxTotalSize = 2 << 30
     static let maxEntries = 65_000
+    /// The most one file may unpack to, whatever its entry claims.
+    static let maxEntrySize = 512 << 20
+    /// Deflate can't make more than about 1,032 bytes of one: an entry claiming more than that is lying, and would
+    /// have Zigzag set aside room for all of it.
+    static let maxDeflateRatio = 1_032
 
     /// The entries, from the archive's index, each checked.
     static func entries(_ data: Data) throws -> [Entry] {
@@ -233,6 +238,8 @@ nonisolated enum PackageZip {
             guard seen.insert(path.joined(separator: "/").lowercased()).inserted else { throw Failure.duplicate(name) }
             guard localHeader < offset, compressedSize <= offset - localHeader else { throw Failure.malformed }
             if method == 0, compressedSize != entrySize { throw Failure.damaged(name) }
+            guard entrySize <= maxEntrySize else { throw Failure.tooLarge }
+            if method == 8, entrySize / maxDeflateRatio > compressedSize { throw Failure.damaged(name) }
             total += entrySize
             guard total <= maxTotalSize else { throw Failure.tooLarge }
             entries.append(Entry(path: path, isDirectory: isDirectory, method: method, compressedSize: compressedSize,

@@ -469,6 +469,43 @@ extension ExtensionSecurityTests {
 // MARK: Packages and updates
 
 extension ExtensionSecurityTests {
+    /// One entry can't claim more than a file could be, nor more than its packed bytes could unpack to.
+    @Test func entriesCantClaimHugeSizes() {
+        let manifest = CraftedZip.Item(name: "manifest.json", data: Data(#"{"version": "1.0"}"#.utf8))
+        let huge = CraftedZip(items: [manifest, .init(name: "a.bin", data: Data([0x03, 0x00]), method: 8, claimedSize: UInt32(PackageZip.maxEntrySize + 1))])
+        #expect(throws: PackageZip.Failure.tooLarge) { try PackageZip.entries(huge.data) }
+        let inflated = CraftedZip(items: [manifest, .init(name: "a.bin", data: Data([0x03, 0x00]), method: 8, claimedSize: 400 << 20)])
+        #expect(throws: PackageZip.Failure.damaged("a.bin")) { try PackageZip.entries(inflated.data) }
+        let fair = CraftedZip(items: [manifest, .init(name: "a.bin", data: Data(repeating: 1, count: 100), method: 8, claimedSize: 50_000)])
+        #expect((try? PackageZip.entries(fair.data))?.count == 2)
+    }
+
+    /// A version names a folder: only Chrome's numbers and dots.
+    @Test func versionsAreOnlyNumbers() {
+        for good in ["1", "1.0", "2.10.3", "1.2.3.4", "65535.0"] { #expect(ExtensionStore.isValidVersion(good), "\(good)") }
+        for bad in ["", ".", "..", "1..2", "1.", ".1", "1/2", "..\\x", "1.2.3.4.5", "1.0-beta", "65536", "1:2", " 1", "١"] {
+            #expect(!ExtensionStore.isValidVersion(bad), "\(bad)")
+        }
+    }
+
+    /// An update that changes the search engine, Zigzag's own pages or who may talk to it waits for the person.
+    @Test func updatesThatTakeOverMoreWait() {
+        let old: [String: Any] = ["permissions": ["storage"], "chrome_settings_overrides": ["search_provider": ["search_url": "https://good.example/?q={searchTerms}"]]]
+        #expect(!ExtensionStore.asksForMore(old, than: old))
+        var moved = old
+        moved["chrome_settings_overrides"] = ["search_provider": ["search_url": "https://evil.example/?q={searchTerms}"]]
+        #expect(ExtensionStore.asksForMore(moved, than: old))
+        var newTab = old
+        newTab["chrome_url_overrides"] = ["newtab": "tab.html"]
+        #expect(ExtensionStore.asksForMore(newTab, than: old))
+        var connectable = old
+        connectable["externally_connectable"] = ["matches": ["https://*.example/*"]]
+        #expect(ExtensionStore.asksForMore(connectable, than: old))
+        // Taking one away asks for nothing.
+        #expect(!ExtensionStore.asksForMore(["permissions": ["storage"]], than: old))
+        #expect(ExtensionStore.asksForMore(["permissions": ["storage", "tabs"]], than: old))
+    }
+
     /// Manifest V2's webRequestBlocking is recorded, so its sign-in answers keep working; a folder's record from
     /// before takes nothing more from its files on disk.
     @Test func blockingIsRecordedAndFoldersMigrateFromTheRecord() {
