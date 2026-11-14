@@ -1,10 +1,12 @@
 import AppKit
 
-/// Site Controls' certificate page, in the panel in place of the rest: a way back, whether macOS trusts the
-/// connection, the chain from the site's certificate to the root (each one a row; the chosen one is shown below), and
-/// the chosen certificate's issuer, validity, key and SHA-256 fingerprint. Plain rows and quiet labels, as the panel.
+/// Site Controls' certificate page, in the panel in place of the rest, under the panel's own header for it (a way back
+/// and its title, which stay put while the page scrolls): whether macOS trusts the connection, the chain from the
+/// site's certificate to the root (each one a row; the chosen one is shown below), and the chosen certificate's
+/// issuer, validity, key and SHA-256 fingerprint. Plain rows and quiet labels, as the panel.
 final class CertificatePage: NSView {
-    var onBack: (() -> Void)?
+    /// Its height changed: another certificate of the chain was chosen, or the details came.
+    var onResize: (() -> Void)?
     var details: CertificateDetails? {
         didSet {
             selected = 0
@@ -13,8 +15,7 @@ final class CertificatePage: NSView {
     }
     private var selected = 0
 
-    private let back = IconButton(symbol: "chevron.left", size: .compact, toolTip: String(localized: "Back", comment: "Tooltip of the back button on the certificate page of the site panel."))
-    private let title = Label(String(localized: "Certificate", comment: "Title of the site panel's page about the site's certificate."), font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
+    static let title = String(localized: "Certificate", comment: "Title of the site panel's page about the site's certificate.")
     private let trustIcon = NSImageView()
     private let trust = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     /// Why macOS doesn't trust it, in its own words.
@@ -26,14 +27,13 @@ final class CertificatePage: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
-        back.onClick = { [weak self] _ in self?.onBack?() }
         trustIcon.imageScaling = .scaleNone
-        [back, title, trustIcon, trust, failure, chainLabel].forEach { addSubview($0) }
+        [trustIcon, trust, failure, chainLabel].forEach { addSubview($0) }
         trust.stringValue = String(localized: "Checking…", comment: "On the certificate page of the site panel, while the certificate is read.")
         trust.textColor = Tokens.Color.textSecondary
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
-        setAccessibilityLabel(title.stringValue)
+        setAccessibilityLabel(Self.title)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -122,15 +122,15 @@ final class CertificatePage: NSView {
             addSubview(valueLabel)
             return (nameLabel, valueLabel)
         }
-        superview?.needsLayout = true
         needsLayout = true
+        onResize?()
     }
 
     private func wrappedHeight(_ label: Label, width: CGFloat) -> CGFloat {
         ceil(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: 10_000)).height ?? label.lineHeight)
     }
 
-    /// How tall it is at `width`, with the panel's padding.
+    /// How tall it is at `width`, with the panel's padding at its sides and bottom; its top is under the header.
     func height(for width: CGFloat, pad: CGFloat) -> CGFloat { arrange(width: width, pad: pad, apply: false) }
 
     private var pad: CGFloat = Tokens.Space.x4
@@ -145,15 +145,7 @@ final class CertificatePage: NSView {
         if !apply { self.pad = pad }
         func place(_ view: NSView, _ rect: NSRect) { if apply { view.frame = rect } }
         let inner = width - pad * 2
-        var y = pad
-        // The back button's glyph stands on the panel's edge, the title after it.
-        let side = Tokens.Metric.compactIconButton
-        let ink = (side - Tokens.Symbol.compactGlyph) / 2
-        place(back, NSRect(x: pad - ink, y: y + (title.lineHeight - side) / 2, width: side, height: side))
-        let titleX = pad - ink + side + Tokens.Space.x1
-        place(title, NSRect(x: titleX - Label.inset, y: y, width: width - pad - titleX + Label.inset * 2, height: title.lineHeight))
-        y += title.lineHeight + Tokens.Space.x4
-
+        var y: CGFloat = 0
         let iconSide = Tokens.Metric.favicon
         place(trustIcon, NSRect(x: pad, y: y + (trust.lineHeight - iconSide) / 2, width: iconSide, height: iconSide))
         let trustX = pad + iconSide + Tokens.Space.x2
@@ -196,6 +188,9 @@ final class CertificatePage: NSView {
     var debugState: [String: Any] {
         ["trust": trust.stringValue, "chain": chainRows.map(\.debugName), "fields": fields.map { "\($0.name.stringValue): \($0.value.stringValue)" }]
     }
+
+    /// A certificate of the chain chosen, as a click on its row.
+    func debugChoose(_ index: Int) { choose(index) }
     #endif
 }
 

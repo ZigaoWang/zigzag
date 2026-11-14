@@ -355,6 +355,22 @@ struct CertificateDetailsTests {
         #expect(details.failure?.isEmpty == false)
     }
 
+    /// The page tells the panel when its height changes: the details came, or another certificate of the chain was
+    /// chosen, whose details can be longer (#220).
+    @MainActor @Test func choosingAnotherCertificateResizesThePanel() throws {
+        let page = CertificatePage()
+        var resized = 0
+        page.onResize = { resized += 1 }
+        let empty = page.height(for: 300, pad: 16)
+        page.details = CertificateDetails.from(try trust(anchored: true))
+        #expect(resized == 1)
+        let site = page.height(for: 300, pad: 16)
+        #expect(site > empty)
+        page.debugChoose(1)
+        #expect(resized == 2)
+        #expect((page.debugState["chain"] as? [String])?.last?.hasSuffix(" *") == true)
+    }
+
     @Test func rolesAlongTheChain() {
         #expect(CertificateDetails.role(at: 0, count: 3, selfSigned: false) == .site)
         #expect(CertificateDetails.role(at: 1, count: 3, selfSigned: false) == .intermediate)
@@ -490,5 +506,42 @@ struct SitePanelRowsTests {
         #expect(PermissionChoice.summary([.ask]) == "Ask")
         #expect(PermissionChoice.shortSummary([.allow, .block, .ask]) == "2 set")
         #expect(PermissionChoice.shortSummary([.ask]) == "Ask")
+    }
+}
+
+/// How tall Site Controls gets, and when a page scrolls under its header (#220).
+struct SitePanelSizingTests {
+    @Test func aPageThatFitsDoesntScroll() {
+        let fit = SitePanelSizing.fit(band: 52, body: 300, maxHeight: 700)
+        #expect(fit.height == 352)
+        #expect(fit.viewport == 300)
+        #expect(!fit.scrolls)
+    }
+
+    /// The certificate's details past the window's bottom: the panel stops there, the header keeps its band, and the
+    /// rest scrolls under it.
+    @Test func aTallPageScrollsUnderItsHeader() {
+        let fit = SitePanelSizing.fit(band: 52, body: 640, maxHeight: 500)
+        #expect(fit.height == 500)
+        #expect(fit.viewport == 448)
+        #expect(fit.scrolls)
+        // The first page has no header to keep: all of it scrolls.
+        let main = SitePanelSizing.fit(band: 0, body: 640, maxHeight: 500)
+        #expect(main.viewport == 500 && main.scrolls)
+    }
+
+    @Test func theRoomIsDownToTheWindowsBottom() {
+        // A full-screen window, a small one, and one too short for anything: a few rows at least.
+        #expect(SitePanelSizing.maxHeight(overlayHeight: 1_000, top: 90) == 1_000 - 90 - Tokens.Metric.cardInset)
+        #expect(SitePanelSizing.maxHeight(overlayHeight: 500, top: 90) == 500 - 90 - Tokens.Metric.cardInset)
+        #expect(SitePanelSizing.maxHeight(overlayHeight: 120, top: 90) == PanelLinkRow.height * 4)
+        // A window made shorter while the panel is open gives it less room, never more than there is.
+        let tall = SitePanelSizing.maxHeight(overlayHeight: 900, top: 90)
+        let short = SitePanelSizing.maxHeight(overlayHeight: 600, top: 90)
+        #expect(SitePanelSizing.fit(band: 52, body: 700, maxHeight: tall).height > SitePanelSizing.fit(band: 52, body: 700, maxHeight: short).height)
+    }
+
+    @Test func theHeaderKeepsItsBand() {
+        #expect(SitePanelSizing.headerBand(pad: 16, header: 24) == 16 + 24 + Tokens.Space.x3)
     }
 }

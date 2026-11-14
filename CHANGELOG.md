@@ -11,6 +11,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The mini player's buttons all light up under the pointer and give when pressed, as Zigzag's other buttons do, with the same wash as its site name, clear over any video. ([#224](https://github.com/ZigaoWang/zigzag/issues/224))
 - The mini player can be turned off from its own right-click menu with Turn Off Mini Player; the video keeps playing in its tab, and a toast says where to turn it on again, with Undo. The setting in Settings › Tabs is now called Show a mini player when you switch tabs. Right-clicking the player also has Back to the site, Play or Pause, Minimize and Close. ([#224](https://github.com/ZigaoWang/zigzag/issues/224))
 
+### Fixed
+- Site Controls' Certificate page scrolls when its details are taller than the window has room for, its back button and title staying at the top; choosing another certificate in the chain no longer leaves its details cut off at the panel's edge. ([#220](https://github.com/ZigaoWang/zigzag/issues/220))
+
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.

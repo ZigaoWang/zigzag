@@ -2939,7 +2939,7 @@
       }
     },
     "Back" : {
-      "comment" : "Button of a step in the welcome window: the step before.\nHidden View menu item, named in Settings › Shortcuts.\nTooltip of a button in the strip on top of each page of a split view: goes back.\nTooltip of the back button on a page of the site panel.\nTooltip of the back button on the certificate page of the site panel.\nTooltip of the sidebar's back button.\nView menu item.",
+      "comment" : "Button of a step in the welcome window: the step before.\nHidden View menu item, named in Settings › Shortcuts.\nTooltip of a button in the strip on top of each page of a split view: goes back.\nTooltip of the back button on a page of the site panel.\nTooltip of the sidebar's back button.\nView menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

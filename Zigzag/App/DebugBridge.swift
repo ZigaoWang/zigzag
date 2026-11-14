@@ -1946,6 +1946,7 @@ enum DebugBridge {
         // dropdown, or Reset Permissions. sitepanelstate <path>: what it shows (JSON). sitext open|fold: its
         // Extensions header. sitextcount <n>: panels opened from now on show n extensions (0: as they are).
         case "sitepage": SitePanel.shown?.debugPage(arg)
+        case "sitecert": SitePanel.shown?.debugCertificate(Int(arg) ?? 0)
         case "sitext": SitePanel.shown?.extensionsSection?.debugCommand(arg)
         case "sitextcount": SitePanel.debugExtensionCount = Int(arg) ?? 0
         case "sitextforget": SiteExtensionsSection.chosenOpen = nil

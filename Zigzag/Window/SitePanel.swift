@@ -72,6 +72,9 @@ final class SitePanel: FloatingPanelView {
     private let permissionsHeader = PanelPageHeader(String(localized: "Permissions", comment: "Row in the site panel, and the title of its page: the site's camera, location, notifications and pop-ups."))
     /// The certificate, its own page while it's open.
     private var certificatePage: CertificatePage?
+    private let certificateHeader = PanelPageHeader(CertificatePage.title)
+    /// A hairline under a page's header while the page has scrolled under it, as a built-in page's header has.
+    private let headerEdge = ColorView(color: Tokens.Color.separator)
     private var zoomStepper: ZoomStepper?
 
     /// The panel's pages: the site at a glance, and one each for what's behind its rows.
@@ -85,6 +88,7 @@ final class SitePanel: FloatingPanelView {
     private let scroll = NSScrollView()
     private let content = FlippedView()
     private var contentReady = false
+    private var scrollToken: NSObjectProtocol?
     /// The tallest it can be where it opened: down to the window's bottom.
     fileprivate var maxHeight: CGFloat = .greatestFiniteMagnitude
 
@@ -135,10 +139,16 @@ final class SitePanel: FloatingPanelView {
         scroll.contentView.drawsBackground = false
         scroll.documentView = content
         addSubview(scroll)
+        // A page's header is the panel's own, over the sheet that scrolls: its way back and its title stay put (#220).
+        [permissionsHeader, certificateHeader, headerEdge].forEach { addSubview($0) }
         [mainBox, permissionsBox].forEach { content.addSubview($0) }
         contentReady = true
         permissionsHeader.onBack = { [weak self] in self?.show(.main) }
-        permissionsBox.addSubview(permissionsHeader)
+        certificateHeader.onBack = { [weak self] in self?.show(.main) }
+        scroll.contentView.postsBoundsChangedNotifications = true
+        scrollToken = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: scroll.contentView, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshHeaderEdge() }
+        }
         radius = Tokens.Radius.panel
         icon.image = tab.favicon
         // In the app's voice, as a page names itself; a site's name keeps its own spelling. Plain http or a port of
@@ -234,7 +244,7 @@ final class SitePanel: FloatingPanelView {
         if pane { x = min(x, overlay.bounds.width - inset - panel.width) }
         panel.frame.origin = NSPoint(x: max(inset, x), y: anchorFrame.maxY + 4)
         // Never past the window's bottom: what doesn't fit scrolls.
-        panel.maxHeight = max(PanelLinkRow.height * 4, controller.root.overlay.bounds.height - panel.frame.minY - Tokens.Metric.cardInset)
+        panel.maxHeight = SitePanelSizing.maxHeight(overlayHeight: overlay.bounds.height, top: panel.frame.minY)
         panel.frame.size = NSSize(width: panel.width, height: panel.fittedHeight)
         controller.root.overlay.addSubview(panel)
         panel.needsLayout = true
@@ -282,6 +292,8 @@ final class SitePanel: FloatingPanelView {
 
     func close() {
         pageToken = nil
+        if let scrollToken { NotificationCenter.default.removeObserver(scrollToken) }
+        scrollToken = nil
         extensionsToken = nil
         opener?.isSelected = false
         if let monitor { NSEvent.removeMonitor(monitor) }
@@ -421,8 +433,9 @@ final class SitePanel: FloatingPanelView {
         applyPage()
         resize()
         scroll.contentView.scroll(to: .zero)
-        if let shown = [mainBox, permissionsBox, certificatePage].compactMap({ $0 }).first(where: { !$0.isHidden }) {
-            Tokens.Motion.present(shown, from: .inPlace, entering: true)
+        let shown: [NSView?] = [mainBox, permissionsBox, certificatePage, pinnedHeader]
+        for view in shown.compactMap({ $0 }) where !view.isHidden && view.superview != nil {
+            Tokens.Motion.present(view, from: .inPlace, entering: true)
         }
     }
 
@@ -430,13 +443,42 @@ final class SitePanel: FloatingPanelView {
     private func applyPage() {
         mainBox.isHidden = page != .main
         permissionsBox.isHidden = page != .permissions
+        permissionsHeader.isHidden = page != .permissions
+        certificateHeader.isHidden = page != .connection
+        refreshHeaderEdge()
+    }
+
+    /// The page's header, which stays put at the top while the page under it scrolls: none on the first page, which
+    /// scrolls whole.
+    private var pinnedHeader: PanelPageHeader? {
+        switch page {
+        case .main: nil
+        case .permissions: permissionsHeader
+        case .connection: certificateHeader
+        }
+    }
+
+    /// The top of the panel a page's header keeps out of the scrolling.
+    private var headerBand: CGFloat { pinnedHeader.map { SitePanelSizing.headerBand(pad: pad, header: $0.height) } ?? 0 }
+
+    private func refreshHeaderEdge() {
+        headerEdge.isHidden = pinnedHeader == nil || scroll.contentView.bounds.minY <= 0
+    }
+
+    /// The window grew or shrank under it (full screen, a resize): it takes the room there is now, and what doesn't fit
+    /// scrolls.
+    override func resize(withOldSuperviewSize oldSize: NSSize) {
+        guard let superview, maxHeight < .greatestFiniteMagnitude else { return }
+        maxHeight = SitePanelSizing.maxHeight(overlayHeight: superview.bounds.height, top: frame.minY)
+        resize()
     }
 
     /// The certificate, read from the trust WebKit checked the page with.
     private func showCertificate() {
         guard page != .connection, let trust = tab.webView?.serverTrust else { return }
         let certificate = CertificatePage()
-        certificate.onBack = { [weak self] in self?.show(.main) }
+        // Choosing another certificate in the chain changes how much there is to show (#220).
+        certificate.onResize = { [weak self] in self?.resize() }
         content.addSubview(certificate)
         certificatePage = certificate
         show(.connection)
@@ -468,7 +510,10 @@ final class SitePanel: FloatingPanelView {
     }
 
     /// As tall as its content, up to `maxHeight`.
-    fileprivate var fittedHeight: CGFloat { min(layoutContent(dryRun: true), maxHeight) }
+    fileprivate var fittedHeight: CGFloat {
+        let band = headerBand
+        return SitePanelSizing.fit(band: band, body: layoutContent(dryRun: true) - band, maxHeight: maxHeight).height
+    }
 
     /// The site at a glance goes in its own page; the other pages add theirs where they're built.
     override func addSubview(_ view: NSView) {
@@ -482,13 +527,17 @@ final class SitePanel: FloatingPanelView {
         if next == .connection { showCertificate() } else { show(next) }
     }
 
+    /// sitecert <index>: a certificate of the chain chosen on the certificate page, as a click on its row.
+    func debugCertificate(_ index: Int) { certificatePage?.debugChoose(index) }
+
     /// What the panel shows, for checking it without looking: its page, and its rows' names, top to bottom.
     var debugState: [String: Any] {
         ["site": site, "page": page.rawValue, "certificate": certificatePage?.debugState ?? [:],
          "links": [connectionRow, permissionsRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugTitle),
          "rows": rows.map(\.debugTitle), "permissions": permissionsGroup.rows.map(\.debugTitle),
          "extensions": extensionsSection?.debugState ?? [:],
-         "zoom": zoomStepper.map { ZoomLevels.percent($0.zoom) } ?? ""]
+         "zoom": zoomStepper.map { ZoomLevels.percent($0.zoom) } ?? "",
+         "scroll": ["panel": frame.height, "viewport": scroll.frame.height, "body": content.frame.height, "offset": scroll.contentView.bounds.minY]]
     }
 
     /// sitedark <automatic|on|off|force>: chooses in the Dark page row's dropdown.
@@ -822,11 +871,18 @@ final class SitePanel: FloatingPanelView {
 
     // MARK: Layout
 
+    /// A page's header at the top, and under it the sheet that scrolls, as tall as the page's body.
     private func layoutContent() {
-        let height = layoutContent(dryRun: false)
-        scroll.frame = bounds
-        content.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(height, bounds.height))
+        let band = headerBand
+        let body = layoutContent(dryRun: false) - band
+        if let header = pinnedHeader {
+            header.frame = NSRect(x: pad, y: pad, width: width - pad * 2, height: header.height)
+            headerEdge.frame = NSRect(x: 0, y: band - Tokens.Metric.hairline, width: bounds.width, height: Tokens.Metric.hairline)
+        }
+        scroll.frame = NSRect(x: 0, y: band, width: bounds.width, height: max(0, bounds.height - band))
+        content.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(body, scroll.frame.height))
         for box in [mainBox, permissionsBox] { box.frame = content.bounds }
+        refreshHeaderEdge()
     }
 
     @discardableResult
@@ -845,10 +901,11 @@ final class SitePanel: FloatingPanelView {
         if page == .connection, let certificate = certificatePage {
             let h = certificate.height(for: width, pad: pad)
             place(certificate, NSRect(x: 0, y: 0, width: width, height: h))
-            return h
+            return headerBand + h
         }
         let inner = width - pad * 2
-        var y = pad
+        // A page under its header starts at the top of the sheet; the first page, a padding down.
+        var y = page == .main ? pad : 0
         // The room after the last thing placed, and the room under its words inside it: both are taken back at the
         // end, so the panel's bottom margin counts from the words, as its top does.
         var gapAfter: CGFloat = 0, slack: CGFloat = 0
@@ -857,14 +914,9 @@ final class SitePanel: FloatingPanelView {
             place(row, NSRect(x: pad - PanelLinkRow.outset, y: y, width: inner + PanelLinkRow.outset * 2, height: PanelLinkRow.height))
             y += PanelLinkRow.height
         }
-        func finish() -> CGFloat { y - gapAfter - slack + pad }
+        func finish() -> CGFloat { headerBand + y - gapAfter - slack + pad }
         // A page's box covers the panel, so what's in it is placed in the panel's own terms.
         for box in [mainBox, permissionsBox] where !box.isHidden { place(box, NSRect(x: 0, y: 0, width: width, height: 10_000)) }
-        func pageHeader(_ header: PanelPageHeader) {
-            place(header, NSRect(x: pad, y: y, width: inner, height: header.height))
-            y += header.height
-            end(Tokens.Space.x3)
-        }
         func group(_ group: PanelGroup) {
             place(group, NSRect(x: pad, y: y, width: inner, height: group.height))
             y += group.height
@@ -872,7 +924,6 @@ final class SitePanel: FloatingPanelView {
 
         switch page {
         case .permissions:
-            pageHeader(permissionsHeader)
             group(permissionsGroup)
             if let resetPermissions {
                 y += Tokens.Space.x2
@@ -1530,6 +1581,27 @@ final class PanelPageHeader: NSView {
         back.frame = NSRect(x: -ink, y: (bounds.height - side) / 2, width: side, height: side)
         let x = showsBack ? side - ink + Tokens.Space.x1 : 0
         label.frame = NSRect(x: x - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: bounds.width - x + Label.inset * 2, height: label.lineHeight)
+    }
+}
+
+/// How tall Site Controls is, and how much of a page scrolls (#220): never past the window's bottom, a page's header
+/// kept at the top, and the rest of the page under it scrolling when it doesn't fit.
+enum SitePanelSizing {
+    /// The tallest the panel can be from `top` in a window's overlay `overlayHeight` tall: down to the window's bottom
+    /// inset, and never so short that a page can't show a few rows.
+    static func maxHeight(overlayHeight: CGFloat, top: CGFloat) -> CGFloat {
+        max(PanelLinkRow.height * 4, overlayHeight - top - Tokens.Metric.cardInset)
+    }
+
+    /// The top a page's header keeps: the panel's padding, the header, and the room under it.
+    static func headerBand(pad: CGFloat, header: CGFloat) -> CGFloat { pad + header + Tokens.Space.x3 }
+
+    /// The panel's height for a page whose header keeps `band` at the top and whose body is `body` tall, and the room
+    /// under the header: all of the body when it fits, and what's left when it doesn't, which then scrolls.
+    static func fit(band: CGFloat, body: CGFloat, maxHeight: CGFloat) -> (height: CGFloat, viewport: CGFloat, scrolls: Bool) {
+        let height = min(band + body, maxHeight)
+        let viewport = max(0, height - band)
+        return (height, viewport, body > viewport)
     }
 }
 
