@@ -93,8 +93,13 @@ enum DownloadRuleSheet {
             argumentView = args
             actionRows.append(FormSheet.Row(label: String(localized: "Arguments", comment: "Label of the arguments field in a download rule's sheet: one argument a line."),
                                             view: args, height: 96))
-            actionRows.append(.note(String(localized: "One argument a line. Each becomes its own argument, so a URL with &, ; or $() is never run as a shell command. The link, cookies and the rest are also in ZIGZAG_LINK, ZIGZAG_COOKIES and the other environment variables.",
-                                           comment: "Under the arguments of a Run Script download rule, explaining argv and environment.")))
+            actionRows.append(.note(String(localized: "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES.",
+                                           comment: "Under the arguments of a Run Script download rule: one argument a line, and the names the link and the cookies arrive under.")))
+            actionRows.append(FormSheet.Row(label: nil,
+                                            view: StatusLabel(String(localized: "Not run through a shell",
+                                                                     comment: "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line."),
+                                                              symbol: "checkmark.shield.fill"),
+                                            height: Tokens.Metric.controlHeight))
         case .jsonRPC:
             let endpoint = FilledField(placeholder: "http://127.0.0.1:6800/jsonrpc")
             endpoint.stringValue = action.rpcEndpoint
@@ -115,9 +120,10 @@ enum DownloadRuleSheet {
                                             view: parameters, height: 110))
             let secret = FilledField(placeholder: String(localized: "Token, if the service asks for one", comment: "Placeholder of the token field in a JSON-RPC download rule's sheet. It's kept in the Keychain."), secure: true)
             secret.stringValue = existing.flatMap { HandoffSecrets.secret(for: $0.id) } ?? ""
+            secret.toolTip = String(localized: "Kept in the Keychain", comment: "Tooltip on the token field of a JSON-RPC download rule's sheet.")
             secretField = secret
             actionRows.append(FormSheet.Row(label: String(localized: "Token", comment: "Label of the token field in a JSON-RPC download rule's sheet."), view: secret))
-            actionRows.append(.note(String(localized: "A JSON array. {link}, {filename}, {cookies} and the rest are filled in, safely quoted. The token is kept in the Keychain.",
+            actionRows.append(.note(String(localized: "A JSON array. Tokens are filled in.",
                                            comment: "Under the parameters of a JSON-RPC download rule.")))
             let status = StatusLabel(String(localized: "Cookies stay on this Mac",
                                             comment: "Beside an icon, under the parameters of a JSON-RPC download rule whose endpoint is on this Mac: the site's cookies would go no further than it."))
@@ -205,7 +211,7 @@ enum DownloadRuleSheet {
                                    title: existing == nil ? String(localized: "Add Download Rule", comment: "Title of the sheet that makes a download rule.")
                                                           : String(localized: "Edit Download Rule", comment: "Title of the sheet that changes a download rule."),
                                    symbol: action.kind.symbol,
-                                   message: String(localized: "The first rule that matches an address wins. Rules run from the top of the list.",
+                                   message: String(localized: "The first rule that matches wins.",
                                                    comment: "Under the title of the sheet that makes a download rule."),
                                    rows: rows,
                                    confirmTitle: existing == nil ? String(localized: "Add", comment: "Button of the sheet that makes a download rule.")

@@ -1854,13 +1854,13 @@
         }
       }
     },
-    "A JSON array. {link}, {filename}, {cookies} and the rest are filled in, safely quoted. The token is kept in the Keychain." : {
+    "A JSON array. Tokens are filled in." : {
       "comment" : "Under the parameters of a JSON-RPC download rule.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "一个 JSON 数组。{link}、{filename}、{cookies} 等会安全转义后填入。令牌保存在钥匙串中。"
+            "value" : "一个 JSON 数组。令牌会自动填入。"
           }
         }
       }
@@ -6283,17 +6283,6 @@
         }
       }
     },
-    "Drag a rule to change its order." : {
-      "comment" : "Hint under the download rules in Settings › Downloads.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "拖移规则即可更改顺序。"
-          }
-        }
-      }
-    },
     "Drag a space to change its order." : {
       "comment" : "Hint under Your Spaces in Settings › Spaces.",
       "localizations" : {
@@ -6312,6 +6301,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "把一个标签页拖到页面上"
+          }
+        }
+      }
+    },
+    "Drag one to change its order." : {
+      "comment" : "Under the download rules in Settings › Downloads, when there is an order to change.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖移即可更改顺序。"
           }
         }
       }
@@ -8700,6 +8700,17 @@
         }
       }
     },
+    "Kept in the Keychain" : {
+      "comment" : "Tooltip on the token field of a JSON-RPC download rule's sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存在钥匙串中"
+          }
+        }
+      }
+    },
     "Key" : {
       "comment" : "A row in Settings › Automation, shown while AI apps may use Zigzag: the secret key an app sends.",
       "localizations" : {
@@ -10406,6 +10417,17 @@
         }
       }
     },
+    "Not run through a shell" : {
+      "comment" : "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不经由 shell 运行"
+          }
+        }
+      }
+    },
     "Not secure" : {
       "comment" : "How a page loaded over plain http, or with a certificate you chose to trust anyway, is marked, in the site panel and the address bar's tooltip.",
       "localizations" : {
@@ -10780,13 +10802,13 @@
         }
       }
     },
-    "One argument a line. Each becomes its own argument, so a URL with &, ; or $() is never run as a shell command. The link, cookies and the rest are also in ZIGZAG_LINK, ZIGZAG_COOKIES and the other environment variables." : {
-      "comment" : "Under the arguments of a Run Script download rule, explaining argv and environment.",
+    "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES." : {
+      "comment" : "Under the arguments of a Run Script download rule: one argument a line, and the names the link and the cookies arrive under.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "每行一个参数。每个都会成为独立的参数，所以含有 &、;、$() 的网址绝不会被当作 shell 命令运行。链接、Cookie 等内容也会放进 ZIGZAG_LINK、ZIGZAG_COOKIES 等环境变量。"
+            "value" : "每行一个参数。链接和 Cookie 通过 ZIGZAG_LINK 和 ZIGZAG_COOKIES 传入。"
           }
         }
       }
@@ -16637,24 +16659,13 @@
         }
       }
     },
-    "The first rule that matches an address wins. A download no rule matches is saved by Zigzag." : {
-      "comment" : "Explanation under the download rules in Settings › Downloads.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第一个匹配地址的规则生效。没有规则匹配的下载由 Zigzag 存储。"
-          }
-        }
-      }
-    },
-    "The first rule that matches an address wins. Rules run from the top of the list." : {
+    "The first rule that matches wins." : {
       "comment" : "Under the title of the sheet that makes a download rule.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "第一个匹配地址的规则生效。规则按列表从上到下运行。"
+            "value" : "第一个匹配的规则生效。"
           }
         }
       }
@@ -17986,17 +17997,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "输入“%@”以确认"
-          }
-        }
-      }
-    },
-    "Type a link or a file’s address to see which rule takes it, and what it would do." : {
-      "comment" : "Explanation under the test address in Settings › Downloads.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "输入链接或文件的地址，看看哪条规则会接手它，以及会怎么处理。"
           }
         }
       }

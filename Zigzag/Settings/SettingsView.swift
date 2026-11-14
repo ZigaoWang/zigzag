@@ -1175,8 +1175,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshDownloadPlaceRules()
         downloadRuleTest.field.delegate = self
         let testRow = FormRow(title: String(localized: "Test an address", comment: "A setting in Settings › Downloads: a field to type an address and see which rule takes it."),
-                              detail: String(localized: "Type a link or a file’s address to see which rule takes it, and what it would do.",
-                                             comment: "Explanation under the test address in Settings › Downloads."),
                               control: downloadRuleTest)
         testRow.keywords = String(localized: "check preview rule test", comment: "Words that find the download rule test with Find a setting. Not shown.")
         downloadRuleTestRow = testRow
@@ -2702,10 +2700,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .downloads:
             section(nil, downloadPlaceGroup)
             section(Self.downloadRulesHeading, downloadRulesGroup, accessory: addDownloadRuleButton)
-            // Said once, under the list, and only when there's an order to change.
-            if downloadRuleRows.count > 1 {
-                note(String(localized: "Drag a rule to change its order.", comment: "Hint under the download rules in Settings › Downloads."))
-            }
             section(Self.downloadTestHeading, downloadTestGroup)
         case .general, .appearance, .tabs, .search, .mini, .automation:
             for (title, group) in groups(of: pane) { section(title, group) }
@@ -2932,9 +2926,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 downloadRulesGroup.add(sitesRow)
             }
         }
+        // One line under the list, and it's the one thing the list can't show: that dragging changes the order.
         let hint = FormRow(title: String(localized: "Rules run from the top", comment: "In Settings › Downloads, under the rules: the first match wins."),
-                           detail: String(localized: "The first rule that matches an address wins. A download no rule matches is saved by Zigzag.",
-                                          comment: "Explanation under the download rules in Settings › Downloads."),
+                           detail: rules.count > 1 ? String(localized: "Drag one to change its order.",
+                                                             comment: "Under the download rules in Settings › Downloads, when there is an order to change.") : nil,
                            control: NSView())
         downloadRulesGroup.add(hint)
     }
@@ -2965,8 +2960,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         guard let row = downloadRuleTestRow else { return }
         let typed = downloadRuleTest.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !typed.isEmpty else {
-            row.detailText = String(localized: "Type a link or a file’s address to see which rule takes it, and what it would do.",
-                                    comment: "Explanation under the test address in Settings › Downloads.")
+            row.detailText = ""
             return
         }
         let url = URL(string: typed) ?? URL(string: "https://\(typed)")
