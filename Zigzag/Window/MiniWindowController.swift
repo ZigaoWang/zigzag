@@ -157,10 +157,6 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         }
         strip.copyButton.onClick = { [weak self] _ in self?.copyPageURL(nil) }
         strip.siteButton.onClick = { [weak self] _ in self?.showSiteControls() }
-        strip.siteButton.onRightClick = { [weak self] _ in
-            self?.showSiteControls()
-            return nil
-        }
         strip.pinButton.onClick = { [weak self] _ in
             guard let window = self?.window else { return }
             KeepOnTop.toggle(window)
@@ -869,6 +865,8 @@ final class MiniRootView: SpaceFrameView {
 /// installed app's strip, the space the page goes to, the page's site in the middle, and Site Controls, Keep on Top, Copy Link and
 /// Open in at the right end, lined up with the page's edge. Dragging it moves the window.
 final class MiniStripView: NSView {
+    /// The narrowest the address field opens: below this between the space and the buttons, it takes more of the strip.
+    static let narrowestField: CGFloat = 160
     /// Back, forward and reload: the browser window's own three, with its tooltips, at a pane strip's size.
     let backButton = MiniStripView.button("chevron.left", toolTip: Shortcuts.tooltip(String(localized: "Back", comment: "Tooltip of the sidebar's back button."), for: #selector(MiniWindowController.goBack(_:))))
     let forwardButton = MiniStripView.button("chevron.right", toolTip: Shortcuts.tooltip(String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."), for: #selector(MiniWindowController.goForward(_:))))
@@ -965,9 +963,16 @@ final class MiniStripView: NSView {
         let fieldLeft = (spaceChip.frame.width > 0 ? spaceChip.frame.maxX : left) + Tokens.Space.x2
         let fieldRight = buttons - Tokens.Space.x2
         let room = max(0, fieldRight - fieldLeft)
-        let field = min(Tokens.Metric.miniAddressWidth, room)
-        let fieldX = min(max(fieldLeft, round(bounds.midX - field / 2)), fieldRight - field)
-        anchor.frame = NSRect(x: fieldX, y: y, width: field, height: h)
+        if room >= Self.narrowestField {
+            let field = min(Tokens.Metric.miniAddressWidth, room)
+            let fieldX = min(max(fieldLeft, round(bounds.midX - field / 2)), fieldRight - field)
+            anchor.frame = NSRect(x: fieldX, y: y, width: field, height: h)
+        } else {
+            // A narrow window leaves too little room there: the field takes the strip from after reload to before the
+            // buttons at its end, over the space's name, which it covers whole rather than in part.
+            let start = left, end = max(start + Self.narrowestField, fieldRight)
+            anchor.frame = NSRect(x: start, y: y, width: min(end, bounds.width - Tokens.Sidebar.lightsX) - start, height: h)
+        }
     }
 }
 

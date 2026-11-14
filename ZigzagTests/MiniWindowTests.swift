@@ -105,7 +105,9 @@ struct MiniWindowTests {
             strip.layout()
             #expect(strip.siteButton.frame.width > 0, "at \(width)")
             #expect(strip.siteButton.frame.maxX == strip.pinButton.frame.minX, "at \(width)")
-            #expect(strip.anchor.frame.maxX <= strip.siteButton.frame.minX - Tokens.Space.x2, "at \(width)")
+            // Editing the address always opens a field wide enough to use; where the strip has room, clear of the buttons.
+            #expect(strip.anchor.frame.width >= MiniStripView.narrowestField, "at \(width)")
+            if width >= 640 { #expect(strip.anchor.frame.maxX <= strip.siteButton.frame.minX - Tokens.Space.x2, "at \(width)") }
             #expect(strip.title.frame.width == 0 || strip.title.frame.maxX <= strip.siteButton.frame.minX + 0.5, "at \(width)")
             #expect(strip.openButton.frame.maxX == width - Tokens.Sidebar.lightsX, "at \(width)")
         }
