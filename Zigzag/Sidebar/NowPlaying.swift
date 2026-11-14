@@ -2,15 +2,15 @@ import AppKit
 
 /// When a tab you're not looking at plays sound, a small control sits above the space dots:
 /// the site, play/pause and mute. Click the title to go there. It's laid out as a tab's row is: the same height,
-/// icon and text columns, and the same small buttons at its end, with a close button last, as a tab's, that shows
-/// under the pointer and hides the card for what that tab is playing now; the sound plays on.
+/// icon and text columns, and the same small buttons at its end, with a close button last, always
+/// there, that hides the card for what that tab is playing now; the sound plays on.
 final class NowPlayingView: InteractiveView {
     private let icon = FaviconView()
     private let title = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
     let playButton = TabRowView.rowButton("pause", toolTip: String(localized: "Pause", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."))
     let muteButton = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."))
-    /// Last, where a tab row's close is, under the pointer. Its room is kept while it's hidden (as a row of several
-    /// pages keeps its close's), so play and mute never move as the pointer comes.
+    /// Last, where a tab row's close is. Always there: a button that appeared on hover would push play and mute aside
+    /// just as the pointer reached them, and a click meant for mute would hide the card.
     let hideButton = TabRowView.rowButton("xmark", toolTip: String(localized: "Hide", comment: "Tooltip, VoiceOver action and menu item of the close button on the sidebar's Now Playing control: hides the control; the tab keeps playing."))
     /// Hides the card for what's playing now: the close button, the menu's Hide and VoiceOver's.
     var onHide: (() -> Void)?
@@ -24,11 +24,6 @@ final class NowPlayingView: InteractiveView {
         layer?.cornerCurve = .continuous
         [icon, title, playButton, muteButton, hideButton].forEach { addSubview($0) }
         hideButton.onClick = { [weak self] _ in self?.onHide?() }
-        // From the keyboard the close button shows while any of the card's buttons has focus, so Tab can reach it.
-        for button in [playButton, muteButton, hideButton] {
-            button.keyboardFocusChanged = { [weak self] _ in self?.refreshHideButton() }
-        }
-        refreshHideButton()
         // Settings › Appearance › Sidebar size: the site's name, icon and buttons at the rows' size.
         sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -57,12 +52,6 @@ final class NowPlayingView: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// The close button takes clicks only while it shows; otherwise a click there goes to the tab.
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        let hit = super.hitTest(point)
-        return hit === hideButton && !showsHideButton ? self : hit
-    }
-
     func show(_ tab: Tab) {
         self.tab = tab
         refresh()
@@ -80,15 +69,23 @@ final class NowPlayingView: InteractiveView {
         needsLayout = true
     }
 
-    /// The close button is up while the pointer is on the card or the keyboard is on one of its buttons. Hover is
-    /// instant, as on every row.
-    private var showsHideButton: Bool {
-        isHovered || [playButton, muteButton, hideButton].contains { $0.hasKeyboardFocus }
-    }
-
-    private func refreshHideButton() {
-        let show = showsHideButton
-        Tokens.Motion.withoutAnimation { hideButton.alphaValue = show ? 1 : 0 }
+    /// Play, mute and the close button at the card's end, always there, so nothing moves under the pointer.
+    private func placeButtons() {
+        let b = Tokens.Sidebar.rowButton
+        let y = (bounds.height - b) / 2
+        let end = bounds.width - SidebarRowView.buttonEdge
+        let hide = NSRect(x: end - b, y: y, width: b, height: b)
+        let mute = NSRect(x: hide.minX - Self.buttonGap - b, y: y, width: b, height: b)
+        let play = NSRect(x: mute.minX - Self.buttonGap - b, y: y, width: b, height: b)
+        let x = icon.frame.maxX + SidebarRowView.titleOffset
+        let h = ceil(title.intrinsicContentSize.height)
+        let titleFrame = NSRect(x: x, y: (bounds.height - h) / 2, width: max(0, play.minX - x - SidebarRowView.buttonEdge), height: h)
+        muteButton.frame = mute
+        playButton.frame = play
+        title.frame = titleFrame
+        hideButton.frame = hide
+        // A title cut short reads whole in its tooltip.
+        toolTip = title.intrinsicContentSize.width > titleFrame.width ? title.stringValue : nil
     }
 
     override func layout() {
@@ -97,23 +94,13 @@ final class NowPlayingView: InteractiveView {
         // as far in from the trailing edge as a row's.
         let size = Tokens.Sidebar.favicon
         icon.frame = NSRect(x: SidebarRowView.inset, y: (bounds.height - size) / 2, width: size, height: size)
-        let b = Tokens.Sidebar.rowButton
-        let y = (bounds.height - b) / 2
-        hideButton.frame = NSRect(x: bounds.width - SidebarRowView.buttonEdge - b, y: y, width: b, height: b)
-        muteButton.frame = NSRect(x: hideButton.frame.minX - Self.buttonGap - b, y: y, width: b, height: b)
-        playButton.frame = NSRect(x: muteButton.frame.minX - Self.buttonGap - b, y: y, width: b, height: b)
-        let x = icon.frame.maxX + SidebarRowView.titleOffset
-        let h = ceil(title.intrinsicContentSize.height)
-        title.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: max(0, playButton.frame.minX - x - SidebarRowView.buttonEdge), height: h)
-        // A title cut short reads whole in its tooltip.
-        toolTip = title.intrinsicContentSize.width > title.frame.width ? title.stringValue : nil
+        placeButtons()
     }
 
     /// Between the two buttons, as between a row's.
     private static let buttonGap: CGFloat = 2
 
     override func stateDidChange(animated: Bool) {
-        refreshHideButton()
         // The rows' ink, on the space's color.
         title.textColor = Brand.Theme.for(self).rowInk
         // The address's and favorites' look: a soft field of the space's color.

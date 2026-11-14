@@ -81,19 +81,14 @@ struct NowPlayingTests {
         view.layout()
         let b = Tokens.Sidebar.rowButton
         #expect(view.hideButton.frame.maxX == 228 - SidebarRowView.buttonEdge)
+        #expect(view.hideButton.frame.width == b)
         #expect(view.muteButton.frame.maxX == view.hideButton.frame.minX - 2)
         #expect(view.playButton.frame.maxX == view.muteButton.frame.minX - 2)
-        #expect(view.hideButton.frame.width == b)
-        // Play and mute stay put as the close comes and goes.
-        let play = view.playButton.frame
+        // Nothing moves or appears as the pointer comes: a click aimed at mute lands on mute.
+        let frames = [view.playButton.frame, view.muteButton.frame, view.hideButton.frame]
         view.isHovered = true
         view.layout()
-        #expect(view.playButton.frame == play)
-        view.isHovered = false
-        // At rest the close is out of sight and takes no click; under the pointer it shows.
-        #expect(view.hideButton.alphaValue == 0)
-        #expect(view.hitTest(NSPoint(x: view.hideButton.frame.midX, y: view.hideButton.frame.midY)) === view)
-        view.isHovered = true
+        #expect([view.playButton.frame, view.muteButton.frame, view.hideButton.frame] == frames)
         #expect(view.hideButton.alphaValue == 1)
         #expect(view.hitTest(NSPoint(x: view.hideButton.frame.midX, y: view.hideButton.frame.midY)) === view.hideButton)
     }
