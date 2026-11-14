@@ -6,6 +6,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- Dark pages in the PDF viewer keep their pictures as they are: a photo is no longer shown as a negative. Text and lines still go dark, and so does a scanned page. ([#226](https://github.com/ZigaoWang/zigzag/issues/226))
+
+### Fixed
 - A page's question to open an app comes up in Zigzag Mini or an installed app's window, over its own page. It used to come up in a browser window behind, so claude.ai's Open Claude seemed to do nothing in Zigzag Mini.
 - The hidden sidebar comes out sooner when you reach for the window's edge, and also when another screen sits beside the window and the pointer runs a little onto it. ([#206](https://github.com/ZigaoWang/zigzag/issues/206))
 

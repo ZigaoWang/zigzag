@@ -13,6 +13,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ## [Unreleased]
 
 ### 修复
+- PDF 阅读器的深色页面会保留图片原本的样子，照片不会再变成底片。文字和线条照样变深，扫描的页面也一样。([#226](https://github.com/ZigaoWang/zigzag/issues/226))
+
+### 修复
 - 网页想打开 App 时的询问，会出现在 Zigzag Mini 或已安装 App 的窗口里、它自己的网页上方。以前会出现在后面的浏览器窗口里，所以在 Zigzag Mini 里点 claude.ai 的“Open Claude”好像没反应。
 - 指针移到窗口边缘时，隐藏的边栏会更快出来；窗口旁边有另一块屏幕、指针稍微冲到那块屏幕上时也一样。([#206](https://github.com/ZigaoWang/zigzag/issues/206))
 

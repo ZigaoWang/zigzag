@@ -142,6 +142,165 @@ import WebKit
         #expect(Self.pixel(image, x: 10, y: 10)[1] > 240)
     }
 
+    // MARK: Dark pages keep their pictures
+
+    /// Four colors, red, green, blue and yellow, two by two: smoothed out, a small photo.
+    static let photoHex = "FF000000FF000000FFFFFF00"
+
+    static func photo() -> CGImage {
+        let bytes: [UInt8] = [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255]
+        let provider = CGDataProvider(data: Data(bytes) as CFData)!
+        return CGImage(width: 2, height: 2, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: 8, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                       bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue), provider: provider, decode: nil,
+                       shouldInterpolate: true, intent: .defaultIntent)!
+    }
+
+    /// A 300 by 400 point page drawn with CoreGraphics: a line of text, and `photo()` in `picture` (page points, y up).
+    static func picturePDF(picture: CGRect, background: CGImage? = nil) -> Data {
+        let data = NSMutableData()
+        var box = CGRect(x: 0, y: 0, width: 300, height: 400)
+        let context = CGContext(consumer: CGDataConsumer(data: data as CFMutableData)!, mediaBox: &box, nil)!
+        context.beginPDFPage(nil)
+        if let background { context.draw(background, in: box) }
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: "Curriculum vitae", attributes: [.font: NSFont.systemFont(ofSize: 24)]))
+        context.textPosition = CGPoint(x: 20, y: 300)
+        CTLineDraw(line, context)
+        context.draw(photo(), in: picture)
+        context.endPDFPage()
+        context.closePDF()
+        return data as Data
+    }
+
+    /// A PDF written by hand from its objects, numbered from 1, the first the catalog.
+    static func handWritten(_ objects: [String]) -> Data {
+        var out = "%PDF-1.4\n"
+        var offsets: [Int] = []
+        for (index, object) in objects.enumerated() {
+            offsets.append(out.utf8.count)
+            out += "\(index + 1) 0 obj\n\(object)\nendobj\n"
+        }
+        let xref = out.utf8.count
+        out += "xref\n0 \(objects.count + 1)\n0000000000 65535 f \n"
+        for offset in offsets { out += String(format: "%010d 00000 n \n", offset) }
+        out += "trailer\n<< /Size \(objects.count + 1) /Root 1 0 R >>\nstartxref\n\(xref)\n%%EOF\n"
+        return Data(out.utf8)
+    }
+
+    static func stream(_ dictionary: String = "", _ content: String) -> String {
+        "<< \(dictionary) /Length \(content.utf8.count) >>\nstream\n\(content)\nendstream"
+    }
+
+    static let photoObject = stream("/Type /XObject /Subtype /Image /Width 2 /Height 2 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /ASCIIHexDecode",
+                                    photoHex + ">")
+
+    /// An image's pixels, 8-bit RGBA, rows top to bottom.
+    static func pixels(_ image: CGImage) -> [UInt8] {
+        let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return Array(UnsafeBufferPointer(start: context.data!.assumingMemoryBound(to: UInt8.self), count: image.width * image.height * 4))
+    }
+
+    /// How far apart two renders are at most in `rect` (pixels, y down), any channel.
+    static func difference(_ a: CGImage, _ b: CGImage, in rect: CGRect) -> Int {
+        let one = pixels(a), other = pixels(b)
+        var most = 0
+        for y in Int(rect.minY)..<Int(rect.maxY) {
+            for x in Int(rect.minX)..<Int(rect.maxX) {
+                for channel in 0..<3 {
+                    let index = (y * a.width + x) * 4 + channel
+                    most = max(most, abs(Int(one[index]) - Int(other[index])))
+                }
+            }
+        }
+        return most
+    }
+
+    static func isDark(_ pixel: [UInt8]) -> Bool { pixel[0] < 50 && pixel[1] < 50 && pixel[2] < 50 }
+
+    /// Light and dark renders of a whole page at a pixel a point.
+    @MainActor static func lightAndDark(_ data: Data) async throws -> (light: CGImage, dark: CGImage) {
+        let document = SafePDF(data: data)
+        let info = try #require(await document.open())
+        let size = try #require(info.pageSizes.first)
+        let rect = CGRect(origin: .zero, size: size)
+        let light = try #require(await document.render(page: 0, rect: rect, scale: 1, dark: false))
+        let dark = try #require(await document.render(page: 0, rect: rect, scale: 1, dark: true))
+        return (light, dark)
+    }
+
+    @Test @MainActor func aDarkPageKeepsItsPhotosColors() async throws {
+        // The photo at 150...250 across, 50...150 up: 250...350 down the page as shown.
+        let (light, dark) = try await Self.lightAndDark(Self.picturePDF(picture: CGRect(x: 150, y: 50, width: 100, height: 100)))
+        let photo = Self.pixel(light, x: 160, y: 260)
+        #expect(photo[0] > 150 && photo[1] < 120, "the light render shows the photo's red corner: \(photo)")
+        #expect(Self.difference(light, dark, in: CGRect(x: 153, y: 253, width: 94, height: 94)) <= 2)
+        // The paper and the text around it go dark: the text's line is mostly dark paper with light letters.
+        #expect(Self.isDark(Self.pixel(dark, x: 100, y: 200)), "\(Self.pixel(dark, x: 100, y: 200))")
+        #expect(Self.isDark(Self.pixel(dark, x: 140, y: 300)), "\(Self.pixel(dark, x: 140, y: 300))")
+        let line = Self.pixels(dark)
+        var bright = 0, all = 0
+        for y in 80..<110 {
+            for x in 20..<220 {
+                all += 1
+                if line[(y * dark.width + x) * 4] > 150 { bright += 1 }
+            }
+        }
+        #expect(bright > 50 && bright < all / 2, "\(bright) light pixels of \(all) in the text's line")
+    }
+
+    @Test @MainActor func aScannedPageStillGoesDark() async throws {
+        // A scan: one picture over the whole page, white with a gray band, and the small photo on it.
+        let white = [UInt8](repeating: 255, count: 30 * 40 * 4)
+        var scan = white
+        for y in 10..<12 { for x in 0..<30 { for c in 0..<3 { scan[(y * 30 + x) * 4 + c] = 90 } } }
+        let provider = CGDataProvider(data: Data(scan) as CFData)!
+        let page = CGImage(width: 30, height: 40, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: 120, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                           bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue), provider: provider, decode: nil,
+                           shouldInterpolate: false, intent: .defaultIntent)!
+        let (_, dark) = try await Self.lightAndDark(Self.picturePDF(picture: CGRect(x: 150, y: 50, width: 100, height: 100), background: page))
+        #expect(Self.isDark(Self.pixel(dark, x: 50, y: 200)), "the scan's paper: \(Self.pixel(dark, x: 50, y: 200))")
+        #expect(Self.isDark(Self.pixel(dark, x: 200, y: 20)), "\(Self.pixel(dark, x: 200, y: 20))")
+    }
+
+    @Test @MainActor func aTurnedPageKeepsItsPhotosColorsWhereItsShown() async throws {
+        // 200 by 100 points turned 90° clockwise, the photo in its top left 40 points: at the top right as shown.
+        let data = Self.handWritten([
+            "<< /Type /Catalog /Pages 2 0 R >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Rotate 90 /Contents 4 0 R /Resources << /XObject << /Im1 5 0 R >> >> >>",
+            Self.stream("", "q 40 0 0 40 0 60 cm /Im1 Do Q 0 g 100 20 60 10 re f"),
+            Self.photoObject,
+        ])
+        let (light, dark) = try await Self.lightAndDark(data)
+        #expect(light.width == 100 && light.height == 200)
+        #expect(!Self.isDark(Self.pixel(light, x: 80, y: 20)) && Self.pixel(light, x: 80, y: 20) != [255, 255, 255, 255])
+        #expect(Self.difference(light, dark, in: CGRect(x: 63, y: 3, width: 34, height: 34)) <= 2)
+        #expect(Self.isDark(Self.pixel(dark, x: 20, y: 20)), "\(Self.pixel(dark, x: 20, y: 20))")
+        #expect(Self.isDark(Self.pixel(dark, x: 50, y: 150)), "\(Self.pixel(dark, x: 50, y: 150))")
+    }
+
+    @Test @MainActor func photosInAFormOrInlineKeepTheirColors() async throws {
+        // A form, drawn twice its size at 100, 20, with the photo 30 points in it: 100...160 across, 20...80 up.
+        // And an inline photo 40 points at 20, 140.
+        let data = Self.handWritten([
+            "<< /Type /Catalog /Pages 2 0 R >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R /Resources << /XObject << /Fm1 5 0 R >> >> >>",
+            Self.stream("", "q 1 0 0 1 100 20 cm /Fm1 Do Q q 40 0 0 40 20 140 cm BI /W 2 /H 2 /CS /RGB /BPC 8 /F /AHx ID \(Self.photoHex)> EI Q"),
+            Self.stream("/Type /XObject /Subtype /Form /BBox [0 0 100 100] /Matrix [2 0 0 2 0 0] /Resources << /XObject << /Im1 6 0 R >> >>",
+                        "q 30 0 0 30 0 0 cm /Im1 Do Q"),
+            Self.photoObject,
+        ])
+        let (light, dark) = try await Self.lightAndDark(data)
+        #expect(Self.pixel(light, x: 105, y: 125)[0] > 150, "the form's photo, light: \(Self.pixel(light, x: 105, y: 125))")
+        #expect(Self.difference(light, dark, in: CGRect(x: 103, y: 123, width: 54, height: 54)) <= 2)
+        #expect(Self.pixel(light, x: 25, y: 25)[0] > 150, "the inline photo, light: \(Self.pixel(light, x: 25, y: 25))")
+        #expect(Self.difference(light, dark, in: CGRect(x: 23, y: 23, width: 34, height: 34)) <= 2)
+        #expect(Self.isDark(Self.pixel(dark, x: 100, y: 100)), "\(Self.pixel(dark, x: 100, y: 100))")
+        #expect(Self.isDark(Self.pixel(dark, x: 180, y: 20)), "\(Self.pixel(dark, x: 180, y: 20))")
+    }
+
     @Test @MainActor func aPagesTextComesWithWhereEachCharacterIs() async throws {
         let document = SafePDF(data: Self.pdf())
         _ = try #require(await document.open())
