@@ -694,6 +694,20 @@ import WebKit
         #expect(document.hasFailed)
     }
 
+    /// A link over most of a page would open on any click there: it's left out. Smaller ones stay.
+    @Test func aLinkOverMostOfThePageIsLeftOut() {
+        let page = CGSize(width: 300, height: 400)
+        let links = [
+            RemoteLink(x: 0, y: 0, width: 300, height: 400, url: "https://example.com/all", page: -1, pageY: .nan),
+            RemoteLink(x: -1000, y: -1000, width: 5000, height: 5000, url: "https://example.com/past", page: -1, pageY: .nan),
+            RemoteLink(x: 0, y: 0, width: 300, height: 210, url: "https://example.com/most", page: -1, pageY: .nan),
+            RemoteLink(x: 0, y: 0, width: 300, height: 190, url: "https://example.com/half", page: -1, pageY: .nan),
+            RemoteLink(x: 40, y: 80, width: 100, height: 25, url: "https://example.com/a", page: -1, pageY: .nan),
+        ]
+        let text = SafePDF.pageText(from: RemotePageText(string: "", boxes: Data(), links: links), pageSize: page)
+        #expect(text.links.map { $0.url?.lastPathComponent } == ["half", "a"])
+    }
+
     /// Nothing in the app reads a PDF's bytes: no PDFKit, no CoreGraphics PDF reader, no AppKit PDF picture. The
     /// helper does all of it. The one exception is the full-page screenshot, which reads the PDF WebKit itself makes
     /// of the page, never a site's.

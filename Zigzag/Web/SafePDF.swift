@@ -124,7 +124,7 @@ final class SafePDF {
         let text: RemotePageText? = await ask(PDFLimits.textTime, .text) { proxy, reply in proxy.text(page: page, reply: reply) }
         guard let text else { return nil }
         guard text.isWellFormed(pages: info.pageSizes.count) else { reject(); return nil }
-        return Self.pageText(from: text)
+        return Self.pageText(from: text, pageSize: info.pageSizes[page])
     }
 
     /// Every page's text, for find.
@@ -156,16 +156,25 @@ final class SafePDF {
         return Info(pageSizes: pageSizes, title: title?.isEmpty == false ? title : nil, outline: outline, allowsCopying: remote.allowsCopying)
     }
 
-    nonisolated static func pageText(from remote: RemotePageText) -> PageText {
+    /// A link may cover at most this much of its page: one over most of it would open on any click there.
+    nonisolated static let maxLinkShare = 0.5
+
+    /// `pageSize`: the page's size as shown, to leave out links that cover most of it.
+    nonisolated static func pageText(from remote: RemotePageText, pageSize: CGSize? = nil) -> PageText {
         let boxes: [CGRect] = remote.boxes.withUnsafeBytes { raw in
             let values = raw.bindMemory(to: Float32.self)
             return stride(from: 0, to: values.count - 3, by: 4).map {
                 CGRect(x: CGFloat(values[$0]), y: CGFloat(values[$0 + 1]), width: CGFloat(values[$0 + 2]), height: CGFloat(values[$0 + 3]))
             }
         }
+        let page = pageSize.map { CGRect(origin: .zero, size: $0) }
         let links = remote.links.compactMap { link -> Link? in
             let url = link.url.flatMap(URL.init(string:))
             guard url != nil || link.page >= 0 else { return nil }
+            if let page {
+                let covered = CGRect(x: link.x, y: link.y, width: link.width, height: link.height).intersection(page)
+                if !covered.isNull, covered.width * covered.height > page.width * page.height * maxLinkShare { return nil }
+            }
             return Link(rect: CGRect(x: link.x, y: link.y, width: link.width, height: link.height), url: url,
                         page: url == nil ? link.page : nil, y: link.pageY.isNaN ? nil : link.pageY)
         }
