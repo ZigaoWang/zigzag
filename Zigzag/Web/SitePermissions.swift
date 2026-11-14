@@ -821,6 +821,12 @@ final class PermissionPrompt: FloatingPanelView {
         // The asking tab closed while an earlier question waited.
         if let tab, tab.isClosed { return nil }
         let asking = tab ?? controller.promptFrontTab
+        // A question that cannot be shown yet is held — WebKit's request keeps waiting — and the tab wears a marker
+        // until it is answered, so nothing is asked and lost in a background tab.
+        let questionID = UUID()
+        if let asking {
+            PendingQuestions.enqueue(.init(id: questionID, tabID: asking.id, origin: origin, title: request))
+        }
         // In the space's own color, like every other button in the window.
         let accent = controller.promptAccent
         return await withCheckedContinuation { continuation in
@@ -861,7 +867,10 @@ final class PermissionPrompt: FloatingPanelView {
             let width = max(row.map(\.fittingWidth).max() ?? 0, Tokens.Dialog.minButtonWidth)
             prompt.buttons = row.map { ($0 as InteractiveView, width) }
             prompt.setAccessibilityLabel(String(localized: "\(host): \(request)?", comment: "VoiceOver label of a site's permission question: the site, then its request, like “zoom.us: Use your camera?”."))
-            prompt.answer = { continuation.resume(returning: $0) }
+            prompt.answer = { response in
+                PendingQuestions.answer(questionID, response)
+                continuation.resume(returning: response)
+            }
             prompt.askingTab = asking
             prompt.controller = controller
             shown[ObjectIdentifier(controller)] = prompt

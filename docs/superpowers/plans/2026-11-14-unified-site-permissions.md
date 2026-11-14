@@ -474,6 +474,9 @@ git commit -m "feat: ask before a rule hands a link or download off"
 
 **Interfaces:**
 - Consumes: every question path from Tasks 3–6.
+- Also closes a gap Task 6 left open: a download a pop-up starts has no `PromptHost` of its own (`PopupWindowController`
+  does not conform), so `DownloadHandoff.decide` returns `.browser` and the rule does not run. Holding the question
+  here is what makes that case visible again, so route a no-host question into the held queue with its originating tab.
 - Produces:
   - `@MainActor enum PendingQuestions { static func enqueue(_ question: PendingQuestion); static func answer(_ id: UUID, _ answer: PermissionAnswer?); static func pending(tabID: UUID) -> [PendingQuestion]; static func hasPending(tabID: UUID) -> Bool; static func canShow(isFront: Bool, windowVisible: Bool) -> Bool }`
   - `struct PendingQuestion: Identifiable { let id: UUID; let tabID: UUID; let origin: String?; let title: String }`
