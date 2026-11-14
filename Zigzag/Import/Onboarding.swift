@@ -1165,10 +1165,10 @@ private final class BringPicker: StepContent {
         signIns.isHidden = !offersSignIns
         // One line: with sign-ins too, it says the one prompt covers both rather than listing them.
         hint.stringValue = isImporting
-            ? (choice.contains(.signIns) ? String(localized: "macOS will ask for your Mac’s password once. Type it, then click Always Allow.",
-                                                  comment: "Welcome window’s import step while importing. Always Allow is macOS's own button.")
-                                         : String(localized: "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow.",
-                                                  comment: "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button."))
+            ? (choice.contains(.signIns) ? String(localized: "macOS will ask for your Mac’s password once. Type it, then click Allow.",
+                                                  comment: "Welcome window’s import step while importing. Allow is macOS's own button.")
+                                         : String(localized: "macOS will ask for your Mac’s password to open your passwords. Type it, then click Allow.",
+                                                  comment: "Import window while importing from Chrome or a browser like it. Allow is macOS's own button."))
             : !problems ? ""
             : broughtAny ? String(localized: "Not everything came over yet.", comment: "Welcome window’s import step when something didn’t come over.")
             : String(localized: "Nothing came over yet.", comment: "Welcome window’s import step when nothing came over because of a problem, explained under each browser.")

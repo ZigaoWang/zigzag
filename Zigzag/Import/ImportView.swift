@@ -237,12 +237,12 @@ final class ImportView: NSView {
         let fromChromium = chosen.contains { if case .chromium(let browser) = $0.source.kind { browser.safeStorage != nil } else { false } }
         let note: String
         switch (data.contains(.passwords), data.contains(.signIns)) {
-        case (true, true): note = String(localized: "macOS will ask for your Mac’s password to open your passwords and sign-ins. Type it, then click Always Allow.",
-                                            comment: "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button.")
-        case (true, false): note = String(localized: "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow.",
-                                             comment: "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button.")
-        case (false, true): note = String(localized: "macOS will ask for your Mac’s password to open your sign-ins. Type it, then click Always Allow.",
-                                             comment: "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button.")
+        case (true, true): note = String(localized: "macOS will ask for your Mac’s password to open your passwords and sign-ins. Type it, then click Allow.",
+                                            comment: "Import window while importing from Chrome or a browser like it. Allow is macOS's own button.")
+        case (true, false): note = String(localized: "macOS will ask for your Mac’s password to open your passwords. Type it, then click Allow.",
+                                             comment: "Import window while importing from Chrome or a browser like it. Allow is macOS's own button.")
+        case (false, true): note = String(localized: "macOS will ask for your Mac’s password to open your sign-ins. Type it, then click Allow.",
+                                             comment: "Import window while importing from Chrome or a browser like it. Allow is macOS's own button.")
         case (false, false): note = ""
         }
         subtitle.stringValue = fromChromium ? note : ""

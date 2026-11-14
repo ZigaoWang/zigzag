@@ -191,13 +191,13 @@ nonisolated enum ChromiumImporter {
             let both = wantsPasswords && !cookieFiles.isEmpty
             let scope: Choice = both ? [.passwords, .cookies] : wantsPasswords ? .passwords : .cookies
             let message = both
-                ? String(localized: "\(browser.name)’s passwords and sign-ins stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Always Allow.",
-                         comment: "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Always Allow is macOS's own button.")
+                ? String(localized: "\(browser.name)’s passwords and sign-ins stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Allow.",
+                         comment: "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Allow is macOS's own button.")
                 : wantsPasswords
-                ? String(localized: "\(browser.name)’s passwords stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Always Allow.",
-                         comment: "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Always Allow is macOS's own button.")
-                : String(localized: "\(browser.name)’s sign-ins stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Always Allow.",
-                         comment: "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Always Allow is macOS's own button.")
+                ? String(localized: "\(browser.name)’s passwords stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Allow.",
+                         comment: "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Allow is macOS's own button.")
+                : String(localized: "\(browser.name)’s sign-ins stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Allow.",
+                         comment: "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Allow is macOS's own button.")
             batch.problems.append(ImportProblem(message: message, fix: .retry, retries: scope.rawValue))
         default:
             break  // No key saved there: no passwords to say anything about.
