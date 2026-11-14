@@ -935,9 +935,9 @@ final class MiniStripView: NSView {
             x += b
         }
         let left = x + Tokens.Space.x1
-        // The button ends as far in from the window's right edge as the traffic lights start from its left, so the
-        // strip sits evenly between the window's rounded corners.
-        let right = bounds.width - Tokens.Sidebar.lightsX
+        // Open in sits in the window's top right corner concentric with it: as far in from the right edge as from the
+        // top, a pill whose curve runs alongside the window's own (`MiniOpenButton`).
+        let right = bounds.width - round((bounds.height - h) / 2)
         // Narrow, the shortcut goes first, then the space's name shortens.
         openButton.showsKeys = true
         if right - left < spaceChip.fittingWidth + b * 3 + openButton.fittingWidth + Tokens.Space.x4 { openButton.showsKeys = false }
@@ -1126,7 +1126,8 @@ final class MiniTitleView: InteractiveView {
 final class MiniOpenButton: InteractiveView {
     private let label = Label("", font: .systemFont(ofSize: Tokens.Pane.addressText, weight: .medium), color: Tokens.Color.textPrimary)
     private let keys = Label("", font: .systemFont(ofSize: Tokens.Pane.addressText), color: Tokens.Color.textSecondary)
-    private static let pad = Tokens.Space.x2 + 2
+    /// In from the pill's round ends, so the words and the shortcut clear its curves.
+    private static let pad = Tokens.Space.x3
     var title: String { label.stringValue }
     /// Whether the shortcut shows after the words; a narrow window leaves it to the tooltip.
     var showsKeys = true { didSet { keys.isHidden = !showsKeys || keys.stringValue.isEmpty; needsLayout = true } }
@@ -1160,6 +1161,8 @@ final class MiniOpenButton: InteractiveView {
 
     override func layout() {
         super.layout()
+        // A pill: in the window's corner, its curve runs alongside the window's (the window's radius less the inset).
+        layer?.cornerRadius = bounds.height / 2
         let h = label.lineHeight
         let keysInk = keys.isHidden ? 0 : keys.inkWidth + 2
         let keysRoom = keys.isHidden ? 0 : keysInk + Tokens.Space.x1 + 2

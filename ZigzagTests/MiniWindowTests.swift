@@ -95,7 +95,7 @@ struct MiniWindowTests {
 
     /// Site Controls (#225) ends the strip's room as it ends the address in a browser window: right before Keep on
     /// Top, with the address field and the site's name kept clear of it, and Open in still as far in from the right
-    /// edge as the traffic lights are from the left.
+    /// edge as from the top, concentric with the window's corner.
     @Test func siteControlsComeBeforeKeepOnTop() {
         let strip = MiniStripView()
         strip.trafficLightsWidth = 52
@@ -109,7 +109,8 @@ struct MiniWindowTests {
             #expect(strip.anchor.frame.width >= MiniStripView.narrowestField, "at \(width)")
             if width >= 640 { #expect(strip.anchor.frame.maxX <= strip.siteButton.frame.minX - Tokens.Space.x2, "at \(width)") }
             #expect(strip.title.frame.width == 0 || strip.title.frame.maxX <= strip.siteButton.frame.minX + 0.5, "at \(width)")
-            #expect(strip.openButton.frame.maxX == width - Tokens.Sidebar.lightsX, "at \(width)")
+            // Concentric with the window's corner: as far in from the right as from the top.
+            #expect(strip.openButton.frame.maxX == width - strip.openButton.frame.minY, "at \(width)")
         }
     }
 }
