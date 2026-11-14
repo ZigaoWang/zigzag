@@ -448,7 +448,7 @@ final class ExtensionHost: NSObject {
         var state = profile.installs.state(id)
         // A record from before the bridge's permissions were kept in it: what it was always given, taken once.
         if var known = state, let granted = known.grantedPermissions, known.bridgeRecorded != true {
-            known.grantedPermissions = Self.migratedGrants(Set(granted), declared: ExtensionStore.isUnpacked(id) ? [] : declared).sorted()
+            known.grantedPermissions = Self.migratedGrants(Set(granted), declared: declared, fromFolder: ExtensionStore.isUnpacked(id)).sorted()
             known.bridgeRecorded = true
             profile.installs.save(known, for: id)
             state = known
@@ -501,9 +501,12 @@ final class ExtensionHost: NSObject {
     /// A record from before the bridge's permissions were kept: those its manifest asks for are added, as they were
     /// always given, and Zigzag's own two, recorded then whatever was asked, stay only as the manifest asks.
     /// `declared` is the manifest the person approved: a store package's, kept in Zigzag's own folder. A folder's can
-    /// have changed since, so for one nothing is added and what it asks for beyond the record is asked about.
-    static func migratedGrants(_ granted: Set<String>, declared: Set<String>) -> Set<String> {
-        granted.subtracting(zigzagGranted)
+    /// have changed since, so for one (`fromFolder`) nothing is added and what it asks for beyond the record is asked
+    /// about; Zigzag's own two that the record has stay while its manifest still asks for them.
+    static func migratedGrants(_ granted: Set<String>, declared: Set<String>, fromFolder: Bool = false) -> Set<String> {
+        let kept = granted.subtracting(zigzagGranted)
+        if fromFolder { return kept.union(granted.intersection(zigzagGranted).intersection(declared)) }
+        return kept
             .union(declared.intersection(zigzagGranted))
             .union(declared.intersection(ExtensionBridgeScript.granted))
     }

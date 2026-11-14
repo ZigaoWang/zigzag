@@ -532,6 +532,12 @@ extension ExtensionSecurityTests {
         #expect(ExtensionHost.carryingBlocking(["storage"], declared: ["webRequest", "webRequestBlocking"]) == nil)
         #expect(ExtensionHost.carryingBlocking(["webRequest", "webRequestBlocking"], declared: ["webRequest", "webRequestBlocking"]) == nil)
         #expect(ExtensionHost.migratedGrants(["storage", "nativeMessaging"], declared: []) == ["storage"])
+        // A folder keeps the native messaging and scripting its record had, while its manifest still asks; nothing
+        // its files ask for beyond the record is added.
+        #expect(ExtensionHost.migratedGrants(["storage", "nativeMessaging", "scripting"], declared: ["storage", "nativeMessaging", "scripting", "history"],
+                                             fromFolder: true) == ["storage", "nativeMessaging", "scripting"])
+        #expect(ExtensionHost.migratedGrants(["storage", "nativeMessaging", "scripting"], declared: ["storage"], fromFolder: true) == ["storage"])
+        #expect(ExtensionHost.migratedGrants(["storage"], declared: ["storage", "nativeMessaging"], fromFolder: true) == ["storage"])
     }
 }
 
