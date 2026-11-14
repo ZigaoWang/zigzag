@@ -8,8 +8,9 @@
 # Usage: scripts/release.sh            build, sign, notarize, staple
 #        scripts/release.sh --publish  also upload the build and appcast to zigzagbrowser.com
 #        scripts/release.sh --local    build and sign with Developer ID only, to use on this Mac
-#        scripts/release.sh --beta N   build version-beta.N and publish it to the beta feed only (Settings ›
-#                                      General › Beta updates); no DMG, website, GitHub release or Homebrew
+#        scripts/release.sh --beta N   build version-beta.N, publish it to the beta feed only (Settings ›
+#                                      General › Beta updates) and tag the commit vX.Y.Z-beta.N; no DMG,
+#                                      website, GitHub release or Homebrew
 # Before releasing: add the version's section to CHANGELOG.md (New and Fixed); every place notes appear reads it.
 # Add it in Chinese to CHANGELOG.zh-Hans.md too (新功能 and 修复), for the app and the update window on a Mac in
 # Chinese; without it they show the English, and this script warns.
@@ -160,6 +161,15 @@ if [[ "${1:-}" == "--beta" ]]; then
   again rsync -a "$ZIP" "$SERVER:$SITE_ROOT/releases/"
   upload_notes
   again rsync -a "$OUT/updates/beta.xml" "$SERVER:$SITE_ROOT/updates/beta.xml"
+  # Every beta is tagged at the commit it was built from (v0.9.1-beta.2), so a report from someone on it can be traced
+  # to its exact code. A tag only: no GitHub release, so the site's Download and Homebrew keep serving the stable one.
+  if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+    echo "Tag v$VERSION already exists; left as it is."
+  else
+    git tag -a "v$VERSION" -m "Zigzag $VERSION" HEAD
+    again git push -q origin "v$VERSION"
+    echo "Tagged v$VERSION."
+  fi
   echo "Done: $VERSION is on the beta feed."
   exit 0
 fi
