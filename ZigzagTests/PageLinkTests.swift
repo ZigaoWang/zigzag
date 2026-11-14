@@ -66,6 +66,23 @@ struct PageLinkTests {
         #expect(Tab.ownSender(of: nil, for: typed) == nil)
         #expect(Tab.ownSender(of: own, for: nil) == nil)
     }
+
+    /// What WebKit tidies on the way still matches: a default port, "." and ".." in the path.
+    @Test func ownLoadMatchesItsTidiedAddress() throws {
+        let pairs = [("https://example.com:443/a", "https://example.com/a"), ("http://example.com:80", "http://example.com/"),
+                     ("https://example.com/a/b/../c", "https://example.com/a/c"), ("https://example.com/./a/./", "https://example.com/a/"),
+                     ("https://example.com/..", "https://example.com/"), ("https://example.com/a/..?q=1", "https://example.com/?q=1")]
+        for (typed, asked) in pairs {
+            let own = Tab.OwnLoad(sender: .you, url: try #require(URL(string: typed)))
+            #expect(Tab.ownSender(of: own, for: URL(string: asked)) == .you, "\(typed)")
+        }
+        // Another port, or another path, is another address.
+        #expect(!Tab.sameAddress(try #require(URL(string: "https://example.com:8443/")), try #require(URL(string: "https://example.com/"))))
+        #expect(!Tab.sameAddress(try #require(URL(string: "http://example.com:443/")), try #require(URL(string: "http://example.com/"))))
+        #expect(!Tab.sameAddress(try #require(URL(string: "https://example.com/a/../b")), try #require(URL(string: "https://example.com/a/b"))))
+        #expect(Tab.withoutDotSegments("/a/b/c/./../../g") == "/a/g")
+        #expect(Tab.withoutDotSegments("mid/content=5/../6") == "mid/6")
+    }
 }
 
 /// When a page's link for another app may put its question up again.

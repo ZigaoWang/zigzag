@@ -829,7 +829,8 @@ final class Tab: NSObject {
     }
 
     /// Who sent the main frame's navigation to `request`: Zigzag's (or your) pending load only when it's for that
-    /// very address. WebKit may tidy the address on the way (a lowercased host, a "/" for an empty path).
+    /// very address. WebKit may tidy the address on the way (a lowercased host, a "/" for an empty path, no :443,
+    /// no "." or ".." in the path).
     static func ownSender(of pending: OwnLoad?, for request: URL?) -> LoadSender? {
         guard let pending, let request else { return nil }
         return sameAddress(pending.url, request) ? pending.sender : nil
@@ -841,11 +842,35 @@ final class Tab: NSObject {
             guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: true) else { return nil }
             parts.scheme = parts.scheme?.lowercased()
             parts.host = parts.host?.lowercased()
-            if parts.host != nil, parts.path.isEmpty { parts.path = "/" }
+            if let port = parts.port, (parts.scheme == "https" && port == 443) || (parts.scheme == "http" && port == 80) { parts.port = nil }
+            if parts.host != nil {
+                parts.percentEncodedPath = withoutDotSegments(parts.percentEncodedPath)
+                if parts.percentEncodedPath.isEmpty { parts.percentEncodedPath = "/" }
+            }
             return parts.string
         }
         guard let left = tidy(a), let right = tidy(b) else { return false }
         return left == right
+    }
+
+    /// A path with its "." and ".." taken out, as a browser does before it asks (RFC 3986, 5.2.4).
+    nonisolated static func withoutDotSegments(_ path: String) -> String {
+        var output: [Substring] = []
+        let segments = path.split(separator: "/", omittingEmptySubsequences: false)
+        for (index, segment) in segments.enumerated() {
+            let isLast = index == segments.count - 1
+            switch segment {
+            case ".":
+                if isLast { output.append("") }
+            case "..":
+                if output.count > 1 { output.removeLast() }
+                if isLast { output.append("") }
+            default:
+                output.append(segment)
+            }
+        }
+        let joined = output.joined(separator: "/")
+        return path.hasPrefix("/") && !joined.hasPrefix("/") ? "/" + joined : joined
     }
 
     /// The first load of a tab made with an address, as whoever gave it.
@@ -1267,14 +1292,16 @@ final class Tab: NSObject {
 extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
         let userInitiated = PopupNotice.isUserInitiated(navigationAction)
-        // Zigzag's own load counts for the main frame's decision for its address only, once, whatever comes of it (a
-        // download, an app's link): never for another the page started, before or after.
+        // Zigzag's own load is over with the main frame's next decision, whatever it is (WebKit may have tidied the
+        // address past matching, or put an error page in its place), so it's never left waiting. Only a decision for
+        // its address counts as its own, whatever comes of it (a download, an app's link): never one the page had on
+        // its way.
         let decidesMainFrame = navigationAction.targetFrame?.isMainFrame == true
         let ownSender = decidesMainFrame ? Self.ownSender(of: ownLoadPending, for: navigationAction.request.url) : nil
         let ownLoad = ownSender != nil
         let ownHistory = decidesMainFrame && ownHistoryTarget != nil && navigationAction.request.url == ownHistoryTarget
         if decidesMainFrame {
-            if ownLoad { ownLoadPending = nil }
+            ownLoadPending = nil
             ownHistoryTarget = nil
         }
         // A download link you click saves. One a script starts on its own saves too (an export that's ready), but not
