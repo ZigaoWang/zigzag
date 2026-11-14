@@ -622,7 +622,7 @@ private final class DataToggle: InteractiveView {
         let x = Tokens.Space.x3
         check.frame = NSRect(x: x, y: (bounds.height - 10) / 2, width: 10, height: 10)
         let lx = isOn ? check.frame.maxX + Tokens.Space.x1 : x + 7
-        label.frame = NSRect(x: lx - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
+        label.frame = NSRect(x: lx - Label.inset, y: label.centeredY(in: bounds.height), width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
     }
 }
 
@@ -850,10 +850,14 @@ private final class BrowserRow: InteractiveView {
     }
 
     private static let rowHeight: CGFloat = 50
+    private static let pad = Tokens.Space.x4
+    /// Where a row's name and line start (as drawn: the labels keep their own inset): past the checkbox and the icon.
+    static let textInset: CGFloat = pad + 18 + Tokens.Space.x3 + 30 + Tokens.Space.x3 + Label.inset
 
     func height(for width: CGFloat) -> CGFloat {
         guard !problem.stringValue.isEmpty else { return Self.rowHeight }
-        let h = ceil(problem.sizeThatFits(NSSize(width: width - 62 - Tokens.Space.x4, height: 200)).height)
+        // Measured at the width it's laid out at, so a long problem is never cut short.
+        let h = ceil(problem.sizeThatFits(NSSize(width: width - (Self.textInset - Label.inset) - Self.pad, height: 200)).height)
         return Self.rowHeight + h + Tokens.Space.x3
     }
 
@@ -948,7 +952,7 @@ private final class BrowserRow: InteractiveView {
 
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x4
+        let pad = Self.pad
         let top = Self.rowHeight
         box.frame = NSRect(x: pad, y: (top - 18) / 2, width: 18, height: 18)
         tick.frame = box.bounds.insetBy(dx: 3, dy: 3)
@@ -1323,7 +1327,8 @@ private final class BringPicker: StepContent {
             let h = row.height(for: width)
             row.frame = NSRect(x: 0, y: ry, width: width, height: h)
             ry += h
-            if i < separators.count { separators[i].frame = NSRect(x: 62, y: ry, width: width - 62, height: Tokens.Metric.hairline) }
+            // The line starts where the rows' words do, past the checkbox and the icon.
+            if i < separators.count { separators[i].frame = NSRect(x: BrowserRow.textInset, y: ry, width: width - BrowserRow.textInset, height: Tokens.Metric.hairline) }
         }
         scroll.isHidden = rows.isEmpty
         let room = bounds.height - linkHeight - (hint.stringValue.isEmpty ? 0 : hint.lineHeight + Tokens.Space.x3)
