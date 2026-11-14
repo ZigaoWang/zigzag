@@ -255,8 +255,7 @@ nonisolated enum MiniPlayerLayout {
         return CGRect(x: round(x), y: round(y), width: frame.width, height: frame.height)
     }
 
-    /// Where a card let go at `frame` comes to rest: where it is, inside `area`, except near an edge, where it settles
-    /// on the line a margin in from the screen's edge (two edges, at a corner).
+    /// Where a card let go at `frame` comes to rest: where it is, kept inside `area`.
     static func dropped(_ frame: CGRect, in area: CGRect) -> CGRect {
         // Exactly where it was let go, only kept on screen: it never jumps to an edge or a corner on its own.
         clamp(frame, in: area)
@@ -308,8 +307,8 @@ nonisolated enum MiniPlayerLayout {
 
     /// Where a card let go at `frame` comes to rest, and its place from then on. Over its window (`window`, the
     /// page and the sidebar both), in the page area's corner nearest its middle; anywhere else on the screen, the
-    /// screen's nearest corner; with `free` (⌘ held), where it was let go, settling on an edge only near one
-    /// (`dropped`).
+    /// screen's nearest corner; with `free`, where it was let go (`dropped`). A drag is always free now; the corners
+    /// are where a card first appears.
     static func rest(_ frame: CGRect, free: Bool, page: CGRect, window: CGRect?, in area: CGRect) -> (frame: CGRect, place: Place) {
         if free {
             let target = dropped(frame, in: area)

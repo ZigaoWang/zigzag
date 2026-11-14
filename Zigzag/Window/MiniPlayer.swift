@@ -202,6 +202,17 @@ final class MiniPlayer {
         apply(model.minimize())
     }
 
+    /// Undo of Turn Off Mini Player: the video it was showing goes back into the player, as when you left its tab,
+    /// unless you've gone to that tab meanwhile.
+    private func bringBack(_ id: UUID?) {
+        guard let id, model.tab == nil, let controller, let tab = controller.tabManager.tab(with: id),
+              let current = controller.tabManager.selectedTab else { return }
+        let shown = Set(controller.tabManager.panes(of: current).map(\.id))
+        guard !shown.contains(id) else { return }
+        unpark { $0.tab?.id == id }
+        apply(model.switched(shown: shown, playing: tab.id))
+    }
+
     /// Right-click on the card: its buttons by name, and turning the mini player off.
     private func menu() -> NSMenu? {
         guard let card, tab != nil else { return nil }
@@ -231,12 +242,17 @@ final class MiniPlayer {
     /// Videos stop following you out of their tabs, as with the setting off. This one plays on in its tab, out of
     /// sight, as minimized; a toast says where the setting is, and takes it back.
     func turnOff() {
+        let id = model.tab
         PictureInPicture.followsTabs = false
         minimize()
         guard let controller else { return }
         Toast.show(String(localized: "Mini player is off. Turn it on again in Settings › Tabs.", comment: "Toast after turning off the mini player from its menu. Settings › Tabs is where its setting is."),
                    symbol: "pip.remove",
-                   action: (String(localized: "Undo", comment: "Button in a toast: takes back what was just done."), { PictureInPicture.followsTabs = true }),
+                   action: (String(localized: "Undo", comment: "Button in a toast: takes back what was just done."), { [weak self] in
+                       PictureInPicture.followsTabs = true
+                       // The player comes back for the video it was showing, not only for the next one.
+                       self?.bringBack(id)
+                   }),
                    duration: 5, in: controller)
     }
 
@@ -281,7 +297,7 @@ final class MiniPlayer {
         card.onToggle = { [weak self] in self?.command("toggle") }
         card.onSeek = { [weak self] by in self?.command("seek", [("by", by)]) }
         card.onSeekTo = { [weak self] fraction in self?.command("seekTo", [("f", fraction)]) }
-        card.onMoved = { [weak self] free in self?.dropped(free: free) }
+        card.onMoved = { [weak self] in self?.dropped() }
         card.onResize = { [weak self] in self?.place() }
         card.onResized = { [weak self] in self?.resized() }
         // A tab's hover preview never stays over the card you're on.
@@ -652,27 +668,26 @@ final class MiniPlayer {
     /// The space you're on changing, which takes the window out of sight or back.
     private var spaceWatch: NSObjectProtocol?
 
-    /// Let go after a drag: over the window, it glides into the page area's nearest corner; anywhere else, into the
-    /// screen's nearest corner, as the Mac's Picture in Picture does. Let go with ⌘ held (`free`), it stays where it
-    /// was let go, settling on an edge only near one. Its place, and its screen, are kept for the next video too.
-    private func dropped(free: Bool) {
+    /// Let go after a drag: it stays exactly where it was let go, kept on screen. Its place, and its screen, are kept
+    /// for the next video too.
+    private func dropped() {
         guard let card else { return }
         let frame = card.globalFrame
         let middle = NSPoint(x: frame.midX, y: frame.midY)
         let area = Self.movableArea(at: middle)
-        let (target, place) = MiniPlayerLayout.rest(frame, free: free, page: pageArea ?? area, window: windowArea, in: area)
+        let (target, place) = MiniPlayerLayout.rest(frame, free: true, page: pageArea ?? area, window: windowArea, in: area)
         Self.place = place
         if let id = Self.screens.first(where: { $0.frame.contains(middle) })?.id { Self.screenID = id }
         card.settle(at: target)
     }
 
-    /// Let go after resizing: its size is kept, for the next video too, and it stays in its corner (or, placed
-    /// freely, where it is).
+    /// Let go after resizing: its size is kept, for the next video too, and it stays where it is (or, never moved
+    /// yet, in its first corner).
     private func resized() {
         guard let card else { return }
         Self.extent = max(card.globalFrame.width, card.globalFrame.height)
         let place = currentPlace
-        if case .free = place { dropped(free: true); return }
+        if case .free = place { dropped(); return }
         if Self.place == nil { Self.place = firstPlace }
         let area = movableArea(for: place)
         card.settle(at: MiniPlayerLayout.frame(for: place, size: card.globalFrame.size, page: pageArea ?? area, in: area))
@@ -779,8 +794,8 @@ final class MiniPlayerView: NSView {
     var onToggle: (() -> Void)?
     var onSeek: ((Double) -> Void)?
     var onSeekTo: ((Double) -> Void)?
-    /// Let go after a drag; true with ⌘ held, to stay where it was let go.
-    var onMoved: ((Bool) -> Void)?
+    /// Let go after a drag.
+    var onMoved: (() -> Void)?
     /// Resized by an edge or a corner: as it goes, and once let go.
     var onResize: (() -> Void)?
     var onResized: (() -> Void)?
@@ -1104,12 +1119,17 @@ final class MiniPlayerView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard !isGoing, !isHidden, frame.contains(point) else { return nil }
         let local = convert(point, from: superview)
-        // Its edges resize it, over the controls too.
+        // A button wins over the edge it sits near, so a press on close or the site's corner is never a resize; the
+        // edges resize everywhere else, the time line's bottom included, which the time line has the rest of.
+        if let hit = controlHit(at: local), hit is InteractiveView { return hit }
         if !MiniPlayerLayout.edges(at: local, in: bounds.size).isEmpty { return self }
-        if showsControls, let hit = controls.hitTest(local), hit is InteractiveView || hit is MiniPlayerProgress, !hit.isHidden {
-            return hit
-        }
-        return self
+        return controlHit(at: local) ?? self
+    }
+
+    /// The control under a point in the card's own terms, while the controls show.
+    private func controlHit(at local: NSPoint) -> NSView? {
+        guard showsControls, let hit = controls.hitTest(local), hit is InteractiveView || hit is MiniPlayerProgress, !hit.isHidden else { return nil }
+        return hit
     }
 
     private var tracking: NSTrackingArea?
@@ -1275,7 +1295,8 @@ final class MiniPlayerView: NSView {
     /// the card's panel almost never is, so the pointer's moves set them, as they do for any window behind others.
     private func showResizeCursor(at point: NSPoint) {
         guard !isDragging else { return }
-        let edges = MiniPlayerLayout.edges(at: point, in: bounds.size)
+        // Over a button the pointer is a pointer: the button takes the press, not the edge.
+        let edges: MiniPlayerLayout.Edges = controlHit(at: point) is InteractiveView ? [] : MiniPlayerLayout.edges(at: point, in: bounds.size)
         let position: NSCursor.FrameResizePosition? = switch edges {
         case [.top, .left]: .topLeft
         case [.top, .right]: .topRight
@@ -1326,7 +1347,7 @@ final class MiniPlayerView: NSView {
         if isDragging {
             isDragging = false
             // It stays where it was let go: a player you place yourself shouldn't jump to a corner.
-            if resized { onResized?() } else { onMoved?(true) }
+            if resized { onResized?() } else { onMoved?() }
         } else {
             // The keyboard, as a player's window takes it; its panel never brings Zigzag in front of the app you're in.
             window?.makeKey()
@@ -1371,14 +1392,14 @@ final class MiniPlayerView: NSView {
         resizing = []
         onResized?()
     }
-    /// A drag of the card by this much, let go where it ends (with ⌘ held: `free`).
-    func debugDrag(dx: CGFloat, dy: CGFloat, free: Bool = false) {
+    /// A drag of the card by this much, let go where it ends.
+    func debugDrag(dx: CGFloat, dy: CGFloat) {
         isDragging = true
         let from = globalFrame
         let to = NSPoint(x: from.minX + dx, y: from.minY + dy)
         moveTo(to, pointer: NSPoint(x: to.x + from.width / 2, y: to.y + from.height / 2))
         isDragging = false
-        onMoved?(free)
+        onMoved?()
     }
     #endif
 }
