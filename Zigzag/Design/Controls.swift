@@ -505,9 +505,15 @@ final class IconButton: InteractiveView {
             let ink = Tokens.Symbol.inkOffset(symbol, size: symbolSize)
             imageView.frame = bounds.offsetBy(dx: -ink.width, dy: isFlipped ? ink.height : -ink.height)
         } else {
-            imageView.frame = bounds
+            // Over a video, the glyph's own ink goes in the middle of the circle (a play triangle leans right in
+            // its image).
+            let ink = isOverMedia ? glyphInk : .zero
+            imageView.frame = bounds.offsetBy(dx: -ink.width, dy: isFlipped ? ink.height : -ink.height)
         }
     }
+
+    /// Where the glyph's ink sits from its image's middle, for `isOverMedia`; set with the glyph.
+    var glyphInk: CGSize = .zero { didSet { needsLayout = true } }
 
     /// Chosen, it's the soft card (`applyRowStyle`) rather than the hover fill: a choice among many, like an icon
     /// in a grid.

@@ -760,15 +760,15 @@ final class MiniPlayerView: NSView {
     /// sit, so white reads on any video, words in it included.
     private let scrim = MiniPlayerScrim()
     private let backButton = MiniPlayerSiteButton()
-    private let minimizeButton = MiniPlayerView.overlayButton("minus", side: MiniPlayerView.topSide, glyph: 13,
+    private let minimizeButton = MiniPlayerView.overlayButton("minus", side: MiniPlayerView.topSide, glyph: MiniPlayerView.topGlyph,
         tip: String(localized: "Minimize", comment: "Tooltip of the mini player's button that hides it; the video keeps playing in its tab."))
-    private let closeButton = MiniPlayerView.overlayButton("xmark", side: MiniPlayerView.topSide, glyph: 13,
+    private let closeButton = MiniPlayerView.overlayButton("xmark", side: MiniPlayerView.topSide, glyph: MiniPlayerView.topGlyph,
         tip: String(localized: "Close", comment: "Tooltip of the mini player's close button: stops the video and closes the player."))
-    private let rewindButton = MiniPlayerView.overlayButton("gobackward.15", side: MiniPlayerView.centerSide, glyph: 20,
+    private let rewindButton = MiniPlayerView.overlayButton("gobackward.15", side: MiniPlayerView.centerSide, glyph: MiniPlayerView.skipGlyph,
         tip: String(localized: "Back 15 Seconds", comment: "Tooltip of the mini player's button that skips the video back 15 seconds."))
-    private let playButton = MiniPlayerView.overlayButton("pause.fill", side: MiniPlayerView.centerSide, glyph: 24,
+    private let playButton = MiniPlayerView.overlayButton("pause.fill", side: MiniPlayerView.centerSide, glyph: MiniPlayerView.playGlyph,
         tip: String(localized: "Pause", comment: "Tooltip of the mini player's play button while the video plays."))
-    private let forwardButton = MiniPlayerView.overlayButton("goforward.15", side: MiniPlayerView.centerSide, glyph: 20,
+    private let forwardButton = MiniPlayerView.overlayButton("goforward.15", side: MiniPlayerView.centerSide, glyph: MiniPlayerView.skipGlyph,
         tip: String(localized: "Forward 15 Seconds", comment: "Tooltip of the mini player's button that skips the video ahead 15 seconds."))
     private let progress = MiniPlayerProgress()
     private weak var holder: PageHolder?
@@ -812,18 +812,32 @@ final class MiniPlayerView: NSView {
         }
     }
 
-    /// The buttons along the top, and the three in the middle.
-    private static let topSide: CGFloat = 28
-    private static let centerSide: CGFloat = 36
+    /// The buttons along the top: 28pt circles (the site's name a pill as tall), one 13pt glyph size for all three.
+    static let topSide: CGFloat = 28
+    static let topGlyph: CGFloat = 13
+    /// The three in the middle: 44pt circles, the skips' glyphs a step under play and pause, so the filled one doesn't
+    /// outweigh the outlined two.
+    static let centerSide: CGFloat = 44
+    static let skipGlyph: CGFloat = 22
+    static let playGlyph: CGFloat = 26
+    /// The room around the controls, the same at every edge: the top row's circles, and the time line, this far in.
+    static let controlsInset: CGFloat = Tokens.Space.x2
     /// The controls go this long after the pointer stops moving over the video.
     private static let idleHide: TimeInterval = 2.5
 
     /// A white glyph on the picture, a step bolder than the window's own, on a soft shadow so it reads on white too.
     private static func overlayButton(_ symbol: String, side: CGFloat, glyph: CGFloat, tip: String) -> IconButton {
         let button = IconButton(symbol: symbol, size: side, symbolSize: glyph, toolTip: tip)
-        button.glyph = overlayGlyph(symbol, size: glyph)
         button.isOverMedia = true
+        setGlyph(symbol, size: glyph, on: button)
         return button
+    }
+
+    /// The button's glyph, its ink in the middle of its circle.
+    private static func setGlyph(_ symbol: String, size: CGFloat, on button: IconButton) {
+        let image = overlayGlyph(symbol, size: size)
+        button.glyph = image
+        button.glyphInk = Tokens.Symbol.inkOffset(of: image, key: "overlay \(symbol) \(size)")
     }
 
     static func overlayGlyph(_ symbol: String, size: CGFloat) -> NSImage {
@@ -937,20 +951,24 @@ final class MiniPlayerView: NSView {
     private func layoutControls() {
         controls.frame = bounds
         scrim.frame = bounds
-        let pad = Tokens.Space.x2, top = Self.topSide
+        let pad = Self.controlsInset, top = Self.topSide
+        // The top row: the site's pill from the left edge, minimize and close from the right, all the same height and
+        // the same distance in, so the arrow and the close sit as far from their corners.
         closeButton.frame = NSRect(x: bounds.width - pad - top, y: pad, width: top, height: top)
         minimizeButton.frame = NSRect(x: closeButton.frame.minX - Tokens.Space.x1 - top, y: pad, width: top, height: top)
-        let room = max(0, minimizeButton.frame.minX - Tokens.Space.x2 - pad)
+        let room = max(top, minimizeButton.frame.minX - Tokens.Space.x2 - pad)
         backButton.frame = NSRect(x: pad, y: pad, width: min(backButton.fittingWidth, room), height: top)
-        // The three in the middle, evenly apart, a touch below the middle so they sit between the two rows.
+        // The time line: as far in from the sides and the bottom as the top row is from the top and sides.
+        let line = MiniPlayerProgress.line
+        progress.frame = NSRect(x: pad, y: bounds.height - pad - line / 2 - MiniPlayerProgress.height / 2,
+                                width: max(0, bounds.width - pad * 2), height: MiniPlayerProgress.height)
+        // The three in the middle, on one line halfway between the two rows, the same distance apart.
         let side = Self.centerSide
-        let middle = NSPoint(x: bounds.midX, y: round((pad + top + bounds.height - MiniPlayerProgress.height) / 2))
-        let gap = round(min(max(bounds.width * 0.18, 52), 76))
+        let middle = NSPoint(x: bounds.midX, y: round((pad + top + bounds.height - pad - line) / 2))
+        let gap = round(min(max(bounds.width * 0.18, side + Tokens.Space.x2), 76))
         for (button, dx) in [(rewindButton, -gap), (playButton, 0), (forwardButton, gap)] {
             button.frame = NSRect(x: round(middle.x + dx - side / 2), y: round(middle.y - side / 2), width: side, height: side)
         }
-        progress.frame = NSRect(x: Tokens.Space.x3, y: bounds.height - MiniPlayerProgress.height - 2,
-                                width: max(0, bounds.width - Tokens.Space.x3 * 2), height: MiniPlayerProgress.height)
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -975,7 +993,7 @@ final class MiniPlayerView: NSView {
             let tip = playing ? String(localized: "Pause", comment: "Tooltip of the mini player's play button while the video plays.")
                 : String(localized: "Play", comment: "Tooltip of the mini player's play button while the video is paused.")
             playButton.symbol = symbol
-            playButton.glyph = Self.overlayGlyph(symbol, size: 24)
+            Self.setGlyph(symbol, size: Self.playGlyph, on: playButton)
             playButton.toolTip = tip
         }
         let seekable = video.duration != nil
@@ -1298,6 +1316,14 @@ final class MiniPlayerView: NSView {
     func debugHover(_ on: Bool) {
         if on { setControls(true, animated: false); hideTimer?.invalidate() } else { setControls(false, animated: false) }
     }
+    /// One control as if the pointer were on it (`hover`), pressing it (`press`), or neither (`off`).
+    func debugButton(_ name: String, _ state: String) {
+        let all: [String: InteractiveView] = ["site": backButton, "minimize": minimizeButton, "close": closeButton,
+                                              "rewind": rewindButton, "play": playButton, "forward": forwardButton]
+        guard let button = all[name] else { return }
+        button.isHovered = state != "off"
+        button.isPressed = state == "press"
+    }
     func debugPress(_ name: String) {
         switch name {
         case "back", "site": onBack?()
@@ -1344,14 +1370,20 @@ final class MiniPlayerSiteButton: InteractiveView {
             needsLayout = true
         }
     }
-    private static let lead: CGFloat = 8, gap: CGFloat = 5, trail: CGFloat = 10, glyph: CGFloat = 12
+    /// The arrow in a circle of the top row's size at the pill's left end, as the close's at the right; the name
+    /// after it, and the pill's round end after the name.
+    private static var side: CGFloat { MiniPlayerView.topSide }
+    private static let trail: CGFloat = 12
+    private var arrowInk: CGSize = .zero
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         pressScales = true
         layer?.cornerRadius = MiniPlayerView.topSideRadius
         layer?.cornerCurve = .continuous
-        arrow.image = MiniPlayerView.overlayGlyph("arrow.up.left", size: Self.glyph)
+        let image = MiniPlayerView.overlayGlyph("arrow.up.left", size: MiniPlayerView.topGlyph)
+        arrow.image = image
+        arrowInk = Tokens.Symbol.inkOffset(of: image, key: "overlay arrow.up.left \(MiniPlayerView.topGlyph)")
         arrow.imageScaling = .scaleNone
         arrow.contentTintColor = .white
         label.lineBreakMode = .byTruncatingTail
@@ -1371,14 +1403,19 @@ final class MiniPlayerSiteButton: InteractiveView {
     override var toolTip: String? { didSet { setAccessibilityLabel(toolTip) } }
 
     /// Wide enough for the whole name.
-    var fittingWidth: CGFloat { ceil(Self.lead + Self.glyph + 2 + Self.gap + ceil((title as NSString).size(withAttributes: [.font: label.font ?? Tokens.Font.small(.semibold)]).width) + 4 + Self.trail) }
+    var fittingWidth: CGFloat { ceil(Self.side - Label.inset + ceil((title as NSString).size(withAttributes: [.font: label.font ?? Tokens.Font.small(.semibold)]).width) + Label.inset * 2 + Self.trail) }
 
     override func layout() {
         super.layout()
-        let side = Self.glyph + 2
-        arrow.frame = NSRect(x: Self.lead, y: (bounds.height - side) / 2, width: side, height: side)
-        let x = arrow.frame.maxX + Self.gap, h = label.lineHeight
-        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: max(0, bounds.width - x - Self.trail), height: h)
+        // The arrow's ink in the middle of the left circle, as a glyph is in the close's.
+        let side = Self.side
+        arrow.frame = NSRect(x: 0, y: 0, width: side, height: side).offsetBy(dx: -arrowInk.width, dy: arrowInk.height)
+        // The name's letters centered on the glyphs: the middle of its capitals on the pill's middle line.
+        let font = label.font ?? Tokens.Font.small(.semibold)
+        let h = ceil(label.intrinsicContentSize.height)
+        let baseline = bounds.height / 2 + font.capHeight / 2
+        let x = side - Label.inset
+        label.frame = NSRect(x: x, y: round(baseline - font.ascender), width: max(0, bounds.width - x - Self.trail), height: h)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -1460,7 +1497,7 @@ private final class MiniPlayerPage: NSView {
 /// The video's time as a thin line along the card's bottom; press or drag on it to go to a point.
 final class MiniPlayerProgress: NSView {
     static let height: CGFloat = 16
-    private static let line: CGFloat = 3
+    static let line: CGFloat = 3
     private let track = CALayer()
     private let fill = CALayer()
     private var fraction: Double = 0

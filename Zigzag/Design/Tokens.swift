@@ -541,9 +541,18 @@ enum Tokens {
 
         /// A symbol's ink, in points from the middle of its image (x right, y up).
         @MainActor private static func inkBox(_ name: String, size: CGFloat) -> CGRect {
-            let key = "\(name) \(size)"
+            inkBox(of: Self.image(name, size: size), key: "\(name) \(size)")
+        }
+
+        /// How far an image's ink sits from its middle (x right, y up), for a symbol drawn some other way (a heavier
+        /// weight, a glyph of its own); `key` names it for the cache.
+        @MainActor static func inkOffset(of image: NSImage, key: String) -> CGSize {
+            let box = inkBox(of: image, key: key)
+            return CGSize(width: box.midX, height: box.midY)
+        }
+
+        @MainActor private static func inkBox(of image: NSImage, key: String) -> CGRect {
             if let known = inkBoxes[key] { return known }
-            let image = Self.image(name, size: size)
             let scale: CGFloat = 4
             let w = Int(image.size.width * scale), h = Int(image.size.height * scale)
             var box = CGRect.zero
@@ -1206,8 +1215,8 @@ enum Tokens {
             highLight: hex(0x000000, alpha: 0.15), highDark: hex(0xFFFFFF, alpha: 0.17))
         /// A button's hover and press over a playing video (the mini player's controls): white washes strong enough
         /// to show over the dimmed picture, whatever its colors.
-        static let mediaHover = NSColor.white.withAlphaComponent(0.16)
-        static let mediaPressed = NSColor.white.withAlphaComponent(0.26)
+        static let mediaHover = NSColor.white.withAlphaComponent(0.22)
+        static let mediaPressed = NSColor.white.withAlphaComponent(0.32)
         /// A chosen row on a panel or a page: a clear neutral fill with a 1px edge (`selectedEdge`) and a shadow-sm
         /// (`liftShadow`). The sidebar's own rows sit on the frame and use `Tokens.Chrome` instead.
         static let selectedFill = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.11),

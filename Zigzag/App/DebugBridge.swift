@@ -405,6 +405,10 @@ enum DebugBridge {
         case "mphover": player.card?.debugHover(arg != "off")
         // mpoff: Turn Off Mini Player, from its menu.
         case "mpoff": player.turnOff()
+        // mpbutton <site|minimize|close|rewind|play|forward> <hover|press|off>: one of the card's controls as the pointer has it.
+        case "mpbutton":
+            let f = arg.split(separator: " ").map(String.init)
+            if f.count == 2 { player.card?.debugButton(f[0], f[1]) }
         // mppointer on|off: the pointer counts as on the card (for the sidebar's hover previews).
         case "mppointer": player.debugPointerOnCard = arg != "off"
         case "mppress": player.card?.debugPress(arg)
