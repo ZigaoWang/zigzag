@@ -429,6 +429,22 @@ struct PageLanguageChoiceTests {
         }
     }
 
+    /// Old codes still in pages' `lang` (iw for Hebrew, in for Indonesian, ji for Yiddish, no for Norwegian) read as
+    /// the codes the language recognizer gives, so the page's own word agrees with its text.
+    @Test func anOldLanguageCodeReadsAsTheNewOne() {
+        #expect(PageTranslator.language(declared: "iw")?.languageCode?.identifier == "he")
+        #expect(PageTranslator.language(declared: "iw-IL")?.region?.identifier == "IL")
+        #expect(PageTranslator.language(declared: "in")?.languageCode?.identifier == "id")
+        #expect(PageTranslator.language(declared: "JI")?.languageCode?.identifier == "yi")
+        #expect(PageTranslator.language(declared: "no_NO")?.languageCode?.identifier == "nb")
+        #expect(PageTranslator.language(declared: "nn")?.languageCode?.identifier == "nn")
+        // A Hebrew page marked the old way, with a fair part of it in Hebrew, is Hebrew, as one marked "he" is.
+        let hebrew = Array(repeating: "שלום לכולם, זהו עמוד בעברית שמספר על מזג האוויר ועל החדשות של היום בעיר.", count: 2)
+        let english = Array(repeating: "Hello everyone, this page tells you about the weather and the news of the day in town.", count: 3)
+        #expect(PageTranslator.pageLanguage(blocks: hebrew + english, declared: "he")?.languageCode?.identifier == "he")
+        #expect(PageTranslator.pageLanguage(blocks: hebrew + english, declared: "iw")?.languageCode?.identifier == "he")
+    }
+
     @Test func anOfferIsForItsOwnPage() {
         let page = URL(string: "https://zh.wikipedia.org/wiki/%E4%B8%8A%E6%B5%B7%E5%B8%82")!
         #expect(PageTranslator.offerStands(offeredFor: page, now: page, foreign: true, translated: false))

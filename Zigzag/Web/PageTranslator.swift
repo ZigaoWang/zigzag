@@ -147,8 +147,13 @@ enum PageTranslator {
         let tag = declared.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "_", with: "-")
         guard let first = tag.split(separator: "-").first?.lowercased(), (2...3).contains(first.count),
               first.allSatisfy({ $0.isASCII && $0.isLetter }), !["und", "mul", "zxx", "mis"].contains(first) else { return nil }
-        return Locale.Language(identifier: tag)
+        // Old codes pages still use, as the language recognizer names them: Hebrew, Indonesian, Yiddish, and
+        // Norwegian, which it reads as Bokmål.
+        guard let modern = legacyCodes[first] else { return Locale.Language(identifier: tag) }
+        return Locale.Language(identifier: ([modern] + tag.split(separator: "-").dropFirst().map(String.init)).joined(separator: "-"))
     }
+
+    private nonisolated static let legacyCodes = ["iw": "he", "in": "id", "ji": "yi", "no": "nb"]
 
     /// How much text of each language the blocks have, by how much each says, and in all; blocks too short to
     /// tell, or told with too little confidence, aren't counted.
