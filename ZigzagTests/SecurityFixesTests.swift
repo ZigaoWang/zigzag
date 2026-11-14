@@ -423,7 +423,7 @@ struct PageNoticeTests {
         for address in ["8.8.8.8", "93.184.216.34", "172.32.0.1", "192.169.0.1", "2606:4700::1111", "::ffff:8.8.8.8"] {
             #expect(IconAddress.isPublic(address), "\(address)")
         }
-        for name in ["localhost", "LOCALHOST.", "app.localhost", "printer.local", "router.home.arpa", "db.internal", ""] {
+        for name in ["localhost", "LOCALHOST.", "app.localhost", "printer.local", "router.home.arpa", "db.internal", "", "router", "router.lan", "nas.home"] {
             #expect(!IconAddress.isPublicName(name), "\(name)")
         }
         #expect(IconAddress.isPublicName("cdn.example.com"))
@@ -431,7 +431,7 @@ struct PageNoticeTests {
 
     @Test func iconsAreFetchedOnlyOverTheWeb() async throws {
         for text in ["http://127.0.0.1/icon.png", "https://[::1]/icon.png", "http://localhost:8080/icon.png", "http://192.168.1.1/x.png",
-                     "file:///etc/hosts", "ftp://8.8.8.8/x.png", "http://169.254.169.254/latest"] {
+                     "file:///etc/hosts", "ftp://8.8.8.8/x.png", "http://169.254.169.254/latest", "http://127.1/x.png", "http://2130706433/x.png"] {
             let url = try #require(URL(string: text))
             #expect(await !IconAddress.mayFetch(url), "\(text)")
         }

@@ -300,12 +300,15 @@ struct DarkReaderTests {
 
     // MARK: Fetching for it
 
-    @Test func onlyStyleAndPicturesOnTheWebAreFetched() {
-        #expect(DarkPages.fetchable(URL(string: "https://cdn.example.com/a.css")))
-        #expect(!DarkPages.fetchable(URL(string: "file:///etc/hosts")))
-        #expect(!DarkPages.fetchable(URL(string: "http://localhost:8080/a.css")))
-        #expect(!DarkPages.fetchable(URL(string: "http://192.168.1.1/a.css")))
-        #expect(!DarkPages.fetchable(URL(string: "http://10.0.0.2/a.css")))
+    @Test func onlyStyleAndPicturesOnTheWebAreFetched() async {
+        #expect(await DarkPages.fetchable(URL(string: "https://8.8.8.8/a.css")))
+        // This Mac and its network in every spelling a resolver takes, and names that are its network's.
+        for text in ["file:///etc/hosts", "http://localhost:8080/a.css", "http://localhost./a.css", "http://192.168.1.1/a.css", "http://10.0.0.2/a.css",
+                     "http://127.1/a.css", "http://2130706433/a.css", "http://0x7f.0.0.1/a.css", "http://0177.0.0.1/a.css", "http://router.lan/a.css",
+                     "http://router/a.css", "http://100.64.0.1/a.css", "http://[::1]/a.css", "http://169.254.169.254/latest"] {
+            #expect(await !DarkPages.fetchable(URL(string: text)), "\(text)")
+        }
+        #expect(IconAddress.isPublicName("8.8.8.8"))
         #expect(DarkPages.fetchableType("text/css; charset=utf-8"))
         #expect(DarkPages.fetchableType("image/png"))
         #expect(!DarkPages.fetchableType("text/html"))

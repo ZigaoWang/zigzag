@@ -655,20 +655,23 @@ enum DarkPages {
 
     // MARK: Fetching for Dark Reader
 
-    /// Whether something a page's Dark Reader can't fetch itself may be fetched for it: only from the web, never local
-    /// or private addresses the page didn't reach the same way.
-    static func fetchable(_ url: URL?) -> Bool {
-        guard let url, let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http", let host = url.host?.lowercased(), !host.isEmpty else { return false }
-        if host == "localhost" || host.hasSuffix(".local") || host.hasSuffix(".localhost") { return false }
-        // A literal address on this Mac's networks.
-        let parts = host.split(separator: ".").compactMap { Int($0) }
-        if parts.count == 4 {
-            if parts[0] == 10 || parts[0] == 127 || parts[0] == 0 || (parts[0] == 169 && parts[1] == 254) || (parts[0] == 192 && parts[1] == 168)
-                || (parts[0] == 172 && (16...31).contains(parts[1])) { return false }
-        }
-        if host.contains(":") { return false }
-        return true
+    /// Whether something a page's Dark Reader can't fetch itself may be fetched for it: only from the web, never this
+    /// Mac or its network, by the address as written (in any of its spellings) and by every address its name
+    /// resolves to (`IconAddress.mayFetchForPage`). Checked again for every redirect.
+    nonisolated static func fetchable(_ url: URL?) async -> Bool {
+        guard let url else { return false }
+        return await IconAddress.mayFetchForPage(url)
     }
+
+    /// Follows a redirect only to where the fetch itself could have gone.
+    nonisolated private final class Redirects: NSObject, URLSessionTaskDelegate, Sendable {
+        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+            guard let url = request.url else { completionHandler(nil); return }
+            Task { completionHandler(await DarkPages.fetchable(url) ? request : nil) }
+        }
+    }
+    nonisolated private static let redirects = Redirects()
 
     /// Only style sheets and pictures, which is all Dark Reader reads.
     nonisolated static func fetchableType(_ type: String) -> Bool {
@@ -692,7 +695,7 @@ enum DarkPages {
     nonisolated static func fetch(_ url: URL) async -> [String: String]? {
         var request = URLRequest(url: url)
         request.setValue("text/css,image/*,*/*;q=0.1", forHTTPHeaderField: "Accept")
-        guard let (data, response) = try? await session.data(for: request), let http = response as? HTTPURLResponse,
+        guard await fetchable(url), let (data, response) = try? await session.data(for: request, delegate: redirects), let http = response as? HTTPURLResponse,
               (200..<300).contains(http.statusCode), data.count <= maxFetchBytes else { return nil }
         let type = http.value(forHTTPHeaderField: "Content-Type") ?? ""
         guard fetchableType(type) else { return nil }
@@ -706,7 +709,7 @@ enum DarkPages {
 
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
             guard let webView = message.webView, nativeScope(of: webView.configuration.websiteDataStore) != nil,
-                  let href = message.body as? String, let url = URL(string: href), fetchable(url) else { replyHandler(nil, nil); return }
+                  let href = message.body as? String, let url = URL(string: href) else { replyHandler(nil, nil); return }
             Task {
                 let got = await DarkPages.fetch(url)
                 replyHandler(got, nil)

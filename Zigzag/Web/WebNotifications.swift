@@ -460,12 +460,26 @@ nonisolated enum IconAddress {
         return bytes(of: host).map { !isPublic($0) } ?? false
     }
 
-    /// Names that are this Mac or its own network, whatever they resolve to, are not.
+    /// For a fetch whose answer goes back to the page (a style sheet Dark Pages reads for it): by every address the
+    /// name resolves to, as `mayFetch`, except that an address in the range a proxy's fake-IP mode hands out
+    /// (198.18.0.0/15, never a device on your network) stands for the site on the web it does for the proxy.
+    static func mayFetchForPage(_ url: URL) async -> Bool {
+        guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let host = url.host(percentEncoded: false), isPublicName(host) else { return false }
+        if let literal = bytes(of: host) { return isPublic(literal) }
+        let addresses = await Task.detached { resolve(host) }.value
+        return !addresses.isEmpty && addresses.allSatisfy { isPublic($0) || isFakeIP($0) }
+    }
+
+    private static func isFakeIP(_ a: [UInt8]) -> Bool { a.count == 4 && a[0] == 198 && (18...19).contains(a[1]) }
+
+    /// Names that are this Mac or its own network, whatever they resolve to, are not: a name of one label (which
+    /// the network's own search domain finishes), and the endings home and office networks use.
     static func isPublicName(_ host: String) -> Bool {
         var name = host.lowercased()
         if name.hasSuffix(".") { name.removeLast() }
         guard !name.isEmpty, name != "localhost" else { return false }
-        return !["localhost", "local", "internal", "home.arpa"].contains { name.hasSuffix("." + $0) }
+        if bytes(of: name) == nil, !name.contains(".") { return false }
+        return !["localhost", "local", "internal", "home.arpa", "lan", "home", "corp", "intranet", "private", "localdomain"].contains { name.hasSuffix("." + $0) }
     }
 
     /// Whether an address, as text ("10.0.0.1", "::1"), is a public one. Text that isn't an address is not.
@@ -476,6 +490,10 @@ nonisolated enum IconAddress {
         var host = text
         if host.hasPrefix("["), host.hasSuffix("]") { host = String(host.dropFirst().dropLast()) }
         var v4 = in_addr()
+        // Read as a resolver reads it, in the short and old forms too: "127.1", "2130706433", "0x7f.0.0.1", and
+        // "0177.0.0.1" in octal, which is 127.0.0.1 to it, not 177.0.0.1.
+        if host.allSatisfy({ $0.isASCII && ($0.isHexDigit || $0 == "." || $0 == "x" || $0 == "X") }), host.first?.isNumber == true,
+           inet_aton(host, &v4) == 1 { return withUnsafeBytes(of: &v4) { Array($0) } }
         if inet_pton(AF_INET, host, &v4) == 1 { return withUnsafeBytes(of: &v4) { Array($0) } }
         var v6 = in6_addr()
         if inet_pton(AF_INET6, host, &v6) == 1 { return withUnsafeBytes(of: &v6) { Array($0) } }
