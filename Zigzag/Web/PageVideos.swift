@@ -75,6 +75,12 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
         if (!isolated) return false;
         for (const [e, before] of isolated.marked) { if (before === null) e.removeAttribute(mark); else e.setAttribute(mark, before); }
         isolated.styles.forEach((s) => s.remove());
+        // The video's own controls back, where they were among its attributes: the ones after it go behind it again.
+        const c = isolated.controls;
+        if (c && !c.attr.ownerElement && !c.target.hasAttribute('controls')) {
+          c.target.setAttributeNode(c.attr);
+          for (const a of c.after) if (a.ownerElement === c.target) { c.target.removeAttributeNode(a); c.target.setAttributeNode(a); }
+        }
         isolated = null;
         return true;
       };
@@ -86,6 +92,16 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
         if (whole && target.isConnected) return true;
         unisolate();
         const marked = [], styles = [];
+        // A video with the browser's own controls would show them over the card when paused, and no style reaches
+        // WebKit's newer ones: they're turned off while it's in the card (#230). Not when a src comes after them,
+        // as putting that back in its place would load the video again.
+        let controls = null;
+        const attr = target.localName === 'video' ? target.getAttributeNode('controls') : null;
+        if (attr) {
+          const all = Array.from(target.attributes);
+          const after = all.slice(all.indexOf(attr) + 1);
+          if (!after.some((a) => a.name === 'src')) { controls = { target, attr, after }; target.removeAttributeNode(attr); }
+        }
         const put = (e, value) => { marked.push([e, e.getAttribute(mark)]); e.setAttribute(mark, value); };
         const style = document.createElement('style');
         style.setAttribute(mark, 'style');
@@ -94,7 +110,7 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
         styles.push(style);
         put(target, 'video');
         for (let e = target.parentElement; e; e = e.parentElement) put(e, 'path');
-        isolated = { target, marked, styles };
+        isolated = { target, marked, styles, controls };
         return true;
       };
       window.__zigzagVideos = {

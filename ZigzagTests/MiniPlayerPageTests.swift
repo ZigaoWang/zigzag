@@ -60,6 +60,8 @@ struct MiniPlayerPageTests {
         #expect(try await visibility("#movie_player", in: webView, pseudo: "::after") == "hidden")
         // The player it sits in stays, on black.
         #expect(try await script("return getComputedStyle(document.body).backgroundColor", in: webView) as? String == "rgb(0, 0, 0)")
+        // Its own controls are off while it's in the card, so they don't show over the card's (#230).
+        #expect(try await script("return document.querySelector('video').controls", in: webView) as? Bool == false)
         // Nothing moved: the video is where it was.
         #expect(try await script("return document.querySelector('video').getBoundingClientRect().width", in: webView) as? Double == 640)
 
@@ -70,6 +72,7 @@ struct MiniPlayerPageTests {
         #expect(try await script("return window.__zigzagVideos.unisolate()", in: webView) as? Bool == true)
         #expect(try await script("return document.documentElement.outerHTML", in: webView) as? String == before)
         #expect(try await visibility(".ytp-chrome-bottom", in: webView) == "visible")
+        #expect(try await script("return document.querySelector('video').controls", in: webView) as? Bool == true)
         #expect(try await script("return window.__zigzagVideos.unisolate()", in: webView) as? Bool == false)
     }
 
