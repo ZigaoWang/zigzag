@@ -716,14 +716,15 @@ final class Tab: NSObject {
 
     /// What a page may send a tab to on its own: only the web. An app's link goes to ExternalLinks, which asks (and
     /// holds to the site's Block); a file on your Mac, a script address, an extension's page or one of Zigzag's own
-    /// is refused, except a local page linking to another file beside it.
+    /// is refused, except a local page linking to another file beside it. So is a data: address: WebKit keeps a page
+    /// from opening one as a page of its own, and Zigzag loading it (⌘-click, Peek) would get it past that.
     enum PageLinkRoute: Equatable { case load, app, refuse }
 
     static func route(forPageLink url: URL, from page: URL?) -> PageLinkRoute {
         let scheme = url.scheme?.lowercased() ?? ""
-        if ["http", "https", "about", "data", "blob"].contains(scheme) { return .load }
+        if ["http", "https", "about", "blob"].contains(scheme) { return .load }
         if scheme == "file" { return page?.isFileURL == true ? .load : .refuse }
-        if scheme.isEmpty || ["javascript", "webkit-extension", HistoryPage.scheme].contains(scheme) { return .refuse }
+        if scheme.isEmpty || ["javascript", "data", "webkit-extension", HistoryPage.scheme].contains(scheme) { return .refuse }
         return .app
     }
 
