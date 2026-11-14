@@ -48,17 +48,26 @@ enum SiteOrigin {
 
 /// Answers given to a site's question, kept for the page that asked only: its tab, until it loads another page or
 /// reloads. That's what Ask means, as in Safari: asked again on every visit, never "asked once, then allowed for good".
-/// Allow and Block are what's kept for the site, chosen in Site Controls or Settings › Privacy.
+/// Allow and Block are what's kept for the site, chosen in Site Controls or Settings › Privacy. Kept as action ids, so
+/// a question whose answers aren't just yes or no (a handoff rule's "browser" or "handOff") holds for the page too.
 struct PagePermissionAnswers {
-    private var answers: [String: Bool] = [:]
+    private var answers: [String: String] = [:]
 
     /// `key` is what the answer is for (`SitePermissions.answerKey`), `kind` what was asked ("camera", "location"…).
-    mutating func note(_ allowed: Bool, key: String, kind: String) { answers["\(key)|\(kind)"] = allowed }
+    mutating func note(_ allowed: Bool, key: String, kind: String) { note(allowed ? "allow" : "deny", key: key, kind: kind) }
+
+    /// The action chosen, as its own id. `key` is what the answer is for (`SitePermissions.answerKey`), `kind` what was
+    /// asked ("camera", "location", "handoff:<rule UUID>"…).
+    mutating func note(_ action: String, key: String, kind: String) { answers["\(key)|\(kind)"] = action }
 
     /// A camera-only or microphone-only question takes an answer given to both at once.
-    func answer(key: String, kind: String) -> Bool? {
+    func action(key: String, kind: String) -> String? {
         answers["\(key)|\(kind)"] ?? (kind == "camera" || kind == "microphone" ? answers["\(key)|cameraAndMicrophone"] : nil)
     }
+
+    /// The answer as yes or no: "allow" is the only action that allows; "deny" and everything else ("browser",
+    /// "handOff") do not.
+    func answer(key: String, kind: String) -> Bool? { action(key: key, kind: kind).map { $0 == "allow" } }
 
     mutating func forget() { answers = [:] }
 
@@ -104,10 +113,12 @@ enum SitePermissions {
     /// Returns whether the answer allows what was asked (`action` other than "deny").
     @discardableResult
     static func rememberAnswer(_ answer: PermissionAnswer, subject: String, origin: String, tab: Tab?, isPrivate: Bool) -> Bool {
-        if answer.remember, !isPrivate {
+        // The tab knows best: a caller that forgets to pass its own privacy is still not allowed to store.
+        let keepsNothing = isPrivate || (tab?.isPrivate ?? false)
+        if answer.remember, !keepsNothing {
             remember(answer.action, subject: subject, origin: origin)
         } else if let tab {
-            tab.permissionAnswers.note(answer.action != "deny", key: origin, kind: subject)
+            tab.permissionAnswers.note(answer.action, key: origin, kind: subject)
         }
         return answer.action != "deny"
     }
@@ -436,7 +447,7 @@ enum SitePermissions {
         let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: "your location",
                                                 symbol: "location.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
-                                                actions: [.deny, .allow], canRemember: key != nil, rememberNote: noSiteNote,
+                                                actions: [.deny, .allow], canRemember: key != nil, rememberNote: key == nil ? noSiteNote : nil,
                                                 answered: {
                                                     key.flatMap { key in
                                                         knownAnswer(site: location(origin: key),
@@ -467,7 +478,7 @@ enum SitePermissions {
         // The question goes once the tab leaves the page it was asked on.
         let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: what,
                                                 symbol: type == .microphone ? "mic.fill" : "video.fill", in: controller, tab: tab, title: title,
-                                                actions: [.deny, .allow], canRemember: key != nil, rememberNote: noSiteNote,
+                                                actions: [.deny, .allow], canRemember: key != nil, rememberNote: key == nil ? noSiteNote : nil,
                                                 answered: {
                                                     key.flatMap { key in
                                                         knownAnswer(site: decision(origin: key, type: type),
