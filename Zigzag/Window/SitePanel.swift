@@ -101,8 +101,9 @@ final class SitePanel: FloatingPanelView {
     static let notSecureSymbol = "lock.open.fill"
 
     /// What the connection line under the site's name says, whether it warns, and why when that isn't plain to see.
-    /// `hasCertificate`: the page came with one; Zigzag's own warning in place of a page that didn't load has none,
-    /// and is never called secure.
+    /// `hasCertificate`: false for Zigzag's own warning in place of a page that didn't load, which is never called
+    /// secure. A page WebKit loaded over https without reporting its certificate (from a service worker, as Discourse
+    /// sites like linux.do are, or from memory) was still checked on the way: it's secure, with no certificate to show.
     static func connection(scheme: String?, onlySecureContent: Bool, certificateException: Bool, hasCertificate: Bool = true) -> (value: String, warns: Bool, reason: String?) {
         let https = scheme?.lowercased() == "https"
         if https, certificateException {
@@ -172,7 +173,7 @@ final class SitePanel: FloatingPanelView {
             // is, and says why.
             let connection = Self.connection(scheme: address.scheme, onlySecureContent: tab.webView?.hasOnlySecureContent ?? true,
                                              certificateException: tab.usesCertificateException,
-                                             hasCertificate: tab.webView.map { $0.serverTrust != nil } ?? true)
+                                             hasCertificate: !tab.showsErrorPage)
             let opens = address.scheme == "https" && tab.webView?.serverTrust != nil
             connectionLine = ConnectionLine(connection.value, warns: connection.warns, opens: opens) { [weak self] in self?.showCertificate() }
             if let reason = connection.reason {
@@ -185,7 +186,11 @@ final class SitePanel: FloatingPanelView {
         if !connectionNote.isHidden { addSubview(connectionNote) }
         let shownSite = site
         pageToken = tab.changed.observe { [weak self, weak tab] change in
-            guard change == .url, let self, let now = tab?.url else { return }
+            guard let self else { return }
+            // Opened while the page was still loading, the connection wasn't known yet (no certificate): it says what
+            // it is once the page has it, without closing and opening the panel again.
+            if change == .loading || change == .navigation { self.refreshConnection() }
+            guard change == .url, let now = tab?.url else { return }
             if (ContentBlocker.site(of: now) ?? now.host() ?? now.absoluteString) != shownSite || SiteOrigin.of(now) != origin { self.close() }
         }
         moreButton.onClick = { [weak self] _ in self?.showMoreMenu() }
@@ -524,6 +529,29 @@ final class SitePanel: FloatingPanelView {
         frame.origin.x = max(inset, min(frame.minX, superview.bounds.width - inset - width))
         frame.size.width = width
         maxHeight = SitePanelSizing.maxHeight(overlayHeight: superview.bounds.height, top: frame.minY)
+        resize()
+    }
+
+    /// The connection line again, as the page now is: a page that finished loading has its certificate.
+    private func refreshConnection() {
+        guard let old = connectionLine, ["http", "https"].contains(url.scheme ?? "") else { return }
+        let connection = Self.connection(scheme: url.scheme, onlySecureContent: tab.webView?.hasOnlySecureContent ?? true,
+                                         certificateException: tab.usesCertificateException,
+                                         hasCertificate: !tab.showsErrorPage)
+        let opens = url.scheme == "https" && tab.webView?.serverTrust != nil
+        let line = ConnectionLine(connection.value, warns: connection.warns, opens: opens) { [weak self] in self?.showCertificate() }
+        guard line.debugText != old.debugText || (connection.reason ?? "") != (connectionNote.isHidden ? "" : connectionNote.stringValue) else { return }
+        line.frame = old.frame
+        replaceSubview(old, with: line)
+        connectionLine = line
+        if let reason = connection.reason {
+            connectionNote.stringValue = reason
+            if connectionNote.superview == nil { addSubview(connectionNote) }
+            connectionNote.isHidden = false
+        } else {
+            connectionNote.isHidden = true
+        }
+        needsLayout = true
         resize()
     }
 
