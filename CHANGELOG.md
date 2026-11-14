@@ -17,6 +17,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Reader pressed while a page is still loading waits for it and opens once it's loaded, instead of saying there's no article over a blank page. Press it again to call it off. ([#233](https://github.com/ZigaoWang/zigzag/issues/233))
 - Translating a Chinese Wikipedia page translates it once, as Simplified Chinese, then says it's translated. Text in Traditional Chinese on it, like the language variant menu, no longer starts a second translation that brings up macOS's Download Languages sheet, and neither does the site's next page in Traditional. The download sheet now only comes up when you ask to translate a page whose language isn't on your Mac yet. ([#231](https://github.com/ZigaoWang/zigzag/issues/231))
 - The Apple Store's checkout shows one Apple Pay mark in its payment options, instead of the Apple Pay logo drawn over the Apple logo and Pay. ([#235](https://github.com/ZigaoWang/zigzag/issues/235))
+- Security hardening for pages, pop-ups, links, downloads, the address and secure connections.
 
 ## [0.9.0] - 2026-11-14
 
