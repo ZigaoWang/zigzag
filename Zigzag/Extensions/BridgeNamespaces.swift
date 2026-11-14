@@ -1235,8 +1235,10 @@ final class BridgeSidePanel: BridgeNamespace {
         case "getPanelBehavior":
             return ["openPanelOnActionClick": opensOnClick.contains(extensionID)]
         case "open":
-            // Chrome lets a panel open only in answer to something you did; a click on the extension leads here.
-            guard Date().timeIntervalSince(UndoClock.lastPageInput) < 5 || Date().timeIntervalSince(lastClick) < 5 else {
+            // Chrome lets a panel open only in answer to something you did with this extension: its button, its menu
+            // item or shortcut, or a click in its own pages. A click or key in some web page, or on another
+            // extension, isn't one.
+            guard host.hasRecentGesture(extensionID) else {
                 throw BridgeError("`sidePanel.open()` may only be called in response to a user gesture.")
             }
             let tab = args.object(0)["tabId"] as? Int
@@ -1250,8 +1252,6 @@ final class BridgeSidePanel: BridgeNamespace {
         }
     }
 
-    private var lastClick = Date.distantPast
-
     /// The page to show: what the extension set for the tab, else for every tab, else its manifest's.
     private func path(for extensionID: String, tab: Int? = nil) -> String? {
         if let tab, let set = tabPaths[extensionID]?[tab] { return set }
@@ -1262,7 +1262,6 @@ final class BridgeSidePanel: BridgeNamespace {
     /// A click on the extension's button: opens or closes its panel when that's what the click is for (it asked, or
     /// it has a panel and no popup). False leaves the click to WebKit.
     func handleClick(_ extensionID: String, hasPopup: Bool, in controller: BrowserWindowController?) -> Bool {
-        lastClick = Date()
         guard !disabled.contains(extensionID), path(for: extensionID) != nil,
               opensOnClick.contains(extensionID) || !hasPopup else { return false }
         if let controller, controller.root.showsSidePanel, host.showsSidePanel(of: extensionID, in: controller) {

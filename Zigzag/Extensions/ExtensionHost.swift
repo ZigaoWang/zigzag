@@ -278,7 +278,9 @@ final class ExtensionHost: NSObject {
 
     private func watchGestures() {
         gestureMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
-            if let self, let id = self.extensionPage(under: event) { self.use.touched(id) }
+            // A key held down repeats on its own: only the press counts.
+            if let self, ExtensionUse.isGesture(event.type, isRepeat: event.type == .keyDown && event.isARepeat),
+               let id = self.extensionPage(under: event) { self.use.touched(id) }
             return event
         }
         menuObserver = NotificationCenter.default.addObserver(forName: NSMenu.willSendActionNotification, object: nil, queue: .main) { [weak self] note in
@@ -986,6 +988,15 @@ struct ExtensionUse {
     }
 
     mutating func touched(_ id: String, at date: Date = Date()) { gestures[id] = date }
+
+    /// A click, or a key pressed (not one repeating while held), as Chrome's transient activation counts them.
+    static func isGesture(_ type: NSEvent.EventType, isRepeat: Bool) -> Bool {
+        switch type {
+        case .leftMouseDown, .rightMouseDown: true
+        case .keyDown: !isRepeat
+        default: false
+        }
+    }
 
     mutating func openedWindow(_ id: String, _ window: ObjectIdentifier) { invocations[id]?.window = window }
 

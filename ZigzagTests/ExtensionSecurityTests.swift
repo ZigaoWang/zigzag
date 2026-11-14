@@ -524,3 +524,16 @@ extension ExtensionSecurityTests {
         #expect(BridgeIdentity.shownAddress(nil) == "")
     }
 }
+
+extension ExtensionSecurityTests {
+    /// A click or a key pressed counts as using an extension; a key repeating while held, or a move, doesn't.
+    @Test func onlyRealPressesAreGestures() {
+        #expect(ExtensionUse.isGesture(.leftMouseDown, isRepeat: false))
+        #expect(ExtensionUse.isGesture(.keyDown, isRepeat: false))
+        #expect(!ExtensionUse.isGesture(.keyDown, isRepeat: true))
+        #expect(!ExtensionUse.isGesture(.mouseMoved, isRepeat: false))
+        var use = ExtensionUse()
+        use.touched("a")
+        #expect(use.hasGesture("a") && !use.hasGesture("b"))
+    }
+}
