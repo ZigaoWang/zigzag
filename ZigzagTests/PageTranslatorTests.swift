@@ -456,4 +456,16 @@ struct PageLanguageChoiceTests {
         #expect(!PageTranslator.offerStands(offeredFor: page, now: page, foreign: true, translated: true))
         #expect(!PageTranslator.offerStands(offeredFor: nil, now: page, foreign: true, translated: false))
     }
+
+    @Test func onlyASitesPageIsReadForItsLanguage() {
+        #expect(PageTranslator.readsLanguage(of: URL(string: "https://en.wikipedia.org/wiki/Shanghai"), errorPage: false))
+        #expect(PageTranslator.readsLanguage(of: URL(fileURLWithPath: "/tmp/notes.html"), errorPage: false))
+        // History and Settings list pages' titles in other languages: they're Zigzag's own, never offered.
+        #expect(!PageTranslator.readsLanguage(of: URL(string: "zigzag://history"), errorPage: false))
+        #expect(!PageTranslator.readsLanguage(of: URL(string: "zigzag://settings/general"), errorPage: false))
+        #expect(!PageTranslator.readsLanguage(of: URL(string: "about:blank"), errorPage: false))
+        #expect(!PageTranslator.readsLanguage(of: nil, errorPage: false))
+        // An error page shown for a site is in your language, whatever the site's is.
+        #expect(!PageTranslator.readsLanguage(of: URL(string: "https://expired.badssl.com"), errorPage: true))
+    }
 }

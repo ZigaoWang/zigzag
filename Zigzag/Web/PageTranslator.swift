@@ -459,6 +459,13 @@ struct TranslationRuns<Key: Hashable, Run: AnyObject> {
 }
 
 extension PageTranslator {
+    /// Whether a page is one that's read for its language and offered a translation: a site's page, never Zigzag's
+    /// own (History, Settings, which list other pages' titles in their languages) nor an error page in its place.
+    nonisolated static func readsLanguage(of url: URL?, errorPage: Bool) -> Bool {
+        guard let scheme = url?.scheme?.lowercased(), !errorPage else { return false }
+        return ["http", "https", "file"].contains(scheme)
+    }
+
     /// Whether an offer to translate, made for the page at `offeredFor`, still stands for the tab's page now: the same
     /// page (a jump within it, by `#`, is the same page), still seen in another language, and not translated yet.
     nonisolated static func offerStands(offeredFor: URL?, now: URL?, foreign: Bool, translated: Bool) -> Bool {

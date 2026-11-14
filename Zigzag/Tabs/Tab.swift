@@ -1665,6 +1665,15 @@ extension Tab: WKNavigationDelegate {
         languageCheck += 1
         let check = languageCheck
         let url = webView.url
+        // History and Settings list other pages' titles in their own languages, and an error page is in yours: none
+        // of them is a page in another language to translate.
+        guard PageTranslator.readsLanguage(of: url, errorPage: url != nil && url == errorShownFor) else {
+            if foreignLanguage != nil {
+                foreignLanguage = nil
+                changed.send(.language)
+            }
+            return
+        }
         Task { [weak self] in
             if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
             guard let self, self.languageCheck == check, self.webView === webView, webView.url == url, !self.isTranslated else { return }
