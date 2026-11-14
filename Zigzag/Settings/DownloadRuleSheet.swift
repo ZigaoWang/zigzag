@@ -10,6 +10,9 @@ enum DownloadRuleSheet {
         let source = existing ?? preset?.rule ?? DownloadRule(name: "", action: DownloadRuleAction(kind: kind))
         // A preset's action may differ from the requested kind (the downloader presets are RPC): the action wins.
         let action = existing?.action ?? preset?.rule.action ?? DownloadRuleAction(kind: kind)
+        /// The sheet, once it's up, so a value filled in from somewhere other than the keyboard (the open panel's
+        /// own answer) can still be followed by the main button.
+        var sheetRef: FormSheet?
 
         let name = FilledField(placeholder: String(localized: "Name", comment: "Placeholder of the name field in the sheet that makes a download rule."))
         name.stringValue = source.name
@@ -40,7 +43,10 @@ enum DownloadRuleSheet {
         var stylePicker: DropdownButton?
 
         func choose(_ panel: NSOpenPanel, into field: FilledField) {
-            if panel.runModal() == .OK, let url = panel.url { field.stringValue = url.path }
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            field.stringValue = url.path
+            // What's picked can decide whether the rule may be added at all: the main button hears it too.
+            sheetRef?.revalidate()
         }
 
         switch action.kind {
@@ -112,7 +118,6 @@ enum DownloadRuleSheet {
                                            comment: "Under the parameters of a JSON-RPC download rule.")))
         }
 
-        var sheetRef: FormSheet?
         let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}.",
                                              comment: "The tokens a download rule's fields may use, listed in its sheet."))
         let matchRows: [FormSheet.Row] = [
