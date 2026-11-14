@@ -2409,8 +2409,22 @@ enum DebugBridge {
                 let n = Int(f.first ?? "") ?? 0
                 if found.indices.contains(n) {
                     let ok = controller.window?.makeFirstResponder(found[n]) ?? false
-                    debugLog("keyfocus \(type(of: found[n])): \(ok)")
+                    debugLog("keyfocus \(type(of: found[n])): \(ok) '\(found[n].accessibilityLabel() ?? "")' \(found[n].convert(found[n].bounds, to: nil))")
                 }
+            }
+        case "keyloop":
+            // keyloop: the window's key view loop as Tab walks it with Full Keyboard Access, from the first
+            // responder: each stop's kind, name and frame, in the debug log.
+            InteractiveView.debugKeyboardAccess = true
+            guard let window = controller.window else { break }
+            window.recalculateKeyViewLoop()
+            var stop = (window.firstResponder as? NSView) ?? window.contentView
+            var seen: [ObjectIdentifier] = []
+            for i in 0..<60 {
+                guard let next = stop?.nextValidKeyView, !seen.contains(ObjectIdentifier(next)) else { break }
+                seen.append(ObjectIdentifier(next))
+                debugLog("keyloop \(i) \(type(of: next)) '\(next.accessibilityLabel() ?? "")' \(next.convert(next.bounds, to: nil)) hidden=\(next.isHiddenOrHasHiddenAncestor) alpha=\(next.alphaValue)")
+                stop = next
             }
         case "unload":
             // unload <title or host>: a pinned page or favorite goes back to not loaded.
