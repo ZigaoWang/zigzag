@@ -89,11 +89,14 @@ enum ExternalLinks {
         let tab = (webView as? BrowserWebView)?.owner
         if !foreign { SitePermissions.noteAsked(.apps, origin: pageOrigin, isPrivate: isPrivate) }
         asking.insert(key)
+        // Asked where the page is: in Zigzag Mini or an installed app's window, over its own page, not in a browser
+        // window behind it, where it couldn't be seen (a report: claude.ai's Open Claude did nothing in Mini).
+        let promptHost: PromptHost = (webView.window?.windowController as? PromptHost).flatMap { $0 is BrowserWindowController ? nil : $0 } ?? controller
         // Asked from a popup: its browser window comes forward, so the question isn't hidden behind the popup.
         if popup != nil { controller.window?.makeKeyAndOrderFront(nil) }
         Task { @MainActor in
             let answer = await PermissionPrompt.ask(host: SitePermissions.askerName(origin), origin: origin, what: name, symbol: "arrow.up.forward.app",
-                                                    icon: NSWorkspace.shared.icon(forFile: app.path), in: controller,
+                                                    icon: NSWorkspace.shared.icon(forFile: app.path), in: promptHost,
                                                     tab: tab, title: String(localized: "Open \(name)", comment: "A page's question to open an app, without its question mark. The placeholder is the app's name, like “zoom.us”."),
                                                     allowTitle: String(localized: "Open", comment: "Button on a page's question to open an app: opens it this time."),
                                                     alwaysTitle: saves ? String(localized: "Always Open", comment: "Button on a page's question to open an app: opens it, and the site may open this app without asking from now on.") : nil,
