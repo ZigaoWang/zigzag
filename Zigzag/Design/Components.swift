@@ -63,13 +63,22 @@ class CardRow: InteractiveView {
     /// From the row's edge to its icon, and from the icon to the title: the sidebar's rows use the same.
     static let inset: CGFloat = Tokens.Space.x2 + 2
 
+    /// Under rows with larger pictures (a download's file icon): the icon centered in their column, `x` in from the
+    /// row's edge and `width` wide, and the title where theirs starts, so the text lines up down the list.
+    var iconColumn: (x: CGFloat, width: CGFloat)? { didSet { needsLayout = true } }
+
     override func layout() {
         super.layout()
         let side = Tokens.Metric.favicon
         var x = Self.inset - Label.inset
         if iconView.image != nil {
-            iconView.frame = NSRect(x: Self.inset, y: (bounds.height - side) / 2, width: side, height: side)
-            x = iconView.frame.maxX + Self.inset - Label.inset
+            if let column = iconColumn {
+                iconView.frame = NSRect(x: column.x + (column.width - side) / 2, y: (bounds.height - side) / 2, width: side, height: side)
+                x = column.x + column.width + Self.inset - Label.inset
+            } else {
+                iconView.frame = NSRect(x: Self.inset, y: (bounds.height - side) / 2, width: side, height: side)
+                x = iconView.frame.maxX + Self.inset - Label.inset
+            }
         }
         let detailWidth = detail.stringValue.isEmpty ? 0 : detail.inkWidth + Label.inset * 2
         detail.frame = NSRect(x: bounds.width - Self.inset + Label.inset - detailWidth, y: detail.centeredY(in: bounds.height),

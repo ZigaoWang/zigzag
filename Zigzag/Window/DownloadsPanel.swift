@@ -187,11 +187,15 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     /// The progress line under a download that's under way.
     private static let barHeight: CGFloat = 3
 
+    /// The file icons' column, from the row's edge: the folder row under the list centers its glyph in it, so the
+    /// names and its title start at one x.
+    static let iconColumn: (x: CGFloat, width: CGFloat) = (CardRow.inset - 2, Tokens.Space.x8)
+
     override func layout() {
         super.layout()
         // The icon sits as far from the row's edge as a sidebar row's does; the buttons as far from the other end.
-        let pad = CardRow.inset - 2
-        let iconSize = Tokens.Space.x8
+        let pad = Self.iconColumn.x
+        let iconSize = Self.iconColumn.width
         icon.frame = NSRect(x: pad, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
         let b = actionButton.frame.size
         actionButton.frame.origin = NSPoint(x: bounds.width - pad - b.width, y: (bounds.height - b.height) / 2)
@@ -308,6 +312,7 @@ final class DownloadsPanelView: FloatingPanelView {
     init(controller: BrowserWindowController) {
         self.controller = controller
         super.init(frame: .zero)
+        folderButton.iconColumn = DownloadRowView.iconColumn
         [title, clearButton, more, folderButton, emptyIcon, emptyNote].forEach { addSubview($0) }
         more.onClick = { [weak self] _ in self?.showMoreMenu() }
         emptyIcon.contentTintColor = Tokens.Color.textTertiary

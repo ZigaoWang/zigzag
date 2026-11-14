@@ -22,6 +22,8 @@ final class NowPlayingView: InteractiveView {
         super.init(frame: frame)
         layer?.cornerRadius = Tokens.Sidebar.rowRadius
         layer?.cornerCurve = .continuous
+        // A long title fades out at its end, as a tab row's does.
+        title.fadesTail = true
         [icon, title, playButton, muteButton, hideButton].forEach { addSubview($0) }
         hideButton.onClick = { [weak self] _ in self?.onHide?() }
         // Settings › Appearance › Sidebar size: the site's name, icon and buttons at the rows' size.
@@ -83,6 +85,7 @@ final class NowPlayingView: InteractiveView {
         muteButton.frame = mute
         playButton.frame = play
         title.frame = titleFrame
+        title.fadeTail()
         hideButton.frame = hide
         // A title cut short reads whole in its tooltip.
         toolTip = title.intrinsicContentSize.width > titleFrame.width ? title.stringValue : nil
