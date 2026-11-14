@@ -77,7 +77,7 @@ import WebKit
     }
 
     /// One host that sent the header, and until when it holds.
-    struct Entry: Codable, Equatable {
+    nonisolated struct Entry: Codable, Equatable, Sendable {
         var until: Date
         var includesSubdomains: Bool
     }
