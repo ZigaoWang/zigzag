@@ -744,6 +744,7 @@ extension ExtensionBridgeTests {
         let names = ["/Users/me/Downloads/report.pdf", "/Users/me/Downloads/photo.png", String(repeating: "a", count: 40) + "!"]
         #expect(await BridgeDownloads.matching(#"\.pdf$"#, in: names) == [0])
         #expect(await BridgeDownloads.matching("(unclosed", in: names) == [])
+        #expect(!BridgeDownloads.isValidPattern("(unclosed") && BridgeDownloads.isValidPattern(#"\.pdf$"#))
         let started = Date()
         #expect(await BridgeDownloads.matching("^(a+)+$", in: names, timeout: 0.3) == nil)
         #expect(Date().timeIntervalSince(started) < 5)

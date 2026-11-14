@@ -144,6 +144,8 @@ final class BridgeDownloads: BridgeNamespace {
             found = found.filter { item in words.allSatisfy { item.filename.lowercased().contains($0) || (item.sourceURL?.absoluteString.lowercased().contains($0) ?? false) } }
         }
         if let pattern = query.string("filenameRegex") {
+            // As Chrome: a pattern that isn't one is an error, not an empty list.
+            guard Self.isValidPattern(pattern) else { throw BridgeError("Invalid filenameRegex") }
             guard let matched = await Self.matching(pattern, in: found.map { $0.destination?.path ?? $0.filename }) else {
                 throw BridgeError("filenameRegex took too long")
             }
@@ -153,6 +155,9 @@ final class BridgeDownloads: BridgeNamespace {
         if let limit = query.number("limit").map(Int.init(saturating:)), limit > 0 { found = Array(found.prefix(limit)) }
         return found
     }
+
+    /// Whether `filenameRegex` is a pattern at all.
+    nonisolated static func isValidPattern(_ pattern: String) -> Bool { (try? NSRegularExpression(pattern: pattern)) != nil }
 
     /// The extension's pattern is its own, and one can take for ever on the right name: it runs away from the main
     /// thread, and gives up after `timeout`. Which names match, by index; nil if it gave up. A pattern that isn't
