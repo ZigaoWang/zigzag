@@ -1,0 +1,82 @@
+# Builds the app on GitHub's macOS runners, for testing a branch without Xcode on the Mac.
+# Temporary: this branch is for a build, not a pull request.
+name: Build Zigzag Dev
+
+on:
+  push:
+    branches: [feat/download-handoff]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show the toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Use a team-free Debug bundle for CI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("project.yml")
+          text = path.read_text()
+          text = text.replace("DEVELOPMENT_TEAM: 432GL3WKY2", 'DEVELOPMENT_TEAM: ""')
+          text = text.replace("PRODUCT_BUNDLE_IDENTIFIER: wang.zigao.zigzag.dev",
+                              "PRODUCT_BUNDLE_IDENTIFIER: com.github.zigzag.ci.dev")
+          path.write_text(text)
+          PY
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -configuration Debug \
+            -destination 'platform=macOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tee build.log
+
+      - name: Sign the app ad hoc so it runs on Apple silicon
+        run: |
+          APP="build/Build/Products/Debug/Zigzag.app"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict "$APP"
+
+      - name: Zip the app
+        run: ditto -c -k --keepParent "build/Build/Products/Debug/Zigzag.app" "Zigzag-Dev.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zigzag-Dev
+          path: Zigzag-Dev.zip
+          if-no-files-found: error
+
+      - name: Run the download rule tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag \
+            -destination 'platform=macOS' -derivedDataPath test-build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            -only-testing:ZigzagTests/DownloadRuleTests | tee test.log
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-logs
+          path: |
+            build.log
+            test.log
+          if-no-files-found: warn
