@@ -216,6 +216,62 @@ struct MCPToolsTests {
         #expect(urls == ["https://example.com/help", "https://other.example/x"])
     }
 
+    private static let secrets = """
+    <title>Checkout</title>
+    <form onsubmit="event.preventDefault()">
+      <input id="name" name="name" value="plain-name">
+      <input id="pw" name="pw" type="password" value="hunter2-SECRET">
+      <input id="pw2" type="text" autocomplete="current-password" value="typed-SECRET">
+      <input id="csrf" name="csrf" type="hidden" value="csrf-SECRET">
+      <input id="card" autocomplete="cc-number" value="4111111111111111">
+      <input id="code" autocomplete="one-time-code" value="otp-SECRET">
+      <input id="pwbutton" type="submit" autocomplete="new-password" value="button-SECRET">
+      <textarea id="note" autocomplete="cc-csc">csc-SECRET</textarea>
+      <input id="send" type="submit" value="Send it">
+    </form>
+    """
+    private static let secretValues = ["hunter2-SECRET", "typed-SECRET", "csrf-SECRET", "4111111111111111", "otp-SECRET", "button-SECRET", "csc-SECRET"]
+
+    /// Every op, on every field: none of them gives back a password's, a hidden field's, a card's or a code's value.
+    @Test func noOpGivesASecretValue() async throws {
+        let (webView, loading) = await page(Self.secrets)
+        _ = loading
+        let fields = ["#name", "#pw", "#pw2", "#csrf", "#card", "#code", "#pwbutton", "#note", "#send"]
+        var answers: [Result<[String: Any], MCPArgumentError>] = []
+        answers.append(await MCPPageScript.run("read", ["maxChars": 5000], in: webView))
+        answers.append(await MCPPageScript.run("links", ["max": 10], in: webView))
+        answers.append(await MCPPageScript.run("state", in: webView))
+        answers.append(await MCPPageScript.run("scroll", ["dy": 10], in: webView))
+        for field in fields {
+            answers.append(await MCPPageScript.run("click", ["selector": field], in: webView))
+            answers.append(await MCPPageScript.run("keyTarget", ["selector": field], in: webView))
+            answers.append(await MCPPageScript.run("waitFor", ["condition": "selector", "value": field, "timeoutMs": 50, "waitID": "w" + field], in: webView))
+            answers.append(await MCPPageScript.run("type", ["selector": field, "text": "", "clear": false, "submit": false], in: webView))
+        }
+        // Clicked by what they say: a secret value is never matched as a button's text either.
+        for secret in Self.secretValues {
+            #expect((try? await MCPPageScript.run("click", ["text": secret], in: webView).get()) == nil, "\(secret)")
+        }
+        // What has the focus after a key, with a secret field focused.
+        for field in ["#pw", "#card"] {
+            _ = await MCPPageScript.run("keyTarget", ["selector": field], in: webView)
+            answers.append(await MCPPageScript.run("awaitKey", in: webView))
+        }
+        #expect(answers.count > 40)
+        for answer in answers {
+            let text: String
+            switch answer {
+            case .success(let object): text = JSON(foundation: object)?.text ?? ""
+            case .failure(let error): text = error.message
+            }
+            for secret in Self.secretValues { #expect(!text.contains(secret), "\(secret) in \(text)") }
+        }
+        // A button's value is its caption, and still names it.
+        let send = try await MCPPageScript.run("click", ["selector": "#send"], in: webView).get()
+        #expect((send["clicked"] as? [String: Any])?["text"] as? String == "Send it")
+        #expect(try await MCPPageScript.run("click", ["text": "send it"], in: webView).get()["clicked"] != nil)
+    }
+
     /// The page's own scripts can't see or replace what the tools run on.
     @Test func runsApartFromThePage() async throws {
         let (webView, loading) = await page("<script>Object.defineProperty(document, 'title', { get: () => 'faked' }); window.find = () => 1;</script><title>Real</title>")

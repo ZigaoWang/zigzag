@@ -83,8 +83,11 @@ enum MCPPageScript {
       if (el.labels && el.labels.length) return clip(el.labels[0].innerText, 120);
       return clip(el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.getAttribute('title') || '', 120);
     };
+    // A field's value is what's typed or filled in, so never a name for it; only a button's value is its caption.
+    const showsValue = (el) => el.tagName === 'INPUT' && ['button', 'submit', 'reset'].includes((el.type || '').toLowerCase()) && !hidesValue(el);
     const describe = (el) => {
-      const text = clip(el.innerText || el.value || el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('alt') || '', 120);
+      const own = hidesValue(el) ? '' : (el.innerText || (showsValue(el) ? el.value : ''));
+      const text = clip(own || el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('alt') || '', 120);
       return { tag: el.tagName.toLowerCase(), text, selector: selectorFor(el) };
     };
     const find = (selector) => {
@@ -143,7 +146,7 @@ enum MCPPageScript {
         const want = args.text.replace(/\s+/g, ' ').trim().toLowerCase();
         const candidates = [...document.querySelectorAll('a, button, input[type=button], input[type=submit], input[type=reset], [role=button], [role=link], [role=tab], [role=menuitem], [role=option], [role=checkbox], summary, label, [onclick]')]
           .filter(shown);
-        const textOf = (c) => (c.innerText || c.value || c.getAttribute('aria-label') || c.getAttribute('title') || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const textOf = (c) => (c.innerText || (showsValue(c) ? c.value : '') || c.getAttribute('aria-label') || c.getAttribute('title') || '').replace(/\s+/g, ' ').trim().toLowerCase();
         el = candidates.find((c) => textOf(c) === want) || candidates.find((c) => textOf(c).includes(want));
         if (!el) return { error: 'Nothing clickable on the page says “' + args.text + '”.' };
       }
