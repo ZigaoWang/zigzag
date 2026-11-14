@@ -5,10 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- The hidden sidebar no longer flickers as it slides out or back: it could show for one frame where it was headed, out or gone, before sliding there, which looked like it opened, closed and opened again. ([#206](https://github.com/ZigaoWang/zigzag/issues/206))
-- A page's button that opens an app, like claude.ai's Open Claude after signing in, always asks when you click it, even right after an earlier question from the page was put off.
-
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
@@ -73,6 +69,8 @@ Split view with up to four pages, sites installed as apps of their own, the side
 - In Change Icon, the first choice shows the site's own icon, so it's clear that it puts the site's icon back.
 
 ### Fixed
+- The hidden sidebar no longer flickers as it slides out or back: it could show for one frame where it was headed, out or gone, before sliding there, which looked like it opened, closed and opened again. ([#206](https://github.com/ZigaoWang/zigzag/issues/206))
+- A page's button that opens an app, like claude.ai's Open Claude after signing in, always asks when you click it, even right after an earlier question from the page was put off.
 - Web apps hear their keyboard shortcuts before Zigzag's menus, as in Safari and Chrome: ⌘A and ⌘B in Google Docs, ⌘K in Slack, Linear and Notion, ⌘[ to indent, and the rest. Only the browser's own keys stay Zigzag's whatever the page wants (new and closed tabs, windows, the address, reload, spaces, quitting), and shortcuts you changed in Settings › Shortcuts stay the browser's on their new keys. ([#219](https://github.com/ZigaoWang/zigzag/issues/219))
 - A page's own Print button works, as in Safari: a school report card's or a receipt's Print brings up the print panel on the window, as ⌘P does, and the page waits until you've printed or canceled.
 - Zigzag Mini has Site Controls, the same button as by a browser window's address, at the right of its strip before Keep on Top, so you can turn Dark page on or off for a site, set its zoom, ad blocking or permissions, and clear its data, without opening the page in a browser window first. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#225](https://github.com/ZigaoWang/zigzag/issues/225))
