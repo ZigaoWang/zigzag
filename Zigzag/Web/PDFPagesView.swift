@@ -569,21 +569,29 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
     private var running: Set<Job> = []
     private static let maxRunning = 2
     private var whenReady: [() -> Void] = []
+    /// Jobs the helper answered with nothing (a piece it wouldn't draw): not asked again until the pages are shown
+    /// at another scale or the other way (light or dark), when they're new jobs anyway.
+    private var emptyJobs: Set<Job> = []
+    private var emptyFor: (level: Int, dark: Bool)?
 
     /// Works out what the screen needs, nearest first, and asks for it; whatever was waiting and isn't needed now is
     /// never asked for.
     func refresh() {
         guard let document, !document.hasFailed, !pageSizes.isEmpty, window != nil || !whenReady.isEmpty else { queue = []; return }
+        let level = self.level, dark = isDark
+        if emptyFor?.level != level || emptyFor?.dark != dark {
+            emptyJobs = []
+            emptyFor = (level, dark)
+        }
         var jobs: [Job] = []
         var seen: Set<Job> = []
-        func add(_ job: Job) { if !running.contains(job), seen.insert(job).inserted { jobs.append(job) } }
+        func add(_ job: Job) { if !running.contains(job), !emptyJobs.contains(job), seen.insert(job).inserted { jobs.append(job) } }
         let shown = visible
         let near = shown.insetBy(dx: -shown.width / 2, dy: -shown.height * 0.75)
         let center = CGPoint(x: shown.midX, y: shown.midY)
         let onScreen = pageLayout.pages(in: shown).sorted {
             abs(pageLayout.frames[$0].midY - center.y) < abs(pageLayout.frames[$1].midY - center.y)
         }
-        let level = self.level, dark = isDark
         // A quick small picture of each page first, while the sharp one comes; then the sharp ones; then the text.
         for page in onScreen where thumbnails[ThumbKey(page: page, dark: dark)] == nil && !isCovered(page, in: shown, level: level) {
             add(.thumbnail(page: page, dark: dark))
@@ -659,7 +667,7 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
             let last = chunkRect(page: page, level: level, column: columns.upperBound, row: rows.upperBound)
             let rect = first.union(last)
             let pixels = CGFloat(level) / 64
-            guard let image = await document.render(page: page, rect: rect, scale: pixels, dark: dark) else { return }
+            guard let image = await document.render(page: page, rect: rect, scale: pixels, dark: dark) else { emptyJobs.insert(job); return }
             // Cut into its pieces, each kept on its own.
             for row in rows {
                 for column in columns {
@@ -675,7 +683,10 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
             let size = pageSizes[page]
             let backing = window?.backingScaleFactor ?? 2
             let pixels = min(Self.thumbnailWidth * backing / size.width, 1024 / max(size.width, size.height) * backing, PDFLimits.maxScale)
-            guard let image = await document.render(page: page, rect: CGRect(origin: .zero, size: size), scale: pixels, dark: dark) else { return }
+            guard let image = await document.render(page: page, rect: CGRect(origin: .zero, size: size), scale: pixels, dark: dark) else {
+                emptyJobs.insert(job)
+                return
+            }
             thumbnails[ThumbKey(page: page, dark: dark)] = (image, tick())
             if thumbnails.count > Self.thumbnailLimit, let oldest = thumbnails.min(by: { $0.value.used < $1.value.used }) {
                 thumbnails[oldest.key] = nil
@@ -1046,21 +1057,41 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
     // MARK: Find
 
     private var findStrings: [String]?
+    private var stringsTask: Task<[String]?, Never>?
     private var findMatches: [(page: Int, range: NSRange)] = []
     private var currentMatch: Int?
     private var pendingFind: (page: Int, range: NSRange)?
+    private var search: Task<[(page: Int, range: NSRange)], Never>?
 
     private func allStrings() async -> [String]? {
         if let findStrings { return findStrings }
-        findStrings = await document?.strings()
-        return findStrings
+        // One asking for everyone waiting: each keystroke of a search doesn't ask the helper again.
+        if let stringsTask { return await stringsTask.value }
+        guard let document else { return nil }
+        let task = Task { @MainActor in await document.strings() }
+        stringsTask = task
+        let strings = await task.value
+        stringsTask = nil
+        findStrings = strings
+        return strings
     }
 
-    /// Every match of `query` in the PDF, case and accents aside.
+    /// Every match of `query` in the PDF, case and accents aside, looked for off the main thread. A newer query
+    /// stops the one before, which comes back empty.
     func matches(of query: String) async -> [(page: Int, range: NSRange)] {
+        search?.cancel()
+        search = nil
         guard !query.isEmpty, let strings = await allStrings() else { return [] }
+        let task = Task.detached(priority: .userInitiated) { Self.matches(of: query, in: strings) }
+        search = task
+        return await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
+    }
+
+    /// Every match of `query` in `strings`, by page; empty once its task is cancelled.
+    nonisolated static func matches(of query: String, in strings: [String]) -> [(page: Int, range: NSRange)] {
         var found: [(page: Int, range: NSRange)] = []
         for (page, string) in strings.enumerated() {
+            if Task.isCancelled { return [] }
             let text = string as NSString
             var from = 0
             while from < text.length {
@@ -1070,7 +1101,7 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
                 from = NSMaxRange(range)
             }
         }
-        return found
+        return Task.isCancelled ? [] : found
     }
 
     func showMatches(_ matches: [(page: Int, range: NSRange)], current: Int?) {
