@@ -111,13 +111,28 @@ final class ExtensionSheet: FloatingPanelView {
     @discardableResult
     static func present(_ content: Content, in controller: BrowserWindowController,
                         onConfirm: @escaping () -> Void, onCancel: @escaping () -> Void = {}) -> ExtensionSheet {
+        present(content, over: controller.root.overlay, card: controller.root.cardFrame, onConfirm: onConfirm, onCancel: onCancel)
+    }
+
+    /// The same over any view of a window (a window that isn't a browser window, like one Settings shows in), at
+    /// the top of it.
+    @discardableResult
+    static func present(_ content: Content, over host: NSView,
+                        onConfirm: @escaping () -> Void, onCancel: @escaping () -> Void = {}) -> ExtensionSheet {
+        present(content, over: host, card: host.bounds, onConfirm: onConfirm, onCancel: onCancel)
+    }
+
+    private static func present(_ content: Content, over host: NSView, card: NSRect,
+                                onConfirm: @escaping () -> Void, onCancel: @escaping () -> Void) -> ExtensionSheet {
         current?.finish(confirmed: false)
         let sheet = ExtensionSheet(content)
         sheet.onConfirm = onConfirm
         sheet.onCancel = onCancel
-        let card = controller.root.cardFrame
-        sheet.frame.origin = NSPoint(x: round(card.midX - width / 2), y: card.minY + Tokens.Space.x6)
-        controller.root.overlay.addSubview(sheet)
+        let top = host.isFlipped ? card.minY + Tokens.Space.x6 : card.maxY - Tokens.Space.x6 - sheet.frame.height
+        sheet.frame.origin = NSPoint(x: round(card.midX - width / 2), y: top)
+        // Kept at the top, centered, as the window resizes.
+        if !host.isFlipped { sheet.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin] }
+        host.addSubview(sheet)
         sheet.needsLayout = true
         sheet.present()
         current = sheet

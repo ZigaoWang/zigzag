@@ -1911,7 +1911,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// The sheet that asks before adding an extension, for one read from a folder: what it will be able to do, and
     /// Add or Cancel. One that can't be read goes straight on, to say it couldn't load.
     private func confirmUnpacked(_ folder: URL, from appName: String?, install: @escaping @MainActor () async -> Void) {
-        guard #available(macOS 15.4, *), let controller = browser else { return }
+        // On the window Settings is in, whatever it is: never another window (a private one, another profile's).
+        guard #available(macOS 15.4, *), let window, let host = window.contentView else { return }
         Task { @MainActor in
             guard let (info, report) = await ExtensionStore.reviewUnpacked(folder) else { await install(); return }
             let content = ExtensionSheet.Content(
@@ -1924,8 +1925,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 report: report,
                 confirm: String(localized: "Add Extension", comment: "Button that adds the extension, in the sheet that asks first."),
                 cancel: String(localized: "Cancel", comment: "Button that closes a sheet without doing anything."))
-            controller.window?.makeKeyAndOrderFront(nil)
-            ExtensionSheet.present(content, in: controller, onConfirm: { Task { @MainActor in await install() } })
+            guard let window = self.window else { return }
+            window.makeKeyAndOrderFront(nil)
+            let confirmed = { Task { @MainActor in await install() } }
+            if let controller = window.windowController as? BrowserWindowController {
+                ExtensionSheet.present(content, in: controller, onConfirm: { _ = confirmed() })
+            } else {
+                ExtensionSheet.present(content, over: host, onConfirm: { _ = confirmed() })
+            }
         }
     }
 
