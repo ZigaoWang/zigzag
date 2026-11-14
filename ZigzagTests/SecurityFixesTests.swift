@@ -539,6 +539,57 @@ struct PasswordSafetyTests {
         #expect(await value("billing", in: webView) == "")
     }
 
+    /// Your card goes only into fields you'd see: not a sliver, not faded out, and only the form you're in.
+    @Test func myCardSkipsFieldsYouWouldntSee() async throws {
+        let (webView, _, _) = await page("""
+        <form><input id="name" name="first_name"><input id="tiny" name="email" style="width:15px;height:8px;padding:0;border:0">
+        <div style="opacity:0.3"><input id="faded" name="phone"></div></form>
+        <form><input id="other" name="email"></form>
+        """)
+        try await fillMyCard(webView, focusing: "name")
+        #expect(await value("name", in: webView) == "Ada")
+        #expect(await value("tiny", in: webView) == "")
+        #expect(await value("faded", in: webView) == "")
+        // Another form on the page: not the one you're in.
+        #expect(await value("other", in: webView) == "")
+    }
+
+    /// A field in no form: just that field, never every field on the page.
+    @Test func myCardWithNoFormFillsOnlyYourField() async throws {
+        let (webView, _, _) = await page("""
+        <input id="name" name="first_name"><input id="email" name="email"><form><input id="inForm" name="phone"></form>
+        """)
+        try await fillMyCard(webView, focusing: "name")
+        #expect(await value("name", in: webView) == "Ada")
+        #expect(await value("email", in: webView) == "")
+        #expect(await value("inForm", in: webView) == "")
+    }
+
+    /// What the page looks like after a sign-in, as the password watcher reads it.
+    private func passwordState(_ html: String, scrollTo: Double = 0) async throws -> [String: Any]? {
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController.addUserScript(PasswordCapture.script)
+        let (webView, _, _) = await page(html, configuration: configuration)
+        if scrollTo > 0 { _ = try await webView.evaluateJavaScript("window.scrollTo(0, \(scrollTo))") }
+        return try await webView.callAsyncJavaScript("return window.__zigzagPasswordState()", arguments: [:], in: nil, contentWorld: .defaultClient) as? [String: Any]
+    }
+
+    /// A sign-in form only scrolled away, or greyed out while the site answers, is still there: the sign-in hasn't
+    /// gone through. One taken away, or pushed off the page, has gone.
+    @Test func aFormScrolledAwayOrDisabledHasntGone() async throws {
+        let scrolled = try await passwordState("""
+        <form><input id="p" type="password" value="typed"></form><div style="height:3000px"></div>
+        """, scrollTo: 2000)
+        #expect(scrolled?["form"] as? Bool == true)
+        #expect(scrolled?["filled"] as? Bool == true)
+        let disabled = try await passwordState("<form><input id='p' type='password' value='typed' disabled></form>")
+        #expect(disabled?["form"] as? Bool == true)
+        let pushedOff = try await passwordState("<form><input id='p' type='password' style='position:absolute;left:-9999px'></form>")
+        #expect(pushedOff?["form"] as? Bool == false)
+        let removed = try await passwordState("<form><input id='p' type='password' style='display:none'></form>")
+        #expect(removed?["form"] as? Bool == false)
+    }
+
     /// What the password watcher tells Zigzag, by kind.
     private final class Heard: NSObject, WKScriptMessageHandler {
         var kinds: [String] = []

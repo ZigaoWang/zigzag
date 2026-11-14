@@ -764,17 +764,23 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     // Checked here, at the moment of filling: only the site the card was offered on gets it.
     if (location.origin !== expectedOrigin) return 0;
     const active = document.activeElement;
-    const scope = (active && active.form) || document;
-    // Your phone and address go only where you can see them land: on screen now (a field far down the page is
-    // one you'd never notice filled), not clipped away inside a tiny box, and not covered by something else.
+    // Your phone and address go only where you can see them land: the field you're in, and the others of its form
+    // (with no form, just that field), at a size you'd see (not a sliver), on screen now (a field far down the page
+    // is one you'd never notice filled), not faded out, not clipped away inside a tiny box, and not covered by
+    // something else.
     const visible = (el) => {
       if (el.disabled || el.readOnly || el.type === 'hidden') return false;
       const r = el.getBoundingClientRect();
-      if (r.width < 8 || r.height < 8) return false;
-      if (r.right < 0 || r.left > innerWidth || r.bottom < 0 || r.top > innerHeight) return false;
+      if (r.width < 20 || r.height < 10) return false;
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      if (cx < 0 || cx > innerWidth || cy < 0 || cy > innerHeight) return false;
       if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
       const style = getComputedStyle(el);
-      if (style.visibility !== 'visible' || parseFloat(style.opacity) < 0.1) return false;
+      if (style.visibility !== 'visible') return false;
+      // Its own opacity and every box's around it: what you'd see of it.
+      let opacity = 1;
+      for (let box = el; box; box = box.parentElement) opacity *= parseFloat(getComputedStyle(box).opacity);
+      if (opacity < 0.5) return false;
       for (let box = el.parentElement; box && box !== document.body; box = box.parentElement) {
         const o = getComputedStyle(box);
         const overflow = o.overflow + o.overflowX + o.overflowY;
@@ -785,8 +791,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         const w = Math.min(r.right, b.right) - Math.max(r.left, b.left), h = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top);
         if (w < 8 || h < 8) return false;
       }
-      const x = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1), y = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
-      const hit = document.elementFromPoint(x, y);
+      const hit = document.elementFromPoint(Math.min(cx, innerWidth - 1), Math.min(cy, innerHeight - 1));
       if (hit && hit !== el && !el.contains(hit) && !(hit.control === el)) return false;
       return true;
     };
@@ -826,10 +831,12 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       el.value = option.value;
       el.dispatchEvent(new Event('change', { bubbles: true }));
     };
+    if (!active || !['INPUT', 'SELECT'].includes(active.tagName) || !visible(active)) return 0;
+    const fields = active.form ? [...active.form.elements].filter((el) => ['INPUT', 'SELECT'].includes(el.tagName)) : [active];
     window.__zigzagFilling = true;
     let filled = 0;
     try {
-      for (const el of [...scope.querySelectorAll('input, select')].filter((el) => visible(el) && section(el) === here)) {
+      for (const el of fields.filter((el) => visible(el) && section(el) === here)) {
         const key = guess(el);
         if (!key) continue;
         if (el.tagName === 'SELECT') {
