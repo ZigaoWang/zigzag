@@ -425,6 +425,57 @@ extension MCPServerTests {
         #expect(count > 0 && String(decoding: buffer[0..<max(count, 0)], as: UTF8.self).hasPrefix("HTTP/1.1 200"))
     }
 
+    /// The first answer on a connection, without waiting for it to close.
+    private static func firstAnswer(_ connection: RawConnection) -> String {
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        let count = recv(connection.socket, &buffer, buffer.count, 0)
+        return String(decoding: buffer[0..<max(count, 0)], as: UTF8.self)
+    }
+
+    /// A 404 to a request with the key (a session that ended, a method Zigzag doesn't have) is an answer: the app's
+    /// connection stays for its next request.
+    @Test func aNotFoundWithTheKeyKeepsTheConnection() async throws {
+        let server = MCPServer(port: 0, endpoint: endpoint())
+        server.start()
+        defer { server.stop() }
+        let port = try #require(await server.waitUntilReady())
+        let app = try #require(RawConnection(port: port))
+        let body = #"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#
+        app.send("POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nAuthorization: Bearer \(Self.token)\r\n"
+                 + "Mcp-Session-Id: ended\r\nContent-Length: \(body.utf8.count)\r\n\r\n" + body)
+        let answer = Self.firstAnswer(app)
+        #expect(answer.hasPrefix("HTTP/1.1 404") && !answer.contains("Connection: close"))
+        #expect(app.readToEnd() == nil)
+    }
+
+    nonisolated struct SlowRunner: MCPToolRunner {
+        var tools: [JSON] { [["name": "slow", "inputSchema": ["type": "object"]]] }
+        func call(_ name: String, arguments: [String: JSON], client: MCPClient) async -> MCPToolResult {
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            return .text("done")
+        }
+    }
+
+    /// An app whose tool call takes a while counts as keyed from the moment its key is accepted: connections that
+    /// never send the key can't push it out mid-call.
+    @Test func aLongToolCallIsNeverPushedOut() async throws {
+        let server = MCPServer(port: 0, endpoint: MCPEndpoint(token: Self.token, runner: SlowRunner(), serverVersion: "1.0"))
+        server.start()
+        defer { server.stop() }
+        let port = try #require(await server.waitUntilReady())
+        let app = try #require(RawConnection(port: port))
+        let body = #"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"slow","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}"#
+        app.send("POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nAuthorization: Bearer \(Self.token)\r\n"
+                 + "MCP-Protocol-Version: 2026-07-28\r\nMcp-Method: tools/call\r\nMcp-Name: slow\r\nContent-Length: \(body.utf8.count)\r\n\r\n" + body)
+        try await Task.sleep(nanoseconds: 200_000_000)
+        var idle: [RawConnection] = []
+        for _ in 0...MCPServer.maxKeylessConnections {
+            idle.append(try #require(RawConnection(port: port)))
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        #expect(Self.firstAnswer(app).hasPrefix("HTTP/1.1 200"))
+    }
+
     @Test func aTakenPortSaysSoAndReplacesTheKey() async throws {
         let holder = MCPServer(port: 0, endpoint: endpoint())
         holder.start()

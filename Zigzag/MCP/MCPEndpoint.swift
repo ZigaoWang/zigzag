@@ -255,7 +255,9 @@ nonisolated final class MCPEndpoint: @unchecked Sendable {
 
     // MARK: Requests
 
-    func handle(_ request: HTTPRequest) async -> HTTPResponse {
+    /// `authorized` is called the moment the key is accepted, before the request is worked on: the connection
+    /// counts as an app's from then on, however long a tool takes.
+    func handle(_ request: HTTPRequest, authorized: () -> Void = {}) async -> HTTPResponse {
         // From a web page (DNS rebinding) or sent to an address other than this Mac's: refused before anything else.
         guard MCPAccess.originAllowed(request.header("origin")), MCPAccess.hostAllowed(request.header("host")) else {
             return .json(403, RPCError.response(id: nil, code: RPCError.invalidRequest, message: "Forbidden: requests must come from this Mac, not a web page."))
@@ -273,6 +275,7 @@ nonisolated final class MCPEndpoint: @unchecked Sendable {
                                                 message: "Unauthorized. Send the key from Zigzag's Settings › Automation as Authorization: Bearer <key>."),
                          headers: [("WWW-Authenticate", "Bearer")])
         }
+        authorized()
         switch request.method {
         case "POST": return await post(request)
         case "DELETE":
