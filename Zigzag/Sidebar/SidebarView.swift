@@ -807,8 +807,7 @@ final class SidebarView: NSView {
             dots.forEach { $0.isHidden = isPrivate }
         }
     }
-    /// A hairline over the list: under the favorites, always, so they and the space's tabs read as two parts of the
-    /// sidebar (#210); without favorites, only while the list is scrolled under it.
+    /// A hairline on the list's top edge, only while the list is scrolled under it, as a scroll edge does on the Mac.
     private let topSeparator = ColorView(color: Tokens.Color.separator)
     /// A hairline at the list's foot, over the bottom bar, only while tabs run on under it, as a scroll edge does
     /// on the Mac (#210).
@@ -957,7 +956,7 @@ final class SidebarView: NSView {
     }
 
     private func updateTopSeparator() {
-        let shows = !favorites.isHidden || scrollView.contentView.bounds.minY > 1
+        let shows = scrollView.contentView.bounds.minY > 1
         if (topSeparator.alphaValue > 0) != shows {
             Tokens.Motion.animate(Tokens.Motion.feedback) { self.topSeparator.animator().alphaValue = shows ? 1 : 0 }
         }
@@ -1028,9 +1027,7 @@ final class SidebarView: NSView {
         nowPlaying.frame = frames.nowPlaying
         let listBottom = frames.listBottom
         scrollView.frame = NSRect(x: pad + swipeOffset, y: listTop, width: width - pad * 2, height: listBottom - listTop)
-        // Under the favorites, halfway down the gap to the list; without them, on the list's top edge.
-        let separatorY = favoritesHeight > 0 ? round(favorites.frame.maxY + (listTop - favorites.frame.maxY) / 2) : listTop - Tokens.Metric.hairline
-        topSeparator.frame = NSRect(x: pad * 2, y: separatorY, width: width - pad * 4, height: Tokens.Metric.hairline)
+        topSeparator.frame = NSRect(x: pad * 2, y: listTop - Tokens.Metric.hairline, width: width - pad * 4, height: Tokens.Metric.hairline)
         bottomSeparator.frame = NSRect(x: pad * 2, y: listBottom, width: width - pad * 4, height: Tokens.Metric.hairline)
         updateTopSeparator()
         if list.frame.width != scrollView.contentSize.width {

@@ -30,9 +30,9 @@ to touch. Warm and friendly, never techy: no monospace, no capitals for effect, 
   separate warm or orange accent anywhere.
 - **Small details that work:** the space dots, the one you're in stretched into a short pill; the selected card's top edge catching the light by one pixel at night (`Chrome.rim`, `setCardRim`; by day the card is too near white for a lit edge to read at 1x, so it has none); a
   hairline under the toolbar only while the list is scrolled under it.
-- **Two faint hairlines in the sidebar** (`Color.separator`, 12pt in from each side, #210): one halfway between the
-  favorites and the list, always there with favorites (without them, the list's top edge only while it's scrolled),
-  and one at the list's foot over the bottom bar, fading in only while tabs run on under it, as a scroll edge does.
+- **Scroll edges in the sidebar** (`Color.separator`, 12pt in from each side): a hairline on the list's top edge only
+  while it's scrolled, and one at its foot over the bottom bar only while tabs run on under it. Nothing divides the
+  favorites from the list; the space between them does.
 - **Edges.** The sidebar has three, and everything sits on one of them: the container edge (6pt: the address field,
   the favorites, the cards), the icon column (12pt: the traffic lights, the address's host, every icon, the
   "Tabs" label, and the space's name, whose ink is pulled back by its side bearing to meet it), and the text column
@@ -155,8 +155,8 @@ A 4pt grid (`Space.x1`...`x16`). Rhythm:
   lights, every icon and the "Tabs" label at 12, every title at 36. The address 40pt from the top, the favorites 8pt
   under it, the list 12pt (`Sidebar.sectionGap`) under them.
 - Sections are separated by space and a quiet label, low in its slot (`Metric.sectionLabelHeight`, 32, on pages and
-  panels; `Sidebar.labelHeight`, 24, in the sidebar's compact scale), not by divider lines; the sidebar's two faint
-  hairlines (favorites over the list, the scroll edge over the bottom bar) are the only ones.
+  panels; `Sidebar.labelHeight`, 24, in the sidebar's compact scale), not by divider lines; the sidebar's scroll edges
+  are the only ones.
 - Panels: 12pt padding (`Space.x3`), 4pt inset for rows inside them so a row's corners run with the panel's.
 - Pages: `Tokens.Page` (gutter 28, header 16 + 28 + 12, max width 880). Grouped rows are at least 44 tall with 16pt
   (`groupPad`) from the group's edge and 12pt (`groupRowPad`) above and below their two lines; list rows are 34.
