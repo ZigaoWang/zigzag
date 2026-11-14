@@ -1107,7 +1107,7 @@ final class BridgeIdentity: NSObject, BridgeNamespace, WKNavigationDelegate, NSW
         if interactive {
             let made = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 640), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
             made.title = String(localized: "Sign In for \(host.displayName(for: extensionID))", comment: "Title of the window where an extension signs in to an account. The placeholder is the extension's name.")
-            made.subtitle = url.host() ?? ""
+            made.subtitle = Self.shownAddress(url)
             made.contentView = webView
             made.isReleasedWhenClosed = false
             made.delegate = self
@@ -1153,6 +1153,19 @@ final class BridgeIdentity: NSObject, BridgeNamespace, WKNavigationDelegate, NSW
         guard let flow = flows[ObjectIdentifier(webView)], let url = webView.url, url.scheme == "https",
               url.host()?.lowercased() == "\(flow.extensionID).chromiumapp.org" else { return }
         end(webView, .success(url))
+    }
+
+    /// The window says which site its page is on now, as the sign-in moves from site to site, so a page can't pass
+    /// for the provider it was sent to.
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        flows[ObjectIdentifier(webView)]?.window?.subtitle = Self.shownAddress(webView.url)
+    }
+
+    /// The site of an address, as the sign-in window shows it: the host for a secure page, the scheme too otherwise.
+    static func shownAddress(_ url: URL?) -> String {
+        guard let url, let host = url.host(), !host.isEmpty else { return url?.scheme.map { "\($0):" } ?? "" }
+        let port = url.port.map { ":\($0)" } ?? ""
+        return url.scheme?.lowercased() == "https" ? host + port : "\(url.scheme ?? "")://\(host)\(port)"
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {

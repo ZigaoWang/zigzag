@@ -513,3 +513,14 @@ extension ExtensionSecurityTests {
         #expect(ExtensionHost.migratedGrants(["storage", "nativeMessaging"], declared: []) == ["storage"])
     }
 }
+
+extension ExtensionSecurityTests {
+    /// The sign-in window names the site its page is on now.
+    @Test func signInWindowsShowTheSite() {
+        #expect(BridgeIdentity.shownAddress(URL(string: "https://accounts.example.com/o/oauth2?x=1")) == "accounts.example.com")
+        #expect(BridgeIdentity.shownAddress(URL(string: "https://login.example:8443/")) == "login.example:8443")
+        #expect(BridgeIdentity.shownAddress(URL(string: "http://login.example/")) == "http://login.example")
+        #expect(BridgeIdentity.shownAddress(URL(string: "about:blank")) == "about:")
+        #expect(BridgeIdentity.shownAddress(nil) == "")
+    }
+}
