@@ -13,6 +13,14 @@ enum PopupNotice {
         return SitePermissions.action(PermissionSubject.popups, origin: origin)
     }
 
+    /// Where the page at `origin` already said its pop-ups should go "this time", if it said so: a page that asks
+    /// again on its own (a second `window.open` while the first is still loading, a retry) is not asked twice. Nil
+    /// when it hasn't, in a private window, or with no site to key the answer to — none of which keeps one.
+    static func pageAction(tab: Tab?, origin: String?, isPrivate: Bool) -> String? {
+        guard !isPrivate, let origin else { return nil }
+        return tab?.permissionAnswers.action(key: origin, kind: PermissionSubject.popups)
+    }
+
     /// WebKit's own record of whether a click or a key started it (not public API, but long-standing); without
     /// it, whether the last thing you did was a click or a key a moment ago.
     static func isUserInitiated(_ action: WKNavigationAction) -> Bool {
@@ -31,8 +39,7 @@ enum PopupNotice {
         guard let host, let url else { return }
         // What this page already answered "this time" holds, so a page that asks again on its own (a second
         // `window.open` while the first is still loading, a retry) is not asked twice.
-        if !isPrivate, let origin,
-           let kept = tab?.permissionAnswers.action(key: origin, kind: PermissionSubject.popups) {
+        if let kept = pageAction(tab: tab, origin: origin, isPrivate: isPrivate) {
             open(url, action: kept, from: tab, in: host)
             return
         }

@@ -315,6 +315,22 @@ import WebKit
         PopupNotice.open(popup, action: "deny", from: tab, in: host)
         #expect(recorder.opened.isEmpty, "a refused pop-up opens nowhere")
     }
+
+    /// A page that asks again on its own is held to the answer it already gave "this time" — no second question — and
+    /// nothing is read back in a private window or with no site to key the answer to, where nothing is kept.
+    @Test func aPagesOwnThisTimePopUpAnswerIsReadBack() {
+        let origin = "https://example.com"
+        let tab = Tab(url: URL(string: origin + "/"), spaceID: UUID())
+        #expect(PopupNotice.pageAction(tab: tab, origin: origin, isPrivate: false) == nil, "nothing answered yet")
+        tab.permissionAnswers.note("mini", key: origin, kind: PermissionSubject.popups)
+        #expect(PopupNotice.pageAction(tab: tab, origin: origin, isPrivate: false) == "mini")
+        // The answer is the page's own: another site on it is asked separately.
+        #expect(PopupNotice.pageAction(tab: tab, origin: "https://other.com", isPrivate: false) == nil)
+        // A private window keeps nothing, and neither does a page with no site or no tab.
+        #expect(PopupNotice.pageAction(tab: tab, origin: origin, isPrivate: true) == nil)
+        #expect(PopupNotice.pageAction(tab: tab, origin: nil, isPrivate: false) == nil)
+        #expect(PopupNotice.pageAction(tab: nil, origin: origin, isPrivate: false) == nil)
+    }
 }
 
 /// The tab that asked a pop-up's question, recording what its host was told to open.
