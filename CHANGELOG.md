@@ -5,9 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-## [0.9.0] - 2026-11-12
+## [0.9.0] - 2026-11-14
 
-Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
+Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, Site Controls is rebuilt, and pictures and PDFs from websites are read in sandboxed helpers.
 
 ### New
 - The Now Playing card at the bottom of the sidebar can be hidden: point at it and click the close button at its end, or right-click it for Hide. The tab keeps playing, and the card comes back when that tab moves on to another page, or for another tab that starts playing. The card is laid out as a tab's row now, the same height, columns and buttons, and follows Settings › Appearance › Sidebar size. ([#223](https://github.com/ZigaoWang/zigzag/issues/223))
@@ -1134,8 +1134,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.8.6...HEAD
-[0.9.0]: https://github.com/ZigaoWang/zigzag/compare/v0.8.6...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/ZigaoWang/zigzag/compare/v0.8.6...v0.9.0
 [0.8.6]: https://github.com/ZigaoWang/zigzag/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/ZigaoWang/zigzag/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/ZigaoWang/zigzag/compare/v0.8.3...v0.8.4
