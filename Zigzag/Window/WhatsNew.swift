@@ -513,10 +513,20 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
 
     override func layout() {
         super.layout()
-        let maxHeight = bounds.height - Tokens.Space.x12
+        // Over the page, as the window's other sheets are (an extension's, Install as App's): never across the bar
+        // above it, where the address and the developer tools are.
+        let page = pageFrame
+        let maxHeight = page.height - Tokens.Space.x12
         let height = min(headerHeight + notesHeight() + footerHeight, maxHeight)
-        panel.frame = NSRect(x: round((bounds.width - width) / 2), y: round(max(Tokens.Space.x6, (bounds.height - height) / 2.4)),
+        panel.frame = NSRect(x: round(page.midX - width / 2), y: round(page.minY + max(Tokens.Space.x6, (page.height - height) / 2.4)),
                              width: width, height: height)
+    }
+
+    /// Where the page is in the window, in this view's terms: the whole window when there's no page to go by.
+    private var pageFrame: NSRect {
+        guard let root = controller?.root, root.window === window else { return bounds }
+        let card = convert(root.cardFrame, from: root)
+        return card.width >= width + Tokens.Space.x6 * 2 && card.height > Tokens.Space.x12 * 2 ? card : bounds
     }
 
     private let iconSize: CGFloat = 52
