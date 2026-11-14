@@ -114,7 +114,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@和 %2$@"
+            "value" : "%1$@ 和 %2$@"
           }
         }
       }
@@ -582,7 +582,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@在 Zigzag 里用不了。"
+            "value" : "%@ 在 Zigzag 里用不了。"
           }
         }
       }
@@ -1910,7 +1910,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI 应用现在不能使用 Zigzag 了。可在“设置 › 自动化”中重新打开。"
+            "value" : "AI App 现在不能使用 Zigzag 了。可在“设置 › 自动化”中重新打开。"
           }
         }
       }
@@ -2400,7 +2400,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "关闭一个已跳转到其他页面（比如新对话）的固定标签页后。"
+            "value" : "固定标签页跳到了别的页面（比如新对话）时，关闭它会提示你。"
           }
         }
       }
@@ -2411,7 +2411,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在你登录之后。存储在你的钥匙串中，并通过 iCloud 同步。"
+            "value" : "登录后提示。存储在钥匙串中，并通过 iCloud 同步。"
           }
         }
       }
@@ -2631,7 +2631,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "一个 AI 应用正在使用此标签页"
+            "value" : "一个 AI App 正在使用此标签页"
           }
         }
       }
@@ -2675,7 +2675,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "应用图标"
+            "value" : "App 图标"
           }
         }
       }
@@ -2686,7 +2686,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "应用名称"
+            "value" : "App 名称"
           }
         }
       }
@@ -2708,7 +2708,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "应用会在 Authorization 请求头中发送它。重设密钥后，所有已连接的应用都会断开。"
+            "value" : "App 会在 Authorization 请求头中发送它。重设密钥后，所有已连接的 App 都会断开。"
           }
         }
       }
@@ -2719,7 +2719,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你通过 MCP 连接的应用（仅限这台 Mac）可以打开、读取和操作你的标签页。不包括无痕浏览窗口、密码和 Zigzag 自己的页面。"
+            "value" : "你通过 MCP 连接的 App（仅限这台 Mac）可以打开、读取和操作你的标签页。不包括无痕浏览窗口、密码和 Zigzag 自己的页面。"
           }
         }
       }
@@ -2967,7 +2967,7 @@
       }
     },
     "Back" : {
-      "comment" : "Button of a step in the welcome window: the step before.\nHidden View menu item, named in Settings › Shortcuts.\nTooltip of a button in the strip on top of each page of a split view: goes back.\nTooltip of the back button on a page of the site panel.\nTooltip of the sidebar's back button.\nView menu item.",
+      "comment" : "Hidden View menu item, named in Settings › Shortcuts.\nTooltip of a button in the strip on top of each page of a split view: goes back.\nTooltip of the back button on a page of the site panel.\nTooltip of the sidebar's back button.\nView menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -3865,7 +3865,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选取“显示”>“显示所有标签页”"
+            "value" : "选取“显示 › 显示所有标签页”"
           }
         }
       }
@@ -4743,7 +4743,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "连接应用"
+            "value" : "连接 App"
           }
         }
       }
@@ -5255,7 +5255,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法启动。端口 %lld 已被其他应用占用，所以 Zigzag 生成了新的密钥。请把新密钥交给你的 AI 应用。"
+            "value" : "无法启动。端口 %lld 已被其他 App 占用，所以 Zigzag 生成了新的密钥。请把新密钥交给你的 AI App。"
           }
         }
       }
@@ -5266,7 +5266,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法启动。端口 %lld 可能已被其他应用占用。"
+            "value" : "无法启动。端口 %lld 可能已被其他 App 占用。"
           }
         }
       }
@@ -6937,7 +6937,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "全屏幕视频填满"
+            "value" : "全屏视频铺满"
           }
         }
       }
@@ -7604,7 +7604,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "安装为应用"
+            "value" : "安装为 App"
           }
         }
       }
@@ -7615,7 +7615,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "安装为应用…"
+            "value" : "安装为 App…"
           }
         }
       }
@@ -7648,7 +7648,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已安装的应用"
+            "value" : "已安装的 App"
           }
         }
       }
@@ -7747,7 +7747,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "它会有自己的窗口和程序坞图标，登录状态和这里一样。"
+            "value" : "它有自己的窗口和程序坞图标，登录状态与这里相同。"
           }
         }
       }
@@ -8321,7 +8321,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "允许 AI 应用使用 Zigzag"
+            "value" : "允许 AI App 使用 Zigzag"
           }
         }
       }
@@ -9224,7 +9224,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新功能"
+            "value" : "新增"
           }
         }
       }
@@ -9950,7 +9950,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "现在关闭"
+            "value" : "目前未开启"
           }
         }
       }
@@ -9961,7 +9961,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "现在打开"
+            "value" : "目前已开启"
           }
         }
       }
@@ -10038,7 +10038,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已为此网站关闭"
+            "value" : "在此网站上关闭"
           }
         }
       }
@@ -10071,7 +10071,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "提示固定跳转后的页面"
+            "value" : "提示固定跳转到的新页面"
           }
         }
       }
@@ -10126,7 +10126,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已为此网站打开"
+            "value" : "在此网站上打开"
           }
         }
       }
@@ -10533,7 +10533,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 %@ 中打开"
+            "value" : "在“%@”中打开"
           }
         }
       }
@@ -10731,7 +10731,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "或者把它粘贴到应用的聊天中，让应用自己完成设置。"
+            "value" : "或者把它粘贴到 App 的聊天中，让 App 自己完成设置。"
           }
         }
       }
@@ -11298,7 +11298,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "粘贴到应用添加 MCP 服务器的地方。大多数应用都接受这种格式。"
+            "value" : "粘贴到 App 添加 MCP 服务器的地方。大多数 App 都接受这种格式。"
           }
         }
       }
@@ -13446,7 +13446,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "替你拒绝网站弹窗索要的 Cookie，只需隐藏的弹窗则直接隐藏。绝不替你同意。"
+            "value" : "替你拒绝网站弹窗要的 Cookie，只用隐藏的弹窗直接隐藏。绝不替你同意。"
           }
         }
       }
@@ -13501,7 +13501,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开后，你在“隐私与安全性 › 自动化”中允许的脚本和应用可以读取和更改你打开的任何网页，无论是否已登录。无痕浏览窗口除外。"
+            "value" : "打开后，你在“隐私与安全性 › 自动化”中允许的脚本和 App 可以读取和更改你打开的任何网页，无论是否已登录。无痕浏览窗口除外。"
           }
         }
       }
@@ -15642,7 +15642,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "应用会从“应用程序”文件夹中删除。你在 Zigzag 中的网站登录状态不受影响。"
+            "value" : "App 会从“应用程序”文件夹中删除。你在 Zigzag 中的网站登录状态不受影响。"
           }
         }
       }
@@ -15895,7 +15895,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "该网站的证书已于 %@ 过期。可能是网站没有续期，或者你 Mac 的日期和时间不正确。"
+            "value" : "该网站的证书已于%@过期。可能是网站没有续期，或者你 Mac 的日期和时间不正确。"
           }
         }
       }
@@ -16071,7 +16071,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此应用要在 Zigzag 中打开，但这台 Mac 上已经没有 Zigzag 了。"
+            "value" : "此 App 要在 Zigzag 中打开，但这台 Mac 上已经没有 Zigzag 了。"
           }
         }
       }
@@ -16247,7 +16247,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此页面为%@"
+            "value" : "这个网页是%@"
           }
         }
       }
@@ -16929,7 +16929,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在登录栏下方，只在每个密码所属的网站上。其中的“密码…”会打开“密码”App 和密码管理器 App。"
+            "value" : "显示在登录框下方，只在密码所属的网站上。点按其中的“密码…”可打开“密码”App 和密码管理器 App。"
           }
         }
       }
@@ -17527,7 +17527,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "使用 Dark Reader，由 Dark Reader Ltd. 开发。"
+            "value" : "基于 Dark Reader（Dark Reader Ltd. 开发）。"
           }
         }
       }
@@ -17858,7 +17858,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "应用能做什么、绝不会碰什么，以及连接不上时可以试试什么。"
+            "value" : "App 能做什么、绝不会碰什么，以及连接不上时可以试试什么。"
           }
         }
       }
@@ -18034,7 +18034,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择“网页”时，全屏幕视频会留在它的标签页里，或分屏浏览中它的那一块。也可以在网站设置里为单个网站选择。"
+            "value" : "选择“网页”时，全屏视频会留在它的标签页里，或分屏里它所在的那一栏。也可以在网站设置里为单个网站选择。"
           }
         }
       }
@@ -19761,6 +19761,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未载入"
+          }
+        }
+      }
+    },
+    "onboarding.back" : {
+      "comment" : "Button of a step in the welcome window: the step before. Not the browser’s Back: in Chinese, the previous step (上一步).",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Back"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一步"
           }
         }
       }

@@ -203,7 +203,7 @@ private final class StepPage: NSView {
     private var dots: [ColorView] = []
     private var title = Onboard.title("")
     private var body = Onboard.subtitle("")
-    private let back = Onboard.quietLight(String(localized: "Back", comment: "Button of a step in the welcome window: the step before."))
+    private let back = Onboard.quietLight(String(localized: "onboarding.back", defaultValue: "Back", comment: "Button of a step in the welcome window: the step before. Not the browser’s Back: in Chinese, the previous step (上一步)."))
     private let next = Onboard.light(String(localized: "Continue", comment: "Main button of a step in the welcome window."))
     private let skip = Onboard.quietLight(String(localized: "Skip", comment: "Button of a step in the welcome window: go on without choosing."))
     private var content = StepContent()
