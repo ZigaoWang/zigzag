@@ -2,8 +2,9 @@ import AppKit
 import WebKit
 
 /// Everything about the page you're on, behind one button by the address (#174). Its first page is short: the site,
-/// a row of quick actions, your extensions to click right there (#215), one line each into Connection (the
-/// certificate) and Permissions (once the site asked), and the few switches that apply to this page. Each of those
+/// with whether its connection is secure in a small line under its name (#221), a row of quick actions, your
+/// extensions to click right there (#215), a line into Permissions (once the site asked), and the few switches that
+/// apply to this page. Each of those
 /// lines opens a page of its own in the same panel, with a way back. Rarer things (installing the site as an app, clearing its cookies or cache) wait in the
 /// ⋯ menu. Changes apply at once.
 final class SitePanel: FloatingPanelView {
@@ -52,10 +53,9 @@ final class SitePanel: FloatingPanelView {
     private let siteLabel = Label.section(String(localized: "This Site", comment: "Section label over the site's settings in the site panel."))
     private var rows: [PanelRow] = []
     private let group = PanelGroup()
-    /// The ways into the panel's pages, one line each with what's there: Connection and Permissions. Only those that
-    /// apply.
-    private var connectionRow: PanelLinkRow?
-    /// Why the connection isn't secure, under its row, when that isn't plain to see (a certificate let through).
+    /// Whether the connection is secure, small under the site's name, and the way into its certificate (#221).
+    private var connectionLine: ConnectionLine?
+    /// Why the connection isn't secure, under the site's name, when that isn't plain to see (a certificate let through).
     private let connectionNote: Label = {
         let label = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
         label.usesSingleLineMode = false
@@ -97,17 +97,17 @@ final class SitePanel: FloatingPanelView {
     static let notSecure = String(localized: "Not secure", comment: "How a page loaded over plain http, or with a certificate you chose to trust anyway, is marked, in the site panel and the address bar's tooltip.")
     static let notSecureSymbol = "lock.open.fill"
 
-    /// What the Connection row says: its one word, whether it warns, and why when that isn't plain to see.
+    /// What the connection line under the site's name says, whether it warns, and why when that isn't plain to see.
     /// `hasCertificate`: the page came with one; Zigzag's own warning in place of a page that didn't load has none,
     /// and is never called secure.
     static func connection(scheme: String?, onlySecureContent: Bool, certificateException: Bool, hasCertificate: Bool = true) -> (value: String, warns: Bool, reason: String?) {
         let https = scheme?.lowercased() == "https"
         if https, certificateException {
-            return (notSecure, true, String(localized: "Its certificate isn’t trusted. You chose to visit it anyway, until you quit Zigzag.", comment: "Under the Connection row of the site panel, on a page whose certificate isn't trusted but you chose Visit this site anyway on the warning."))
+            return (notSecure, true, String(localized: "Its certificate isn’t trusted. You chose to visit it anyway, until you quit Zigzag.", comment: "Under the site's name at the top of the site panel, on a page whose certificate isn't trusted but you chose Visit this site anyway on the warning."))
         }
         if https, !hasCertificate { return (notSecure, true, nil) }
-        if https, onlySecureContent { return (String(localized: "Secure", comment: "On the Connection row of the site panel: the page came over https."), false, nil) }
-        if https { return (String(localized: "Partly secure", comment: "On the Connection row of the site panel: an https page with some parts loaded over plain http."), true, nil) }
+        if https, onlySecureContent { return (String(localized: "Secure connection", comment: "Small, under the site's name at the top of the site panel: the page came over https. Clicking it shows the certificate."), false, nil) }
+        if https { return (String(localized: "Partly secure", comment: "Small, under the site's name at the top of the site panel: an https page with some parts loaded over plain http."), true, nil) }
         return (notSecure, true, nil)
     }
     static let pinTitle = String(localized: "Pin to Address", comment: "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: gives the extension a button in the address bar.")
@@ -162,25 +162,22 @@ final class SitePanel: FloatingPanelView {
         siteName.setAccessibilityValue(named)
         let address = self.url
         if ["http", "https"].contains(address.scheme ?? "") {
-            // The connection, by its one word: secure, or not. Only an https page has a certificate to show; plain
-            // http just says it's not secure. An extension's own page never crosses the network: no row.
-            // A certificate let through on the warning page is not secure, whatever else the page is, and says why.
+            // The connection, in a few words under the site's name: secure, or not. Only an https page has a
+            // certificate to show; plain http just says it's not secure. An extension's own page never crosses the
+            // network: no line. A certificate let through on the warning page is not secure, whatever else the page
+            // is, and says why.
             let connection = Self.connection(scheme: address.scheme, onlySecureContent: tab.webView?.hasOnlySecureContent ?? true,
                                              certificateException: tab.usesCertificateException,
                                              hasCertificate: tab.webView.map { $0.serverTrust != nil } ?? true)
             let opens = address.scheme == "https" && tab.webView?.serverTrust != nil
-            let row = PanelLinkRow(String(localized: "Connection", comment: "Row in the site panel: whether the page's connection is secure. On an https page it opens the site's certificate."),
-                                   value: connection.value, goes: opens) { [weak self] in self?.showCertificate() }
-            row.isEnabled = opens
-            if connection.warns { row.valueColor = Tokens.Color.warning }
-            connectionRow = row
+            connectionLine = ConnectionLine(connection.value, warns: connection.warns, opens: opens) { [weak self] in self?.showCertificate() }
             if let reason = connection.reason {
                 connectionNote.stringValue = reason
                 connectionNote.isHidden = false
             }
         }
         [icon, siteName, siteNameHover, moreButton].forEach { addSubview($0) }
-        if let connectionRow { addSubview(connectionRow) }
+        if let connectionLine { addSubview(connectionLine) }
         if !connectionNote.isHidden { addSubview(connectionNote) }
         let shownSite = site
         pageToken = tab.changed.observe { [weak self, weak tab] change in
@@ -533,7 +530,8 @@ final class SitePanel: FloatingPanelView {
     /// What the panel shows, for checking it without looking: its page, and its rows' names, top to bottom.
     var debugState: [String: Any] {
         ["site": site, "page": page.rawValue, "certificate": certificatePage?.debugState ?? [:],
-         "links": [connectionRow, permissionsRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugTitle),
+         "connection": connectionLine?.debugText ?? "",
+         "links": [permissionsRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugTitle),
          "rows": rows.map(\.debugTitle), "permissions": permissionsGroup.rows.map(\.debugTitle),
          "extensions": extensionsSection?.debugState ?? [:],
          "zoom": zoomStepper.map { ZoomLevels.percent($0.zoom) } ?? "",
@@ -953,7 +951,11 @@ final class SitePanel: FloatingPanelView {
         // Header: the site's icon and name, and ⋯.
         let iconSide = Tokens.Space.x6
         let moreSide = Tokens.Metric.iconButton
-        let headerHeight = max(siteName.lineHeight, moreSide)
+        // The name, and under it the connection's line when there is one: the icon and ⋯ in the middle of both.
+        let lineHeight = connectionLine == nil ? 0 : ConnectionLine.height
+        let block = siteName.lineHeight + lineHeight
+        let headerHeight = max(block, moreSide)
+        let nameY = y + (headerHeight - block) / 2
         let moreX = width - pad - moreSide + Tokens.Space.x1
         place(moreButton, NSRect(x: moreX, y: y + (headerHeight - moreSide) / 2, width: moreSide, height: moreSide))
         place(icon, NSRect(x: pad, y: y + (headerHeight - iconSide) / 2, width: iconSide, height: iconSide))
@@ -961,9 +963,21 @@ final class SitePanel: FloatingPanelView {
         let textWidth = (moreButton.isHidden ? width - pad : moreX) - textX
         siteName.attributedStringValue = Self.fitted(shownName, in: textWidth)
         siteNameHover.toolTip = siteName.stringValue == shownName ? nil : shownName
-        place(siteName, NSRect(x: textX - Label.inset, y: y + (headerHeight - siteName.lineHeight) / 2, width: textWidth + Label.inset * 2, height: siteName.lineHeight))
-        place(siteNameHover, NSRect(x: textX, y: y, width: min(textWidth, siteName.inkWidth), height: headerHeight))
+        place(siteName, NSRect(x: textX - Label.inset, y: nameY, width: textWidth + Label.inset * 2, height: siteName.lineHeight))
+        place(siteNameHover, NSRect(x: textX, y: nameY, width: min(textWidth, siteName.inkWidth), height: siteName.lineHeight))
+        if let connectionLine {
+            // On the name's text column, as wide as its words: the rest of the header stays the name's.
+            place(connectionLine, NSRect(x: textX, y: nameY + siteName.lineHeight, width: min(textWidth, connectionLine.fittingWidth), height: lineHeight))
+        }
         y += headerHeight
+        // Why it isn't secure, when that isn't plain to see, under the whole header.
+        if !connectionNote.isHidden {
+            y += Tokens.Space.x2
+            let w = inner + Label.inset * 2
+            let h = ceil(connectionNote.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: w, height: 10_000)).height ?? connectionNote.lineHeight)
+            place(connectionNote, NSRect(x: pad - Label.inset, y: y, width: w, height: h))
+            y += h
+        }
         end(Tokens.Space.x4)
 
         // Actions are named tiles: one row, like the markings along a device's edge. In a narrow panel, where a name
@@ -996,10 +1010,9 @@ final class SitePanel: FloatingPanelView {
 
         // One line into each of the other pages, each saying what's there; only those that apply.
         var c = SitePanelRows.Context()
-        c.isWeb = connectionRow != nil
         c.hasPermissions = permissionsRow?.isHidden == false
         let links = SitePanelRows.links(c)
-        let linkRows: [(SitePanelRows.Link, PanelLinkRow?)] = [(.connection, connectionRow), (.permissions, permissionsRow)]
+        let linkRows: [(SitePanelRows.Link, PanelLinkRow?)] = [(.permissions, permissionsRow)]
         var placed = false
         for (kind, row) in linkRows {
             guard let row else { continue }
@@ -1009,13 +1022,6 @@ final class SitePanel: FloatingPanelView {
             link(row)
             placed = true
             end(0, slack: row.bottomSlack)
-            if kind == .connection, !connectionNote.isHidden {
-                let w = inner + Label.inset * 2
-                let h = ceil(connectionNote.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: w, height: 10_000)).height ?? connectionNote.lineHeight)
-                place(connectionNote, NSRect(x: pad - Label.inset, y: y, width: w, height: h))
-                y += h + Tokens.Space.x2
-                end(0)
-            }
         }
         if placed { end(Tokens.Space.x4, slack: slack) }
 
@@ -1548,8 +1554,69 @@ final class ZoomStepper: NSView {
     }
 }
 
-/// The top of the panel: the site's icon and name, and under it whether the connection is private. On an https page
-/// it's the way into the certificate, with a chevron at its end.
+/// Under the site's name at the top of the panel: whether the connection is secure, in a few small words after the
+/// address's lock (#221), for the one thing most people need from it at a glance. Quiet when it's secure; in the
+/// warning color, with the address's open lock, when it isn't (plain http, a certificate trusted anyway, parts of the
+/// page over plain http). On an https page it's the way into the certificate: a chevron after its words, which step
+/// up under the pointer as a section header's do.
+final class ConnectionLine: InteractiveView {
+    /// Its words with a little room above and below, for the pointer.
+    static let height = Label("", font: Tokens.Font.small(), color: .clear).lineHeight + Tokens.Space.x1
+    private let glyph = NSImageView()
+    private let label: Label
+    private let chevron = NSImageView()
+    private let warns: Bool
+    private let opens: Bool
+
+    init(_ text: String, warns: Bool, opens: Bool, run: @escaping () -> Void) {
+        label = Label(text, font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
+        self.warns = warns
+        self.opens = opens
+        super.init(frame: .zero)
+        glyph.image = Tokens.Symbol.image(warns ? SitePanel.notSecureSymbol : "lock", size: Tokens.Symbol.inline)
+        glyph.imageScaling = .scaleNone
+        chevron.image = Tokens.Symbol.image("chevron.right", size: Tokens.Symbol.inline)
+        chevron.imageScaling = .scaleNone
+        chevron.isHidden = !opens
+        [glyph, label, chevron].forEach { addSubview($0) }
+        isEnabled = opens
+        onClick = { _ in run() }
+        if opens { toolTip = String(localized: "Show Certificate", comment: "Tooltip of the line under the site's name in the site panel that says whether the connection is secure: opens the site's certificate.") }
+        setAccessibilityElement(true)
+        setAccessibilityRole(opens ? .button : .staticText)
+        setAccessibilityLabel(String(localized: "Connection", comment: "VoiceOver name of the line under the site's name in the site panel that says whether the page's connection is secure. On an https page it opens the site's certificate."))
+        setAccessibilityValue(text)
+        stateDidChange(animated: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    var debugText: String { label.stringValue + (warns ? " (warns)" : "") + (opens ? " >" : "") }
+
+    private var side: CGFloat { Tokens.Symbol.inline }
+    /// The lock, the words and the chevron, and no more.
+    var fittingWidth: CGFloat { ceil(side + Tokens.Space.x1 + label.inkWidth + (opens ? 2 + side : 0)) }
+
+    override func layout() {
+        super.layout()
+        glyph.frame = NSRect(x: 0, y: (bounds.height - side) / 2, width: side, height: side)
+        let x = side + Tokens.Space.x1
+        let room = max(0, bounds.width - x - (opens ? 2 + side : 0))
+        let w = min(label.inkWidth, room)
+        label.frame = NSRect(x: x - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: w + Label.inset * 2, height: label.lineHeight)
+        chevron.frame = NSRect(x: x + w + 2, y: (bounds.height - side) / 2, width: side, height: side)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        // No wash: the words step up under the pointer. Not secure always stands out.
+        let hot = isHovered && isEnabled
+        let ink = warns ? Tokens.Color.warning : hot ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
+        label.textColor = ink
+        glyph.contentTintColor = ink
+        chevron.contentTintColor = hot ? (warns ? Tokens.Color.warning : Tokens.Color.textSecondary) : Tokens.Color.textTertiary
+    }
+}
+
 /// The top of one of the panel's pages: a way back, and its title.
 final class PanelPageHeader: NSView {
     private let back = IconButton(symbol: "chevron.left", size: .compact, toolTip: String(localized: "Back", comment: "Tooltip of the back button on a page of the site panel."))
@@ -1609,8 +1676,9 @@ enum SitePanelSizing {
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
     enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, fullScreenFills, alwaysTranslate, extensions }
-    /// The rows into the panel's other pages. Extensions are on the first page itself (#215).
-    enum Link: Equatable { case connection, permissions }
+    /// The rows into the panel's other pages. Extensions are on the first page itself (#215), and the connection is a
+    /// small line under the site's name (#221).
+    enum Link: Equatable { case permissions }
 
     struct Context {
         /// An http or https page, not an extension's own page.
@@ -1654,7 +1722,6 @@ enum SitePanelRows {
 
     static func links(_ c: Context) -> [Link] {
         var links: [Link] = []
-        if c.isWeb { links.append(.connection) }
         if c.hasPermissions { links.append(.permissions) }
         return links
     }

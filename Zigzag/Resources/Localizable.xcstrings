@@ -4624,7 +4624,7 @@
       }
     },
     "Connection" : {
-      "comment" : "Row in the site panel: whether the page's connection is secure. On an https page it opens the site's certificate.",
+      "comment" : "VoiceOver name of the line under the site's name in the site panel that says whether the page's connection is secure. On an https page it opens the site's certificate.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7677,7 +7677,7 @@
       }
     },
     "Its certificate isn’t trusted. You chose to visit it anyway, until you quit Zigzag." : {
-      "comment" : "Under the Connection row of the site panel, on a page whose certificate isn't trusted but you chose Visit this site anyway on the warning.",
+      "comment" : "Under the site's name at the top of the site panel, on a page whose certificate isn't trusted but you chose Visit this site anyway on the warning.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10909,7 +10909,7 @@
       }
     },
     "Partly secure" : {
-      "comment" : "On the Connection row of the site panel: an https page with some parts loaded over plain http.",
+      "comment" : "Small, under the site's name at the top of the site panel: an https page with some parts loaded over plain http.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13443,6 +13443,7 @@
     },
     "Secure" : {
       "comment" : "On the Connection row of the site panel: the page came over https.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13453,7 +13454,7 @@
       }
     },
     "Secure connection" : {
-      "comment" : "In the site panel, in the welcome window’s picture of Zigzag.\nVoiceOver label of the lock before the address in a pop-up window.",
+      "comment" : "In the site panel, in the welcome window’s picture of Zigzag.\nSmall, under the site's name at the top of the site panel: the page came over https. Clicking it shows the certificate.\nVoiceOver label of the lock before the address in a pop-up window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13911,6 +13912,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示所有标签页"
+          }
+        }
+      }
+    },
+    "Show Certificate" : {
+      "comment" : "Tooltip of the line under the site's name in the site panel that says whether the connection is secure: opens the site's certificate.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示证书"
           }
         }
       }

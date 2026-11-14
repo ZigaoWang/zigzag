@@ -100,6 +100,7 @@ struct CertificateTrustTests {
         #expect(excepted.value == SitePanel.notSecure && excepted.warns && excepted.reason != nil)
         let secure = SitePanel.connection(scheme: "https", onlySecureContent: true, certificateException: false)
         #expect(secure.value != SitePanel.notSecure && !secure.warns && secure.reason == nil)
+        #expect(secure.value == "Secure connection")
         #expect(SitePanel.connection(scheme: "https", onlySecureContent: false, certificateException: false).warns)
         // Zigzag's own warning page in place of the site: no certificate, never secure.
         let warning = SitePanel.connection(scheme: "https", onlySecureContent: true, certificateException: false, hasCertificate: false)

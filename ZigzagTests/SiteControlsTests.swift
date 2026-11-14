@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Security
 import Testing
@@ -388,7 +389,8 @@ struct SitePanelRowsTests {
 
     @Test func anOrdinaryPage() {
         #expect(SitePanelRows.rows(Context()) == [.zoom, .adBlocking, .darkPage, .keepAwake])
-        #expect(SitePanelRows.links(Context()) == [.connection])
+        // The connection is a line under the site's name (#221), not a row into a page.
+        #expect(SitePanelRows.links(Context()).isEmpty)
     }
 
     /// Extensions are on the first page itself (#215), not behind a row; whether they run here is a switch of This
@@ -452,7 +454,7 @@ struct SitePanelRowsTests {
         c.siteChoices = false
         c.extensionHost = false
         #expect(SitePanelRows.rows(c) == [.zoom])
-        #expect(SitePanelRows.links(c) == [.connection])
+        #expect(SitePanelRows.links(c).isEmpty)
     }
 
     @Test func adBlockingOffInSettings() {
@@ -496,7 +498,7 @@ struct SitePanelRowsTests {
         var c = Context()
         #expect(!SitePanelRows.links(c).contains(.permissions))
         c.hasPermissions = true
-        #expect(SitePanelRows.links(c) == [.connection, .permissions])
+        #expect(SitePanelRows.links(c) == [.permissions])
     }
 
     @Test func permissionsSayWhatWasChosen() {
@@ -543,5 +545,31 @@ struct SitePanelSizingTests {
 
     @Test func theHeaderKeepsItsBand() {
         #expect(SitePanelSizing.headerBand(pad: 16, header: 24) == 16 + 24 + Tokens.Space.x3)
+    }
+}
+
+/// The connection under the site's name (#221): a small line, the way into the certificate only where there is one.
+@MainActor
+struct ConnectionLineTests {
+    @Test func secureOpensTheCertificate() {
+        var opened = false
+        let line = ConnectionLine("Secure connection", warns: false, opens: true) { opened = true }
+        #expect(line.isEnabled)
+        #expect(line.accessibilityRole() == .button)
+        #expect(line.accessibilityValue() as? String == "Secure connection")
+        #expect(line.debugText == "Secure connection >")
+        _ = line.accessibilityPerformPress()
+        #expect(opened)
+    }
+
+    @Test func plainHTTPOnlySaysSo() {
+        let line = ConnectionLine(SitePanel.notSecure, warns: true, opens: false) {}
+        #expect(!line.isEnabled)
+        #expect(line.accessibilityRole() == .staticText)
+        #expect(line.debugText == "Not secure (warns)")
+        // Narrower without its chevron: as wide as its words, never the whole header.
+        let opening = ConnectionLine(SitePanel.notSecure, warns: true, opens: true) {}
+        #expect(opening.fittingWidth > line.fittingWidth)
+        #expect(line.fittingWidth < 120)
     }
 }
