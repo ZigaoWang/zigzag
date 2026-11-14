@@ -318,7 +318,8 @@ final class FormRow: NSView, SettingsSearchable {
         let width = textWidth(for: bounds.width) + Label.inset * 2
         let detailHeight = detailHeight(for: bounds.width)
         let block = title.lineHeight + (detail.isHidden ? 0 : Self.lineGap + detailHeight)
-        let top = stacked ? Tokens.Page.groupRowPad : round((bounds.height - block) / 2)
+        // A title alone sits with its capitals in the middle, level with the words in the control beside it.
+        let top = stacked ? Tokens.Page.groupRowPad : detail.isHidden ? title.centeredY(in: bounds.height) : round((bounds.height - block) / 2)
         title.frame = NSRect(x: x, y: top, width: width, height: title.lineHeight)
         detail.frame = NSRect(x: x, y: title.frame.maxY + Self.lineGap, width: width, height: detailHeight)
     }
@@ -2522,7 +2523,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                      width: max(0, contentWidth - size.width - Tokens.Space.x4 - Tokens.Page.groupPad), height: label.lineHeight)
                 place(label)
                 if let accessory {
-                    accessory.frame = NSRect(x: pad + contentWidth - Tokens.Page.groupPad - size.width, y: round(label.frame.midY - size.height / 2),
+                    // Centered on the heading's capitals, which the system font draws a little under its line's middle.
+                    let capsMiddle = label.frame.midY + Label.capsBelowMiddle(of: label.font ?? Tokens.Font.label(), lineHeight: label.lineHeight)
+                    accessory.frame = NSRect(x: pad + contentWidth - Tokens.Page.groupPad - size.width, y: round(capsMiddle - size.height / 2),
                                              width: size.width, height: size.height)
                     place(accessory)
                 }
@@ -3541,7 +3544,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
             let w: CGFloat = 168
             x -= w
             field.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: w, height: h)
-            fieldLabel.frame = NSRect(x: Tokens.Space.x2, y: (h - fieldLabel.lineHeight) / 2, width: w - Tokens.Space.x4, height: fieldLabel.lineHeight)
+            fieldLabel.frame = NSRect(x: Tokens.Space.x2, y: fieldLabel.centeredY(in: h), width: w - Tokens.Space.x4, height: fieldLabel.lineHeight)
         } else if caps.isEmpty && item != nil {
             fieldLabel.stringValue = String(localized: "None", comment: "In place of the keys of a command with no shortcut, in Settings › Shortcuts.")
         } else {
@@ -3556,7 +3559,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
             let w = fieldLabel.inkWidth + Tokens.Space.x2
             x -= w
             field.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: w, height: h)
-            fieldLabel.frame = NSRect(x: 0, y: (h - fieldLabel.lineHeight) / 2, width: w, height: fieldLabel.lineHeight)
+            fieldLabel.frame = NSRect(x: 0, y: fieldLabel.centeredY(in: h), width: w, height: fieldLabel.lineHeight)
         }
         if !removeButton.isHidden {
             let b = removeButton.frame.width
@@ -3570,7 +3573,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         }
         let width = max(0, x - pad - Tokens.Space.x4)
         if note.isHidden {
-            title.frame = NSRect(x: pad - Label.inset, y: (bounds.height - title.lineHeight) / 2, width: width, height: title.lineHeight)
+            title.frame = NSRect(x: pad - Label.inset, y: title.centeredY(in: bounds.height), width: width, height: title.lineHeight)
         } else {
             let block = title.lineHeight + note.lineHeight
             title.frame = NSRect(x: pad - Label.inset, y: (bounds.height - block) / 2, width: width, height: title.lineHeight)

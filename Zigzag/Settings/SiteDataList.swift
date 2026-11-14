@@ -338,7 +338,7 @@ final class SiteDataRow: NSView {
         let b = Tokens.Metric.compactIconButton
         remove.frame = NSRect(x: bounds.width - pad - b + Tokens.Space.x1, y: round((bounds.height - b) / 2), width: b, height: b)
         let sizeWidth: CGFloat = size.stringValue.isEmpty ? 0 : size.textWidth
-        size.frame = NSRect(x: remove.frame.minX - Tokens.Space.x2 - sizeWidth, y: round((bounds.height - size.lineHeight) / 2), width: sizeWidth, height: size.lineHeight)
+        size.frame = NSRect(x: remove.frame.minX - Tokens.Space.x2 - sizeWidth, y: size.centeredY(in: bounds.height), width: sizeWidth, height: size.lineHeight)
         let x = pad + side + Tokens.Space.x3
         let width = max(0, size.frame.minX - Tokens.Space.x4 - x) + Label.inset * 2
         let block = title.lineHeight + 2 + detail.lineHeight
