@@ -443,7 +443,14 @@ final class IconButton: InteractiveView {
     var tint: NSColor = Tokens.Color.icon { didSet { stateDidChange(animated: false) } }
     var radius: CGFloat = Tokens.Radius.control { didSet { layer?.cornerRadius = radius } }
     var showsFillAtRest = false { didSet { stateDidChange(animated: false) } }
-    private let symbolSize: CGFloat
+    /// The symbol's size; a button that lives on through a change of the sidebar's size takes the new one.
+    var symbolSize: CGFloat {
+        didSet {
+            guard oldValue != symbolSize, image == nil, glyph == nil else { return }
+            imageView.image = Tokens.Symbol.image(symbol, size: symbolSize)
+            needsLayout = true
+        }
+    }
 
     /// The two sizes an icon button comes in.
     enum Size {

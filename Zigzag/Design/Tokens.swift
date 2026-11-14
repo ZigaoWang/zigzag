@@ -297,8 +297,8 @@ enum Tokens {
         /// Each space's target in the bottom bar: a toolbar button, and at Large a little more round its larger icon,
         /// as tall as the bar leaves room for.
         static var spaceTarget: CGFloat { current == .large ? 28 : button }
-        /// The now-playing strip above the bottom bar.
-        static let nowPlayingHeight: CGFloat = 34
+        /// The now-playing card above the bottom bar: a row's height, at every size.
+        static var nowPlayingHeight: CGFloat { rowHeight }
     }
 
     /// The strip on top of each pane in split view: 30 tall, 24pt buttons with 13pt glyphs, the address in a 22pt

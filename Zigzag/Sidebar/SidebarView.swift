@@ -1345,13 +1345,16 @@ final class SidebarView: NSView {
         return (playing, bottom)
     }
 
-    /// Shows (or hides) the now-playing control, making room above the dots.
-    func setNowPlaying(_ tab: Tab?, paused: Bool) {
+    /// Shows (or hides) the now-playing control, making room above the dots. `hiding`: you hid it, so it's put away,
+    /// a touch smaller as it fades (the present role going; with Reduce Motion only the fade, from a key at once).
+    func setNowPlaying(_ tab: Tab?, paused: Bool, hiding: Bool = false) {
         let show = tab != nil
         if let tab { nowPlaying.isPaused = paused; nowPlaying.show(tab) }
         guard show == (nowPlaying.isHidden || nowPlayingFadingOut) else { return }
         nowPlayingFadingOut = false
         if show {
+            // Whatever a hide left on its layer goes before it fades back in.
+            Tokens.Motion.settle(nowPlaying)
             nowPlaying.isHidden = false
             needsLayout = true
             nowPlaying.alphaValue = 0
@@ -1360,14 +1363,22 @@ final class SidebarView: NSView {
         }
         // Fades out where it is first; only then does the list take back its room, so nothing vanishes at once.
         nowPlayingFadingOut = true
-        Tokens.Motion.animate(Tokens.Motion.leaving, { self.nowPlaying.animator().alphaValue = 0 }, completion: {
+        let done: @MainActor () -> Void = {
             // Playing again before the fade finished: it stays.
             guard self.nowPlayingFadingOut else { return }
             self.nowPlayingFadingOut = false
             self.nowPlaying.isHidden = true
+            self.nowPlaying.isHovered = false
+            Tokens.Motion.settle(self.nowPlaying)
             self.nowPlaying.alphaValue = 1
             self.needsLayout = true
-        })
+        }
+        if hiding {
+            if Tokens.Motion.isFromKey { done(); return }
+            Tokens.Motion.present(nowPlaying, from: .point(CGPoint(x: 0.5, y: 0.5)), entering: false) { MainActor.assumeIsolated { done() } }
+            return
+        }
+        Tokens.Motion.animate(Tokens.Motion.leaving, { self.nowPlaying.animator().alphaValue = 0 }, completion: done)
     }
 
     /// True while the now-playing control fades away, before it gives its room back to the list.

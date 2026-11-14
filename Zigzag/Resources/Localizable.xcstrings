@@ -7048,6 +7048,17 @@
         }
       }
     },
+    "Hide" : {
+      "comment" : "Tooltip, VoiceOver action and menu item of the close button on the sidebar's Now Playing control: hides the control; the tab keeps playing.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏"
+          }
+        }
+      }
+    },
     "Hide %@" : {
       "comment" : "First menu of an installed app's window: hides the app. The placeholder is the app's name, like Wikipedia.",
       "localizations" : {

@@ -182,6 +182,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let tab = self?.nowPlayingTab else { return }
             tab.setMuted(!tab.isMuted)
         }
+        sidebar.nowPlaying.onHide = { [weak self] in self?.hideNowPlaying() }
+        sidebar.nowPlaying.onRightClick = { [weak self] _ in self?.nowPlayingMenu() }
         sidebar.reloadButton.onClick = { [weak self] _ in
             guard let tab = self?.tabManager.selectedTab else { return }
             tab.isLoading ? tab.stopLoading() : tab.reload()
@@ -887,6 +889,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private weak var nowPlayingTab: Tab?
+    /// Which tab Now Playing is for, and the ones you've hidden it for.
+    private var nowPlayingChoice = NowPlayingChoice()
 
     /// The pane enlarged over the others for a moment, if any (#160).
     private(set) var paneZoom = PaneZoom()
@@ -1200,13 +1204,51 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return ids[index] == current ? nil : ids[index]
     }
 
-    /// The control shows the most recent tab making sound (or paused by it) that you aren't looking at.
-    private func updateNowPlaying() {
+    /// The control shows the most recent tab making sound (or paused by it) that you aren't looking at, unless you've
+    /// hidden it for what that tab is playing (`NowPlayingChoice`).
+    private func updateNowPlaying(hiding: Bool = false) {
         let selected = tabManager.selectedTab
-        let candidates = tabManager.recentTabs.filter { ($0.isPlayingAudio || $0.isPlaybackPaused) && $0 !== selected }
-        let tab = candidates.first
+        let tabs = tabManager.recentTabs
+        let candidates = tabs.map {
+            NowPlayingChoice.Candidate(id: $0.id, page: NowPlayingChoice.page(of: $0.url),
+                                       sounding: $0.isPlayingAudio || $0.isPlaybackPaused, isSelected: $0 === selected)
+        }
+        let id = nowPlayingChoice.pick(from: candidates)
+        let tab = id.flatMap { id in tabs.first { $0.id == id } }
         nowPlayingTab = tab
-        sidebar.setNowPlaying(tab, paused: tab?.isPlaybackPaused ?? false)
+        sidebar.setNowPlaying(tab, paused: tab?.isPlaybackPaused ?? false, hiding: hiding)
+    }
+
+    /// Hides Now Playing for what its tab is playing now. The sound plays on; the card comes back when the tab goes
+    /// to another page, and shows another tab that makes sound meanwhile.
+    func hideNowPlaying() {
+        guard let tab = nowPlayingTab else { return }
+        nowPlayingChoice.hide(tab.id, page: NowPlayingChoice.page(of: tab.url))
+        updateNowPlaying(hiding: true)
+    }
+
+    /// Right-click on Now Playing: what its buttons do, by name, and Hide.
+    private func nowPlayingMenu() -> NSMenu? {
+        guard let tab = nowPlayingTab else { return nil }
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(SidebarMenus.Item(String(localized: "Show Tab", comment: "VoiceOver action on the sidebar's Now Playing control: goes to the tab playing sound.")) { [weak self] in
+            self?.tabManager.select(tab)
+        })
+        menu.addItem(.separator())
+        menu.addItem(SidebarMenus.Item(tab.isPlaybackPaused ? String(localized: "Play", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")
+                                       : String(localized: "Pause", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")) {
+            tab.setPlaybackPaused(!tab.isPlaybackPaused)
+        })
+        menu.addItem(SidebarMenus.Item(tab.isMuted ? String(localized: "Unmute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")
+                                       : String(localized: "Mute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")) {
+            tab.setMuted(!tab.isMuted)
+        })
+        menu.addItem(.separator())
+        menu.addItem(SidebarMenus.Item(String(localized: "Hide", comment: "Tooltip, VoiceOver action and menu item of the close button on the sidebar's Now Playing control: hides the control; the tab keeps playing.")) { [weak self] in
+            self?.hideNowPlaying()
+        })
+        return menu
     }
 
     /// One button by the address, for everything about this page: quick actions, extensions, the site's own
