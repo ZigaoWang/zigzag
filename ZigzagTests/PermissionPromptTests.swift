@@ -18,6 +18,21 @@ struct PermissionPromptTests {
     }
 
     @Test func theAnswerCarriesTheChosenActionAndDuration() {
-        #expect(PermissionAnswer(action: "newTab", remember: true).action == "newTab")
+        let always = PermissionAnswer(action: "newTab", remember: true)
+        #expect(always.action == "newTab")
+        #expect(always.remember == true)
+        #expect(PermissionAnswer(action: "newTab", remember: false).remember == false)
+    }
+
+    @Test func aKnownSiteAnswerIsAlwaysAndTakesPrecedence() {
+        let answer = SitePermissions.knownAnswer(site: true, page: false)
+        #expect(answer?.action == "allow")
+        #expect(answer?.remember == true)
+    }
+
+    @Test func aKnownPageAnswerIsThisTime() {
+        let answer = SitePermissions.knownAnswer(site: nil, page: true)
+        #expect(answer?.action == "allow")
+        #expect(answer?.remember == false)
     }
 }
