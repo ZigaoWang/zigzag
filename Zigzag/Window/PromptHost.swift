@@ -73,3 +73,48 @@ extension BrowserWindowController: PromptHost {
     var promptAnchor: NSView? { sidebar.address }
     func promptToast(_ text: String, symbol: String, duration: TimeInterval) { Toast.show(text, symbol: symbol, duration: duration, in: self) }
 }
+
+/// The top of a page holds one thing at a time. A page's questions (a site's permission, Save password?) take turns
+/// there: one shows, the next waits hidden until it's answered or set aside. A toast that comes while a question is
+/// up shows under it, and moves up once the question goes.
+@MainActor enum PageQuestions {
+    /// The question showing at the top of a page in `overlay`, other than `except`.
+    static func showing(in overlay: NSView, except: NSView? = nil) -> FloatingPanelView? {
+        overlay.subviews.lazy.compactMap { $0 as? FloatingPanelView }.first { view in
+            view !== except && (view is PermissionPrompt || view is SavePasswordPrompt) && !view.isHidden && !view.dismissing
+        }
+    }
+
+    /// Whether `question` may come up now: no other question is showing in its overlay.
+    static func mayShow(_ question: NSView, in overlay: NSView) -> Bool { showing(in: overlay, except: question) == nil }
+
+    /// What a toast at the top of `area` keeps clear of: a question or the update note showing there.
+    static func occupied(in overlay: NSView) -> NSRect? {
+        if let question = showing(in: overlay) { return question.frame }
+        return overlay.subviews.lazy.compactMap { $0 as? WhatsNewOffer }.first { !$0.isHidden && !$0.dismissing }?.frame
+    }
+
+    /// `area` with the top cut off down to the bottom of `taken`, for a toast to sit under what's there.
+    static func area(_ area: NSRect, below taken: NSRect?) -> NSRect {
+        guard let taken, taken.intersects(area), taken.maxY > area.minY else { return area }
+        var below = area
+        below.origin.y = taken.maxY
+        below.size.height = max(0, area.maxY - taken.maxY)
+        return below
+    }
+
+    /// A question came up: a toast showing moves under it.
+    static func cameUp(in host: PromptHost) {
+        if let controller = host as? BrowserWindowController { Toast.reposition(in: controller) }
+    }
+
+    /// A question went, or stepped aside for another tab: the oldest one waiting for this page comes up, and a toast
+    /// under it moves back up.
+    static func turnFreed(in host: PromptHost) {
+        for view in host.promptOverlay.subviews {
+            (view as? PermissionPrompt)?.followTab()
+            (view as? SavePasswordPrompt)?.followTab()
+        }
+        if let controller = host as? BrowserWindowController { Toast.reposition(in: controller) }
+    }
+}

@@ -125,6 +125,8 @@ final class ExtensionSheet: FloatingPanelView {
     private static func present(_ content: Content, over host: NSView, card: NSRect,
                                 onConfirm: @escaping () -> Void, onCancel: @escaping () -> Void) -> ExtensionSheet {
         current?.finish(confirmed: false)
+        // One sheet at a time: What's New, which only informs, makes way.
+        WhatsNewSheet.makeRoom(in: host.window)
         let sheet = ExtensionSheet(content)
         sheet.onConfirm = onConfirm
         sheet.onCancel = onCancel

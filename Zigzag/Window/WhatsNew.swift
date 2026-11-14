@@ -418,7 +418,8 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
     }
 
     static func present(in controller: BrowserWindowController) {
-        guard let host = controller.window?.contentView, !host.subviews.contains(where: { $0 is WhatsNewSheet }) else { return }
+        guard let host = controller.window?.contentView, !host.subviews.contains(where: { $0 is WhatsNewSheet }),
+              !otherSheetIsUp(in: controller) else { return }
         let sheet = WhatsNewSheet(controller: controller)
         sheet.frame = host.bounds
         sheet.autoresizingMask = [.width, .height]
@@ -434,6 +435,23 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
             guard let sheet, event.window === host.window else { return event }
             return sheet.handle(event)
         }
+        // The notes are about the app, not a tab, but they cover the page: another tab or space chosen (from the
+        // menu bar, a link from another app), they go rather than sit over a page they weren't opened on.
+        sheet.tabsToken = controller.tabManager.changed.observe { [weak sheet] change in
+            if change == .selection || change == .space { sheet?.close() }
+        }
+    }
+
+    /// A sheet that asks for an answer (Install as App, a confirmation, an extension's, a page's dialog) is up in the
+    /// window: the notes don't stack on it.
+    private static func otherSheetIsUp(in controller: BrowserWindowController) -> Bool {
+        let hosts = [controller.window?.contentView, controller.root.overlay].compactMap { $0 }
+        return hosts.contains { $0.subviews.contains { $0 is FormSheet || $0 is ConfirmSheet || $0 is ExtensionSheet || $0 is PageDialogSheet } }
+    }
+
+    /// Another sheet is coming up in `window`: the notes, which only inform, make way for it rather than sit under it.
+    static func makeRoom(in window: NSWindow?) {
+        window?.contentView?.subviews.compactMap { $0 as? WhatsNewSheet }.forEach { $0.close() }
     }
 
     /// As a confirmation does (`ConfirmSheet`), no key gets past it to the window behind: Return, Esc and ⌘W close it,
@@ -482,8 +500,10 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
     }
 
     private var waiting: [() -> Void] = []
+    private var tabsToken: SignalToken?
 
     private func close() {
+        tabsToken = nil
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         panel.dismiss()

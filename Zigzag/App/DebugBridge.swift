@@ -2067,6 +2067,8 @@ enum DebugBridge {
             func find(_ v: NSView) -> ReaderControls? { (v as? ReaderControls) ?? v.subviews.lazy.compactMap(find).first }
             if let content = controller.window?.contentView { find(content)?.toggleOptions() }
         case "hidetoasts": Toast.hide(in: controller)
+        // showtoast <text>: a plain toast over the page, as a confirmation shows, for six seconds.
+        case "showtoast": Toast.show(arg, symbol: "checkmark", duration: 6, in: controller)
         case "toast":
             // toast [press]: logs the toast showing and its button; press clicks the button.
             if let toast = controller.root.overlay.subviews.compactMap({ $0 as? ToastView }).last {

@@ -56,6 +56,8 @@ final class ConfirmSheet: NSView {
     }
 
     private static func present(_ sheet: ConfirmSheet, in host: NSView) {
+        // One sheet at a time: What's New, which only informs, makes way.
+        WhatsNewSheet.makeRoom(in: host.window)
         sheet.frame = host.bounds
         sheet.autoresizingMask = [.width, .height]
         host.addSubview(sheet)

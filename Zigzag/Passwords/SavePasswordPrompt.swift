@@ -166,7 +166,7 @@ final class SavePasswordPrompt: FloatingPanelView {
 
     /// Shown while its tab is in front (either side of a split counts), set aside while another tab is, and gone
     /// once its tab has closed or left the window. It only counts down while it can be seen.
-    private func followTab() {
+    func followTab() {
         guard superview != nil, let controller else { return }
         guard let tab, !tab.isClosed, controller.promptHolds(tab) else { close(saved: false); return }
         if controller.promptShows(tab) {
@@ -175,10 +175,14 @@ final class SavePasswordPrompt: FloatingPanelView {
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.superview != nil, let area = controller.pageFrame(showing: tab) else { return }
                 if self.isHidden {
+                    // One question at a time at the top of the page (`PageQuestions`): a site's question showing
+                    // there goes first, and this comes up once it's answered.
+                    guard PageQuestions.mayShow(self, in: controller.promptOverlay) else { return }
                     self.place(in: area)
                     self.isHidden = false
                     self.present()
                     self.scheduleHide()
+                    PageQuestions.cameUp(in: controller)
                 } else {
                     self.reposition()
                 }
@@ -190,6 +194,7 @@ final class SavePasswordPrompt: FloatingPanelView {
                 window.makeFirstResponder(controller.promptFrontTab?.webView)
             }
             isHidden = true
+            PageQuestions.turnFreed(in: controller)
         }
     }
 
@@ -224,11 +229,15 @@ final class SavePasswordPrompt: FloatingPanelView {
         current?.close(saved: false)
         let prompt = SavePasswordPrompt(kind: .save(username: "student"), origin: origin)
         [prompt.neverButton, prompt.notNowButton, prompt.saveButton].forEach { $0.onClick = { [weak prompt] _ in prompt?.close(saved: false) } }
-        let card = controller.root.cardFrame
-        prompt.frame.origin = NSPoint(x: card.minX + Tokens.Space.x3, y: card.minY + Tokens.Space.x3)
+        // For the tab in front, where and when a real one comes up: it takes its turn after a site's question.
+        prompt.tab = controller.tabManager.selectedTab
+        prompt.controller = controller
+        prompt.slidesFromTop = true
+        prompt.isHidden = true
         controller.root.overlay.addSubview(prompt)
-        prompt.present()
         current = prompt
+        prompt.followTab()
+        prompt.tabsToken = controller.observePromptTabs { [weak prompt] in prompt?.followTab() }
     }
 
     static func debugClose() { current?.close(saved: false) }
@@ -281,6 +290,7 @@ final class SavePasswordPrompt: FloatingPanelView {
         finish(saved)
         // Out of sight already (its tab is behind another): simply gone, with nothing to watch leave.
         if isHidden { removeFromSuperview() } else { dismiss() }
+        if let controller { PageQuestions.turnFreed(in: controller) }
     }
 
     private func layoutContent() {

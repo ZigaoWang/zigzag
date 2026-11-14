@@ -735,17 +735,21 @@ final class PermissionPrompt: FloatingPanelView {
 
     /// Shown while the asking tab is in front (either side of a split counts), set aside while another tab is,
     /// and "not now" once it's closed or has gone to another window.
-    private func followTab() {
+    /// One question at a time at the top of the page (`PageQuestions`): in front while Save password? is up, it
+    /// waits for that to go.
+    func followTab() {
         guard answer != nil, let controller else { return }
         guard let tab = askingTab, !tab.isClosed, controller.promptHolds(tab) else { finish(.notNow); return }
         let inFront = controller.promptShows(tab)
         if inFront, isHidden {
+            guard PageQuestions.mayShow(self, in: controller.promptOverlay) else { return }
             controller.clearForPrompt()
             place(in: controller)
             isHidden = false
             slideIn()
         } else if !inFront, !isHidden {
             isHidden = true
+            PageQuestions.turnFreed(in: controller)
         }
     }
 
@@ -797,6 +801,7 @@ final class PermissionPrompt: FloatingPanelView {
         self.answer = nil
         answer?(choice)
         slideOut()
+        if let controller { PageQuestions.turnFreed(in: controller) }
     }
 
     /// Taken away without an answer (its window closed): the page hears "not now" rather than waiting forever.

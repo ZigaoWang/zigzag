@@ -159,6 +159,8 @@ final class PageDialogSheet: NSView {
                 }
             }
             // On a tab out of sight, it waits there until the tab is in front again; `viewDidMoveToWindow` shows it.
+            // On the page in front, What's New, which only informs, makes way for it.
+            WhatsNewSheet.makeRoom(in: host.window)
             host.addSubview(sheet)
         }
     }
