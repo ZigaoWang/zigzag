@@ -58,6 +58,12 @@ enum ExternalLinks {
         return !webSchemes.contains(scheme)
     }
 
+    /// Whether an app answer can be kept for the page at `url`: only a secure page, and never a frame from another
+    /// site (its answer would be the page's to give, not the frame's).
+    static func canRemember(url: URL?, foreign: Bool) -> Bool {
+        !foreign && url?.scheme?.lowercased() == "https"
+    }
+
     /// Frames count too: meeting pages often open their app from a hidden frame, and the question keeps that honest.
     /// Only a page you can see asks; one in a background tab never puts a question over another site.
     /// `isClick`: a real click or key started it (not a script's click()).
@@ -68,6 +74,8 @@ enum ExternalLinks {
     /// `byYou`: you typed it in the address bar or chose it in the command bar, never a page or Zigzag on its own: it
     /// opens without asking, unless the site is set to Block.
     /// `sourceIsMainFrame`: the link or script that asked is the page's own document, not a frame in it.
+    /// `fromPDF`: the link is in a PDF, so it's the PDF's, not the site's: it always asks, and never opens an app at
+    /// once.
     static func open(_ url: URL, isMainFrame: Bool, isClick: Bool, linkClick: Bool? = nil, sourceIsMainFrame: Bool = true, from webView: WKWebView,
                      asker: WKSecurityOrigin? = nil, byYou: Bool = false, fromPDF: Bool = false) {
         let scheme = url.scheme?.lowercased() ?? ""
@@ -97,19 +105,22 @@ enum ExternalLinks {
         let host = foreign ? askerHost : pageHost
         let origin = foreign ? asker.flatMap { SiteOrigin.of($0) } : pageOrigin
         let key = "\(origin ?? host)|\(scheme)"
-        // The page's Allow or Block, or the app it was told Always Open to. A frame from elsewhere gets only Block, and
+        let tab = (webView as? BrowserWebView)?.owner
+        // The page's Allow or Block, or the app it was told Always Open to. The site-wide row comes first, as it
+        // always did: Allow means every app on the site, Block means none. A frame from elsewhere gets only Block, and
         // so does a link in a PDF (`fromPDF`), whose links are the PDF's, not the site's: it always asks.
         // A page with no site of its own (about:blank its opener wrote) is held to the Block of the site that made
         // it: the frame that asked, which has its origin, or the tab that opened it.
         let openerOrigin = (webView as? BrowserWebView)?.owner?.opener.flatMap { SiteOrigin.of($0.url) }
         let standIns = pageOrigin == nil ? [asker.flatMap { SiteOrigin.of($0) }, openerOrigin].compactMap { $0 } : []
-        let decision: () -> Bool? = {
-            let found = Self.decision(page: pageOrigin, standIns: standIns, scheme: scheme, foreign: foreign)
-            return fromPDF && found == true ? nil : found
+        let stored: () -> String? = {
+            let found = Self.storedAppAction(pageOrigin: pageOrigin, standIns: standIns, origin: origin, scheme: scheme,
+                                             foreign: foreign, tab: tab)
+            return fromPDF && found == "allow" ? nil : found
         }
         let clickedHere = isClick && isMainFrame && webView.window != nil
         let everydayClick = isEverydayClick(clickedHere: clickedHere, linkClick: linkClick ?? isClick, sourceIsMainFrame: sourceIsMainFrame, fromPDF: fromPDF)
-        switch verdict(byYou: byYou, clickedHere: everydayClick, scheme: scheme, stored: decision().map { $0 ? "allow" : "deny" }, canRemember: canRemember) {
+        switch verdict(byYou: byYou, clickedHere: everydayClick, scheme: scheme, stored: stored(), canRemember: canRemember) {
         case .block:
             Diagnostics.note("Blocked opening an app", site: host, "\(scheme):", isPrivate: !webView.configuration.websiteDataStore.isPersistent)
             return
@@ -127,7 +138,6 @@ enum ExternalLinks {
         // Nothing to keep the answer under (a private window, or a page with no host): Open is for this time only.
         // Nor is it from a PDF: Always Open there would let any PDF on the site open the app.
         let saves = !isPrivate && origin != nil && canRemember && !fromPDF
-        let tab = (webView as? BrowserWebView)?.owner
         if !foreign { SitePermissions.noteAsked(.apps, origin: pageOrigin, isPrivate: isPrivate) }
         asked.asking.insert(key)
         // Asked where the page is: in Zigzag Mini or an installed app's window, over its own page, not in a browser
@@ -140,16 +150,19 @@ enum ExternalLinks {
                                                     icon: NSWorkspace.shared.icon(forFile: app.path), in: promptHost,
                                                     tab: tab, title: String(localized: "Open \(name)", comment: "A page's question to open an app, without its question mark. The placeholder is the app's name, like “zoom.us”."),
                                                     actions: [.deny, .allow], canRemember: saves,
-                                                    answered: { decision().map { PermissionAnswer(action: $0 ? "allow" : "deny", remember: true) } })
+                                                    answered: { stored().map { PermissionAnswer(action: $0, remember: true) } })
             asked.asking.remove(key)
             guard let answer else {
                 asked.putOff[key] = Date().addingTimeInterval(60)
                 return
             }
             // This time holds on the page that asked, until it navigates; Always is kept for the site, and only
-            // where it could be kept (https, no foreign frame, not a private window).
+            // where it could be kept (https, no foreign frame, not a private window). A Deny is the site's, under
+            // the one "apps" key Site Controls and Settings show, so the row and the browser agree and no other app
+            // on the site asks again; Always Allow stays that one app's.
             if let origin {
-                SitePermissions.rememberAnswer(answer, subject: PermissionSubject.app(scheme), origin: origin, tab: tab, isPrivate: isPrivate)
+                SitePermissions.rememberAnswer(answer, subject: Self.storageSubject(for: answer, scheme: scheme),
+                                               origin: origin, tab: tab, isPrivate: isPrivate)
             }
             if answer.action == "allow" { NSWorkspace.shared.open(url) }
         }
@@ -170,30 +183,45 @@ enum ExternalLinks {
         return .ask
     }
 
-    /// Whether an app answer can be kept for the page at `url`: only a secure page, and never a frame from another
-    /// site (its answer would be the page's to give, not the frame's).
-    static func canRemember(url: URL?, foreign: Bool) -> Bool {
-        !foreign && url?.scheme?.lowercased() == "https"
-    }
-
-    /// What's kept for the page at `page` opening `scheme`'s app: its Allow or Block, or the app it was told Always
-    /// Open to; nil asks. A frame from another site on the page (`foreign`) is held by Block only, never let in.
-    static func decision(page: String?, scheme: String, foreign: Bool, stored: String?) -> String? {
-        guard let page, let stored else { return nil }
-        if stored == "deny" { return "deny" }
-        return foreign ? nil : stored
-    }
-
     /// Whether mail, phone and FaceTime may open at once: only for a link you clicked in the page in front itself,
     /// never from a frame in it, a script riding on your click, or a PDF.
     static func isEverydayClick(clickedHere: Bool, linkClick: Bool, sourceIsMainFrame: Bool, fromPDF: Bool) -> Bool {
         clickedHere && linkClick && sourceIsMainFrame && !fromPDF
     }
 
-    /// The same, where a page with no site (`page` nil) answers to the Block of the sites standing in for it.
-    static func decision(page: String?, standIns: [String], scheme: String, foreign: Bool) -> Bool? {
-        if let page { return decision(page: page, scheme: scheme, foreign: foreign) }
-        return standIns.contains { decision(page: $0, scheme: scheme, foreign: true) == false } ? false : nil
+    /// What's kept for the page at `page` opening an app: its Allow or Block, or the app it was told Always Open to;
+    /// nil asks. A frame from another site on the page (`foreign`) is held by Block only, never let in.
+    static func decision(page: String?, foreign: Bool, stored: String?) -> String? {
+        guard let page, let stored else { return nil }
+        if stored == "deny" { return "deny" }
+        return foreign ? nil : stored
+    }
+
+    /// What a page opening an app is held to, in one place: the site's own Allow or Block (the one "Open apps" row,
+    /// which means every app), then the app told Always Allow, then the page's own answer this time. The site-wide
+    /// row is read before the app's own key — a site-wide Allow covers every app, exactly as it always did. A page
+    /// with no site of its own (`pageOrigin` nil) is held to the Block of the sites standing in for it. Nil asks.
+    static func storedAppAction(pageOrigin: String?, standIns: [String], origin: String?, scheme: String, foreign: Bool, tab: Tab?) -> String? {
+        let siteWide = pageOrigin.flatMap { SitePermissions.action(PermissionSubject.apps, origin: $0) }
+        let perApp = pageOrigin.flatMap { SitePermissions.action(PermissionSubject.app(scheme), origin: $0) }
+        if let kept = decision(page: pageOrigin, foreign: foreign, stored: siteWide ?? perApp) { return kept }
+        if pageOrigin == nil {
+            let blocked = standIns.contains { standIn in
+                let wide = SitePermissions.action(PermissionSubject.apps, origin: standIn)
+                let app = SitePermissions.action(PermissionSubject.app(scheme), origin: standIn)
+                return decision(page: standIn, foreign: true, stored: wide ?? app) == "deny"
+            }
+            if blocked { return "deny" }
+        }
+        guard let origin else { return nil }
+        return tab?.permissionAnswers.action(key: origin, kind: PermissionSubject.app(scheme))
+    }
+
+    /// The subject an answered app question is kept under. An "Always / Don't Allow" is the *site's* deny — the one
+    /// "apps" row Site Controls and Settings show — so the row and the browser agree and no other app on the site asks
+    /// again; anything else (a This-time answer, or an Always Allow) stays that one app's key.
+    static func storageSubject(for answer: PermissionAnswer, scheme: String) -> String {
+        answer.action == "deny" && answer.remember ? PermissionSubject.apps : PermissionSubject.app(scheme)
     }
 
     /// Whether the frame that asked is someone other than the page: another site, or a frame with no host of its own
