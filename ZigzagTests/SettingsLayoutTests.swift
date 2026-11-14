@@ -116,6 +116,19 @@ struct SettingsLayoutTests {
         #expect(fresh.inkWidth == tracked)
     }
 
+    /// Text or a font set around the label, through its cell, is measured again too: what was measured is checked
+    /// against what the label has.
+    @Test func aLabelsMeasureChecksWhatItWasFor() throws {
+        let label = Label("Short", font: Tokens.Font.body())
+        let short = label.inkWidth
+        let cell = try #require(label.cell)
+        cell.stringValue = "A much longer title than that"
+        let long = label.inkWidth
+        #expect(long > short)
+        cell.font = Tokens.Font.body().withSize(Tokens.Font.body().pointSize * 2)
+        #expect(label.inkWidth > long)
+    }
+
     /// The fade at a label's end follows its text: one that grows past its room fades, one cut back to fit doesn't.
     @Test func aLabelsFadeFollowsItsText() {
         let label = Label("Fits", font: Tokens.Font.body())

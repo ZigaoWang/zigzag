@@ -32,6 +32,16 @@ import Testing
         }
     }
 
+    /// A tab's title is faded once a layout, where it ends up (under the close button, past a pin's name), not first
+    /// where a plain row would put it.
+    @Test func aTabsTitleIsFadedOnceALayout() {
+        let row = row(parts: 1, width: 220)
+        let before = row.title.fadesAsked
+        row.needsLayout = true
+        row.layoutSubtreeIfNeeded()
+        #expect(row.title.fadesAsked == before + 1)
+    }
+
     @Test func theOtherIconsStepAlongEvenly() {
         let xs = icons(of: row(parts: 4, width: 260)).map(\.minX)
         let steps = zip(xs.dropFirst(), xs).map { $0 - $1 }

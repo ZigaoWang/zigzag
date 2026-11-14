@@ -698,6 +698,9 @@ final class Label: NSTextField {
     /// Fades the text out just before `end` (in its own terms; a button over its end), or, with none, at its own
     /// end when the text doesn't fit. Text that fits, with nothing over it, has no fade.
     func fadeTail(endingAt end: CGFloat? = nil) {
+        #if DEBUG
+        fadesAsked += 1
+        #endif
         let room = bounds.width - Label.inset * 2
         let stop = end ?? (inkWidth > room + 0.5 ? bounds.width - Label.inset : nil)
         // Every layout of every row asks again: the same size and the same cut as last time leave the mask be.
@@ -744,21 +747,26 @@ final class Label: NSTextField {
     /// styled text (a space's name, set tight), it's measured as drawn, tracking included.
     /// Measured once per text, font and tracking: a sidebar row asks on every layout.
     var inkWidth: CGFloat {
-        if let measured = measuredInk { return measured.width }
+        let font = self.font ?? Tokens.Font.body()
+        let text = stringValue
+        // Set aside whenever the text or font is set through the label; checked here too, for a change made
+        // around it (through its cell).
+        if let measured = measuredInk, measured.text == text, measured.fontName == font.fontName, measured.pointSize == font.pointSize {
+            return measured.width
+        }
         let styled = attributedStringValue
         let kern = styled.length > 0 ? styled.attribute(.kern, at: 0, effectiveRange: nil) as? NSNumber : nil
-        let font = self.font ?? Tokens.Font.body()
-        let width = kern != nil ? ceil(styled.size().width) : ceil((stringValue as NSString).size(withAttributes: [.font: font]).width)
-        measuredInk = MeasuredInk(text: styled.string, fontName: font.fontName, pointSize: font.pointSize, kern: kern?.doubleValue, width: width)
+        let width = kern != nil ? ceil(styled.size().width) : ceil((text as NSString).size(withAttributes: [.font: font]).width)
+        measuredInk = MeasuredInk(text: text, fontName: font.fontName, pointSize: font.pointSize, width: width)
         return width
     }
 
-    /// The last `inkWidth` and what it was measured for; set aside whenever the text or the font changes.
+    /// The last `inkWidth` and what it was measured for. Tracking isn't kept: it only ever comes with styled text
+    /// set through the label, which sets the measure aside.
     private struct MeasuredInk: Equatable {
         var text: String
         var fontName: String
         var pointSize: CGFloat
-        var kern: Double?
         var width: CGFloat
     }
     private var measuredInk: MeasuredInk? { didSet { if measuredInk == nil { lastFade = nil } } }
@@ -770,6 +778,8 @@ final class Label: NSTextField {
     #if DEBUG
     /// Whether `inkWidth` would measure again: for tests.
     var hasMeasuredInk: Bool { measuredInk != nil }
+    /// How many times `fadeTail` was asked: for tests.
+    var fadesAsked = 0
     #endif
 
     /// The label's built-in inset on each side, so text can sit exactly where it's placed.
