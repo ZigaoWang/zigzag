@@ -40,13 +40,13 @@ struct SettingsPageTests {
     }
 
     @Test func theColumnKeepsItsOrder() {
-        #expect(SettingsPane.allCases == [.general, .appearance, .tabs, .spaces, .profiles, .search, .mini, .translation, .passwords,
+        #expect(SettingsPane.allCases == [.general, .downloads, .appearance, .tabs, .spaces, .profiles, .search, .mini, .translation, .passwords,
                                           .privacy, .websiteData, .extensions, .shortcuts, .automation, .developer])
     }
 
     @Test func theColumnIsInGroups() {
         let groups = SettingsPane.columnGroups(manyProfiles: false)
-        #expect(groups.shared == [[.general, .appearance, .tabs, .spaces, .profiles], [.search, .mini, .translation],
+        #expect(groups.shared == [[.general, .downloads, .appearance, .tabs, .spaces, .profiles], [.search, .mini, .translation],
                                   [.passwords, .privacy], [.extensions, .shortcuts, .automation, .developer]])
         #expect(groups.profile.isEmpty)
         // A gap before each group but the first.
@@ -55,7 +55,7 @@ struct SettingsPageTests {
 
     @Test func withMoreProfilesExtensionsLeavesItsGroup() {
         let groups = SettingsPane.columnGroups(manyProfiles: true)
-        #expect(groups.shared == [[.general, .appearance, .tabs, .spaces, .profiles], [.search, .mini, .translation],
+        #expect(groups.shared == [[.general, .downloads, .appearance, .tabs, .spaces, .profiles], [.search, .mini, .translation],
                                   [.passwords, .privacy], [.shortcuts, .automation, .developer]])
         #expect(groups.profile == [.extensions, .websiteData])
         #expect(SettingsPane.groupStarts(manyProfiles: true) == [.search, .passwords, .shortcuts])
@@ -70,7 +70,7 @@ struct SettingsPageTests {
 
     @Test func withOneProfileTheColumnIsAsItWasBeforeProfiles() {
         let column = SettingsPane.column(manyProfiles: false)
-        #expect(column.shared == [.general, .appearance, .tabs, .spaces, .profiles, .search, .mini, .translation, .passwords, .privacy,
+        #expect(column.shared == [.general, .downloads, .appearance, .tabs, .spaces, .profiles, .search, .mini, .translation, .passwords, .privacy,
                                   .extensions, .shortcuts, .automation, .developer])
         #expect(column.profile.isEmpty)
         // What websites keep is in Privacy, and an address that names Website Data opens it there.
@@ -82,7 +82,7 @@ struct SettingsPageTests {
     @Test func withMoreProfilesTheSectionsAboutOneStandApart() {
         let column = SettingsPane.column(manyProfiles: true)
         #expect(column.profile == [.extensions, .websiteData])
-        #expect(column.shared == [.general, .appearance, .tabs, .spaces, .profiles, .search, .mini, .translation, .passwords, .privacy,
+        #expect(column.shared == [.general, .downloads, .appearance, .tabs, .spaces, .profiles, .search, .mini, .translation, .passwords, .privacy,
                                   .shortcuts, .automation, .developer])
         // Every section is listed once.
         #expect(Set(column.shared + column.profile) == Set(SettingsPane.allCases))
