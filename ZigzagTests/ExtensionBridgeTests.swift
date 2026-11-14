@@ -750,4 +750,12 @@ extension ExtensionBridgeTests {
         let long = ExtensionLog.entry(String(repeating: "é", count: 10_000))
         #expect(long.unicodeScalars.count == ExtensionLog.lineLimit + 1 && long.hasSuffix("…"))
     }
+
+    /// The sound taps take chunks of the size they send, not any a page posts.
+    @Test func tapChunksAreCapped() {
+        #expect(BridgeTabCapture.acceptsChunk(pcm: String(repeating: "A", count: 44_000), rate: 48_000))
+        #expect(!BridgeTabCapture.acceptsChunk(pcm: String(repeating: "A", count: BridgeTabCapture.maxChunkCharacters + 1), rate: 48_000))
+        #expect(!BridgeTabCapture.acceptsChunk(pcm: "AAAA", rate: 0))
+        #expect(!BridgeTabCapture.acceptsChunk(pcm: "AAAA", rate: .infinity))
+    }
 }

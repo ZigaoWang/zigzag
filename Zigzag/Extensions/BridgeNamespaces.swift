@@ -1744,10 +1744,18 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         }
     }
 
+    /// The most one chunk of sound may be, as base64: the taps send a few thousand samples at a time (16384 at
+    /// most, 44 KB). The page's own world can post to the handler too, so anything bigger is dropped unread.
+    nonisolated static let maxChunkCharacters = 64 * 1024
+
+    nonisolated static func acceptsChunk(pcm: String, rate: Double) -> Bool {
+        pcm.utf8.count <= maxChunkCharacters && (8_000...384_000).contains(rate)
+    }
+
     nonisolated func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         MainActor.assumeIsolated {
             guard let body = message.body as? [String: Any], let id = body["tap"] as? String, let pcm = body["pcm"] as? String,
-                  let rate = body["rate"] as? Double else { return }
+                  let rate = body["rate"] as? Double, Self.acceptsChunk(pcm: pcm, rate: rate) else { return }
             let at = body["at"] as? Double ?? 0
             var level = body["level"] as? Double ?? 1
             #if DEBUG
