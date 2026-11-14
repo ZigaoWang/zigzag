@@ -246,12 +246,9 @@ final class Tab: NSObject {
     let changed = Signal<Change>()
 
     /// The page showing came with a certificate you chose to trust on the warning page ("Visit anyway"): the
-    /// connection is not secure, and the address and Site Controls say so for as long as it's in use.
-    var usesCertificateException: Bool {
-        guard let webView, let url = webView.url, url.scheme?.lowercased() == "https", let host = url.host(),
-              let trust = webView.serverTrust else { return false }
-        return CertificateExceptions.allows(host, trust: trust, in: webView.configuration.websiteDataStore)
-    }
+    /// connection is not secure, and the address and Site Controls say so for as long as it's in use, after the
+    /// choice runs out too.
+    var usesCertificateException: Bool { CertificateExceptions.isShowingException(in: webView) }
 
     #if DEBUG
     /// visitanyway: what the warning's "Visit anyway" does, for a test copy whose clicks don't reach the page. Only

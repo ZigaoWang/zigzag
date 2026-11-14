@@ -131,10 +131,20 @@ enum PageDialogs {
     static func allows(_ host: String, leaf: Data?, in store: WKWebsiteDataStore, now: Date = Date()) -> Bool {
         guard let leaf, !leaf.isEmpty, let hosts = trusted.object(forKey: store),
               let exception = hosts[host.lowercased()] as? Exception else { return false }
-        guard now < exception.until else {
-            hosts.removeObject(forKey: host.lowercased())
-            return false
-        }
+        return now < exception.until && exception.leaf == leaf
+    }
+
+    /// Whether the page `webView` shows came with a certificate you chose to trust on the warning page.
+    static func isShowingException(in webView: WKWebView?) -> Bool {
+        guard let webView, let url = webView.url, url.scheme?.lowercased() == "https", let host = url.host(),
+              let trust = webView.serverTrust else { return false }
+        return wasTrusted(host, leaf: leaf(of: trust), in: webView.configuration.websiteDataStore)
+    }
+
+    /// Whether `leaf` is a certificate you chose to trust for `host`, even if that choice has since run out: a page
+    /// still showing what came with it isn't secure, and goes on saying so.
+    static func wasTrusted(_ host: String, leaf: Data?, in store: WKWebsiteDataStore) -> Bool {
+        guard let leaf, !leaf.isEmpty, let exception = trusted.object(forKey: store)?[host.lowercased()] as? Exception else { return false }
         return exception.leaf == leaf
     }
 
@@ -144,9 +154,17 @@ enum PageDialogs {
         return now < exception.until
     }
 
-    /// The choices for `store` go (its site data was cleared).
-    static func forget(in store: WKWebsiteDataStore) {
-        trusted.removeObject(forKey: store)
+    /// The choices for `store` go (its site data was cleared): all of them, or one site's (covering its subdomains
+    /// and the domains it's under).
+    static func forget(in store: WKWebsiteDataStore, site: String? = nil) {
+        guard let site = site?.lowercased() else {
+            trusted.removeObject(forKey: store)
+            return
+        }
+        guard let hosts = trusted.object(forKey: store) else { return }
+        for case let key as String in hosts.allKeys where key == site || key.hasSuffix("." + site) || site.hasSuffix("." + key) {
+            hosts.removeObject(forKey: key)
+        }
     }
 
     /// Per data store, the certificate each development server on this Mac first showed, by host and port: two

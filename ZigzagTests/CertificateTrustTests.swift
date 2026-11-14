@@ -95,6 +95,68 @@ struct CertificateTrustTests {
         #expect(StrictTransport.isKnown("secure.example", in: store))
     }
 
+    @Test func knowsThePreloadList() {
+        #expect(StrictTransport.isPreloadLoaded)
+        // A name that covers its subdomains, and one that covers itself only.
+        #expect(StrictTransport.isKnown("github.com", in: nil))
+        #expect(StrictTransport.isKnown("gist.github.com", in: nil))
+        #expect(StrictTransport.isKnown("paypal.com", in: nil))
+        #expect(StrictTransport.isKnown("PayPal.com.", in: nil))
+        #expect(!StrictTransport.isKnown("not-on-the-list.paypal.com", in: nil))
+        #expect(!StrictTransport.isKnown("zigzag-not-preloaded.example", in: nil))
+        #expect(!StrictTransport.isKnown("github.com.evil.example", in: nil))
+    }
+
+    @Test func aProfileKeepsItsHSTSHostsAcrossLaunches() throws {
+        let store = WKWebsiteDataStore.default()
+        StrictTransport.forget(in: store)
+        StrictTransport.note("kept.example", policy: .init(maxAge: 600, includesSubdomains: true), in: store)
+        StrictTransport.note("gone.example", policy: .init(maxAge: 600, includesSubdomains: false), in: store, now: Date(timeIntervalSinceNow: -700))
+        StrictTransport.settle()
+        // Read again, as at the next launch.
+        StrictTransport.reload()
+        #expect(StrictTransport.isKnown("www.kept.example", in: store))
+        #expect(!StrictTransport.isKnown("gone.example", in: store))
+        // A private window's are never written.
+        let privateStore = WKWebsiteDataStore.nonPersistent()
+        StrictTransport.note("private.example", policy: .init(maxAge: 600, includesSubdomains: false), in: privateStore)
+        StrictTransport.settle()
+        #expect(StrictTransport.isKnown("private.example", in: privateStore))
+        #expect(!StrictTransport.isKnown("private.example", in: store))
+        // Clearing the site's data takes it, on disk too.
+        WebsiteData.forgetConnections(in: store, site: "kept.example")
+        StrictTransport.settle()
+        StrictTransport.reload()
+        #expect(!StrictTransport.isKnown("kept.example", in: store))
+        let file = try #require(StrictTransport.file("default"))
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+    }
+
+    @Test func clearingSiteDataForgetsExceptions() {
+        let store = WKWebsiteDataStore.nonPersistent()
+        CertificateExceptions.allow("nas.example.com", certificate: Data([1]), in: store)
+        CertificateExceptions.allow("router.local", certificate: Data([2]), in: store)
+        StrictTransport.note("example.com", policy: .init(maxAge: 600, includesSubdomains: false), in: store)
+        WebsiteData.forgetConnections(in: store, site: "example.com")
+        #expect(!CertificateExceptions.hasException(for: "nas.example.com", in: store))
+        #expect(CertificateExceptions.hasException(for: "router.local", in: store))
+        #expect(!StrictTransport.isKnown("example.com", in: store))
+        WebsiteData.forgetConnections(in: store)
+        #expect(!CertificateExceptions.hasException(for: "router.local", in: store))
+    }
+
+    @Test func aPageOnAnExceptionStaysNotSecureWhenItRunsOut() {
+        let store = WKWebsiteDataStore.nonPersistent()
+        let leaf = Data([5, 5, 5])
+        CertificateExceptions.allow("nas.local", certificate: leaf, in: store, now: Date(timeIntervalSinceNow: -CertificateExceptions.lifetime - 1))
+        // No longer let through for a new load, but a page that came with it is still marked.
+        #expect(!CertificateExceptions.allows("nas.local", leaf: leaf, in: store))
+        #expect(CertificateExceptions.wasTrusted("NAS.local", leaf: leaf, in: store))
+        #expect(!CertificateExceptions.wasTrusted("nas.local", leaf: Data([6]), in: store))
+        CertificateExceptions.forget(in: store)
+        #expect(!CertificateExceptions.wasTrusted("nas.local", leaf: leaf, in: store))
+    }
+
     @Test func siteControlsSayALetThroughCertificateIsNotSecure() {
         let excepted = SitePanel.connection(scheme: "https", onlySecureContent: true, certificateException: true)
         #expect(excepted.value == SitePanel.notSecure && excepted.warns && excepted.reason != nil)

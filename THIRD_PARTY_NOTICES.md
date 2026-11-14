@@ -267,6 +267,46 @@ contributors, with comments removed; the source form is at
 
 License: [Mozilla Public License, Version 2.0](https://mozilla.org/MPL/2.0/).
 
+### HSTS preload list
+
+Knowing which sites may only be reached over a secure connection, so their certificate warnings have no way past.
+`Zigzag/Resources/hsts_preload.txt` is made by `scripts/update-hsts-preload.py` from Chromium's
+[transport_security_state_static.json](https://chromium.googlesource.com/chromium/src/+/main/net/http/transport_security_state_static.json):
+only the host names of its `force-https` entries are kept, one a line, `=` before a name whose subdomains aren't
+covered. Taken from Chromium at `ae2874435a43aeef98ad724bcd90b06d07d1d8c8`.
+
+License: BSD-style, from [Chromium's LICENSE](https://chromium.googlesource.com/chromium/src/+/main/LICENSE):
+
+```
+Copyright 2012 The Chromium Authors
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * Neither the name of Google LLC nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
 ### Top-level domains
 
 Telling an address from a search in the address bar. `Zigzag/Resources/tlds.txt` is the list of top-level domains

@@ -24,6 +24,8 @@ enum WebsiteData {
     static func clear(_ kind: Kind, site: String? = nil, in store: WKWebsiteDataStore) async {
         // Dark pages' sites seen dark name the sites they were seen on: they go with either.
         DarkSeen.forget(in: store, site: site)
+        // What a site's own data is cleared with: the certificates you chose to trust for it and its HSTS answer.
+        if kind == .cookies { forgetConnections(in: store, site: site) }
         guard let site else {
             await store.removeData(ofTypes: kind.types, modifiedSince: .distantPast)
             return
@@ -35,5 +37,11 @@ enum WebsiteData {
         }
         guard !matching.isEmpty else { return }
         await store.removeData(ofTypes: kind.types, for: matching)
+    }
+
+    /// Lets go of the certificate exceptions and the hosts that sent Strict-Transport-Security, for one site or all.
+    static func forgetConnections(in store: WKWebsiteDataStore, site: String? = nil) {
+        CertificateExceptions.forget(in: store, site: site)
+        StrictTransport.forget(in: store, site: site)
     }
 }

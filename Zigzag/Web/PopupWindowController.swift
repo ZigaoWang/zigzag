@@ -187,8 +187,16 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     /// The address of the page on screen: never one only on its way, which a page could start and never finish.
     private var shownURL: URL?
 
+    /// The address Zigzag's own page for a load that failed is showing at, if it's showing one.
+    private var errorShownFor: URL?
+
+    /// The lock says what Site Controls' connection line says: a certificate let through on the warning page, or
+    /// Zigzag's own warning in place of a page, is never secure.
     private func updateHeader() {
-        header.show(url: shownURL, secure: webView.hasOnlySecureContent)
+        let connection = SitePanel.connection(scheme: shownURL?.scheme, onlySecureContent: webView.hasOnlySecureContent,
+                                              certificateException: CertificateExceptions.isShowingException(in: webView),
+                                              hasCertificate: !(shownURL != nil && shownURL == errorShownFor))
+        header.show(url: shownURL, secure: !connection.warns)
     }
 
     /// Shows an extension's popup over this window, from the right end of its header, so it isn't hidden behind it.
@@ -262,6 +270,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         PageDialogs.pageLoaded(webView)
         shownURL = webView.url
+        errorShownFor = ErrorPage.consume(webView) ? webView.url : nil
         updateHeader()
     }
 

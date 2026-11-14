@@ -168,13 +168,17 @@ final class WebKitSiteData: SiteDataSource {
         await store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), for: records)
         names.forEach { byName[$0] = nil }
         // Dark pages' sites seen dark go with the site's data, as when cookies are cleared.
-        for name in Set(names.map(SiteDataListing.site(of:))) { DarkSeen.forget(in: store, site: name) }
+        for name in Set(names.map(SiteDataListing.site(of:))) {
+            DarkSeen.forget(in: store, site: name)
+            WebsiteData.forgetConnections(in: store, site: name)
+        }
     }
 
     func removeAll() async {
         await store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
         byName = [:]
         DarkSeen.forget(in: store)
+        WebsiteData.forgetConnections(in: store)
     }
 }
 
