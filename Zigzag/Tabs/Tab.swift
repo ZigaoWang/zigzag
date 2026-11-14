@@ -2026,12 +2026,14 @@ extension Tab: WKUIDelegate {
             // banner asks and nothing opens now. Zigzag's own pages never open this way.
             guard Self.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
             if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(url)) {
-                switch stored {
-                case "deny":
+                switch PopupNotice.destination(for: stored) {
+                case .deny:
                     return nil
-                case "mini":
+                case .viewer:
+                    // WebKit is still offering the pop-up here, so it is made the real thing: `window.opener` and
+                    // everything the page does with the new window keep working.
                     return PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: webView.window, opener: self)
-                default:
+                case .thisTab, .newTab:
                     if let target = navigationAction.request.url, let promptHost = host as? PromptHost {
                         PopupNotice.open(target, action: stored, from: self, in: promptHost)
                     }

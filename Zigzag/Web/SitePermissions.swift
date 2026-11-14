@@ -88,7 +88,7 @@ enum SitePermissions {
             var actions: [String: String] = [:]
             for (key, value) in defaults.dictionary(forKey: key) ?? [:] {
                 if let action = value as? String { actions[key] = action }
-                else if let allowed = value as? Bool { actions[key] = allowed ? "allow" : "deny" }
+                else if let allowed = value as? Bool { actions[key] = allowed ? legacyYes(forKey: key) : "deny" }
             }
             return actions
         }
@@ -103,6 +103,13 @@ enum SitePermissions {
         case .microphone: [.microphone]
         default: [.camera, .microphone]
         }
+    }
+
+    /// A legacy `true` becomes the subject's ordinary yes, which is not "allow" for every subject: the answer a site's
+    /// pop-ups are kept under is a destination ("mini", "thisTab", "newTab") or "deny", never "allow", and the design
+    /// says an old `true` there means the pop-up viewer. Everywhere else a yes is "allow".
+    private static func legacyYes(forKey key: String) -> String {
+        key.hasSuffix("|" + PermissionSubject.popups) ? "mini" : "allow"
     }
 
     /// Converts any answers written by the old Bool store in place, and the old combined camera-and-microphone key
@@ -120,7 +127,6 @@ enum SitePermissions {
         }
         defaults.set(now, forKey: key)
     }
-
     static func action(_ subject: String, origin: String) -> String? {
         let now = stored
         if subject.hasPrefix("app:"), now["\(origin)|\(PermissionSubject.apps)"] == "deny" { return "deny" }
@@ -345,10 +351,13 @@ enum SitePermissions {
     /// Always Open on a site's question: that one app, for that site.
     static func allowOpeningApp(origin: String, scheme: String) { remember("allow", subject: PermissionSubject.app(scheme), origin: origin) }
 
-    /// Pop-ups a site opens on its own: allowed once you've said Always Allow, blocked (nil) otherwise.
+    /// Pop-ups a site opens on its own: allowed once you've said Always Allow, blocked (nil or false) otherwise. The
+    /// yes is kept as the destination it means — the pop-up viewer — not as a bare "allow", which is no destination.
     static func popups(origin: String) -> Bool { allowed(action(PermissionSubject.popups, origin: origin)) == true }
 
-    static func setPopups(_ allowed: Bool?, origin: String) { remember(action(for: allowed), subject: PermissionSubject.popups, origin: origin) }
+    static func setPopups(_ allowed: Bool?, origin: String) {
+        remember(allowed.map { $0 ? "mini" : "deny" }, subject: PermissionSubject.popups, origin: origin)
+    }
 
     /// WebRTC (`WebRTCProtection`): Allow or Block kept for the site, nil to follow the setting.
     static func webRTC(origin: String) -> Bool? { allowed(stored["\(origin)|webRTC"]) }
