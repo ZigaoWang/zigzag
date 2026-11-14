@@ -12,13 +12,6 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
-### 修复
-- PDF 阅读器的深色页面会保留图片原本的样子，照片不会再变成底片。文字和线条照样变深，扫描的页面也一样。([#226](https://github.com/ZigaoWang/zigzag/issues/226))
-
-### 修复
-- 网页想打开 App 时的询问，会出现在 Zigzag Mini 或已安装 App 的窗口里、它自己的网页上方。以前会出现在后面的浏览器窗口里，所以在 Zigzag Mini 里点 claude.ai 的“Open Claude”好像没反应。
-- 指针移到窗口边缘时，隐藏的边栏会更快出来；窗口旁边有另一块屏幕、指针稍微冲到那块屏幕上时也一样。([#206](https://github.com/ZigaoWang/zigzag/issues/206))
-
 ## [0.9.0] - 2026-11-12
 
 分屏浏览最多放四个页面，网站可以安装成独立的应用，边栏可以放在左边或右边，标签页在窗口之间移动时保持原样。深色网页改用 Dark Reader，广告拦截加入了 uBlock Origin 的过滤列表，Cookie 弹窗会自动帮你拒绝，“网站设置”也重新做了。
@@ -83,6 +76,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - “更改图标”里的第一个选项显示网站自己的图标，一看就知道它是用来恢复网站图标的。
 
 ### 修复
+- PDF 阅读器的深色页面会保留图片原本的样子，照片不会再变成底片。文字和线条照样变深，扫描的页面也一样。([#226](https://github.com/ZigaoWang/zigzag/issues/226))
+- 网页想打开 App 时的询问，会出现在 Zigzag Mini 或已安装 App 的窗口里、它自己的网页上方。以前会出现在后面的浏览器窗口里，所以在 Zigzag Mini 里点 claude.ai 的“Open Claude”好像没反应。
+- 指针移到窗口边缘时，隐藏的边栏会更快出来；窗口旁边有另一块屏幕、指针稍微冲到那块屏幕上时也一样。([#206](https://github.com/ZigaoWang/zigzag/issues/206))
 - 隐藏的边栏滑出或收回时不再闪：以前它可能先在要去的位置（出来或消失）显示一帧，再滑过去，看起来像是打开、关上又打开。([#206](https://github.com/ZigaoWang/zigzag/issues/206))
 - 网页上打开 App 的按钮（比如 claude.ai 登录后的“Open Claude”）在你点按时总会询问，即使网页刚才的询问被搁置了。
 - 网页应用会比 Zigzag 的菜单先收到自己的快捷键，和 Safari、Chrome 一样：Google 文档里的 ⌘A、⌘B，Slack、Linear、Notion 里的 ⌘K，用 ⌘[ 缩进等等。只有浏览器自己的快捷键（新标签页、重新打开关闭的标签页、窗口、地址栏、重新载入、空间、退出）无论网页想不想要都归 Zigzag；你在“设置 › 快捷键”里改过的快捷键，换了按键也照样归浏览器。([#219](https://github.com/ZigaoWang/zigzag/issues/219))
