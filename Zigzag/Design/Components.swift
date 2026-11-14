@@ -198,22 +198,25 @@ extension InteractiveView {
     /// primary's dark fill (a light button on the brand's blue, a destructive red), with `ink` on it.
     @discardableResult
     func applyButtonLook(_ look: ButtonLook, tint: NSColor? = nil, ink: NSColor? = nil) -> NSColor {
+        // A disabled control is inert: the pointer over it must not make it look clickable.
+        let hovered = isEnabled && isHovered
+        let pressed = isEnabled && isPressed
         let fill: NSColor?
         var text = Tokens.Color.textPrimary
         switch look {
         case .secondary:
-            fill = isPressed ? Tokens.Color.controlPressed : isHovered || isSelected ? Tokens.Color.controlHover : Tokens.Color.controlFill
+            fill = pressed ? Tokens.Color.controlPressed : hovered || isSelected ? Tokens.Color.controlHover : Tokens.Color.controlFill
         case .primary:
             if let tint {
-                fill = isPressed ? (tint.shadow(withLevel: 0.15) ?? tint) : isHovered ? (tint.highlight(withLevel: 0.08) ?? tint) : tint
+                fill = pressed ? (tint.shadow(withLevel: 0.15) ?? tint) : hovered ? (tint.highlight(withLevel: 0.08) ?? tint) : tint
                 text = ink ?? .white
             } else {
-                fill = isPressed ? Tokens.Color.primaryPressed : isHovered ? Tokens.Color.primaryHover : Tokens.Color.primaryFill
+                fill = pressed ? Tokens.Color.primaryPressed : hovered ? Tokens.Color.primaryHover : Tokens.Color.primaryFill
                 text = ink ?? Tokens.Color.onPrimary
             }
         case .quiet:
-            fill = isPressed ? Tokens.Color.pressedFill : isHovered || isSelected ? Tokens.Color.hoverFill : nil
-            text = isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+            fill = pressed ? Tokens.Color.pressedFill : hovered || isSelected ? Tokens.Color.hoverFill : nil
+            text = hovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         }
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
         let edged = look == .secondary
