@@ -136,8 +136,23 @@ enum PageScripts {
     static var all: [WKUserScript] {
         // Picture in Picture lives in the site panel and View › Picture in Picture (⌥⌘P), not as a pill drawn over
         // videos: pages lay out their own players, and a pill placed from outside drifts off them.
-        [WKUserScript(source: linkHover, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient)]
+        [WKUserScript(source: linkHover, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient), applePayMark]
     }
+
+    /// The Apple Store's checkout draws one Apple Pay mark (#235). WebKit gives Apple Pay only to Safari, so the
+    /// store uses Apple's Apple Pay script for other browsers, marks the page `supports-applepay-ac` and writes the
+    /// mark as text, the Apple logo and Pay. Its payment option also has the Apple Pay logo as a
+    /// `-webkit-named-image`, which only WebKit draws: Chrome shows just the text, Safari just the logo, and Zigzag
+    /// drew both, one over the other. The logo goes in that case, as the store's own rule takes it off its button.
+    static let applePayMark = WKUserScript(source: """
+    (() => {
+      const host = location.hostname;
+      if (host !== 'apple.com' && !host.endsWith('.apple.com')) return;
+      const style = document.createElement('style');
+      style.textContent = 'html.supports-applepay-ac .rf-paymentoptions-image-applepay { background-image: none !important; }';
+      (document.head || document.documentElement).appendChild(style);
+    })();
+    """, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .defaultClient)
 
     /// Chrome's name for the messaging WebKit gives sites an extension lists (Resources/Extensions/chrome-runtime.js).
     static func chromeRuntime(matching patterns: [String: [String]]) -> WKUserScript {
