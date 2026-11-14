@@ -75,12 +75,13 @@ jobs:
             -only-testing:ZigzagTests/PermissionPromptTests \
             -only-testing:ZigzagTests/PendingQuestionsTests \
             -only-testing:ZigzagTests/PageLinkTests \
-            -only-testing:ZigzagTests/SiteControlsPermissionTests | tee test.log
+            -only-testing:ZigzagTests/SiteControlsPermissionTests \
+            -only-testing:ZigzagTests/SettingsLayoutTests | tee test.log
 
       - name: Check the tests that matter really ran
         # A selector that matches nothing passes silently, so name one test per area; and a red test is a red build.
         run: |
-          for t in eachMatchKind remembersAnActionPerSubjectAndOrigin migratesOldBoolsOnce theAnswerCarriesTheChosenActionAndDuration openAppsIsAPermission aTabWearsTheMarkerOnlyWhileItsQuestionCannotBeShown everyPopupValueHasADestination anAppLinkReadsTheSiteWideRowThenTheAppThenThePage theDownloadsListGroupsSitesByTheirAnswer anAnswerIsKeptOnlyWhereItMayBe aStoredAllowSkipsTheQuestionAndABlockStopsIt aLegacyPopupYesMeansTheViewer allowingPopupsKeepsTheViewer anAnsweredDenyIsKeptForTheWholeSite aPopUpGoesThroughTheTabThatAskedNotABrowserWindow aPagesOwnThisTimePopUpAnswerIsReadBack; do
+          for t in eachMatchKind remembersAnActionPerSubjectAndOrigin migratesOldBoolsOnce theAnswerCarriesTheChosenActionAndDuration openAppsIsAPermission aTabWearsTheMarkerOnlyWhileItsQuestionCannotBeShown everyPopupValueHasADestination anAppLinkReadsTheSiteWideRowThenTheAppThenThePage theDownloadsListGroupsSitesByTheirAnswer anAnswerIsKeptOnlyWhereItMayBe aStoredAllowSkipsTheQuestionAndABlockStopsIt aLegacyPopupYesMeansTheViewer allowingPopupsKeepsTheViewer anAnsweredDenyIsKeptForTheWholeSite aPopUpGoesThroughTheTabThatAskedNotABrowserWindow aPagesOwnThisTimePopUpAnswerIsReadBack fitsThePageItIsGivenInsideAnAnimation aFieldInARowIsGivenRoomToDraw aFieldHasASizeOfItsOwn; do
             grep -q "✔ Test $t() passed" test.log || { echo "did not run: $t"; exit 1; }
           done
           if grep -q "✘" test.log; then echo "a test failed"; exit 1; fi
