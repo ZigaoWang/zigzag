@@ -5,14 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- Zigzag uses about 9 MB less memory: the list of sites that only allow secure connections is read in place when a certificate warning needs it, instead of loaded at launch.
-- VoiceOver reads Zigzag's own buttons, switches, menus and rows by name, like Back, Downloads or a tab's title, and says which tab is current. They came through as pictures named after their icons, and some had no name at all.
-- What's New opens over the page, below the bar above it, instead of across the address and the developer tools.
-- An extension's popup opened from the sidebar stays inside the window, instead of hanging past its left edge.
-- In onboarding, the note that no other browsers were found sits in the middle of its card.
-- Install as App's name field shows it's ready for typing in light mode too, as it does in dark. In the sheet for adding an extension, a site's name no longer breaks across two lines at a hyphen.
-
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
@@ -49,6 +41,12 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - Switches that are off stand out from the page in dark mode, on a lighter gray track as macOS draws them, instead of nearly vanishing into it.
 - Menus in a group of settings are the same width, so they line up down the page, like Sidebar size, Favorites per row and Dark pages in Appearance.
 - General no longer offers Restore from before the last update when there was no update, as after Zigzag first starts with a new data folder.
+- Zigzag uses about 9 MB less memory: the list of sites that only allow secure connections is read in place when a certificate warning needs it, instead of loaded at launch.
+- VoiceOver reads Zigzag's own buttons, switches, menus and rows by name, like Back, Downloads or a tab's title, and says which tab is current. They came through as pictures named after their icons, and some had no name at all.
+- What's New opens over the page, below the bar above it, instead of across the address and the developer tools.
+- An extension's popup opened from the sidebar stays inside the window, instead of hanging past its left edge.
+- In onboarding, the note that no other browsers were found sits in the middle of its card.
+- Install as App's name field shows it's ready for typing in light mode too, as it does in dark. In the sheet for adding an extension, a site's name no longer breaks across two lines at a hyphen.
 
 - A one-page PDF stays in the middle with Two Pages on, instead of sitting alone on the right like a book's first page.
 - A strong password from Use Strong Password stays in Passwords until a newer one for the same account takes its place, however long the site takes to confirm it. Unconfirmed ones are no longer deleted after two weeks.
