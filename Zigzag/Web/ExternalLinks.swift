@@ -35,8 +35,17 @@ enum ExternalLinks {
                 putOff[key] = nil
                 return true
             }
-            return !declined.contains(key) && (putOff[key].map { now > $0 } ?? true)
+            guard !declined.contains(key), putOff[key].map({ now > $0 }) ?? true else { return false }
+            // Asking on its own, from any site or frame: never while another question is up, and not again for a
+            // few seconds, so frames from many sites can't line up question after question.
+            guard asking.isEmpty, lastOnItsOwn.map({ now.timeIntervalSince($0) >= Self.unaskedGap }) ?? true else { return false }
+            lastOnItsOwn = now
+            return true
         }
+
+        /// When a question last went up without a click of yours.
+        var lastOnItsOwn: Date?
+        static let unaskedGap: TimeInterval = 10
     }
     private static var asked = Asked()
 

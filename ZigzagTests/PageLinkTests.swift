@@ -94,6 +94,26 @@ struct ExternalLinkAskingTests {
         #expect(asked.putOff[key] == nil)
     }
 
+    /// Questions nobody clicked for, from frames of many sites, come one at a time and a few seconds apart.
+    @Test func questionsOnTheirOwnAreSpacedAcrossFrames() {
+        var asked = ExternalLinks.Asked()
+        let now = Date()
+        let first = asked.mayAsk("https://a.example|zoommtg", clickedHere: false, linkClick: false, now: now)
+        #expect(first)
+        asked.asking.insert("https://a.example|zoommtg")
+        let whileUp = asked.mayAsk("https://b.example|zoommtg", clickedHere: false, linkClick: false, now: now.addingTimeInterval(1))
+        #expect(!whileUp)
+        asked.asking.removeAll()
+        let tooSoon = asked.mayAsk("https://c.example|steam", clickedHere: false, linkClick: false, now: now.addingTimeInterval(2))
+        #expect(!tooSoon)
+        // Your own click always asks.
+        let clicked = asked.mayAsk("https://d.example|zoommtg", clickedHere: true, linkClick: true, now: now.addingTimeInterval(3))
+        #expect(clicked)
+        let later = asked.mayAsk("https://e.example|zoommtg", clickedHere: false, linkClick: false,
+                                 now: now.addingTimeInterval(ExternalLinks.Asked.unaskedGap + 1))
+        #expect(later)
+    }
+
     /// Don't Open holds against a page's script riding on a click; only a link you click asks again.
     @Test func onlyALinkClickUndoesDontOpen() {
         var asked = ExternalLinks.Asked()
