@@ -1407,15 +1407,13 @@ extension Tab: WKNavigationDelegate {
         ownLoad || ownHistory || (fromInternalPage && !isBackForward)
     }
 
-    /// The site a URL belongs to, so mail.google.com and accounts.google.com count as one: the last two parts of
-    /// the host, or three under a country's own second level (bbc.co.uk).
+    /// The site a URL belongs to, so mail.google.com and accounts.google.com count as one: its registrable domain by
+    /// the Public Suffix List (bbc.co.uk, and myapp.vercel.app, which is someone else's site from evil.vercel.app).
+    /// A host with none (an address, a single name, a public suffix itself) is its own site.
     nonisolated static func site(of url: URL) -> String? {
-        guard let host = url.host()?.lowercased(), !host.isEmpty else { return nil }
-        let parts = host.split(separator: ".")
-        guard parts.count > 2 else { return host }
-        let secondLevel: Set<Substring> = ["co", "com", "org", "net", "ac", "gov", "edu", "ne", "or", "go"]
-        let keep = parts.last!.count == 2 && secondLevel.contains(parts[parts.count - 2]) ? 3 : 2
-        return parts.suffix(keep).joined(separator: ".")
+        guard var host = url.host()?.lowercased(), !host.isEmpty else { return nil }
+        if host.hasSuffix(".") { host.removeLast() }
+        return HostText.registrableDomain(of: host) ?? host
     }
 
     /// Whether a link you click from `here` to `url` goes to another site, so a tab that keeps its site (a pinned

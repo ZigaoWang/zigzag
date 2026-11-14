@@ -13,4 +13,16 @@ struct LinkSiteTests {
         #expect(site("https://github.com/x") == "github.com")
         #expect(site("https://github.com") != site("https://gitlab.com"))
     }
+
+    /// Sites under a shared host (vercel.app, github.io) are each their own, as the Public Suffix List has them: a
+    /// web app installed from one never takes another's page as its own.
+    @Test func sitesUnderASharedHostAreApart() throws {
+        let site = { (s: String) in Tab.site(of: URL(string: s)!) }
+        #expect(site("https://myapp.vercel.app/") == "myapp.vercel.app")
+        #expect(site("https://evil.vercel.app/") != site("https://myapp.vercel.app/"))
+        #expect(site("https://alice.github.io/") != site("https://bob.github.io/"))
+        #expect(site("https://a.b.example.com.au/") == "example.com.au")
+        #expect(site("http://192.168.1.1/") == "192.168.1.1")
+        #expect(site("http://localhost:3000/") == "localhost")
+    }
 }
