@@ -229,6 +229,40 @@ struct MCPWaitAndKeysTests {
         #expect(secret["secret"] as? Bool == true)
     }
 
+    /// A password field in a shadow root, or in a frame of the page's own origin, is still told apart.
+    @Test func secretFieldsInShadowRootsAndFrames() async throws {
+        let html = """
+        <div id="host"></div>
+        <iframe id="same" srcdoc="<input id='inner' type='password' value='x'>"></iframe>
+        <iframe id="other" sandbox="allow-scripts" srcdoc="<input id='far'>"></iframe>
+        <script>
+        const root = document.querySelector('#host').attachShadow({ mode: 'open' });
+        root.innerHTML = '<input id="spw" type="password" value="x"><input id="plain">';
+        </script>
+        """
+        let (webView, loading) = await page(html)
+        _ = loading
+        _ = try await value("document.querySelector('#host').shadowRoot.querySelector('#spw').focus(), 'ok'", in: webView)
+        #expect(try await target(nil, in: webView)["secret"] as? Bool == true)
+        _ = try await value("document.querySelector('#host').shadowRoot.querySelector('#plain').focus(), 'ok'", in: webView)
+        #expect(try await target(nil, in: webView)["secret"] as? Bool == false)
+        // Waited for, as a srcdoc frame may load after the page.
+        for _ in 0..<50 {
+            let ready = try await value("String(!!(document.querySelector('#same').contentDocument && document.querySelector('#same').contentDocument.querySelector('#inner')))", in: webView)
+            if ready == "true" { break }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        _ = try await value("document.querySelector('#same').contentDocument.querySelector('#inner').focus(), 'ok'", in: webView)
+        let framed = try await target(nil, in: webView)
+        #expect(framed["secret"] as? Bool == true)
+        #expect(framed["inFrame"] as? Bool == false)
+        // Another origin's frame can't be looked into: it stays the frame, and press_key refuses what acts in it.
+        _ = try await value("document.querySelector('#other').focus(), 'ok'", in: webView)
+        #expect(try await target(nil, in: webView)["inFrame"] as? Bool == true)
+        for name in ["Enter", "Tab", "Space"] { #expect(try key(name).reachesFrame, "\(name)") }
+        for name in ["ArrowDown", "Escape", "PageDown", "a"] { #expect(try !key(name).reachesFrame, "\(name)") }
+    }
+
     /// ⌘⌥⌃J is one of Zigzag's menu items here: pressed in the page, the page gets it, and the menu never does.
     @Test func aModifierComboNeverReachesTheMenus() async throws {
         final class Target: NSObject {

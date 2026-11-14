@@ -31,6 +31,9 @@ nonisolated struct MCPKeyPress: Equatable, Sendable {
     /// May submit a form or follow a link, so a page load is waited for after it.
     var mayNavigate: Bool { ["Enter", " "].contains(key) }
 
+    /// Acts on what has the focus (presses a link or button, moves on), so it never goes into another site's frame.
+    var reachesFrame: Bool { ["Enter", " ", "Tab"].contains(key) }
+
     var modifierFlags: NSEvent.ModifierFlags {
         var flags: NSEvent.ModifierFlags = []
         if modifiers.contains(.shift) { flags.insert(.shift) }

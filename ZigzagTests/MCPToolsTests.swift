@@ -84,7 +84,10 @@ struct MCPToolsTests {
         // Zigzag's error or certificate warning page: its "Visit anyway" is the person's to choose.
         #expect(MCPSafety.refusal(url: site, isPrivate: false, errorPage: true) == .errorPage)
         #expect(MCPSafety.refusal(url: site, isPrivate: false, errorPage: true, needsPage: false) == .errorPage)
-        for refusal in [MCPSafety.Refusal.privateWindow, .ownPage, .extensionPage, .notAWebPage, .emptyTab, .stopped, .errorPage] {
+        // Turned off in Settings while a tool waited: nothing more happens.
+        #expect(MCPSafety.refusal(url: site, isPrivate: false, on: false) == .turnedOff)
+        #expect(MCPSafety.refusal(url: site, isPrivate: false, stopped: true, on: false) == .turnedOff)
+        for refusal in [MCPSafety.Refusal.privateWindow, .ownPage, .extensionPage, .notAWebPage, .emptyTab, .stopped, .errorPage, .turnedOff] {
             #expect(!MCPSafety.message(refusal).isEmpty)
         }
     }

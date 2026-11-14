@@ -141,9 +141,11 @@ enum MCPBrowser {
                 if press.editsText, target["secret"] as? Bool == true {
                     return .error("The focus is in a password field. Zigzag never lets AI apps type passwords; ask the person to type it.")
                 }
-                if press.editsText, target["inFrame"] as? Bool == true {
-                    return .error("The focus is in a frame inside the page, where Zigzag can't tell whether it's a password field. Click or focus a field in the page itself first.")
+                if press.editsText || press.reachesFrame, target["inFrame"] as? Bool == true {
+                    return .error("The focus is in a frame from another site inside the page, where Zigzag can't tell what the key would do. Click or focus something in the page itself first.")
                 }
+                // The page answered after a wait: still allowed, on the same kind of page?
+                if let refusal = refusal(for: tab, webView: webView) { return .error(MCPSafety.message(refusal)) }
                 let after = await MCPKeyDelivery.press(press, in: webView)
                 if press.mayNavigate { await waitForLoad(tab, from: before, grace: 0.6) }
                 var result: [String: JSON] = ["pressed": .string(press.name)]
@@ -160,7 +162,7 @@ enum MCPBrowser {
     private static func waitFor(_ condition: MCPWaitCondition, timeout: TimeInterval, in tab: Tab, controller: BrowserWindowController) async -> MCPToolResult {
         let webView: WKWebView
         if let awakeView = tab.webView { webView = awakeView } else { webView = await awake(tab) }
-        if let refusal = MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id), errorPage: tab.showsErrorPage) {
+        if let refusal = refusal(for: tab, webView: webView) {
             return .error(MCPSafety.message(refusal))
         }
         let wait = MCPWait(condition, in: webView, timeout: timeout) { [weak tab, weak webView] in
@@ -168,7 +170,7 @@ enum MCPBrowser {
             guard let webView, tab.webView === webView else { return "The tab went to sleep while waiting, so the wait ended." }
             if !MCPService.isOn { return MCPWait.stoppedMessage }
             // Stopped, or now on a page no tool may use (the load it waited for went to one).
-            if let refusal = MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id), errorPage: tab.showsErrorPage) {
+            if let refusal = refusal(for: tab, webView: webView) {
                 return MCPSafety.message(refusal)
             }
             return nil
@@ -251,11 +253,17 @@ enum MCPBrowser {
     /// Runs `body` on the tab's page once it's awake and loaded, if it's still a page a tool may use by then.
     private static func page(_ tab: Tab, _ body: @MainActor (WKWebView) async -> MCPToolResult) async -> MCPToolResult {
         let webView = await awake(tab)
-        // Woken or done loading, it may be on another page now: checked again, on that page.
-        if let refusal = MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id), errorPage: tab.showsErrorPage) {
+        // Woken or done loading, it may be on another page now, or AI apps turned off meanwhile: checked again.
+        if let refusal = refusal(for: tab, webView: webView) {
             return .error(MCPSafety.message(refusal))
         }
         return await body(webView)
+    }
+
+    /// Why a tool can't go on with the tab's page now, after a wait: checked again each time one ends.
+    private static func refusal(for tab: Tab, webView: WKWebView) -> MCPSafety.Refusal? {
+        MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id),
+                          errorPage: tab.showsErrorPage, on: MCPService.isOn)
     }
 
     /// The tab's web view, woken if it slept, once its page is done loading (or after a while if it never is).

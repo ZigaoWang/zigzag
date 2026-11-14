@@ -90,6 +90,22 @@ enum MCPPageScript {
       const text = clip(own || el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('alt') || '', 120);
       return { tag: el.tagName.toLowerCase(), text, selector: selectorFor(el) };
     };
+    // The element the keys go to: through open shadow roots and frames of this page's own origin, down to the one
+    // with the focus. A frame of another origin stays the frame, as nothing in it can be seen from here.
+    const deepActive = () => {
+      let active = document.activeElement;
+      for (let depth = 0; active && depth < 32; depth++) {
+        if (active.shadowRoot && active.shadowRoot.activeElement) { active = active.shadowRoot.activeElement; continue; }
+        if (active.tagName === 'IFRAME' || active.tagName === 'FRAME') {
+          let inner = null;
+          try { inner = active.contentDocument; } catch (e) { inner = null; }
+          const next = inner && inner.activeElement;
+          if (next && next !== inner.body && next !== inner.documentElement) { active = next; continue; }
+        }
+        break;
+      }
+      return active;
+    };
     const find = (selector) => {
       try { return document.querySelector(selector); } catch (e) { throw new Error('Invalid CSS selector: ' + selector); }
     };
@@ -288,11 +304,12 @@ enum MCPPageScript {
         if (el.disabled) return { error: 'That element is disabled.' };
         el.scrollIntoView({ block: 'center', inline: 'center' });
         if (typeof el.focus === 'function') el.focus({ preventScroll: true });
-        if (document.activeElement !== el && !el.contains(document.activeElement)) {
+        const now = deepActive();
+        if (now !== el && !el.contains(document.activeElement) && !(el.shadowRoot && el.shadowRoot.contains(now))) {
           return { error: 'That element can’t take the keyboard focus, so the key would go somewhere else.' };
         }
       }
-      const active = document.activeElement;
+      const active = deepActive();
       const page = !active || active === document.body || active === document.documentElement;
       return { focused: page ? null : describe(active), secret: !page && isSecret(active),
                inFrame: !page && (active.tagName === 'IFRAME' || active.tagName === 'FRAME') };
@@ -304,7 +321,7 @@ enum MCPPageScript {
         const finish = () => {
           removeEventListener('keyup', up, true);
           clearTimeout(timer);
-          const active = document.activeElement;
+          const active = deepActive();
           const page = !active || active === document.body || active === document.documentElement;
           resolve({ focused: page ? null : describe(active) });
         };
