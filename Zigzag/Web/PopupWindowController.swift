@@ -86,7 +86,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         return controller
     }
 
-    private init(configuration: WKWebViewConfiguration, pageSize: NSSize, origin: NSPoint?, parent: NSWindow?) {
+    private init(configuration: WKWebViewConfiguration, pageSize: NSSize, origin: NSPoint?, parent: NSWindow?, opener: Tab? = nil) {
         // Its own WebRTC switch, never its opener's (`WebRTCProtection`), set for each page it goes to.
         WebRTCProtection.isolate(configuration)
         webView = WKWebView(frame: .zero, configuration: configuration)

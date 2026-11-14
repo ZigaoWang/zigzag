@@ -203,4 +203,31 @@ import WebKit
             }
         }
     }
+
+    /// Site Controls keeps working on the unified store: its Allow is the permission's own ordinary yes (Mini for
+    /// pop-ups), its Block is a deny, and Ask removes the answer.
+    @Test func siteControlsStillReadTheUnifiedAnswers() throws {
+        try withDefaults { _ in
+            SitePermissions.remember("newTab", subject: PermissionSubject.popups, origin: "https://a.com")
+            #expect(SitePermissions.choice(.popups, origin: "https://a.com") == .allow)
+            SitePermissions.setChoice(.block, for: .popups, origin: "https://a.com")
+            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://a.com") == "deny")
+            SitePermissions.setChoice(.allow, for: .popups, origin: "https://a.com")
+            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://a.com") == "mini")
+            SitePermissions.setChoice(.ask, for: .popups, origin: "https://a.com")
+            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://a.com") == nil)
+        }
+    }
+
+    /// Settings › Downloads lists the sites a rule was decided on, per rule.
+    @Test func settingsListsTheSitesARuleWasDecidedOn() throws {
+        try withDefaults { _ in
+            let rule = UUID()
+            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(rule), origin: "https://b.com")
+            SitePermissions.remember("browser", subject: PermissionSubject.handoff(rule), origin: "https://a.com")
+            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(UUID()), origin: "https://c.com")
+            #expect(SitePermissions.sites(prefix: PermissionSubject.handoff(rule)) == ["https://a.com", "https://b.com"])
+            #expect(SitePermissions.sites(prefix: "handoff:") == ["https://a.com", "https://b.com", "https://c.com"])
+        }
+    }
 }

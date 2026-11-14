@@ -252,6 +252,16 @@ enum SitePermissions {
         Set(stored.keys.compactMap { $0.split(separator: "|").first.map(String.init) })
     }
 
+    /// The origins that hold an answer under a subject's own id (`"handoff:<rule UUID>"`), for listing, per rule, the
+    /// sites a handoff rule was decided on. Sorted, so a list built from it doesn't shuffle.
+    static func sites(prefix: String) -> [String] {
+        stored.keys.compactMap { key in
+            let parts = key.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2, parts[1].hasPrefix(prefix) else { return nil }
+            return String(parts[0])
+        }.sorted()
+    }
+
     static func forgetAll() { defaults.removeObject(forKey: key) }
 
     /// A site's answer about your location, if it ever asked.
