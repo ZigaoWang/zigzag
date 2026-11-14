@@ -753,6 +753,19 @@ final class BridgeUserScripts: BridgeNamespace {
           try { Object.defineProperty(F.prototype, 'constructor', { value: guarded, writable: true, configurable: true }); } catch (e) {}
           if (F === Function) { try { Object.defineProperty(globalThis, 'Function', { value: guarded, writable: true, configurable: true }); } catch (e) {} }
         }
+        // A string given to a timer is code too. As under Chrome's CSP, it never runs, and nothing throws.
+        for (const name of ['setTimeout', 'setInterval']) {
+          const timer = globalThis[name];
+          if (typeof timer !== 'function') continue;
+          const checked = function (handler, ...rest) {
+            if (typeof handler !== 'function') {
+              console.error("Refused to evaluate a string as JavaScript because 'unsafe-eval' is not an allowed source of script in this world's Content Security Policy.");
+              return Reflect.apply(timer, globalThis, [() => {}, ...rest.slice(0, 1)]);
+            }
+            return Reflect.apply(timer, globalThis, [handler, ...rest]);
+          };
+          try { Object.defineProperty(globalThis, name, { value: checked, writable: true, configurable: true }); } catch (e) {}
+        }
       }
       const handlers = globalThis.webkit && globalThis.webkit.messageHandlers;
       const handler = config.messaging && handlers && handlers.zigzagUserScript;

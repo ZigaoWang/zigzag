@@ -263,6 +263,14 @@ struct UserScriptsTests {
             return tries.map((t) => { try { t(); return 'ran'; } catch (e) { return e.name; } }).join();
             """, in: strict) as? String
         #expect(refused == "EvalError,EvalError,EvalError,EvalError,EvalError,EvalError")
+        // A string handed to a timer never runs; a function still does.
+        let timers = try await run("""
+            globalThis.ranFromString = false;
+            setTimeout('globalThis.ranFromString = true', 0);
+            setInterval('globalThis.ranFromString = true', 0);
+            return await new Promise((done) => setTimeout((a) => done(String(globalThis.ranFromString) + ' ' + a), 30, 'called'));
+            """, in: strict) as? String
+        #expect(timers == "false called")
         // Functions are still functions, and an inline script the world's CSP allows runs in the world.
         #expect(try await run("return (() => {}) instanceof Function && typeof Function.prototype.call", in: strict) as? String == "function")
         #expect(try await run("return globalThis.__zigzagInlineScript('6 * 7')", in: strict) as? Int == 42)
