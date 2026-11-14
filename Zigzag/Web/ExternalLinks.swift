@@ -72,8 +72,15 @@ enum ExternalLinks {
         case .ask:
             break
         }
-        guard let controller, webView.window != nil, !asking.contains(key), !declined.contains(key),
-              putOff[key].map({ Date() > $0 }) ?? true else { return }
+        // A page asking again on its own, after you put it off or said Don't Open, is let be for now. A click of
+        // yours in the page is asked every time: it's you asking, and the click that dismissed the last question
+        // (claude.ai asks on load, and its Open Claude button asks again) must not be what silences this one.
+        guard let controller, webView.window != nil else { return }
+        if !clickedHere {
+            guard !asking.contains(key), !declined.contains(key), putOff[key].map({ Date() > $0 }) ?? true else { return }
+        }
+        putOff[key] = nil
+        declined.remove(key)
         let name = appName(app)
         // Private windows, popups included, never remember the answer.
         let isPrivate = !webView.configuration.websiteDataStore.isPersistent
