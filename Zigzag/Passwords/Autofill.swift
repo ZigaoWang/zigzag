@@ -676,14 +676,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
 
     """
 
-    /// Picks the first candidate the field accepts (its `pattern` and lengths), puts it in every new-password
-    /// field of the focused form (the password and its confirmation), and returns its index and the username
-    /// typed so far, if any.
-    static let generatedFiller = placeholderCheck + """
-    // Checked here, at the moment of filling: only the site the menu was offered on gets it.
-    if (location.origin !== expectedOrigin) return { index: -1, moved: true };
-    const active = document.activeElement;
-    const scope = (active && active.form) || document;
+    /// What both login fillers (`filler`, `generatedFiller`) check a field with before filling it: `visible` and
+    /// `inView`. One copy, so the two can't drift apart.
+    static let loginFields = placeholderCheck + """
     // Only fields a person can see: a real size, on the page, not transparent or hidden by an ancestor; on the page
     // across and near where you are (half a screen above or below, as a form's other field can be), not clipped
     // away inside a tiny box, and not covered by something else.
@@ -717,6 +712,17 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
       return x >= 0 && x <= innerWidth && y >= 0 && y <= innerHeight;
     };
+
+    """
+
+    /// Picks the first candidate the field accepts (its `pattern` and lengths), puts it in every new-password
+    /// field of the focused form (the password and its confirmation), and returns its index and the username
+    /// typed so far, if any.
+    static let generatedFiller = loginFields + """
+    // Checked here, at the moment of filling: only the site the menu was offered on gets it.
+    if (location.origin !== expectedOrigin) return { index: -1, moved: true };
+    const active = document.activeElement;
+    const scope = (active && active.form) || document;
     if (active && active.tagName === 'INPUT' && !inView(active)) return { index: -1, noField: true };
     const inputs = [...scope.querySelectorAll('input')].filter(visible);
     const passwords = inputs.filter((el) => el.type === 'password');
@@ -855,44 +861,11 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     /// Fills the focused form: the username field (if there is one) and the password field, the way typing would.
     /// An empty username or password leaves its field as it is. `mark` (true unless given) marks the fields as filled
     /// by Zigzag, so signing in with them counts as your login.
-    static let filler = placeholderCheck + """
+    static let filler = loginFields + """
     // Checked here, at the moment of filling: only the exact site the login belongs to gets it.
     if (location.origin !== expectedOrigin) return { moved: true };
     const active = document.activeElement;
     const scope = (active && active.form) || document;
-    // Only fields a person can see: a real size, on the page, not transparent or hidden by an ancestor; on the page
-    // across and near where you are (half a screen above or below, as a form's other field can be), not clipped
-    // away inside a tiny box, and not covered by something else.
-    const visible = (el) => {
-      if (el.disabled || el.readOnly || el.type === 'hidden') return false;
-      const r = el.getBoundingClientRect();
-      if (r.width < 8 || r.height < 8) return false;
-      if (r.right < 0 || r.left > innerWidth || r.bottom < -innerHeight / 2 || r.top > innerHeight * 1.5) return false;
-      if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
-      const style = getComputedStyle(el);
-      if (style.visibility !== 'visible' || parseFloat(style.opacity) < 0.1) return false;
-      for (let box = el.parentElement; box && box !== document.body; box = box.parentElement) {
-        const o = getComputedStyle(box);
-        const overflow = o.overflow + o.overflowX + o.overflowY;
-        if (!/(hidden|clip|scroll|auto)/.test(overflow)) continue;
-        const b = box.getBoundingClientRect();
-        if (b.width < 8 || b.height < 8) return false;
-        // A scrolling box can be scrolled to what's below; one that clips can't.
-        if (!/(hidden|clip)/.test(overflow)) continue;
-        const w = Math.min(r.right, b.right) - Math.max(r.left, b.left), h = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top);
-        if (w < 8 || h < 8) return false;
-      }
-      if (r.top >= 0 && r.bottom <= innerHeight) {
-        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-        if (hit && hit !== el && !el.contains(hit) && !(hit.control === el) && !placeholderOver(el, r.left + r.width / 2, r.top + r.height / 2)) return false;
-      }
-      return true;
-    };
-    // The field the menu was for is on the page you see, never one scrolled away or placed off it.
-    const inView = (el) => {
-      const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
-      return x >= 0 && x <= innerWidth && y >= 0 && y <= innerHeight;
-    };
     if (active && active.tagName === 'INPUT' && !inView(active)) return { password: false, username: false, usernameEmpty: false };
     const inputs = [...scope.querySelectorAll('input')].filter(visible);
     // The password field you picked the login in, unless it's marked for a new password; then the current
