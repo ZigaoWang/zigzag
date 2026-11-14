@@ -1056,7 +1056,7 @@ private final class FieldRow: NSView {
         super.layout()
         let pad = Tokens.Space.x3
         let nameWidth: CGFloat = 88
-        nameLabel.frame = NSRect(x: pad, y: (bounds.height - nameLabel.lineHeight) / 2, width: nameWidth, height: nameLabel.lineHeight)
+        nameLabel.frame = NSRect(x: pad, y: nameLabel.centeredY(in: bounds.height), width: nameWidth, height: nameLabel.lineHeight)
         var right = bounds.width - Tokens.Space.x2
         for button in buttons.reversed() where !button.isHidden {
             let side = Tokens.Metric.compactIconButton
@@ -1068,7 +1068,7 @@ private final class FieldRow: NSView {
             let h = Tokens.Page.controlHeight
             editor.frame = NSRect(x: x - Tokens.Space.x2, y: (bounds.height - h) / 2, width: bounds.width - x - Tokens.Space.x1, height: h)
         }
-        valueLabel.frame = NSRect(x: x, y: (bounds.height - valueLabel.lineHeight) / 2, width: right - x - Tokens.Space.x2, height: valueLabel.lineHeight)
+        valueLabel.frame = NSRect(x: x, y: valueLabel.centeredY(in: bounds.height), width: right - x - Tokens.Space.x2, height: valueLabel.lineHeight)
     }
 }
 
