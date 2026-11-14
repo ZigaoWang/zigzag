@@ -27,7 +27,7 @@ final class BridgeDownloads: BridgeNamespace {
         case "download":
             return try await start(args.object(0))
         case "search":
-            return search(args.object(0)).map(describe)
+            return try await search(args.object(0)).map(describe)
         case "pause", "resume", "cancel":
             guard let item = item(Int(saturating: args.number(0) ?? -1)) else { throw BridgeError("Invalid download id") }
             switch fn {
@@ -37,7 +37,7 @@ final class BridgeDownloads: BridgeNamespace {
             }
             return nil
         case "erase":
-            let gone = search(args.object(0)).filter { $0.state != .downloading }
+            let gone = try await search(args.object(0)).filter { $0.state != .downloading }
             for item in gone { manager.remove(item) }
             return gone.compactMap { numbers[$0.id] }
         case "removeFile":
@@ -134,7 +134,7 @@ final class BridgeDownloads: BridgeNamespace {
         return visible.first { $0.id == id }
     }
 
-    private func search(_ query: [String: Any]) -> [DownloadItem] {
+    private func search(_ query: [String: Any]) async throws -> [DownloadItem] {
         var found = visible
         if let id = query.number("id").map(Int.init(saturating:)) { found = found.filter { number(for: $0) == id } }
         if let state = query.string("state") { found = found.filter { Self.state($0) == state } }
@@ -143,12 +143,37 @@ final class BridgeDownloads: BridgeNamespace {
             let words = text.lowercased().split(separator: " ").map(String.init)
             found = found.filter { item in words.allSatisfy { item.filename.lowercased().contains($0) || (item.sourceURL?.absoluteString.lowercased().contains($0) ?? false) } }
         }
-        if let pattern = query.string("filenameRegex"), let regex = try? NSRegularExpression(pattern: pattern) {
-            found = found.filter { regex.firstMatch(in: $0.destination?.path ?? $0.filename, range: NSRange(location: 0, length: ($0.destination?.path ?? $0.filename).utf16.count)) != nil }
+        if let pattern = query.string("filenameRegex") {
+            guard let matched = await Self.matching(pattern, in: found.map { $0.destination?.path ?? $0.filename }) else {
+                throw BridgeError("filenameRegex took too long")
+            }
+            found = matched.sorted().map { found[$0] }
         }
         if (query["orderBy"] as? [String])?.first == "startTime" { found.sort { $0.started < $1.started } }
         if let limit = query.number("limit").map(Int.init(saturating:)), limit > 0 { found = Array(found.prefix(limit)) }
         return found
+    }
+
+    /// The extension's pattern is its own, and one can take for ever on the right name: it runs away from the main
+    /// thread, and gives up after `timeout`. Which names match, by index; nil if it gave up. A pattern that isn't
+    /// one matches nothing.
+    nonisolated static func matching(_ pattern: String, in names: [String], timeout: TimeInterval = 1) async -> Set<Int>? {
+        guard pattern.utf16.count <= 1_000 else { return [] }
+        return await Task.detached(priority: .utility) { () -> Set<Int>? in
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+            let deadline = Date(timeIntervalSinceNow: timeout)
+            var found = Set<Int>()
+            for (index, name) in names.enumerated() {
+                var matched = false, late = false
+                // Progress reports come while it works, so a slow match can be stopped partway.
+                regex.enumerateMatches(in: name, options: [.reportProgress], range: NSRange(location: 0, length: name.utf16.count)) { result, _, stop in
+                    if result != nil { matched = true; stop.pointee = true } else if Date() > deadline { late = true; stop.pointee = true }
+                }
+                if late || Date() > deadline { return nil }
+                if matched { found.insert(index) }
+            }
+            return found
+        }.value
     }
 
     private static func state(_ item: DownloadItem) -> String {

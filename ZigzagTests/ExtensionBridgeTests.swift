@@ -731,3 +731,15 @@ extension ExtensionBridgeTests {
         }
     }
 }
+
+extension ExtensionBridgeTests {
+    /// downloads.search's filenameRegex runs away from the main thread and gives up on a pattern that takes too long.
+    @Test func downloadSearchPatternsGiveUp() async {
+        let names = ["/Users/me/Downloads/report.pdf", "/Users/me/Downloads/photo.png", String(repeating: "a", count: 40) + "!"]
+        #expect(await BridgeDownloads.matching(#"\.pdf$"#, in: names) == [0])
+        #expect(await BridgeDownloads.matching("(unclosed", in: names) == [])
+        let started = Date()
+        #expect(await BridgeDownloads.matching("^(a+)+$", in: names, timeout: 0.3) == nil)
+        #expect(Date().timeIntervalSince(started) < 5)
+    }
+}
