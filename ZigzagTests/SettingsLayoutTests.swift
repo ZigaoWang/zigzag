@@ -134,4 +134,37 @@ struct SettingsLayoutTests {
         label.fadeTail()
         #expect(label.layer?.mask == nil)
     }
+
+    /// A row puts its control where the control's own width says. A field is filled by the space it's given, so
+    /// nothing else would ever give it one, and it drew at no width: a row holding one (the test address under the
+    /// download rules) showed the words and no field to type in.
+    @Test func aFieldInARowIsGivenRoomToDraw() async throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 776), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView?.wantsLayer = true
+        let settings = SettingsView(pane: .downloads)
+        settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+        window.contentView?.addSubview(settings)
+        settings.layoutSubtreeIfNeeded()
+
+        let pane = try #require(settings.subviews.compactMap { $0 as? NSScrollView }.last?.documentView)
+        var fields: [FilledField] = []
+        func collect(_ view: NSView) {
+            if let field = view as? FilledField { fields.append(field) }
+            view.subviews.forEach(collect)
+        }
+        collect(pane)
+        #expect(!fields.isEmpty)
+        for field in fields {
+            #expect(field.frame.width > 0)
+            #expect(field.frame.height > 0)
+        }
+    }
+
+    /// The size no view can be drawn at is none, and a field is laid out by asking it: its own size has to be
+    /// a size.
+    @Test func aFieldHasASizeOfItsOwn() {
+        let field = FilledField(placeholder: "example.com")
+        #expect(field.intrinsicContentSize.width > 0)
+        #expect(field.intrinsicContentSize.height > 0)
+    }
 }

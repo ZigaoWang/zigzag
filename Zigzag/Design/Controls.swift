@@ -1158,6 +1158,13 @@ final class FilledField: NSView {
     /// Its padding is the field's: a press there types, never drags the window.
     override var mouseDownCanMoveWindow: Bool { false }
 
+    /// A field is filled by the space it's given, so it draws at the size its holder hands it — a sheet's row. But
+    /// a Settings row puts its control at the control's own width, and a stack beside a button has nothing else to
+    /// size it by, and both asked this: no answer, so no width, so no field at all.
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: Tokens.Page.searchWidth, height: Tokens.Metric.controlHeight)
+    }
+
     /// Capsule ends instead of the field's corners: a search or address field standing on its own in a panel.
     var isPill = false { didSet { needsLayout = true } }
 
