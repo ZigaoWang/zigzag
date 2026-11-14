@@ -270,9 +270,15 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         // Downloads as a tab's are: a stream of them nobody clicked for is refused.
         if let policy = downloads.decide(shouldDownload: navigationAction.shouldPerformDownload, clicked: PopupNotice.isUserInitiated(navigationAction),
                                          isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true) {
+            // A rule for downloads may take it instead: then WebKit makes no download at all.
+            if policy == .download, let url = navigationAction.request.url,
+               await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: false) { return .cancel }
             if policy == .cancel { refusedDownload() }
             return policy
         }
+        // A link a rule wants opens in its app, never a popup page that would be blank.
+        if PopupNotice.isUserInitiated(navigationAction), let url = navigationAction.request.url,
+           await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: true) { return .cancel }
         // Zigzag's own pages (History) open in its tabs, never in a page's pop-up.
         if navigationAction.request.url?.scheme?.lowercased() == HistoryPage.scheme { return .cancel }
         // WebRTC on or off for where it's going, before its page is made, as in a tab.
@@ -323,6 +329,15 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         // Shown or saved as in a tab: a file sent as an attachment is saved, never shown as the site's page.
         let policy = downloads.decide(mimeType: response.mimeType, contentDisposition: (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition"),
                                       canShowMIMEType: navigationResponse.canShowMIMEType, isMainFrame: navigationResponse.isForMainFrame)
+        // A file a rule wants never reaches the downloads list.
+        if policy == .download, let url = response.url {
+            let mime = (response.mimeType ?? "").lowercased()
+            let disposition = ((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? "").lowercased()
+            let filename = Tab.filename(from: disposition) ?? DownloadTokens.filename(for: url, suggested: "")
+            if await handOffIfWanted(url, request: URLRequest(url: url), appliesToLinks: false, filename: filename, mime: mime) {
+                return .cancel
+            }
+        }
         if policy == .cancel, navigationResponse.isForMainFrame { refusedDownload() }
         // WebRTC follows the page that's to show, where a redirect took it.
         if navigationResponse.isForMainFrame {
@@ -337,6 +352,22 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         guard let content = window?.contentView, window?.isVisible == true else { return }
         let area = NSRect(x: 0, y: Self.headerHeight, width: content.bounds.width, height: max(0, content.bounds.height - Self.headerHeight))
         Toast.show(DownloadPolicy.refusedText, symbol: "arrow.down.circle", duration: 3, over: content, area: area)
+    }
+
+    /// Runs the first rule that catches `url`. True means the popup's page should not load or download it.
+    private func handOffIfWanted(_ url: URL, request: URLRequest, appliesToLinks: Bool, filename: String? = nil, mime: String = "") async -> Bool {
+        // Zigzag's own pages and an extension's are never a rule's to take.
+        guard url.scheme?.lowercased() != HistoryPage.scheme, !Tab.isExtensionPage(url) else { return false }
+        guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks) else { return false }
+        let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? webView.url
+        let handoff = DownloadHandoff.Request(url: url, referrer: referrer,
+                                              filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
+                                              mime: mime, space: "",
+                                              dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
+                                              window: parentWindow)
+        let outcome = await DownloadHandoff.perform(rule, request: handoff)
+        if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+        return true
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
