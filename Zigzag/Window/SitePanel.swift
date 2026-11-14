@@ -1773,12 +1773,14 @@ final class PanelPageHeader: NSView {
 
     override func layout() {
         super.layout()
-        // The back glyph's ink on the panel's text column, the title after it.
+        // The back glyph's ink on the panel's text column (the button centers the ink, which is narrower than its
+        // glyph's box), the title after it.
         let side = Tokens.Metric.compactIconButton
-        let ink = (side - Tokens.Symbol.compactGlyph) / 2
+        let inkWidth = Tokens.Symbol.inkSize("chevron.left", size: Tokens.Symbol.compactGlyph).width
+        let ink = (side - inkWidth) / 2
         back.frame = NSRect(x: -ink, y: (bounds.height - side) / 2, width: side, height: side)
-        let x = showsBack ? side - ink + Tokens.Space.x1 : 0
-        label.frame = NSRect(x: x - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: bounds.width - x + Label.inset * 2, height: label.lineHeight)
+        let x = showsBack ? round(inkWidth + Tokens.Space.x3) : 0
+        label.frame = NSRect(x: x - Label.inset, y: label.centeredY(in: bounds.height), width: bounds.width - x + Label.inset * 2, height: label.lineHeight)
     }
 }
 
