@@ -98,10 +98,6 @@ struct MCPToolsTests {
         #expect(MCPSafety.isPasswordField(type: "text", autocomplete: "current-password"))
         #expect(MCPSafety.isPasswordField(type: "text", autocomplete: "new-password"))
         #expect(!MCPSafety.isPasswordField(type: "email", autocomplete: "username"))
-        #expect(MCPSafety.hidesValue(type: "text", autocomplete: "cc-number"))
-        #expect(MCPSafety.hidesValue(type: "text", autocomplete: "one-time-code"))
-        #expect(MCPSafety.hidesValue(type: "hidden", autocomplete: nil))
-        #expect(!MCPSafety.hidesValue(type: "search", autocomplete: "off"))
     }
 
     @Test func theBarNamesTheApp() {
@@ -292,7 +288,7 @@ struct MCPToolsTests {
         }
         // A button's value is its caption, and still names it.
         let send = try await MCPPageScript.run("click", ["selector": "#send"], in: webView).get()
-        #expect((send["clicked"] as? [String: Any])?["text"] as? String == "Send it")
+        #expect((send["clicked"] as? [String: Any])?["name"] as? String == "Send it")
         #expect(try await MCPPageScript.run("click", ["text": "send it"], in: webView).get()["clicked"] != nil)
     }
 

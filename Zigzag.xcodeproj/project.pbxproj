@@ -247,6 +247,7 @@
 		73BEB8BF61DB6AA3E32A3ACB /* PasswordMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9EC4A25A23CB02B95200F47 /* PasswordMenuTests.swift */; };
 		73E14C8446755316A2074FAE /* PageQuestionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2243A294BB6D05FECB5249CE /* PageQuestionsTests.swift */; };
 		744F96926627557412B2B114 /* PageFullScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B82054C6133E2CC5F2D859E /* PageFullScreen.swift */; };
+		745A663B26C9080CDAE9FA2C /* MCPSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11D0EB48767ADA615522D55 /* MCPSnapshotTests.swift */; };
 		74E21381E1E1236C1E3449C0 /* BridgeUserScripts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3E2C413D61E7DBFC4242F2 /* BridgeUserScripts.swift */; };
 		751BFDE224833B08BD7A597B /* SafePDFTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 687E897D4F5886E6376DAA6D /* SafePDFTests.swift */; };
 		75CC6D443207EDB11002FAD3 /* MainMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9C34787271E39E26E0156FC /* MainMenu.swift */; };
@@ -955,6 +956,7 @@
 		B030A4C0601F5AE1232B9288 /* chrome-runtime.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "chrome-runtime.js"; sourceTree = "<group>"; };
 		B0560887D19F137BADD3B098 /* Tab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tab.swift; sourceTree = "<group>"; };
 		B0DE85F403C80DB6286E463D /* EnergyWarningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyWarningTests.swift; sourceTree = "<group>"; };
+		B11D0EB48767ADA615522D55 /* MCPSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPSnapshotTests.swift; sourceTree = "<group>"; };
 		B13E82E7DA1A290559EC8C20 /* SplitDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDropTests.swift; sourceTree = "<group>"; };
 		B1C94BBE34DB020CBB3EA2A2 /* ProxyRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyRulesTests.swift; sourceTree = "<group>"; };
 		B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptHost.swift; sourceTree = "<group>"; };
@@ -1753,6 +1755,7 @@
 				A415AA1C66517812829F10FF /* MCPHTTPTests.swift */,
 				521AE408AF88148280EB7303 /* MCPServerTests.swift */,
 				8F62FA2BF2A457B8137CE704 /* MCPSetupTests.swift */,
+				B11D0EB48767ADA615522D55 /* MCPSnapshotTests.swift */,
 				B61ECD99BC5A8E42155612FF /* MCPToolsTests.swift */,
 				AF8F49BF1E3DA70E50A2BABD /* MCPWaitAndKeysTests.swift */,
 				A8679BD8FFD9BC3825E36199 /* MiniLinkWakeTests.swift */,
@@ -2596,6 +2599,7 @@
 				591D0F32133D82363A1359F9 /* MCPHTTPTests.swift in Sources */,
 				8FFF17FE67210434B930B549 /* MCPServerTests.swift in Sources */,
 				F44995777C048CCAB085C8AA /* MCPSetupTests.swift in Sources */,
+				745A663B26C9080CDAE9FA2C /* MCPSnapshotTests.swift in Sources */,
 				37EC1B1453CB6D5DDE86AB1C /* MCPToolsTests.swift in Sources */,
 				B3B62EC2B7D5B8441706CBA8 /* MCPWaitAndKeysTests.swift in Sources */,
 				51EE9D0D64F917582D398645 /* MainThreadStallTests.swift in Sources */,

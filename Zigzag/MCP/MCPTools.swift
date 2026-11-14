@@ -285,12 +285,4 @@ nonisolated enum MCPSafety {
         let type = (type ?? "").lowercased(), autocomplete = (autocomplete ?? "").lowercased()
         return type == "password" || autocomplete.contains("password")
     }
-
-    /// A field whose value read_page leaves out: a password's, a card's number or code, a one-time code.
-    /// Mirrors `hidesValue` in the page script.
-    static func hidesValue(type: String?, autocomplete: String?) -> Bool {
-        let autocomplete = (autocomplete ?? "").lowercased()
-        return isPasswordField(type: type, autocomplete: autocomplete) || (type ?? "").lowercased() == "hidden"
-            || ["cc-number", "cc-csc", "one-time-code"].contains { autocomplete.contains($0) }
-    }
 }
