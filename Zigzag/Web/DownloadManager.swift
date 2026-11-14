@@ -485,7 +485,13 @@ extension DownloadManager: WKDownloadDelegate {
         var replacing: URL?
         if let chosen = chosenDestinations.removeValue(forKey: ObjectIdentifier(download)) {
             destination = chosen
-            if FileManager.default.fileExists(atPath: chosen.path) { replacing = chosen }
+            // A name chosen ahead (an extension's download with "overwrite") only ever replaces a plain file there,
+            // never a folder or a link: anything else there keeps its place and the download takes a new name.
+            if FileManager.default.fileExists(atPath: chosen.path) {
+                if Self.isPlainFile(chosen) { replacing = chosen } else {
+                    destination = Self.uniqueDestination(for: chosen.lastPathComponent, avoiding: inProgress)
+                }
+            }
         } else if Self.asksWhereToSave {
             guard let chosen = await askWhere(name: destination.lastPathComponent, in: window) else {
                 // Cancelled in the sheet: no download, and nothing left in the list.
@@ -554,12 +560,19 @@ extension DownloadManager: WKDownloadDelegate {
         return url
     }
 
+    /// A regular file, not a folder, a package or a link (looked at without following it).
+    static func isPlainFile(_ url: URL) -> Bool {
+        guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .isPackageKey]) else { return false }
+        return values.isRegularFile == true && values.isSymbolicLink != true && values.isPackage != true
+    }
+
     func downloadDidFinish(_ download: WKDownload) {
         guard let item = item(for: download) else { return }
         helpers[item.id] = nil
         // Done: now it takes the place of the file it replaces.
         if let target = item.replaces, let temporary = item.destination {
-            if (try? FileManager.default.replaceItemAt(target, withItemAt: temporary)) != nil { item.destination = target }
+            // Checked again: what's there now may have changed while the download ran.
+            if Self.isPlainFile(target), (try? FileManager.default.replaceItemAt(target, withItemAt: temporary)) != nil { item.destination = target }
             item.replaces = nil
         }
         item.state = .finished
