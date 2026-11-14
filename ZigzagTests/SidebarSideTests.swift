@@ -238,3 +238,51 @@ struct PinnedSpaceNameTests {
         #expect(SidebarListView.pinnedHeaderOffset(scrolled: 320) == 320)
     }
 }
+
+/// A row's title never moves or cuts shorter as the pointer comes and its button shows: the button comes over the
+/// title's faded end.
+@MainActor struct RowHoverTests {
+    private func row(pinned: Bool, away: Bool) -> (TabRowView, Tab) {
+        let tab = Tab(url: URL(string: "https://video.example.com/watch")!, title: "A very long page title that runs past the row's end", spaceID: UUID())
+        let row = TabRowView(frame: NSRect(x: 0, y: 0, width: 220, height: Tokens.Sidebar.rowHeight))
+        row.isBookmark = pinned
+        row.configure(tab: tab)
+        if away {
+            row.pinName = "A pinned page with a long name of its own"
+            row.isAway = true
+        }
+        return (row, tab)
+    }
+
+    private func frames(_ row: TabRowView) -> [NSRect] {
+        row.layout()
+        return row.subviews.compactMap { $0 as? Label }.filter { !$0.isHidden }.map(\.frame)
+    }
+
+    @Test func aTabsTitleStaysPutUnderThePointer() {
+        let (row, tab) = row(pinned: false, away: false)
+        let rest = frames(row)
+        row.isHovered = true
+        #expect(!row.closeButton.isHidden)
+        #expect(frames(row) == rest)
+        _ = tab
+    }
+
+    @Test func aMovedOnPinnedRowStaysPutUnderThePointer() {
+        let (row, tab) = row(pinned: true, away: true)
+        let rest = frames(row)
+        row.isHovered = true
+        #expect(frames(row) == rest)
+        _ = tab
+    }
+
+    @Test func theTabYouAreOnKeepsRoomForItsCloseButton() {
+        let (row, tab) = row(pinned: false, away: false)
+        row.isSelected = true
+        #expect(!row.closeButton.isHidden)
+        // Its title ends before the close button, which is always there.
+        let title = frames(row).first { $0.minX > 0 }
+        #expect((title?.maxX ?? .infinity) <= row.closeButton.frame.minX)
+        _ = tab
+    }
+}

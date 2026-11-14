@@ -699,8 +699,16 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// The close button's place at the row's end, or the number's while it's there.
     private var endSlot: CGFloat { showsClose ? closeButton.frame.width : showsNumber ? numberHint?.width ?? 0 : 0 }
 
+    /// The close button (or a pinned tab's unload or back button) comes only with the pointer here: it shows over the
+    /// title's faded end instead of taking room from it, so the title never moves or cuts shorter as the pointer comes
+    /// and goes. The tab you're on keeps its close button in view, so it has its room.
+    private var closeOverlays: Bool { !isSplit && !(isSelected && !isBookmark) && !reservesClose && !showsNumber && renameField == nil }
+    /// A speaker or a nested tabs' chevron beside it stays put while the close button comes and goes: the button's
+    /// room is kept for it, as a row of several pages keeps it.
+    private var reservesClose: Bool { !isSplit && (showsAudio || showsNested) }
+
     override var trailingAccessoryWidth: CGFloat {
-        let close = endSlot
+        let close = closeOverlays ? 0 : reservesClose ? max(endSlot, closeButton.frame.width) : endSlot
         let nested = showsNested ? Tokens.Sidebar.rowButton + (close > 0 ? Self.buttonGap : 0) : 0
         // In a split each half's speaker sits at that half's end (laid out with the halves).
         let audio = isSplit ? 0 : showsAudio ? audioButton.frame.width + (close + nested > 0 ? Self.buttonGap : 0) : 0
@@ -843,6 +851,31 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             title.frame.size.width = max(0, title.frame.width - 6 - Tokens.Space.x1)
         }
         layoutRenameField()
+        layoutTitleFade()
+    }
+
+    /// While the close button shows over the title's end (`closeOverlays`), the title fades out just before it.
+    private func layoutTitleFade() {
+        let covered = closeOverlays && !closeButton.isHidden && title.frame.maxX > closeButton.frame.minX
+        guard covered else {
+            if title.layer?.mask != nil { title.layer?.mask = nil }
+            return
+        }
+        title.wantsLayer = true
+        guard let layer = title.layer, title.bounds.width > 0 else { return }
+        let fade = (layer.mask as? CAGradientLayer) ?? CAGradientLayer()
+        // Clear from a little before the button, so the text never runs into it.
+        let end = closeButton.frame.minX - Self.buttonGap - title.frame.minX
+        let start = max(0, end - Tokens.Space.x4)
+        Tokens.Motion.withoutAnimation {
+            fade.frame = layer.bounds
+            fade.startPoint = CGPoint(x: 0, y: 0.5)
+            fade.endPoint = CGPoint(x: 1, y: 0.5)
+            fade.colors = [NSColor.black.cgColor, NSColor.black.cgColor, NSColor.clear.cgColor, NSColor.clear.cgColor]
+            let width = title.bounds.width
+            fade.locations = [0, NSNumber(value: Double(start / width)), NSNumber(value: Double(max(start, end) / width)), 1]
+        }
+        if layer.mask !== fade { layer.mask = fade }
     }
 
     private func layoutButtonsAndHalves() {
@@ -856,7 +889,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         }
         // A row of several pages keeps the close button's room whether or not it shows, so its parts never move as
         // the pointer comes and goes.
-        let slot = isSplit ? max(endSlot, size.width) : endSlot
+        let slot = isSplit || reservesClose ? max(endSlot, size.width) : endSlot
         var end = slot > 0 ? bounds.width - edge - slot - Self.buttonGap : bounds.width - edge
         if showsNested {
             nestedButton.frame = NSRect(x: end - size.width, y: y, width: size.width, height: size.height)
