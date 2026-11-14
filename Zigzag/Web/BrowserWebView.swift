@@ -109,12 +109,27 @@ final class BrowserWebView: WKWebView {
 
     private func readSelectionForMenu() {
         menuSelection = nil
-        evaluateJavaScript("getSelection().toString()", in: nil, in: .defaultClient) { [weak self] result in
+        runOwnScript(Self.selectionScript) { [weak self] result in
             MainActor.assumeIsolated {
                 if case .success(let text) = result { self?.menuSelection = text as? String }
             }
         }
     }
+
+    /// The page's selection, read in Zigzag's own world (the page can't stand in its own answer), or the selection
+    /// in the frame you're in when the page has none and that frame is the page's own site.
+    static let selectionScript = """
+    (() => {
+      let text = getSelection().toString();
+      if (!text) {
+        try {
+          const frame = document.activeElement;
+          if (frame && frame.contentWindow) text = frame.contentWindow.getSelection().toString();
+        } catch (e) {}
+      }
+      return text;
+    })()
+    """
 
     /// When the last click in the page ended (system uptime). WebKit reports a click on the key icon in a sign-in
     /// field a moment after; a page can't make one of these.
