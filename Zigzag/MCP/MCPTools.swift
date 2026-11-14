@@ -5,6 +5,7 @@ import Foundation
 nonisolated enum MCPTools {
     static let readDefault = 20_000, readMax = 100_000, readMin = 500
     static let linksDefault = 200, linksMax = 1_000
+    static let waitDefault = 5_000, waitMax = 30_000, waitMin = 100
 
     private static let tabID: JSON = ["type": "integer", "minimum": 1,
                                       "description": "The tab's id from list_tabs. Leave it out for the tab in front."]
@@ -53,6 +54,23 @@ nonisolated enum MCPTools {
              properties: ["id": tabID, "dy": ["type": "number", "description": "Points to scroll."],
                           "selector": ["type": "string", "description": "A CSS selector for a scrolling element. Leave it out for the page."]],
              required: ["dy"]),
+        tool("wait_for", "Wait For", "Waits until something holds on the page, or the time runs out: some text shows (text) or goes (text_gone), an element matching a CSS selector shows (selector) or goes (selector_gone), or the page finishes loading (load). Give one of them. Ends with an error if the tab closes or loads another page first.",
+             properties: ["id": tabID,
+                          "text": ["type": "string", "description": "Text to wait for on the page, ignoring case and spacing."],
+                          "text_gone": ["type": "string", "description": "Text to wait to disappear from the page."],
+                          "selector": ["type": "string", "description": "A CSS selector to wait for a visible element matching it."],
+                          "selector_gone": ["type": "string", "description": "A CSS selector to wait until no visible element matches it."],
+                          "load": ["type": "boolean", "description": "true to wait for the page to finish loading."],
+                          "timeout_ms": ["type": "integer", "minimum": .int(waitMin), "maximum": .int(waitMax),
+                                         "description": "How long to wait, in milliseconds. Default \(waitDefault)."]],
+             readOnly: true),
+        tool("press_key", "Press Key", "Presses a key in the page, as the person would on the keyboard: in the element that has the focus, or in the one a CSS selector finds, focused first. Keys: Enter, Escape, Tab, Backspace, Delete, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home, End, PageUp, PageDown, Space, or one character. Modifiers can be given as \"Shift+Tab\" or in modifiers. Keys only reach the page, never Zigzag's own shortcuts, and never type into password fields.",
+             properties: ["id": tabID,
+                          "key": ["type": "string", "description": "The key, like Enter, Shift+Tab, ArrowDown or a."],
+                          "modifiers": ["type": "array", "items": ["type": "string", "enum": ["shift", "alt", "ctrl", "meta"]],
+                                        "description": "Modifier keys held down with it."],
+                          "selector": ["type": "string", "description": "A CSS selector for an element to focus first. Leave it out for the element that has the focus."]],
+             required: ["key"]),
     ]
 
     static let names = definitions.compactMap { $0["name"]?.string }
@@ -72,6 +90,8 @@ nonisolated enum MCPCommand: Equatable, Sendable {
     case click(Int?, selector: String?, text: String?)
     case type(Int?, selector: String, text: String, clear: Bool, submit: Bool)
     case scroll(Int?, dy: Double, selector: String?)
+    case waitFor(Int?, MCPWaitCondition, timeoutMs: Int)
+    case pressKey(Int?, MCPKeyPress, selector: String?)
 
     /// The tab it names, if any. Nil also for "the tab in front".
     var tabID: Int? {
@@ -80,6 +100,7 @@ nonisolated enum MCPCommand: Equatable, Sendable {
         case .activate(let id), .close(let id): id
         case .navigate(let id, _), .goBack(let id), .goForward(let id), .reload(let id), .read(let id, _), .links(let id, _),
              .screenshot(let id), .click(let id, _, _), .type(let id, _, _, _, _), .scroll(let id, _, _): id
+        case .waitFor(let id, _, _), .pressKey(let id, _, _): id
         }
     }
 
@@ -117,6 +138,36 @@ nonisolated enum MCPCommand: Equatable, Sendable {
             case "scroll":
                 guard let dy = arguments["dy"]?.number, dy.isFinite else { throw MCPArgumentError("scroll needs dy, a number of points.") }
                 return .success(.scroll(try a.id(), dy: max(-100_000, min(100_000, dy)), selector: try a.string("selector")))
+            case "wait_for":
+                var conditions: [MCPWaitCondition] = []
+                if let text = try a.string("text") { conditions.append(.text(text)) }
+                if let text = try a.string("text_gone") { conditions.append(.textGone(text)) }
+                if let selector = try a.string("selector") { conditions.append(.selector(selector)) }
+                if let selector = try a.string("selector_gone") { conditions.append(.selectorGone(selector)) }
+                if let load = try a.bool("load") {
+                    guard load else { throw MCPArgumentError("load can only be true: leave it out to wait for something else.") }
+                    conditions.append(.load)
+                }
+                guard conditions.count == 1, let condition = conditions.first else {
+                    throw MCPArgumentError("wait_for takes one of text, text_gone, selector, selector_gone or load.")
+                }
+                if case .text(let text) = condition, text.count > 10_000 { throw MCPArgumentError("text is too long.") }
+                if case .textGone(let text) = condition, text.count > 10_000 { throw MCPArgumentError("text_gone is too long.") }
+                let timeout = try a.int("timeout_ms", in: MCPTools.waitMin...MCPTools.waitMax) ?? MCPTools.waitDefault
+                return .success(.waitFor(try a.id(), condition, timeoutMs: timeout))
+            case "press_key":
+                guard let key = try a.string("key", allowEmpty: true), !key.isEmpty else { throw MCPArgumentError("press_key needs a key, like Enter or Tab.") }
+                var modifiers: [String] = []
+                if let value = arguments["modifiers"], value != .null {
+                    guard let list = value.array, list.allSatisfy({ $0.string != nil }) else {
+                        throw MCPArgumentError("modifiers must be a list of shift, alt, ctrl and meta.")
+                    }
+                    modifiers = list.compactMap(\.string)
+                }
+                switch MCPKeyPress.parse(key, modifiers: modifiers) {
+                case .failure(let error): throw error
+                case .success(let press): return .success(.pressKey(try a.id(), press, selector: try a.string("selector")))
+                }
             default: return .failure(.init("Unknown tool: \(name)"))
             }
         } catch let error as MCPArgumentError {

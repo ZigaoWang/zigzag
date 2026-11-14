@@ -124,7 +124,61 @@ enum MCPBrowser {
                 case .success(let object): return .data(json(object))
                 }
             }
+        case .waitFor(_, let condition, let timeoutMs):
+            return await waitFor(condition, timeout: TimeInterval(timeoutMs) / 1000, in: tab, controller: found.controller)
+        case .pressKey(_, let press, let selector):
+            return await page(tab) { webView in
+                let before = webView.backForwardList.currentItem
+                var args: [String: Any] = [:]
+                if let selector { args["selector"] = selector }
+                let target: [String: Any]
+                switch await MCPPageScript.run("keyTarget", args, in: webView) {
+                case .failure(let error): return .error(error.message)
+                case .success(let object): target = object
+                }
+                if press.editsText, target["secret"] as? Bool == true {
+                    return .error("The focus is in a password field. Zigzag never lets AI apps type passwords; ask the person to type it.")
+                }
+                if press.editsText, target["inFrame"] as? Bool == true {
+                    return .error("The focus is in a frame inside the page, where Zigzag can't tell whether it's a password field. Click or focus a field in the page itself first.")
+                }
+                let after = await MCPKeyDelivery.press(press, in: webView)
+                if press.mayNavigate { await waitForLoad(tab, from: before, grace: 0.6) }
+                var result: [String: JSON] = ["pressed": .string(press.name)]
+                result["target"] = target["focused"].flatMap { json($0) } ?? .null
+                result["focused"] = after
+                result["tab"] = info(tab, in: found.controller)
+                return .data(.object(result))
+            }
         case .listTabs, .openTab: return .error("Unexpected.")
+        }
+    }
+
+    /// wait_for: the tab woken if it slept, then the page watches for the condition, for `timeout` at most.
+    private static func waitFor(_ condition: MCPWaitCondition, timeout: TimeInterval, in tab: Tab, controller: BrowserWindowController) async -> MCPToolResult {
+        let webView: WKWebView
+        if let awakeView = tab.webView { webView = awakeView } else { webView = await awake(tab) }
+        if let refusal = MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id)) {
+            return .error(MCPSafety.message(refusal))
+        }
+        let wait = MCPWait(condition, in: webView, timeout: timeout) { [weak tab, weak webView] in
+            guard let tab, !tab.isClosed else { return "The tab was closed while waiting, so the wait ended." }
+            guard let webView, tab.webView === webView else { return "The tab went to sleep while waiting, so the wait ended." }
+            if !MCPService.isOn { return MCPWait.stoppedMessage }
+            // Stopped, or now on a page no tool may use (the load it waited for went to one).
+            if let refusal = MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id)) {
+                return MCPSafety.message(refusal)
+            }
+            return nil
+        }
+        switch await wait.run() {
+        case .failed(let message): return .error(message)
+        case .matched(let object, let elapsedMs):
+            var result: [String: JSON] = ["matched": .string(condition.name), "elapsed_ms": .int(elapsedMs)]
+            if let value = condition.value { result["value"] = .string(value) }
+            if let element = object["element"] { result["element"] = json(element) }
+            result["tab"] = info(tab, in: controller)
+            return .data(.object(result))
         }
     }
 

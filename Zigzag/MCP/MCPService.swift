@@ -65,6 +65,7 @@ enum MCPService {
     }
 
     private static func stop() {
+        MCPWait.cancelAll(MCPWait.stoppedMessage)
         server?.stop()
         server = nil
         problem = nil
@@ -95,6 +96,7 @@ enum MCPService {
     static func resetKey() {
         let new = MCPKeyFile.reset() ?? ""
         server?.endpoint.setToken(new)
+        MCPWait.cancelAll(MCPWait.stoppedMessage)
         AgentControl.shared.reset()
         changed.send()
     }

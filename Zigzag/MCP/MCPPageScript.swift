@@ -18,6 +18,25 @@ enum MCPPageScript {
         }
     }
 
+    /// Starts `op` in the page and hands its answer to `then` when it comes. The request is on its way to the page
+    /// when this returns, so what's sent to the web view after it (a key press) reaches the page after it too.
+    static func start(_ op: String, _ args: [String: Any] = [:], in webView: WKWebView,
+                      then: @escaping @MainActor (Result<[String: Any], MCPArgumentError>) -> Void) {
+        webView.callAsyncJavaScript(body, arguments: ["op": op, "args": args], in: nil, in: world) { result in
+            MainActor.assumeIsolated {
+                switch result {
+                case .success(let value):
+                    guard let object = value as? [String: Any] else { then(.failure(.init("The page gave no answer."))); return }
+                    if let error = object["error"] as? String { then(.failure(.init(error))); return }
+                    then(.success(object))
+                case .failure(let error):
+                    let message = (error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String
+                    then(.failure(.init(message.map { "The page couldn't do it: \($0)" } ?? "The page couldn't do it.")))
+                }
+            }
+        }
+    }
+
     /// The function's body; `op` and `args` are its arguments.
     static let body = #"""
     const isSecret = (el) => {
@@ -191,6 +210,105 @@ enum MCPPageScript {
       window.scrollBy({ top: args.dy, behavior: 'instant' });
       const page = document.scrollingElement || document.documentElement;
       return { scrollTop: window.scrollY, scrollHeight: page.scrollHeight, height: window.innerHeight };
+    }
+    case 'waitFor': {
+      // Checked when the page changes (a MutationObserver), and every quarter second besides, for what changes
+      // without touching the DOM (a style sheet, an animation). Zigzag ends it on time; the page's own timer only
+      // tidies up if that never comes.
+      const waits = globalThis.__zigzagWaits || (globalThis.__zigzagWaits = new Map());
+      const norm = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      const want = norm(args.value);
+      const visible = () => {
+        try { return [...document.querySelectorAll(args.value)].find(shown) || null; } catch (e) { throw new Error('Invalid CSS selector: ' + args.value); }
+      };
+      const pageText = () => norm((document.body || document.documentElement || {}).innerText);
+      const check = () => {
+        switch (args.condition) {
+        case 'text': return pageText().includes(want) ? {} : null;
+        case 'text_gone': return pageText().includes(want) ? null : {};
+        case 'selector': { const el = visible(); return el ? { element: describe(el) } : null; }
+        case 'selector_gone': return visible() ? null : {};
+        case 'load': return document.readyState === 'complete' ? {} : null;
+        default: throw new Error('Unknown condition.');
+        }
+      };
+      if (args.condition === 'selector' || args.condition === 'selector_gone') visible();
+      return await new Promise((resolve) => {
+        let done = false, last = 0, later = null, poll = null, cleanup = null;
+        const observer = new MutationObserver(() => soon());
+        const finish = (value) => {
+          if (done) return;
+          done = true;
+          observer.disconnect();
+          clearInterval(poll);
+          clearTimeout(cleanup);
+          clearTimeout(later);
+          removeEventListener('pagehide', gone, true);
+          document.removeEventListener('readystatechange', run);
+          waits.delete(args.waitID);
+          resolve(value);
+        };
+        const run = () => {
+          later = null;
+          if (done) return;
+          last = performance.now();
+          let hit = null;
+          try { hit = check(); } catch (e) { finish({ error: String(e.message || e) }); return; }
+          if (hit) finish(Object.assign({ matched: args.condition }, hit));
+        };
+        // At most every 50 ms, however fast the page changes.
+        const soon = () => {
+          if (done || later) return;
+          const wait = 50 - (performance.now() - last);
+          if (wait <= 0) run(); else later = setTimeout(run, wait);
+        };
+        const gone = () => finish({ navigated: true });
+        waits.set(args.waitID, () => finish({ cancelled: true }));
+        addEventListener('pagehide', gone, true);
+        document.addEventListener('readystatechange', run);
+        observer.observe(document, { subtree: true, childList: true, characterData: true, attributes: true });
+        poll = setInterval(run, 250);
+        cleanup = setTimeout(() => finish({ timedOut: true }), args.timeoutMs + 2000);
+        run();
+      });
+    }
+    case 'cancelWait': {
+      const stop = globalThis.__zigzagWaits && globalThis.__zigzagWaits.get(args.waitID);
+      if (stop) stop();
+      return { cancelled: !!stop };
+    }
+    case 'keyTarget': {
+      // Where press_key's key will go: the element a selector finds, focused first, or the one with the focus.
+      if (args.selector) {
+        const el = find(args.selector);
+        if (!el) return { error: 'Nothing on the page matches ' + args.selector + '.' };
+        if (el.disabled) return { error: 'That element is disabled.' };
+        el.scrollIntoView({ block: 'center', inline: 'center' });
+        if (typeof el.focus === 'function') el.focus({ preventScroll: true });
+        if (document.activeElement !== el && !el.contains(document.activeElement)) {
+          return { error: 'That element can’t take the keyboard focus, so the key would go somewhere else.' };
+        }
+      }
+      const active = document.activeElement;
+      const page = !active || active === document.body || active === document.documentElement;
+      return { focused: page ? null : describe(active), secret: !page && isSecret(active),
+               inFrame: !page && (active.tagName === 'IFRAME' || active.tagName === 'FRAME') };
+    }
+    case 'awaitKey': {
+      // Answers once the page has had the key up (so what the key down did is done), or after a moment.
+      return await new Promise((resolve) => {
+        let timer = null;
+        const finish = () => {
+          removeEventListener('keyup', up, true);
+          clearTimeout(timer);
+          const active = document.activeElement;
+          const page = !active || active === document.body || active === document.documentElement;
+          resolve({ focused: page ? null : describe(active) });
+        };
+        const up = (e) => { if (e.isTrusted) finish(); };
+        addEventListener('keyup', up, true);
+        timer = setTimeout(finish, 1000);
+      });
     }
     case 'state':
       return { title: document.title, url: location.href, readyState: document.readyState };

@@ -17,7 +17,7 @@ struct MCPToolsTests {
 
     @Test func everyToolHasASchemaAndAName() {
         #expect(MCPTools.names == ["list_tabs", "open_tab", "activate_tab", "close_tab", "navigate", "go_back", "go_forward", "reload",
-                                   "read_page", "get_links", "screenshot", "click", "type", "scroll"])
+                                   "read_page", "get_links", "screenshot", "click", "type", "scroll", "wait_for", "press_key"])
         for tool in MCPTools.definitions {
             #expect(tool["inputSchema"]?["type"] == "object")
             #expect(tool["description"]?.string?.isEmpty == false)
