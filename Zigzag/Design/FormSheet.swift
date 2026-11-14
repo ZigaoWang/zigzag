@@ -35,6 +35,13 @@ final class FormSheet: NSView, NSTextFieldDelegate {
     private var completion: (Bool) -> Void
     /// Hears that it closed without being confirmed, for whoever needs to know either way.
     var onCancel: (() -> Void)?
+    /// Hears the pointer over the main button, which may be greyed, so whoever made the form can mark the fields that
+    /// are holding it up: a button that can't be pressed then says which field it wants instead of sitting there dead.
+    var onConfirmHover: ((Bool) -> Void)?
+    /// What the main button should say for itself while it can't be pressed — asked each time the form is
+    /// revalidated, so the words stay true as the form is filled in. Shown only while the button is dead: the owner's
+    /// answer to "why not?", in words, so the reason is found without hunting through the form.
+    var heldUpNote: (() -> String?)? { didSet { refreshHeldUpNote() } }
     private var monitor: Any?
     private weak var previousResponder: NSResponder?
 
@@ -67,6 +74,7 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         buttons.trailing = [cancel, confirm]
         confirm.onClick = { [weak self] _ in self?.finish(true) }
         cancel.onClick = { [weak self] _ in self?.finish(false) }
+        confirm.hoverChanged = { [weak self] over in self?.onConfirmHover?(over) }
         panel.onLayout = { [weak self] in self?.layoutPanel() }
         setAccessibilityRole(.sheet)
         setAccessibilityLabel(title)
@@ -107,7 +115,13 @@ final class FormSheet: NSView, NSTextFieldDelegate {
     }
 
     /// The main button follows what's been filled in.
-    func revalidate() { confirm.isEnabled = canConfirm() }
+    func revalidate() {
+        confirm.isEnabled = canConfirm()
+        refreshHeldUpNote()
+    }
+
+    /// The button explains itself only while it can't be pressed: a live button has nothing to answer for.
+    private func refreshHeldUpNote() { confirm.toolTip = confirm.isEnabled ? nil : heldUpNote?() }
 
     func controlTextDidChange(_ obj: Notification) { revalidate() }
 

@@ -40,6 +40,10 @@ struct SettingsLayoutTests {
     /// middle, so a label is set that much higher than its line box would be, in a container counting from the top
     /// or from the bottom, on the screen's pixels.
     @Test func labelsCenterTheirCapitals() {
+        // Where the letters land is a sub-pixel offset: on a display with no sub-pixels to speak of it rounds away
+        // and the two positions measured below come out equal, so there is nothing here to measure. Upstream runs
+        // this on Retina; a CI runner has no screen at all, and reports none.
+        guard (NSScreen.main?.backingScaleFactor ?? 1) >= 2 else { return }
         let font = Tokens.Font.control()
         final class Flipped: NSView { override var isFlipped: Bool { true } }
         let height = Tokens.Page.controlHeight
@@ -166,5 +170,22 @@ struct SettingsLayoutTests {
         let field = FilledField(placeholder: "example.com")
         #expect(field.intrinsicContentSize.width > 0)
         #expect(field.intrinsicContentSize.height > 0)
+    }
+
+    /// A form sheet lays its rows out by frame. A row holding a field with a Choose… button beside it must give the
+    /// button its width inside the row: `NSStackView(views:)` turns autoresizing off, so a stack left to itself sizes
+    /// to its content (the field's own width plus the button) and the button is drawn past the row's end, unseen.
+    @Test func aFieldBesideAButtonKeepsTheButtonInsideTheRow() {
+        let field = FilledField(placeholder: "example.com")
+        let button = PillButton(title: "Choose…")
+        let stack = DownloadRuleSheet.stack(field, button)
+        let rowWidth: CGFloat = 216
+        stack.frame = NSRect(x: 0, y: 0, width: rowWidth, height: Tokens.Metric.controlHeight)
+        stack.layoutSubtreeIfNeeded()
+        #expect(stack.frame.width == rowWidth, "the stack took the row's width")
+        #expect(field.frame.width > 0)
+        #expect(button.frame.width > 0, "the button was given room")
+        #expect(field.frame.minX >= -0.5)
+        #expect(button.frame.maxX <= rowWidth + 0.5, "the button sits inside the row, not past its end")
     }
 }

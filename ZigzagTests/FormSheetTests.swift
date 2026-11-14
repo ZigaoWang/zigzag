@@ -50,4 +50,44 @@ struct FormSheetTests {
         #expect(action(36, composing: true) == .pass)
         #expect(action(53, composing: true) == .pass)
     }
+
+    /// A form whose main button can't be pressed says why, in two places: the words are on the button itself as its
+    /// tooltip, and the pointer over it tells the form's owner to mark the fields holding it up. A live button says
+    /// nothing, so nothing is marked for no reason.
+    @Test func aFormThatCannotBeConfirmedSaysWhatHoldsItUp() throws {
+        var confirmable = false
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 420, height: 320), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView?.wantsLayer = true
+        let host = try #require(window.contentView)
+        let sheet = FormSheet.show(in: host, title: "Add", rows: [], confirmTitle: "Add",
+                                   canConfirm: { confirmable }, completion: { _ in })
+        sheet.heldUpNote = { confirmable ? nil : "Give it a name." }
+        sheet.revalidate()
+
+        var hovered: Bool?
+        sheet.onConfirmHover = { hovered = $0 }
+        let confirm = try #require(sheet.selfAndDescendants(of: PillButton.self).first { $0.title == "Add" })
+        #expect(!confirm.isEnabled)
+        #expect(confirm.toolTip == "Give it a name.")
+
+        // The pointer over the dead button: the form hears it, so the owner can mark what is holding it up.
+        confirm.isHovered = true
+        #expect(hovered == true)
+        confirm.isHovered = false
+        #expect(hovered == false)
+
+        // Nothing holding it up: the button is live and has nothing to answer for.
+        confirmable = true
+        sheet.revalidate()
+        #expect(confirm.isEnabled)
+        #expect(confirm.toolTip == nil)
+    }
+}
+
+private extension NSView {
+    /// This view and everything under it of `kind`, outermost first. A test's own copy of the sheet's search: the
+    /// app's is `fileprivate` to the form it serves, and one test is no reason to widen that.
+    func selfAndDescendants<T: NSView>(of kind: T.Type) -> [T] {
+        ((self as? T).map { [$0] } ?? []) + subviews.flatMap { $0.selfAndDescendants(of: kind) }
+    }
 }

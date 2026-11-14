@@ -18,6 +18,8 @@ enum DownloadRuleSheet {
         name.stringValue = source.name
         let pattern = FilledField(placeholder: String(localized: "example.com/files/", comment: "Placeholder of the pattern field in the sheet that makes a download rule."))
         pattern.stringValue = source.pattern
+        /// Whether the pointer is over the main button, which asks for the whole answer to "why can't I add this?".
+        var addHovered = false
 
         let applies = DropdownButton()
         applies.options = DownloadRule.Applies.allCases.map { DropdownButton.Option(title: $0.title) }
@@ -183,20 +185,33 @@ enum DownloadRuleSheet {
                        color: offThisMac ? Tokens.Color.warning : nil)
         }
 
-        /// A pattern that isn't a working regular expression: the field says so in place, since a broken expression
-        /// is otherwise only a rule that never matches the address it was meant to.
-        func refreshPatternWarning(_ rule: DownloadRule?) {
-            let broken = rule.map { !$0.isValidPattern } ?? false
-            pattern.isInvalid = broken
-            pattern.toolTip = broken
-                ? String(localized: "That isn’t a working regular expression. Zigzag saves nothing it can’t read.", comment: "Tooltip on the address field of a download rule whose regular expression doesn't compile.")
-                : nil
+        /// Mark the fields holding Add back: the pattern, and the action's own field. `all` also marks the two you
+        /// may simply not have reached yet — a name and a pattern that is still empty — which is what the pointer over
+        /// the dead button asks for. One list serves the markers, the tooltips and the button's own answer, so the
+        /// three can never disagree.
+        func markHeldUp(_ rule: DownloadRule?) {
+            let held = rule.map { Self.heldUp($0, all: addHovered) } ?? []
+            let notes = Dictionary(held.map { ($0.field, $0.note) }, uniquingKeysWith: { first, _ in first })
+            // The fields this sheet holds. Every one this sheet can show is marked.
+            let fields: [HeldField: FilledField?] = [.name: name, .pattern: pattern, .action(.app): appField,
+                                                     .action(.url): urlField, .action(.script): scriptField,
+                                                     .action(.endpoint): endpointField, .action(.method): methodField]
+            for (which, field) in fields {
+                let note = notes[which]
+                field?.isInvalid = note != nil
+                field?.toolTip = note
+            }
+        }
+
+        /// What the dead Add button says for itself: the first thing to fix, in the order the form is filled in.
+        func heldUpNote() -> String? {
+            ruleFromFields().flatMap { Self.heldUp($0, all: true).first?.note }
         }
 
         let valid = {
             let rule = ruleFromFields()
             refreshCookieStatus(rule)
-            refreshPatternWarning(rule)
+            markHeldUp(rule)
             guard let rule, !rule.name.isEmpty else { return false }
             guard rule.match == .any || !rule.pattern.isEmpty else { return false }
             guard rule.isValidPattern else { return false }
@@ -241,18 +256,93 @@ enum DownloadRuleSheet {
             }
         }
         sheetRef = sheet
+        // Hovering the dead Add button marks every field holding it up, and the button says the first of them for
+        // itself; leaving it takes the markers back.
+        sheet.onConfirmHover = { over in
+            addHovered = over
+            sheetRef?.revalidate()
+        }
+        sheet.heldUpNote = { heldUpNote() }
     }
 
-    /// A field with a button at its end, both stretched across the form's row.
-    private static func stack(_ field: NSView, _ button: NSView) -> NSStackView {
+    /// A field with a button beside it (a path and Choose…). The sheet lays its rows out by frame, and
+    /// `NSStackView(views:)` turns autoresizing off, so without this the stack would size to its content — the field's
+    /// own width plus the button — and the button would be drawn past the row's end, unseen. The field is what gives
+    /// way when the row is narrower than the two together; the button keeps its own width.
+    static func stack(_ field: NSView, _ button: NSView) -> NSStackView {
         let stack = NSStackView(views: [field, button])
         stack.orientation = .horizontal
         stack.spacing = Tokens.Space.x2
         stack.distribution = .fill
         stack.alignment = .centerY
+        stack.translatesAutoresizingMaskIntoConstraints = true
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
         button.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        // Shrinking is the other half of it: with both at the default resistance, a row narrower than field + button
+        // can't be resolved and the stack lays the button out past the end rather than drawing it inside.
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
         return stack
+    }
+
+    /// Everything holding a rule's Add button back, in the order the form is filled in: the name, what it matches,
+    /// then the action's own field. `all` adds the two you may simply not have reached yet — an empty name and an
+    /// empty pattern — which is what the pointer over the dead button asks for; a broken expression is always worth
+    /// saying. Empty means Add can be pressed.
+    static func heldUp(_ rule: DownloadRule, all: Bool) -> [(field: HeldField, note: String)] {
+        var held: [(field: HeldField, note: String)] = []
+        if all, rule.name.isEmpty {
+            held.append((.name, String(localized: "Give the rule a name.", comment: "Tooltip on the name field of a download rule being added without one, so its Add button can't be pressed.")))
+        }
+        if rule.match != .any, rule.pattern.isEmpty {
+            if all {
+                held.append((.pattern, String(localized: "Type what this rule catches.", comment: "Tooltip on the address field of a download rule with no pattern yet, so its Add button can't be pressed.")))
+            }
+        } else if !rule.isValidPattern {
+            held.append((.pattern, String(localized: "That isn’t a working regular expression. Zigzag saves nothing it can’t read.", comment: "Tooltip on the address field of a download rule whose regular expression doesn't compile.")))
+        }
+        if let action = actionHoldUp(rule.action) { held.append((.action(action.field), action.note)) }
+        return held
+    }
+
+    /// Which of the sheet's fields something can be said about.
+    enum HeldField: Hashable {
+        case name
+        case pattern
+        case action(ActionField)
+    }
+
+    /// Which of a rule action's own fields is holding its Add button back, if one is.
+    enum ActionField: Equatable { case app, url, script, endpoint, method }
+
+    /// The field a rule's action still needs something in, and what to say about it: nil when the action can run.
+    /// Kept out of the sheet so the one thing that decides it — `isComplete` — is tested against every kind, and so a
+    /// greyed Add button never leaves the person guessing which field to fill. An address with no scheme (`bing.com`)
+    /// is complete's own case, and its own words.
+    static func actionHoldUp(_ action: DownloadRuleAction) -> (field: ActionField, note: String)? {
+        switch action.kind {
+        case .openApp:
+            return action.appPath.isEmpty
+                ? (.app, String(localized: "Choose the app this rule opens the link with.", comment: "Tooltip on the app field of a download rule whose action has no app yet, so its Add button is greyed."))
+                : nil
+        case .openURL:
+            if action.urlTemplate.isEmpty {
+                return (.url, String(localized: "Type the address this rule sends the link to.", comment: "Tooltip on the address field of a download rule whose action has no address yet, so its Add button is greyed."))
+            }
+            return action.isComplete ? nil
+                : (.url, String(localized: "This address needs a scheme, like “mpv://” or “https://”.", comment: "Tooltip on the address field of a download rule whose address has no scheme, so nothing could open it and its Add button is greyed."))
+        case .runScript:
+            return action.scriptPath.isEmpty
+                ? (.script, String(localized: "Choose the script this rule runs.", comment: "Tooltip on the script field of a download rule whose action has no script yet, so its Add button is greyed."))
+                : nil
+        case .jsonRPC:
+            if !action.endpointIsUsable {
+                return (.endpoint, String(localized: "Type the address of the JSON-RPC service, like http://127.0.0.1:6800/jsonrpc.", comment: "Tooltip on the endpoint field of a JSON-RPC download rule that has none, or one that has a scheme missing or no address at all, so its Add button is greyed."))
+            }
+            return action.rpcMethod.isEmpty
+                ? (.method, String(localized: "Name the method to call on the service.", comment: "Tooltip on the method field of a JSON-RPC download rule that names no method, so its Add button is greyed."))
+                : nil
+        }
     }
 }
 

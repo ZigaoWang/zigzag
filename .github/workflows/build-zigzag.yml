@@ -76,12 +76,16 @@ jobs:
             -only-testing:ZigzagTests/PendingQuestionsTests \
             -only-testing:ZigzagTests/PageLinkTests \
             -only-testing:ZigzagTests/SiteControlsPermissionTests \
+            -only-testing:ZigzagTests/FormSheetTests \
             -only-testing:ZigzagTests/SettingsLayoutTests | tee test.log
+          # labelsCenterTheirCapitals is upstream's own test and measures a sub-pixel offset, which rounds away on a
+          # runner with no Retina display: it stands aside there itself, at the top of the test. `-skip-testing:` with
+          # a single test's name is not honoured for this suite, so the test is what knows (see SettingsLayoutTests).
 
       - name: Check the tests that matter really ran
         # A selector that matches nothing passes silently, so name one test per area; and a red test is a red build.
         run: |
-          for t in eachMatchKind remembersAnActionPerSubjectAndOrigin migratesOldBoolsOnce theAnswerCarriesTheChosenActionAndDuration openAppsIsAPermission aTabWearsTheMarkerOnlyWhileItsQuestionCannotBeShown everyPopupValueHasADestination anAppLinkReadsTheSiteWideRowThenTheAppThenThePage theDownloadsListGroupsSitesByTheirAnswer anAnswerIsKeptOnlyWhereItMayBe aStoredAllowSkipsTheQuestionAndABlockStopsIt aLegacyPopupYesMeansTheViewer allowingPopupsKeepsTheViewer anAnsweredDenyIsKeptForTheWholeSite aPopUpGoesThroughTheTabThatAskedNotABrowserWindow aPagesOwnThisTimePopUpAnswerIsReadBack aCardSaysHowManyWaitBehindIt fitsThePageItIsGivenInsideAnAnimation aFieldInARowIsGivenRoomToDraw aFieldHasASizeOfItsOwn; do
+          for t in eachMatchKind remembersAnActionPerSubjectAndOrigin migratesOldBoolsOnce theAnswerCarriesTheChosenActionAndDuration openAppsIsAPermission aTabWearsTheMarkerOnlyWhileItsQuestionCannotBeShown everyPopupValueHasADestination anAppLinkReadsTheSiteWideRowThenTheAppThenThePage theDownloadsListGroupsSitesByTheirAnswer anAnswerIsKeptOnlyWhereItMayBe aStoredAllowSkipsTheQuestionAndABlockStopsIt aLegacyPopupYesMeansTheViewer allowingPopupsKeepsTheViewer anAnsweredDenyIsKeptForTheWholeSite aPopUpGoesThroughTheTabThatAskedNotABrowserWindow aPagesOwnThisTimePopUpAnswerIsReadBack aCardSaysHowManyWaitBehindIt fitsThePageItIsGivenInsideAnAnimation aFieldInARowIsGivenRoomToDraw aFieldHasASizeOfItsOwn aFieldBesideAButtonKeepsTheButtonInsideTheRow anActionThatCannotRunNamesTheFieldHoldingItUp aRuleSaysEverythingHoldingAddBack aFormThatCannotBeConfirmedSaysWhatHoldsItUp; do
             grep -q "✔ Test $t() passed" test.log || { echo "did not run: $t"; exit 1; }
           done
           if grep -q "✘" test.log; then echo "a test failed"; exit 1; fi
