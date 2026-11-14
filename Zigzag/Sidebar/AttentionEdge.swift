@@ -60,3 +60,13 @@ final class AttentionEdge: NSView {
 
     override func resetCursorRects() { addCursorRect(bounds, cursor: .pointingHand) }
 }
+
+extension AttentionEdge {
+    /// Its frame for the page of a window that shows one page and has no sidebar to hang a dot on (Zigzag Mini, a web
+    /// app): a hairline on the window's own edge, on the side `sidebarOnRight` puts the sidebar, its glow spilling
+    /// onto the page. A browser window instead gives it the resize handle's frame, at the sidebar's edge.
+    static func frame(forPage area: NSRect, sidebarOnRight: Bool) -> NSRect {
+        NSRect(x: sidebarOnRight ? area.maxX - Tokens.Metric.hairline : area.minX,
+               y: area.minY, width: Tokens.Metric.resizeHandleWidth, height: area.height)
+    }
+}
