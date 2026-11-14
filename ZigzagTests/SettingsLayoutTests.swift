@@ -72,4 +72,20 @@ struct SettingsLayoutTests {
             if field.frame.height != drawn { break }
         }
     }
+
+    /// Menus in one group of settings share the widest one's width, and follow it when its choices change.
+    @Test func menusInAGroupShareAWidth() {
+        let short = DropdownButton(), long = DropdownButton()
+        short.options = [.init(title: "Small"), .init(title: "Medium")]
+        long.options = [.init(title: "Off"), .init(title: "When Zigzag is dark")]
+        let alone = short.intrinsicContentSize.width
+        let group = FormGroup()
+        group.add(FormRow(title: "Sidebar size", control: short))
+        group.add(FormRow(title: "Dark pages", control: long))
+        #expect(short.intrinsicContentSize.width == long.intrinsicContentSize.width)
+        #expect(short.intrinsicContentSize.width > alone)
+        long.options = [.init(title: "Off")]
+        #expect(short.intrinsicContentSize.width == alone)
+        #expect(long.intrinsicContentSize.width == alone)
+    }
 }

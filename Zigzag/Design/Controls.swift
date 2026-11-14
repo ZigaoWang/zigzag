@@ -1188,6 +1188,30 @@ final class Toggle: InteractiveView {
 /// A choice from a list, drawn as Zigzag's: the current choice (with its icon) on the secondary look, a chevron at
 /// the end, and Zigzag's own menu (`MenuPanel`) when clicked, its chosen item right over the button as macOS places it.
 /// Press and drag to an item to choose in one go; with the keyboard, Space, Return or an arrow opens it.
+/// Menus that line up as one column, as the ones in a group of settings: each as wide as the widest of them.
+final class DropdownWidthGroup {
+    private let members = NSHashTable<DropdownButton>.weakObjects()
+    private var updating = false
+
+    func add(_ button: DropdownButton) {
+        members.add(button)
+        button.widthGroup = self
+    }
+
+    var width: CGFloat { members.allObjects.filter { !$0.showsPictureOnly }.map(\.naturalWidth).max() ?? 0 }
+
+    /// One of them changed its choices: each takes the new width.
+    func changed() {
+        guard !updating else { return }
+        updating = true
+        defer { updating = false }
+        for button in members.allObjects {
+            button.invalidateIntrinsicContentSize()
+            button.superview?.needsLayout = true
+        }
+    }
+}
+
 final class DropdownButton: InteractiveView {
     struct Option {
         var title: String
@@ -1251,13 +1275,23 @@ final class DropdownButton: InteractiveView {
         invalidateIntrinsicContentSize()
         needsLayout = true
         superview?.needsLayout = true
+        widthGroup?.changed()
+    }
+
+    /// Menus set one under another (a group of settings) share the widest one's width, so their edges line up.
+    weak var widthGroup: DropdownWidthGroup? { didSet { oldValue?.changed(); widthGroup?.changed() } }
+
+    /// Wide enough for its longest choice, as a pop-up button is.
+    var naturalWidth: CGFloat {
+        let widest = options.map { ($0.title as NSString).size(withAttributes: [.font: Tokens.Font.control()]).width }.max() ?? 0
+        let iconWidth: CGFloat = options.contains { $0.image != nil } ? Self.iconSide + Tokens.Space.x2 : 0
+        if showsPictureOnly { return ceil(Self.textInset + iconWidth + 10 + Self.textInset) }
+        return ceil(Self.textInset + iconWidth + widest + Tokens.Space.x3 + 10 + Self.textInset)
     }
 
     override var intrinsicContentSize: NSSize {
-        let widest = options.map { ($0.title as NSString).size(withAttributes: [.font: Tokens.Font.control()]).width }.max() ?? 0
-        let iconWidth: CGFloat = options.contains { $0.image != nil } ? Self.iconSide + Tokens.Space.x2 : 0
-        if showsPictureOnly { return NSSize(width: ceil(Self.textInset + iconWidth + 10 + Self.textInset), height: Tokens.Page.controlHeight) }
-        return NSSize(width: ceil(Self.textInset + iconWidth + widest + Tokens.Space.x3 + 10 + Self.textInset), height: Tokens.Page.controlHeight)
+        let shared = showsPictureOnly ? 0 : widthGroup?.width ?? 0
+        return NSSize(width: max(naturalWidth, shared), height: Tokens.Page.controlHeight)
     }
 
     override func layout() {

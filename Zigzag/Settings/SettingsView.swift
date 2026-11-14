@@ -9,6 +9,8 @@ final class FormGroup: NSView {
     private(set) var rows: [NSView] = []
     private var lines: [NSView] = []
     private let background = ColorView(color: Tokens.Color.surfaceGroup)
+    /// The menus of its rows, one width, so their left edges line up down the group as their right edges do.
+    private let dropdowns = DropdownWidthGroup()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -29,6 +31,7 @@ final class FormGroup: NSView {
         }
         rows.append(row)
         addSubview(row)
+        if let menu = (row as? FormRow)?.control as? DropdownButton { dropdowns.add(menu) }
         // A row added to a group already on the page takes the group's width at its next layout.
         needsLayout = true
     }
