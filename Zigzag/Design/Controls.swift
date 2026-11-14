@@ -605,6 +605,10 @@ final class Label: NSTextField {
     func fadeTail(endingAt end: CGFloat? = nil) {
         let room = bounds.width - Label.inset * 2
         let stop = end ?? (inkWidth > room + 0.5 ? bounds.width - Label.inset : nil)
+        // Every layout of every row asks again: the same size and the same cut as last time leave the mask be.
+        let wanted = Fade(size: bounds.size, stop: stop)
+        if wanted == lastFade, (stop == nil || bounds.width <= 0) == (layer?.mask == nil) { return }
+        lastFade = wanted
         guard let stop, bounds.width > 0 else {
             if layer?.mask != nil { layer?.mask = nil }
             return
@@ -624,6 +628,13 @@ final class Label: NSTextField {
         if layer.mask !== fade { layer.mask = fade }
     }
 
+    /// What `fadeTail` last drew: its size and where the fade ended.
+    private struct Fade: Equatable {
+        var size: NSSize
+        var stop: CGFloat?
+    }
+    private var lastFade: Fade?
+
     /// Moved to a screen of another scale: where `centeredY` puts it is on the old screen's pixels, so the view
     /// that places it does so again.
     override func viewDidChangeBackingProperties() {
@@ -636,11 +647,35 @@ final class Label: NSTextField {
 
     /// The text's own width, without the padding `textWidth` adds: for laying out text inside a pill. Set as
     /// styled text (a space's name, set tight), it's measured as drawn, tracking included.
+    /// Measured once per text, font and tracking: a sidebar row asks on every layout.
     var inkWidth: CGFloat {
+        if let measured = measuredInk { return measured.width }
         let styled = attributedStringValue
-        if styled.length > 0, styled.attribute(.kern, at: 0, effectiveRange: nil) != nil { return ceil(styled.size().width) }
-        return ceil((stringValue as NSString).size(withAttributes: [.font: font ?? Tokens.Font.body()]).width)
+        let kern = styled.length > 0 ? styled.attribute(.kern, at: 0, effectiveRange: nil) as? NSNumber : nil
+        let font = self.font ?? Tokens.Font.body()
+        let width = kern != nil ? ceil(styled.size().width) : ceil((stringValue as NSString).size(withAttributes: [.font: font]).width)
+        measuredInk = MeasuredInk(text: styled.string, fontName: font.fontName, pointSize: font.pointSize, kern: kern?.doubleValue, width: width)
+        return width
     }
+
+    /// The last `inkWidth` and what it was measured for; set aside whenever the text or the font changes.
+    private struct MeasuredInk: Equatable {
+        var text: String
+        var fontName: String
+        var pointSize: CGFloat
+        var kern: Double?
+        var width: CGFloat
+    }
+    private var measuredInk: MeasuredInk? { didSet { if measuredInk == nil { lastFade = nil } } }
+
+    override var stringValue: String { didSet { measuredInk = nil } }
+    override var attributedStringValue: NSAttributedString { didSet { measuredInk = nil } }
+    override var font: NSFont? { didSet { measuredInk = nil } }
+
+    #if DEBUG
+    /// Whether `inkWidth` would measure again: for tests.
+    var hasMeasuredInk: Bool { measuredInk != nil }
+    #endif
 
     /// The label's built-in inset on each side, so text can sit exactly where it's placed.
     static let inset: CGFloat = 2
@@ -648,12 +683,17 @@ final class Label: NSTextField {
     /// Height of one line in this label's font.
     var lineHeight: CGFloat { ceil(intrinsicContentSize.height) }
 
-    private static var capsOffsets: [String: CGFloat] = [:]
+    private struct CapsKey: Hashable {
+        var fontName: String
+        var pointSize: CGFloat
+        var lineHeight: CGFloat
+    }
+    private static var capsOffsets: [CapsKey: CGFloat] = [:]
 
     /// How far below the middle of a label's line its capital letters' middle is drawn, measured once per font by
     /// drawing a few capitals (the cell's own insets and the font's metrics both play in, so it's measured, not worked out).
     static func capsBelowMiddle(of font: NSFont, lineHeight: CGFloat) -> CGFloat {
-        let key = "\(font.fontName)-\(font.pointSize)-\(lineHeight)"
+        let key = CapsKey(fontName: font.fontName, pointSize: font.pointSize, lineHeight: lineHeight)
         if let known = capsOffsets[key] { return known }
         let probe = NSTextField(labelWithString: "HOEX")
         probe.font = font

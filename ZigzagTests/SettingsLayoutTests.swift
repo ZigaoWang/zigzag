@@ -88,4 +88,50 @@ struct SettingsLayoutTests {
         #expect(short.intrinsicContentSize.width == alone)
         #expect(long.intrinsicContentSize.width == alone)
     }
+
+    /// A label measures its text once (a sidebar row asks on every layout), and again whenever its text, styled
+    /// text or font changes.
+    @Test func aLabelsMeasuredWidthFollowsItsTextAndFont() {
+        let label = Label("Short", font: Tokens.Font.body())
+        #expect(!label.hasMeasuredInk)
+        let short = label.inkWidth
+        #expect(label.hasMeasuredInk)
+        #expect(label.inkWidth == short)
+        label.stringValue = "A much longer title than that"
+        #expect(!label.hasMeasuredInk)
+        let long = label.inkWidth
+        #expect(long > short)
+        label.font = Tokens.Font.body().withSize(Tokens.Font.body().pointSize * 2)
+        #expect(!label.hasMeasuredInk)
+        #expect(label.inkWidth > long)
+        // Styled text with tracking is measured as drawn.
+        let font = label.font ?? Tokens.Font.body()
+        label.attributedStringValue = NSAttributedString(string: "A much longer title than that", attributes: [.font: font, .kern: 4])
+        #expect(!label.hasMeasuredInk)
+        let tracked = label.inkWidth
+        #expect(tracked > ceil(("A much longer title than that" as NSString).size(withAttributes: [.font: font]).width))
+        // Each measurement is the same as a fresh label's.
+        let fresh = Label("", font: font)
+        fresh.attributedStringValue = NSAttributedString(string: "A much longer title than that", attributes: [.font: font, .kern: 4])
+        #expect(fresh.inkWidth == tracked)
+    }
+
+    /// The fade at a label's end follows its text: one that grows past its room fades, one cut back to fit doesn't.
+    @Test func aLabelsFadeFollowsItsText() {
+        let label = Label("Fits", font: Tokens.Font.body())
+        label.fadesTail = true
+        label.frame = NSRect(x: 0, y: 0, width: 120, height: 20)
+        label.fadeTail()
+        #expect(label.layer?.mask == nil)
+        label.stringValue = "A title far too long for a hundred and twenty points"
+        label.fadeTail()
+        #expect(label.layer?.mask != nil)
+        // Asked again with nothing changed, it stays as it is.
+        let mask = label.layer?.mask
+        label.fadeTail()
+        #expect(label.layer?.mask === mask)
+        label.stringValue = "Fits"
+        label.fadeTail()
+        #expect(label.layer?.mask == nil)
+    }
 }
