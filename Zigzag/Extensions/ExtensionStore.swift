@@ -447,8 +447,16 @@ enum ExtensionStore {
         CRXPackage.extensionID(Array(SHA256.hash(data: Data(url.standardizedFileURL.path.utf8)).prefix(16)))
     }
 
+    /// What an extension in a folder asks for, for the same sheet a store package shows before it's added. Nil when
+    /// the folder holds nothing WebKit can read (loading it then says so).
+    @available(macOS 15.4, *)
+    static func reviewUnpacked(_ url: URL) async -> (extension: WKWebExtension, report: ExtensionReport)? {
+        guard let manifest = manifest(in: url), let ext = try? await WKWebExtension(resourceBaseURL: url) else { return nil }
+        return (ext, ExtensionReport(extension: ext, manifest: manifest, id: unpackedID(for: url)))
+    }
+
     /// Loads an extension from a folder on disk (Install from Folder, or one that comes inside an app), read where it
-    /// is and never changed.
+    /// is and never changed. Settings first shows what it asks for (`reviewUnpacked`), as for the store.
     static func loadUnpacked(_ url: URL, in profile: Profile) async -> String? {
         guard #available(macOS 15.4, *),
               FileManager.default.fileExists(atPath: url.appendingPathComponent("manifest.json").path) else { return nil }

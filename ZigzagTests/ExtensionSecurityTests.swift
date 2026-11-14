@@ -548,3 +548,22 @@ extension ExtensionSecurityTests {
         #expect(use.hasGesture("a") && !use.hasGesture("b"))
     }
 }
+
+extension ExtensionSecurityTests {
+    /// A folder's extension shows what it asks for before it's added, as a store package does.
+    @Test func foldersAreReviewedBeforeTheyAreAdded() async throws {
+        let folder = try Self.temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let manifest: [String: Any] = ["manifest_version": 3, "name": "Folder", "version": "1.0", "permissions": ["history", "clipboardRead"],
+                                       "host_permissions": ["<all_urls>"]]
+        try JSONSerialization.data(withJSONObject: manifest).write(to: folder.appendingPathComponent("manifest.json"))
+        let reviewed = try #require(await ExtensionStore.reviewUnpacked(folder))
+        let lines = reviewed.report.abilities.map(\.text)
+        #expect(lines.contains("Read and change what you see on every website"))
+        #expect(lines.contains("Read and change your browsing history"))
+        #expect(lines.contains("Read what you copy"))
+        let empty = try Self.temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: empty) }
+        #expect(await ExtensionStore.reviewUnpacked(empty) == nil)
+    }
+}

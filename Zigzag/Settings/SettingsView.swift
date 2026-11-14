@@ -1893,16 +1893,38 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// Installs an extension from the app it comes in, read from there: the app's updates update it.
+    /// Installs an extension from the app it comes in, read from there: the app's updates update it. What it asks for
+    /// is shown first, as for one from the store.
     private func install(_ found: AppBundledExtensions.Found) {
         let profile = profile
-        Task { @MainActor [weak self] in
+        confirmUnpacked(found.folder, from: found.appName) { [weak self] in
             if await ExtensionStore.loadUnpacked(found.folder, in: profile) == nil, let host = self {
                 ConfirmSheet.notice(in: host, title: String(localized: "Couldn’t load this extension", comment: "Title of the notice when an unpacked extension can't load."),
                                     message: String(localized: "\(found.appName) may have changed or moved. Open it once, then try again.",
                                                     comment: "Message of the notice when an extension that comes inside an app can't install. The placeholder is the app, like StopTheMadness Pro."))
             }
             self?.reloadExtensions()
+        }
+    }
+
+    /// The sheet that asks before adding an extension, for one read from a folder: what it will be able to do, and
+    /// Add or Cancel. One that can't be read goes straight on, to say it couldn't load.
+    private func confirmUnpacked(_ folder: URL, from appName: String?, install: @escaping @MainActor () async -> Void) {
+        guard #available(macOS 15.4, *), let controller = browser else { return }
+        Task { @MainActor in
+            guard let (info, report) = await ExtensionStore.reviewUnpacked(folder) else { await install(); return }
+            let content = ExtensionSheet.Content(
+                icon: info.icon(for: NSSize(width: 40, height: 40)),
+                title: info.displayName.map { String(localized: "Add \($0)?", comment: "Title of the sheet that asks before adding an extension. The name is the extension's.") }
+                    ?? String(localized: "Add this extension?", comment: "Title of the sheet that asks before adding an extension that has no name."),
+                subtitle: appName.map { String(localized: "Comes inside \($0) on this Mac", comment: "Under the title of the sheet that asks before adding an extension that comes inside an app. The placeholder is the app, like StopTheMadness Pro.") }
+                    ?? String(localized: "From a folder on this Mac", comment: "Under the title of the sheet that asks before adding an extension from a folder (Install from Folder in Settings › Extensions)."),
+                heading: String(localized: "It will be able to", comment: "Heading over the list of what an extension can do, in the sheet that asks before adding it."),
+                report: report,
+                confirm: String(localized: "Add Extension", comment: "Button that adds the extension, in the sheet that asks first."),
+                cancel: String(localized: "Cancel", comment: "Button that closes a sheet without doing anything."))
+            controller.window?.makeKeyAndOrderFront(nil)
+            ExtensionSheet.present(content, in: controller, onConfirm: { Task { @MainActor in await install() } })
         }
     }
 
@@ -1976,7 +1998,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let profile = profile
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
-            Task { @MainActor in
+            self?.confirmUnpacked(url, from: nil) { [weak self] in
                 if await ExtensionStore.loadUnpacked(url, in: profile) == nil, let host = self {
                     ConfirmSheet.notice(in: host, title: String(localized: "Couldn’t load this extension", comment: "Title of the notice when an unpacked extension can't load."),
                                         message: String(localized: "That folder needs a manifest.json that Zigzag can read. Choose the folder that holds it.",
