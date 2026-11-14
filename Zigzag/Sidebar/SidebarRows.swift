@@ -1432,24 +1432,55 @@ final class ClearTabsButton: InteractiveView {
         arrow.imageScaling = .scaleNone
         [arrow, label].forEach { addSubview($0) }
         setAccessibilityRole(.button)
-        step = .others(0)
+        step = Step(kind: .others, pages: 0)
         stateDidChange(animated: false)
     }
 
     /// What a click does now, and its tooltip says so: the tabs you haven't been using, then every tab but the one
-    /// you're on, then that one too.
-    enum Step: Equatable { case unused(Int), others(Int), last(Int) }
-    var step: Step = .others(0) {
+    /// you're on, then that one too. On a favorite or a pinned page none of the tabs is yours: it's all of them.
+    /// `pages` counts each page, a split's two included; `oneSplit` is what it closes being a single split view,
+    /// which is named as one.
+    struct Step: Equatable {
+        enum Kind: Equatable { case unused, others, all, last }
+        var kind: Kind
+        var pages: Int
+        var oneSplit = false
+    }
+    var step = Step(kind: .others, pages: 0) {
         didSet {
-            switch step {
-            case .unused(let n):
-                toolTip = String(localized: "Close \(n) tabs you haven’t used in a while", comment: "Tooltip of the sidebar's Clear button: closes the tabs you haven't looked at in a while, keeping the ones you're working with now.")
-            case .others(let n):
-                toolTip = String(localized: "Close the other \(n) tabs", comment: "Tooltip of the sidebar's Clear button: closes every tab but the one you're on.")
-            case .last(let n):
-                toolTip = String(localized: "Close the last \(n) tabs, leaving the space empty", comment: "Tooltip of the sidebar's Clear button when the only tabs left are the one you're on (and the pages beside it in a split).")
-            }
+            toolTip = Self.tooltip(for: step)
             setAccessibilityLabel(toolTip)
+        }
+    }
+
+    /// Clear's step for what it would close in a list: `listed`, the list's tabs; `groups`, the splits and tile
+    /// groups by page; `current`, the page you're on, which may not be among them (a favorite, a pinned page).
+    nonisolated static func step(kind: TabManager.ClearKind, closing: Set<UUID>, current: UUID?, listed: Set<UUID>, groups: [[UUID]]) -> Step {
+        let yoursListed = current.map { id in listed.contains(id) || groups.contains { $0.contains(id) && !listed.isDisjoint(with: $0) } } ?? false
+        let oneSplit = closing.count > 1 && groups.contains { Set($0) == closing }
+        let shown: Step.Kind = switch kind {
+        case .unused: .unused
+        case .others: yoursListed ? .others : .all
+        case .last: .last
+        }
+        return Step(kind: shown, pages: closing.count, oneSplit: oneSplit)
+    }
+
+    nonisolated static func tooltip(for step: Step) -> String {
+        let n = step.pages
+        if step.oneSplit {
+            return switch step.kind {
+            case .unused: String(localized: "Close the split view you haven’t used in a while", comment: "Tooltip of the sidebar's Clear button when what it closes is one split view you haven't looked at in a while.")
+            case .others: String(localized: "Close the other split view", comment: "Tooltip of the sidebar's Clear button when the only other tabs are one split view.")
+            case .all: String(localized: "Close the split view", comment: "Tooltip of the sidebar's Clear button while you're on a favorite or pinned page and the only tabs are one split view.")
+            case .last: String(localized: "Close this split view, leaving the space empty", comment: "Tooltip of the sidebar's Clear button when the only tabs left are the split view you're on.")
+            }
+        }
+        return switch step.kind {
+        case .unused: String(localized: "Close \(n) tabs you haven’t used in a while", comment: "Tooltip of the sidebar's Clear button: closes the tabs you haven't looked at in a while, keeping the ones you're working with now.")
+        case .others: String(localized: "Close the other \(n) tabs", comment: "Tooltip of the sidebar's Clear button: closes every tab but the one you're on.")
+        case .all: String(localized: "Close all \(n) tabs", comment: "Tooltip of the sidebar's Clear button while you're on a favorite or pinned page, so none of the tabs is yours: closes every tab.")
+        case .last: String(localized: "Close the last \(n) tabs, leaving the space empty", comment: "Tooltip of the sidebar's Clear button when the only tabs left are the one you're on (and the pages beside it in a split).")
         }
     }
 

@@ -1001,11 +1001,8 @@ final class SidebarListView: NSView {
             // Clear is there whenever it has something to close, and its tooltip says what.
             (view as? SeparatorRowView)?.hasTabs = !closing.isEmpty
             (view as? SeparatorRowView)?.refreshInk()
-            (view as? SeparatorRowView)?.clearButton.step = switch kind {
-            case .unused: .unused(closing.count)
-            case .others: .others(closing.count)
-            case .last: .last(closing.count)
-            }
+            (view as? SeparatorRowView)?.clearButton.step = ClearTabsButton.step(kind: kind, closing: Set(closing.map(\.id)), current: manager.selectedTab(in: space)?.id,
+                                                                                listed: Set(manager.tabs(in: space).map(\.id)), groups: manager.splits.map(\.ids))
             // What it would close changed under the pointer (a tab opened, one started playing): the rows follow.
             if clearPreview != nil, Set(closing.map(\.id)) != clearPreview { previewClear(true) }
 

@@ -238,6 +238,7 @@
 		82FC26C29ED58C84FDC746B3 /* WebKitSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C39431B8AEC6A4334D9A32E /* WebKitSetup.swift */; };
 		8324064912EF010CCD59D05B /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECBBB2069512C8FAA5C9183D /* Components.swift */; };
 		83383198F272FD26FC479A1F /* PageVideos.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6B84DBDA9267299D5DB571D /* PageVideos.swift */; };
+		8377230ECD7E9BB931B97A7B /* ClearWordingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8055982B8B54C35C4214DBB3 /* ClearWordingTests.swift */; };
 		83A451FE075DF252B6AA5FD3 /* audio-routes.js in Resources */ = {isa = PBXBuildFile; fileRef = CD2C91E2BA65EF3F426B22F9 /* audio-routes.js */; };
 		840BF35758F92C3AF4FC460D /* PageSizeInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9386D76C86995FCCE7A77BC2 /* PageSizeInputTests.swift */; };
 		84475A03BF280A73B4048B32 /* MiniPlayerPageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165A889A6DCFB9D1F338BC7C /* MiniPlayerPageTests.swift */; };
@@ -740,6 +741,7 @@
 		7F945D7E0BF21B2E2FD7A4C7 /* EmojiSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiSearchTests.swift; sourceTree = "<group>"; };
 		802533FCCDFF7BE687CA65D7 /* OtherBrowsers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OtherBrowsers.swift; sourceTree = "<group>"; };
 		804A63C8F2764EC4BE20451D /* PasswordStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordStoreTests.swift; sourceTree = "<group>"; };
+		8055982B8B54C35C4214DBB3 /* ClearWordingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearWordingTests.swift; sourceTree = "<group>"; };
 		8056AFCD49228FC19D70CCBD /* OwnWindowTabsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnWindowTabsTests.swift; sourceTree = "<group>"; };
 		81370CCCA627CE0FAFB02E03 /* ExtensionImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionImport.swift; sourceTree = "<group>"; };
 		818D2FEE410E6D64CD17AADD /* logins.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = logins.json; sourceTree = "<group>"; };
@@ -1514,6 +1516,7 @@
 				501B90ADF75ED2EF79493586 /* CertificateTrustTests.swift */,
 				6B6C77CFE33BFCD7CC963266 /* ChromeProfilesImportTests.swift */,
 				7069B71082962459B24D179F /* ChromiumExtensionsTests.swift */,
+				8055982B8B54C35C4214DBB3 /* ClearWordingTests.swift */,
 				F18C84CC63265389A43E642F /* CommandActionTests.swift */,
 				CE6475CD75E987F5A8B0D182 /* CommandBarHistoryTests.swift */,
 				97B89F5BC1A42191D2C02C66 /* CommandBarRankingTests.swift */,
@@ -2287,6 +2290,7 @@
 				CE33211DE5E98DCFE4811C4A /* CertificateTrustTests.swift in Sources */,
 				D7DA27736AE177FF489E42C3 /* ChromeProfilesImportTests.swift in Sources */,
 				95116D4DAA8CC50801C588B5 /* ChromiumExtensionsTests.swift in Sources */,
+				8377230ECD7E9BB931B97A7B /* ClearWordingTests.swift in Sources */,
 				54665D76641D0469C5A31D12 /* CommandActionTests.swift in Sources */,
 				23B86800C5070366304E8423 /* CommandBarHistoryTests.swift in Sources */,
 				AD66AB1C32F3990847A89971 /* CommandBarRankingTests.swift in Sources */,

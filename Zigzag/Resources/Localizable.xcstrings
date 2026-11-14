@@ -4487,6 +4487,41 @@
         }
       }
     },
+    "Close all %lld tabs" : {
+      "comment" : "Tooltip of the sidebar's Clear button while you're on a favorite or pinned page, so none of the tabs is yours: closes every tab.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Close the tab"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Close all %lld tabs"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "关闭全部 %lld 个标签页"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Close it" : {
       "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while a Peek is open. The Esc key is shown beside it.",
       "localizations" : {
@@ -4564,6 +4599,50 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Close the other split view" : {
+      "comment" : "Tooltip of the sidebar's Clear button when the only other tabs are one split view.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭另一个分屏浏览"
+          }
+        }
+      }
+    },
+    "Close the split view" : {
+      "comment" : "Tooltip of the sidebar's Clear button while you're on a favorite or pinned page and the only tabs are one split view.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭分屏浏览"
+          }
+        }
+      }
+    },
+    "Close the split view you haven’t used in a while" : {
+      "comment" : "Tooltip of the sidebar's Clear button when what it closes is one split view you haven't looked at in a while.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭有一阵子没用的分屏浏览"
+          }
+        }
+      }
+    },
+    "Close this split view, leaving the space empty" : {
+      "comment" : "Tooltip of the sidebar's Clear button when the only tabs left are the split view you're on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭这个分屏浏览，空间将变为空"
           }
         }
       }
