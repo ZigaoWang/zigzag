@@ -71,13 +71,32 @@ enum CommandRanker {
         return URL(string: "https://" + trimmed)
     }
 
+    /// Selected text without the sentence around it: quotes, brackets and punctuation at either end. A parenthesis is
+    /// the address's own when it has the other one (en.wikipedia.org/wiki/Mercury_(planet)); one that wraps the whole
+    /// address, or has no partner in it, is the sentence's.
+    static func withoutSurroundings(_ text: String) -> String {
+        let around = CharacterSet(charactersIn: "\"'“”‘’«»<>[]{}.,;:!?。，；：！？")
+        var bare = text.trimmingCharacters(in: around)
+        while true {
+            let before = bare
+            if bare.hasPrefix("("), bare.hasSuffix(")"), bare.count >= 2 {
+                bare = String(bare.dropFirst().dropLast())
+            } else if bare.hasSuffix(")"), !bare.contains("(") {
+                bare = String(bare.dropLast())
+            } else if bare.hasPrefix("("), !bare.contains(")") {
+                bare = String(bare.dropFirst())
+            }
+            bare = bare.trimmingCharacters(in: around)
+            if bare == before { return bare }
+        }
+    }
+
     /// The web address some selected text is, when it's only that (#234): "example.com", or a whole https address,
     /// the quotes, brackets or full stop around it in a sentence left off. Only the web: never a file or about: page.
     static func url(fromSelection text: String) -> URL? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed.count <= 2048, !trimmed.contains(where: \.isNewline) else { return nil }
-        let bare = trimmed.trimmingCharacters(in: CharacterSet(charactersIn: "\"'“”‘’«»<>()[]{}.,;:!?。，；：！？"))
-        guard let url = url(from: bare), let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https", url.host?.isEmpty == false else { return nil }
+        guard let url = url(from: withoutSurroundings(trimmed)), let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https", url.host?.isEmpty == false else { return nil }
         return url
     }
 

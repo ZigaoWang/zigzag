@@ -22,6 +22,13 @@ struct AddressTests {
         #expect(CommandRanker.url(fromSelection: " example.com ")?.absoluteString == "https://example.com")
         #expect(CommandRanker.url(fromSelection: "(github.com/ZigaoWang/zigzag).")?.absoluteString == "https://github.com/ZigaoWang/zigzag")
         #expect(CommandRanker.url(fromSelection: "“https://example.com/a?b=1”")?.absoluteString == "https://example.com/a?b=1")
+        // A parenthesis is the address's own when it has its partner in it.
+        let planet = "https://en.wikipedia.org/wiki/Mercury_(planet)"
+        #expect(CommandRanker.url(fromSelection: planet)?.absoluteString == planet)
+        #expect(CommandRanker.url(fromSelection: "(\(planet)).")?.absoluteString == planet)
+        #expect(CommandRanker.url(fromSelection: "\(planet),")?.absoluteString == planet)
+        #expect(CommandRanker.url(fromSelection: "example.com/a)")?.absoluteString == "https://example.com/a")
+        #expect(CommandRanker.url(fromSelection: "(example.com/a")?.absoluteString == "https://example.com/a")
         #expect(CommandRanker.url(fromSelection: "localhost:3000")?.absoluteString == "http://localhost:3000")
         #expect(CommandRanker.url(fromSelection: "node.js") == nil)
         #expect(CommandRanker.url(fromSelection: "go to example.com") == nil)
