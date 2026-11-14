@@ -373,6 +373,60 @@ struct AdFiltersTests {
         }
     }
 
+    /// A scriptlet that asks for trust runs from uBlock Origin's own lists only: from Zigzag's list, under its name or
+    /// an alias, it's left out, as it is by any list that isn't uBlock Origin's.
+    @Test func trustedScriptletsRunFromUBlockOriginsListsOnly() async throws {
+        var all = try #require(try JSONSerialization.jsonObject(with: Self.scriptlets) as? [String: Any])
+        var scriptlets = try #require(all["scriptlets"] as? [[String: Any]])
+        scriptlets.append(["name": "trusted-set-flag.js", "aliases": ["tsf.js"], "requiresTrust": true,
+                           "body": "function trustedSetFlag(name, value) { window[name] = value; }", "dependencies": []])
+        scriptlets.append(["name": "quiet-trust.js", "aliases": [], "requiresTrust": true,
+                           "body": "function quietTrust() { window.zigzagQuiet = 1; }", "dependencies": []])
+        all["scriptlets"] = scriptlets
+        let resources = try JSONSerialization.data(withJSONObject: all)
+        Self.serveEverything(scriptlets: resources, filters: Self.list("Test filters", "www.youtube.com##+js(trusted-set-flag, zigzagFlag, ublock)"))
+        Server.answers[AdFilterSources.zigzagFixes.urls[0].absoluteString] = .init(status: 200, body: Self.list("Test Zigzag fixes", """
+            example.net##+js(trusted-set-flag, zigzagFlag, ours)
+            example.net##+js(tsf, zigzagFlag, alias)
+            example.net##+js(quiet-trust)
+            example.com##+js(trusted-set-flag, zigzagFlag, ours)
+            example.com##+js(set-flag, zigzagFlag, plain)
+            """))
+        let (engine, directory) = makeEngine()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        engine.start()
+        try await waitUntilReady(engine)
+
+        let youTube = await engine.injection(for: URL(string: "https://www.youtube.com/")!)
+        #expect(youTube.page.count == 1)
+        #expect(youTube.page.first?.contains("ublock") == true)
+        #expect(await engine.injection(for: URL(string: "https://example.net/")!).isEmpty)
+        let plain = await engine.injection(for: URL(string: "https://example.com/")!)
+        #expect(plain.page.count == 1)
+        #expect(plain.page.first?.contains("plain") == true)
+        #expect(plain.page.first?.contains("trustedSetFlag") == false)
+    }
+
+    /// A hiding rule hides: a selector that would close its rule and write CSS of its own never reaches the style sheet.
+    @Test func aSelectorThatWritesCSSIsLeftOut() async throws {
+        Self.serveEverything(filters: Self.list("Test filters", """
+            www.youtube.com##x{}*{background:red}y
+            www.youtube.com##@import url(https://evil.example/a.css)
+            www.youtube.com##a;b
+            www.youtube.com##.ad-box
+            """))
+        let (engine, directory) = makeEngine()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        engine.start()
+        try await waitUntilReady(engine)
+        let styles = await engine.injection(for: URL(string: "https://www.youtube.com/")!).styles
+        #expect(styles.contains(".ad-box"))
+        #expect(!styles.contains("background"))
+        #expect(!styles.contains("@import"))
+        #expect(!styles.contains("a;b"))
+        #expect(styles.filter { $0 == "{" }.count == 1)
+    }
+
     // MARK: Pages
 
     private final class Loading: NSObject, WKNavigationDelegate {

@@ -33,6 +33,11 @@ import WebKit
 /// is anything else, the CDN's or someone's in between, is never used. Without a pinned copy the lists still hide what
 /// they name and no scriptlet runs. scripts/pin-scriptlets.sh moves the pin to Ghostery's newest revision before a
 /// release; release.sh warns when it isn't.
+///
+/// Some scriptlets uBlock Origin runs only from its own lists (`requiresTrust`, the trusted-* ones: they set cookies,
+/// click, rewrite a page's scripts). Here too: a list that isn't uBlock Origin's, Zigzag's own included, has those
+/// lines left out before the engine takes it (ad-engine.js, withoutTrustedScriptlets). And a hiding rule whose
+/// selector holds `{`, `}`, `@` or `;` never reaches a style sheet, so a list can only hide, not write CSS of its own.
 nonisolated enum AdFilterSources {
     struct List: Sendable {
         let id: String
@@ -42,6 +47,8 @@ nonisolated enum AdFilterSources {
         var bundled: String?
         /// The size below which a download is taken for a cut-off or error page. Zigzag's own list is short.
         var minimumSize = 1_000
+        /// One of uBlock Origin's own lists, the only ones whose trusted-* scriptlets run.
+        var trusted = false
 
         /// The copy in the app, if the list has one.
         var bundledData: Data? {
@@ -56,14 +63,14 @@ nonisolated enum AdFilterSources {
     static let lists: [List] = [
         List(id: "ublock-filters", urls: urls("https://ublockorigin.github.io/uAssetsCDN/filters/filters.min.txt",
                                               "https://ublockorigin.pages.dev/filters/filters.min.txt",
-                                              "https://cdn.jsdelivr.net/gh/uBlockOrigin/uAssetsCDN@main/filters/filters.min.txt")),
+                                              "https://cdn.jsdelivr.net/gh/uBlockOrigin/uAssetsCDN@main/filters/filters.min.txt"), trusted: true),
         List(id: "ublock-quick-fixes", urls: urls("https://ublockorigin.github.io/uAssets/filters/quick-fixes.txt",
                                                   "https://ublockorigin.github.io/uAssetsCDN/filters/quick-fixes.min.txt",
                                                   "https://ublockorigin.pages.dev/filters/quick-fixes.min.txt",
-                                                  "https://cdn.jsdelivr.net/gh/uBlockOrigin/uAssetsCDN@main/filters/quick-fixes.min.txt")),
+                                                  "https://cdn.jsdelivr.net/gh/uBlockOrigin/uAssetsCDN@main/filters/quick-fixes.min.txt"), trusted: true),
         List(id: "ublock-unbreak", urls: urls("https://ublockorigin.github.io/uAssetsCDN/filters/unbreak.min.txt",
                                               "https://ublockorigin.pages.dev/filters/unbreak.min.txt",
-                                              "https://cdn.jsdelivr.net/gh/uBlockOrigin/uAssetsCDN@main/filters/unbreak.min.txt")),
+                                              "https://cdn.jsdelivr.net/gh/uBlockOrigin/uAssetsCDN@main/filters/unbreak.min.txt"), trusted: true),
         zigzagFixes,
     ]
 
@@ -263,9 +270,11 @@ nonisolated final class AdEngine: @unchecked Sendable {
 
     /// The downloaded lists and scriptlets as they are now (Zigzag's own list from the app until it's downloaded), or
     /// nil while a list is missing. Without pinned scriptlets the lists are used with none.
-    private func inputs() -> (lists: [String], scriptlets: String, checksum: String)? {
+    private func inputs() -> (lists: [String], trusted: [Bool], scriptlets: String, checksum: String)? {
         var lists: [String] = []
         var hash = SHA256()
+        // How the lists are read, so an engine saved by a release that read them otherwise is built again.
+        hash.update(data: Data(Self.readingRevision.utf8))
         for list in AdFilterSources.lists {
             guard let data = (try? Data(contentsOf: listFile(list.id))) ?? list.bundledData, let text = String(data: data, encoding: .utf8) else { return nil }
             lists.append(text)
@@ -274,8 +283,11 @@ nonisolated final class AdEngine: @unchecked Sendable {
         let data = pinnedScriptlets()?.data ?? Data(Self.noScriptlets.utf8)
         guard let scriptlets = String(data: data, encoding: .utf8) else { return nil }
         hash.update(data: data)
-        return (lists, scriptlets, hash.finalize().map { String(format: "%02x", $0) }.joined())
+        return (lists, AdFilterSources.lists.map(\.trusted), scriptlets, hash.finalize().map { String(format: "%02x", $0) }.joined())
     }
+
+    /// Changed whenever ad-engine.js changes what it keeps of the lists.
+    private static let readingRevision = "trusted-lists-1"
 
     // MARK: Starting
 
@@ -343,7 +355,7 @@ nonisolated final class AdEngine: @unchecked Sendable {
             let started = Date()
             builder.exception = nil
             let api = builder.objectForKeyedSubscript("ZigzagAdEngine")
-            let result = api?.invokeMethod("build", withArguments: [inputs.lists, inputs.scriptlets, inputs.checksum])?.toString()
+            let result = api?.invokeMethod("build", withArguments: [inputs.lists, inputs.scriptlets, inputs.checksum, inputs.trusted])?.toString()
             if let error = builder.exception?.toString() {
                 state.withLock { $0.lastError = "Couldn't build: \(error)" }
                 return

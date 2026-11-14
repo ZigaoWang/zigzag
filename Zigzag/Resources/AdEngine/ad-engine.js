@@ -121,6 +121,53 @@ var ZigzagAdEngine = (() => {
     return script;
   }
 
+  const options = {
+    loadNetworkFilters: false, loadCSPFilters: false, loadGenericCosmeticsFilters: false,
+    enableHtmlFiltering: false, loadExtendedSelectors: false, enableCompression: false,
+    loadPreprocessors: true,
+  };
+
+  // A scriptlet that asks for trust (uBlock Origin runs those from its own lists only), by any of its names.
+  function needsTrust(name, scriptlets) {
+    if (typeof name !== 'string') return true;
+    const bare = name.trim().replace(/^(['"])(.*)\1$/, '$2').trim();
+    if (bare.startsWith('trusted-')) return true;
+    const scriptlet = scriptlets.get(bare.endsWith('.js') ? bare : `${bare}.js`);
+    return scriptlet !== undefined && scriptlet.requiresTrust === true;
+  }
+
+  // A list that isn't uBlock Origin's, less its lines naming a scriptlet that asks for trust. The engine reads the
+  // list on its own first, so they're found as it will read them; a line that reads as one by its text goes too.
+  function withoutTrustedScriptlets(list, resources) {
+    const scriptlets = new Map();
+    try {
+      for (const scriptlet of JSON.parse(resources).scriptlets || []) {
+        for (const name of [scriptlet.name, ...(scriptlet.aliases || [])]) scriptlets.set(name, scriptlet);
+      }
+    } catch (e) { /* none: the names alone say which ask for trust */ }
+    const dropped = new Set();
+    const parsed = GhosteryAdblocker.FiltersEngine.parse(list, { ...options, debug: true });
+    for (const filter of parsed.cosmetics.getFilters()) {
+      if (!filter.isScriptInject() || filter.isUnhide()) continue;
+      const script = filter.parseScript();
+      if (script === undefined || needsTrust(script.name, scriptlets)) dropped.add((filter.rawLine || '').trim());
+    }
+    return list.split('\n').filter((line) => {
+      const trimmed = line.trim();
+      if (dropped.has(trimmed)) return false;
+      const named = /(#@?#)\+js\(\s*([^,)]*)/.exec(trimmed);
+      return named === null || named[1] === '#@#' || !needsTrust(named[2], scriptlets);
+    }).join('\n');
+  }
+
+  // A hiding rule goes into a style sheet as it is, and the engine's own check of a selector needs a document, which
+  // this context doesn't have: one that could close the rule and start another, or an at-rule, is left out.
+  function isPlainSelector(filter) {
+    const selector = filter.getSelector();
+    if (typeof selector !== 'string' || /[{}@;]/.test(selector)) return false;
+    return filter.style === undefined || !/[{}@]/.test(filter.style);
+  }
+
   function adopt(built) {
     isolated = new Set(built.resources.scriptlets.filter((s) => s.executionWorld === 'ISOLATED').map((s) => s.name));
     engine = built;
@@ -131,12 +178,11 @@ var ZigzagAdEngine = (() => {
 
     // The lists as text, the scriptlets as JSON. Only what pages are handed for their own site is kept: Zigzag's
     // content blocker already stops the requests and hides what every site shares.
-    build(lists, resources, checksum) {
-      const built = GhosteryAdblocker.FiltersEngine.parse(lists.join('\n'), {
-        loadNetworkFilters: false, loadCSPFilters: false, loadGenericCosmeticsFilters: false,
-        enableHtmlFiltering: false, loadExtendedSelectors: false, enableCompression: false,
-        loadPreprocessors: true,
-      });
+    // `trusted` says, list by list, whether it's one of uBlock Origin's own: only those may name a scriptlet that
+    // asks for trust (trusted-*), as in uBlock Origin itself.
+    build(lists, resources, checksum, trusted) {
+      const text = lists.map((list, i) => (trusted && trusted[i] === true ? list : withoutTrustedScriptlets(list, resources)));
+      const built = GhosteryAdblocker.FiltersEngine.parse(text.join('\n'), options);
       built.updateEnv(environment);
       // With no pinned scriptlets (AdFilters.swift), none: the lists still hide what they name.
       built.updateResources(resources, checksum);
@@ -164,7 +210,7 @@ var ZigzagAdEngine = (() => {
       for (const { filter, exception } of matches) {
         if (filter === undefined || exception !== undefined) continue;
         if (!filter.isScriptInject()) {
-          hiding.push(filter);
+          if (isPlainSelector(filter)) hiding.push(filter);
           continue;
         }
         const parsed = filter.parseScript();
