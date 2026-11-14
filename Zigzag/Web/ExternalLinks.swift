@@ -54,7 +54,7 @@ enum ExternalLinks {
     /// and it never gets the page's saved answer, though the page's Block holds for it too.
     /// `byYou`: you typed it in the address bar or chose it in the command bar, never a page or Zigzag on its own: it
     /// opens without asking, unless the site is set to Block.
-    static func open(_ url: URL, isMainFrame: Bool, isClick: Bool, linkClick: Bool? = nil, from webView: WKWebView, asker: WKSecurityOrigin? = nil, byYou: Bool = false) {
+    static func open(_ url: URL, isMainFrame: Bool, isClick: Bool, linkClick: Bool? = nil, from webView: WKWebView, asker: WKSecurityOrigin? = nil, byYou: Bool = false, fromPDF: Bool = false) {
         let scheme = url.scheme?.lowercased() ?? ""
         // Only a site installed as an app sends these, from its own small app: never a page.
         if scheme == WebAppLink.scheme { return }
@@ -82,10 +82,14 @@ enum ExternalLinks {
         let host = foreign ? askerHost : pageHost
         let origin = foreign ? asker.flatMap { SiteOrigin.of($0) } : pageOrigin
         let key = "\(origin ?? host)|\(scheme)"
-        // The page's Allow or Block, or the app it was told Always Open to. A frame from elsewhere gets only Block.
-        let decision: () -> Bool? = { Self.decision(page: pageOrigin, scheme: scheme, foreign: foreign) }
+        // The page's Allow or Block, or the app it was told Always Open to. A frame from elsewhere gets only Block, and
+        // so does a link in a PDF (`fromPDF`), whose links are the PDF's, not the site's: it always asks.
+        let decision: () -> Bool? = {
+            let found = Self.decision(page: pageOrigin, scheme: scheme, foreign: foreign)
+            return fromPDF && found == true ? nil : found
+        }
         let clickedHere = isClick && isMainFrame && webView.window != nil
-        switch verdict(byYou: byYou, decision: decision(), clickedHere: clickedHere, scheme: scheme) {
+        switch verdict(byYou: byYou, decision: decision(), clickedHere: clickedHere && !fromPDF, scheme: scheme) {
         case .block:
             Diagnostics.note("Blocked opening an app", site: host, "\(scheme):", isPrivate: !webView.configuration.websiteDataStore.isPersistent)
             return
@@ -101,7 +105,8 @@ enum ExternalLinks {
         // Private windows, popups included, never remember the answer.
         let isPrivate = !webView.configuration.websiteDataStore.isPersistent
         // Nothing to keep the answer under (a private window, or a page with no host): Open is for this time only.
-        let saves = !isPrivate && origin != nil && canRemember
+        // Nor is it from a PDF: Always Open there would let any PDF on the site open the app.
+        let saves = !isPrivate && origin != nil && canRemember && !fromPDF
         let tab = (webView as? BrowserWebView)?.owner
         if !foreign { SitePermissions.noteAsked(.apps, origin: pageOrigin, isPrivate: isPrivate) }
         asked.asking.insert(key)

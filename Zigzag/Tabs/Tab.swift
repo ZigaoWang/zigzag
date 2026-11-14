@@ -1811,7 +1811,7 @@ extension Tab {
         let viewer = PDFViewerView(url: url, isPrivate: self.isPrivate, profile: self.profile.id)
         viewer.onOpenLink = { [weak self] link in self?.load(link, by: .page) }
         viewer.onExternalLink = { [weak webView] link in
-            if let webView { ExternalLinks.open(link, isMainFrame: true, isClick: true, from: webView) }
+            if let webView { ExternalLinks.open(link, isMainFrame: true, isClick: true, from: webView, fromPDF: true) }
         }
         viewer.onSwipe = { [weak webView] event, room in (webView as? BrowserWebView)?.handleSwipe(event, room: room) ?? false }
         // The helper failed on it later (crashed on it, or took too long): WebKit's viewer underneath shows it.
