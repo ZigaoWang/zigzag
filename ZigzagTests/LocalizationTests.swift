@@ -89,6 +89,9 @@ struct LocalizationTests {
         #expect(Words.sentences("Never says yes.", "Uses Autoconsent.") == "Never says yes. Uses Autoconsent.")
         #expect(Words.sentences("", "Uses Autoconsent.") == "Uses Autoconsent.")
         #expect(Words.sentences("Never says yes.", nil) == "Never says yes.")
+        // A closing quote is English's too: after one, the space stays, unless a full-width stop is just inside it.
+        #expect(Words.sentences("It says “Allow.”", "Then reload.") == "It says “Allow.” Then reload.")
+        #expect(Words.sentences("它说“允许。”", "然后重新载入。") == "它说“允许。”然后重新载入。")
     }
 
     /// Two localized sentences are never glued with a plain space in code: `Words.sentences` spaces them.

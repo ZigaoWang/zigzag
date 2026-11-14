@@ -22,12 +22,16 @@ enum Words {
         guard let second, !second.isEmpty else { return first }
         guard !first.isEmpty else { return second }
         // A full-width stop carries its own space, in any language Zigzag shows: never one more after it.
-        if let last = first.last, fullWidthStops.contains(last) { return first + second }
+        // A closing quote is English's too (“…”), so it counts only after a full-width stop (“好。”).
+        var marks = first.reversed().makeIterator()
+        var last = marks.next()
+        if last == "”" { last = marks.next() }
+        if let last, fullWidthStops.contains(last) { return first + second }
         return String(localized: "\(first) \(second)", comment: "Joins two sentences, one after the other. Leave out the space if your language doesn't put one between sentences.")
     }
 
-    /// The marks that end a sentence in Chinese and Japanese, with their own room after them.
-    private static let fullWidthStops: Set<Character> = ["。", "！", "？", "；", "：", "」", "』", "）", "”"]
+    /// The marks that end a sentence in Chinese and Japanese, with their own room after them: full-width ones only.
+    private static let fullWidthStops: Set<Character> = ["。", "！", "？", "；", "：", "」", "』", "）", "．"]
 
     /// "Chrome, Arc and Safari": a list joined the way this language joins one ("Chrome、Arc 和 Safari").
     static func list(_ items: [String]) -> String {
