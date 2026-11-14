@@ -93,9 +93,14 @@ import Testing
 @testable import Zigzag
 
 @Suite(.serialized) struct SitePermissionsPolicyTests {
-    let defaults = UserDefaults(suiteName: "SitePermissionsPolicyTests")!
-    init() { defaults.removePersistentDomain(forName: "SitePermissionsPolicyTests"); SitePermissions.defaults = defaults }
-    deinit { SitePermissions.defaults = .standard }
+    /// Every test starts with `let defaults = freshDefaults()` and restores with `defer { SitePermissions.defaults = before }`.
+    private func freshDefaults(_ before: inout UserDefaults) -> UserDefaults {
+        before = SitePermissions.defaults
+        let suite = UserDefaults(suiteName: "SitePermissionsPolicyTests")!
+        suite.removePersistentDomain(forName: "SitePermissionsPolicyTests")
+        SitePermissions.defaults = suite
+        return suite
+    }
 
     @Test func remembersAnActionPerSubjectAndOrigin() {
         SitePermissions.remember("mini", subject: PermissionSubject.popups, origin: "https://example.com")
