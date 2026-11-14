@@ -1,5 +1,7 @@
 import AppKit
 import CoreText
+import Network
+import os
 import Testing
 import WebKit
 @testable import Zigzag
@@ -368,11 +370,12 @@ import WebKit
         #expect(await SafePDF(data: Self.pdf()).open() != nil)
     }
 
+    // Each PDF made to crash the helper is its own bytes: one that crashed it is remembered, and never sent again.
     @Test @MainActor func aPDFThatBringsTheHelperDownFailsAlone() async throws {
         let good = SafePDF(data: Self.pdf(pages: 2))
         _ = try #require(await good.open())
         var failed = false
-        let bad = SafePDF(data: Data("%PDF-ZIGZAG-TEST-CRASH\n".utf8))
+        let bad = SafePDF(data: Data("%PDF-ZIGZAG-TEST-CRASH\nshared".utf8))
         bad.onFail = { failed = true }
         // Both at once: the good one's request is in the helper as it goes down.
         async let goodTile = good.render(page: 1, rect: CGRect(x: 0, y: 0, width: 100, height: 100), scale: 1, dark: false)
@@ -390,7 +393,7 @@ import WebKit
 
     @Test @MainActor func aPDFThatHadTheHelperToItselfFailsAtOnce() async throws {
         var breaks = 0
-        let bad = SafePDF(data: Data("%PDF-ZIGZAG-TEST-CRASH\n".utf8)) {
+        let bad = SafePDF(data: Data("%PDF-ZIGZAG-TEST-CRASH\nalone".utf8)) {
             breaks += 1
             return XPCPDFLink(serviceName: PDFService.name)
         }
@@ -399,6 +402,31 @@ import WebKit
         // One connection, one crash: it isn't sent again to bring the helper down a second time.
         #expect(breaks == 1)
         #expect(await SafePDF(data: Self.pdf()).open() != nil)
+    }
+
+    @Test @MainActor func aPDFThatBroughtTheHelperDownIsntSentAgain() async throws {
+        let bytes = Data("%PDF-ZIGZAG-TEST-CRASH\nremembered".utf8)
+        let url = URL(string: "https://example.com/crash-\(UUID().uuidString).pdf")!
+        #expect(!SafePDF.broughtDownTheHelper(url))
+        #expect(await SafePDF(data: bytes, source: url).open() == nil)
+        #expect(SafePDF.broughtDownTheHelper(url))
+        // The page reloads it, from the same address or another: it fails at once, the helper never asked.
+        var links = 0
+        let again = SafePDF(data: bytes) {
+            links += 1
+            return XPCPDFLink(serviceName: PDFService.name)
+        }
+        #expect(await again.open() == nil)
+        #expect(again.hasFailed)
+        #expect(links == 0)
+        // Other bytes the same size are sent as ever.
+        var otherLinks = 0
+        let sameSize = SafePDF(data: Data("%PDF-ZIGZAG-TEST-CRASI\nremembered".utf8)) {
+            otherLinks += 1
+            return XPCPDFLink(serviceName: PDFService.name)
+        }
+        #expect(await sameSize.open() == nil)
+        #expect(otherLinks == 1)
     }
 
     @Test @MainActor func aPDFTooSlowFailsAndTheRestGoOn() async throws {
@@ -419,6 +447,89 @@ import WebKit
         #expect(await missing.open() == nil)
         #expect(missing.hasFailed)
         #expect(Date().timeIntervalSince(start) < 5)
+        // No helper isn't the PDF's doing: it opens once there is one.
+        #expect(await SafePDF(data: Self.pdf()).open() != nil)
+    }
+
+    // MARK: One request at a time for each PDF
+
+    /// Pictures asked for while a long find is in the helper wait in Zigzag, their clocks not yet running: in the
+    /// helper they'd wait behind it, and run out of time there.
+    @Test @MainActor func picturesWaitingBehindAFindDontRunOutOfTime() async throws {
+        // A fiftieth of the limits: pictures get 0.24 seconds, find 0.8. Find takes 0.4 in this helper.
+        let helper = FakePDFHelper(renderTime: 0.02, stringsTime: 0.4)
+        let document = SafePDF(data: Data("%PDF-fake".utf8), timeScale: 0.02) { FakePDFLink(helper) }
+        _ = try #require(await document.open())
+        let find = Task { await document.strings() }
+        let tiles = (0..<3).map { _ in
+            Task { await document.render(page: 0, rect: CGRect(x: 0, y: 0, width: 10, height: 10), scale: 1, dark: false) }
+        }
+        #expect(await find.value?.count == 1)
+        for tile in tiles { #expect(await tile.value != nil) }
+        #expect(!document.hasFailed)
+        #expect(helper.most == 1, "requests in the helper at once: \(helper.most)")
+    }
+
+    @Test @MainActor func picturesGoBeforeTextAndFind() async throws {
+        let helper = FakePDFHelper(renderTime: 0.1)
+        let document = SafePDF(data: Data("%PDF-fake".utf8)) { FakePDFLink(helper) }
+        _ = try #require(await document.open())
+        let rect = CGRect(x: 0, y: 0, width: 10, height: 10)
+        let first = Task { await document.render(page: 0, rect: rect, scale: 1, dark: false) }
+        let find = Task { await document.strings() }
+        let text = Task { await document.text(page: 0) }
+        let picture = Task { await document.render(page: 0, rect: rect, scale: 1, dark: false) }
+        _ = await (first.value, find.value, text.value, picture.value)
+        #expect(helper.log == ["open", "render", "render", "text", "strings"])
+    }
+
+    /// A piece the helper draws nothing for isn't asked for again and again.
+    @Test @MainActor func aPieceThatComesBackEmptyIsntAskedForAgain() async throws {
+        let helper = FakePDFHelper(drawsNothing: true)
+        let document = SafePDF(data: Data("%PDF-fake".utf8)) { FakePDFLink(helper) }
+        let info = try #require(await document.open())
+        let view = ZigzagPDFView()
+        view.frame = CGRect(x: 0, y: 0, width: 400, height: 500)
+        view.show(document, info: info, startPage: 0)
+        view.whenShown {}
+        try await Task.sleep(for: .milliseconds(800))
+        let asked = helper.log.filter { $0 == "render" }.count
+        #expect(asked > 0 && asked < 12, "\(asked) pictures asked for")
+        // The other way, dark: those are new pieces, asked for once each too.
+        view.isDark = true
+        view.whenShown {}
+        try await Task.sleep(for: .milliseconds(500))
+        let dark = helper.log.filter { $0 == "render" }.count - asked
+        #expect(dark > 0 && dark < 12, "\(dark) dark pictures asked for")
+    }
+
+    // MARK: Find
+
+    @Test func findLooksThroughEveryPageAndAnOlderSearchStops() async {
+        let strings = ["Hello world", "nothing", "HÉLLO again, hello"]
+        let found = ZigzagPDFView.matches(of: "hello", in: strings)
+        #expect(found.map(\.page) == [0, 2, 2])
+        #expect(found.map(\.range) == [NSRange(location: 0, length: 5), NSRange(location: 0, length: 5), NSRange(location: 13, length: 5)])
+        let stopped = Task.detached {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return ZigzagPDFView.matches(of: "hello", in: strings)
+        }
+        #expect(await stopped.value.isEmpty)
+    }
+
+    @Test @MainActor func findInThePDFsText() async throws {
+        let document = SafePDF(data: Self.pdf(pages: 3))
+        let info = try #require(await document.open())
+        let view = ZigzagPDFView()
+        view.frame = CGRect(x: 0, y: 0, width: 400, height: 500)
+        view.show(document, info: info, startPage: 0)
+        // A newer search while the first waits: the first comes back empty, the newer finds its matches.
+        let older = Task { @MainActor in await view.matches(of: "hello") }
+        let newer = Task { @MainActor in await view.matches(of: "world 3") }
+        let (first, second) = await (older.value, newer.value)
+        #expect(second.map(\.page) == [2])
+        #expect(first.isEmpty || first.count == 3)
+        #expect(await view.matches(of: "second line").count == 3)
     }
 
     @Test func badAnswersAreNotTaken() {
@@ -442,6 +553,13 @@ import WebKit
         #expect(RemotePageText(string: "ab", boxes: Data(count: 32), links: []).isWellFormed(pages: 1))
         let farLink = RemoteLink(x: 0, y: 0, width: 1, height: 1, url: nil, page: 9, pageY: .nan)
         #expect(!RemotePageText(string: "", boxes: Data(), links: [farLink]).isWellFormed(pages: 1))
+        // A box that's no place, or turned inside out, isn't taken: it would reach the layers that mark text.
+        func boxes(_ values: [Float32]) -> Data { values.withUnsafeBytes { Data($0) } }
+        #expect(RemotePageText(string: "a", boxes: boxes([1, 2, 3, 4]), links: []).isWellFormed(pages: 1))
+        #expect(RemotePageText(string: "a", boxes: boxes([0, 0, 0, 0]), links: []).isWellFormed(pages: 1))
+        for bad: [Float32] in [[.nan, 2, 3, 4], [1, .infinity, 3, 4], [1, 2, -.infinity, 4], [1, 2, 3, .nan], [1, 2, -1, 4], [1, 2, 3, -0.5]] {
+            #expect(!RemotePageText(string: "a", boxes: boxes(bad), links: []).isWellFormed(pages: 1), "\(bad)")
+        }
     }
 
     // MARK: Where the pages sit
@@ -482,6 +600,44 @@ import WebKit
         #expect(await PDFViewerView.load(URL(string: "ftp://example.com/a.pdf")!, from: webView, userAgent: nil) == nil)
     }
 
+    /// A file past the limit isn't read in to find out: its size says so. (A sparse file: nothing written.)
+    @Test @MainActor func aFileTooBigIsntRead() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".pdf")
+        try Data("%PDF-1.4\n".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let handle = try FileHandle(forWritingTo: file)
+        try handle.truncate(atOffset: UInt64(SafePDF.maxInputBytes) + 1)
+        try handle.close()
+        let start = Date()
+        #expect(await PDFViewerView.load(file, from: WKWebView(), userAgent: nil) == nil)
+        #expect(Date().timeIntervalSince(start) < 1)
+        #expect(await PDFViewerView.load(file, from: WKWebView(), userAgent: nil, limit: Int.max) != nil)
+    }
+
+    /// The viewer's own download: as the browser, never CFNetwork's default; and given up past the limit, whether the
+    /// server says it's too big or only sends too much.
+    @Test @MainActor func theViewersDownloadSaysItsTheBrowserAndStopsPastTheLimit() async throws {
+        let server = try PDFTestServer()
+        let base = try await server.start()
+        defer { server.stop() }
+        let webView = WKWebView()
+        let small = try #require(await PDFViewerView.load(base.appendingPathComponent("ua"), from: webView, userAgent: nil))
+        #expect(small.starts(with: Data("%PDF-".utf8)))
+        let sent = try #require(server.userAgents.withLock { $0.last })
+        #expect(sent.hasPrefix("Mozilla/5.0") && sent.contains("Safari/605.1.15"), "\(sent)")
+        // The page's own, when it said; the web view's custom one, when it has one.
+        _ = await PDFViewerView.load(base.appendingPathComponent("ua"), from: webView, userAgent: "Page/1.0")
+        #expect(server.userAgents.withLock { $0.last } == "Page/1.0")
+        webView.customUserAgent = "Custom/2.0"
+        _ = await PDFViewerView.load(base.appendingPathComponent("ua"), from: webView, userAgent: nil)
+        #expect(server.userAgents.withLock { $0.last } == "Custom/2.0")
+        // Past the limit: sent without saying how long, or said too long up front.
+        #expect(await PDFViewerView.load(base.appendingPathComponent("stream"), from: webView, userAgent: nil, limit: 64 * 1024) == nil)
+        #expect(await PDFViewerView.load(base.appendingPathComponent("stream"), from: webView, userAgent: nil, limit: 1024 * 1024)?.count == 256 * 1024)
+        #expect(await PDFViewerView.load(base.appendingPathComponent("said"), from: webView, userAgent: nil, limit: 64 * 1024) == nil)
+        #expect(await PDFViewerView.load(base.appendingPathComponent("missing"), from: webView, userAgent: nil) == nil)
+    }
+
     /// Nothing in the app reads a PDF's bytes: no PDFKit, no CoreGraphics PDF reader, no AppKit PDF picture. The
     /// helper does all of it. The one exception is the full-page screenshot, which reads the PDF WebKit itself makes
     /// of the page, never a site's.
@@ -505,6 +661,140 @@ import WebKit
             for decoder in ["NSImage(data", "CGImageSource", "NSImage(contentsOf", "NSBitmapImageRep(data"] {
                 #expect(!source.contains(decoder), "\(name): \(decoder)")
             }
+        }
+    }
+}
+
+/// A stand-in for the PDF helper: one page, 300 by 400, answered one request at a time as the helper does, each
+/// noted in order. `drawsNothing`: every picture comes back empty.
+nonisolated private final class FakePDFHelper: NSObject, PDFRendering, @unchecked Sendable {
+    private let queue = DispatchQueue(label: "zigzag.tests.fake-pdf-helper")
+    private let lock = NSLock()
+    private var noted: [String] = []
+    private var inside = 0
+    private var mostInside = 0
+    private let renderTime: TimeInterval
+    private let stringsTime: TimeInterval
+    private let drawsNothing: Bool
+
+    var log: [String] { lock.withLock { noted } }
+    /// The most requests that were in it at once, waiting or worked on.
+    var most: Int { lock.withLock { mostInside } }
+
+    init(renderTime: TimeInterval = 0, stringsTime: TimeInterval = 0, drawsNothing: Bool = false) {
+        self.renderTime = renderTime
+        self.stringsTime = stringsTime
+        self.drawsNothing = drawsNothing
+    }
+
+    private func run(_ name: String, _ work: @escaping @Sendable () -> Void) {
+        lock.withLock { inside += 1; mostInside = max(mostInside, inside) }
+        queue.async { [self] in
+            lock.withLock { noted.append(name) }
+            work()
+            lock.withLock { inside -= 1 }
+        }
+    }
+
+    func open(_ data: Data, reply: @escaping @Sendable (RemotePDFInfo?) -> Void) {
+        run("open") {
+            let sizes = [300.0, 400.0].withUnsafeBytes { Data($0) }
+            reply(RemotePDFInfo(pageCount: 1, sizes: sizes, title: nil, outline: [], allowsCopying: true))
+        }
+    }
+
+    func render(page: Int, x: Double, y: Double, width: Double, height: Double, scale: Double, dark: Bool,
+                reply: @escaping @Sendable (RemotePDFTile?, Bool) -> Void) {
+        run("render") { [renderTime, drawsNothing] in
+            Thread.sleep(forTimeInterval: renderTime)
+            guard !drawsNothing else { reply(nil, true); return }
+            let w = max(1, Int((min(width, 300) * scale - 0.01).rounded(.up))), h = max(1, Int((min(height, 400) * scale - 0.01).rounded(.up)))
+            reply(RemotePDFTile(pixels: Data(count: w * h * 4), width: w, height: h), true)
+        }
+    }
+
+    func text(page: Int, reply: @escaping @Sendable (RemotePageText?, Bool) -> Void) {
+        run("text") { reply(RemotePageText(string: "", boxes: Data(), links: []), true) }
+    }
+
+    func strings(reply: @escaping @Sendable ([String]?, Bool) -> Void) {
+        run("strings") { [stringsTime] in
+            Thread.sleep(forTimeInterval: stringsTime)
+            reply([""], true)
+        }
+    }
+}
+
+nonisolated private final class FakePDFLink: PDFLink, @unchecked Sendable {
+    private let helper: FakePDFHelper
+    init(_ helper: FakePDFHelper) { self.helper = helper }
+    func send(_ request: @escaping @Sendable (PDFRendering) -> Void, failed: @escaping @Sendable (Bool) -> Void) { request(helper) }
+    func invalidate() {}
+}
+
+/// A local server for the viewer's own download: `/ua` notes the user agent and answers a small PDF; `/stream`
+/// sends 256 KB without saying how long; `/said` says a gigabyte; anything else is not found.
+nonisolated private final class PDFTestServer: @unchecked Sendable {
+    let listener: NWListener
+    let userAgents = OSAllocatedUnfairLock(initialState: [String]())
+    private let queue = DispatchQueue(label: "zigzag.tests.pdf-server")
+
+    init() throws {
+        listener = try NWListener(using: .tcp, on: .any)
+        let queue = queue, userAgents = userAgents
+        listener.newConnectionHandler = { connection in
+            connection.start(queue: queue)
+            Self.receive(connection, bytes: Data(), userAgents: userAgents)
+        }
+    }
+
+    func start() async throws -> URL {
+        try await withCheckedThrowingContinuation { done in
+            listener.stateUpdateHandler = { [listener] state in
+                switch state {
+                case .ready:
+                    listener.stateUpdateHandler = nil
+                    done.resume(returning: URL(string: "http://127.0.0.1:\(listener.port!.rawValue)/")!)
+                case .failed(let error):
+                    listener.stateUpdateHandler = nil
+                    done.resume(throwing: error)
+                default: break
+                }
+            }
+            listener.start(queue: queue)
+        }
+    }
+
+    func stop() { listener.cancel() }
+
+    private static func receive(_ connection: NWConnection, bytes: Data, userAgents: OSAllocatedUnfairLock<[String]>) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { data, _, complete, error in
+            var bytes = bytes
+            if let data { bytes.append(data) }
+            guard let boundary = bytes.range(of: Data("\r\n\r\n".utf8)) else {
+                if !complete && error == nil && bytes.count < 65536 { receive(connection, bytes: bytes, userAgents: userAgents) } else { connection.cancel() }
+                return
+            }
+            let lines = String(decoding: bytes[..<boundary.lowerBound], as: UTF8.self).components(separatedBy: "\r\n")
+            let path = lines.first?.components(separatedBy: " ").dropFirst().first ?? "/"
+            let head: String, body: Data
+            switch path {
+            case "/ua":
+                let agent = lines.first { $0.lowercased().hasPrefix("user-agent:") }.map { String($0.dropFirst("User-Agent:".count)).trimmingCharacters(in: .whitespaces) }
+                userAgents.withLock { $0.append(agent ?? "") }
+                body = Data("%PDF-1.4\nsmall".utf8)
+                head = "HTTP/1.1 200 OK\r\nContent-Type: application/pdf\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
+            case "/stream":
+                body = Data(count: 256 * 1024)
+                head = "HTTP/1.1 200 OK\r\nContent-Type: application/pdf\r\nConnection: close\r\n\r\n"
+            case "/said":
+                body = Data(count: 1024)
+                head = "HTTP/1.1 200 OK\r\nContent-Type: application/pdf\r\nContent-Length: 1000000000\r\nConnection: close\r\n\r\n"
+            default:
+                body = Data("not found".utf8)
+                head = "HTTP/1.1 404 Not Found\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
+            }
+            connection.send(content: Data(head.utf8) + body, completion: .contentProcessed { _ in connection.cancel() })
         }
     }
 }
