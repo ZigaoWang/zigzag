@@ -12,6 +12,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Clear, above the tabs in the sidebar, treats a split view as one: it stays while you've used any of its pages lately and closes whole, never leaving half of it behind, and a split with a playing page or a pinned page in it stays. A tab with tabs nested under it stays or goes with them, folded ones included. A tab you left a few minutes ago no longer counts as one you haven't used in a while.
 - Pointing at Clear, or reaching it with Tab, dims the tabs it would close and says what it will do, like Close 3 tabs you haven't used in a while or Close the last 2 tabs, leaving the space empty. After each click, what the next one would close shows as soon as the closed tabs have gone. A split's row dims as one, both pages, and fades with age as its newest page does.
 - A paused video in the mini player no longer shows the page's own video controls over the card's, on sites that use the browser's built-in controls. ([#230](https://github.com/ZigaoWang/zigzag/issues/230))
+- Permissions in Site Controls says when a site hasn't asked for anything yet, instead of showing an empty page, and has no Reset Permissions while there's nothing to reset. ([#232](https://github.com/ZigaoWang/zigzag/issues/232))
 
 ## [0.9.0] - 2026-11-14
 

@@ -72,6 +72,18 @@ final class SitePanel: FloatingPanelView {
     private var permissionsRow: PanelLinkRow?
     private let permissionsGroup = PanelGroup()
     private var resetPermissions: PanelLinkRow?
+    /// The Permissions page of a site that hasn't asked for anything: says so, with no Reset (#232).
+    private let permissionsEmpty: Label = {
+        let label = Label(String(localized: "This site hasn’t asked for anything yet.", comment: "On a site's Permissions page in the site panel when the site hasn't asked for the camera, location, notifications or anything else."),
+                          font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+        label.usesSingleLineMode = false
+        label.maximumNumberOfLines = 0
+        label.lineBreakMode = .byWordWrapping
+        label.cell?.wraps = true
+        label.cell?.truncatesLastVisibleLine = false
+        label.isHidden = true
+        return label
+    }()
     private let permissionsHeader = PanelPageHeader(String(localized: "Permissions", comment: "Row in the site panel, and the title of its page: the site's camera, location, notifications and pop-ups."))
     /// The certificate, its own page while it's open.
     private var certificatePage: CertificatePage?
@@ -923,6 +935,8 @@ final class SitePanel: FloatingPanelView {
         }
         if permissionsGroup.superview == nil { permissionsBox.addSubview(permissionsGroup) }
         permissionsGroup.rows = permissionRows
+        if permissionsEmpty.superview == nil { permissionsBox.addSubview(permissionsEmpty) }
+        permissionsEmpty.isHidden = !permissionRows.isEmpty
         if resetPermissions == nil, let origin {
             let row = PanelLinkRow(String(localized: "Reset Permissions", comment: "Row under a site's permissions in the site panel: forgets every answer given to the site, so it asks again.")) { [weak self] in
                 SitePermissions.reset(origin: origin)
@@ -933,6 +947,7 @@ final class SitePanel: FloatingPanelView {
             permissionsBox.addSubview(row)
             resetPermissions = row
         }
+        resetPermissions?.isHidden = permissionRows.isEmpty
         if permissionsRow == nil, origin != nil {
             let row = PanelLinkRow(permissionsHeader.title, value: "", goes: true) { [weak self] in self?.show(.permissions) }
             addSubview(row)
@@ -1028,7 +1043,13 @@ final class SitePanel: FloatingPanelView {
         switch page {
         case .permissions:
             group(permissionsGroup)
-            if let resetPermissions {
+            if !permissionsEmpty.isHidden {
+                let w = inner + Label.inset * 2
+                let h = ceil(permissionsEmpty.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: w, height: 10_000)).height ?? permissionsEmpty.lineHeight)
+                place(permissionsEmpty, NSRect(x: pad - Label.inset, y: y + Tokens.Space.x2, width: w, height: h))
+                y += Tokens.Space.x2 + h
+            }
+            if let resetPermissions, !resetPermissions.isHidden {
                 y += Tokens.Space.x2
                 link(resetPermissions)
                 end(0, slack: resetPermissions.bottomSlack)
