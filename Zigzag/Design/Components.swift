@@ -372,7 +372,7 @@ final class KeyCap: NSView {
 
     override func layout() {
         super.layout()
-        label.frame = NSRect(x: 0, y: (bounds.height - label.lineHeight) / 2, width: bounds.width, height: label.lineHeight)
+        label.frame = NSRect(x: 0, y: label.centeredY(in: bounds.height), width: bounds.width, height: label.lineHeight)
         iconView.frame = bounds
     }
 

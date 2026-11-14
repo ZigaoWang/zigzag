@@ -38,7 +38,7 @@ final class PageTitleView: NSView {
 
     override func layout() {
         super.layout()
-        label.frame = NSRect(x: -Label.inset, y: round((bounds.height - label.lineHeight) / 2),
+        label.frame = NSRect(x: -Label.inset, y: label.centeredY(in: bounds.height),
                              width: max(0, bounds.width + Label.inset), height: label.lineHeight)
     }
 }
@@ -169,10 +169,10 @@ class ListItem: InteractiveView {
             icon.frame = NSRect(x: Tokens.Page.rowInset - 1, y: (bounds.height - side) / 2, width: side, height: side)
             let x = icon.frame.maxX + Tokens.Space.x2 + 1 - Label.inset
             let countWidth = count.isHidden ? 0 : count.inkWidth + Label.inset * 2
-            count.frame = NSRect(x: bounds.width - Tokens.Page.rowInset + Label.inset - countWidth, y: (bounds.height - count.lineHeight) / 2,
+            count.frame = NSRect(x: bounds.width - Tokens.Page.rowInset + Label.inset - countWidth, y: count.centeredY(in: bounds.height),
                                  width: countWidth, height: count.lineHeight)
             let end = count.isHidden ? bounds.width - Tokens.Space.x2 : count.frame.minX - Tokens.Space.x2
-            label.frame = NSRect(x: x, y: (bounds.height - label.lineHeight) / 2, width: max(0, end - x), height: label.lineHeight)
+            label.frame = NSRect(x: x, y: label.centeredY(in: bounds.height), width: max(0, end - x), height: label.lineHeight)
         }
     }
 

@@ -35,4 +35,26 @@ struct SettingsLayoutTests {
         #expect(sections.frame.width == Tokens.Page.columnWidth)
         #expect(pane.frame.width == 1032 - Tokens.Page.columnWidth - Tokens.Metric.hairline)
     }
+
+    /// A control's words sit with their capitals in the middle: the system font draws them a little under its line's
+    /// middle, so a label is set that much higher than its line box would be, in a container counting from the top
+    /// or from the bottom, on the screen's pixels.
+    @Test func labelsCenterTheirCapitals() {
+        let font = Tokens.Font.control()
+        final class Flipped: NSView { override var isFlipped: Bool { true } }
+        let height = Tokens.Page.controlHeight
+        let down = Label("HOEX", font: font), up = Label("HOEX", font: font)
+        let flipped = Flipped(), plain = NSView()
+        flipped.addSubview(down)
+        plain.addSubview(up)
+        let below = Label.capsBelowMiddle(of: font, lineHeight: down.lineHeight)
+        #expect(below > 0 && below < 1)
+        let lineBox = (height - down.lineHeight) / 2
+        let y = (down: down.centeredY(in: height), up: up.centeredY(in: height))
+        #expect(y.down < lineBox && y.up > lineBox)
+        #expect(abs(y.down - (lineBox - below)) <= 0.25 && abs(y.up - (lineBox + below)) <= 0.25)
+        let scale = NSScreen.main?.backingScaleFactor ?? 2
+        #expect((y.down * scale).rounded() == y.down * scale && (y.up * scale).rounded() == y.up * scale)
+        withExtendedLifetime((flipped, plain)) {}
+    }
 }
