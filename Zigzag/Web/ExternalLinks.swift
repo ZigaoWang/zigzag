@@ -145,21 +145,19 @@ enum ExternalLinks {
             let answer = await PermissionPrompt.ask(host: SitePermissions.askerName(origin), origin: origin, what: name, symbol: "arrow.up.forward.app",
                                                     icon: NSWorkspace.shared.icon(forFile: app.path), in: promptHost,
                                                     tab: tab, title: String(localized: "Open \(name)", comment: "A page's question to open an app, without its question mark. The placeholder is the app's name, like “zoom.us”."),
-                                                    allowTitle: String(localized: "Open", comment: "Button on a page's question to open an app: opens it this time."),
-                                                    alwaysTitle: saves ? String(localized: "Always Open", comment: "Button on a page's question to open an app: opens it, and the site may open this app without asking from now on.") : nil,
-                                                    denyTitle: String(localized: "Don’t Open", comment: "Button on a page's question to open an app."),
-                                                    answered: { decision().map { $0 ? .allow : .deny } })
+                                                    actions: [.deny, .allow], canRemember: saves,
+                                                    answered: { decision().map { PermissionAnswer(action: $0 ? "allow" : "deny", remember: true) } })
             asked.asking.remove(key)
-            switch answer {
-            case .allow, .alternate:
-                openApp()
-            case .always:
-                if saves, let origin { SitePermissions.allowOpeningApp(origin: origin, scheme: scheme) }
-                openApp()
-            case .deny:
-                asked.declined.insert(key)
-            case .notNow:
+            guard let answer else {
                 asked.putOff[key] = Date().addingTimeInterval(60)
+                return
+            }
+            if answer.action == "deny" {
+                asked.declined.insert(key)
+            } else {
+                if answer.remember, saves, let origin { SitePermissions.allowOpeningApp(origin: origin, scheme: scheme) }
+                openApp()
+            }
             }
         }
     }

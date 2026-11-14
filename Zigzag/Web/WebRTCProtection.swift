@@ -175,13 +175,14 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
         if bringingForward { controller.window?.makeKeyAndOrderFront(nil) }
         let answer = await PermissionPrompt.ask(host: SitePermissions.askerName(origin), origin: origin, what: "WebRTC", symbol: "phone.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use WebRTC for calls", comment: "A site's permission question, without its question mark: WebRTC is off for the site (Settings › Privacy › Protect IP address from WebRTC), and it tried to start a call. WebRTC is a name: keep it as it is."),
-                                                allowTitle: String(localized: "Allow and Reload", comment: "Button on the question to use WebRTC for calls on a site: allows it for the site and reloads the page."))
-        switch answer {
-        case .allow, .always: return origin
+                                                actions: [.deny, PermissionAction(id: "allow", title: String(localized: "Allow and Reload", comment: "Button on the question to use WebRTC for calls on a site: allows it for the site and reloads the page."), isDeny: false, isProminent: true)],
+                                                canRemember: false)
+        switch answer?.action {
+        case "allow": return origin
         // Don't Allow is the site's choice: kept, as Block in Site Controls would be.
-        case .deny: keep(false, origin: origin, in: tab)
+        case "deny": keep(false, origin: origin, in: tab)
         // Put away (×, Esc, the tab went on): not asked again until Zigzag next opens.
-        case .notNow, .alternate: putAway.insert(origin)
+        default: putAway.insert(origin)
         }
         return nil
     }
