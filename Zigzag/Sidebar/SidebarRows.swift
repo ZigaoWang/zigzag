@@ -893,21 +893,22 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             let pieces: [(NSView, NSView, IconButton)] = [(icon, title, audioButton), (partnerIcon, partnerTitle, partnerAudioButton)]
                 + views.map { ($0.icon, $0.title, $0.audio) }
             // Every part the same: titles in all of them or in none. With titles, each part's icon sits where a tab's
-            // does in its row, its part's inset in from where the part starts, as a split of two's do; without, the
-            // icons spread evenly from the tabs' icon column to the row's end, the speaker after an icon while that
-            // page plays. Pointing at a part names its page.
+            // does in its row, its part's inset in from where the part starts, as a split of two's do; without, each
+            // icon is centered in its part, the speaker after it while that page plays. Pointing at a part names its
+            // page.
             let titles = parts.first.map { Self.segmentShowsTitle(width: $0.end - $0.start) } ?? false
             for (i, part) in parts.enumerated() where i < pieces.count {
                 let (icon, title, audio) = pieces[i]
                 if titles {
                     place(icon: icon, title: title, audio: audio, from: part.start, to: part.end)
                 } else {
-                    // No room for titles: the first icon in the tabs' icon column (#203), the last as far in from the
-                    // row's end, the rest evenly between, so the row reads as one even group with no empty room after
-                    // the last icon.
-                    let first = Self.inset, last = (parts.last?.end ?? trailEnd) - Self.inset - side
-                    let step = parts.count > 1 ? (last - first) / CGFloat(parts.count - 1) : 0
-                    icon.frame = NSRect(x: round(first + step * CGFloat(i)), y: iconY, width: side, height: side)
+                    // No room for titles: each icon in the middle of its part, as in a segmented control, so it sits
+                    // in the middle of its part's light when that page is the one you're in, and the row reads evenly.
+                    // The last part runs on to the row's end where the others stop a gap short: measured as wide
+                    // as the others, so the icons stay evenly apart.
+                    let room = audio.isHidden ? side : side + Self.buttonGap + size.width
+                    let partEnd = i == parts.count - 1 ? part.end - edge : part.end
+                    icon.frame = NSRect(x: round((part.start + partEnd - room) / 2), y: iconY, width: side, height: side)
                     if !audio.isHidden { audio.frame.origin = NSPoint(x: icon.frame.maxX + Self.buttonGap, y: y) }
                     title.frame = NSRect(x: icon.frame.maxX, y: titleY, width: 0, height: titleH)
                 }
