@@ -180,6 +180,11 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
     var twoUp = false {
         didSet { if twoUp != oldValue { autoScales = true; relayout(keeping: topAnchor()) } }
     }
+
+    /// Two pages side by side only when there are two to show: a one-page document stays in the middle, rather than
+    /// alone on the right as a book's first page.
+    private var spread: Bool { twoUp && pageSizes.count > 1 }
+
     var isDark = false {
         didSet { if isDark != oldValue { darkChanged() } }
     }
@@ -275,8 +280,8 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
         guard !pageSizes.isEmpty else { return }
         let width = scrollView.contentSize.width
         laidOutWidth = width
-        if autoScales { scale = PDFLayout.fitScale(sizes: pageSizes, twoUp: twoUp, width: width) }
-        pageLayout = PDFLayout(sizes: pageSizes, scale: scale, twoUp: twoUp, width: width, bottom: bottomInset)
+        if autoScales { scale = PDFLayout.fitScale(sizes: pageSizes, twoUp: spread, width: width) }
+        pageLayout = PDFLayout(sizes: pageSizes, scale: scale, twoUp: spread, width: width, bottom: bottomInset)
         canvas.frame = CGRect(origin: .zero, size: CGSize(width: pageLayout.size.width, height: max(pageLayout.size.height, scrollView.contentSize.height)))
         if let anchor, pageLayout.frames.indices.contains(anchor.page) {
             let frame = pageLayout.frames[anchor.page]
@@ -401,7 +406,7 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
 
     /// A two-finger double tap: in to twice the fitting size at the pointer, or back to fitting.
     fileprivate func smartMagnify(_ event: NSEvent) {
-        let fit = PDFLayout.fitScale(sizes: pageSizes, twoUp: twoUp, width: scrollView.contentSize.width)
+        let fit = PDFLayout.fitScale(sizes: pageSizes, twoUp: spread, width: scrollView.contentSize.width)
         if autoScales || abs(scale - fit) < 0.01 {
             let point = scrollView.contentView.convert(event.locationInWindow, from: nil)
             zoom(to: fit * 2, at: CGPoint(x: point.x - visible.minX, y: point.y - visible.minY))
@@ -421,9 +426,9 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
         case 125: origin.y = command ? .greatestFiniteMagnitude : origin.y + line // down
         case 126: origin.y = command ? 0 : origin.y - line // up
         case 123: // left: sideways when zoomed in, else the page before
-            if sidewaysRoom.left || sidewaysRoom.right { origin.x -= line } else { go(toPage: max(currentPage - (twoUp ? 2 : 1), 0), y: nil, animated: true); return }
+            if sidewaysRoom.left || sidewaysRoom.right { origin.x -= line } else { go(toPage: max(currentPage - (spread ? 2 : 1), 0), y: nil, animated: true); return }
         case 124:
-            if sidewaysRoom.left || sidewaysRoom.right { origin.x += line } else { go(toPage: min(currentPage + (twoUp ? 2 : 1), pageCount - 1), y: nil, animated: true); return }
+            if sidewaysRoom.left || sidewaysRoom.right { origin.x += line } else { go(toPage: min(currentPage + (spread ? 2 : 1), pageCount - 1), y: nil, animated: true); return }
         case 121: origin.y += page // page down
         case 116: origin.y -= page // page up
         case 115: origin.y = 0 // home
