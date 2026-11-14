@@ -114,6 +114,8 @@ enum DownloadRuleSheet {
             actionRows.append(FormSheet.Row(label: String(localized: "Token", comment: "Label of the token field in a JSON-RPC download rule's sheet."), view: secret))
             actionRows.append(.note(String(localized: "A JSON array. {link}, {filename}, {cookies} and the rest are filled in, safely quoted. The token is kept in the Keychain.",
                                            comment: "Under the parameters of a JSON-RPC download rule.")))
+            actionRows.append(.note(String(localized: "The site’s cookies go only to a service on this Mac. An endpoint on another machine can’t be given {cookies} or {cookie_header}.",
+                                           comment: "Under the parameters of a JSON-RPC download rule, about cookies and where they may be sent.")))
         }
 
         let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}.",

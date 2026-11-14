@@ -45,7 +45,10 @@ enum DownloadHandoff {
                                    mime: request.mime, space: request.space)
         let secret = rule.action.kind == .jsonRPC ? (HandoffSecrets.secret(for: rule.id) ?? "") : ""
         var cookieFile: URL?
-        if rule.needsCookies {
+        // The site's own sign-in goes out only to a service on this Mac. The editor refuses to save a rule that asks
+        // for it anywhere else; this is the same rule again, where the handoff runs, so an endpoint edited by hand
+        // can't send them off this Mac either.
+        if rule.needsCookies, !rule.sendsCookiesOffThisMac {
             let cookies = await cookies(from: request.dataStore, for: request.url)
             values.cookieHeader = HandoffCookies.header(cookies)
             if rule.usesCookieFile, let file = try? HandoffCookies.writeFile(cookies) {

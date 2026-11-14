@@ -83,8 +83,12 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         action.textFields.contains { $0.contains("{cookies}") }
     }
 
-    /// What the row says it does, in a few words.
-    var actionSummary: String { action.summary }
+    /// Whether this rule would send the site's cookies to a service another machine could be answering at.
+    /// `{cookies}` and `{cookie_header}` carry the site's own sign-in, so a JSON-RPC rule may ask for them only on
+    /// this Mac: the endpoint is written by hand, and only a service here can be trusted with them.
+    var sendsCookiesOffThisMac: Bool {
+        action.kind == .jsonRPC && needsCookies && !action.endpointIsLocal
+    }
 
     /// The rule in a sentence, as its row in Settings › Downloads says it: "Files ending in .torrent go to
     /// rTorrent". The name is your own, so a rule you named reads with it.
@@ -234,6 +238,16 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         case .runScript: [scriptPath] + arguments
         case .jsonRPC: [rpcEndpoint, rpcMethod, rpcParameters]
         }
+    }
+
+    /// The tokens that stand for the site's own sign-in. They are only filled in for a service on this Mac.
+    static let cookieTokens = ["{cookies}", "{cookie_header}"]
+
+    /// Whether the service answers on this Mac. Any other host — a name, an address on the network — is a machine
+    /// that is not this one, whatever it's called, so only these three count.
+    var endpointIsLocal: Bool {
+        guard let host = URL(string: rpcEndpoint)?.host()?.lowercased(), !host.isEmpty else { return false }
+        return host == "localhost" || host == "127.0.0.1" || host == "::1"
     }
 
     var summary: String {
