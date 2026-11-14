@@ -140,6 +140,6 @@ enum PageOutlines {
     static func set(_ on: Bool, in webView: WKWebView) {
         guard on || outlined.contains(webView) else { return }
         if on { outlined.add(webView) } else { outlined.remove(webView) }
-        webView.callAsyncJavaScript(script, arguments: ["on": on, "id": styleID], in: nil, in: world) { _ in }
+        webView.runOwnScript(script, asFunction: true, arguments: ["on": on, "id": styleID], world: world)
     }
 }

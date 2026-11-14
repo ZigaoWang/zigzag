@@ -49,3 +49,82 @@ struct OwnScriptsTests {
         #expect(controller.userScripts.first === extensionScript)
     }
 }
+
+/// Zigzag's own scripts never hand a page a click: a page that redefines what they might call (a getter on
+/// `navigator.userAgent` that calls window.open) gets no popup out of Zigzag reading it.
+@MainActor
+struct OwnScriptGestureTests {
+    private final class Page: NSObject, WKUIDelegate, WKNavigationDelegate {
+        var opened = 0
+        var done: CheckedContinuation<Void, Never>?
+        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction,
+                     windowFeatures: WKWindowFeatures) -> WKWebView? {
+            // What Zigzag lets through on its own: a window a click opened (PopupNotice.allows).
+            if PopupNotice.isUserInitiated(navigationAction) { opened += 1 }
+            return nil
+        }
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
+    }
+
+    /// Everything Zigzag's scripts might reach for, made to open a window.
+    private static let trap = """
+    <html><head><link rel="icon" href="/favicon.ico"></head><body><video></video><script>
+    window.calls = 0;
+    const open = () => { window.calls++; window.open('https://example.org/popup', '_blank'); return 'trap'; };
+    Object.defineProperty(Navigator.prototype, 'userAgent', { get: open, configurable: true });
+    Object.defineProperty(Document.prototype, 'contentType', { get: open, configurable: true });
+    const all = Document.prototype.querySelectorAll;
+    Document.prototype.querySelectorAll = function (...a) { open(); return all.apply(this, a); };
+    Array.from = function () { open(); return []; };
+    window.getSelection = function () { open(); return null; };
+    </script></body></html>
+    """
+
+    private func load() async -> (WKWebView, Page) {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 300), configuration: configuration)
+        let page = Page()
+        webView.uiDelegate = page
+        webView.navigationDelegate = page
+        await withCheckedContinuation { done in
+            page.done = done
+            webView.loadHTMLString(Self.trap, baseURL: URL(string: "https://example.com/"))
+        }
+        return (webView, page)
+    }
+
+    @Test func readingThePageOpensNothing() async throws {
+        #expect(WKWebView.runsScriptsWithoutGesture)
+        let (webView, page) = await load()
+        // What a tab asks of every page it loads, and what it runs on its own.
+        let type = try await webView.runOwnScript(Tab.pdfCheckScript) as? String
+        #expect(type == "text/html")
+        let icons = try await webView.runOwnScript(PageScripts.iconLinks) as? [[String: String]]
+        #expect(icons?.first?["href"] == "https://example.com/favicon.ico")
+        _ = try await webView.runOwnScript(Tab.elementMuting(true))
+        _ = try await webView.runOwnScript("window.getSelection().toString()")
+        // The user agent is the web view's own, not the page's answer.
+        #expect(webView.sentUserAgent?.contains("AppleWebKit") == true)
+        let calls = try await webView.evaluateJavaScript("window.calls", in: nil, contentWorld: .page) as? Int
+        #expect(calls == 0)
+        #expect(page.opened == 0)
+        withExtendedLifetime(page) {}
+    }
+
+    @Test func aScriptInThePagesWorldCarriesNoClick() async throws {
+        let (webView, page) = await load()
+        // Run where the page's own code is (a consent platform's check, full screen's switch): the getter runs,
+        // but without a click its window.open is refused.
+        _ = try await webView.runOwnScript("navigator.userAgent", world: .page)
+        _ = try await webView.runOwnScript("return navigator.userAgent", asFunction: true, world: .page)
+        let calls = try await webView.evaluateJavaScript("window.calls", in: nil, contentWorld: .page) as? Int
+        #expect(calls == 2)
+        #expect(page.opened == 0)
+        // What WebKit's plain call does, for comparison: it runs as a click, and the page's window opens.
+        _ = try await webView.evaluateJavaScript("navigator.userAgent")
+        #expect(page.opened == 1)
+        withExtendedLifetime(page) {}
+    }
+}

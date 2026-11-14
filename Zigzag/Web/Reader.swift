@@ -110,12 +110,12 @@ enum Reader {
 
     /// Reads the article ahead of time, while the page is idle, so Reader opens at once.
     static func prepare(_ webView: WKWebView) {
-        webView.evaluateJavaScript("window.__zigzagReader && window.__zigzagReader.prepare(); 0", in: nil, in: .defaultClient, completionHandler: nil)
+        webView.runOwnScript("window.__zigzagReader && window.__zigzagReader.prepare(); 0")
     }
 
     /// Whether the page in a web view looks like an article.
     static func isArticle(_ webView: WKWebView) async -> Bool {
-        let result = try? await webView.evaluateJavaScript("window.__zigzagReader ? window.__zigzagReader.isArticle() : false", in: nil, contentWorld: .defaultClient)
+        let result = try? await webView.runOwnScript("window.__zigzagReader ? window.__zigzagReader.isArticle() : false")
         return (result as? Bool) ?? false
     }
 
@@ -136,7 +136,7 @@ enum Reader {
     }
 
     static func article(in webView: WKWebView) async -> Article? {
-        guard let json = try? await webView.evaluateJavaScript("window.__zigzagReader ? window.__zigzagReader.take() : null", in: nil, contentWorld: .defaultClient) as? String,
+        guard let json = try? await webView.runOwnScript("window.__zigzagReader ? window.__zigzagReader.take() : null") as? String,
               let data = json.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(Article.self, from: data)
     }
@@ -532,7 +532,7 @@ final class ReaderView: NSView {
     private func apply(_ preferences: Reader.Preferences) {
         Reader.Preferences.saved = preferences
         // The page's own scripts are off; this runs in Zigzag's world, so the change is instant.
-        webView.evaluateJavaScript(preferences.script, in: nil, in: .defaultClient, completionHandler: nil)
+        webView.runOwnScript(preferences.script)
         controls.theme = preferences.theme
     }
 

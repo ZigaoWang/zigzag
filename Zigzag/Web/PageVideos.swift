@@ -259,8 +259,8 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
     func origin(of frame: Frame, in webView: WKWebView) async -> CGPoint? {
         if frame.isMain { return .zero }
         // The page itself is asked, whether or not it has said anything (it may have no video of its own).
-        guard let list = try? await webView.callAsyncJavaScript("return window.__zigzagVideos ? window.__zigzagVideos.frames() : [];",
-                                                               arguments: [:], in: nil, contentWorld: .defaultClient) as? [[Any]] else { return nil }
+        guard let list = try? await webView.runOwnScript("return window.__zigzagVideos ? window.__zigzagVideos.frames() : [];", asFunction: true,
+                                                               world: .defaultClient) as? [[Any]] else { return nil }
         return Self.origin(of: frame, among: list)
     }
 

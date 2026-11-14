@@ -262,9 +262,15 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
             }
         }
         guard let entry, let webView = entry.webView else { return }
-        webView.callAsyncJavaScript("window.__zigzagNotification && window.__zigzagNotification(id, type)",
-                                    arguments: ["id": entry.id, "type": dismissed ? "close" : "click"],
-                                    in: entry.frame, in: .page, completionHandler: nil)
+        let source = "window.__zigzagNotification && window.__zigzagNotification(id, type)"
+        let arguments: [String: Any] = ["id": entry.id, "type": dismissed ? "close" : "click"]
+        // A click on the notification is yours, as in other browsers (the page may bring its window forward); one
+        // closed or dismissed carries no click to the page.
+        if dismissed {
+            webView.runOwnScript(source, asFunction: true, arguments: arguments, in: entry.frame, world: .page)
+        } else {
+            webView.callAsyncJavaScript(source, arguments: arguments, in: entry.frame, in: .page, completionHandler: nil)
+        }
     }
 
     // MARK: Page script

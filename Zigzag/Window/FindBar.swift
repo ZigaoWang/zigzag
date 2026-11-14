@@ -284,7 +284,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         }
         guard let webView = window?.findableWebView, !query.isEmpty else { return }
         watch(webView)
-        if fromStart { webView.evaluateJavaScript("window.getSelection().removeAllRanges()") }
+        if fromStart { webView.runOwnScript("window.getSelection().removeAllRanges()") }
         // WebKit's own find, which counts the same matches it goes through (`PageFind`).
         guard PageFind.isAvailable else {
             let config = WKFindConfiguration()
@@ -374,7 +374,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         (searchedPDF ?? window?.selectedTab?.pdfViewer)?.clearFind()
         searchedPDF = nil
         if let webView = searched ?? window?.findableWebView {
-            webView.evaluateJavaScript("window.getSelection().removeAllRanges()")
+            webView.runOwnScript("window.getSelection().removeAllRanges()")
             // WebKit draws its own highlight over the match, apart from the selection; it stays until told to go.
             if webView.responds(to: Self.hideFindUI) { webView.perform(Self.hideFindUI) }
         }

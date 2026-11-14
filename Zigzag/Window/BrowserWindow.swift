@@ -107,7 +107,8 @@ final class BrowserWindow: NSWindow {
                       return e.tagName === 'INPUT' && !/^(button|submit|reset|checkbox|radio|range|color|file|image|hidden)$/i.test(e.type);
                     })()
                     """
-                webView.evaluateJavaScript(editing) { [weak controller] result, _ in
+                webView.runOwnScript(editing) { [weak controller] answer in
+                    let result = try? answer.get()
                     MainActor.assumeIsolated {
                         guard (result as? Bool) != true, let controller else { return }
                         back ? controller.goBack(nil) : controller.goForward(nil)

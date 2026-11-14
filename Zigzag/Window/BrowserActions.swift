@@ -202,7 +202,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func findNextMatch(_ sender: Any?) { findBar.next(backwards: false) }
     @objc func findPreviousMatch(_ sender: Any?) { findBar.next(backwards: true) }
     @objc func useSelectionForFind(_ sender: Any?) {
-        selectedWebView?.evaluateJavaScript("window.getSelection().toString()") { [weak self] result, _ in
+        selectedWebView?.runOwnScript("window.getSelection().toString()") { [weak self] answer in
+            let result = try? answer.get()
             MainActor.assumeIsolated {
                 guard let text = result as? String, !text.isEmpty else { return }
                 self?.findBar.show(query: text)
@@ -215,7 +216,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         let script = "(() => { const s = getSelection(); if (!s || s.rangeCount === 0 || s.isCollapsed) return false;"
             + " const node = s.getRangeAt(0).startContainer; const el = node.nodeType === 1 ? node : node.parentElement;"
             + " if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); return true; })()"
-        selectedWebView?.evaluateJavaScript(script, completionHandler: nil)
+        selectedWebView?.runOwnScript(script)
     }
 
     // MARK: View
@@ -391,7 +392,8 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func viewSource(_ sender: Any?) {
         guard let url = selectedTab?.url, url.scheme?.hasPrefix("http") == true else { return }
-        selectedWebView?.evaluateJavaScript("document.documentElement.outerHTML") { [weak self] result, _ in
+        selectedWebView?.runOwnScript("document.documentElement.outerHTML") { [weak self] answer in
+            let result = try? answer.get()
             MainActor.assumeIsolated {
                 guard let html = result as? String, let self else { return }
                 let escaped = html.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")

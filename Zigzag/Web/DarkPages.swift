@@ -564,16 +564,16 @@ enum DarkPages {
         let frames: [WKFrameInfo?] = [nil] + PageFrames.shared.frames(in: webView)
         for frame in frames {
             // The plain script steps aside for Dark Reader's where dark pages are now wanted.
-            webView.callAsyncJavaScript("""
+            webView.runOwnScript("""
                 const d = window.__zigzagDark;
                 if (d && d.plain && wanted) { d.retire(); return false; }
                 if (d) { d.set(config); return true; }
                 return false;
-                """, arguments: ["config": config, "wanted": wanted], in: frame, in: world) { result in
+                """, asFunction: true, arguments: ["config": config, "wanted": wanted], in: frame, world: world) { result in
                 guard wanted, case .success(let had) = result, (had as? Bool) == false else { return }
                 MainActor.assumeIsolated {
-                    webView.evaluateJavaScript(proxyScript.source, in: frame, in: .page) { _ in }
-                    webView.evaluateJavaScript(script(for: store, url: webView.url).source, in: frame, in: world) { _ in }
+                    webView.runOwnScript(proxyScript.source, in: frame, world: .page)
+                    webView.runOwnScript(script(for: store, url: webView.url).source, in: frame, world: world)
                 }
             }
         }
@@ -581,7 +581,7 @@ enum DarkPages {
 
     /// The page script's own look again, for a page that changed without loading (a single-page app's new view).
     static func recheck(_ webView: WKWebView) {
-        webView.callAsyncJavaScript("if (window.__zigzagDark) window.__zigzagDark.check();", arguments: [:], in: nil, in: world) { _ in }
+        webView.runOwnScript("if (window.__zigzagDark) window.__zigzagDark.check();", asFunction: true, world: world)
     }
 
     /// What the page script found on a page.

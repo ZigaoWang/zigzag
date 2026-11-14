@@ -184,7 +184,7 @@ enum PageFullScreen {
         for webView in webViews.allObjects {
             let controller = webView.configuration.userContentController
             if controllers.insert(ObjectIdentifier(controller)).inserted { install(in: controller) }
-            webView.evaluateJavaScript(applyCall(config), in: nil, in: .page) { _ in }
+            webView.runOwnScript(applyCall(config), world: .page)
         }
         changed.send()
     }
@@ -192,7 +192,7 @@ enum PageFullScreen {
     /// Esc in Zigzag's window, while a page there fills itself: it leaves.
     static func exit(_ tab: Tab) {
         guard tab.isInPageFullScreen, let webView = tab.webView else { return }
-        webView.evaluateJavaScript(exitCall, in: nil, in: .page) { _ in }
+        webView.runOwnScript(exitCall, world: .page)
         tab.isInPageFullScreen = false
     }
 

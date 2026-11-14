@@ -102,7 +102,7 @@ enum PageTranslator {
     /// has: a Spanish page under an English menu, or one marked lang="en", is still Spanish (#218). A page that's
     /// all menus goes by all of its text.
     static func pageLanguage(of webView: WKWebView) async -> Locale.Language? {
-        guard let json = try? await webView.evaluateJavaScript(script("sample()"), in: nil, contentWorld: .defaultClient) as? String,
+        guard let json = try? await webView.runOwnScript(script("sample()")) as? String,
               let sample = try? JSONDecoder().decode(Sample.self, from: Data(json.utf8)) else { return nil }
         return dominantLanguage(ofBlocks: sample.blocks) ?? dominantLanguage(of: sample.all)
     }
@@ -178,7 +178,7 @@ enum PageTranslator {
     /// The text pieces to translate, in page order, and the blocks they're in. Translations put back with `apply`
     /// go by these pieces' places.
     static func text(in webView: WKWebView) async -> PageText {
-        let json = try? await webView.evaluateJavaScript(script("collect()"), in: nil, contentWorld: .defaultClient) as? String
+        let json = try? await webView.runOwnScript(script("collect()")) as? String
         return json.flatMap { try? JSONDecoder().decode(PageText.self, from: Data($0.utf8)) } ?? PageText(pieces: [], blocks: [], blockTexts: [])
     }
 
@@ -280,11 +280,11 @@ enum PageTranslator {
 
     static func apply(_ translations: [Int: String], in webView: WKWebView) async {
         guard let data = try? JSONEncoder().encode(translations.mapKeys(String.init)), let json = String(data: data, encoding: .utf8) else { return }
-        _ = try? await webView.evaluateJavaScript(script("apply(\(json))"), in: nil, contentWorld: .defaultClient)
+        _ = try? await webView.runOwnScript(script("apply(\(json))"))
     }
 
     static func restore(in webView: WKWebView) {
-        webView.evaluateJavaScript(script("restore()"), in: nil, in: .defaultClient)
+        webView.runOwnScript(script("restore()"))
     }
 
     private static func script(_ call: String) -> String { core + "\n__zigzagTranslate." + call + ";" }

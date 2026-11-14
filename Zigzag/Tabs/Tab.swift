@@ -966,7 +966,8 @@ final class Tab: NSObject {
                 isMuted = now
             } else {
                 // No page muting in this WebKit: each sound the page plays, now and later, is muted instead.
-                webView.evaluateJavaScript(Self.elementMuting(muted))
+                // In the world the document-start part runs in, where the page can't redefine what it calls.
+                webView.runOwnScript(Self.elementMuting(muted))
                 isMuted = muted
             }
         } else {
@@ -1240,9 +1241,9 @@ final class Tab: NSObject {
             changed.send(.favicon)
             return
         }
-        webView.evaluateJavaScript(PageScripts.iconLinks) { [weak self] result, _ in
+        webView.runOwnScript(PageScripts.iconLinks) { [weak self] answer in
             MainActor.assumeIsolated {
-                let links = (result as? [[String: String]]) ?? []
+                let links = ((try? answer.get()) as? [[String: String]]) ?? []
                 if let self, self.favicon != nil, let source = self.iconSource, source.page == pageURL, source.links == links { return }
                 FaviconStore.shared.resolve(pageURL: pageURL, links: links) { image in
                     guard let self, let image, self.url?.host() == pageURL.host() else { return }
@@ -1815,21 +1816,26 @@ extension Tab {
         }
         // The response said PDF: the viewer goes up now, while WebKit still loads it (the page can't be asked till then).
         if pdfResponseURL == url { showPDF(url, in: webView, userAgent: nil, fresh: fresh) }
-        webView.evaluateJavaScript("[document.contentType, navigator.userAgent]") { [weak self, weak webView] result, _ in
+        // Asked of the document in Zigzag's own world, with no click to it; the user agent is the web view's, never
+        // the page's word for it (`runOwnScript`).
+        webView.runOwnScript(Self.pdfCheckScript) { [weak self, weak webView] answer in
             MainActor.assumeIsolated {
                 guard let self, let webView, webView === self.webView, webView.url == url else { return }
-                let values = result as? [String]
+                let contentType = (try? answer.get()) as? String
                 // While a PDF still loads, WebKit's page may not say so yet: the response already did.
-                guard values?.first == "application/pdf" || self.pdfResponseURL == url else {
+                guard contentType == "application/pdf" || self.pdfResponseURL == url else {
                     self.showsPDF = false
                     (webView as? BrowserWebView)?.isPDF = false
                     if self.pdfViewer != nil { self.setPDFViewer(nil) }
                     return
                 }
-                self.showPDF(url, in: webView, userAgent: values?.count == 2 ? values?[1] : nil, fresh: fresh && self.pdfResponseURL != url)
+                self.showPDF(url, in: webView, userAgent: webView.sentUserAgent, fresh: fresh && self.pdfResponseURL != url)
             }
         }
     }
+
+    /// What asks the page whether it's a PDF.
+    static let pdfCheckScript = "document.contentType"
 
     /// The page at `url` is a PDF: Zigzag's viewer over it, unless it's showing already (and this isn't a new load).
     private func showPDF(_ url: URL, in webView: WKWebView, userAgent: String?, fresh: Bool) {

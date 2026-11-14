@@ -354,7 +354,8 @@ final class BrowserWebView: WKWebView {
     }
 
     @objc private func searchSelection(_ sender: NSMenuItem) {
-        evaluateJavaScript("window.getSelection().toString()") { [weak self] result, _ in
+        runOwnScript("window.getSelection().toString()") { [weak self] answer in
+            let result = try? answer.get()
             MainActor.assumeIsolated {
                 guard let self, let text = (result as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty,
                       let controller = WindowManager.shared.controller(for: self.window) else { return }

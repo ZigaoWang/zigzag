@@ -705,7 +705,8 @@ final class GuidedTour: NSView {
           return null;
         })()
         """
-        webView.evaluateJavaScript(script) { [weak self, weak webView] result, _ in
+        webView.runOwnScript(script) { [weak self, weak webView] answer in
+            let result = try? answer.get()
             MainActor.assumeIsolated {
                 guard let self, let webView, let point = result as? [Double], point.count == 2 else { self?.peekLink = nil; return }
                 let zoom = webView.pageZoom * webView.magnification
