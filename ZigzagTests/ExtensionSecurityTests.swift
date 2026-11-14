@@ -526,6 +526,17 @@ extension ExtensionSecurityTests {
 }
 
 extension ExtensionSecurityTests {
+    /// Side panels and offscreen pages stay on the extension's own pages.
+    @Test func panelsStayOnTheExtensionsPages() {
+        let base = URL(string: "webkit-extension://abcdefghijklmnopabcdefghijklmnop/")!
+        #expect(ExtensionPageGuard.staysInExtension(URL(string: "webkit-extension://abcdefghijklmnopabcdefghijklmnop/panel.html?tabId=3"), base: base))
+        #expect(ExtensionPageGuard.staysInExtension(URL(string: "about:blank"), base: base))
+        #expect(!ExtensionPageGuard.staysInExtension(URL(string: "webkit-extension://ponmlkjihgfedcbaponmlkjihgfedcba/panel.html"), base: base))
+        #expect(!ExtensionPageGuard.staysInExtension(URL(string: "https://evil.example/login"), base: base))
+        #expect(!ExtensionPageGuard.staysInExtension(URL(string: "data:text/html,hi"), base: base))
+        #expect(!ExtensionPageGuard.staysInExtension(nil, base: base))
+    }
+
     /// A click or a key pressed counts as using an extension; a key repeating while held, or a move, doesn't.
     @Test func onlyRealPressesAreGestures() {
         #expect(ExtensionUse.isGesture(.leftMouseDown, isRepeat: false))

@@ -592,10 +592,12 @@ final class BridgeOffscreen: BridgeNamespace {
             place(page)
             // As in Chrome, done once the page has loaded and its scripts listen: extensions message it right away.
             let loaded = PageLoad()
-            page.navigationDelegate = loaded
+            // It stays one of the extension's pages: it can't be sent to a site, where nothing would show it.
+            let stays = ExtensionPageGuard(base: context.baseURL, loaded: loaded)
+            stays.attach(to: page)
             page.load(URLRequest(url: url))
             await loaded.wait(seconds: 10)
-            page.navigationDelegate = nil
+            stays.loaded = nil
             ExtensionLog.write("offscreen page for \(host.displayName(for: extensionID)) opened: \(url.lastPathComponent)")
             return nil
         case "closeDocument":
@@ -611,6 +613,53 @@ final class BridgeOffscreen: BridgeNamespace {
 
     func release(_ extensionID: String) {
         remove(extensionID)
+    }
+}
+
+/// Keeps a side panel or offscreen page on the extension's own pages, which have no address bar to say where they
+/// are: the page itself can't go to a site. A link you click in a side panel opens in a tab instead (`onLink`).
+/// Frames inside the page may still show sites, as in Chrome.
+@MainActor
+final class ExtensionPageGuard: NSObject, WKNavigationDelegate {
+    let base: URL
+    var onLink: ((URL) -> Void)?
+    fileprivate var loaded: PageLoad?
+    private static var key = 0
+
+    fileprivate init(base: URL, loaded: PageLoad? = nil, onLink: ((URL) -> Void)? = nil) {
+        self.base = base
+        self.loaded = loaded
+        self.onLink = onLink
+    }
+
+    convenience init(base: URL, onLink: ((URL) -> Void)? = nil) { self.init(base: base, loaded: nil, onLink: onLink) }
+
+    /// Made the page's navigation delegate, and kept as long as the page is.
+    func attach(to page: WKWebView) {
+        page.navigationDelegate = self
+        objc_setAssociatedObject(page, &Self.key, self, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    }
+
+    /// Whether the page may go there: one of the extension's own pages, or a blank one.
+    static func staysInExtension(_ url: URL?, base: URL) -> Bool {
+        guard let url else { return false }
+        if url.absoluteString == "about:blank" || url.absoluteString == "about:srcdoc" { return true }
+        return url.scheme?.lowercased() == base.scheme?.lowercased() && url.host()?.lowercased() == base.host()?.lowercased()
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
+        guard action.targetFrame?.isMainFrame ?? true else { return .allow }
+        if Self.staysInExtension(action.request.url, base: base) { return .allow }
+        if action.navigationType == .linkActivated, let url = action.request.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+            onLink?(url)
+        }
+        return .cancel
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { loaded?.webView(webView, didFinish: navigation) }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { loaded?.webView(webView, didFail: navigation, withError: error) }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        loaded?.webView(webView, didFailProvisionalNavigation: navigation, withError: error)
     }
 }
 
@@ -1284,6 +1333,9 @@ final class BridgeSidePanel: BridgeNamespace {
         if root.showsSidePanel, host.showsSidePanel(of: extensionID, in: controller), root.sidePanel.webView?.url == url,
            root.sidePanel.tabID == panelTab { return true }
         let webView = WKWebView(frame: .zero, configuration: configuration)
+        ExtensionPageGuard(base: context.baseURL, onLink: { [weak controller] link in
+            _ = controller?.tabManager.newTab(url: link)
+        }).attach(to: webView)
         webView.load(URLRequest(url: url))
         let image = context.webExtension.icon(for: NSSize(width: 32, height: 32))
         root.sidePanel.show(webView, extensionID: extensionID, name: context.webExtension.displayName
