@@ -689,10 +689,42 @@ final class PermissionPrompt: FloatingPanelView {
     private weak var askingTab: Tab?
     private weak var controller: PromptHost?
     private var tabsToken: SignalToken?
+    private var waitingToken: SignalToken?
+    /// Others waiting their turn in this window, under the answers: there only while there are any.
+    private let moreWaiting = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    /// How many questions are waiting in this window, this one counted, as last read.
+    private var questionsWaiting = 1
+
+    /// How many questions come after the one on screen, or nothing when this is the only one in the window.
+    static func waitingBehind(questionsWaiting: Int) -> Int? {
+        questionsWaiting > 1 ? questionsWaiting - 1 : nil
+    }
+
+    /// What the card says under its answers while other questions wait their turn in the same window: how many
+    /// come after this one. Nothing while this is the only one, since there is nothing to wait for.
+    static func waitingLine(questionsWaiting: Int) -> String? {
+        guard let behind = waitingBehind(questionsWaiting: questionsWaiting) else { return nil }
+        return String(localized: "\(behind) more questions waiting", comment: "A line on a site's permission question when more than one question is waiting in the same window: how many are still behind the one on screen.")
+    }
 
     private static var queue: [ObjectIdentifier: Task<PermissionAnswer?, Never>] = [:]
     /// The question on screen in each window, so it can follow the sidebar.
     private static var shown: [ObjectIdentifier: PermissionPrompt] = [:]
+    /// Questions asked in each window that have not been answered yet: one is on screen, the rest wait their turn.
+    /// A question is asked one at a time in a window (see `ask`'s chain), so the card that is up can say how many
+    /// are behind it instead of stacking a card each.
+    private static var waiting: [ObjectIdentifier: Int] = [:]
+    /// Sent whenever a window's count changes, so a card on screen can say what is behind it.
+    static let waitingChanged = Signal<Void>()
+
+    /// Questions waiting their turn in this window, the one on screen included.
+    static func questionsWaiting(in controller: PromptHost) -> Int { waiting[ObjectIdentifier(controller)] ?? 0 }
+
+    private static func setWaiting(_ count: Int, in controller: PromptHost) {
+        let key = ObjectIdentifier(controller)
+        if count > 0 { waiting[key] = count } else { waiting[key] = nil }
+        waitingChanged.send()
+    }
 
     /// A question is on screen in this window.
     static func isShowing(in controller: PromptHost) -> Bool {
@@ -744,6 +776,8 @@ final class PermissionPrompt: FloatingPanelView {
                     answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         let key = ObjectIdentifier(controller)
         let before = queue[key]
+        // This question is one more waiting in the window: on screen now, or behind the one that is up.
+        setWaiting(questionsWaiting(in: controller) + 1, in: controller)
         // A private window never offers or returns Always, including an answer found while this question waited.
         let remembers = canRemember && !controller.promptIsPrivate
         let task = Task<PermissionAnswer?, Never> { @MainActor in
@@ -757,6 +791,8 @@ final class PermissionPrompt: FloatingPanelView {
         }
         queue[key] = task
         let answer = await task.value
+        // Answered or put off: it is no longer one of the window's waiting questions.
+        setWaiting(max(0, questionsWaiting(in: controller) - 1), in: controller)
         let said = if let answer {
             answer.action == "deny" ? "not allowed" : answer.remember ? "always allowed" : answer.action == "allow" ? "allowed" : "allowed the other way"
         } else { "put off" }
@@ -817,6 +853,7 @@ final class PermissionPrompt: FloatingPanelView {
                 return button
             }
             for button in row { prompt.addSubview(button) }
+            prompt.addSubview(prompt.moreWaiting)
             // Side by side at one width, as a Mac dialog sets its answers.
             let width = max(row.map(\.fittingWidth).max() ?? 0, Tokens.Dialog.minButtonWidth)
             prompt.buttons = row.map { ($0 as InteractiveView, width) }
@@ -840,6 +877,10 @@ final class PermissionPrompt: FloatingPanelView {
             }
             prompt.askingTab = asking
             prompt.controller = controller
+            // How many are waiting in this window, and told again whenever that changes: a question asked while this
+            // one is up waits its turn behind it, and the card says so rather than stacking a card of its own.
+            prompt.questionsWaiting = Self.questionsWaiting(in: controller)
+            prompt.waitingToken = Self.waitingChanged.observe { [weak prompt] in prompt?.refreshWaiting() }
             shown[ObjectIdentifier(controller)] = prompt
             controller.promptOverlay.addSubview(prompt)
             prompt.isHidden = true
@@ -880,6 +921,16 @@ final class PermissionPrompt: FloatingPanelView {
             // Last, once it listens: a tab already gone puts it off here, and that takes down what was just set up.
             prompt.followTab()
         }
+    }
+
+    /// Says how many others are waiting in this window, and takes the card's height with it — asked whenever a
+    /// question is asked or answered while this one is up, so the card never says a count it no longer has.
+    private func refreshWaiting() {
+        guard let controller else { return }
+        questionsWaiting = Self.questionsWaiting(in: controller)
+        guard superview != nil, !isHidden else { return }
+        place(in: controller)
+        needsLayout = true
     }
 
     /// Shown while the asking tab is in front (either side of a split counts), set aside while another tab is,
@@ -1023,7 +1074,10 @@ final class PermissionPrompt: FloatingPanelView {
         // One line of answers, or, where they don't fit, the duration on a row of its own above them.
         let answers = answersFit(in: width) ? Self.buttonHeight
                                              : Tokens.Page.controlHeight + Tokens.Space.x2 + Self.buttonHeight
-        return header + Tokens.Space.x4 + answers + Self.pad
+        // A line under them while other questions wait their turn in this window.
+        let waiting = Self.waitingLine(questionsWaiting: questionsWaiting) == nil ? 0
+                                                                                 : moreWaiting.lineHeight + Tokens.Space.x2
+        return header + Tokens.Space.x4 + answers + waiting + Self.pad
     }
 
     /// The answers side by side at one width, with the gaps between.
@@ -1089,6 +1143,14 @@ final class PermissionPrompt: FloatingPanelView {
             x -= bw
             button.frame = NSRect(x: x, y: y, width: bw, height: Self.buttonHeight)
             x -= Self.buttonGap
+        }
+        // What is waiting behind this one, under the answers: the card is a line taller while there is any.
+        let waiting = Self.waitingLine(questionsWaiting: questionsWaiting)
+        moreWaiting.isHidden = waiting == nil
+        if let waiting {
+            moreWaiting.stringValue = waiting
+            moreWaiting.frame = NSRect(x: pad, y: y + Self.buttonHeight + Tokens.Space.x2,
+                                       width: available, height: moreWaiting.lineHeight)
         }
     }
 }

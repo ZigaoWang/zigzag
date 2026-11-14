@@ -10,6 +10,17 @@ struct PermissionPromptTests {
         #expect(ordered.last?.isProminent == true)
     }
 
+    /// One question at a time in a window: the card that is up says how many wait their turn behind it, and says
+    /// nothing when none do — an empty line would be a label with no work.
+    @Test func aCardSaysHowManyWaitBehindIt() {
+        #expect(PermissionPrompt.waitingBehind(questionsWaiting: 0) == nil)
+        #expect(PermissionPrompt.waitingBehind(questionsWaiting: 1) == nil)
+        #expect(PermissionPrompt.waitingBehind(questionsWaiting: 2) == 1)
+        #expect(PermissionPrompt.waitingBehind(questionsWaiting: 4) == 3)
+        #expect(PermissionPrompt.waitingLine(questionsWaiting: 1) == nil)
+        #expect(PermissionPrompt.waitingLine(questionsWaiting: 3) != nil)
+    }
+
     @Test func aQuestionWithFourActionsKeepsDenyFirst() {
         let ordered = PermissionPrompt.actions(for: [.deny, .alternate("thisTab", "This Tab"),
                                                     .alternate("newTab", "New Tab"), .alternate("mini", "Mini")])
