@@ -1402,6 +1402,10 @@ final class DropdownButton: InteractiveView {
     var onSelect: ((Int) -> Void)?
     /// Under the choices, after a line: making a new thing to choose ("New Profile…").
     var actions: [Action] = []
+    /// How it's painted: the plain control, or, where it stands in for a filled answer (a question's own affirmative,
+    /// offered as choices), the primary look. `tint` replaces the primary's fill with the window's accent.
+    var look: ButtonLook = .secondary { didSet { stateDidChange(animated: false) } }
+    var tint: NSColor? { didSet { stateDidChange(animated: false) } }
     private var openedAt: TimeInterval = 0
     private var menuOpen = false { didSet { stateDidChange(animated: false) } }
 
@@ -1524,10 +1528,11 @@ final class DropdownButton: InteractiveView {
     override func accessibilityPerformShowMenu() -> Bool { openMenu(); return true }
 
     override func stateDidChange(animated: Bool) {
-        let ink = applyButtonLook(.secondary)
-        if menuOpen { layer?.set(backgroundColor: cgColor(Tokens.Color.controlHover), animated: false) }
+        let ink = applyButtonLook(look, tint: look == .primary ? tint : nil)
+        // An open menu shows on the control itself, unless it's already the filled answer, whose fill says enough.
+        if menuOpen, look == .secondary { layer?.set(backgroundColor: cgColor(Tokens.Color.controlHover), animated: false) }
         label.textColor = ink
-        chevron.contentTintColor = Tokens.Color.textSecondary
+        chevron.contentTintColor = look == .primary ? ink : Tokens.Color.textSecondary
         alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
     }
 }

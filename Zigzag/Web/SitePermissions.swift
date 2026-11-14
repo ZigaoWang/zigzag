@@ -728,6 +728,10 @@ final class PermissionPrompt: FloatingPanelView {
     private let asker = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let closeButton = IconButton(symbol: "xmark", toolTip: String(localized: "Not Now", comment: "Tooltip of the × on a site's permission question."))
     private let duration = DropdownButton()
+    /// Answers of the same kind, offered as one dropdown rather than a button each (where a pop-up opens): choosing
+    /// one answers the question, so the card stays a line.
+    private let answerMenu = DropdownButton()
+    private var menuChoices: [PermissionAction] = []
     /// The site that asked: when the tab goes elsewhere, the question no longer applies.
     private var askingHost = ""
     /// The origin that asked, when there is one: the question goes once the tab is on another origin, even one
@@ -791,11 +795,14 @@ final class PermissionPrompt: FloatingPanelView {
     /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
     /// `tab` is the tab whose page asked; without one, it's the tab in front when the question comes up.
     /// `host` is how the site is named in the question; `origin`, when given, is the site it's for (`SiteOrigin`).
+    /// `menu` is answers of one kind offered as a single dropdown after the buttons (where a pop-up opens); choosing
+    /// one answers the question, and it stands in as the question's own filled answer.
     /// The duration choice is This time unless `canRemember` offers Always on this site. A disabled choice keeps
     /// `rememberNote` as its explanation. Nil means Not Now.
     static func ask(host: String, origin: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil,
-                    actions: [PermissionAction] = [.deny, .allow], canRemember: Bool = true, rememberNote: String? = nil,
+                    actions: [PermissionAction] = [.deny, .allow], menu: [PermissionAction] = [],
+                    canRemember: Bool = true, rememberNote: String? = nil,
                     answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         let key = ObjectIdentifier(controller)
         let before = queue[key]
@@ -807,7 +814,7 @@ final class PermissionPrompt: FloatingPanelView {
                 return PermissionAnswer(action: known.action, remember: known.remember && remembers)
             }
             return await show(host: host, request: title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English."),
-                              symbol: symbol, icon: icon, actions: actions, canRemember: remembers, rememberNote: rememberNote,
+                              symbol: symbol, icon: icon, actions: actions, menu: menu, canRemember: remembers, rememberNote: rememberNote,
                               origin: origin, in: controller, tab: tab)
         }
         queue[key] = task
@@ -821,7 +828,7 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, actions: [PermissionAction],
-                             canRemember: Bool, rememberNote: String?, origin: String?, in controller: PromptHost, tab: Tab?) async -> PermissionAnswer? {
+                             menu: [PermissionAction], canRemember: Bool, rememberNote: String?, origin: String?, in controller: PromptHost, tab: Tab?) async -> PermissionAnswer? {
         // Never under What's New, where it couldn't be seen: it waits until the notes close.
         await withCheckedContinuation { continuation in
             WhatsNewSheet.afterClosing(in: controller.window) { continuation.resume() }
@@ -875,6 +882,19 @@ final class PermissionPrompt: FloatingPanelView {
             // Side by side at one width, as a Mac dialog sets its answers.
             let width = max(row.map(\.fittingWidth).max() ?? 0, Tokens.Dialog.minButtonWidth)
             prompt.buttons = row.map { ($0 as InteractiveView, width) }
+            // Answers of one kind (where a pop-up opens), one dropdown instead of a button each: it stands in as the
+            // question's own filled answer, and choosing from it answers, as clicking a button does.
+            if !menu.isEmpty {
+                prompt.menuChoices = menu
+                prompt.answerMenu.options = menu.map { DropdownButton.Option(title: $0.title) }
+                prompt.answerMenu.look = .primary
+                prompt.answerMenu.tint = accent
+                prompt.answerMenu.onSelect = { [weak prompt] index in
+                    guard let prompt, prompt.acceptsAllow, menu.indices.contains(index) else { return }
+                    prompt.finish(PermissionAnswer(action: menu[index].id, remember: canRemember && prompt.duration.selectedIndex == 1))
+                }
+                prompt.addSubview(prompt.answerMenu)
+            }
             prompt.setAccessibilityLabel(String(localized: "\(host): \(request)?", comment: "VoiceOver label of a site's permission question: the site, then its request, like “zoom.us: Use your camera?”."))
             prompt.answer = { response in
                 PendingQuestions.answer(questionID, response)
@@ -900,6 +920,11 @@ final class PermissionPrompt: FloatingPanelView {
                 guard let prompt, !prompt.isHidden, event.window === prompt.window else { return event }
                 // The command bar over it has its own clicks.
                 if controller?.promptIsCovered == true { return event }
+                // The card's own dropdown is a menu panel in this window, drawn over the page and usually past the
+                // card's lower edge: a click on it is a click on the card, never a click away (which would put the
+                // question off instead of answering it).
+                if let menu = MenuPanel.current, menu.window === prompt.window,
+                   menu.bounds.contains(menu.convert(event.locationInWindow, from: nil)) { return event }
                 let inside = prompt.bounds.contains(prompt.convert(event.locationInWindow, from: nil))
                 let address = controller?.promptAnchor
                 let onAddress = address.map { $0.bounds.contains($0.convert(event.locationInWindow, from: nil)) } ?? false
@@ -949,8 +974,9 @@ final class PermissionPrompt: FloatingPanelView {
         isElevated = true
         radius = Tokens.Radius.panel
         let area = askingTab.flatMap { controller.pageFrame(showing: $0) } ?? controller.focusedPaneFrame
-        // Wide enough for the answers and the duration control, within the page's own measure.
-        let measured = max(buttonsWidth, duration.isHidden ? 0 : duration.intrinsicContentSize.width) + Self.pad * 2        let width = min(max(420, measured), min(560, area.width - Tokens.Space.x6))
+        // Wide enough for the buttons, the menu and the duration on one line, within the page's own measure.
+        let measured = answersWidth + Self.pad * 2
+        let width = min(max(Self.width, measured), min(Self.maxWidth, area.width - Tokens.Space.x6))
         frame = NSRect(x: round(area.midX - width / 2), y: area.minY + Tokens.Space.x3, width: width, height: height(for: width))
     }
 
@@ -1043,6 +1069,8 @@ final class PermissionPrompt: FloatingPanelView {
     #endif
 
     private static let width: CGFloat = 420
+    /// The widest a question is allowed to get: enough for the answers, the menu and the duration on one line.
+    private static let maxWidth: CGFloat = 720
     private static let pad: CGFloat = 16
     private static let iconSide = Tokens.Dialog.iconSide
     private static let buttonHeight = DialogButtons.height
@@ -1060,14 +1088,30 @@ final class PermissionPrompt: FloatingPanelView {
     private func textHeight(for width: CGFloat) -> CGFloat { requestHeight(for: width) + 2 + asker.lineHeight }
 
     private func height(for width: CGFloat) -> CGFloat {
-        let h = Self.pad + max(Self.iconSide, textHeight(for: width))
-        return h + Tokens.Space.x4 + Tokens.Page.controlHeight + Tokens.Space.x2 + Self.buttonHeight + Self.pad
+        let header = Self.pad + max(Self.iconSide, textHeight(for: width))
+        // One line of answers, or, where they don't fit, the duration on a row of its own above them.
+        let answers = answersFit(in: width) ? Self.buttonHeight
+                                             : Tokens.Page.controlHeight + Tokens.Space.x2 + Self.buttonHeight
+        return header + Tokens.Space.x4 + answers + Self.pad
     }
 
     /// The answers side by side at one width, with the gaps between.
     private var buttonsWidth: CGFloat {
         buttons.reduce(0) { $0 + $1.width } + Self.buttonGap * CGFloat(max(0, buttons.count - 1))
     }
+
+    /// The control after the buttons, where the question offers one: the answers of one kind, as a dropdown.
+    private var menuWidth: CGFloat { menuChoices.isEmpty ? 0 : answerMenu.intrinsicContentSize.width + Self.buttonGap }
+
+    /// ... then the duration, which every question offers (disabled where the answer can't be kept).
+    private var durationWidth: CGFloat { duration.isHidden ? 0 : duration.intrinsicContentSize.width + Self.buttonGap }
+
+    /// Everything on the answers' row, one line wide: the buttons, the menu and the duration.
+    private var answersWidth: CGFloat { buttonsWidth + menuWidth + durationWidth }
+
+    /// Whether they fit on the card's one line at `width`. Where they don't (Zigzag Mini, a narrow pane, longer
+    /// translations), the duration takes the row above the buttons.
+    private func answersFit(in width: CGFloat) -> Bool { answersWidth <= width - Self.pad * 2 }
 
     private func layoutContent() {
         let pad = Self.pad, w = bounds.width
@@ -1082,30 +1126,38 @@ final class PermissionPrompt: FloatingPanelView {
         request.frame = NSRect(x: textX - Label.inset, y: top, width: textWidth + Label.inset * 2, height: requestHeight(for: w))
         asker.frame = NSRect(x: textX - Label.inset, y: request.frame.maxY + 2, width: textWidth + Label.inset * 2, height: asker.lineHeight)
         var y = pad + header + Tokens.Space.x4
-        if !duration.isHidden {
+        // One line, at the trailing edge: the buttons, then the menu, then the duration, as a Mac dialog sets its
+        // answers. Where they don't fit, the duration takes the row above and the rest share the row below it.
+        let oneLine = answersFit(in: w)
+        if !oneLine, !duration.isHidden {
             let size = duration.intrinsicContentSize
             duration.frame = NSRect(x: w - pad - size.width, y: y, width: size.width, height: Tokens.Page.controlHeight)
             y = duration.frame.maxY + Tokens.Space.x2
         }
-        // Four answers take the full row from the left. Fewer sit at the right until they need the whole width.
-        let total = buttonsWidth, available = w - pad * 2
-        let ownRow = buttons.count > 3
-        let even = ownRow || total > available || w < Self.width
+        let available = w - pad * 2
+        // The buttons share what's left of the row after the menu, all the same width.
         let each = max(Tokens.Dialog.minButtonWidth,
-                       (available - Self.buttonGap * CGFloat(max(0, buttons.count - 1))) / CGFloat(max(1, buttons.count)))
-        var x = ownRow ? pad : w - pad
-        if ownRow {
-            for (button, _) in buttons {
-                button.frame = NSRect(x: x, y: y, width: each, height: Self.buttonHeight)
-                x += each + Self.buttonGap
-            }
-        } else {
-            for (button, width) in buttons.reversed() {
-                let bw = even ? each : width
-                x -= bw
-                button.frame = NSRect(x: x, y: y, width: bw, height: Self.buttonHeight)
-                x -= Self.buttonGap
-            }
+                       (available - menuWidth - Self.buttonGap * CGFloat(max(0, buttons.count - 1))) / CGFloat(max(1, buttons.count)))
+        var x = w - pad
+        if oneLine {
+            let size = duration.intrinsicContentSize
+            x -= size.width
+            duration.frame = NSRect(x: x, y: y, width: size.width, height: Tokens.Page.controlHeight)
+            x -= Self.buttonGap
+        }
+        if !menuChoices.isEmpty {
+            let size = answerMenu.intrinsicContentSize
+            x -= size.width
+            answerMenu.frame = NSRect(x: x, y: y, width: size.width, height: Tokens.Page.controlHeight)
+            x -= Self.buttonGap
+        }
+        // More answers than the row holds: each takes an equal share of it.
+        let even = !oneLine || buttonsWidth > available
+        for (button, width) in buttons.reversed() {
+            let bw = even ? each : width
+            x -= bw
+            button.frame = NSRect(x: x, y: y, width: bw, height: Self.buttonHeight)
+            x -= Self.buttonGap
         }
     }
 }

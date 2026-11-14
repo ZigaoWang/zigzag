@@ -48,10 +48,10 @@ enum PopupNotice {
                 host: SitePermissions.askerName(origin), origin: origin, what: SiteOrigin.of(url).map(SiteOrigin.label) ?? "", symbol: "macwindow.badge.plus",
                 in: host, tab: tab,
                 title: String(localized: "A page wants to open a new window", comment: "A page's question before Zigzag opens the pop-up window it asked for."),
-                actions: [.deny,
-                          .alternate("thisTab", String(localized: "This Tab", comment: "Button in the pop-up question: loads the pop-up's page in the tab you are in.")),
-                          .alternate("newTab", String(localized: "New Tab", comment: "Button in the pop-up question: opens the pop-up's page in a new tab.")),
-                          .alternate("mini", String(localized: "Mini", comment: "Button in the pop-up question: opens the pop-up's page in the small pop-up viewer window."))],
+                actions: [.deny],
+                menu: [.alternate("thisTab", String(localized: "This Tab", comment: "Choice in the pop-up question's menu: loads the pop-up's page in the tab you are in.")),
+                       .alternate("newTab", String(localized: "New Tab", comment: "Choice in the pop-up question's menu: opens the pop-up's page in a new tab.")),
+                       .alternate("mini", String(localized: "Mini", comment: "Choice in the pop-up question's menu: opens the pop-up's page in the small pop-up viewer window."))],
                 canRemember: !isPrivate && origin != nil)
             guard let answer else { return }
             if let origin {
