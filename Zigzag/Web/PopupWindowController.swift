@@ -259,7 +259,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         // Downloads as a tab's are: a stream of them nobody clicked for is refused.
         if let policy = downloads.decide(shouldDownload: navigationAction.shouldPerformDownload, clicked: PopupNotice.isUserInitiated(navigationAction),
                                          isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true) {
-            if policy == .cancel { Diagnostics.note("Download refused", site: webView.url?.host(), "A page started another download without a click", isPrivate: isPrivate) }
+            if policy == .cancel { refusedDownload() }
             return policy
         }
         // Zigzag's own pages (History) open in its tabs, never in a page's pop-up.
@@ -306,8 +306,18 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         let response = navigationResponse.response
         StrictTransport.note(response, in: webView.configuration.websiteDataStore)
         // Shown or saved as in a tab: a file sent as an attachment is saved, never shown as the site's page.
-        return downloads.decide(mimeType: response.mimeType, contentDisposition: (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition"),
-                                canShowMIMEType: navigationResponse.canShowMIMEType, isMainFrame: navigationResponse.isForMainFrame)
+        let policy = downloads.decide(mimeType: response.mimeType, contentDisposition: (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition"),
+                                      canShowMIMEType: navigationResponse.canShowMIMEType, isMainFrame: navigationResponse.isForMainFrame)
+        if policy == .cancel, navigationResponse.isForMainFrame { refusedDownload() }
+        return policy
+    }
+
+    /// A download the page started on its own, refused: said over the page, under the header, never silently.
+    private func refusedDownload() {
+        Diagnostics.note("Download refused", site: webView.url?.host(), "A page started another download without a click", isPrivate: isPrivate)
+        guard let content = window?.contentView, window?.isVisible == true else { return }
+        let area = NSRect(x: 0, y: Self.headerHeight, width: content.bounds.width, height: max(0, content.bounds.height - Self.headerHeight))
+        Toast.show(DownloadPolicy.refusedText, symbol: "arrow.down.circle", duration: 3, over: content, area: area)
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {

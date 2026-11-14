@@ -3153,6 +3153,17 @@
         }
       }
     },
+    "Blocked a download the page started on its own" : {
+      "comment" : "Toast when a page starts a second download within half a minute without a click.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已拦截网页自行开始的下载"
+          }
+        }
+      }
+    },
     "Blocking requests the old way" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
       "localizations" : {

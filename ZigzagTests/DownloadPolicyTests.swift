@@ -67,4 +67,39 @@ struct DownloadPolicyTests {
         #expect(policy.decide(shouldDownload: false, clicked: false, isMainFrame: true, now: now.addingTimeInterval(4)) == nil)
         #expect(policy.decide(shouldDownload: true, clicked: false, isMainFrame: true, now: now.addingTimeInterval(DownloadPolicy.scriptDownloadGap + 2)) == .download)
     }
+
+    /// A file the page goes to because you sent it there saves, however soon after another: the address you pasted
+    /// that redirects to a CDN, the "your download starts in 5 seconds" page you clicked through to.
+    @Test func whereYouSentThePageAlwaysSaves() {
+        let policy = DownloadPolicy()
+        let now = Date()
+        let zip = { (at: TimeInterval) in
+            policy.decide(mimeType: "application/zip", contentDisposition: nil, canShowMIMEType: false, isMainFrame: true, now: now.addingTimeInterval(at))
+        }
+        // A script's download a moment ago.
+        #expect(policy.decide(shouldDownload: true, clicked: false, isMainFrame: true, now: now) == .download)
+        // Your pasted address, and the redirect on its way (WebKit's decision for it isn't a click).
+        _ = policy.decide(shouldDownload: false, clicked: true, isMainFrame: true, now: now.addingTimeInterval(1))
+        _ = policy.decide(shouldDownload: false, clicked: false, isMainFrame: true, now: now.addingTimeInterval(1.2))
+        #expect(zip(1.5) == .download)
+        // You clicked a download link; its page sends itself to the file a few seconds later, on its own.
+        _ = policy.decide(shouldDownload: false, clicked: true, isMainFrame: true, now: now.addingTimeInterval(2))
+        _ = policy.decide(shouldDownload: false, clicked: false, isMainFrame: true, now: now.addingTimeInterval(7))
+        #expect(zip(7.5) == .download)
+        // Again for the next file.
+        _ = policy.decide(shouldDownload: false, clicked: true, isMainFrame: true, now: now.addingTimeInterval(9))
+        _ = policy.decide(shouldDownload: false, clicked: false, isMainFrame: true, now: now.addingTimeInterval(14))
+        #expect(zip(14.5) == .download)
+        // With nothing from you in between, the page going to file after file is held back.
+        _ = policy.decide(shouldDownload: false, clicked: false, isMainFrame: true, now: now.addingTimeInterval(16))
+        #expect(zip(16.5) == .cancel)
+        #expect(policy.decide(shouldDownload: true, clicked: false, isMainFrame: true, now: now.addingTimeInterval(17)) == .cancel)
+    }
+
+    /// The first download a pop-up's page starts on its own, straight to a file, saves.
+    @Test func aPopUpGoingStraightToAFileSaves() {
+        let policy = DownloadPolicy()
+        _ = policy.decide(shouldDownload: false, clicked: false, isMainFrame: true)
+        #expect(policy.decide(mimeType: "application/octet-stream", contentDisposition: "attachment; filename=a.dmg", canShowMIMEType: false, isMainFrame: true) == .download)
+    }
 }

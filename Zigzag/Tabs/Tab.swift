@@ -1282,7 +1282,7 @@ extension Tab: WKNavigationDelegate {
         // hand over a file a moment later (a download page's hidden frame).
         if let policy = downloads.decide(shouldDownload: navigationAction.shouldPerformDownload, clicked: userInitiated || ownLoad,
                                          isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true) {
-            if policy == .cancel { Diagnostics.note("Download refused", site: url?.host(), "A page started another download without a click", isPrivate: isPrivate) }
+            if policy == .cancel { refusedDownload(in: webView) }
             return (policy, preferences)
         }
 
@@ -1454,12 +1454,21 @@ extension Tab: WKNavigationDelegate {
         if navigationResponse.isForMainFrame {
             WebRTCProtection.apply(to: webView, for: policy == .allow ? response.url : webView.url, in: self)
         }
+        // A main frame's file held back: one nobody asked for, too soon after another (`DownloadPolicy`).
+        if policy == .cancel, navigationResponse.isForMainFrame { refusedDownload(in: webView) }
         #if DEBUG
         if policy == .download {
             debugLog("download chosen: mime=\(mime) canShow=\(navigationResponse.canShowMIMEType) mainFrame=\(navigationResponse.isForMainFrame) attachment=\(disposition != nil)")
         }
         #endif
         return policy
+    }
+
+    /// A download the page started on its own, refused: noted, and said where the page is, never silently.
+    private func refusedDownload(in webView: WKWebView) {
+        Diagnostics.note("Download refused", site: url?.host(), "A page started another download without a click", isPrivate: isPrivate)
+        guard let host = webView.window?.windowController as? PromptHost else { return }
+        host.promptToast(DownloadPolicy.refusedText, symbol: "arrow.down.circle", duration: 3)
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
