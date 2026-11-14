@@ -190,6 +190,7 @@ enum DebugBridge {
         case "minimove": mini?.openInZigzag()
         case "minispace": mini?.debugSpace(arg)
         case "minicopy": mini?.copyPageURL(nil)
+        case "minisite": mini?.showSiteControls()
         case "miniresize":
             let n = arg.split(separator: " ").compactMap { Double($0) }
             if n.count == 2, let window = mini?.window {

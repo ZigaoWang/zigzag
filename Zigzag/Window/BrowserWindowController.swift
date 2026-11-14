@@ -705,23 +705,30 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Clears one site's cache or cookies, then loads its page again: from Site Controls' ⋯ menu, View › Developer
     /// and the command bar, which all ask the same way. Only a web site has a cache and cookies of its own.
     func confirmClear(_ kind: WebsiteData.Kind, of tab: Tab) {
+        Self.confirmClear(kind, of: tab, over: root.overlay) { [weak self] text in
+            if let self { Toast.show(text, symbol: "checkmark.circle", in: self) }
+        }
+    }
+
+    /// The sheet over `overlay` that asks before clearing one site's cache or cookies, then clears them; `done` says
+    /// what was cleared. A browser window's, and Zigzag Mini's (#225).
+    static func confirmClear(_ kind: WebsiteData.Kind, of tab: Tab, over overlay: NSView, done: @escaping @MainActor (String) -> Void) {
         guard let url = tab.url, ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let site = ContentBlocker.site(of: url) else { return }
         let cookies = kind == .cookies
         let message = cookies ? String(localized: "You’ll be signed out of \(site). Other sites aren’t touched.", comment: "Message of the sheet that asks before clearing one site's cookies.")
                               : String(localized: "It loads a little slower the first time. You stay signed in.", comment: "Message of the sheet that asks before clearing one site's cache.")
-        ConfirmSheet.show(in: root.overlay,
+        ConfirmSheet.show(in: overlay,
                           title: cookies ? String(localized: "Clear cookies for \(site)?", comment: "Title of the sheet that asks before clearing one site's cookies. The site is a domain, like example.com.")
                                          : String(localized: "Clear the cache for \(site)?", comment: "Title of the sheet that asks before clearing one site's cache. The site is a domain, like example.com."),
                           message: Words.sentences(message, tab.isDevelopment ? Self.everyPortNote(for: url, site: site) : nil),
                           confirmTitle: cookies ? String(localized: "Clear Cookies", comment: "Button that clears cookies, in the sheet that asks first.")
-                                                : String(localized: "Clear Cache", comment: "Button that clears the cache, in the sheet that asks first."), destructive: cookies) { [weak self, weak tab] confirmed in
+                                                : String(localized: "Clear Cache", comment: "Button that clears the cache, in the sheet that asks first."), destructive: cookies) { [weak tab] confirmed in
             guard confirmed, let tab else { return }
-            Task { @MainActor [weak self] in
+            Task { @MainActor in
                 await WebsiteData.clear(kind, site: site, in: tab.privateStore ?? tab.profile.store)
                 tab.reload()
-                if let self { Toast.show(kind == .cache ? String(localized: "Cache cleared for \(site)", comment: "Toast after one site's cache is cleared. The site is a domain, like example.com.")
-                                                        : String(localized: "Cookies cleared for \(site)", comment: "Toast after one site's cookies are cleared. The site is a domain, like example.com."),
-                                         symbol: "checkmark.circle", in: self) }
+                done(kind == .cache ? String(localized: "Cache cleared for \(site)", comment: "Toast after one site's cache is cleared. The site is a domain, like example.com.")
+                                    : String(localized: "Cookies cleared for \(site)", comment: "Toast after one site's cookies are cleared. The site is a domain, like example.com."))
             }
         }
     }

@@ -17,6 +17,9 @@ final class SitePanel: FloatingPanelView {
     static func closeCurrent() { current?.close() }
 
     private weak var controller: BrowserWindowController?
+    /// Opened in Zigzag Mini (#225): its one page, with what a page's own settings are; what needs a browser window
+    /// (Reader, translating, extensions' popups, the developer tools) stays there.
+    private weak var mini: MiniWindowController?
     private weak var anchor: NSView?
     /// The button it opened from, shown pressed while it's open: the sidebar's, or a split pane's (#160).
     private weak var opener: IconButton?
@@ -117,14 +120,15 @@ final class SitePanel: FloatingPanelView {
     private var width: CGFloat = SitePanel.width
     private var pad: CGFloat { width < Self.width ? Tokens.Space.x3 : Tokens.Space.x4 }
 
-    private init?(controller: BrowserWindowController, tab asked: Tab?) {
+    private init?(controller: BrowserWindowController?, mini: MiniWindowController? = nil, tab asked: Tab?) {
         // With no page (a new tab), it still opens: your extensions are always one click away.
-        let tab = asked ?? controller.tabManager.selectedTab ?? Tab(url: nil, spaceID: controller.tabManager.currentSpaceID)
+        guard let tab = asked ?? controller.map({ $0.tabManager.selectedTab ?? Tab(url: nil, spaceID: $0.tabManager.currentSpaceID) }) else { return nil }
         let url = tab.url.flatMap { ["http", "https", "webkit-extension"].contains($0.scheme ?? "") ? $0 : nil }
         isBlank = url == nil
         self.controller = controller
+        self.mini = mini
         self.tab = tab
-        isPrivate = tab.isPrivate || controller.tabManager.isPrivate
+        isPrivate = tab.isPrivate || controller?.tabManager.isPrivate == true
         self.url = url ?? URL(string: "about:blank")!
         site = url.map { ContentBlocker.site(of: $0) ?? $0.host() ?? $0.absoluteString } ?? String(localized: "New Tab", comment: "Name the site panel shows for a new tab with no page.")
         let origin = SiteOrigin.of(url)
@@ -258,23 +262,59 @@ final class SitePanel: FloatingPanelView {
         panel.present(arrival: .pop)
         opener.isSelected = true
         current = panel
+        // Only its own window: keys and clicks in Settings or another window are theirs.
         panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
-            // Only its own window: keys and clicks in Settings or another window are theirs. A menu open over it
-            // takes Esc and the click that closes it.
-            guard let panel, event.window === panel.window, MenuPanel.current == nil else { return event }
-            if event.type == .keyDown {
-                // Esc on one of its pages goes back; on the panel, it closes.
-                if event.keyCode == 53 {
-                    if panel.showsSubpage { panel.show(.main) } else { panel.close() }
-                    return nil
-                }
-                return event
+            guard let panel else { return event }
+            return panel.handle(event)
+        }
+    }
+
+    /// Opens the panel for Zigzag Mini's page under its strip's Site Controls button, or closes the one open (#225).
+    static func toggle(in mini: MiniWindowController, from button: IconButton) {
+        if let current, current.superview != nil {
+            let here = current.window === mini.window
+            current.close()
+            if here { return }
+        }
+        guard let panel = SitePanel(controller: nil, mini: mini, tab: mini.tab) else { return }
+        panel.anchor = button
+        // Over the page, under the button's end, as from the address above a browser window's page; kept in the window.
+        let overlay = mini.overlay
+        let inset = Tokens.Metric.cardInset
+        panel.width = max(Self.minimumWidth, min(Self.width, overlay.bounds.width - inset * 2))
+        let b = button.convert(button.bounds, to: overlay)
+        let x = min(b.maxX - panel.width, overlay.bounds.width - inset - panel.width)
+        panel.frame.origin = NSPoint(x: max(inset, x), y: max(b.maxY, 0) + 4)
+        panel.maxHeight = SitePanelSizing.maxHeight(overlayHeight: overlay.bounds.height, top: panel.frame.minY)
+        panel.frame.size = NSSize(width: panel.width, height: panel.fittedHeight)
+        overlay.addSubview(panel)
+        panel.needsLayout = true
+        panel.opener = button
+        panel.growsFrom = CGPoint(x: min(max((b.midX - panel.frame.minX) / panel.frame.width, 0), 1), y: 0)
+        panel.present(arrival: .pop)
+        button.isSelected = true
+        current = panel
+        panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
+            guard let panel else { return event }
+            return panel.handle(event)
+        }
+    }
+
+    /// A click or key while it's open, in its own window only: Esc goes back from one of its pages, or closes it; a
+    /// click outside it and its button closes it. A menu open over it takes Esc and the click that closes it.
+    private func handle(_ event: NSEvent) -> NSEvent? {
+        guard event.window === window, MenuPanel.current == nil else { return event }
+        if event.type == .keyDown {
+            if event.keyCode == 53 {
+                if showsSubpage { show(.main) } else { close() }
+                return nil
             }
-            let inside = panel.bounds.contains(panel.convert(event.locationInWindow, from: nil))
-            let onAnchor = panel.anchor.map { $0.bounds.contains($0.convert(event.locationInWindow, from: nil)) } ?? false
-            if !inside && !onAnchor { panel.close() }
             return event
         }
+        let inside = bounds.contains(convert(event.locationInWindow, from: nil))
+        let onAnchor = anchor.map { $0.bounds.contains($0.convert(event.locationInWindow, from: nil)) } ?? false
+        if !inside && !onAnchor { close() }
+        return event
     }
 
     /// The split pane's strip a view is in, if any.
@@ -304,19 +344,27 @@ final class SitePanel: FloatingPanelView {
     /// What this page can do right now, as named tiles: sharing, the link, a screenshot and translating always, Reader
     /// and Picture in Picture when the page has them. The steady ones come first, so they never move.
     private func buildTiles() {
-        guard let controller else { return }
-        let readerOn = controller.isShowingReader
+        // Zigzag Mini (`mini`) has the page's own actions: sharing, the link and Picture in Picture.
+        guard controller != nil || mini != nil else { return }
+        let readerOn = controller?.isShowingReader ?? false
         // (symbol, caption, full name for the tooltip and VoiceOver, on, action)
         var specs: [(String, String, String, Bool, () -> Void)] = []
         let share = String(localized: "Share", comment: "Action in the site panel: shares the page.")
-        specs.append(("square.and.arrow.up", share, share, false, { [weak self] in self?.close(); self?.controller?.sharePage(nil) }))
+        specs.append(("square.and.arrow.up", share, share, false, { [weak self] in
+            guard let self else { return }
+            let opener = self.opener, url = self.url
+            self.close()
+            if let controller = self.controller { controller.sharePage(nil); return }
+            guard let opener else { return }
+            NSSharingServicePicker(items: [url as NSURL]).show(relativeTo: opener.bounds, of: opener, preferredEdge: .minY)
+        }))
         let copyLink = String(localized: "Copy Link", comment: "Action in the site panel: copies the page's address.")
         specs.append(("link", copyLink, copyLink, false, { [weak self] in
             guard let self else { return }
-            self.controller?.copyLink(self.url)
+            if let controller = self.controller { controller.copyLink(self.url) } else { self.mini?.copyPageURL(nil) }
             self.close()
         }))
-        if PageScreenshot.canTake(tab), !readerOn {
+        if controller != nil, PageScreenshot.canTake(tab), !readerOn {
             specs.append(("camera.viewfinder",
                           String(localized: "Capture", comment: "Action in the site panel, under its icon: takes a screenshot of the whole page."),
                           String(localized: "Take Screenshot of Whole Page", comment: "Tooltip of the Capture action in the site panel."),
@@ -329,11 +377,11 @@ final class SitePanel: FloatingPanelView {
         // Always here, as in the menu, for when the offer went by or never came: a page that's already in your
         // language says so, and a translated one goes back to its original.
         let translate = String(localized: "Translate", comment: "Action in the site panel: translates the page.")
-        specs.append(("translate",
+        if controller != nil { specs.append(("translate",
                       tab.isTranslated ? String(localized: "Original", comment: "Action in the site panel, under its icon: shows the translated page as it was.") : translate,
                       tab.isTranslated ? String(localized: "Show Original", comment: "Tooltip of the Original action in the site panel.") : translate,
-                      tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() }))
-        if tab.isArticle || readerOn {
+                      tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() })) }
+        if controller != nil, tab.isArticle || readerOn {
             specs.append(("doc.plaintext", String(localized: "Reader", comment: "Action in the site panel, under its icon: opens or closes Reader."),
                           readerOn ? String(localized: "Hide Reader", comment: "Tooltip of the Reader action in the site panel, while Reader is on.")
                                    : String(localized: "Show Reader", comment: "Tooltip of the Reader action in the site panel."),
@@ -344,7 +392,11 @@ final class SitePanel: FloatingPanelView {
             specs.append(("pip", String(localized: "Float", comment: "Action in the site panel, under its icon: plays the page's video in Picture in Picture."),
                           floating ? String(localized: "Back to Page", comment: "Tooltip of the Float action in the site panel, while the video floats: puts it back in its page.")
                                    : String(localized: "Picture in Picture", comment: "Tooltip of the Float action in the site panel."),
-                          floating, { [weak self] in self?.controller?.togglePictureInPicture(nil); self?.close() }))
+                          floating, { [weak self] in
+                guard let self else { return }
+                if let controller = self.controller { controller.togglePictureInPicture(nil) } else { self.tab.webView?.togglePictureInPicture() }
+                self.close()
+            }))
         }
         actionTiles = specs.map { symbol, caption, title, on, run in
             // The panel's own short action words; the tooltip and VoiceOver keep the full name.
@@ -571,7 +623,8 @@ final class SitePanel: FloatingPanelView {
     /// Your extensions, as their toolbar buttons are: the icon, the badge, and whether each works on this site.
     private func buildExtensions() {
         // Extensions don't run in a private window, as in Chrome's incognito: none to show, nor to get here.
-        guard #available(macOS 15.4, *), let host = tab.extensionHost else { return }
+        // In Zigzag Mini, none: an extension's popup opens from a browser window's address.
+        guard #available(macOS 15.4, *), controller != nil, let host = tab.extensionHost else { return }
         let actions = host.actions(for: tab)
         let installs = tab.profile.installs
         let offHere = !isBlank && ExtensionStore.extensionsOffSites.contains(site)
@@ -694,14 +747,15 @@ final class SitePanel: FloatingPanelView {
         // Once a consent pop-up was found on the page, or a choice was made for the site (#175).
         context.cookieBanners = CookieBanners.applies(to: url)
             && (CookieBanners.outcome(in: tab.webView, site: site) != nil || CookieBanners.choice(for: url) != nil)
-        if #available(macOS 15.4, *) { context.extensionHost = tab.extensionHost != nil && !isBlank }
+        if #available(macOS 15.4, *) { context.extensionHost = controller != nil && tab.extensionHost != nil && !isBlank }
         context.hasExtensions = !(extensionsSection?.items.isEmpty ?? true)
         context.hasPermissions = origin.map { !SitePermissions.shown(origin: $0, isPrivate: isPrivate || tab.isPrivate).isEmpty } ?? false
         context.siteChoices = KeepAwake.isOffered(for: url, isPrivate: isPrivate)
         // Offered on a page with a video, or once chosen; the setting is in Settings › Tabs.
         context.fullScreen = PageFullScreen.isOffered(for: url, isPrivate: isPrivate)
             && (PageFullScreen.choice(for: url) != nil || tab.webView.map({ PageVideos.shared.frames(in: $0).contains { !$0.videos.isEmpty } }) == true)
-        context.foreignLanguage = tab.foreignLanguage != nil
+        // Translating is a browser window's (`translatePage`).
+        context.foreignLanguage = controller != nil && tab.foreignLanguage != nil
         context.coveredPage = controller?.isShowingReader == true || tab.pdfViewer != nil || tab.webView == nil
         return context
     }
@@ -864,7 +918,7 @@ final class SitePanel: FloatingPanelView {
     private func clear(_ kind: WebsiteData.Kind) {
         let tab = tab
         close()
-        controller?.confirmClear(kind, of: tab)
+        if let controller { controller.confirmClear(kind, of: tab) } else { mini?.confirmClear(kind, of: tab) }
     }
 
     // MARK: Layout

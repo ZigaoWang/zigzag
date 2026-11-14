@@ -86,10 +86,28 @@ struct MiniWindowTests {
             strip.frame = NSRect(x: 0, y: 0, width: width, height: Tokens.Metric.miniStripHeight)
             strip.layout()
             let row = [strip.backButton, strip.forwardButton, strip.reloadButton, strip.spaceChip, strip.title,
-                       strip.pinButton, strip.copyButton, strip.openButton].map(\.frame).filter { $0.width > 0 }
+                       strip.siteButton, strip.pinButton, strip.copyButton, strip.openButton].map(\.frame).filter { $0.width > 0 }
             for (a, b) in zip(row, row.dropFirst()) { #expect(a.maxX <= b.minX + 0.5, "at \(width)") }
             #expect(strip.reloadButton.frame.minX > strip.trafficLightsWidth)
             #expect(strip.openButton.frame.maxX <= width)
+        }
+    }
+
+    /// Site Controls (#225) ends the strip's room as it ends the address in a browser window: right before Keep on
+    /// Top, with the address field and the site's name kept clear of it, and Open in still as far in from the right
+    /// edge as the traffic lights are from the left.
+    @Test func siteControlsComeBeforeKeepOnTop() {
+        let strip = MiniStripView()
+        strip.trafficLightsWidth = 52
+        strip.openButton.show("Open in Personal", keys: "⌘O")
+        for width in [Tokens.Metric.miniWindowMinSize.width, 640, 900, 1400] {
+            strip.frame = NSRect(x: 0, y: 0, width: width, height: Tokens.Metric.miniStripHeight)
+            strip.layout()
+            #expect(strip.siteButton.frame.width > 0, "at \(width)")
+            #expect(strip.siteButton.frame.maxX == strip.pinButton.frame.minX, "at \(width)")
+            #expect(strip.anchor.frame.maxX <= strip.siteButton.frame.minX - Tokens.Space.x2, "at \(width)")
+            #expect(strip.title.frame.width == 0 || strip.title.frame.maxX <= strip.siteButton.frame.minX + 0.5, "at \(width)")
+            #expect(strip.openButton.frame.maxX == width - Tokens.Sidebar.lightsX, "at \(width)")
         }
     }
 }

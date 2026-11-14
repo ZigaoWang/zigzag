@@ -13,6 +13,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Site Controls says whether the connection is secure in a small line under the site's name instead of a row of its own: Secure connection, quiet, or Not secure or Partly secure in orange. Clicking it still shows the certificate. ([#221](https://github.com/ZigaoWang/zigzag/issues/221))
 
 ### Fixed
+- Zigzag Mini has Site Controls, the same button as by a browser window's address, at the right of its strip before Keep on Top, so you can turn Dark page on or off for a site, set its zoom, ad blocking or permissions, and clear its data, without opening the page in a browser window first. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#225](https://github.com/ZigaoWang/zigzag/issues/225))
 - Site Controls' Certificate page scrolls when its details are taller than the window has room for, its back button and title staying at the top; choosing another certificate in the chain no longer leaves its details cut off at the panel's edge. ([#220](https://github.com/ZigaoWang/zigzag/issues/220))
 
 ## [0.9.0] - 2026-11-12

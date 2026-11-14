@@ -156,6 +156,11 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             return true
         }
         strip.copyButton.onClick = { [weak self] _ in self?.copyPageURL(nil) }
+        strip.siteButton.onClick = { [weak self] _ in self?.showSiteControls() }
+        strip.siteButton.onRightClick = { [weak self] _ in
+            self?.showSiteControls()
+            return nil
+        }
         strip.pinButton.onClick = { [weak self] _ in
             guard let window = self?.window else { return }
             KeepOnTop.toggle(window)
@@ -361,6 +366,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         strip.openButton.show(openTitle, keys: Shortcuts.keys(for: #selector(openDocument(_:))))
         strip.openButton.isEnabled = tab.url != nil
         strip.copyButton.isEnabled = tab.url != nil
+        strip.siteButton.isEnabled = tab.url != nil
         strip.showNavigation(canGoBack: tab.canGoBack, canGoForward: tab.canGoForward, isLoading: tab.isLoading)
         KeepOnTop.refresh(strip.pinButton, for: window)
         strip.needsLayout = true
@@ -541,6 +547,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// The page is leaving for a browser window: this window lets go of it, and closing leaves it open.
     private func letGo() {
+        if SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
         movedOut = true
         pageGone.send()
         tokens.removeAll()
@@ -570,6 +577,20 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(url.absoluteString, forType: .string)
         Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", over: overlay, area: overlay.bounds)
+    }
+
+    /// The strip's Site Controls: the browser window's site panel for this page, Dark page and all (#225).
+    func showSiteControls() {
+        guard !isLeaving, !movedOut else { return }
+        SitePanel.toggle(in: self, from: strip.siteButton)
+    }
+
+    /// The site panel's Clear Cookies and Clear Cache, asking first over the page as a browser window does.
+    func confirmClear(_ kind: WebsiteData.Kind, of tab: Tab) {
+        BrowserWindowController.confirmClear(kind, of: tab, over: overlay) { [weak self] text in
+            guard let self else { return }
+            Toast.show(text, symbol: "checkmark.circle", over: self.overlay, area: self.overlay.bounds)
+        }
     }
 
     // MARK: Menu commands while it's in front
@@ -629,6 +650,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         returnTo = nil
         isClosing = true
+        if SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
         pageGone.send()
         linkStatus.hide()
         Autofill.shared.forget(windowOf: window)
@@ -844,7 +866,7 @@ final class MiniRootView: SpaceFrameView {
 // MARK: - The top strip
 
 /// The strip on top, as slim as a split view pane's: the traffic lights, back, forward and reload after them as in an
-/// installed app's strip, the space the page goes to, the page's site in the middle, and Keep on Top, Copy Link and
+/// installed app's strip, the space the page goes to, the page's site in the middle, and Site Controls, Keep on Top, Copy Link and
 /// Open in at the right end, lined up with the page's edge. Dragging it moves the window.
 final class MiniStripView: NSView {
     /// Back, forward and reload: the browser window's own three, with its tooltips, at a pane strip's size.
@@ -857,6 +879,8 @@ final class MiniStripView: NSView {
                                                                             for: #selector(MiniWindowController.copyPageURL(_:))))
     /// Window › Keep on Top for this window: a pin, filled while it's on.
     let pinButton = MiniStripView.button("pin", toolTip: KeepOnTop.title)
+    /// Site Controls, as by a browser window's address: the site panel for this page (#225).
+    let siteButton = MiniStripView.button("slider.horizontal.3", toolTip: String(localized: "Site Controls", comment: "Name of the button by the address that opens the site panel: its tooltip and VoiceOver name."))
 
     static func button(_ symbol: String, toolTip: String) -> IconButton {
         let button = IconButton(symbol: symbol, size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph, toolTip: toolTip)
@@ -873,7 +897,7 @@ final class MiniStripView: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         anchor.isHidden = true
-        [anchor, backButton, forwardButton, reloadButton, spaceChip, title, pinButton, copyButton, openButton].forEach(addSubview)
+        [anchor, backButton, forwardButton, reloadButton, spaceChip, title, siteButton, pinButton, copyButton, openButton].forEach(addSubview)
         setAccessibilityElement(false)
     }
 
@@ -896,7 +920,7 @@ final class MiniStripView: NSView {
     #if DEBUG
     var debugFrames: [String: [CGFloat]] {
         let views: [(String, NSView)] = [("back", backButton), ("forward", forwardButton), ("reload", reloadButton), ("space", spaceChip),
-                                         ("title", title), ("pin", pinButton), ("copy", copyButton), ("open", openButton)]
+                                         ("title", title), ("site", siteButton), ("pin", pinButton), ("copy", copyButton), ("open", openButton)]
         return Dictionary(uniqueKeysWithValues: views.map { ($0.0, [$0.1.frame.minX, $0.1.frame.width]) })
     }
     #endif
@@ -918,25 +942,28 @@ final class MiniStripView: NSView {
         let right = bounds.width - Tokens.Sidebar.lightsX
         // Narrow, the shortcut goes first, then the space's name shortens.
         openButton.showsKeys = true
-        if right - left < spaceChip.fittingWidth + b * 2 + openButton.fittingWidth + Tokens.Space.x4 { openButton.showsKeys = false }
-        let openWidth = min(openButton.fittingWidth, max(0, right - left - b * 2))
+        if right - left < spaceChip.fittingWidth + b * 3 + openButton.fittingWidth + Tokens.Space.x4 { openButton.showsKeys = false }
+        let openWidth = min(openButton.fittingWidth, max(0, right - left - b * 3))
         openButton.frame = NSRect(x: right - openWidth, y: y, width: openWidth, height: h)
         copyButton.frame = NSRect(x: openButton.frame.minX - Tokens.Space.x1 - b, y: round(mid - b / 2), width: b, height: b)
         pinButton.frame = NSRect(x: copyButton.frame.minX - b, y: round(mid - b / 2), width: b, height: b)
+        // Site Controls first of the strip's end, as it ends the address in a browser window.
+        siteButton.frame = NSRect(x: pinButton.frame.minX - b, y: round(mid - b / 2), width: b, height: b)
+        let buttons = siteButton.frame.minX
         // At the narrowest the space's name gives way before anything overlaps; Open in still names the space.
-        var chipWidth = max(0, min(spaceChip.fittingWidth, pinButton.frame.minX - Tokens.Space.x2 - left))
+        var chipWidth = max(0, min(spaceChip.fittingWidth, buttons - Tokens.Space.x2 - left))
         if chipWidth < Tokens.Space.x8 { chipWidth = 0 }
         spaceChip.frame = NSRect(x: left, y: y, width: chipWidth, height: h)
         // The site stays in the middle of the window, as wide on both sides as the room beside it allows; with too
         // little room it steps aside.
-        let half = max(0, min(bounds.midX - spaceChip.frame.maxX, pinButton.frame.minX - bounds.midX) - Tokens.Space.x2)
+        let half = max(0, min(bounds.midX - spaceChip.frame.maxX, buttons - bounds.midX) - Tokens.Space.x2)
         var width = min(title.fittingWidth, half * 2)
         if width < Tokens.Space.x10 { width = 0 }
         title.frame = NSRect(x: round(bounds.midX - width / 2), y: y, width: width, height: h)
-        // Editing the address opens in the room between the space and Keep on Top, centered on the window where it can
-        // be, so it never covers half the space's name or crowds the buttons.
+        // Editing the address opens in the room between the space and Site Controls, centered on the window where it
+        // can be, so it never covers half the space's name or crowds the buttons.
         let fieldLeft = (spaceChip.frame.width > 0 ? spaceChip.frame.maxX : left) + Tokens.Space.x2
-        let fieldRight = pinButton.frame.minX - Tokens.Space.x2
+        let fieldRight = buttons - Tokens.Space.x2
         let room = max(0, fieldRight - fieldLeft)
         let field = min(Tokens.Metric.miniAddressWidth, room)
         let fieldX = min(max(fieldLeft, round(bounds.midX - field / 2)), fieldRight - field)
