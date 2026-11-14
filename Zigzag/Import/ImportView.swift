@@ -603,10 +603,13 @@ final class ImportView: NSView {
         if showsChoices {
             y += Tokens.Space.x4
             place(choiceLabel, height: choiceLabel.lineHeight, gap: Tokens.Space.x2)
-            var cx = x
+            // The pills reach out by their padding, so each line's first check starts where the words above do, as
+            // Choose File… below does.
+            let start = x + Label.inset - Tokens.Space.x2
+            var cx = start
             for (_, box) in choiceButtons where !box.isHidden {
                 let w = box.fittingWidth
-                if cx + w > x + width { cx = x; y += Tokens.Space.x8 + Tokens.Space.x2 }
+                if cx + w > x + width { cx = start; y += Tokens.Space.x8 + Tokens.Space.x2 }
                 box.frame = NSRect(x: cx, y: y, width: w, height: Tokens.Space.x8)
                 cx += w + Tokens.Space.x2
             }
