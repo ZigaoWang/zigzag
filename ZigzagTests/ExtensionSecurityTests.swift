@@ -510,6 +510,10 @@ extension ExtensionSecurityTests {
     /// before takes nothing more from its files on disk.
     @Test func blockingIsRecordedAndFoldersMigrateFromTheRecord() {
         #expect(ExtensionHost.askedPermissions(requested: ["webRequest"], declared: ["webRequest", "webRequestBlocking"]).contains("webRequestBlocking"))
+        // An extension approved before webRequestBlocking was recorded (Tampermonkey) takes it quietly, never asked again.
+        #expect(ExtensionHost.carryingBlocking(["storage", "webRequest"], declared: ["webRequest", "webRequestBlocking"]) == ["storage", "webRequest", "webRequestBlocking"])
+        #expect(ExtensionHost.carryingBlocking(["storage"], declared: ["webRequest", "webRequestBlocking"]) == nil)
+        #expect(ExtensionHost.carryingBlocking(["webRequest", "webRequestBlocking"], declared: ["webRequest", "webRequestBlocking"]) == nil)
         #expect(ExtensionHost.migratedGrants(["storage", "nativeMessaging"], declared: []) == ["storage"])
     }
 }

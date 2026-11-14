@@ -427,6 +427,14 @@ final class ExtensionHost: NSObject {
             profile.installs.save(known, for: id)
             state = known
         }
+        // webRequestBlocking was granted from the manifest before it was recorded, along with webRequest: a record that
+        // has webRequest takes it quietly, once, rather than asking again for access the extension always had.
+        if var known = state, let granted = known.grantedPermissions,
+           let carried = Self.carryingBlocking(granted, declared: declared) {
+            known.grantedPermissions = carried
+            profile.installs.save(known, for: id)
+            state = known
+        }
         let asked = Self.askedPermissions(requested: Set(ext.requestedPermissions.map(\.rawValue)), declared: declared)
         let permissions = Set(state?.grantedPermissions ?? Array(asked)).map(WKWebExtension.Permission.init(rawValue:))
         let patterns = state?.grantedMatchPatterns.map { Set($0.compactMap { try? WKWebExtension.MatchPattern(string: $0) }) } ?? ext.allRequestedMatchPatterns
@@ -442,6 +450,13 @@ final class ExtensionHost: NSObject {
         applySiteAccess(to: context)
         let wanted = asked.subtracting(profile.installs.state(id)?.grantedPermissions ?? [])
         if !wanted.isEmpty { askForNewAccess(wanted, for: context) }
+    }
+
+    /// A record that has webRequest and a manifest with webRequestBlocking: the record with it added, as it was always
+    /// granted alongside before it was recorded; nil when nothing changes.
+    static func carryingBlocking(_ granted: [String], declared: Set<String>) -> [String]? {
+        guard declared.contains("webRequestBlocking"), granted.contains("webRequest"), !granted.contains("webRequestBlocking") else { return nil }
+        return (granted + ["webRequestBlocking"]).sorted()
     }
 
     /// The permissions Zigzag grants every extension for its own needs (its bridge's native messaging; scripting for
