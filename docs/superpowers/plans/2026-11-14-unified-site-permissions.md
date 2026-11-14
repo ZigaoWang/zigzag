@@ -200,7 +200,8 @@ git commit -m "feat: store site permissions as actions, not yes or no"
 **Interfaces:**
 - Consumes: `PermissionAction`, `PermissionAnswer`, `SitePermissions.action(_:origin:)`.
 - Produces:
-  - `PermissionPrompt.ask(host:origin:what:symbol:icon:in:tab:title:actions:canRemember:answered:) async -> PermissionAnswer?`
+  - `PermissionPrompt.ask(host:origin:what:symbol:icon:in:tab:title:actions:canRemember:rememberNote:answered:) async -> PermissionAnswer?`
+  - `PermissionPrompt.buttonTitles(actions:)` not needed; `DropdownButton.isEnabled` added so the duration control can be greyed rather than hidden.
   - `PermissionPrompt.actions(for: [PermissionAction]) -> [PermissionAction]` (deny first, prominent last)
   - `nil` means Not Now; callers never treat it as an answer.
 
@@ -231,7 +232,7 @@ CI compile failure: `PermissionPrompt.actions` and the new `ask` signature do no
 
 Replace `Answer` with `PermissionAnswer?`; delete `allowTitle`/`alwaysTitle`/`alternateTitle`/`denyTitle` in favour of
 `actions`. Draw a `DropdownButton` above the buttons with options **This time** / **Always on this site**, defaulting to
-This time, hidden when `canRemember` is false. Buttons are the ordered actions, equal width; a question with more than
+This time, greyed out with a tooltip explaining why when `canRemember` is false. Buttons are the ordered actions, equal width; a question with more than
 three actions places its row under the request, one line each at the left, never below `Tokens.Dialog.minButtonWidth`.
 Width: `min(max(420, measured), min(560, area.width - Tokens.Space.x6))`. Keep the existing fade, `shownAt` guard,
 click monitor, `followTab`, debug hooks and `.notNow` behaviour.
