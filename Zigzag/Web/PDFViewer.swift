@@ -542,15 +542,27 @@ final class PDFViewerView: NSView {
     }
 }
 
-/// One download, given up as soon as it says or shows it's past `limit` bytes: nothing more of it is held.
-nonisolated private final class CappedDownload: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+/// One download, given up as soon as it says or shows it's past `limit` bytes: nothing more of it is held. With
+/// `mayFollow`, a redirect is followed only where it says (a site icon's, FaviconStore).
+nonisolated final class CappedDownload: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private let limit: Int
+    private let mayFollow: (@Sendable (URL) async -> Bool)?
     private let lock = NSLock()
     private var body = Data()
     private var tooBig = false
     private var done: CheckedContinuation<Data?, Never>?
 
-    init(limit: Int) { self.limit = limit }
+    init(limit: Int, mayFollow: (@Sendable (URL) async -> Bool)? = nil) {
+        self.limit = limit
+        self.mayFollow = mayFollow
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+        guard let mayFollow else { completionHandler(request); return }
+        guard let url = request.url else { completionHandler(nil); return }
+        Task { completionHandler(await mayFollow(url) ? request : nil) }
+    }
 
     func fetch(_ request: URLRequest, configuration: URLSessionConfiguration) async -> Data? {
         let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
@@ -566,7 +578,8 @@ nonisolated private final class CappedDownload: NSObject, URLSessionDataDelegate
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
                     completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void) {
-        let failed = ((response as? HTTPURLResponse)?.statusCode ?? 200) >= 400
+        // An error, or a redirect not followed: not the file.
+        let failed = ((response as? HTTPURLResponse)?.statusCode ?? 200) >= 300
         let said = response.expectedContentLength
         if said > limit { lock.withLock { tooBig = true } }
         completionHandler(failed || said > limit ? .cancel : .allow)

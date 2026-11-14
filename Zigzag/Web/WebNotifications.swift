@@ -406,6 +406,14 @@ nonisolated enum IconAddress {
         return !addresses.isEmpty && addresses.allSatisfy(isPublic)
     }
 
+    /// Whether a page is itself on this Mac or its network, by its name or address alone (never by what the name
+    /// resolves to, which its site picks): localhost, a .local name, 192.168.1.1. Its own icons may be there too.
+    static func isLocal(_ url: URL) -> Bool {
+        guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let host = url.host(percentEncoded: false), !host.isEmpty else { return false }
+        if !isPublicName(host) { return true }
+        return bytes(of: host).map { !isPublic($0) } ?? false
+    }
+
     /// Names that are this Mac or its own network, whatever they resolve to, are not.
     static func isPublicName(_ host: String) -> Bool {
         var name = host.lowercased()

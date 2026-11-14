@@ -20,12 +20,34 @@ final class FaviconStore {
 
     /// Icons are fetched without cookies: one jar for every fetch, whichever profile the page was in, would let a site
     /// tell one profile's visit from another's as the same person's.
-    static func makeSession() -> URLSession {
+    static func makeSession() -> URLSession { URLSession(configuration: makeConfiguration()) }
+
+    static func makeConfiguration() -> URLSessionConfiguration {
         let config = URLSessionConfiguration.default
         config.dropsCookies()
         config.timeoutIntervalForRequest = 10
         config.httpAdditionalHeaders = ["User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) \(WebKitSetup.applicationNameForUserAgent)"]
-        return URLSession(configuration: config)
+        return config
+    }
+
+    /// The most an icon may be: one past it is given up as it arrives, so a link to an endless stream costs nothing.
+    nonisolated static let maxIconBytes = 2_000_000
+
+    /// Whether Zigzag may fetch `icon` for `page`. A page picks its icon links, and the fetch is Zigzag's own, so it
+    /// could reach what the page's own requests can't: http and https only (never file:, which reads this Mac's
+    /// files), and on a public address (`IconAddress`), unless the page is itself on this Mac or its network.
+    nonisolated static func mayFetch(_ icon: URL, for page: URL) async -> Bool {
+        guard ["http", "https"].contains(icon.scheme?.lowercased() ?? "") else { return false }
+        if IconAddress.isLocal(page) { return true }
+        return await IconAddress.mayFetch(icon)
+    }
+
+    /// An icon's bytes, checked by `mayFetch` here and at every redirect, and at most `maxIconBytes` of them.
+    nonisolated static func download(_ icon: URL, for page: URL, configuration: URLSessionConfiguration,
+                                     limit: Int = maxIconBytes) async -> Data? {
+        guard await mayFetch(icon, for: page) else { return nil }
+        return await CappedDownload(limit: limit, mayFollow: { await mayFetch($0, for: page) })
+            .fetch(URLRequest(url: icon), configuration: configuration)
     }
 
     /// Fires with the host whose icon changed.
@@ -103,7 +125,7 @@ final class FaviconStore {
         guard let key = key(for: pageURL) else { completion(nil); return }
         let (icons, touch) = Self.rank(links: links, pageURL: pageURL)
         let hasIcon = memory[key] != nil || FileManager.default.fileExists(atPath: file(for: key).path)
-        fetchFirst(icons, touch: touch, key: key, save: Self.speaksForSite(pageURL, hasIcon: hasIcon), completion: completion)
+        fetchFirst(icons, touch: touch, page: pageURL, key: key, save: Self.speaksForSite(pageURL, hasIcon: hasIcon), completion: completion)
     }
 
     /// Whether a page's icon becomes its whole site's. A page deep in a site can wear its own (each claude.ai artifact
@@ -156,7 +178,7 @@ final class FaviconStore {
         var pages = [url]
         if let home = URL(string: "/", relativeTo: url)?.absoluteURL, home.path() != url.path() { pages.append(home) }
         let (icons, touch) = Self.rank(links: [], pageURL: url)
-        fetchFirst(icons, touch: touch, key: key) { [weak self] image in
+        fetchFirst(icons, touch: touch, page: url, key: key) { [weak self] image in
             guard image == nil else { done(true); return }
             // Nothing at the usual addresses (Brave Search keeps its icons on a CDN): the icons the pages list.
             self?.fetchListed(on: pages, key: key, done: done)
@@ -171,7 +193,7 @@ final class FaviconStore {
             guard let self else { return }
             guard !links.isEmpty else { self.fetchListed(on: rest, key: key, done: done); return }
             let (icons, touch) = Self.rank(links: links, pageURL: page)
-            self.fetchFirst(icons, touch: touch, key: key) { [weak self] image in
+            self.fetchFirst(icons, touch: touch, page: page, key: key) { [weak self] image in
                 if image == nil { self?.fetchListed(on: rest, key: key, done: done) } else { done(true) }
             }
         }
@@ -237,7 +259,9 @@ final class FaviconStore {
         // An SVG first, then the smallest of 64px or more, then of 32px or more, then the rest, largest first.
         var icons: [(URL, Int)] = [], touch: [(URL, Int)] = []
         for link in links {
-            guard let href = link["href"], let url = URL(string: href) else { continue }
+            // An icon on the web or in the page itself; never file: or any other scheme a link can name.
+            guard let href = link["href"], let url = URL(string: href),
+                  ["http", "https", "data"].contains(url.scheme?.lowercased() ?? "") else { continue }
             let isSVG = (link["type"] ?? "").contains("svg") || url.pathExtension.lowercased() == "svg"
             if (link["rel"] ?? "").contains("apple-touch") {
                 // A home-screen icon that doesn't say is the usual 180px.
@@ -251,6 +275,10 @@ final class FaviconStore {
         components.scheme = pageURL.scheme ?? "https"
         components.host = pageURL.host()
         components.port = pageURL.port
+        // The site's usual addresses are only looked at for a site on the web.
+        guard ["http", "https"].contains(components.scheme?.lowercased() ?? "") else {
+            return (icons.sorted { $0.1 > $1.1 }.map(\.0), touch.sorted { $0.1 > $1.1 }.map(\.0))
+        }
         if icons.isEmpty {
             components.path = "/favicon.ico"
             if let fallback = components.url { icons.append((fallback, 0)) }
@@ -266,19 +294,19 @@ final class FaviconStore {
     /// A 16px icon (too small to stay sharp anywhere bigger than a tab) is kept only until a larger one of the site's
     /// own turns up further down the list. The home-screen icons in `touch` are tried only when the site has none
     /// of its own at all: a small icon of its own still wins over a home-screen tile.
-    private func fetchFirst(_ candidates: [URL], touch: [URL] = [], key: String, save: Bool = true, small: NSImage? = nil, completion: @escaping (NSImage?) -> Void) {
+    private func fetchFirst(_ candidates: [URL], touch: [URL] = [], page: URL, key: String, save: Bool = true, small: NSImage? = nil, completion: @escaping (NSImage?) -> Void) {
         func finish(_ image: NSImage, normalized: NSImage? = nil) {
             if save { store(image, key: key, normalized: normalized); completion(memory[key]) } else { completion(normalized ?? Self.normalize(image)) }
         }
         func found(_ image: NSImage, rest: [URL], read: Decoded? = nil) {
             // An icon that draws nothing (an SVG styled by the page, which AppKit can't follow) is passed over.
             if read?.blank ?? Self.isBlank(image) {
-                fetchFirst(rest, touch: touch, key: key, save: save, small: small, completion: completion)
+                fetchFirst(rest, touch: touch, page: page, key: key, save: save, small: small, completion: completion)
                 return
             }
             let pixels = image.representations.map(\.pixelsWide).max() ?? 0
             if pixels > 0, pixels < 32, !rest.isEmpty {
-                fetchFirst(rest, touch: touch, key: key, save: save, small: small ?? image, completion: completion)
+                fetchFirst(rest, touch: touch, page: page, key: key, save: save, small: small ?? image, completion: completion)
             } else if pixels > 0, pixels < 32, let small, (small.representations.map(\.pixelsWide).max() ?? 0) >= pixels {
                 finish(small)
             } else {
@@ -289,7 +317,7 @@ final class FaviconStore {
             if let small {
                 finish(small)
             } else if !touch.isEmpty {
-                fetchFirst(touch, key: key, save: save, completion: completion)
+                fetchFirst(touch, page: page, key: key, save: save, completion: completion)
             } else {
                 completion(nil)
             }
@@ -297,15 +325,14 @@ final class FaviconStore {
         }
         let rest = Array(candidates.dropFirst())
         let side = Tokens.Metric.favicon
+        let configuration = session.configuration
         Task {
             let data: Data?
-            if next.scheme == "data" {
+            if next.scheme?.lowercased() == "data" {
                 // The page's own bytes, read like any icon.
-                data = SafePictures.bytes(ofDataURL: next.absoluteString)
+                data = SafePictures.bytes(ofDataURL: next.absoluteString, limit: Self.maxIconBytes)
             } else {
-                let result = try? await session.data(from: next)
-                let ok = ((result?.1 as? HTTPURLResponse)?.statusCode ?? 200) < 400
-                data = ok ? result?.0 : nil
+                data = await Self.download(next, for: page, configuration: configuration)
             }
             // Read by the picture helper, then drawn to its square and looked at off the main thread: many tabs
             // loading at once each fetch one.
@@ -314,7 +341,7 @@ final class FaviconStore {
                 found(read.image, rest: rest, read: read)
             } else {
                 if unavailable { unread.insert(key) }
-                fetchFirst(rest, touch: touch, key: key, save: save, small: small, completion: completion)
+                fetchFirst(rest, touch: touch, page: page, key: key, save: save, small: small, completion: completion)
             }
         }
     }

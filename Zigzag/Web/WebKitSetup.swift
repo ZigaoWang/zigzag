@@ -174,7 +174,9 @@ enum PageScripts {
     static let iconLinks = """
     (() => {
       const links = Array.from(document.querySelectorAll('link[rel~="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]'));
-      return links.map(l => ({ href: l.href, sizes: l.getAttribute('sizes') || '', rel: l.rel, type: l.type || '' }));
+      // On the web or in the page itself only (FaviconStore checks again): never file: or another scheme.
+      return links.filter(l => /^(https?|data):/i.test(l.href))
+        .map(l => ({ href: l.href, sizes: l.getAttribute('sizes') || '', rel: l.rel, type: l.type || '' }));
     })();
     """
 }

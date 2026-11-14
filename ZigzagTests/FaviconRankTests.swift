@@ -100,3 +100,100 @@ struct FaviconSessionTests {
         #expect(URLSessionConfiguration.ephemeral.httpCookieStorage != nil)
     }
 }
+
+/// A page picks its icon links, and Zigzag fetches them itself: only from the web or the page, never this Mac's files,
+/// never this Mac or its network for a page on the web, and never more than an icon's worth of bytes.
+@Suite(.serialized)
+@MainActor
+struct FaviconSourceTests {
+    nonisolated final class Server: URLProtocol, @unchecked Sendable {
+        /// Address to (status, Location or nil, body size).
+        nonisolated(unsafe) static var answers: [String: (Int, String?, Int)] = [:]
+        nonisolated(unsafe) static var asked: [URL] = []
+
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override func startLoading() {
+            let url = request.url!
+            Self.asked.append(url)
+            let (status, location, size) = Self.answers[url.absoluteString] ?? (404, nil, 0)
+            let headers = location.map { ["Location": $0] } ?? [:]
+            let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)!
+            if let location, let next = URL(string: location) {
+                client?.urlProtocol(self, wasRedirectedTo: URLRequest(url: next), redirectResponse: response)
+                return
+            }
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            // In pieces, as a stream would come.
+            var sent = 0
+            while sent < size {
+                let piece = min(256_000, size - sent)
+                client?.urlProtocol(self, didLoad: Data(repeating: 0x41, count: piece))
+                sent += piece
+            }
+            client?.urlProtocolDidFinishLoading(self)
+        }
+        override func stopLoading() {}
+    }
+
+    private let page = URL(string: "https://example.com/")!
+
+    private func configuration() -> URLSessionConfiguration {
+        let configuration = FaviconStore.makeConfiguration()
+        configuration.protocolClasses = [Server.self]
+        return configuration
+    }
+
+    @Test func onlyWebAndPageIconsAreRanked() {
+        let ranked = FaviconStore.rank(links: [
+            ["rel": "icon", "href": "file:///etc/hosts", "sizes": "64x64"],
+            ["rel": "icon", "href": "file:///dev/zero"],
+            ["rel": "icon", "href": "ftp://example.com/i.png"],
+            ["rel": "icon", "href": "data:image/png;base64,AAAA"],
+            ["rel": "icon", "href": "https://example.com/i.png"],
+        ], pageURL: page)
+        #expect(Set(ranked.icons.compactMap(\.scheme)) == ["data", "https"])
+        #expect(ranked.icons.count == 2)
+        // A page that isn't on the web has no usual addresses to look at.
+        let file = FaviconStore.rank(links: [], pageURL: URL(string: "file://host/a.html")!)
+        #expect(file.icons.isEmpty && file.touch.isEmpty)
+    }
+
+    @Test func fileAndOtherSchemesAreNeverFetched() async {
+        #expect(await !FaviconStore.mayFetch(URL(string: "file:///etc/hosts")!, for: page))
+        #expect(await !FaviconStore.mayFetch(URL(string: "file:///dev/zero")!, for: URL(string: "http://localhost:3000/")!))
+        #expect(await FaviconStore.download(URL(string: "file:///etc/hosts")!, for: page, configuration: configuration()) == nil)
+    }
+
+    @Test func aPageOnTheWebGetsNoIconFromThisMacOrItsNetwork() async {
+        for address in ["http://127.0.0.1/i.png", "http://localhost/i.png", "http://192.168.1.1/favicon.ico", "http://[::1]/i.png", "http://printer.local/i.png"] {
+            #expect(await !FaviconStore.mayFetch(URL(string: address)!, for: page), "\(address)")
+        }
+        #expect(await FaviconStore.mayFetch(URL(string: "https://93.184.216.34/i.png")!, for: page))
+        // A page that is itself there may have its icon there too.
+        #expect(await FaviconStore.mayFetch(URL(string: "http://localhost:3000/favicon.ico")!, for: URL(string: "http://localhost:3000/")!))
+        #expect(await FaviconStore.mayFetch(URL(string: "http://192.168.1.1/favicon.ico")!, for: URL(string: "http://192.168.1.1/")!))
+    }
+
+    @Test func aRedirectIsCheckedAsTheIconItself() async {
+        Server.asked = []
+        Server.answers = [
+            "https://93.184.216.34/to-lan.png": (302, "http://192.168.1.1/secret", 0),
+            "http://192.168.1.1/secret": (200, nil, 100),
+            "https://93.184.216.34/moved.png": (301, "https://93.184.216.35/i.png", 0),
+            "https://93.184.216.35/i.png": (200, nil, 100),
+        ]
+        #expect(await FaviconStore.download(URL(string: "https://93.184.216.34/to-lan.png")!, for: page, configuration: configuration()) == nil)
+        #expect(!Server.asked.contains { $0.host() == "192.168.1.1" })
+        #expect(await FaviconStore.download(URL(string: "https://93.184.216.34/moved.png")!, for: page, configuration: configuration())?.count == 100)
+    }
+
+    @Test func anIconPastTheLimitIsGivenUp() async {
+        Server.answers = [
+            "https://93.184.216.34/huge.ico": (200, nil, FaviconStore.maxIconBytes + 1_000),
+            "https://93.184.216.34/fine.ico": (200, nil, 4_000),
+        ]
+        #expect(await FaviconStore.download(URL(string: "https://93.184.216.34/huge.ico")!, for: page, configuration: configuration()) == nil)
+        #expect(await FaviconStore.download(URL(string: "https://93.184.216.34/fine.ico")!, for: page, configuration: configuration())?.count == 4_000)
+    }
+}
