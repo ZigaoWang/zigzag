@@ -1300,6 +1300,15 @@ final class Tab: NSObject {
     /// The page last committed here: the site the tab's icon belongs to.
     private var committedURL: URL? { didSet { refreshDevelopment() } }
 
+    /// What a tab wears while an error page ("This Connection Isn't Private", "Can't find…") stands in for its page:
+    /// a warning, never the icon of the page that was there before, nor the site's own, as if it had loaded.
+    static let errorPageIcon = Tokens.Symbol.image("exclamationmark.triangle", size: Tokens.Symbol.row)
+
+    /// The icon a page wears straight away: the warning on an error page, else the one kept for its site.
+    static func immediateIcon(for url: URL, errorPage: Bool) -> NSImage? {
+        errorPage ? errorPageIcon : FaviconStore.shared.cachedIcon(for: url)
+    }
+
     /// Whether the icon stays as a new page commits: only on the same site (www. or not). The first page committed
     /// in a tab keeps the icon it was restored with.
     nonisolated static func keepsIcon(from previous: URL?, to committed: URL) -> Bool {
@@ -1315,6 +1324,12 @@ final class Tab: NSObject {
 
     fileprivate func refreshFavicon() {
         guard let webView, let pageURL = webView.url else { return }
+        // An error page has no icon of its own to look for; the warning stays.
+        if showsErrorPage {
+            favicon = Self.immediateIcon(for: pageURL, errorPage: true)
+            changed.send(.favicon)
+            return
+        }
         // Private tabs only use icons already saved from normal browsing; they never fetch or save one.
         if isPrivate || Self.isExtensionPage(pageURL) || HistoryPage.isInternal(pageURL) {
             favicon = FaviconStore.shared.cachedIcon(for: pageURL)
@@ -1326,7 +1341,7 @@ final class Tab: NSObject {
                 let links = ((try? answer.get()) as? [[String: String]]) ?? []
                 if let self, self.favicon != nil, let source = self.iconSource, source.page == pageURL, source.links == links { return }
                 FaviconStore.shared.resolve(pageURL: pageURL, links: links) { image in
-                    guard let self, let image, self.url?.host() == pageURL.host() else { return }
+                    guard let self, let image, self.url?.host() == pageURL.host(), !self.showsErrorPage else { return }
                     self.iconSource = (pageURL, links)
                     self.favicon = image
                     self.changed.send(.favicon)
@@ -1608,7 +1623,8 @@ extension Tab: WKNavigationDelegate {
         if let url = webView.url {
             // A new page from another site never wears the last one's icon, even where the address showed it before
             // it came (Zigzag's own loads): the site's own if it's known, otherwise the globe until the page offers one.
-            if !Self.keepsIcon(from: committedURL, to: url) {
+            // Nor does a page that came after an error page (Try Again) keep its warning.
+            if !Self.keepsIcon(from: committedURL, to: url) || showsErrorPage {
                 favicon = FaviconStore.shared.cachedIcon(for: url)
                 iconSource = nil
                 changed.send(.favicon)
@@ -1626,6 +1642,12 @@ extension Tab: WKNavigationDelegate {
             zoomHost = host
             if isSearchTab, !SearchFolding.isSearchResultsPage(url) { isSearchTab = false }
             errorShownFor = ErrorPage.consume(webView) ? url : nil
+            // An error page in place of the page: the warning, whatever icon was showing.
+            if showsErrorPage {
+                favicon = Self.immediateIcon(for: url, errorPage: true)
+                iconSource = nil
+                changed.send(.favicon)
+            }
             recordHistory(url, title: webView.title)
         }
     }
