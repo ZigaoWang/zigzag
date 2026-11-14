@@ -244,4 +244,235 @@ struct MCPSnapshotTests {
         #expect(try await name("#x") == "Close")
         #expect(try await name("#ok") == "OK")
     }
+
+    // MARK: Refs
+
+    private func ref(_ selector: String, in webView: WKWebView) async throws -> String {
+        try #require(field(selector, in: try await fields(webView))?["ref"] as? String)
+    }
+
+    private func number(_ ref: String) -> Int { Int(ref.dropFirst()) ?? 0 }
+
+    /// An element keeps its ref while it stays as it was; a new one gets a higher number; one that changed or went
+    /// is refused, never mistaken for another; and a new page never hands out a number used before.
+    @Test func refsStandForOneElementAsItWas() async throws {
+        let (webView, loading) = await page("""
+        <title>Shop</title>
+        <input id="q" aria-label="Search">
+        <button id="buy" onclick="document.title = 'bought'">Buy</button>
+        <button id="gone">Gone soon</button>
+        """)
+        _ = loading
+        let q = try await ref("#q", in: webView)
+        #expect(try await ref("#q", in: webView) == q)
+        let buy = try #require((try await MCPPageScript.run("click", ["selector": "#buy"], in: webView).get()["clicked"] as? [String: Any])?["ref"] as? String)
+        #expect(number(buy) > number(q))
+        _ = try await webView.evaluateJavaScript("document.title = 'Shop'")
+        // The same button, now saying something else: its old ref is refused and nothing is clicked.
+        _ = try await webView.evaluateJavaScript("document.querySelector('#buy').textContent = 'Pay 500 euros'")
+        let changed = await MCPPageScript.run("click", ["ref": buy], in: webView)
+        #expect(changed.failure?.message.contains("changed since your snapshot") == true)
+        #expect(changed.failure?.message.contains("button \"Buy\"") == true)
+        #expect(try await webView.evaluateJavaScript("document.title") as? String == "Shop")
+        let gone = try #require((try await MCPPageScript.run("click", ["selector": "#gone"], in: webView).get()["clicked"] as? [String: Any])?["ref"] as? String)
+        _ = try await webView.evaluateJavaScript("document.querySelector('#gone').remove()")
+        #expect((await MCPPageScript.run("click", ["ref": gone], in: webView)).failure?.message.contains("isn’t on this page now") == true)
+        // A new page: the old refs mean nothing there, and its own are numbers never given before.
+        let highest = number(gone)
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString("<input id='q' aria-label='Search'>", baseURL: URL(string: "https://example.com/"))
+        }
+        #expect((await MCPPageScript.run("type", ["ref": q, "text": "x", "clear": true, "submit": false], in: webView)).failure != nil)
+        #expect(number(try await ref("#q", in: webView)) > highest)
+    }
+
+    /// Two tabs read at the same moment never get the same ref, and a ref from one tab never acts on the other.
+    @Test func refsBelongToTheirTab() async throws {
+        let html = "<input id='q' aria-label='Search'><button id='go' onclick=\"document.title = 'clicked'\">Go</button>"
+        let (one, loadingOne) = await page(html), (two, loadingTwo) = await page(html)
+        _ = (loadingOne, loadingTwo)
+        async let first = MCPPageScript.run("read", ["maxChars": 1000], in: one)
+        async let second = MCPPageScript.run("read", ["maxChars": 1000], in: two)
+        let refsOne = Set(((try await first.get())["fields"] as? [[String: Any]] ?? []).compactMap { $0["ref"] as? String })
+        let refsTwo = Set(((try await second.get())["fields"] as? [[String: Any]] ?? []).compactMap { $0["ref"] as? String })
+        #expect(!refsOne.isEmpty && refsOne.isDisjoint(with: refsTwo), "\(refsOne) \(refsTwo)")
+        let go = try #require((try await MCPPageScript.run("click", ["selector": "#go"], in: one).get()["clicked"] as? [String: Any])?["ref"] as? String)
+        _ = try await one.evaluateJavaScript("document.title = 'one'")
+        let elsewhere = await MCPPageScript.run("click", ["ref": go], in: two)
+        #expect(elsewhere.failure?.message.contains("another tab") == true, "\(String(describing: elsewhere.failure))")
+        #expect(try await two.evaluateJavaScript("document.title") as? String != "clicked")
+    }
+
+    /// A click reaches only what the person could click: not something covered, disabled or behind an open dialog;
+    /// a tall element where it shows; a hidden checkbox through its label.
+    @Test func clicksOnlyWhatThePersonCould() async throws {
+        let (webView, loading) = await page("""
+        <title>Start</title>
+        <button id="under" onclick="document.title = 'under'">Under</button>
+        <div style="position:fixed; left:0; top:0; width:800px; height:200px; background:white">Cookies? <button>OK</button></div>
+        <div style="height:300px"></div>
+        <button id="off" disabled onclick="document.title = 'off'">Off</button>
+        <div id="tall" style="height:2000px" onclick="document.title = 'tall'">Tall</div>
+        <label><input id="remember" type="checkbox" style="opacity:0; position:absolute"> Remember me</label>
+        """)
+        _ = loading
+        _ = try await webView.evaluateJavaScript("scrollTo(0, 0)")
+        let covered = await MCPPageScript.run("click", ["selector": "#under"], in: webView)
+        #expect(covered.failure?.message.contains("Something covers") == true)
+        #expect(try await webView.evaluateJavaScript("document.title") as? String == "Start")
+        #expect((await MCPPageScript.run("click", ["selector": "#off"], in: webView)).failure != nil)
+        _ = try await MCPPageScript.run("click", ["selector": "#tall"], in: webView).get()
+        #expect(try await webView.evaluateJavaScript("document.title") as? String == "tall")
+        _ = try await MCPPageScript.run("click", ["selector": "#remember"], in: webView).get()
+        #expect(try await webView.evaluateJavaScript("document.querySelector('#remember').checked") as? Bool == true)
+    }
+
+    @Test func nothingBehindAnOpenDialog() async throws {
+        let (webView, loading) = await page("""
+        <button id="behind">Behind</button>
+        <dialog id="d"><button id="inside" onclick="document.title = 'inside'">Inside</button></dialog>
+        <script>document.querySelector('#d').showModal()</script>
+        """)
+        _ = loading
+        #expect((await MCPPageScript.run("click", ["selector": "#behind"], in: webView)).failure != nil)
+        _ = try await MCPPageScript.run("click", ["selector": "#inside"], in: webView).get()
+        #expect(try await webView.evaluateJavaScript("document.title") as? String == "inside")
+    }
+
+    /// A link broken over two lines is clicked where it is, not at the middle of the box around both its lines.
+    @Test func aLinkOverTwoLinesClicks() async throws {
+        let (webView, loading) = await page("""
+        <title>Start</title>
+        <style>body { margin: 0 } p { width: 300px; font: 16px/20px Menlo, monospace; margin: 0 }</style>
+        <p><a id="other" href="#" onclick="document.title = 'other'; return false">aaaaaaaaaaaaaaa</a>
+        <a id="wrapped" href="#" onclick="document.title = 'wrapped'; return false">bbbbbbbbbb bbbbbbbbbb</a>
+        <a id="last" href="#" onclick="document.title = 'last'; return false">ccccccccccccccc</a></p>
+        """)
+        _ = loading
+        // As laid out: the wrapped link is on two lines, and the middle of the box around them isn't on it.
+        let boxes = try await webView.evaluateJavaScript("document.querySelector('#wrapped').getClientRects().length") as? Int
+        #expect((boxes ?? 0) >= 2)
+        _ = try await MCPPageScript.run("click", ["selector": "#wrapped"], in: webView).get()
+        #expect(try await webView.evaluateJavaScript("document.title") as? String == "wrapped")
+    }
+
+    /// The keyboard reaches what the person's could: nothing disabled (by itself, its fieldset or the page's word),
+    /// nothing that can't take the focus. What takes it is typed in, seen or not.
+    @Test func keysOnlyWhereThePersonCouldType() async throws {
+        let (webView, loading) = await page("""
+        <fieldset disabled><input id="held" value="as it was"></fieldset>
+        <input id="said" aria-disabled="true" value="as it was">
+        <input id="none" style="display:none" value="as it was">
+        <select id="list" disabled><option>One</option><option>Two</option></select>
+        <div style="position:relative; width:200px; height:30px; background:#ccc"><input id="over" style="position:absolute; inset:0; opacity:0"></div>
+        <input id="tucked" style="position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)">
+        <select id="choice"><option>One</option><option>Two</option></select>
+        """)
+        _ = loading
+        for id in ["held", "said", "none"] {
+            let typed = await MCPPageScript.run("type", ["selector": "#\(id)", "text": "changed", "clear": true, "submit": false], in: webView)
+            #expect(typed.failure != nil, "\(id)")
+            #expect(try await webView.evaluateJavaScript("document.querySelector('#\(id)').value") as? String == "as it was", "\(id)")
+            #expect((await MCPPageScript.run("keyTarget", ["selector": "#\(id)"], in: webView)).failure != nil, "\(id)")
+        }
+        #expect((await MCPPageScript.run("type", ["selector": "#list", "text": "Two", "clear": true, "submit": false], in: webView)).failure != nil)
+        #expect(try await webView.evaluateJavaScript("document.querySelector('#list').value") as? String == "One")
+        for id in ["over", "tucked"] {
+            _ = try await MCPPageScript.run("type", ["selector": "#\(id)", "text": "typed", "clear": true, "submit": false], in: webView).get()
+            #expect(try await webView.evaluateJavaScript("document.querySelector('#\(id)').value") as? String == "typed", "\(id)")
+            _ = try await MCPPageScript.run("keyTarget", ["selector": "#\(id)"], in: webView).get()
+        }
+        _ = try await MCPPageScript.run("type", ["selector": "#choice", "text": "Two", "clear": true, "submit": false], in: webView).get()
+        #expect(try await webView.evaluateJavaScript("document.querySelector('#choice').value") as? String == "Two")
+    }
+
+    /// An element that changed gets a new ref, and its old one is let go on Zigzag's side too.
+    @Test func aChangedElementsOldRefIsLetGo() async throws {
+        let (webView, loading) = await page("<button id='b'>Count 0</button>")
+        _ = loading
+        for count in 1...10 {
+            _ = try await MCPPageScript.run("click", ["selector": "#b"], in: webView).get()
+            _ = try await webView.evaluateJavaScript("document.querySelector('#b').textContent = 'Count \(count)'")
+        }
+        _ = try await MCPPageScript.run("click", ["selector": "#b"], in: webView).get()
+        #expect(MCPRefs.held(by: webView) <= 2, "\(MCPRefs.held(by: webView))")
+    }
+
+    /// A key meant for a paragraph of a rich-text editor goes to the editor, which is what takes the focus. Typing
+    /// takes the editor itself: a paragraph isn't a field, and clearing "it" would empty the whole of the editor.
+    @Test func aParagraphOfAnEditorIsntAField() async throws {
+        let (webView, loading) = await page("<input id='first'><div id='editor' contenteditable><p id='para'>Start</p><p>Second paragraph</p></div>")
+        _ = loading
+        _ = try await webView.evaluateJavaScript("document.querySelector('#first').focus()")
+        let refused = await MCPPageScript.run("type", ["selector": "#para", "text": "Typed words", "clear": true, "submit": false], in: webView)
+        #expect(refused.failure?.message.contains("rich-text field") == true)
+        #expect(try await webView.evaluateJavaScript("document.querySelector('#editor').textContent") as? String == "StartSecond paragraph")
+        #expect(try await webView.evaluateJavaScript("document.activeElement.id") as? String == "first")
+        _ = try await MCPPageScript.run("keyTarget", ["selector": "#para"], in: webView).get()
+        #expect(try await webView.evaluateJavaScript("document.activeElement.id") as? String == "editor")
+        _ = try await MCPPageScript.run("type", ["selector": "#editor", "text": "Typed words", "clear": true, "submit": false], in: webView).get()
+        #expect(try await webView.evaluateJavaScript("document.querySelector('#editor').textContent") as? String == "Typed words")
+    }
+
+    /// A refused type leaves the page as it was: the focus where it was, nothing scrolled.
+    @Test func aRefusedTypeTouchesNothing() async throws {
+        let (webView, loading) = await page("""
+        <input id="first"><div style="height:3000px"></div>
+        <input id="fixed" readonly value="as it was"><select id="list"><option>One</option></select>
+        <script>document.querySelector('#first').focus()</script>
+        """)
+        _ = loading
+        _ = try await webView.evaluateJavaScript("document.querySelector('#first').focus(); scrollTo(0, 0)")
+        #expect((await MCPPageScript.run("type", ["selector": "#fixed", "text": "x", "clear": true, "submit": false], in: webView)).failure != nil)
+        #expect((await MCPPageScript.run("type", ["selector": "#list", "text": "Nine", "clear": true, "submit": false], in: webView)).failure != nil)
+        #expect(try await webView.evaluateJavaScript("document.activeElement.id") as? String == "first")
+        #expect(try await webView.evaluateJavaScript("scrollY") as? Int == 0)
+    }
+
+    /// A link over two lines whose first half is under something clicks where it's free; under it all, it's refused.
+    @Test func aLinkHalfCoveredClicksWhereItsFree() async throws {
+        let (webView, loading) = await page("""
+        <title>Start</title>
+        <style>body { margin: 0 } p { width: 300px; font: 16px/20px Menlo, monospace; margin: 0 }</style>
+        <p>aaaaaaaaaaaaaaa <a id="wrapped" href="#" onclick="document.title = 'wrapped'; return false">bbbbbbbbbb bbbbbbbbbb</a></p>
+        <div id="cover" style="position:absolute; left:0; top:0; width:300px; height:20px; background:#ccc"></div>
+        """)
+        _ = loading
+        _ = try await MCPPageScript.run("click", ["selector": "#wrapped"], in: webView).get()
+        #expect(try await webView.evaluateJavaScript("document.title") as? String == "wrapped")
+        _ = try await webView.evaluateJavaScript("document.querySelector('#cover').style.height = '40px'")
+        #expect((await MCPPageScript.run("click", ["selector": "#wrapped"], in: webView)).failure?.message.contains("Something covers") == true)
+    }
+
+    @Test func neverTypesAPasswordByRef() async throws {
+        let (webView, loading) = await page("<input id='pw' type='password'>")
+        _ = loading
+        let pw = try await ref("#pw", in: webView)
+        #expect((await MCPPageScript.run("type", ["ref": pw, "text": "x", "clear": true, "submit": false], in: webView)).failure?.message == "password")
+        #expect(try await webView.evaluateJavaScript("document.querySelector('#pw').value") as? String == "")
+    }
+
+    /// The page can't see the refs, plant its own or change how they're kept.
+    @Test func refsAreOutOfThePagesReach() async throws {
+        let (webView, loading) = await page("""
+        <button id="b" onclick="document.title = 'clicked'">Go</button>
+        <script>
+        window.__zigzagRefs = { byRef: new Map([['e1', { el: { deref: () => document.body }, print: '' }]]) };
+        WeakRef.prototype.deref = () => null;
+        Map.prototype.get = () => undefined;
+        Element.prototype.getAttribute = () => 'evil';
+        </script>
+        """)
+        _ = loading
+        let b = try #require((try await MCPPageScript.run("click", ["selector": "#b"], in: webView).get()["clicked"] as? [String: Any])?["ref"] as? String)
+        _ = try await webView.evaluateJavaScript("document.title = 'x'")
+        _ = try await MCPPageScript.run("click", ["ref": b], in: webView).get()
+        #expect(try await webView.evaluateJavaScript("document.title") as? String == "clicked")
+        #expect(try await webView.evaluateJavaScript("typeof window.__zigzagRefs.byRef.get") as? String == "function")
+    }
+}
+
+private extension Result {
+    var failure: Failure? { if case .failure(let error) = self { error } else { nil } }
 }

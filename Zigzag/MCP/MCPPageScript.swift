@@ -12,14 +12,15 @@ enum MCPPageScript {
 
     /// Runs `op` with `args` in the page's main frame. The page's answer, or an error message.
     static func run(_ op: String, _ args: [String: Any] = [:], in webView: WKWebView) async -> Result<[String: Any], MCPArgumentError> {
+        let sent: [String: Any]
+        switch MCPRefs.inbound(args, for: webView) {
+        case .failure(let error): return .failure(error)
+        case .success(let args): sent = args
+        }
         do {
-            let value = try await webView.callAsyncJavaScript(body, arguments: ["op": op, "args": args], in: nil, contentWorld: world)
-            guard let object = value as? [String: Any] else { return .failure(.init("The page gave no answer.")) }
-            if let error = object["error"] as? String { return .failure(.init(error)) }
-            return .success(object)
+            return answer(try await webView.callAsyncJavaScript(body, arguments: ["op": op, "args": sent], in: nil, contentWorld: world), from: webView)
         } catch {
-            let message = (error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String
-            return .failure(.init(message.map { "The page couldn't do it: \($0)" } ?? "The page couldn't do it."))
+            return failure(error)
         }
     }
 
@@ -27,26 +28,46 @@ enum MCPPageScript {
     /// when this returns, so what's sent to the web view after it (a key press) reaches the page after it too.
     static func start(_ op: String, _ args: [String: Any] = [:], in webView: WKWebView,
                       then: @escaping @MainActor (Result<[String: Any], MCPArgumentError>) -> Void) {
-        webView.callAsyncJavaScript(body, arguments: ["op": op, "args": args], in: nil, in: world) { result in
+        let sent: [String: Any]
+        switch MCPRefs.inbound(args, for: webView) {
+        case .failure(let error): then(.failure(error)); return
+        case .success(let args): sent = args
+        }
+        webView.callAsyncJavaScript(body, arguments: ["op": op, "args": sent], in: nil, in: world) { [weak webView] result in
             MainActor.assumeIsolated {
                 switch result {
                 case .success(let value):
-                    guard let object = value as? [String: Any] else { then(.failure(.init("The page gave no answer."))); return }
-                    if let error = object["error"] as? String { then(.failure(.init(error))); return }
-                    then(.success(object))
-                case .failure(let error):
-                    let message = (error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String
-                    then(.failure(.init(message.map { "The page couldn't do it: \($0)" } ?? "The page couldn't do it.")))
+                    guard let webView else { then(.failure(.init("The page gave no answer."))); return }
+                    then(answer(value, from: webView))
+                case .failure(let error): then(failure(error))
                 }
             }
         }
     }
 
+    /// The page's answer, its refs swapped for the ones apps are given.
+    private static func answer(_ value: Any?, from webView: WKWebView) -> Result<[String: Any], MCPArgumentError> {
+        guard let given = value as? [String: Any] else { return .failure(.init("The page gave no answer.")) }
+        let object = MCPRefs.outbound(given, for: webView)
+        if let error = object["error"] as? String { return .failure(.init(error)) }
+        return .success(object)
+    }
+
+    private static func failure(_ error: Error) -> Result<[String: Any], MCPArgumentError> {
+        let message = (error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String
+        return .failure(.init(message.map { "The page couldn't do it: \($0)" } ?? "The page couldn't do it."))
+    }
+
     /// The function's body; `op` and `args` are its arguments.
     static let body = #"""
     \#(PageState.fieldRules)
-    // Zigzag's own notes in the page, in this world so the page can't see them: the fields the agent typed into.
-    const zz = globalThis.__zigzagRefs || (globalThis.__zigzagRefs = { typed: new WeakMap() });
+    // Zigzag's own notes in the page, in this world so the page can't see them: the fields the agent typed into, and
+    // the refs it was given for elements, each with what it stood for.
+    // The page's own refs and its id: Zigzag gives apps refs of its own for them (MCPRefs).
+    const zz = globalThis.__zigzagRefs || (globalThis.__zigzagRefs = { typed: new WeakMap(), byEl: new WeakMap(), byRef: new Map(), next: 0,
+      page: globalThis.crypto && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36) });
+    // A ref as the app has it, for what's said back.
+    const shownRef = args.refShown || args.ref;
     const isSecret = (el) => {
       const type = (el.getAttribute && el.getAttribute('type') || '').toLowerCase();
       const ac = (el.getAttribute && el.getAttribute('autocomplete') || '').toLowerCase();
@@ -536,8 +557,6 @@ enum MCPPageScript {
     };
     // A field's value is what's typed or filled in, so never a name for it; only a button's value is its caption.
     const showsValue = (el) => el.tagName === 'INPUT' && ['button', 'submit', 'reset'].includes((el.type || '').toLowerCase()) && !sensitive(el);
-    // An element as the tools name it back: its role and name as a screen reader has them, and a selector for it.
-    const describe = (el) => ({ role: roleOf(el) || el.localName, name: nameOf(el).name, tag: el.localName, selector: selectorFor(el) });
     // The element the keys go to: through open shadow roots and frames of this page's own origin, down to the one
     // with the focus. A frame of another origin stays the frame, as nothing in it can be seen from here.
     const deepActive = () => {
@@ -557,7 +576,140 @@ enum MCPPageScript {
     const find = (selector) => {
       try { return document.querySelector(selector); } catch (e) { throw new Error('Invalid CSS selector: ' + selector); }
     };
+    // What a ref stands for. If any of it changes, so does the ref: an old ref can't act on something else.
+    const printOf = (el) => [roleOf(el) || el.localName, nameOf(el).name, el.getAttribute('href') || '', el.type || ''].join('\u0001');
+    const said = (el) => {
+      const name = nameOf(el).name;
+      return (roleOf(el) || el.localName) + (name ? ' ' + JSON.stringify(name) : '');
+    };
+    // Every so often, the refs to what's left the page are let go of (resolve refuses them anyway), here and, through
+    // refsGone in the answer, in Zigzag (MCPRefs), so a page that lives long doesn't pile them up.
+    const letGo = () => {
+      for (const [ref, entry] of zz.byRef) {
+        const el = entry.el.deref();
+        if (el && el.isConnected) continue;
+        zz.byRef.delete(ref);
+        (zz.gone || (zz.gone = [])).push(ref);
+      }
+    };
+    const refFor = (el) => {
+      const print = printOf(el);
+      const known = zz.byEl.get(el);
+      if (known && zz.byRef.get(known)?.print === print) return known;
+      // As it was, it's gone: its old ref is let go, here and (told with the answer) on Zigzag's side.
+      if (known) { zz.byRef.delete(known); (zz.gone || (zz.gone = [])).push(known); }
+      const ref = 'e' + (++zz.next);
+      if (zz.next % 500 === 0) letGo();
+      zz.byEl.set(el, ref);
+      zz.byRef.set(ref, { el: new WeakRef(el), print, was: said(el) });
+      return ref;
+    };
+    // An element as the tools name it back: its ref, its role and name as a screen reader has them, and a selector.
+    const describe = (el) => ({ ref: refFor(el), role: roleOf(el) || el.localName, name: nameOf(el).name, tag: el.localName, selector: selectorFor(el) });
+    // The element a tool is given: by ref (still the element it was, as it was), by CSS selector, or by the text it
+    // shows (something clickable). Never a guess from a ref's role or name. { el } or { error }.
+    const clickable = 'a, button, input[type=button], input[type=submit], input[type=reset], [role=button], [role=link], [role=tab], '
+      + '[role=menuitem], [role=option], [role=checkbox], summary, label, [onclick]';
+    const resolve = (args) => {
+      if (args.ref) {
+        const entry = args.refPage === zz.page ? zz.byRef.get(args.ref) : null;
+        const el = entry && entry.el.deref();
+        if (!el || !el.isConnected) return { error: shownRef + ' isn’t on this page now: the page changed or loaded again since your snapshot. Take a new snapshot.' };
+        if (printOf(el) !== entry.print) return { error: shownRef + ' changed since your snapshot (it was ' + entry.was + '). Take a new snapshot.' };
+        return { el };
+      }
+      if (args.selector) {
+        const el = find(args.selector);
+        return el ? { el } : { error: 'Nothing on the page matches ' + args.selector + '.' };
+      }
+      if (args.text) {
+        const want = fold(args.text);
+        const candidates = [...document.querySelectorAll(clickable)].filter(shown);
+        const text = (c) => fold(c.innerText || (showsValue(c) ? c.value : '') || c.getAttribute('aria-label') || c.getAttribute('title') || '');
+        const el = candidates.find((c) => text(c) === want) || candidates.find((c) => text(c).includes(want));
+        return el ? { el } : { error: 'Nothing clickable on the page says “' + args.text + '”.' };
+      }
+      return { el: null };
+    };
+    // The open dialog on top, which has the person's attention: the one holding the focus (showModal() puts it there,
+    // and what's under the top dialog is inert, so it can't be anywhere else), looking through shadow roots; otherwise
+    // the last one open in the page.
+    const topModal = () => {
+      const isModal = (el) => { try { return el.localName === 'dialog' && el.matches(':modal'); } catch (e) { return false; } };
+      for (let at = deepActive(); at; at = composedParent(at)) if (at.nodeType === Node.ELEMENT_NODE && isModal(at)) return at;
+      const open = document.querySelectorAll('dialog:modal');
+      return open.length ? open[open.length - 1] : null;
+    };
+    // Set aside, as the person finds it: inside something the page made inert, or outside the dialog on top (all of
+    // which is inert while it's open), looking through shadow roots on the way up.
+    const setAside = (el) => {
+      const modal = topModal();
+      let inModal = !modal;
+      for (let at = el; at; at = composedParent(at)) {
+        if (at.nodeType === Node.ELEMENT_NODE && at.hasAttribute('inert')) return true;
+        if (at === modal) inModal = true;
+      }
+      return !inModal;
+    };
+    // What keeps the person from using an element at all, by pointer or keyboard: it's disabled (itself, by what
+    // holds it, or by the page's word), or set aside (inert, or behind an open dialog). { error } or null.
+    const blocked = (el, who) => {
+      if (el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true') return { error: 'That element is disabled.' };
+      if (setAside(el)) return { error: who + ' can’t be used now: something else on the page (a dialog) has the person’s attention.' };
+      return null;
+    };
+    // Where keys meant for an element go: in rich text, to where its editing starts (a paragraph of an editor
+    // can't take the focus, its editor does); anywhere else, to the element.
+    const keysGoTo = (el) => {
+      let at = el;
+      if (el.isContentEditable && !isField(el)) while (!editingHost(at) && at.parentElement) at = at.parentElement;
+      return at;
+    };
+    // Gives the element the keyboard, as the person's click or Tab would, and says whether it took it: WebKit gives
+    // the focus to nothing hidden, disabled or inert. Seen or not: the field a code editor types into isn't. The
+    // last thing before keys go, once nothing else can refuse: it scrolls the page and moves the focus.
+    // { error } or null.
+    const focused = (el, who) => {
+      const target = keysGoTo(el);
+      const holds = () => { const now = deepActive(); return now === target || target.contains(document.activeElement) || !!(target.shadowRoot && target.shadowRoot.contains(now)); };
+      el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+      // Already in it (the caret in an editor): left where it is.
+      if (!holds() && typeof target.focus === 'function') target.focus({ preventScroll: true });
+      return holds() ? null : { error: who + ' can’t take the keyboard focus, so keys would go somewhere else.' };
+    };
+    // Whether a click would reach the element as the person's would: nothing keeps them from it, it shows, and
+    // nothing covers it, once scrolled into view. A checkbox or radio a page hides and draws itself is clicked
+    // through its label, as the person does. { target, x, y } or { error }.
+    const reachable = (el, who) => {
+      const stop = blocked(el, who);
+      if (stop) return stop;
+      let target = el;
+      if (!hittable(el)) {
+        const label = el.labels && [...el.labels].find(shown);
+        if (!label) return { error: who + ' is on the page but doesn’t show, so it can’t be clicked.' };
+        target = label;
+      }
+      // At once, whatever the page's own scroll-behavior: where it is now is where the click is checked and lands.
+      target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+      // Each of its boxes in the window in turn (a link over two lines has two, and the middle of both may be on
+      // neither): the first with nothing over its middle is where the click goes.
+      const inView = [...target.getClientRects()]
+        .map((box) => ({ left: Math.max(box.left, 0), right: Math.min(box.right, innerWidth), top: Math.max(box.top, 0), bottom: Math.min(box.bottom, innerHeight) }))
+        .filter((box) => box.right > box.left && box.bottom > box.top);
+      if (!inView.length) return { error: who + ' can’t be scrolled into view.' };
+      const root = target.getRootNode();
+      let over = null;
+      for (const box of inView) {
+        const x = (box.left + box.right) / 2, y = (box.top + box.bottom) / 2;
+        const hit = (root.elementFromPoint ? root : document).elementFromPoint(x, y);
+        if (!hit || composedContains(target, hit) || composedContains(hit, target)
+          || (el.labels && [...el.labels].some((label) => composedContains(label, hit)))) return { target, x, y };
+        over = over || hit;
+      }
+      return { error: 'Something covers ' + who + ': ' + said(over) + ' is on top of it. Close it or scroll it out of the way first.' };
+    };
 
+    const answer = await (async () => {
     switch (op) {
     case 'read': {
       const root = document.body || document.documentElement;
@@ -568,7 +720,7 @@ enum MCPPageScript {
         if (fields.length >= 100) break;
         const type = (el.type || el.tagName).toLowerCase();
         if (type === 'hidden' || !shown(el)) continue;
-        const field = { selector: selectorFor(el), tag: el.tagName.toLowerCase(), type, label: nameOf(el).name, name: el.getAttribute('name') || '' };
+        const field = { ref: refFor(el), selector: selectorFor(el), tag: el.tagName.toLowerCase(), type, label: nameOf(el).name, name: el.getAttribute('name') || '' };
         if (type === 'checkbox' || type === 'radio') {
           field.checked = el.checked;
         } else {
@@ -603,48 +755,56 @@ enum MCPPageScript {
       return { links, total, truncated: total > links.length };
     }
     case 'click': {
-      let el = null;
-      if (args.selector) {
-        el = find(args.selector);
-        if (!el) return { error: 'Nothing on the page matches ' + args.selector + '.' };
-      } else {
-        const want = args.text.replace(/\s+/g, ' ').trim().toLowerCase();
-        const candidates = [...document.querySelectorAll('a, button, input[type=button], input[type=submit], input[type=reset], [role=button], [role=link], [role=tab], [role=menuitem], [role=option], [role=checkbox], summary, label, [onclick]')]
-          .filter(shown);
-        const textOf = (c) => (c.innerText || (showsValue(c) ? c.value : '') || c.getAttribute('aria-label') || c.getAttribute('title') || '').replace(/\s+/g, ' ').trim().toLowerCase();
-        el = candidates.find((c) => textOf(c) === want) || candidates.find((c) => textOf(c).includes(want));
-        if (!el) return { error: 'Nothing clickable on the page says “' + args.text + '”.' };
-      }
-      if (el.disabled) return { error: 'That element is disabled.' };
-      el.scrollIntoView({ block: 'center', inline: 'center' });
-      const r = el.getBoundingClientRect();
-      const at = { bubbles: true, cancelable: true, composed: true, view: window, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0 };
-      for (const kind of ['pointerdown', 'mousedown']) el.dispatchEvent(new (kind.startsWith('pointer') && window.PointerEvent ? PointerEvent : MouseEvent)(kind, at));
-      if (typeof el.focus === 'function') el.focus({ preventScroll: true });
-      for (const kind of ['pointerup', 'mouseup']) el.dispatchEvent(new (kind.startsWith('pointer') && window.PointerEvent ? PointerEvent : MouseEvent)(kind, at));
-      el.click();
+      const found = resolve(args);
+      if (found.error) return found;
+      const el = found.el;
+      const reach = reachable(el, shownRef || 'That element');
+      if (reach.error) return reach;
+      const target = reach.target;
+      const at = { bubbles: true, cancelable: true, composed: true, view: window, clientX: reach.x, clientY: reach.y, button: 0 };
+      for (const kind of ['pointerdown', 'mousedown']) target.dispatchEvent(new (kind.startsWith('pointer') && window.PointerEvent ? PointerEvent : MouseEvent)(kind, at));
+      if (typeof target.focus === 'function') target.focus({ preventScroll: true });
+      for (const kind of ['pointerup', 'mouseup']) target.dispatchEvent(new (kind.startsWith('pointer') && window.PointerEvent ? PointerEvent : MouseEvent)(kind, at));
+      // An SVG has no click() of its own.
+      if (typeof target.click === 'function') target.click(); else target.dispatchEvent(new MouseEvent('click', at));
+      names.clear();
       return { clicked: describe(el) };
     }
     case 'type': {
-      const el = find(args.selector);
-      if (!el) return { error: 'Nothing on the page matches ' + args.selector + '.' };
+      const found = resolve(args);
+      if (found.error) return found;
+      const el = found.el;
       if (isSecret(el)) return { error: 'password' };
-      el.scrollIntoView({ block: 'center' });
+      if (!isField(el) && !el.isContentEditable) return { error: 'That element isn’t a field: ' + el.tagName.toLowerCase() + '.' };
+      // Everything that can refuse comes before the focus moves: a refused call leaves the page as it was.
+      const who = shownRef || 'That field';
+      // A piece of a rich-text field (a paragraph of an editor) isn't a field: typing goes to the whole of it, and
+      // clearing would empty it.
+      if (!isField(el) && !editingHost(el)) {
+        return { error: (shownRef || 'That element') + ' is part of a rich-text field, not a field. Type in the field itself (it has a ref of its own in the snapshot), or click where the text should go and use press_key.' };
+      }
+      const stop = blocked(el, who);
+      if (stop) return stop;
+      if (el.tagName !== 'SELECT' && isField(el) && el.readOnly) return { error: 'That field can’t be typed in.' };
+      let option = null;
       if (el.tagName === 'SELECT') {
         const want = args.text.trim().toLowerCase();
         const options = [...el.options];
-        const option = options.find((o) => o.text.trim().toLowerCase() === want || o.value.toLowerCase() === want)
+        option = options.find((o) => o.text.trim().toLowerCase() === want || o.value.toLowerCase() === want)
           || options.find((o) => o.text.toLowerCase().includes(want));
         if (!option) return { error: 'The list has no option “' + args.text + '”. It has: ' + options.slice(0, 30).map((o) => o.text.trim()).join(', ') };
+      }
+      const unfocused = focused(el, who);
+      if (unfocused) return unfocused;
+      if (option) {
         el.value = option.value;
         zz.typed.set(el, rawValue(el));
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
+        names.clear();
         return { typed: describe(el), value: option.text.trim() };
       }
-      if (typeof el.focus === 'function') el.focus();
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-        if (el.readOnly || el.disabled) return { error: 'That field can’t be typed in.' };
         const value = args.clear ? args.text : el.value + args.text;
         // All of it is the app's own when it replaced what was there, or added to what was its own already (or to
         // nothing). Added to anything else, it's no longer only the app's.
@@ -654,12 +814,10 @@ enum MCPPageScript {
         if (allItsOwn) zz.typed.set(el, value); else zz.typed.delete(el);
         el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: args.text }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
-      } else if (el.isContentEditable) {
+      } else {
         if (args.clear) { document.execCommand('selectAll', false, null); document.execCommand('delete', false, null); }
         document.execCommand('insertText', false, args.text);
         zz.typed.delete(el);
-      } else {
-        return { error: 'That element isn’t a field: ' + el.tagName.toLowerCase() + '.' };
       }
       let submitted = false;
       if (args.submit) {
@@ -671,13 +829,15 @@ enum MCPPageScript {
           submitted = true;
         }
       }
+      names.clear();
       return { typed: describe(el), submitted };
     }
     case 'scroll': {
       let target = null;
-      if (args.selector) {
-        target = find(args.selector);
-        if (!target) return { error: 'Nothing on the page matches ' + args.selector + '.' };
+      if (args.ref || args.selector) {
+        const found = resolve(args);
+        if (found.error) return found;
+        target = found.el;
         target.scrollBy({ top: args.dy, behavior: 'instant' });
         return { scrollTop: target.scrollTop, scrollHeight: target.scrollHeight, height: target.clientHeight };
       }
@@ -753,16 +913,13 @@ enum MCPPageScript {
     }
     case 'keyTarget': {
       // Where press_key's key will go: the element a selector finds, focused first, or the one with the focus.
-      if (args.selector) {
-        const el = find(args.selector);
-        if (!el) return { error: 'Nothing on the page matches ' + args.selector + '.' };
-        if (el.disabled) return { error: 'That element is disabled.' };
-        el.scrollIntoView({ block: 'center', inline: 'center' });
-        if (typeof el.focus === 'function') el.focus({ preventScroll: true });
-        const now = deepActive();
-        if (now !== el && !el.contains(document.activeElement) && !(el.shadowRoot && el.shadowRoot.contains(now))) {
-          return { error: 'That element can’t take the keyboard focus, so the key would go somewhere else.' };
-        }
+      if (args.ref || args.selector) {
+        const found = resolve(args);
+        if (found.error) return found;
+        const who = shownRef || 'That element';
+        const stop = blocked(found.el, who) || focused(found.el, who);
+        names.clear();
+        if (stop) return stop;
       }
       const active = deepActive();
       const page = !active || active === document.body || active === document.documentElement;
@@ -790,5 +947,117 @@ enum MCPPageScript {
     default:
       return { error: 'Unknown operation.' };
     }
+    })();
+    if (answer && typeof answer === 'object') {
+      answer.refPage = zz.page;
+      if (zz.gone && zz.gone.length) { answer.refsGone = zz.gone; zz.gone = []; }
+    }
+    return answer;
     """#
+}
+
+/// The refs apps are given. Each page numbers the elements it hands out in its own way (e1, e2… for that page, with
+/// an id of its own); these are Zigzag's numbers for them, one counter for every tab. So two tabs never hand out the
+/// same ref, a ref is only taken back on the tab and page it came from, and an element keeps its number while its page
+/// lasts.
+@MainActor
+enum MCPRefs {
+    private struct Local: Hashable {
+        let view: ObjectIdentifier
+        let page: String
+        let ref: String
+    }
+
+    private struct Owner {
+        weak var view: WKWebView?
+        let page: String
+        let ref: String
+    }
+
+    private static var count = 0
+    private static var given: [Local: String] = [:]
+    private static var owners: [String: Owner] = [:]
+    /// The pages each web view gave refs on, latest first. A few are kept: Back can bring a page back as it was.
+    private static var pages: [ObjectIdentifier: [String]] = [:]
+    private static let pagesKept = 5
+
+    /// How many refs Zigzag holds for a web view's pages (for tests).
+    static func held(by view: WKWebView) -> Int { owners.values.filter { $0.view === view }.count }
+
+    /// `args` with a ref in its page's own terms, or why it can't be used on this web view's page.
+    static func inbound(_ args: [String: Any], for view: WKWebView) -> Result<[String: Any], MCPArgumentError> {
+        guard let shown = args["ref"] as? String else { return .success(args) }
+        guard let owner = owners[shown], owner.view === view else {
+            return .failure(.init("\(shown) isn’t on this page now: it’s from another tab, or the page changed or loaded again since your snapshot. Take a new snapshot."))
+        }
+        var args = args
+        args["ref"] = owner.ref
+        args["refPage"] = owner.page
+        args["refShown"] = shown
+        return .success(args)
+    }
+
+    /// The page's answer with each of its refs, wherever it is, swapped for the one apps are given. The refs the page
+    /// let go of (to what's left it) are let go of here too.
+    static func outbound(_ answer: [String: Any], for view: WKWebView) -> [String: Any] {
+        var answer = answer
+        let gone = answer.removeValue(forKey: "refsGone") as? [String] ?? []
+        guard let page = answer.removeValue(forKey: "refPage") as? String else { return answer }
+        remember(page, of: view)
+        forget(gone, page: page, of: view)
+        return swap(answer, page: page, view: view) as? [String: Any] ?? answer
+    }
+
+    private static func forget(_ refs: [String], page: String, of view: WKWebView) {
+        guard !refs.isEmpty else { return }
+        let id = ObjectIdentifier(view)
+        for ref in refs {
+            guard let shown = given.removeValue(forKey: Local(view: id, page: page, ref: ref)) else { continue }
+            owners[shown] = nil
+        }
+    }
+
+    private static func swap(_ value: Any, page: String, view: WKWebView) -> Any {
+        switch value {
+        case var object as [String: Any]:
+            for (key, item) in object {
+                if key == "ref", let local = item as? String { object[key] = global(local, page: page, view: view) }
+                else if item is [String: Any] || item is [Any] { object[key] = swap(item, page: page, view: view) }
+            }
+            return object
+        case let list as [Any]:
+            return list.map { swap($0, page: page, view: view) }
+        default:
+            return value
+        }
+    }
+
+    private static func global(_ local: String, page: String, view: WKWebView) -> String {
+        let key = Local(view: ObjectIdentifier(view), page: page, ref: local)
+        if let known = given[key] { return known }
+        count += 1
+        let ref = "e\(count)"
+        given[key] = ref
+        owners[ref] = Owner(view: view, page: page, ref: local)
+        return ref
+    }
+
+    /// A page the web view answered from: the latest first. A page that goes out of the last few, or a web view that's
+    /// gone, takes its refs with it.
+    private static func remember(_ page: String, of view: WKWebView) {
+        let id = ObjectIdentifier(view)
+        var list = pages[id] ?? []
+        guard list.first != page else { return }
+        list.removeAll { $0 == page }
+        list.insert(page, at: 0)
+        let dropped = Set(list.dropFirst(pagesKept))
+        pages[id] = Array(list.prefix(pagesKept))
+        owners = owners.filter { _, owner in
+            guard let other = owner.view else { return false }
+            return !(ObjectIdentifier(other) == id && dropped.contains(owner.page))
+        }
+        let alive = Set(owners.values.compactMap { $0.view.map(ObjectIdentifier.init) })
+        given = given.filter { alive.contains($0.key.view) && !($0.key.view == id && dropped.contains($0.key.page)) }
+        pages = pages.filter { alive.contains($0.key) || $0.key == id }
+    }
 }
