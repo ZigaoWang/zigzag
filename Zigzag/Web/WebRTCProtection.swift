@@ -43,11 +43,14 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
 
     /// Whether the page at `url` may use WebRTC in `tab`. A page with no site to keep a choice for (about:blank,
     /// file:, data:) follows the setting.
-    static func allows(_ url: URL?, in tab: Tab?) -> Bool {
+    static func allows(_ url: URL?, in tab: Tab?) -> Bool { allows(url, here: tab?.webRTCHere) }
+
+    /// The same with a private tab's own choices given (`Tab.webRTCHere`), as a pop-up keeps its opener's.
+    static func allows(_ url: URL?, here choices: [String: Bool]?) -> Bool {
         guard isAvailable else { return true }
         let origin = SiteOrigin.of(url)
         return allows(protectionOn: isOn, kept: origin.flatMap(SitePermissions.webRTC(origin:)),
-                      here: origin.flatMap { tab?.webRTCHere[$0] })
+                      here: origin.flatMap { choices?[$0] })
     }
 
     /// What Site Controls shows for the site in `tab`: Allow or Block, never Ask, since nothing asks first.
@@ -76,10 +79,12 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
 
     /// Sets the web view's switch for the page it's going to. Each tab's web view has its own preferences
     /// (`isolate`), so one page's choice never reaches another's.
-    static func apply(to webView: WKWebView, for url: URL?, in tab: Tab?) {
+    static func apply(to webView: WKWebView, for url: URL?, in tab: Tab?) { apply(to: webView, for: url, here: tab?.webRTCHere) }
+
+    static func apply(to webView: WKWebView, for url: URL?, here choices: [String: Bool]?) {
         guard isAvailable else { return }
         let preferences = webView.configuration.preferences
-        let wanted = allows(url, in: tab)
+        let wanted = allows(url, here: choices)
         if (preferences.value(forKey: preferenceKey) as? Bool) != wanted { preferences.setValue(wanted, forKey: preferenceKey) }
     }
 
@@ -159,7 +164,7 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
         let webView = popup.webView
         guard SiteOrigin.of(webView.url) == origin else { return true }
         Diagnostics.note("WebRTC", site: SiteOrigin.label(origin), "allowed in a pop-up, reloaded", isPrivate: tab.isPrivate)
-        apply(to: webView, for: webView.url, in: tab)
+        apply(to: webView, for: webView.url, here: popup.webRTCChoices)
         webView.reload()
         return true
     }
