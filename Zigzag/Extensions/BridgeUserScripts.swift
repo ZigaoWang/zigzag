@@ -273,6 +273,7 @@ final class BridgeUserScripts: BridgeNamespace {
     private func currentScripts() -> (scripts: [WKUserScript], handlers: [(world: WKContentWorld, name: String)]) {
         if let built, built.generation == generation { return (built.scripts, built.handlers) }
         var scripts: [WKUserScript] = [], handlers: [(world: WKContentWorld, name: String)] = []
+        var usesPage = false
         for id in host.profile.installs.installedIDs {
             guard let context = host.context(for: id), ExtensionBridge.allows(Self.permission, for: context) else { continue }
             let registry = registry(for: id)
@@ -292,6 +293,8 @@ final class BridgeUserScripts: BridgeNamespace {
                                                includeGlobs: script["includeGlobs"] as? [String] ?? [], excludeGlobs: script["excludeGlobs"] as? [String] ?? [],
                                                access: access, injectionTime: runAt == 0 ? .atDocumentStart : .atDocumentEnd,
                                                mainFrameOnly: !(script["allFrames"] as? Bool ?? false), world: world)
+                    guard let user else { continue }
+                    if main { usesPage = true }
                     made.append((runAt, script.string("id") ?? "", user))
                 }
             }
@@ -299,8 +302,10 @@ final class BridgeUserScripts: BridgeNamespace {
             for worldID in worldsUsed {
                 let world = WKContentWorld.world(name: Self.worldName(extensionID: id, worldID: worldID))
                 handlers.append((world, Self.worldHandler))
-                scripts.append(WKUserScript(source: Self.mark + "\n" + Self.prelude(Self.settings(for: worldID, in: registry.worlds), extensionID: id),
-                                            injectionTime: .atDocumentStart, forMainFrameOnly: false, in: world))
+                if let prelude = Self.nativeScript(source: Self.mark + "\n" + Self.prelude(Self.settings(for: worldID, in: registry.worlds), extensionID: id),
+                                                   injectionTime: .atDocumentStart, mainFrameOnly: false, world: world) {
+                    scripts.append(prelude)
+                }
             }
             // Chrome runs document_start scripts, then document_end, then document_idle, each by its ID, as Chrome keeps
             // them: Tampermonkey names its own "1|page", "2|…" and "3|content" to run in that order. A script's sources
@@ -308,6 +313,8 @@ final class BridgeUserScripts: BridgeNamespace {
             scripts += made.enumerated().sorted { ($0.element.runAt, $0.element.id, $0.offset) < ($1.element.runAt, $1.element.id, $1.offset) }
                 .map(\.element.script)
         }
+        // The page's world gets the gate before anything, once, for the scripts that run there.
+        if usesPage, let gate = Self.pageGate { scripts.insert(gate, at: 0) }
         built = (generation, scripts, handlers)
         return (scripts, handlers)
     }
@@ -321,31 +328,90 @@ final class BridgeUserScripts: BridgeNamespace {
         return (context.grantedPermissionMatchPatterns.filter { $0.value > now }.keys.map(\.string).sorted(), denied)
     }
 
-    /// One source of a user script as a page script: WebKit matches the patterns itself where it can read them, and
-    /// anything else (globs, site access, patterns it can't read) is checked by the code before it runs.
+    /// One source of a user script as a page script, or nil where it can't run anywhere. WebKit always decides where
+    /// it runs, by match patterns: the script's own where WebKit reads them, every web address otherwise (never
+    /// zigzag:// or an extension's pages), with the sites the extension may not run on excluded. Anything left (globs,
+    /// patterns WebKit can't read, site access it can't fold into the patterns) is checked in the page before the code
+    /// runs, and the code is then run as a string of its own (`__zigzagUserScriptGate`), never spliced into the check,
+    /// so nothing in it can reach outside.
     static func userScript(code: String, matches: [String], excludeMatches: [String], includeGlobs: [String], excludeGlobs: [String],
                            access: (allowed: [String], denied: [String])?, injectionTime: WKUserScriptInjectionTime,
-                           mainFrameOnly: Bool, world: WKContentWorld) -> WKUserScript {
-        let include = webKitPatterns(matches), exclude = webKitPatterns(excludeMatches)
-        let native = include != nil && exclude != nil && canMatchNatively
-        var checks: [String] = []
-        if !native { checks.append(matchCheck(allowed: matches, denied: excludeMatches)) }
-        if !includeGlobs.isEmpty || !excludeGlobs.isEmpty { checks.append(globCheck(include: includeGlobs, exclude: excludeGlobs)) }
-        if let access { checks.append(matchCheck(allowed: access.allowed, denied: access.denied)) }
-        let body = checks.isEmpty ? code : "if (\(checks.joined(separator: " && "))) {\n\(code)\n}\n"
-        let source = mark + "\n" + body
-        if native, let include, let exclude,
-           let script = matchingScript(source: source, injectionTime: injectionTime, mainFrameOnly: mainFrameOnly, include: include, exclude: exclude, world: world) {
-            return script
+                           mainFrameOnly: Bool, world: WKContentWorld) -> WKUserScript? {
+        var checks: [[String: Any]] = []
+        var include: [String]
+        if let native = webKitPatterns(matches) { include = native } else {
+            include = webAddresses(including: matches)
+            checks.append(matchCheck(allowed: matches, denied: []))
         }
-        let fallback = native ? mark + "\n" + "if (\(([matchCheck(allowed: matches, denied: excludeMatches)] + checks).joined(separator: " && "))) {\n\(code)\n}\n" : source
-        return WKUserScript(source: fallback, injectionTime: injectionTime, forMainFrameOnly: mainFrameOnly, in: world)
+        var exclude: [String] = []
+        if let native = webKitPatterns(excludeMatches) { exclude = native } else { checks.append(matchCheck(allowed: ["<all_urls>"], denied: excludeMatches)) }
+        if let access {
+            if let denied = webKitPatterns(access.denied) { exclude += withTrailingDots(denied) } else { checks.append(matchCheck(allowed: ["<all_urls>"], denied: access.denied)) }
+            if let allowed = webKitPatterns(access.allowed), let both = intersection(include, allowed) { include = both } else {
+                checks.append(matchCheck(allowed: access.allowed, denied: []))
+            }
+        }
+        if !includeGlobs.isEmpty || !excludeGlobs.isEmpty { checks.append(globCheck(include: includeGlobs, exclude: excludeGlobs)) }
+        guard !include.isEmpty else { return nil }
+        let body = checks.isEmpty ? code : "globalThis.__zigzagUserScriptGate && globalThis.__zigzagUserScriptGate(\(jsonString(gateKey)), \(json(checks)), \(jsonString(code)));\n"
+        return matchingScript(source: mark + "\n" + body, injectionTime: injectionTime, mainFrameOnly: mainFrameOnly, include: include, exclude: exclude, world: world)
+    }
+
+    /// Every web address and, if one of the patterns is for files, every file: where a script whose patterns WebKit
+    /// can't read may run, its code checking them first.
+    private static func webAddresses(including patterns: [String]) -> [String] {
+        let files = patterns.contains { $0 == "<all_urls>" || $0.lowercased().hasPrefix("file:") }
+        return ["*://*/*"] + (files ? ["file:///*"] : [])
+    }
+
+    /// The same patterns, each host also with a trailing dot (bank.com. is bank.com).
+    static func withTrailingDots(_ patterns: [String]) -> [String] {
+        var out = patterns
+        for pattern in patterns {
+            guard let parts = patternParts(pattern), parts.scheme != "file", parts.host != "*", !parts.host.hasSuffix(".") else { continue }
+            out.append(parts.scheme + "://" + parts.host + "." + parts.path)
+        }
+        return out
+    }
+
+    /// The addresses both lists of WebKit patterns cover, as patterns; nil when that can't be said exactly (two paths
+    /// that aren't the same and neither is every path), and the code checks instead.
+    static func intersection(_ first: [String], _ second: [String]) -> [String]? {
+        func covers(_ wide: String, _ narrow: String) -> Bool {
+            if wide == "*" || wide == narrow { return true }
+            guard wide.hasPrefix("*.") else { return false }
+            let domain = String(wide.dropFirst(2)), name = narrow.hasPrefix("*.") ? String(narrow.dropFirst(2)) : narrow
+            return name == domain || name.hasSuffix("." + domain)
+        }
+        var out: [String] = []
+        for a in first {
+            for b in second {
+                guard let x = patternParts(a), let y = patternParts(b) else { return nil }
+                let scheme: String
+                if x.scheme == y.scheme { scheme = x.scheme }
+                else if x.scheme == "*", ["http", "https"].contains(y.scheme) { scheme = y.scheme }
+                else if y.scheme == "*", ["http", "https"].contains(x.scheme) { scheme = x.scheme }
+                else { continue }
+                let p = x.host.lowercased(), q = y.host.lowercased(), host: String
+                if covers(p, q) { host = q } else if covers(q, p) { host = p } else { continue }
+                let path: String
+                if x.path == y.path || y.path == "/*" { path = x.path } else if x.path == "/*" { path = y.path } else { return nil }
+                let pattern = scheme + "://" + host + path
+                if !out.contains(pattern) { out.append(pattern) }
+            }
+        }
+        return out
     }
 
     /// WebKit's own way to give a page script match patterns, as it does for content scripts. Not public; without
-    /// it, the code checks its patterns itself.
+    /// it, user scripts don't run at all.
     private static let matchingInit = NSSelectorFromString("_initWithSource:injectionTime:forMainFrameOnly:includeMatchPatternStrings:excludeMatchPatternStrings:associatedURL:contentWorld:")
     static var canMatchNatively: Bool { class_getInstanceMethod(WKUserScript.self, matchingInit) != nil }
+
+    /// A page script WebKit runs only where the patterns say; nil if WebKit can't be told them.
+    static func nativeScript(source: String, injectionTime: WKUserScriptInjectionTime, mainFrameOnly: Bool, world: WKContentWorld) -> WKUserScript? {
+        matchingScript(source: source, injectionTime: injectionTime, mainFrameOnly: mainFrameOnly, include: ["*://*/*", "file:///*"], exclude: [], world: world)
+    }
 
     private static func matchingScript(source: String, injectionTime: WKUserScriptInjectionTime, mainFrameOnly: Bool,
                                        include: [String], exclude: [String], world: WKContentWorld) -> WKUserScript? {
@@ -390,7 +456,8 @@ final class BridgeUserScripts: BridgeNamespace {
         var host: String
         let hostPart = parts.host.split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
         let port = parts.host.contains(":") ? parts.host.split(separator: ":", maxSplits: 1).last.map(String.init) : nil
-        if hostPart == "*" { host = "[^/:]*" } else if hostPart.hasPrefix("*.") { host = "(?:[^/:]*\\.)?" + escaped(String(hostPart.dropFirst(2))) } else { host = escaped(hostPart) }
+        // A host with a trailing dot (bank.com.) is the same host.
+        if hostPart == "*" { host = "[^/:]*" } else if hostPart.hasPrefix("*.") { host = "(?:[^/:]*\\.)?" + escaped(String(hostPart.dropFirst(2))) + "\\.?" } else { host = escaped(hostPart) + "\\.?" }
         // No port in the pattern matches any port, as in Chrome; `*` matches any.
         host += port.map { $0 == "*" ? "(?::\\d+)?" : ":" + escaped($0) } ?? "(?::\\d+)?"
         let path = parts.path.map { $0 == "*" ? ".*" : escaped(String($0)) }.joined()
@@ -399,23 +466,59 @@ final class BridgeUserScripts: BridgeNamespace {
 
     private static func escaped(_ text: String) -> String { NSRegularExpression.escapedPattern(for: text) }
 
-    /// A test of the address against Chrome's patterns, for the code to make before it runs.
-    private static func matchCheck(allowed: [String], denied: [String]) -> String {
-        "(() => { const url = location.href.split('#')[0], test = (p) => new RegExp(p).test(url); return \(json(allowed.compactMap(patternRegex))).some(test) && !\(json(denied.compactMap(patternRegex))).some(test); })()"
+    /// A test of the address (without its fragment) against Chrome's patterns, for the gate to make: one of `allowed`
+    /// and none of `denied`.
+    private static func matchCheck(allowed: [String], denied: [String]) -> [String: Any] {
+        ["allow": allowed.compactMap(patternRegex), "deny": denied.compactMap(patternRegex), "any": false, "fragment": false]
     }
 
-    private static func globCheck(include: [String], exclude: [String]) -> String {
-        "(() => { const url = location.href, test = (p) => new RegExp(p).test(url), include = \(json(include.map(globPattern))), exclude = \(json(exclude.map(globPattern))); return (!include.length || include.some(test)) && !exclude.some(test); })()"
+    /// A test of the whole address against Chrome's globs: one of `include`, if any, and none of `exclude`.
+    private static func globCheck(include: [String], exclude: [String]) -> [String: Any] {
+        ["allow": include.map(globPattern), "deny": exclude.map(globPattern), "any": include.isEmpty, "fragment": true]
     }
 
     private static func json(_ value: Any) -> String {
         (try? JSONSerialization.data(withJSONObject: value, options: [.withoutEscapingSlashes])).map { String(decoding: $0, as: UTF8.self) } ?? "[]"
     }
 
-    /// The code, run only where its globs allow (WebKit's page scripts have no globs of their own).
-    static func fileText(code: String, includeGlobs: [String], excludeGlobs: [String]) -> String {
-        guard !includeGlobs.isEmpty || !excludeGlobs.isEmpty else { return code }
-        return "if (\(globCheck(include: includeGlobs, exclude: excludeGlobs))) {\n\(code)\n}\n"
+    /// A string as a JavaScript string literal.
+    static func jsonString(_ text: String) -> String {
+        (try? JSONSerialization.data(withJSONObject: text, options: [.fragmentsAllowed])).map { String(decoding: $0, as: UTF8.self) } ?? "\"\""
+    }
+
+    /// What a page script hands the gate, so only Zigzag's scripts run code through it (a script in a world without
+    /// 'unsafe-eval' can't use it as a way around that). New each launch.
+    static let gateKey = UUID().uuidString
+
+    /// Defines `__zigzagUserScriptGate(key, checks, code)` in a world, with `run` (the world's own eval, taken before
+    /// anything else could change it): it runs the code only if the address passes every check. It holds on to what it
+    /// uses as the world had it at document start, so a page that redefines RegExp, String or Array methods later
+    /// can't change its answer.
+    private static func gateSource(run: String) -> String {
+        #"""
+        (() => {
+          if (Object.prototype.hasOwnProperty.call(globalThis, '__zigzagUserScriptGate')) return;
+          const evaluate = \#(run), KEY = \#(jsonString(gateKey));
+          const R = RegExp, exec = RegExp.prototype.exec, apply = Reflect.apply, indexOf = String.prototype.indexOf, slice = String.prototype.slice;
+          const loc = location, own = Object.getOwnPropertyDescriptor(loc, 'href'), href = own && own.get ? () => apply(own.get, loc, []) : () => loc.href;
+          const hit = (list, url) => { for (let i = 0; i < list.length; i++) { if (apply(exec, new R(list[i]), [url]) !== null) return true; } return false; };
+          Object.defineProperty(globalThis, '__zigzagUserScriptGate', { value: (key, checks, code) => {
+            if (key !== KEY) return;
+            const whole = '' + href(), at = apply(indexOf, whole, ['#']), bare = at < 0 ? whole : apply(slice, whole, [0, at]);
+            for (let i = 0; i < checks.length; i++) {
+              const check = checks[i], url = check.fragment ? whole : bare;
+              if (check.allow.length ? !hit(check.allow, url) : !check.any) return;
+              if (hit(check.deny, url)) return;
+            }
+            return evaluate(code);
+          } });
+        })();
+        """#
+    }
+
+    /// The gate in the page's world, for scripts that run there (MAIN): at document start, before the page's own code.
+    static var pageGate: WKUserScript? {
+        nativeScript(source: mark + "\n" + gateSource(run: "globalThis.eval"), injectionTime: .atDocumentStart, mainFrameOnly: false, world: .page)
     }
 
     /// A Chrome glob as a regular expression for the whole address: `*` is anything, `?` one character.
@@ -610,7 +713,7 @@ final class BridgeUserScripts: BridgeNamespace {
     /// on, and its CSP's eval rule.
     static func prelude(_ settings: WorldSettings, extensionID: String) -> String {
         let config = json(["messaging": settings.messaging, "eval": settings.allowsEval, "inline": settings.allowsInline, "id": extensionID])
-        return preludeSource.replacingOccurrences(of: "__CONFIG__", with: config)
+        return preludeSource.replacingOccurrences(of: "__CONFIG__", with: config).replacingOccurrences(of: "__GATE__", with: gateSource(run: "run"))
     }
 
     private static let preludeSource = #"""
@@ -620,6 +723,7 @@ final class BridgeUserScripts: BridgeNamespace {
       const config = __CONFIG__;
       // An inline script the page won't run, run here instead, where the world's CSP allows inline scripts.
       const run = globalThis.eval;
+      __GATE__
       if (config.inline) Object.defineProperty(globalThis, '__zigzagInlineScript', { value: (code) => run(String(code)) });
       // Without 'unsafe-eval', strings aren't run as code, as Chrome's CSP for the world has it.
       if (!config.eval) {

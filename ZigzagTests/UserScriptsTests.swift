@@ -23,10 +23,26 @@ struct UserScriptsTests {
         #expect(matches("*greasyfork*", "https://greasyfork.org/scripts/1"))
     }
 
-    @Test func codeIsLeftAsItIsWithoutGlobs() {
-        #expect(BridgeUserScripts.fileText(code: "let a = 1;", includeGlobs: [], excludeGlobs: []) == "let a = 1;")
-        let wrapped = BridgeUserScripts.fileText(code: "let a = 1;", includeGlobs: ["*a*"], excludeGlobs: [])
-        #expect(wrapped.contains("let a = 1;") && wrapped.hasPrefix("if ("))
+    @Test func codeIsLeftAsItIsWithoutChecksAndOtherwiseNeverSpliced() throws {
+        func source(_ globs: [String]) throws -> String {
+            try #require(BridgeUserScripts.userScript(code: "let a = 1;", matches: ["<all_urls>"], excludeMatches: [], includeGlobs: globs, excludeGlobs: [],
+                                                      access: nil, injectionTime: .atDocumentEnd, mainFrameOnly: true, world: .page)).source
+        }
+        #expect(try source([]) == BridgeUserScripts.mark + "\nlet a = 1;")
+        // With a check, the code is a string the gate runs once the check passes.
+        let gated = try source(["*a*"])
+        #expect(gated.contains(#""let a = 1;""#) && !gated.contains("\nlet a = 1;"))
+    }
+
+    @Test func siteAccessFoldsIntoThePatterns() {
+        #expect(BridgeUserScripts.intersection(["*://*/*", "file:///*"], ["https://example.com/*"]) == ["https://example.com/*"])
+        #expect(BridgeUserScripts.intersection(["https://*.example.com/a*"], ["*://*.example.com/*"]) == ["https://*.example.com/a*"])
+        #expect(BridgeUserScripts.intersection(["https://www.example.com/*"], ["*://*.example.com/*"]) == ["https://www.example.com/*"])
+        #expect(BridgeUserScripts.intersection(["https://example.org/*"], ["*://*.example.com/*"]) == [])
+        #expect(BridgeUserScripts.intersection(["file:///*"], ["*://*/*"]) == [])
+        // Two different paths: the code checks.
+        #expect(BridgeUserScripts.intersection(["https://a.test/x*"], ["https://a.test/y*"]) == nil)
+        #expect(BridgeUserScripts.withTrailingDots(["*://bank.com/*", "*://*/*"]) == ["*://bank.com/*", "*://*/*", "*://bank.com./*"])
     }
 
     @Test func registeringChecksAsChromeDoes() {
@@ -114,6 +130,10 @@ struct UserScriptsTests {
         #expect(test("https://a.test/x?y=*", "https://a.test/x?y=1"))
         #expect(test("<all_urls>", "file:///Users/a.html"))
         #expect(!test("https://*/*", "http://a.test/"))
+        // A trailing dot is the same host.
+        #expect(test("*://bank.com/*", "https://bank.com./a"))
+        #expect(test("*://*.bank.com/*", "https://www.bank.com.:8443/a"))
+        #expect(!test("*://bank.com/*", "https://bank.com.evil.test/a"))
         #expect(BridgeUserScripts.patternRegex("not a pattern") == nil)
     }
 
@@ -137,11 +157,24 @@ struct UserScriptsTests {
 
     private static let world = WKContentWorld.world(name: BridgeUserScripts.worldName(extensionID: "testextensionaaaaaaaaaaaaaaaaaaa", worldID: nil))
 
+    /// Serves zigzag:// pages, as Zigzag's own (History) are.
+    private final class OwnPages: NSObject, WKURLSchemeHandler {
+        func webView(_ webView: WKWebView, start task: any WKURLSchemeTask) {
+            let body = Data("<html><body>history</body></html>".utf8)
+            task.didReceive(URLResponse(url: task.request.url!, mimeType: "text/html", expectedContentLength: body.count, textEncodingName: "utf-8"))
+            task.didReceive(body)
+            task.didFinish()
+        }
+        func webView(_ webView: WKWebView, stop task: any WKURLSchemeTask) {}
+    }
+
     private func page(_ settings: BridgeUserScripts.WorldSettings, scripts: [WKUserScript] = [], echo: Echo? = nil,
-                      at address: String = "https://example.com/") async -> WKWebView {
+                      at address: String = "https://example.com/", html: String = "<html><body>page</body></html>") async -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
+        configuration.setURLSchemeHandler(OwnPages(), forURLScheme: "zigzag")
         let controller = configuration.userContentController
+        if let gate = BridgeUserScripts.pageGate { controller.addUserScript(gate) }
         controller.addUserScript(WKUserScript(source: BridgeUserScripts.prelude(settings, extensionID: "testextensionaaaaaaaaaaaaaaaaaaa"), injectionTime: .atDocumentStart, forMainFrameOnly: false, in: Self.world))
         scripts.forEach(controller.addUserScript)
         if let echo { controller.addScriptMessageHandler(echo, contentWorld: Self.world, name: BridgeUserScripts.worldHandler) }
@@ -150,7 +183,7 @@ struct UserScriptsTests {
         webView.navigationDelegate = loading
         await withCheckedContinuation { done in
             loading.done = done
-            webView.loadHTMLString("<html><body>page</body></html>", baseURL: URL(string: address))
+            if address.hasPrefix("zigzag:") { webView.load(URLRequest(url: URL(string: address)!)) } else { webView.loadHTMLString(html, baseURL: URL(string: address)) }
         }
         withExtendedLifetime(loading) {}
         return webView
@@ -241,7 +274,7 @@ struct UserScriptsTests {
 
     @Test func scriptsRunOnlyWhereTheirPatternsAndSiteAccessAllow() async throws {
         func script(_ flag: String, matches: [String], excludeMatches: [String] = [], globs: [String] = [],
-                    access: (allowed: [String], denied: [String])? = nil) -> WKUserScript {
+                    access: (allowed: [String], denied: [String])? = nil) -> WKUserScript? {
             BridgeUserScripts.userScript(code: "document.documentElement.dataset.\(flag) = 'yes';", matches: matches, excludeMatches: excludeMatches,
                                          includeGlobs: globs, excludeGlobs: [], access: access, injectionTime: .atDocumentEnd,
                                          mainFrameOnly: true, world: Self.world)
@@ -257,9 +290,94 @@ struct UserScriptsTests {
             script("allowedElsewhere", matches: ["<all_urls>"], access: (["https://example.org/*"], [])),
             script("offHere", matches: ["<all_urls>"], access: (["<all_urls>"], ["*://example.com/*"])),
         ]
-        let webView = await page(.init(), scripts: scripts)
+        let webView = await page(.init(), scripts: scripts.compactMap { $0 })
         let ran = try await run("return Object.keys(document.documentElement.dataset).sort().join()", in: webView, world: .page) as? String
         #expect(ran == "all,allowedHere,here,port")
+    }
+
+    /// Code that closes the check's block and opens another, to run outside it, runs nowhere: it's never part of
+    /// the check, only a string the gate runs once the check passes (and here it doesn't parse).
+    @Test func codeCantStepOutsideItsCheck() async throws {
+        let escape = "document.documentElement.dataset.inside = 'yes'; } document.documentElement.dataset.escaped = 'yes'; if (0) {"
+        func script(_ world: WKContentWorld, matches: [String] = ["<all_urls>"], globs: [String] = [], excludeGlobs: [String] = [],
+                    access: (allowed: [String], denied: [String])? = nil) -> WKUserScript? {
+            BridgeUserScripts.userScript(code: escape, matches: matches, excludeMatches: [], includeGlobs: globs, excludeGlobs: excludeGlobs,
+                                         access: access, injectionTime: .atDocumentEnd, mainFrameOnly: true, world: world)
+        }
+        var scripts: [WKUserScript?] = []
+        for world in [Self.world, WKContentWorld.page] {
+            scripts += [script(world, excludeGlobs: ["*example.com*"]), script(world, globs: ["*example.org*"]),
+                        script(world, matches: ["https://example.org:*/*"]),
+                        script(world, matches: ["https://example.org:*/*"], access: (["<all_urls>"], ["*://example.com/*"]))]
+        }
+        let webView = await page(.init(), scripts: scripts.compactMap { $0 })
+        let ran = try await run("return Object.keys(document.documentElement.dataset).sort().join()", in: webView, world: .page) as? String
+        #expect(ran == "")
+        // Where its check passes, code that parses runs as before, in either world.
+        let good = [Self.world, WKContentWorld.page].compactMap {
+            BridgeUserScripts.userScript(code: "document.documentElement.dataset[(globalThis.__zigzagUserScriptWorld ? 'own' : 'page')] = 'yes';",
+                                         matches: ["https://example.com:*/*"], excludeMatches: [], includeGlobs: ["*example.com*"], excludeGlobs: [],
+                                         access: nil, injectionTime: .atDocumentEnd, mainFrameOnly: true, world: $0)
+        }
+        let other = await page(.init(), scripts: good)
+        #expect(try await run("return Object.keys(document.documentElement.dataset).sort().join()", in: other, world: .page) as? String == "own,page")
+    }
+
+    /// Zigzag's own pages (History, at zigzag://) never run a user script, whatever its patterns say.
+    @Test func zigzagsOwnPagesNeverRunUserScripts() async throws {
+        var scripts: [WKUserScript] = []
+        for world in [Self.world, WKContentWorld.page] {
+            for matches in [["<all_urls>"], ["*://*/*"], ["https://example.com:*/*"], ["zigzag://history/*"]] {
+                for (globs, time) in [(["*"], WKUserScriptInjectionTime.atDocumentEnd), ([], .atDocumentStart)] {
+                    if let script = BridgeUserScripts.userScript(code: "document.documentElement.dataset.ran = 'yes';", matches: matches, excludeMatches: [],
+                                                                 includeGlobs: globs, excludeGlobs: [], access: nil, injectionTime: time,
+                                                                 mainFrameOnly: false, world: world) { scripts.append(script) }
+                }
+            }
+        }
+        let webView = await page(.init(), scripts: scripts, at: "zigzag://history")
+        #expect(webView.url?.absoluteString.hasPrefix("zigzag://history") == true)
+        #expect(try await run("return document.body.textContent + '|' + Object.keys(document.documentElement.dataset).join()", in: webView, world: .page) as? String == "history|")
+        // The gate isn't there either.
+        #expect(try await run("return typeof globalThis.__zigzagUserScriptGate", in: webView, world: .page) as? String == "undefined")
+    }
+
+    /// A site where extensions are off, at its address with a trailing dot, is still off.
+    @Test func aTrailingDotIsTheSameSite() async throws {
+        let access = (allowed: ["<all_urls>"], denied: ["*://example.com/*", "*://*.example.com/*"])
+        let scripts = [Self.world, WKContentWorld.page].flatMap { world in
+            [["<all_urls>"], ["https://example.com:*/*"]].compactMap { matches in
+                BridgeUserScripts.userScript(code: "document.documentElement.dataset.ran = 'yes';", matches: matches, excludeMatches: [],
+                                             includeGlobs: [], excludeGlobs: [], access: access, injectionTime: .atDocumentEnd,
+                                             mainFrameOnly: true, world: world)
+            }
+        }
+        let webView = await page(.init(), scripts: scripts, at: "https://example.com./")
+        #expect(try await run("return location.hostname + '|' + Object.keys(document.documentElement.dataset).join()", in: webView, world: .page) as? String == "example.com.|")
+        #expect(ContentBlocker.site(of: URL(string: "https://www.example.com./")) == "example.com")
+    }
+
+    /// A page that redefines what a check would use, before a script in its world runs, doesn't change the answer.
+    @Test func aPageCantTalkTheCheckRound() async throws {
+        let html = """
+            <html><body><script>
+            RegExp.prototype.test = () => false; RegExp.prototype.exec = () => null;
+            String.prototype.split = function () { return ['https://example.org/']; };
+            String.prototype.indexOf = () => -1; String.prototype.slice = () => 'https://example.org/';
+            Array.prototype.some = () => false; Reflect.apply = () => null;
+            window.RegExp = function () { return /^/; };
+            </script>page</body></html>
+            """
+        let scripts = [
+            BridgeUserScripts.userScript(code: "document.documentElement.dataset.excluded = 'yes';", matches: ["<all_urls>"], excludeMatches: [],
+                                         includeGlobs: [], excludeGlobs: ["*example.com*"], access: nil, injectionTime: .atDocumentEnd, mainFrameOnly: true, world: .page),
+            BridgeUserScripts.userScript(code: "document.documentElement.dataset.elsewhere = 'yes';", matches: ["https://example.org:*/*"], excludeMatches: [],
+                                         includeGlobs: [], excludeGlobs: [], access: nil, injectionTime: .atDocumentEnd, mainFrameOnly: true, world: .page),
+            BridgeUserScripts.userScript(code: "document.documentElement.dataset.here = 'yes';", matches: ["https://example.com:*/*"], excludeMatches: [],
+                                         includeGlobs: ["*example.com*"], excludeGlobs: [], access: nil, injectionTime: .atDocumentEnd, mainFrameOnly: true, world: .page),
+        ].compactMap { $0 }
+        let webView = await page(.init(), scripts: scripts, html: html)
+        #expect(try await run("return Object.keys(document.documentElement.dataset).sort().join()", in: webView, world: .page) as? String == "here")
     }
 
     @Test func theRelayAndPreludeParse() {
