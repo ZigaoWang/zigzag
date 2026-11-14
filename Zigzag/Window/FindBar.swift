@@ -45,6 +45,12 @@ final class PlainTextField: NSTextField {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Placed by `centeredY` on its screen's pixels: on a screen of another scale, placed again (as `Label` is).
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        superview?.needsLayout = true
+    }
 }
 
 /// Draws and edits the text a little in from the sides, and centered in its height if the field asks, so a selection

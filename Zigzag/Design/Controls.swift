@@ -590,6 +590,13 @@ final class Label: NSTextField {
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
+    /// Moved to a screen of another scale: where `centeredY` puts it is on the old screen's pixels, so the view
+    /// that places it does so again.
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        superview?.needsLayout = true
+    }
+
     /// Exact width of the text, plus the cell's own padding.
     var textWidth: CGFloat { inkWidth + Tokens.Space.x2 }
 
