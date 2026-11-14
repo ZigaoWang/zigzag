@@ -212,9 +212,6 @@ nonisolated enum MiniPlayerLayout {
 
     /// It never goes nearer the screen's edges than this, so its rounded edge always shows whole.
     static let edgeInset: CGFloat = 4
-    /// Let go this near an edge's resting line (`margin` from the screen's edge), it settles on it; anywhere else,
-    /// it stays where it was let go.
-    static let snapDistance: CGFloat = 16
 
     /// Where the card sits: how far its edges are from the nearest corner's edges. As its room changes, it keeps
     /// that distance from that corner, so a card at the bottom right stays at the bottom right.
@@ -261,14 +258,8 @@ nonisolated enum MiniPlayerLayout {
     /// Where a card let go at `frame` comes to rest: where it is, inside `area`, except near an edge, where it settles
     /// on the line a margin in from the screen's edge (two edges, at a corner).
     static func dropped(_ frame: CGRect, in area: CGRect) -> CGRect {
-        var f = clamp(frame, in: area)
-        let inset = max(0, margin - edgeInset)
-        let rest = area.insetBy(dx: inset, dy: inset)
-        if f.minX - rest.minX <= snapDistance { f.origin.x = rest.minX }
-        else if rest.maxX - f.maxX <= snapDistance { f.origin.x = rest.maxX - f.width }
-        if f.minY - rest.minY <= snapDistance { f.origin.y = rest.minY }
-        else if rest.maxY - f.maxY <= snapDistance { f.origin.y = rest.maxY - f.height }
-        return clamp(f, in: area)
+        // Exactly where it was let go, only kept on screen: it never jumps to an edge or a corner on its own.
+        clamp(frame, in: area)
     }
 
     /// Where the card may go on a screen (#172): anywhere in its usable part (`visible`: clear of the menu bar and
@@ -370,8 +361,8 @@ nonisolated enum MiniPlayerLayout {
         static let left = Edges(rawValue: 1), right = Edges(rawValue: 2), top = Edges(rawValue: 4), bottom = Edges(rawValue: 8)
     }
 
-    static let grip: CGFloat = 5
-    static let cornerGrip: CGFloat = 12
+    static let grip: CGFloat = 8
+    static let cornerGrip: CGFloat = 18
 
     static func edges(at point: CGPoint, in size: CGSize) -> Edges {
         guard point.x >= 0, point.y >= 0, point.x <= size.width, point.y <= size.height else { return [] }

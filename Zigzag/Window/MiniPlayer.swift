@@ -962,9 +962,9 @@ final class MiniPlayerView: NSView {
         let line = MiniPlayerProgress.line
         progress.frame = NSRect(x: pad, y: bounds.height - pad - line / 2 - MiniPlayerProgress.height / 2,
                                 width: max(0, bounds.width - pad * 2), height: MiniPlayerProgress.height)
-        // The three in the middle, on one line halfway between the two rows, the same distance apart.
+        // The three in the middle, on the card's own middle, the same distance apart, as a player's controls sit.
         let side = Self.centerSide
-        let middle = NSPoint(x: bounds.midX, y: round((pad + top + bounds.height - pad - line) / 2))
+        let middle = NSPoint(x: bounds.midX, y: round(bounds.midY))
         let gap = round(min(max(bounds.width * 0.18, side + Tokens.Space.x2), 76))
         for (button, dx) in [(rewindButton, -gap), (playButton, 0), (forwardButton, gap)] {
             button.frame = NSRect(x: round(middle.x + dx - side / 2), y: round(middle.y - side / 2), width: side, height: side)
@@ -1123,8 +1123,12 @@ final class MiniPlayerView: NSView {
     }
 
     override func mouseEntered(with event: NSEvent) { onPointer?(); keepControls() }
-    override func mouseMoved(with event: NSEvent) { keepControls() }
+    override func mouseMoved(with event: NSEvent) {
+        keepControls()
+        showResizeCursor(at: convert(event.locationInWindow, from: nil))
+    }
     override func mouseExited(with event: NSEvent) {
+        if !isDragging { NSCursor.arrow.set() }
         guard !isDragging, !progress.isScrubbing else { return }
         hideTimer?.invalidate()
         setControls(false, animated: true)
@@ -1267,6 +1271,25 @@ final class MiniPlayerView: NSView {
         for (rect, position) in zones { addCursorRect(rect, cursor: .frameResize(position: position, directions: .all)) }
     }
 
+    /// The resize arrows as the pointer nears an edge or a corner. Cursor rectangles only work in the key window and
+    /// the card's panel almost never is, so the pointer's moves set them, as they do for any window behind others.
+    private func showResizeCursor(at point: NSPoint) {
+        guard !isDragging else { return }
+        let edges = MiniPlayerLayout.edges(at: point, in: bounds.size)
+        let position: NSCursor.FrameResizePosition? = switch edges {
+        case [.top, .left]: .topLeft
+        case [.top, .right]: .topRight
+        case [.bottom, .left]: .bottomLeft
+        case [.bottom, .right]: .bottomRight
+        case [.top]: .top
+        case [.bottom]: .bottom
+        case [.left]: .left
+        case [.right]: .right
+        default: nil
+        }
+        (position.map { NSCursor.frameResize(position: $0, directions: .all) } ?? .arrow).set()
+    }
+
     /// Glides to where it comes to rest after a drag, briefly, as a window snaps; at once with Reduce Motion.
     /// Meanwhile the page inside keeps the card's size, so nothing jumps.
     func settle(at target: NSRect) {
@@ -1302,7 +1325,8 @@ final class MiniPlayerView: NSView {
         resizing = []
         if isDragging {
             isDragging = false
-            if resized { onResized?() } else { onMoved?(event.modifierFlags.contains(.command)) }
+            // It stays where it was let go: a player you place yourself shouldn't jump to a corner.
+            if resized { onResized?() } else { onMoved?(true) }
         } else {
             // The keyboard, as a player's window takes it; its panel never brings Zigzag in front of the app you're in.
             window?.makeKey()

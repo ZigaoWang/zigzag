@@ -219,16 +219,20 @@ struct MiniPlayerTests {
         #expect(window.contains(MiniPlayerLayout.dropped(out, in: window)))
     }
 
-    @Test func letGoNearAnEdgeItSettlesOnIt() {
-        // 15 points from the left edge, far from the others: onto the resting line a margin in, and no further.
+    @Test func letGoNearAnEdgeItStaysWhereItWasLetGo() {
+        // Near an edge or a corner, it doesn't jump onto it: it rests exactly where it was let go.
         let near = CGRect(x: 15, y: 300, width: 333, height: 187)
-        #expect(MiniPlayerLayout.dropped(near, in: window) == CGRect(x: MiniPlayerLayout.margin, y: 300, width: 333, height: 187))
-        // Near a corner: both edges.
+        #expect(MiniPlayerLayout.dropped(near, in: window) == near)
         let corner = CGRect(x: 1280 - 333 - 20, y: 805 - 187 - 5, width: 333, height: 187)
-        #expect(MiniPlayerLayout.dropped(corner, in: window) == CGRect(x: 1280 - 12 - 333, y: 805 - 12 - 187, width: 333, height: 187))
-        // A little further than the snap distance: it stays.
-        let away = CGRect(x: 12 + MiniPlayerLayout.snapDistance + 2, y: 300, width: 333, height: 187)
-        #expect(MiniPlayerLayout.dropped(away, in: window) == away)
+        #expect(MiniPlayerLayout.dropped(corner, in: window) == corner)
+    }
+
+    @Test func aPressNearItsEdgesResizes() {
+        let size = CGSize(width: 333, height: 187)
+        #expect(MiniPlayerLayout.edges(at: CGPoint(x: 6, y: 90), in: size) == [.left])
+        #expect(MiniPlayerLayout.edges(at: CGPoint(x: 327, y: 90), in: size) == [.right])
+        #expect(MiniPlayerLayout.edges(at: CGPoint(x: 10, y: 10), in: size) == [.top, .left])
+        #expect(MiniPlayerLayout.edges(at: CGPoint(x: 160, y: 90), in: size).isEmpty)
     }
 
     @Test func itKeepsToItsCornerAsTheWindowResizes() {
