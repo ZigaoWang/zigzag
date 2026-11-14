@@ -2755,6 +2755,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Turned on or off elsewhere (another Settings tab): the switch follows.
         if aiAppsToggle.isOn != shown { aiAppsToggle.isOn = shown }
         let detail = MCPService.problem == nil ? MCPService.address
+            : MCPService.replacedKeyForBusyPort
+            ? String(localized: "Couldn’t start. Port \(Int(MCPService.port)) is in use by another app, so Zigzag made a new key. Give your AI apps the new key.",
+                     comment: "Under “Server address” in Settings › Automation when another app holds the MCP server's port: Zigzag replaced the key, since an AI app connecting there may have sent the old one to that app. The placeholder is a port number.")
             : String(localized: "Couldn’t start. Port \(Int(MCPService.port)) may be in use by another app.",
                      comment: "Under “Server address” in Settings › Automation when Zigzag's MCP server couldn't start. The placeholder is a port number.")
         let rows = [aiAddressRow, aiKeyRow, aiSetupRow, aiPromptRow]

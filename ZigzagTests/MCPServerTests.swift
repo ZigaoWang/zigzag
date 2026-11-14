@@ -338,3 +338,114 @@ struct MCPServerTests {
         var names: [String] { lock.withLock { all } }
     }
 }
+
+// MARK: Connections that don't send the key
+
+extension MCPServerTests {
+    /// A plain TCP connection to the test server, read with a timeout.
+    nonisolated final class RawConnection {
+        let socket: Int32
+
+        init?(port: UInt16) {
+            socket = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+            guard socket >= 0 else { return nil }
+            var address = sockaddr_in()
+            address.sin_family = sa_family_t(AF_INET)
+            address.sin_port = port.bigEndian
+            address.sin_addr.s_addr = inet_addr("127.0.0.1")
+            let connected = withUnsafePointer(to: &address) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(socket, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+            }
+            guard connected == 0 else { close(socket); return nil }
+            var timeout = timeval(tv_sec: 3, tv_usec: 0)
+            setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+        }
+
+        deinit { close(socket) }
+
+        func send(_ text: String) {
+            _ = Array(text.utf8).withUnsafeBytes { Darwin.send(socket, $0.baseAddress, $0.count, 0) }
+        }
+
+        /// Everything until the server closes, or nil if it's still open when the timeout passes.
+        func readToEnd() -> String? {
+            var all = Data()
+            var buffer = [UInt8](repeating: 0, count: 4096)
+            while true {
+                let count = recv(socket, &buffer, buffer.count, 0)
+                if count == 0 { return String(decoding: all, as: UTF8.self) }
+                if count < 0 { return nil }
+                all.append(contentsOf: buffer[0..<count])
+            }
+        }
+    }
+
+    private static func request(key: String?) -> String {
+        let body = Self.initialize.text
+        var head = "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: \(body.utf8.count)\r\n"
+        if let key { head += "Authorization: Bearer \(key)\r\n" }
+        return head + "\r\n" + body
+    }
+
+    @Test func refusedConnectionsAreClosed() async throws {
+        let server = MCPServer(port: 0, endpoint: endpoint())
+        server.start()
+        defer { server.stop() }
+        let port = try #require(await server.waitUntilReady())
+        let refused = try #require(RawConnection(port: port))
+        refused.send(Self.request(key: nil))
+        let answer = try #require(refused.readToEnd())
+        #expect(answer.hasPrefix("HTTP/1.1 401") && answer.contains("Connection: close"))
+        let wrongPath = try #require(RawConnection(port: port))
+        wrongPath.send("POST /other HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Bearer \(Self.token)\r\nContent-Length: 0\r\n\r\n")
+        #expect(try #require(wrongPath.readToEnd()).hasPrefix("HTTP/1.1 404"))
+        // With the key, the connection stays for the next request.
+        let kept = try #require(RawConnection(port: port))
+        kept.send(Self.request(key: Self.token))
+        #expect(kept.readToEnd() == nil)
+    }
+
+    @Test func connectionsWithoutTheKeyCantFillTheServer() async throws {
+        let server = MCPServer(port: 0, endpoint: endpoint())
+        server.start()
+        defer { server.stop() }
+        let port = try #require(await server.waitUntilReady())
+        var idle: [RawConnection] = []
+        for _ in 0..<MCPServer.maxKeylessConnections {
+            idle.append(try #require(RawConnection(port: port)))
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        // One more pushes out the oldest that never sent the key, and an app with the key still gets in.
+        let app = try #require(RawConnection(port: port))
+        try await Task.sleep(nanoseconds: 200_000_000)
+        #expect(idle[0].readToEnd() == "")
+        app.send(Self.request(key: Self.token))
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        let count = recv(app.socket, &buffer, buffer.count, 0)
+        #expect(count > 0 && String(decoding: buffer[0..<max(count, 0)], as: UTF8.self).hasPrefix("HTTP/1.1 200"))
+    }
+
+    @Test func aTakenPortSaysSoAndReplacesTheKey() async throws {
+        let holder = MCPServer(port: 0, endpoint: endpoint())
+        holder.start()
+        defer { holder.stop() }
+        let port = try #require(await holder.waitUntilReady())
+        let second = MCPServer(port: port, endpoint: endpoint())
+        let states = Box()
+        second.onState = { state in
+            if case .failed(_, let inUse) = state { states.add(inUse ? "in use" : "failed") }
+        }
+        second.start()
+        defer { second.stop() }
+        #expect(await second.waitUntilReady() == nil)
+        #expect(states.names == ["in use"])
+
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("mcp-key-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let endpoint = endpoint()
+        await MCPService.replaceKeyForBusyPort(endpoint, keyFile: file)
+        let new = try #require(MCPKeyFile.token(at: file, creating: false))
+        #expect(new != Self.token)
+        #expect(await endpoint.handle(post(Self.initialize)).status == 401)
+    }
+}

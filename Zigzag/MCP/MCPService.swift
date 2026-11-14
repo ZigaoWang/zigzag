@@ -19,6 +19,9 @@ enum MCPService {
 
     /// What Settings shows under the address: nil while all is well.
     private(set) static var problem: String?
+    /// The port was taken, so the key was replaced: whatever holds the port may have been handed the old one by an
+    /// app connecting to it. Settings says so.
+    private(set) static var replacedKeyForBusyPort = false
     /// Told when the server starts, stops or fails.
     static let changed = Signal<Void>()
 
@@ -47,12 +50,15 @@ enum MCPService {
             stopAccess()
         }
         let server = MCPServer(port: port, endpoint: endpoint)
-        server.onState = { state in
+        server.onState = { [weak server] state in
             Task { @MainActor in
                 switch state {
-                case .failed(let message):
+                case .failed(let message, let portInUse):
                     problem = message
                     NSLog("Zigzag MCP: %@", message)
+                    if portInUse, let server, self.server === server {
+                        replaceKeyForBusyPort(server.endpoint)
+                    }
                 case .ready: problem = nil
                 default: break
                 }
@@ -61,7 +67,15 @@ enum MCPService {
         }
         self.server = server
         problem = nil
+        replacedKeyForBusyPort = false
         server.start()
+    }
+
+    /// Something else listens where apps send the key: the key changes, so one it was given there opens nothing here.
+    static func replaceKeyForBusyPort(_ endpoint: MCPEndpoint, keyFile: URL = MCPKeyFile.url) {
+        let new = MCPKeyFile.reset(at: keyFile) ?? ""
+        endpoint.setToken(new)
+        replacedKeyForBusyPort = true
     }
 
     private static func stop() {
@@ -69,6 +83,7 @@ enum MCPService {
         server?.stop()
         server = nil
         problem = nil
+        replacedKeyForBusyPort = false
         AgentControl.shared.onStop = nil
         AgentControl.shared.reset()
         changed.send()
