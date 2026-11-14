@@ -188,6 +188,7 @@ final class FormRow: NSView, SettingsSearchable {
     }
     #if DEBUG
     var debugTitle: String { title.stringValue }
+    var debugDetail: NSTextField { detail }
     #endif
     private let title = Label("", font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
     private let detail = NSTextField(wrappingLabelWithString: "")
@@ -292,8 +293,10 @@ final class FormRow: NSView, SettingsSearchable {
         return max(0, width - pad - control - textInset)
     }
 
+    /// Measured at the width it's laid out at, its inset included: measured narrower, a line that just fits would be
+    /// counted as two, and the row would keep room for a line it never draws.
     private func detailHeight(for width: CGFloat) -> CGFloat {
-        detail.isHidden ? 0 : ceil(detail.sizeThatFits(NSSize(width: textWidth(for: width), height: 400)).height)
+        detail.isHidden ? 0 : ceil(detail.sizeThatFits(NSSize(width: textWidth(for: width) + Label.inset * 2, height: 400)).height)
     }
 
     /// The height this row needs at `width`.

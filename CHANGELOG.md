@@ -13,6 +13,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The Now Playing card fades out a long title at its end, as sidebar rows do, instead of cutting it with an ellipsis, and Open Downloads Folder lines up with the file names above it in the Downloads panel.
 - Show All Tabs turns dark or light with the rest of Zigzag while it's open, instead of keeping the light color behind white text. Its cards show each page as it looks now, not a picture taken before light or dark changed.
 - The space editor shows a space that follows your Mac at the shade the sidebar has, light by day and deep at night, and moves with it when light or dark changes while the editor is open.
+- In Settings › Zigzag Mini, the New Zigzag Mini row is as tall as its one line of text needs, with its keys in the middle of it.
 
 ## [0.9.1] - 2026-11-15
 

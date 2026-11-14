@@ -57,4 +57,19 @@ struct SettingsLayoutTests {
         #expect((y.down * scale).rounded() == y.down * scale && (y.up * scale).rounded() == y.up * scale)
         withExtendedLifetime((flipped, plain)) {}
     }
+
+    /// A row's explanation is measured at the width it's drawn at: one that just fits on a line gets one line's room,
+    /// not two, at every width, so the row's text and control share its middle.
+    @Test func rowsKeepRoomOnlyForTheLinesTheyDraw() {
+        let detail = "A small window for a quick look at a page. Esc closes it, and ⌘O moves it into your browser window to keep it."
+        for width in stride(from: CGFloat(420), through: 1000, by: 1) {
+            let row = FormRow(title: "New Zigzag Mini", detail: detail, control: Toggle(isOn: false))
+            row.frame = NSRect(x: 0, y: 0, width: width, height: row.height(for: width))
+            row.layoutSubtreeIfNeeded()
+            let field = row.debugDetail
+            let drawn = ceil(field.sizeThatFits(NSSize(width: field.frame.width, height: 400)).height)
+            #expect(field.frame.height == drawn, "at \(width)")
+            if field.frame.height != drawn { break }
+        }
+    }
 }
