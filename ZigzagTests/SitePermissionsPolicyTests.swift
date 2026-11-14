@@ -272,4 +272,99 @@ import WebKit
             #expect(SitePermissions.sites(prefix: "handoff:") == ["https://a.com", "https://b.com", "https://c.com"])
         }
     }
+
+    /// Settings › Downloads groups a rule's answered sites by what was answered, so a refused site does not read like
+    /// a handed-off one; the groups come in the question's own order and only when they have sites.
+    @Test func theDownloadsListGroupsSitesByTheirAnswer() throws {
+        try withDefaults { _ in
+            let rule = UUID()
+            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(rule), origin: "https://a.com")
+            SitePermissions.remember("deny", subject: PermissionSubject.handoff(rule), origin: "https://b.com")
+            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(rule), origin: "https://c.com")
+            SitePermissions.remember("browser", subject: PermissionSubject.handoff(rule), origin: "https://d.com")
+            let decided = SitePermissions.decisions(prefix: PermissionSubject.handoff(rule))
+            #expect(decided.map(\.origin) == ["https://a.com", "https://b.com", "https://c.com", "https://d.com"])
+            let groups = SettingsView.handoffAnswerGroups(decided)
+            #expect(groups.map(\.sites) == [["https://a.com", "https://c.com"], ["https://d.com"], ["https://b.com"]])
+            // The row's title is the very word the question's button used.
+            #expect(groups.map(\.title) == ["Hand Off", "Open in Browser", "Don’t Allow"])
+            #expect(SettingsView.handoffAnswerGroups([]).isEmpty)
+        }
+    }
+
+    /// A page's own pop-up answered "This Tab" or "New Tab" is opened by the tab that asked, through that tab's own
+    /// host: Zigzag Mini's and an installed app's windows are not `BrowserWindowController`s, and casting to one was
+    /// how their pop-ups used to vanish. A host that is not a browser window still routes correctly, and "Don't
+    /// Allow" opens nothing at all.
+    @Test func aPopUpGoesThroughTheTabThatAskedNotABrowserWindow() {
+        let host = QuestionHostStub()
+        let recorder = RecordingTabHost()
+        let tab = Tab(url: URL(string: "https://example.com/"), spaceID: UUID())
+        tab.host = recorder
+        let popup = URL(string: "https://example.com/pop-up")!
+
+        PopupNotice.open(popup, action: "thisTab", from: tab, in: host)
+        #expect(recorder.opened.map { $0.url } == [popup.absoluteString])
+        #expect(recorder.opened.map { $0.disposition } == ["currentTab"])
+
+        recorder.opened.removeAll()
+        PopupNotice.open(popup, action: "newTab", from: tab, in: host)
+        #expect(recorder.opened.map { $0.disposition } == ["foregroundTab"])
+
+        recorder.opened.removeAll()
+        PopupNotice.open(popup, action: "deny", from: tab, in: host)
+        #expect(recorder.opened.isEmpty, "a refused pop-up opens nowhere")
+    }
+
+    /// A page that asks again on its own is held to the answer it already gave "this time" — no second question — and
+    /// nothing is read back in a private window or with no site to key the answer to, where nothing is kept.
+    @Test func aPagesOwnThisTimePopUpAnswerIsReadBack() {
+        let origin = "https://example.com"
+        let tab = Tab(url: URL(string: origin + "/"), spaceID: UUID())
+        #expect(PopupNotice.pageAction(tab: tab, origin: origin, isPrivate: false) == nil, "nothing answered yet")
+        tab.permissionAnswers.note("mini", key: origin, kind: PermissionSubject.popups)
+        #expect(PopupNotice.pageAction(tab: tab, origin: origin, isPrivate: false) == "mini")
+        // The answer is the page's own: another site on it is asked separately.
+        #expect(PopupNotice.pageAction(tab: tab, origin: "https://other.com", isPrivate: false) == nil)
+        // A private window keeps nothing, and neither does a page with no site or no tab.
+        #expect(PopupNotice.pageAction(tab: tab, origin: origin, isPrivate: true) == nil)
+        #expect(PopupNotice.pageAction(tab: tab, origin: nil, isPrivate: false) == nil)
+        #expect(PopupNotice.pageAction(tab: nil, origin: origin, isPrivate: false) == nil)
+    }
 }
+
+/// The tab that asked a pop-up's question, recording what its host was told to open.
+@MainActor
+private final class RecordingTabHost: TabHost {
+    var opened: [(url: String, disposition: String)] = []
+    var hostWindow: NSWindow? { nil }
+    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
+        opened.append((url.absoluteString, "\(disposition)"))
+    }
+    func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction,
+             features: WKWindowFeatures) -> WKWebView? { nil }
+    func tabDidRequestClose(_ tab: Tab) {}
+    func tabWantsToReturnToOpener(_ tab: Tab) {}
+    func tab(_ tab: Tab, hoveringLink url: URL?) {}
+    func tabWantsToBeShown(_ tab: Tab) {}
+}
+
+/// A window that can show a question but is no browser window; nothing here is touched for the two destinations
+/// that go through the tab, which is the point.
+@MainActor
+private final class QuestionHostStub: PromptHost {
+    var window: NSWindow? { nil }
+    var promptOverlay: NSView { NSView() }
+    func pageFrame(showing tab: Tab) -> NSRect? { nil }
+    var focusedPaneFrame: NSRect { .zero }
+    var promptFrontTab: Tab? { nil }
+    func promptHolds(_ tab: Tab) -> Bool { false }
+    func promptShows(_ tab: Tab) -> Bool { false }
+    var promptIsPrivate: Bool { false }
+    var promptAccent: NSColor { .controlAccentColor }
+    func observePromptTabs(_ body: @escaping () -> Void) -> SignalToken? { nil }
+    var promptPageViews: [NSView] { [] }
+    func clearForPrompt() {}
+    var promptIsCovered: Bool { false }
+    var promptAnchor: NSView? { nil }
+    func promptToast(_ text: String, symbol: String, duration: TimeInterval) {}

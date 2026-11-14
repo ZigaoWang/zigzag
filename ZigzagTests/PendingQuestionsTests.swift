@@ -4,12 +4,19 @@ import Testing
 
 /// A question for a tab that cannot show it yet: it waits, the tab is marked, and nothing is answered for you.
 @MainActor @Suite(.serialized) struct PendingQuestionsTests {
-    @Test func aBackgroundTabHoldsItsQuestion() {
+    /// A tab wears its marker exactly while a question is waiting for it and cannot be shown yet: not before it was
+    /// asked, and not while it is the tab in front of a visible window. This is the very predicate the sidebar row
+    /// and the sidebar's edge glow call (`PendingQuestions.waits`), so inverting it would light up a tab that has
+    /// nothing to answer, or hide one that does.
+    @Test func aTabWearsTheMarkerOnlyWhileItsQuestionCannotBeShown() {
         PendingQuestions.forgetAll()
         let tabID = UUID()
+        #expect(PendingQuestions.waits(tabID: tabID, isFront: false, windowVisible: true) == false, "nothing asked yet")
         PendingQuestions.enqueue(.init(id: UUID(), tabID: tabID, origin: "https://a.com", title: "Open mpv"))
-        #expect(PendingQuestions.canShow(isFront: false, windowVisible: true) == false)
-        #expect(PendingQuestions.pending(tabID: tabID).count == 1)
+        #expect(PendingQuestions.waits(tabID: tabID, isFront: false, windowVisible: true) == true, "a background tab")
+        #expect(PendingQuestions.waits(tabID: tabID, isFront: true, windowVisible: false) == true, "a hidden window")
+        #expect(PendingQuestions.waits(tabID: tabID, isFront: true, windowVisible: true) == false, "there, able to be shown")
+        #expect(PendingQuestions.waits(tabID: UUID(), isFront: false, windowVisible: true) == false, "another tab")
     }
 
     @Test func answeringClearsTheMarker() {
