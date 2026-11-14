@@ -5,6 +5,17 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- A strong password from Use Strong Password stays in Passwords until a newer one for the same account takes its place, however long the site takes to confirm it. Unconfirmed ones are no longer deleted after two weeks.
+- Fill from My Card fills the name, email and address fields around the one you're in on pages without a form, and in fields inside a page's own components. When nothing on the page can take your card, it says so.
+- In the password menu, the arrow keys move between rows as soon as it opens. Only Return waits a moment.
+- Install from Folder… and the extensions that come with apps show their sheet in the window Settings is in, never in another window, and no longer do nothing when Settings is the only window.
+- An extension can open its side panel when you click in a page and its script on that page passes the click on, as in Chrome.
+- An extension's background can connect to an app on your Mac, or to a site its manifest names, as in Chrome.
+- An extension installed from a folder keeps the companion-app access it had.
+- An AI app's long tool call is no longer cut off when many other connections open meanwhile.
+- When another app holds the AI apps' port, Zigzag replaces the key only if an AI app may have been given it, not on every launch.
+
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
