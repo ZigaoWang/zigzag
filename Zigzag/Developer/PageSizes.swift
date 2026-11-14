@@ -21,8 +21,9 @@ enum PageSizes {
                        Size(name: "iPhone 16 Pro Max", width: 440, height: 956), Size(name: "Pixel 7", width: 412, height: 915),
                        Size(name: "Galaxy S24", width: 360, height: 780), Size(name: "iPad mini", width: 744, height: 1133),
                        Size(name: "iPad Air", width: 820, height: 1180), Size(name: "iPad Pro 13″", width: 1032, height: 1376),
-                       Size(name: "Laptop", width: 1280, height: 800), Size(name: "Desktop", width: 1440, height: 900),
-                       Size(name: "Full HD", width: 1920, height: 1080)]
+                       Size(name: String(localized: "pagesize.laptop", defaultValue: "Laptop", comment: "A page size in the developer tools: a common laptop window, 1280 × 800."), width: 1280, height: 800),
+                       Size(name: String(localized: "pagesize.desktop", defaultValue: "Desktop", comment: "A page size in the developer tools: a common desktop window, 1440 × 900."), width: 1440, height: 900),
+                       Size(name: String(localized: "pagesize.fullhd", defaultValue: "Full HD", comment: "A page size in the developer tools: a full HD screen, 1920 × 1080."), width: 1920, height: 1080)]
     /// The least and the most a page's side can be: narrower than any phone, and no larger than a page ever is.
     static let limits = 200...8000
 

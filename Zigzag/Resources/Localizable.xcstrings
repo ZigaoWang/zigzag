@@ -19783,6 +19783,42 @@
         }
       }
     },
+    "onboarding.site.calendar" : {
+      "comment" : "A site to pin in the welcome window: Google Calendar, named as Google names it in your language.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Calendar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日历"
+          }
+        }
+      }
+    },
+    "onboarding.site.drive" : {
+      "comment" : "A site to pin in the welcome window: Google Drive, named as Google names it in your language.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Drive"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "云端硬盘"
+          }
+        }
+      }
+    },
     "open" : {
       "comment" : "Spoken by VoiceOver after a favorite's name: its page is loaded.",
       "localizations" : {
@@ -19801,6 +19837,60 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "用“%@”打开"
+          }
+        }
+      }
+    },
+    "pagesize.desktop" : {
+      "comment" : "A page size in the developer tools: a common desktop window, 1440 × 900.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Desktop"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "台式机"
+          }
+        }
+      }
+    },
+    "pagesize.fullhd" : {
+      "comment" : "A page size in the developer tools: a full HD screen, 1920 × 1080.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Full HD"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全高清"
+          }
+        }
+      }
+    },
+    "pagesize.laptop" : {
+      "comment" : "A page size in the developer tools: a common laptop window, 1280 × 800.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Laptop"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "笔记本电脑"
           }
         }
       }
