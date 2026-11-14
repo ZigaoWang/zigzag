@@ -35,4 +35,14 @@ struct PermissionPromptTests {
         #expect(answer?.action == "allow")
         #expect(answer?.remember == false)
     }
+
+    @Test func aDisabledDropdownDimsAndKeepsItsExplanation() {
+        let dropdown = DropdownButton()
+        dropdown.options = [DropdownButton.Option(title: "This time"), DropdownButton.Option(title: "Always on this site")]
+        dropdown.isEnabled = false
+        dropdown.toolTip = "Private windows don’t remember answers."
+        dropdown.layout()
+        #expect(dropdown.alphaValue == Tokens.Opacity.disabled)
+        #expect(dropdown.toolTip == "Private windows don’t remember answers.")
+    }
 }

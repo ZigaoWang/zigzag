@@ -668,10 +668,11 @@ final class PermissionPrompt: FloatingPanelView {
     /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
     /// `tab` is the tab whose page asked; without one, it's the tab in front when the question comes up.
     /// `host` is how the site is named in the question; `origin`, when given, is the site it's for (`SiteOrigin`).
-    /// The duration choice is This time unless `canRemember` offers Always on this site. Nil means Not Now.
+    /// The duration choice is This time unless `canRemember` offers Always on this site. A disabled choice keeps
+    /// `rememberNote` as its explanation. Nil means Not Now.
     static func ask(host: String, origin: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil,
-                    actions: [PermissionAction] = [.deny, .allow], canRemember: Bool = true,
+                    actions: [PermissionAction] = [.deny, .allow], canRemember: Bool = true, rememberNote: String? = nil,
                     answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         let key = ObjectIdentifier(controller)
         let before = queue[key]
@@ -683,7 +684,8 @@ final class PermissionPrompt: FloatingPanelView {
                 return PermissionAnswer(action: known.action, remember: known.remember && remembers)
             }
             return await show(host: host, request: title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English."),
-                              symbol: symbol, icon: icon, actions: actions, canRemember: remembers, origin: origin, in: controller, tab: tab)
+                              symbol: symbol, icon: icon, actions: actions, canRemember: remembers, rememberNote: rememberNote,
+                              origin: origin, in: controller, tab: tab)
         }
         queue[key] = task
         let answer = await task.value
@@ -696,7 +698,7 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, actions: [PermissionAction],
-                             canRemember: Bool, origin: String?, in controller: PromptHost, tab: Tab?) async -> PermissionAnswer? {
+                             canRemember: Bool, rememberNote: String?, origin: String?, in controller: PromptHost, tab: Tab?) async -> PermissionAnswer? {
         // Never under What's New, where it couldn't be seen: it waits until the notes close.
         await withCheckedContinuation { continuation in
             WhatsNewSheet.afterClosing(in: controller.window) { continuation.resume() }
@@ -725,7 +727,12 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.picture.contentTintColor = Tokens.Color.textPrimary
                 prompt.badge.color = .clear
             }
-            prompt.duration.isHidden = !canRemember
+            prompt.duration.isEnabled = canRemember
+            if !canRemember {
+                prompt.duration.toolTip = rememberNote ?? (controller.promptIsPrivate
+                    ? String(localized: "Private windows don’t remember answers.", comment: "Tooltip of the disabled duration dropdown on a permission question in a private window.")
+                    : String(localized: "This site can’t remember this answer.", comment: "Tooltip of the disabled duration dropdown on a permission question whose answer cannot be kept."))
+            }
             let row = Self.actions(for: actions).map { action -> PillButton in
                 let button = PillButton(title: action.title, style: action.isProminent ? .prominent : .plain)
                 if action.isProminent { button.tint = accent }
@@ -805,7 +812,7 @@ final class PermissionPrompt: FloatingPanelView {
         radius = Tokens.Radius.panel
         let area = controller.focusedPaneFrame
         // Wide enough for the answers and duration, within the page's own measure.
-        let measured = max(buttonsWidth, duration.isHidden ? 0 : duration.intrinsicContentSize.width) + Self.pad * 2
+        let measured = max(buttonsWidth, duration.intrinsicContentSize.width) + Self.pad * 2
         let width = min(max(420, measured), min(560, area.width - Tokens.Space.x6))
         frame = NSRect(x: round(area.midX - width / 2), y: area.minY + Tokens.Space.x3, width: width, height: height(for: width))
     }
@@ -845,8 +852,8 @@ final class PermissionPrompt: FloatingPanelView {
     required init?(coder: NSCoder) { fatalError() }
 
     private func finish(_ choice: PermissionAnswer?) {
-        // The hidden duration control also guards debug answers: a private or one-time question never returns Always.
-        let choice = choice.map { PermissionAnswer(action: $0.action, remember: $0.remember && !duration.isHidden) }
+        // The disabled duration control also guards debug answers: a private or one-time question never returns Always.
+        let choice = choice.map { PermissionAnswer(action: $0.action, remember: $0.remember && duration.isEnabled) }
         stopListening()
         let answer = self.answer
         self.answer = nil
@@ -916,8 +923,7 @@ final class PermissionPrompt: FloatingPanelView {
 
     private func height(for width: CGFloat) -> CGFloat {
         let h = Self.pad + max(Self.iconSide, textHeight(for: width))
-        let durationHeight = duration.isHidden ? 0 : Tokens.Page.controlHeight + Tokens.Space.x2
-        return h + Tokens.Space.x4 + durationHeight + Self.buttonHeight + Self.pad
+        return h + Tokens.Space.x4 + Tokens.Page.controlHeight + Tokens.Space.x2 + Self.buttonHeight + Self.pad
     }
 
     /// The answers side by side at one width, with the gaps between.
