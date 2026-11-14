@@ -100,9 +100,12 @@ codesign -dvv "$APP" 2>&1 | grep -E "Authority=Developer ID|TeamIdentifier"
 # The picture helper reads what websites send: it must be signed like the app, with the hardened runtime, and
 # sandboxed. Exporting signs it with the app; a release where it isn't stops here.
 HELPER="$APP/Contents/XPCServices/ZigzagImageDecoder.xpc"
-codesign -dvv "$HELPER" 2>&1 | grep -q "Authority=Developer ID Application" || { echo "The picture helper isn't signed with Developer ID"; exit 1; }
-codesign -dvv "$HELPER" 2>&1 | grep -q "flags=.*runtime" || { echo "The picture helper lacks the hardened runtime"; exit 1; }
-codesign -d --entitlements - --xml "$HELPER" 2>/dev/null | grep -q "com.apple.security.app-sandbox" || { echo "The picture helper isn't sandboxed"; exit 1; }
+# Read codesign's answers first: with pipefail, grep -q quitting early fails codesign's write and the whole check.
+HELPER_SIGNATURE=$(codesign -dvv "$HELPER" 2>&1 || true)
+HELPER_ENTITLEMENTS=$(codesign -d --entitlements - --xml "$HELPER" 2>/dev/null || true)
+[[ "$HELPER_SIGNATURE" == *"Authority=Developer ID Application"* ]] || { echo "The picture helper isn't signed with Developer ID"; exit 1; }
+[[ "$HELPER_SIGNATURE" =~ "flags=[^ ]*runtime" ]] || { echo "The picture helper lacks the hardened runtime"; exit 1; }
+[[ "$HELPER_ENTITLEMENTS" == *"com.apple.security.app-sandbox"* ]] || { echo "The picture helper isn't sandboxed"; exit 1; }
 
 if [[ "${1:-}" == "--local" ]]; then
   echo "Done (not notarized): $APP"
