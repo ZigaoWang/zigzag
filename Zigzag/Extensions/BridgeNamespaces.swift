@@ -632,8 +632,6 @@ final class ExtensionPageGuard: NSObject, WKNavigationDelegate {
         self.onLink = onLink
     }
 
-    convenience init(base: URL, onLink: ((URL) -> Void)? = nil) { self.init(base: base, loaded: nil, onLink: onLink) }
-
     /// Made the page's navigation delegate, and kept as long as the page is.
     func attach(to page: WKWebView) {
         page.navigationDelegate = self
