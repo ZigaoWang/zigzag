@@ -11996,6 +11996,17 @@
         }
       }
     },
+    "Reader opens once the page loads" : {
+      "comment" : "Toast when Reader is pressed while the page is still loading.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页面载入完成后会打开阅读器"
+          }
+        }
+      }
+    },
     "Reading List" : {
       "comment" : "Folder that pages from another browser's reading list are imported into.",
       "localizations" : {

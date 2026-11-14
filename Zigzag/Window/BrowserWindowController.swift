@@ -1631,9 +1631,46 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return selectedWebView
     }
 
+    /// Reader pressed while the page is still loading: it opens once the load is done (#233).
+    private var readerWait: SignalToken?
+    private var readerWaitLimit: DispatchWorkItem?
+
     func toggleReader() {
         if reader != nil { closeReader(); return }
-        guard let tab = tabManager.selectedTab, let webView = tab.webView, let url = tab.url else { return }
+        // Pressed again while it waits: it doesn't open after all.
+        if readerWait != nil { endReaderWait(); return }
+        guard let tab = tabManager.selectedTab, let webView = tab.webView, tab.url != nil else { return }
+        // Mid-load the page may not be there yet to read, or be the one you're leaving: Reader waits for it, and
+        // the page stays as it is meanwhile. A page that never quite finishes (a stalled picture) is read anyway.
+        guard !webView.isLoading else {
+            Toast.show(String(localized: "Reader opens once the page loads", comment: "Toast when Reader is pressed while the page is still loading."), symbol: "doc.plaintext", duration: 2, in: self)
+            readerWait = tab.changed.observe { [weak self, weak tab] change in
+                guard case .loading = change, let self, let tab, tab.webView?.isLoading == false else { return }
+                self.endReaderWait()
+                self.openReader(in: tab)
+            }
+            let limit = DispatchWorkItem { [weak self, weak tab] in
+                guard let self, let tab, self.readerWait != nil else { return }
+                self.endReaderWait()
+                self.openReader(in: tab)
+            }
+            readerWaitLimit = limit
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: limit)
+            return
+        }
+        openReader(in: tab)
+    }
+
+    private func endReaderWait() {
+        readerWait?.cancel()
+        readerWait = nil
+        readerWaitLimit?.cancel()
+        readerWaitLimit = nil
+    }
+
+    private func openReader(in tab: Tab) {
+        // Waited for a page you've since left: Reader isn't for the tab you're on now.
+        guard reader == nil, tabManager.selectedTab === tab, let webView = tab.webView, let url = tab.url else { return }
         Task { [weak self] in
             guard let article = await Reader.article(in: webView), let self else {
                 if let self { Toast.show(String(localized: "This page doesn’t have an article to read", comment: "Toast when Reader can't find an article on the page."), symbol: "doc.plaintext", duration: 2, in: self) }
