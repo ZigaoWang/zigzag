@@ -1275,7 +1275,25 @@ final class SpaceLookEditor: NSView {
         let follows = Self.startingDepth(draft, dark: isDark)
         return index == 0 ? draft.brightness ?? follows : draft.brightness2 ?? draft.brightness ?? follows
     }
-    private let isDark: Bool
+    /// Whether the window looks dark, for where a space that follows the Mac sits on Shade.
+    private var isDark: Bool
+    /// Where Shade shows the selected color, from 0 (lightest) to 1 (darkest).
+    var shownDepth: Double { depth(selected) }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        follow(dark: effectiveAppearance.isDark)
+    }
+
+    /// Light or dark changed while the editor is open. A space that follows the Mac changed with it, as the sidebar
+    /// shows: its wheel and Shade move to where it is now, so they show the color the space has.
+    func follow(dark: Bool) {
+        guard dark != isDark else { return }
+        isDark = dark
+        guard !colorChosen else { return }
+        draft.brightness = Self.startingDepth(original, dark: dark)
+        sync(animated: false)
+    }
 
     /// Lighter or darker. With two colors both move together, keeping the step between them; holding Option moves
     /// only the selected one.

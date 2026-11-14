@@ -115,4 +115,21 @@ struct SpaceDefaultColorsTests {
         #expect(older.defaultColor == nil)
         #expect(Library.defaultColors(of: [older]) == [.mint])
     }
+
+    /// The space editor shows a space that follows the Mac at the shade it has now, as the sidebar does, and moves
+    /// with it when light or dark changes while it's open. A color you chose stays where you put it.
+    @MainActor @Test func editorShowsTheShadeTheSpaceHasNow() {
+        let space = SpaceInfo(name: "Personal", color: .sky, defaultColor: .sky)
+        let editor = SpaceLookEditor(space: space, defaultColor: .sky, dark: true)
+        #expect(editor.shownDepth > 0.5)
+        editor.follow(dark: false)
+        #expect(editor.shownDepth < 0.5)
+        #expect(SpaceLookEditor(space: space, defaultColor: .sky, dark: false).shownDepth == editor.shownDepth)
+
+        var chosen = space
+        chosen.brightness = 0.8
+        let mine = SpaceLookEditor(space: chosen, defaultColor: .sky, dark: true)
+        mine.follow(dark: false)
+        #expect(abs(mine.shownDepth - 0.8) < 0.001)
+    }
 }
