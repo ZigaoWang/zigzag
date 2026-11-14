@@ -129,8 +129,9 @@ nonisolated enum MCPKeyFile {
     static var url: URL { Paths.file("MCP Key") }
 
     static func token(at url: URL = url, creating: Bool) -> String? {
+        // Only a key as Zigzag makes them: one written there by hand, or by something else, is replaced.
         if let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-           text.count >= 32 {
+           MCPAccess.isZigzagKey(text) {
             // Kept to you alone, even if something loosened it.
             try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
             return text

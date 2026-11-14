@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Zigzag
@@ -48,5 +49,37 @@ struct MCPSetupTests {
         // Short enough to paste into a chat, and the key is the only secret in it.
         #expect(prompt.count < 900)
         #expect(prompt.components(separatedBy: token).count == 2)
+    }
+}
+
+extension MCPSetupTests {
+    /// Copies with the key are marked concealed for clipboard managers; the address alone isn't.
+    @MainActor @Test func keyCopiesAreConcealed() {
+        let board = NSPasteboard(name: NSPasteboard.Name("zigzag-test-\(UUID().uuidString)"))
+        defer { board.releaseGlobally() }
+        let marker = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
+        SettingsView.copy("Authorization: Bearer \(token)", concealed: true, to: board)
+        #expect(board.string(forType: .string) == "Authorization: Bearer \(token)")
+        #expect(board.types?.contains(marker) == true)
+        SettingsView.copy(address, to: board)
+        #expect(board.string(forType: .string) == address)
+        #expect(board.types?.contains(marker) == false)
+    }
+
+    /// Only a key as Zigzag makes them counts: one written into the key file by hand is replaced.
+    @Test func onlyZigzagsOwnKeysAreUsed() throws {
+        for _ in 0..<200 { #expect(MCPAccess.isZigzagKey(MCPAccess.newToken())) }
+        let good = MCPAccess.newToken()
+        for text in [String(good.dropLast()), good + "A", String(repeating: "x", count: 32), String(repeating: "a", count: 64),
+                     String(good.dropLast()) + "+", String(good.dropLast()) + "=", String(good.dropLast()) + "é",
+                     String(repeating: "A", count: 42) + "B"] {
+            #expect(!MCPAccess.isZigzagKey(text), "\(text)")
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("mcp-key-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data("chosen-by-someone-else-0123456789abcdef".utf8).write(to: url)
+        #expect(MCPKeyFile.token(at: url, creating: false) == nil)
+        let made = try #require(MCPKeyFile.token(at: url, creating: true))
+        #expect(MCPAccess.isZigzagKey(made) && MCPKeyFile.token(at: url, creating: false) == made)
     }
 }

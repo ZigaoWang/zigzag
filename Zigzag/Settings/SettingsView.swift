@@ -917,7 +917,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private lazy var aiKeyRow: FormRow = {
         let copy = PillButton(title: String(localized: "Copy Header", comment: "Button in Settings › Automation: copies the Authorization header, with the key, that an AI app sends."))
         copy.onClick = { [weak copy] _ in
-            Self.copy(MCPService.authorizationHeader)
+            Self.copy(MCPService.authorizationHeader, concealed: true)
             copy?.flash(String(localized: "Copied", comment: "Shown on a Copy button for a moment after it copies."))
         }
         let reset = PillButton(title: String(localized: "Reset Key", comment: "Button in Settings › Automation: makes a new key for AI apps, which disconnects every app using the old one."))
@@ -938,7 +938,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private lazy var aiSetupRow: FormRow = {
         let copy = PillButton(title: String(localized: "Copy Setup", comment: "Button in Settings › Automation › Connect an App: copies the JSON setup, with the address and key, that MCP apps take."))
         copy.onClick = { [weak copy] _ in
-            Self.copy(MCPSetup.configuration(address: MCPService.address, token: MCPService.token))
+            Self.copy(MCPSetup.configuration(address: MCPService.address, token: MCPService.token), concealed: true)
             copy?.flash(String(localized: "Copied", comment: "Shown on a Copy button for a moment after it copies."))
         }
         let row = FormRow(title: String(localized: "Setup", comment: "A row in Settings › Automation › Connect an App: the JSON setup to paste into an AI app."),
@@ -952,7 +952,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private lazy var aiPromptRow: FormRow = {
         let copy = PillButton(title: String(localized: "Copy Prompt", comment: "Button in Settings › Automation › Connect an App: copies a prompt to paste into an AI app's chat, so it connects to Zigzag."))
         copy.onClick = { [weak copy] _ in
-            Self.copy(MCPSetup.prompt(address: MCPService.address, token: MCPService.token))
+            Self.copy(MCPSetup.prompt(address: MCPService.address, token: MCPService.token), concealed: true)
             copy?.flash(String(localized: "Copied", comment: "Shown on a Copy button for a moment after it copies."))
         }
         let row = FormRow(title: String(localized: "Prompt", comment: "A row in Settings › Automation › Connect an App: a prompt to paste into an AI app's chat."),
@@ -2744,9 +2744,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         controller.window?.makeKeyAndOrderFront(nil)
     }
 
-    private static func copy(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+    /// A copy with the AI apps' key in it is marked concealed, so clipboard managers and history apps leave it out.
+    static func copy(_ text: String, concealed: Bool = false, to board: NSPasteboard = .general) {
+        let marker = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
+        // Declared with the text, so it's never on the clipboard unmarked even for a moment.
+        board.declareTypes(concealed ? [.string, marker] : [.string], owner: nil)
+        board.setString(text, forType: .string)
+        if concealed { board.setData(Data(), forType: marker) }
     }
 
     /// The address and key show only while AI apps may use Zigzag; the address says so if the server couldn't start.

@@ -130,6 +130,17 @@ nonisolated enum MCPAccess {
             .replacingOccurrences(of: "=", with: "")
     }
 
+    /// A key as `newToken` makes them: 43 characters of URL-safe base64 that are 32 bytes, with nothing over.
+    static func isZigzagKey(_ text: String) -> Bool {
+        guard text.utf8.count == 43,
+              text.utf8.allSatisfy({ (0x41...0x5A).contains($0) || (0x61...0x7A).contains($0) || (0x30...0x39).contains($0) || $0 == 0x2D || $0 == 0x5F })
+        else { return false }
+        let standard = text.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/") + "="
+        guard let bytes = Data(base64Encoded: standard), bytes.count == 32 else { return false }
+        // The last character carries two bits past the 32 bytes; Zigzag's keys have them clear.
+        return Data(bytes).base64EncodedString() == standard
+    }
+
     /// Mcp-Name may come base64-encoded, as `=?base64?…?=`, when the name isn't plain ASCII.
     static func decodedHeader(_ value: String) -> String {
         guard value.hasPrefix("=?base64?"), value.hasSuffix("?="), value.count > 11 else { return value }
