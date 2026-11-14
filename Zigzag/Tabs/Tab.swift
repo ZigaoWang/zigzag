@@ -1481,7 +1481,8 @@ extension Tab: WKNavigationDelegate {
         }
         let fresh = pdfFreshLoad
         pdfFreshLoad = false
-        // A new page: a PDF that couldn't open before gets another try.
+        // A new page: a PDF that couldn't open before gets another try, unless it brought the helper down
+        // (`SafePDF.broughtDownTheHelper`).
         pdfFailed = []
         checkForPDF(webView, fresh: fresh)
         hasLoadedOnce = true
@@ -1797,8 +1798,9 @@ extension Tab {
             self.title = file.isEmpty || file == "/" ? (url.host() ?? "") : (file.removingPercentEncoding ?? file)
             self.changed.send(.title)
         }
-        // In peek, a form's reply, or one ours couldn't open: WebKit's own viewer shows it.
-        guard !self.isPeek, self.pageIsGet, !self.pdfFailed.contains(url) else {
+        // In peek, a form's reply, or one ours couldn't open (on this page, or one that brought the helper down this
+        // session, which a reload would only bring down again): WebKit's own viewer shows it.
+        guard !self.isPeek, self.pageIsGet, !self.pdfFailed.contains(url), !SafePDF.broughtDownTheHelper(url) else {
             if self.pdfViewer != nil { self.setPDFViewer(nil) }
             return
         }
@@ -1821,7 +1823,7 @@ extension Tab {
             guard let webView else { return }
             let data = await PDFViewerView.load(url, from: webView, userAgent: userAgent)
             var opened: (SafePDF, SafePDF.Info)?
-            if let data { opened = await PDFViewerView.open(data) }
+            if let data { opened = await PDFViewerView.open(data, from: url) }
             guard !Task.isCancelled, let self, let viewer, self.pdfViewer === viewer, self.webView === webView, webView.url == url else { return }
             // Couldn't fetch or open it: WebKit's viewer underneath shows instead, and stays.
             guard let (document, info) = opened else {

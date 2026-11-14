@@ -5,8 +5,9 @@ import PDFKit
 // no files, and answers its viewer in plain numbers, strings and pixels (PDFService.swift). Only Zigzag itself can
 // reach it: an XPC service bundled in the app is visible to that app alone.
 //
-// Each connection holds one PDF. A request stuck past its time limit (a PDF made to hang PDFKit) ends the helper;
-// Zigzag starts it again, sends the PDFs that were open again, and a PDF that brings it down twice fails alone.
+// Each connection holds one PDF, until Zigzag lets the connection go. A request stuck past its time limit (a PDF
+// made to hang PDFKit) ends the helper; Zigzag starts it again and sends the PDFs that were open again. A PDF that
+// brings it down with the helper to itself fails alone; one that shared it is sent alone next time (SafePDF.swift).
 
 /// One PDF, and the answers about it.
 final class Renderer: NSObject, PDFRendering, @unchecked Sendable {
@@ -305,7 +306,8 @@ nonisolated enum PictureAreas {
                 }
                 var resources: CGPDFDictionaryRef?
                 _ = CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources)
-                // Without resources of its own, a form uses its page's: the parent stream's are looked in next.
+                // Without resources of its own, a form uses those of whatever draws it: the stream's own dictionary
+                // stands in, holding none, and each name is looked for in the parent stream's (`content`) next.
                 let inner = CGPDFContentStreamCreateWithStream(stream, resources ?? dictionary, content)
                 let innerScanner = CGPDFScannerCreate(inner, scan.table, info)
                 // A form draws inside its own `q`…`Q`: what it leaves saved, or tries to restore past, is its own.
