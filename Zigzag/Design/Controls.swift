@@ -1435,7 +1435,8 @@ final class DropdownButton: InteractiveView {
     private func refresh() {
         label.stringValue = current?.title ?? ""
         label.isHidden = showsPictureOnly
-        toolTip = showsPictureOnly ? current?.title : nil
+        if showsPictureOnly { toolTip = current?.title }
+        else if isEnabled { toolTip = nil }
         // A neutral globe where a site's icon is missing, so the column of pictures never has a gap.
         let pictured = options.contains { $0.image != nil }
         icon.image = current?.image ?? (pictured ? MenuPanel.placeholder : nil)
@@ -1475,11 +1476,11 @@ final class DropdownButton: InteractiveView {
         chevron.frame = NSRect(x: bounds.width - Self.textInset - 10, y: (bounds.height - 14) / 2, width: 10, height: 14)
         label.frame = NSRect(x: x - Label.inset, y: label.centeredY(in: bounds.height), width: max(0, chevron.frame.minX - x - Tokens.Space.x1), height: label.lineHeight)
         // A choice cut short (a long profile name) shows whole under the pointer (#189).
-        if !showsPictureOnly { toolTip = label.frame.width < label.textWidth - Tokens.Space.x1 ? current?.title : nil }
+        if !showsPictureOnly, isEnabled { toolTip = label.frame.width < label.textWidth - Tokens.Space.x1 ? current?.title : nil }
     }
 
     func openMenu() {
-        guard !options.isEmpty, MenuPanel.current?.anchor !== self else { return }
+        guard isEnabled, !options.isEmpty, MenuPanel.current?.anchor !== self else { return }
         var items: [MenuPanel.Entry] = options.enumerated().map { index, option in
             .item(MenuPanel.Item(title: option.title, image: option.image, isChecked: index == selectedIndex) { [weak self] in
                 guard let self else { return }
@@ -1527,6 +1528,7 @@ final class DropdownButton: InteractiveView {
         if menuOpen { layer?.set(backgroundColor: cgColor(Tokens.Color.controlHover), animated: false) }
         label.textColor = ink
         chevron.contentTintColor = Tokens.Color.textSecondary
+        alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
     }
 }
 
