@@ -258,7 +258,7 @@ git commit -m "feat: one prompt for every site permission"
 
 **Interfaces:**
 - Consumes: Task 2's `PermissionPrompt.ask`.
-- Produces: `SitePermissions.request(origin:type:window:isPrivate:tab:) async -> WKPermissionDecision` unchanged in name, now writing `PermissionAnswer.remember` into the store, and the page answer when `remember == false`.
+- Produces: `SitePermissions.request(origin:type:window:isPrivate:tab:) async -> WKPermissionDecision` unchanged in name, now writing `PermissionAnswer.remember` into the store, and the page answer when `remember == false`; `SitePermissions.rememberAnswer(_ answer: PermissionAnswer, subject: String, origin: String, tab: Tab?) -> Bool` (stores only when `remember` and not private; returns whether the action is not `"deny"`); `DisplayCaptureChoice.actions: [PermissionAction]`.
 
 - [ ] **Step 1: Write failing tests for the answer mapping**
 
@@ -311,7 +311,7 @@ git commit -m "feat: remember deny, and this-time answers, for media and locatio
 
 **Interfaces:**
 - Consumes: Task 2's prompt, Task 1's store.
-- Produces: `ExternalLinks.decision(page:scheme:foreign:) -> String?` returning the stored action id; `ExternalLinks.verdict(byYou:clickedHere:scheme:stored:canRemember:) -> Verdict` where `Verdict` is `.block`, `.open`, `.ask`.
+- Produces: `ExternalLinks.decision(page:scheme:foreign:) -> String?` returning the stored action id; `ExternalLinks.verdict(byYou:clickedHere:scheme:stored:canRemember:) -> Verdict` where `Verdict` is `.block`, `.open`, `.ask`; `ExternalLinks.canRemember(url: URL?, foreign: Bool) -> Bool`.
 
 - [ ] **Step 1: Write failing tests**
 

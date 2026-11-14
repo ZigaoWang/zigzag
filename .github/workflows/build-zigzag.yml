@@ -4,7 +4,7 @@ name: Build Zigzag Dev
 
 on:
   push:
-    branches: [feat/download-handoff]
+    branches: [feat/download-handoff, feat/site-permissions]
   workflow_dispatch:
 
 permissions:
