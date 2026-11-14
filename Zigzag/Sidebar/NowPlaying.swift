@@ -114,19 +114,30 @@ final class NowPlayingView: InteractiveView {
 
 /// Which tab the sidebar's Now Playing card is for, and the ones it's been hidden for.
 ///
-/// It's the most recent tab you aren't looking at that makes sound, or that Zigzag paused. Hiding it is for what that
-/// tab is playing now, never a pause: the card stays away while the tab plays on, pauses and plays again on the same
-/// page, and comes back once the tab goes to another page (the next video, another track's page). Another tab making
-/// sound gets the card meanwhile. A closed tab is forgotten.
+/// It's the most recent tab you aren't looking at that makes sound, that Zigzag paused, or whose video is in the mini
+/// player, paused there or not. Hiding it is for what that tab is playing now, never a pause: the card stays away
+/// while the tab plays on, pauses and plays again on the same page, and comes back once the tab goes to another page
+/// (the next video, another track's page). Another tab making sound gets the card meanwhile. A closed tab is forgotten.
 struct NowPlayingChoice {
     /// A tab of the window, in most-recent order.
     struct Candidate: Equatable {
         let id: UUID
         /// The page it's on (`page(of:)`).
         let page: String
-        /// Playing sound, or paused from the card.
+        /// Playing sound, paused from the card, or in the mini player, playing or paused there.
         let sounding: Bool
         let isSelected: Bool
+    }
+
+    /// Whether a tab has the card's attention: playing sound, paused from the card, or its video in the mini player,
+    /// paused there or not (the card stays until the mini player lets it go).
+    static func isSounding(playing: Bool, pausedFromCard: Bool, inMiniPlayer: Bool) -> Bool {
+        playing || pausedFromCard || inMiniPlayer
+    }
+
+    /// Whether the card shows it paused, with Play: paused from the card, or stopped in the mini player.
+    static func isPaused(playing: Bool, pausedFromCard: Bool, inMiniPlayer: Bool) -> Bool {
+        pausedFromCard || (inMiniPlayer && !playing)
     }
 
     /// Each hidden tab, with the page it was hidden on.

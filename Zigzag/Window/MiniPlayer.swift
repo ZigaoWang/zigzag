@@ -317,6 +317,7 @@ final class MiniPlayer {
         #endif
         card.appear(from: from, corner: MiniPlayerLayout.growPoint(of: card.globalFrame, in: movableArea(for: currentPlace)))
         watchWindow()
+        controller.miniPlayerChanged()
 
         tokens = [
             PageVideos.shared.reported.observe { [weak self, weak webView] page in
@@ -399,6 +400,7 @@ final class MiniPlayer {
         frameID = nil
         video = nil
         if keeps, let webView { parkedPageReported(webView) }
+        controller?.miniPlayerChanged()
     }
 
     // MARK: Minimized
@@ -507,6 +509,16 @@ final class MiniPlayer {
             _ = await PageVideos.shared.run(name, all, in: frame, of: webView)
             _ = await PageVideos.shared.run("report", in: frame, of: webView)
         }
+    }
+
+    /// `tab`'s video is the one in the card, playing or paused.
+    func holds(_ tab: Tab) -> Bool { self.tab === tab && card != nil }
+
+    /// Plays or pauses `tab`'s video when it's the one in the card, as the card's own button does. False otherwise.
+    func togglePlayback(of tab: Tab) -> Bool {
+        guard holds(tab), currentFrame != nil else { return false }
+        command("toggle")
+        return true
     }
 
     private var currentFrame: PageVideos.Frame? {
@@ -884,6 +896,7 @@ final class MiniPlayerView: NSView {
         controls.addSubview(scrim)
         for view in [backButton, minimizeButton, closeButton, rewindButton, playButton, forwardButton, progress] as [NSView] { controls.addSubview(view) }
         addSubview(controls)
+        showControls(animated: false)
 
         edge.layer?.borderWidth = Tokens.Metric.hairline
         addSubview(edge)
@@ -1002,7 +1015,9 @@ final class MiniPlayerView: NSView {
     /// The video's state: play or pause, its time, and whether it can be skipped through at all (not a live stream).
     func update(_ video: PageVideo) {
         let playing = video.isPlaying
+        let changed = playing != isPlaying
         isPlaying = playing
+        if changed, !isGoing { showControls(animated: true) }
         let symbol = playing ? "pause.fill" : "play.fill"
         if playButton.symbol != symbol {
             let tip = playing ? String(localized: "Pause", comment: "Tooltip of the mini player's play button while the video plays.")
@@ -1211,12 +1226,28 @@ final class MiniPlayerView: NSView {
     func setControls(_ on: Bool, animated: Bool) {
         guard on != showsControls else { return }
         showsControls = on
-        if animated {
-            Tokens.Motion.animate(Tokens.Motion.feedback) { self.controls.animator().alphaValue = on ? 1 : 0 }
-        } else {
-            controls.alphaValue = on ? 1 : 0
-        }
+        showControls(animated: animated)
         if !on { [backButton, minimizeButton, closeButton, rewindButton, playButton, forwardButton].forEach { $0.isHovered = false } }
+    }
+
+    /// Paused, the play button stays on the picture with the pointer away, alone, where it is with the rest: the card
+    /// says it's paused with its own control. Everything else comes only with the pointer.
+    private func showControls(animated: Bool) {
+        let all: CGFloat = showsControls ? 1 : 0
+        let play: CGFloat = showsControls || !isPlaying ? 1 : 0
+        let rest: [NSView] = [scrim, backButton, minimizeButton, closeButton, rewindButton, forwardButton, progress]
+        let apply = {
+            self.controls.animator().alphaValue = play
+            rest.forEach { $0.animator().alphaValue = all }
+        }
+        if animated {
+            Tokens.Motion.animate(Tokens.Motion.feedback) { apply() }
+        } else {
+            Tokens.Motion.withoutAnimation {
+                self.controls.alphaValue = play
+                rest.forEach { $0.alphaValue = all }
+            }
+        }
     }
 
     // MARK: Dragging

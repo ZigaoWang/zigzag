@@ -19,6 +19,22 @@ struct NowPlayingTests {
         #expect(choice.pick(from: []) == nil)
     }
 
+    @Test func pausedInTheMiniPlayerKeepsTheCard() {
+        // Paused from the mini player: no sound, but the video is still there, so the card stays, showing Play.
+        #expect(NowPlayingChoice.isSounding(playing: false, pausedFromCard: false, inMiniPlayer: true))
+        #expect(NowPlayingChoice.isPaused(playing: false, pausedFromCard: false, inMiniPlayer: true))
+        // Playing there again: Pause.
+        #expect(!NowPlayingChoice.isPaused(playing: true, pausedFromCard: false, inMiniPlayer: true))
+        // Paused from the card, the same as before.
+        #expect(NowPlayingChoice.isSounding(playing: false, pausedFromCard: true, inMiniPlayer: false))
+        #expect(NowPlayingChoice.isPaused(playing: false, pausedFromCard: true, inMiniPlayer: false))
+        // Stopped by the page with no mini player: nothing to show.
+        #expect(!NowPlayingChoice.isSounding(playing: false, pausedFromCard: false, inMiniPlayer: false))
+        var choice = NowPlayingChoice()
+        let paused = NowPlayingChoice.isSounding(playing: false, pausedFromCard: false, inMiniPlayer: true)
+        #expect(choice.pick(from: [tab(a, sounding: false, selected: true), tab(b, sounding: paused)]) == b)
+    }
+
     @Test func hiddenItStaysAwayWhileTheTabPlaysOn() {
         var choice = NowPlayingChoice()
         let page = "https://video.example/watch?v=1"

@@ -9,6 +9,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Open in from Zigzag Mini, into a window that had just opened with its command bar, closes the bar instead of leaving it over the page.
 - Pop-up windows center their window buttons in the bar at the top, fill to the bottom edge without a strip of the bar's color, and mark a page that isn't secure with the open padlock the address uses.
 - With Protect IP address from WebRTC on, Site Controls no longer counts WebRTC as blocked on every site or offers Reset Permissions for it. Permissions still has the WebRTC row, so a site can be allowed before a call, under a line saying the site hasn't asked for anything when it hasn't. ([#229](https://github.com/ZigaoWang/zigzag/issues/229))
+- Pausing from the mini player keeps the sidebar's Now Playing card, showing Play, for as long as the video is in the mini player, and the mini player shows its play button while paused, with the pointer away. The card's play button and the mini player's now play and pause the same way.
 
 ## [0.9.1] - 2026-11-15
 
