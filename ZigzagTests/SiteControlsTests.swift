@@ -267,7 +267,7 @@ struct SiteControlsPermissionTests {
             #expect(ExternalLinks.decision(page: site, foreign: true, stored: "allow") == nil)
             // Always Open on one app is kept under that app's own key.
             SitePermissions.allowOpeningApp(origin: site, scheme: "zoommtg")
-            #expect(SitePermissions.action(PermissionSubject.app(scheme: "zoommtg"), origin: site) == "allow")
+            #expect(SitePermissions.action(PermissionSubject.app("zoommtg"), origin: site) == "allow")
             SitePermissions.setChoice(.block, for: .apps, origin: site)
             let blocked = SitePermissions.action(PermissionSubject.apps, origin: site)
             #expect(blocked == "deny")
