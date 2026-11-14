@@ -153,10 +153,35 @@ enum DownloadRuleSheet {
             return rule
         }
 
+        /// A rule that would send the site's cookies off this Mac, said on the endpoint field itself: it can't be
+        /// saved, and the field holds it up rather than leaving the button dead unexplained.
+        func refreshCookieWarning(_ rule: DownloadRule?) {
+            let offThisMac = rule?.sendsCookiesOffThisMac ?? false
+            endpointField?.isInvalid = offThisMac
+            endpointField?.toolTip = offThisMac
+                ? String(localized: "Cookies go only to a service on this Mac. Take {cookies} and {cookie_header} out of the parameters, or point the endpoint at 127.0.0.1.",
+                         comment: "Tooltip on the endpoint field of a JSON-RPC download rule that would send the site's cookies to another machine.")
+                : nil
+        }
+
+        /// A pattern that isn't a working regular expression: the field says so in place, since a broken expression
+        /// is otherwise only a rule that never matches the address it was meant to.
+        func refreshPatternWarning(_ rule: DownloadRule?) {
+            let broken = rule.map { !$0.isValidPattern } ?? false
+            pattern.isInvalid = broken
+            pattern.toolTip = broken
+                ? String(localized: "That isn’t a working regular expression. Zigzag saves nothing it can’t read.", comment: "Tooltip on the address field of a download rule whose regular expression doesn't compile.")
+                : nil
+        }
+
         let valid = {
-            guard let rule = ruleFromFields(), !rule.name.isEmpty else { return false }
+            let rule = ruleFromFields()
+            refreshCookieWarning(rule)
+            refreshPatternWarning(rule)
+            guard let rule, !rule.name.isEmpty else { return false }
             guard rule.match == .any || !rule.pattern.isEmpty else { return false }
             guard rule.isValidPattern else { return false }
+            guard !rule.sendsCookiesOffThisMac else { return false }
             return rule.action.isComplete
         }
         for picker in [applies, match] + [stylePicker].compactMap({ $0 }) {
