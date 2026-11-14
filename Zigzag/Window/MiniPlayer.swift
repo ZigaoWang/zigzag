@@ -256,7 +256,11 @@ final class MiniPlayer {
         place()
         card.update(video)
         panel.orderFrontRegardless()
-        card.appear(from: source.flatMap { rect in root.window.map { Self.global($0.convertToScreen(root.convert(rect, to: nil))) } })
+        let from = source.flatMap { rect in root.window.map { Self.global($0.convertToScreen(root.convert(rect, to: nil))) } }
+        #if DEBUG
+        debugLog("miniplayer appears from \(from.map { String(describing: $0) } ?? "its corner") to \(card.globalFrame)")
+        #endif
+        card.appear(from: from, corner: MiniPlayerLayout.growPoint(of: card.globalFrame, in: movableArea(for: currentPlace)))
         watchWindow()
 
         tokens = [
@@ -587,7 +591,9 @@ final class MiniPlayer {
         // Until it's first moved, at the bottom of the page away from the sidebar.
         let target = MiniPlayerLayout.frame(for: place, size: size, page: pageArea ?? area, in: area)
         card.dragArea = { Self.movableArea(at: $0) }
-        if !card.isDragging, !card.isSettling, card.globalFrame != target { card.globalFrame = target }
+        // While it grows in, its panel spans the video's place and its own: set back to the card's frame then, the
+        // panel would cut the growing card off, and it would show up at once only when it landed.
+        if !card.isDragging, !card.isSettling, !card.isGrowing, card.globalFrame != target { card.globalFrame = target }
         let shown = card.isDragging || card.isSettling ? card.globalFrame.size : target.size
         card.show(MiniPlayerLayout.placement(showing: card.shown(picture, of: webView), in: shown))
     }
@@ -942,17 +948,25 @@ final class MiniPlayerView: NSView {
 
     // MARK: Showing up and going
 
-    /// Grows out of where the video was on the page (`source`, on screen as `globalFrame` is), or fades in where it
-    /// sits. While it grows, its panel takes in both places, so nothing of it is cut off, then fits the card again.
-    func appear(from source: NSRect?) {
+    /// Grows out of where the video was on the page (`source`, on screen as `globalFrame` is), travelling as a large
+    /// transition does (`Motion.Role.large`, on the drawer's curve). Where that isn't known (a video in a frame), it
+    /// comes out of the corner it sits in (`corner`, 0 to 1 from its top left), as a panel grows from what opened it.
+    /// With Reduce Motion it only crossfades in place. While it grows, its panel takes in both places, so nothing of
+    /// it is cut off, then fits the card again.
+    func appear(from source: NSRect?, corner: CGPoint) {
         guard let layer, let superview, let window else { return }
         layoutSubtreeIfNeeded()
-        guard let source, source.width > 1, !Tokens.Motion.reduceMotion else {
+        if Tokens.Motion.reduceMotion {
             Tokens.Motion.present(self, from: .inPlace, entering: true)
+            return
+        }
+        guard let source, source.width > 1 else {
+            Tokens.Motion.present(self, from: .point(corner), entering: true)
             return
         }
         let target = globalFrame
         let room = target.union(source)
+        isGrowing = true
         window.hasShadow = false
         autoresizingMask = []
         globalFrame = room
@@ -969,21 +983,29 @@ final class MiniPlayerView: NSView {
         let start = CATransform3DConcat(CATransform3DMakeScale(k, k, 1), CATransform3DMakeTranslation(dx, dy, 0))
         CATransaction.begin()
         CATransaction.setCompletionBlock { [weak self] in
-            MainActor.assumeIsolated { self?.fitPanel(to: target) }
+            // Placed again once it has landed, for anything that changed while it grew.
+            MainActor.assumeIsolated { self?.fitPanel(to: target); self?.onResize?() }
         }
         let grow = CABasicAnimation(keyPath: "transform")
         grow.fromValue = NSValue(caTransform3D: start)
         grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        grow.duration = Tokens.Motion.zoom * Tokens.Motion.debugSlowdown
-        grow.timingFunction = Tokens.Motion.easeOut
+        let curve = Tokens.Motion.Role.large.curve()
+        grow.duration = curve.duration * Tokens.Motion.debugSlowdown
+        grow.timingFunction = curve.timing
         layer.add(grow, forKey: "grow")
         CATransaction.commit()
     }
 
+    /// Growing in from the video's place, its panel spanning both (`appear`).
+    private(set) var isGrowing = false
+
     /// The panel back to the card's own size once it has grown in, unless it was moved meanwhile.
     private func fitPanel(to target: NSRect) {
+        isGrowing = false
         guard let window, let superview, autoresizingMask.isEmpty else { return }
         let now = frame.offsetBy(dx: MiniPlayer.global(window.frame).minX, dy: MiniPlayer.global(window.frame).minY)
+        // The panel shrinking to the card and the card filling it show together, never one a frame before the other.
+        window.disableScreenUpdatesUntilFlush()
         Tokens.Motion.withoutAnimation {
             globalFrame = isDragging ? now : target
             frame = superview.bounds

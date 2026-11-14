@@ -197,6 +197,12 @@ nonisolated enum MiniPlayerLayout {
     /// bottom right as the Mac's Picture in Picture has it, or the bottom left beside a sidebar on the right.
     static func firstCorner(sidebarOnRight: Bool) -> Corner { sidebarOnRight ? .bottomLeft : .bottomRight }
 
+    /// Where on the card it comes out of when it shows up with no video's place to grow from: the corner of it
+    /// nearest the corner of `area` it sits in (0 to 1 from its top left, y running down as `frame`'s does).
+    static func growPoint(of frame: NSRect, in area: NSRect) -> CGPoint {
+        CGPoint(x: frame.midX < area.midX ? 0 : 1, y: frame.midY < area.midY ? 0 : 1)
+    }
+
     /// The card in a corner of an area, a margin in (flipped: y runs down).
     static func frame(at corner: Corner, size: CGSize, in area: CGRect) -> CGRect {
         frame(for: Anchor(corner: corner, offset: CGSize(width: margin, height: margin)), size: size, in: area)
