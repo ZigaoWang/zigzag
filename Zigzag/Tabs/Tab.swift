@@ -1803,12 +1803,9 @@ extension Tab: WKUIDelegate {
     // The completion-handler form: its Swift async name differs between SDKs, and a near miss is never called.
     func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo,
                  type: WKMediaCaptureType, decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
-        Task {
-            // A call on a page without WebRTC can't work: it's offered first, and once allowed the page reloads and
-            // asks again.
-            if await WebRTCProtection.offer(in: self) { decisionHandler(.deny); return }
-            decisionHandler(await SitePermissions.request(origin: origin, type: type, window: host?.hostWindow, isPrivate: isPrivate, tab: self))
-        }
+        // The camera and microphone work without WebRTC: WebRTC is offered only when the page reaches for a call
+        // (`WebRTCProtection`), never in place of this question.
+        Task { decisionHandler(await SitePermissions.request(origin: origin, type: type, window: host?.hostWindow, isPrivate: isPrivate, tab: self)) }
     }
 
     /// Screen sharing (Meet, Zoom, Teams). WebKit asks the browser through this unpublished method; the answer
