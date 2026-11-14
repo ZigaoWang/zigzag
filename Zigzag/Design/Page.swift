@@ -303,7 +303,9 @@ enum PageStyle {
     .page-title h1 { font-size: 26px; font-weight: 300; letter-spacing: -0.023em; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* A page's search: the outlined pill, white with a hairline edge and a faint shadow, the accent's ring while typing. */
-    .search { display: flex; align-items: center; gap: 4px; background: var(--control); border-radius: calc(var(--control-height) / 2); padding: 0 14px 0 10px;
+    /* Controls keep 1px more under their words than over them: flex centers the line box, and the system font draws its
+       capitals a little under that box's middle (Label.centeredY), so this sets them in the middle as the app's own. */
+    .search { display: flex; align-items: center; gap: 4px; background: var(--control); border-radius: calc(var(--control-height) / 2); padding: 0 14px 1px 10px;
               height: var(--control-height); width: var(--search); max-width: 100%; box-shadow: inset 0 0 0 1px var(--control-edge), 0 0.5px 1.5px var(--control-shadow); }
     .search:focus-within { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) var(--focus), transparent); }
     .search svg { flex: none; width: 16px; padding: 1px; color: var(--faint); }
@@ -316,12 +318,12 @@ enum PageStyle {
     /* A pill button (PillButton): the secondary look, white with a hairline edge and a faint shadow. `.quiet` shows a
        fill only under the pointer; `.prominent` is the primary, filled with the space's accent, one per page. Hover and press are
        instant; press darkens, never scales. */
-    .button { height: var(--control-height); padding: 0 14px; border-radius: calc(var(--control-height) / 2); background: var(--control); color: var(--text);
+    .button { height: var(--control-height); padding: 0 14px 1px; border-radius: calc(var(--control-height) / 2); background: var(--control); color: var(--text);
               box-shadow: inset 0 0 0 1px var(--control-edge), 0 0.5px 1.5px var(--control-shadow); font-size: var(--control-text);
               font-weight: 400; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
     .button:hover, .button[aria-expanded="true"] { background: var(--control-hover); }
     .button:active { background: var(--control-pressed); }
-    .button.quiet { background: none; box-shadow: none; padding: 0 var(--space-3); }
+    .button.quiet { background: none; box-shadow: none; padding: 0 var(--space-3) 1px; }
     .button.quiet:hover, .button.quiet[aria-expanded="true"] { background: var(--hover); }
     .button.quiet:active { background: var(--pressed); }
     .button.prominent { background: var(--accent); color: var(--on-accent); box-shadow: none; }
@@ -342,7 +344,7 @@ enum PageStyle {
     @media (prefers-reduced-motion: reduce) { .menu.open { animation-name: menu-fade; } .menu.closing:not(.open) { animation-name: menu-fade-out; } }
     @keyframes menu-fade { from { opacity: 0; } }
     @keyframes menu-fade-out { to { opacity: 0; } }
-    .menu [role="menuitem"] { display: block; width: 100%; text-align: left; height: var(--control-height); padding: 0 var(--row-inset); border-radius: var(--radius-row);
+    .menu [role="menuitem"] { display: block; width: 100%; text-align: left; height: var(--control-height); padding: 0 var(--row-inset) 1px; border-radius: var(--radius-row);
                               font-size: var(--body); }
     .menu [role="menuitem"]:hover, .menu [role="menuitem"]:focus-visible { background: var(--highlight); outline: none; }
     .menu [role="menuitem"]:active { background: var(--pressed); }
