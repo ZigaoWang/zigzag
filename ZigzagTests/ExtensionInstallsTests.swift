@@ -86,3 +86,17 @@ struct CarriedExtensionStateTests {
         #expect(here.grantedPermissions != nil && here.grantedMatchPatterns != nil)
     }
 }
+
+/// A store package is read off the main actor, and only up to the cap.
+struct ExtensionPackageFetchTests {
+    @Test func aPackageIsReadUpToTheCap() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-package-\(UUID().uuidString)")
+        let bytes = Data((0..<200_000).map { UInt8($0 % 251) })
+        try bytes.write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let (whole, _) = try await ExtensionStore.fetch(file, limit: 1 << 20)
+        #expect(whole == bytes)
+        let (capped, _) = try await ExtensionStore.fetch(file, limit: 100_000)
+        #expect(capped == nil)
+    }
+}

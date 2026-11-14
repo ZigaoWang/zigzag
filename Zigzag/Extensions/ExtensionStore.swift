@@ -502,8 +502,9 @@ enum ExtensionStore {
     /// Far more than any package in the store, whose largest are a few hundred megabytes.
     nonisolated static let maxPackageBytes = 512 << 20
 
-    /// A package's bytes, or nil once they pass `limit`: a server can't fill memory by sending without end.
-    nonisolated static func fetch(_ url: URL, limit: Int = maxPackageBytes, session: URLSession = .shared) async throws -> (Data?, URLResponse) {
+    /// A package's bytes, or nil once they pass `limit`: a server can't fill memory by sending without end. Read
+    /// off the main actor (`@concurrent`): a package of a few hundred megabytes is read a byte at a time.
+    @concurrent nonisolated static func fetch(_ url: URL, limit: Int = maxPackageBytes, session: URLSession = .shared) async throws -> (Data?, URLResponse) {
         let (bytes, response) = try await session.bytes(from: url)
         if response.expectedContentLength > Int64(limit) { bytes.task.cancel(); return (nil, response) }
         var data = Data()
