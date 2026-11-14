@@ -32,7 +32,7 @@ enum PageTranslator {
         set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: "TranslateAlways") }
     }
 
-    static func code(of language: Locale.Language) -> String { language.languageCode?.identifier ?? language.minimalIdentifier }
+    nonisolated static func code(of language: Locale.Language) -> String { language.languageCode?.identifier ?? language.minimalIdentifier }
 
     static func translatesAlways(_ language: Locale.Language) -> Bool { alwaysLanguages.contains(code(of: language)) }
 
@@ -89,7 +89,12 @@ enum PageTranslator {
 
     /// Apple can translate between these on this Mac (now, or once the language is downloaded).
     static func canTranslate(from source: Locale.Language, to target: Locale.Language) async -> Bool {
-        await LanguageAvailability().status(from: source, to: target) != .unsupported
+        await status(from: source, to: target) != .unsupported
+    }
+
+    /// Whether Apple can translate between these on this Mac now, once they're downloaded, or not at all.
+    static func status(from source: Locale.Language, to target: Locale.Language) async -> LanguageAvailability.Status {
+        await LanguageAvailability().status(from: source, to: target)
     }
 
     /// The language most of the page is in, whatever it is; nil when there's too little text to tell.
@@ -185,6 +190,37 @@ enum PageTranslator {
         return dominantLanguage(ofBlocks: text.blockTexts) ?? seen
     }
 
+    /// The language a page on a site you translated is taken to be in: the one it was translated from before, when
+    /// it's the same language read again (Simplified Chinese where Wikipedia's variant switcher made it Traditional),
+    /// so it's translated as it was and never asks macOS for another download (#231).
+    nonisolated static func keeping(_ kept: Locale.Language?, over seen: Locale.Language?) -> Locale.Language? {
+        guard let kept, let seen, seen.languageCode == kept.languageCode else { return seen }
+        return kept
+    }
+
+    /// Which groups to translate now, given what's on this Mac for each (`status`, in the same order). Languages
+    /// Apple can't translate are left out and named. A language still to download is translated only when it's
+    /// the page's own (the first group) and you asked: macOS's download sheet comes up only from something you
+    /// did, never for a menu of language names or for a page translating on its own (#231). Translating on its own
+    /// with its language not here yet, nothing runs, and `offer` says to offer it instead.
+    nonisolated static func runnable(_ groups: [Group], status: [LanguageAvailability.Status], asked: Bool)
+        -> (groups: [Group], unsupported: [Locale.Language], offer: Bool) {
+        var run: [Group] = [], unsupported: [Locale.Language] = []
+        var first = true
+        for (group, status) in zip(groups, status) {
+            switch status {
+            case .unsupported: unsupported.append(group.source); continue
+            case .installed: run.append(group)
+            default:
+                if first {
+                    if asked { run.append(group) } else { return ([], unsupported, true) }
+                }
+            }
+            first = false
+        }
+        return (run, unsupported, false)
+    }
+
     /// What to translate into `target`, a group for each language, the one with the most text first (#197). Each
     /// block is in the language it reads as; one too short to tell (a button, a menu item) is in the page's. Text
     /// already in the target language is left as it is, so a page in English with a paragraph of Chinese has just
@@ -201,8 +237,12 @@ enum PageTranslator {
                 language = block < text.blockTexts.count ? blockLanguage(text.blockTexts[block], page: page) : page
                 languages[block] = language
             }
-            guard let language, language.languageCode != target.languageCode else { continue }
-            let key = language.minimalIdentifier
+            guard var language, language.languageCode != target.languageCode else { continue }
+            // One language in another script (Traditional Chinese on a Simplified page, as Wikipedia's variant
+            // menus are) is translated with the page, not on its own: on its own it takes a second language
+            // download macOS asks for (#231).
+            if let page, page.languageCode == language.languageCode { language = page }
+            let key = code(of: language)
             if groups[key] == nil { order.append(key); groups[key] = (language, [], 0) }
             groups[key]?.pieces.append(index)
             groups[key]?.size += piece.count

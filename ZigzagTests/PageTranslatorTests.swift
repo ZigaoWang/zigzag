@@ -179,6 +179,60 @@ struct PageTranslatorTests {
         #expect(groups.map { $0.source.languageCode } == [.japanese, .chinese])
     }
 
+    // MARK: Script variants and downloads (#231)
+
+    private static let traditional = Locale.Language(identifier: "zh-Hant")
+
+    /// Wikipedia's Simplified article under a variant menu and notice in Traditional: one translation, from the page's
+    /// Simplified, never a second one from Traditional.
+    @Test func aPagesOwnLanguageInAnotherScriptGoesWithThePage() {
+        let page = text([
+            ["豫园是建于明朝时期的古典园林，座落于中华人民共和国上海市黄浦区，原上海老城厢东北部，北靠福佑路，东临安仁街。"],
+            ["我們支援澳門繁體，選取內容的語言變體。儲存您偏好的中文語言變體，以避免顯示簡繁混雜的內容。"],
+        ])
+        let groups = PageTranslator.plan(page, page: Self.chinese, into: Self.english)
+        #expect(groups.count == 1)
+        #expect(groups.first?.source.minimalIdentifier == Self.chinese.minimalIdentifier)
+        #expect(groups.first?.pieces == [0, 1])
+    }
+
+    /// A site translated from Simplified Chinese: its next page, read as Traditional, is still taken as Simplified.
+    @Test func aTranslatedSitesNextPageKeepsItsLanguage() {
+        #expect(PageTranslator.keeping(Self.chinese, over: Self.traditional) == Self.chinese)
+        #expect(PageTranslator.keeping(Self.chinese, over: Locale.Language(identifier: "ja")) == Locale.Language(identifier: "ja"))
+        #expect(PageTranslator.keeping(nil, over: Self.traditional) == Self.traditional)
+        #expect(PageTranslator.keeping(Self.chinese, over: nil) == nil)
+    }
+
+    private func groups(_ codes: [String]) -> [PageTranslator.Group] {
+        codes.enumerated().map { PageTranslator.Group(source: Locale.Language(identifier: $0.element), pieces: [$0.offset]) }
+    }
+
+    /// Asked for, the page's own language may need a download; a menu of other language names never brings one up.
+    @Test func onlyThePagesOwnLanguageAskedForMayDownload() {
+        let planned = groups(["zh-Hans", "nl", "ja", "la"])
+        let asked = PageTranslator.runnable(planned, status: [.supported, .supported, .installed, .unsupported], asked: true)
+        #expect(asked.groups.map(\.source.minimalIdentifier) == ["zh", "ja"])
+        #expect(asked.unsupported.map(\.minimalIdentifier) == ["la"])
+        #expect(!asked.offer)
+    }
+
+    /// Translating on its own (a site you translated), a language not on this Mac is offered, not downloaded.
+    @Test func translatingOnItsOwnNeverDownloads() {
+        let planned = groups(["zh-Hant", "ja"])
+        let missing = PageTranslator.runnable(planned, status: [.supported, .installed], asked: false)
+        #expect(missing.groups.isEmpty && missing.offer)
+        let here = PageTranslator.runnable(planned, status: [.installed, .supported], asked: false)
+        #expect(here.groups.map(\.source) == [Self.traditional])
+        #expect(!here.offer)
+    }
+
+    /// A language Apple can't translate doesn't count as the page's own: the next one is.
+    @Test func anUnsupportedFirstGroupPassesToTheNext() {
+        let result = PageTranslator.runnable(groups(["la", "zh-Hans"]), status: [.unsupported, .supported], asked: true)
+        #expect(result.groups.map(\.source.minimalIdentifier) == ["zh"])
+    }
+
     // MARK: Pages detection missed (#218)
 
     /// A Spanish page marked lang="en", under a long English menu that fills the start of its text.

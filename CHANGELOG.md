@@ -15,6 +15,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A paused video in the mini player no longer shows the page's own video controls over the card's, on sites that use the browser's built-in controls. ([#230](https://github.com/ZigaoWang/zigzag/issues/230))
 - Permissions in Site Controls says when a site hasn't asked for anything yet, instead of showing an empty page, and has no Reset Permissions while there's nothing to reset. ([#232](https://github.com/ZigaoWang/zigzag/issues/232))
 - Reader pressed while a page is still loading waits for it and opens once it's loaded, instead of saying there's no article over a blank page. Press it again to call it off. ([#233](https://github.com/ZigaoWang/zigzag/issues/233))
+- Translating a Chinese Wikipedia page translates it once, as Simplified Chinese, then says it's translated. Text in Traditional Chinese on it, like the language variant menu, no longer starts a second translation that brings up macOS's Download Languages sheet, and neither does the site's next page in Traditional. The download sheet now only comes up when you ask to translate a page whose language isn't on your Mac yet. ([#231](https://github.com/ZigaoWang/zigzag/issues/231))
 
 ## [0.9.0] - 2026-11-14
 
