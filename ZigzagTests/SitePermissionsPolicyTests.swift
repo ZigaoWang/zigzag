@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import WebKit
@@ -175,6 +176,9 @@ import WebKit
         #expect(ExternalLinks.canRemember(url: URL(string: "https://example.com"), foreign: true) == false)
     }
 
+    /// A kept answer is honoured as it stands — the site's Allow opens, its Block stops, and nothing asks again.
+    /// Whether an answer *may* be written is a separate gate (`saves`), so `verdict` never second-guesses a stored
+    /// Allow: an http origin's Allow can only have been chosen in Site Controls, and it must be respected.
     @Test func aStoredAllowSkipsTheQuestionAndABlockStopsIt() {
         #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: "allow") == .open)
         #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: "deny") == .block)

@@ -225,6 +225,14 @@ enum ExternalLinks {
         !foreign && url?.scheme?.lowercased() == "https"
     }
 
+    /// The subject an answered app question is kept under. An "Always / Don't Allow" is the *site's* deny — the one
+    /// "apps" row Site Controls and Settings show — so the row and the browser agree and no other app on the site asks
+    /// again; anything else (a This-time answer, or an Always Allow) stays that one app's key. The design's own words:
+    /// app launches keep the site-wide `apps` flag as their deny key; the per-app allow key is unchanged.
+    static func storageSubject(for answer: PermissionAnswer, scheme: String) -> String {
+        answer.action == "deny" && answer.remember ? PermissionSubject.apps : PermissionSubject.app(scheme)
+    }
+
     /// What's kept for the page at `page` opening an app: its Allow or Block, or the app it was told Always Open to;
     /// nil asks. A frame from another site on the page (`foreign`) is held by Block only, never let in.
     static func decision(page: String?, foreign: Bool, stored: String?) -> String? {
@@ -251,13 +259,6 @@ enum ExternalLinks {
         }
         guard let origin else { return nil }
         return tab?.permissionAnswers.action(key: origin, kind: PermissionSubject.app(scheme))
-    }
-
-    /// The subject an answered app question is kept under. An "Always / Don't Allow" is the *site's* deny — the one
-    /// "apps" row Site Controls and Settings show — so the row and the browser agree and no other app on the site asks
-    /// again; anything else (a This-time answer, or an Always Allow) stays that one app's key.
-    static func storageSubject(for answer: PermissionAnswer, scheme: String) -> String {
-        answer.action == "deny" && answer.remember ? PermissionSubject.apps : PermissionSubject.app(scheme)
     }
 
     /// Whether the frame that asked is someone other than the page: another site, or a frame with no host of its own
