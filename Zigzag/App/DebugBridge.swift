@@ -1959,6 +1959,8 @@ enum DebugBridge {
         case "sitextforget": SiteExtensionsSection.chosenOpen = nil
         case "sitezoom": SitePanel.shown?.debugZoom(arg)
         case "sitepermrow": SitePanel.shown?.debugPermissionRow(arg)
+        // webrtcoffer: the question a page without WebRTC gets when it starts a call, for the tab in front.
+        case "webrtcoffer": if let tab = controller.tabManager.selectedTab { Task { let allowed = await WebRTCProtection.offer(in: tab); debugLog("webrtcoffer => \(allowed)") } }
         // sitedark <automatic|on|off|force>: the Dark page row's dropdown.
         case "sitedark": SitePanel.shown?.debugDark(arg)
         case "sitepanelstate":
@@ -1966,10 +1968,10 @@ enum DebugBridge {
                   let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) else { debugLog("sitepanelstate: no panel"); break }
             try? data.write(to: URL(fileURLWithPath: arg))
         case "siteperm":
-            // siteperm <camera|location|notifications|popups|apps> <ask|allow|block|asked>: for the page in front's site,
+            // siteperm <camera|location|notifications|popups|apps|webrtc> <ask|allow|block|asked>: for the page in front's site,
             // as its Site Controls row would choose, or as if it had just asked.
             let f = arg.split(separator: " ").map(String.init)
-            let kinds: [String: SitePermission] = ["camera": .cameraAndMicrophone, "location": .location, "notifications": .notifications, "popups": .popups, "apps": .apps]
+            let kinds: [String: SitePermission] = ["camera": .cameraAndMicrophone, "location": .location, "notifications": .notifications, "popups": .popups, "apps": .apps, "webrtc": .webRTC]
             guard f.count == 2, let permission = kinds[f[0]], let origin = SiteOrigin.of(controller.tabManager.selectedTab?.url) else { debugLog("siteperm refused"); break }
             if f[1] == "asked" {
                 SitePermissions.noteAsked(permission, origin: origin, isPrivate: false)

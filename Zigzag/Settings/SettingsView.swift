@@ -888,6 +888,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let defaultButton = PillButton(title: String(localized: "Set as Default", comment: "Button in Settings › General that makes Zigzag the default browser."))
     private let defaultStatus = StatusLabel(String(localized: "Zigzag is your default browser", comment: "In Settings › General, in place of Set as Default once it's done."))
     private let blockingToggle = Toggle()
+    private let webRTCToggle = Toggle()
     private let cookieBanners = DropdownButton()
     private let pipToggle = Toggle()
     private let fullScreenFill = DropdownButton()
@@ -1390,6 +1391,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             self?.reloadBlocking()
             self?.layoutDocument()
         }
+        // Pages already open keep what they loaded with until they load again (`WebRTCProtection`).
+        webRTCToggle.onChange = { on in WebRTCProtection.isOn = on }
         cookieBanners.options = CookieBanners.Mode.allCases.map { mode in
             let title = switch mode {
             case .reject: String(localized: "Reject When Possible", comment: "A choice for “Cookie banners” in Settings › Privacy: Zigzag says no to a site's cookie consent pop-up, or hides one that only needs hiding.")
@@ -2103,6 +2106,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                  detail: bannersDetail, control: cookieBanners)
         bannersRow.keywords = String(localized: "cookies consent gdpr pop-up popup notice reject accept privacy banner", comment: "Words that find the Cookie banners setting with Find a setting in Settings. Not shown.")
         blockingGroup.add(bannersRow)
+        // WebRTC (#229): only where WebKit still has its switch.
+        if WebRTCProtection.isAvailable {
+            webRTCToggle.isOn = WebRTCProtection.isOn
+            let webRTCRow = FormRow(title: String(localized: "Protect IP address from WebRTC", comment: "A setting in Settings › Privacy: turns WebRTC off, except on sites you allow. WebRTC is a name: keep it as it is."),
+                                    detail: String(localized: "WebRTC, which sites use for calls, can show them your real IP address even while you use a proxy or VPN. When on, it’s off except on sites you allow in Site Controls.",
+                                                   comment: "Explanation under “Protect IP address from WebRTC” in Settings › Privacy. WebRTC is a name: keep it as it is. Site Controls is the panel from the address."),
+                                    control: webRTCToggle)
+            webRTCRow.keywords = String(localized: "webrtc ip address leak proxy vpn calls privacy", comment: "Words that find the Protect IP address from WebRTC setting with Find a setting in Settings. Not shown.")
+            blockingGroup.add(webRTCRow)
+        }
     }
 
     private func reloadPasswords() {
@@ -2803,6 +2816,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         defaultStatus.isHidden = !isDefault
         defaultButton.isHidden = isDefault
         blockingToggle.isOn = ContentBlocker.isEnabled
+        webRTCToggle.isOn = WebRTCProtection.isOn
         cookieBanners.selectedIndex = CookieBanners.Mode.allCases.firstIndex(of: CookieBanners.mode) ?? 0
         pipToggle.isOn = PictureInPicture.followsTabs
         fullScreenFill.selectedIndex = PageFullScreen.Fill.allCases.firstIndex(of: PageFullScreen.fill) ?? 0
@@ -3113,8 +3127,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                                                         comment: "Under a site in Settings › Privacy › Sites: the choices made for it, as one sentence."),
                                    icon: favicon, control: forget))
             guard let origin else { continue }
-            let options = PermissionChoice.allCases
             for permission in permissions {
+                let options = permission.choices
                 let dropdown = DropdownButton()
                 dropdown.options = options.map { DropdownButton.Option(title: $0.title) }
                 dropdown.selectedIndex = options.firstIndex(of: SitePermissions.choice(permission, origin: origin)) ?? 0

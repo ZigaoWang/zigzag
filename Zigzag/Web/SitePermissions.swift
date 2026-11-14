@@ -225,6 +225,9 @@ enum SitePermissions {
 
     static func setPopups(_ allowed: Bool?, origin: String) { all["\(origin)|popups"] = allowed }
 
+    /// WebRTC (`WebRTCProtection`): Allow or Block kept for the site, nil to follow the setting.
+    static func webRTC(origin: String) -> Bool? { all["\(origin)|webRTC"] }
+
     /// Every site's notification choice by origin, for the page script: it knows the answer before the page asks.
     static var notificationDecisions: [String: Bool] {
         var out: [String: Bool] = [:]
@@ -259,7 +262,9 @@ enum SitePermissions {
 
     /// What Site Controls shows for a permission: Ask with nothing kept, Allow when every answer kept says yes,
     /// otherwise Block. Pop-ups are blocked with a notice until allowed, so for them Ask is the start.
+    /// WebRTC is never Ask: with nothing kept it's what the setting says (`WebRTCProtection`).
     static func choice(_ permission: SitePermission, origin: String) -> PermissionChoice {
+        if permission == .webRTC { return WebRTCProtection.choice(origin: origin, in: nil) }
         let now = all
         return PermissionChoice(answers: keys(for: permission, on: origin).compactMap { now[$0] })
     }
@@ -282,9 +287,15 @@ enum SitePermissions {
 
     /// The permissions Site Controls has a row for on this site: once it asked this session, or once something is
     /// kept for it. Notifications and pop-ups aren't offered in a private window, which never shows or allows them.
+    /// WebRTC has its row on every site while Settings › Privacy keeps it off, so a site that needs it for calls can
+    /// be allowed before it tries; and none where WebKit has no switch for it.
     static func shown(origin: String, isPrivate: Bool) -> [SitePermission] {
         SitePermission.allCases.filter { permission in
             if isPrivate, !permission.inPrivate { return false }
+            if permission == .webRTC {
+                guard WebRTCProtection.isAvailable else { return false }
+                if WebRTCProtection.isOn { return true }
+            }
             return hasDecision(permission, origin: origin) || hasAsked(permission, origin: origin)
         }
     }
@@ -434,7 +445,7 @@ enum DisplayCaptureChoice: Int, CaseIterable {
 /// What a site can ask for, as Site Controls has a row for each. Calls ask for the camera and microphone at once and
 /// are answered as one.
 enum SitePermission: String, CaseIterable {
-    case cameraAndMicrophone, location, notifications, popups, apps
+    case cameraAndMicrophone, location, notifications, popups, apps, webRTC
 
     /// The kinds of answer kept for it.
     var kinds: [String] {
@@ -444,15 +455,20 @@ enum SitePermission: String, CaseIterable {
         case .notifications: ["notifications"]
         case .popups: ["popups"]
         case .apps: ["apps"]
+        case .webRTC: ["webRTC"]
         }
     }
+
+    /// What its dropdown offers. WebRTC is never asked about first: a page has it as it loads or not at all, so it's
+    /// Allow or Block, and with nothing chosen, what the setting says.
+    var choices: [PermissionChoice] { self == .webRTC ? [.allow, .block] : PermissionChoice.allCases }
 
     /// The one kind a choice made in Site Controls is kept as.
     var primaryKind: String { self == .cameraAndMicrophone ? "cameraAndMicrophone" : rawValue }
 
     /// A private window asks for the camera, location and apps to open (and keeps nothing); it never shows
-    /// notifications or opens pop-ups on its own.
-    var inPrivate: Bool { self == .cameraAndMicrophone || self == .location || self == .apps }
+    /// notifications or opens pop-ups on its own. WebRTC follows the setting there, chosen for the tab alone.
+    var inPrivate: Bool { self == .cameraAndMicrophone || self == .location || self == .apps || self == .webRTC }
 
     var title: String {
         switch self {
@@ -461,6 +477,7 @@ enum SitePermission: String, CaseIterable {
         case .notifications: String(localized: "Notifications", comment: "Row in the site panel's This Site group.")
         case .popups: String(localized: "Pop-ups", comment: "Row in the site panel's This Site group.")
         case .apps: String(localized: "Open apps", comment: "Row in the site panel's This Site group: whether the site's links may open apps on this Mac, like Zoom or the App Store.")
+        case .webRTC: String(localized: "WebRTC", comment: "Row in the site panel's This Site group: whether the site may use WebRTC, which calls need, and which can show sites your real IP address. A name: keep it as it is.")
         }
     }
 }

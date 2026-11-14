@@ -2498,6 +2498,17 @@
         }
       }
     },
+    "Allow and Reload" : {
+      "comment" : "Button on the question to use WebRTC for calls on a site: allows it for the site and reloads the page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许并重新载入"
+          }
+        }
+      }
+    },
     "Allow and Update" : {
       "comment" : "Button that allows an extension's update its new access.",
       "localizations" : {
@@ -11686,6 +11697,17 @@
         }
       }
     },
+    "Protect IP address from WebRTC" : {
+      "comment" : "A setting in Settings › Privacy: turns WebRTC off, except on sites you allow. WebRTC is a name: keep it as it is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "防止 WebRTC 泄露 IP 地址"
+          }
+        }
+      }
+    },
     "Proxy scripts (PAC)" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag: proxy auto-config scripts, which choose a proxy for each site.",
       "localizations" : {
@@ -13298,17 +13320,6 @@
         }
       }
     },
-    "Scripts can’t run JavaScript in a private window." : {
-      "comment" : "Error a script gets when it runs JavaScript in a private window's tab.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "脚本不能在无痕浏览窗口中运行 JavaScript。"
-          }
-        }
-      }
-    },
     "Scripts can’t run JavaScript in Zigzag’s error or certificate warning page." : {
       "comment" : "Error a script gets when it runs JavaScript in a tab showing a page that couldn't load or a certificate warning.",
       "localizations" : {
@@ -13316,6 +13327,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "脚本不能在 Zigzag 的错误页面或证书警告页面中运行 JavaScript。"
+          }
+        }
+      }
+    },
+    "Scripts can’t run JavaScript in a private window." : {
+      "comment" : "Error a script gets when it runs JavaScript in a private window's tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本不能在无痕浏览窗口中运行 JavaScript。"
           }
         }
       }
@@ -17038,6 +17060,17 @@
         }
       }
     },
+    "Use WebRTC for calls" : {
+      "comment" : "A site's permission question, without its question mark: WebRTC is off for the site (Settings › Privacy › Protect IP address from WebRTC), and it tried to start a call. WebRTC is a name: keep it as it is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许使用 WebRTC 通话"
+          }
+        }
+      }
+    },
     "Use a web address with %s where the words go." : {
       "comment" : "Toast when the custom search address in Settings › Search isn't valid. Keep %s as it is.",
       "localizations" : {
@@ -17453,6 +17486,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "网页检查器"
+          }
+        }
+      }
+    },
+    "WebRTC" : {
+      "comment" : "Row in the site panel's This Site group: whether the site may use WebRTC, which calls need, and which can show sites your real IP address. A name: keep it as it is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "WebRTC"
+          }
+        }
+      }
+    },
+    "WebRTC, which sites use for calls, can show them your real IP address even while you use a proxy or VPN. When on, it’s off except on sites you allow in Site Controls." : {
+      "comment" : "Explanation under “Protect IP address from WebRTC” in Settings › Privacy. WebRTC is a name: keep it as it is. Site Controls is the panel from the address.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站用 WebRTC 进行通话，但即使你在用代理或 VPN，它也可能让网站看到你的真实 IP 地址。打开后，除了你在网站设置里允许的网站，其他网站都不能用 WebRTC。"
           }
         }
       }
@@ -19637,6 +19692,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "web app dock install application 网页应用 程序坞 安装 应用"
+          }
+        }
+      }
+    },
+    "webrtc ip address leak proxy vpn calls privacy" : {
+      "comment" : "Words that find the Protect IP address from WebRTC setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "webrtc ip 地址 泄露 代理 vpn 通话 隐私"
           }
         }
       }

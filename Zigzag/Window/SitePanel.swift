@@ -641,8 +641,9 @@ final class SitePanel: FloatingPanelView {
                                               eventNumber: 0, clickCount: 1, pressure: 0) { resetPermissions?.onClick?(click) }
             return
         }
-        guard f.count == 2, let row = Int(f[0]), permissionsGroup.rows.indices.contains(row),
-              let choice = ["ask", "allow", "block"].firstIndex(of: f[1]) else { return }
+        guard f.count == 2, let row = Int(f[0]), permissionsGroup.rows.indices.contains(row), permissionKinds.indices.contains(row),
+              let wanted = ["ask": PermissionChoice.ask, "allow": .allow, "block": .block][f[1]],
+              let choice = permissionKinds[row].choices.firstIndex(of: wanted) else { return }
         permissionsGroup.rows[row].debugChoose(choice)
     }
     #endif
@@ -901,14 +902,23 @@ final class SitePanel: FloatingPanelView {
     /// call from elsewhere embedded in the page count there too. None asked, no page and no row into it.
     private func buildPermissions() {
         var permissionRows: [PanelRow] = []
+        permissionKinds = []
         if let origin {
-            let choices = PermissionChoice.allCases
+            let tab = tab
             for permission in SitePermissions.shown(origin: origin, isPrivate: isPrivate || tab.isPrivate) {
-                let now = SitePermissions.choice(permission, origin: origin)
+                let choices = permission.choices
+                let now = choice(permission, origin: origin)
+                // WebRTC is for the page as it loads: choosing reloads it (`WebRTCProtection.choose`), and in a private
+                // window it's this tab's alone.
                 permissionRows.append(.choice(permission.title, options: choices.map(\.title), selected: choices.firstIndex(of: now) ?? 0) { [weak self] index in
-                    SitePermissions.setChoice(choices[index], for: permission, origin: origin)
+                    if permission == .webRTC {
+                        WebRTCProtection.choose(choices[index] == .allow, origin: origin, in: tab)
+                    } else {
+                        SitePermissions.setChoice(choices[index], for: permission, origin: origin)
+                    }
                     self?.refreshPermissionsRow()
                 })
+                permissionKinds.append(permission)
             }
         }
         if permissionsGroup.superview == nil { permissionsBox.addSubview(permissionsGroup) }
@@ -936,7 +946,7 @@ final class SitePanel: FloatingPanelView {
         guard let origin, let row = permissionsRow else { return }
         let shown = SitePermissions.shown(origin: origin, isPrivate: isPrivate || tab.isPrivate)
         row.isHidden = shown.isEmpty
-        let choices = shown.map { SitePermissions.choice($0, origin: origin) }
+        let choices = shown.map { choice($0, origin: origin) }
         row.value = PermissionChoice.summary(choices)
         row.shortValue = PermissionChoice.shortSummary(choices)
         needsLayout = true
@@ -945,6 +955,14 @@ final class SitePanel: FloatingPanelView {
     private func rebuildRows() {
         buildRows()
         resize()
+    }
+
+    /// The permissions of the rows on the Permissions page, top to bottom.
+    private var permissionKinds: [SitePermission] = []
+
+    /// What a permission's row shows: WebRTC as this tab has it, a private window's own choice included.
+    private func choice(_ permission: SitePermission, origin: String) -> PermissionChoice {
+        permission == .webRTC ? WebRTCProtection.choice(origin: origin, in: tab) : SitePermissions.choice(permission, origin: origin)
     }
 
     /// Asks first: cookies sign you out of the site, and neither can be taken back.

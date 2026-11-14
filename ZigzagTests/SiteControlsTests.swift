@@ -82,7 +82,8 @@ struct SiteControlsPermissionTests {
             #expect(tab.permissionAnswers.answer(key: site, kind: "location") == false)
             // Nothing kept for the site: it's still Ask, and another tab on it asks.
             #expect(SitePermissions.choices(origin: site).isEmpty)
-            for permission in SitePermission.allCases { #expect(SitePermissions.choice(permission, origin: site) == .ask) }
+            // WebRTC is never Ask: with nothing kept, it follows its setting.
+            for permission in SitePermission.allCases where permission.choices.contains(.ask) { #expect(SitePermissions.choice(permission, origin: site) == .ask) }
             let other = Tab(url: URL(string: site), title: "Meet", spaceID: UUID())
             #expect(SitePermissions.notifications(origin: site, tab: other) == nil)
             // Another origin's question on the same page has its own answer.
@@ -114,7 +115,8 @@ struct SiteControlsPermissionTests {
                 SitePermissions.setChoice(.block, for: permission, origin: site)
                 #expect(SitePermissions.choice(permission, origin: site) == .block)
                 SitePermissions.setChoice(.ask, for: permission, origin: site)
-                #expect(SitePermissions.choice(permission, origin: site) == .ask)
+                // WebRTC has no Ask: forgotten, it's what the setting says (off: allowed).
+                #expect(SitePermissions.choice(permission, origin: site) == (permission == .webRTC ? .allow : .ask))
                 #expect(!SitePermissions.hasDecision(permission, origin: site))
             }
             #expect(SitePermissions.choices(origin: site).isEmpty)

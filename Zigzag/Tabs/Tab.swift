@@ -206,6 +206,9 @@ final class Tab: NSObject {
     /// What you answered the page's questions (camera, location, notifications) while it's open: asked again once
     /// it loads another page or reloads, as a site set to Ask is.
     var permissionAnswers = PagePermissionAnswers()
+    /// WebRTC allowed or blocked for a site in this tab alone, by origin: a private window's choice, never kept
+    /// (`WebRTCProtection`).
+    var webRTCHere: [String: Bool] = [:]
     /// From a site you've let send notifications: kept awake and out of the archive, so they keep coming.
     var notifiesUser: Bool {
         guard !isPrivate, let origin = SiteOrigin.of(url) else { return false }
@@ -446,6 +449,8 @@ final class Tab: NSObject {
         let extensionConfiguration = fromWebKit ? nil : Self.extensionConfiguration(for: url, in: profile)
         let configuration = pendingConfiguration ?? extensionConfiguration ?? WebKitSetup.makeConfiguration(for: profile)
         pendingConfiguration = nil
+        // A page's new window would share its opener's WebRTC switch otherwise.
+        if fromWebKit { WebRTCProtection.isolate(configuration) }
         if extensionConfiguration != nil {
             configuration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
         } else if !fromWebKit {
@@ -453,6 +458,7 @@ final class Tab: NSObject {
             WebNotifications.attach(to: configuration, isPrivate: privateStore != nil)
             Passkeys.attach(to: configuration, isPrivate: privateStore != nil, profile: profile)
             HistoryPage.attach(to: configuration)
+            WebRTCProtection.attach(to: configuration)
             if let privateStore {
                 configuration.websiteDataStore = privateStore
                 // Extensions stay out of private browsing, as in Chrome: they can't read or change these pages.
@@ -501,6 +507,7 @@ final class Tab: NSObject {
         if DebugBridge.mutesEverything { isMuted = webView.setPageAudioMuted(true) ?? true }
         #endif
         self.webView = webView
+        WebRTCProtection.apply(to: webView, for: url, in: self)
         if let pageHolder { pageHolder.hold(webView) } else { pageHolder = PageHolder(holding: webView) }
         observe(webView)
         DarkPages.attach(to: webView)
@@ -1352,6 +1359,8 @@ extension Tab: WKNavigationDelegate {
             // The page's ad blocking follows where it's going: allowed sites load without it. Only now, once it's
             // going there: a link opened elsewhere leaves this page's blocking as it was.
             if !showsExtensionPage { ContentBlocker.apply(to: webView, for: url) }
+            // WebRTC on or off for where it's going, before its page is made (`WebRTCProtection`).
+            WebRTCProtection.apply(to: webView, for: url, in: self)
             // Back, Forward and Reload go to pages you've had; anything else the page started waits to show.
             addressWaitsForCommit = openedByPage || (!ownLoad && ![.backForward, .reload].contains(navigationAction.navigationType))
         }
@@ -1429,6 +1438,11 @@ extension Tab: WKNavigationDelegate {
             policy = .allow
         } else {
             policy = frameMaySave ? .download : .cancel
+        }
+        // WebRTC follows the page that's to show, where a redirect took it; one that isn't shown leaves the page
+        // that stays as it was.
+        if navigationResponse.isForMainFrame {
+            WebRTCProtection.apply(to: webView, for: policy == .allow ? response.url : webView.url, in: self)
         }
         #if DEBUG
         if policy == .download {
@@ -1743,7 +1757,12 @@ extension Tab: WKUIDelegate {
     // The completion-handler form: its Swift async name differs between SDKs, and a near miss is never called.
     func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo,
                  type: WKMediaCaptureType, decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
-        Task { decisionHandler(await SitePermissions.request(origin: origin, type: type, window: host?.hostWindow, isPrivate: isPrivate, tab: self)) }
+        Task {
+            // A call on a page without WebRTC can't work: it's offered first, and once allowed the page reloads and
+            // asks again.
+            if await WebRTCProtection.offer(in: self) { decisionHandler(.deny); return }
+            decisionHandler(await SitePermissions.request(origin: origin, type: type, window: host?.hostWindow, isPrivate: isPrivate, tab: self))
+        }
     }
 
     /// Screen sharing (Meet, Zoom, Teams). WebKit asks the browser through this unpublished method; the answer

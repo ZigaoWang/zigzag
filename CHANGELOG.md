@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Protect IP address from WebRTC, in Settings › Privacy, keeps sites from learning your real IP address through WebRTC while you use a proxy or VPN. When it's on, WebRTC is off except on sites you allow: Site Controls › Permissions has a WebRTC row on every site, and a site that starts a call without it asks to Allow and Reload. Calls on Meet, Zoom, Teams or Discord work once the site is allowed. It's off unless you turn it on, and a private window follows it without remembering what you allow there. ([#229](https://github.com/ZigaoWang/zigzag/issues/229))
+
 ## [0.9.0] - 2026-11-14
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, Site Controls is rebuilt, and pictures and PDFs from websites are read in sandboxed helpers.
