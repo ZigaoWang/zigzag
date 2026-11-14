@@ -984,11 +984,15 @@ final class Library {
         spaces.first { $0.bookmarks.contains { $0.id == id } }?.id
     }
 
+    /// Where something asked for at `index` goes in a list of `count`: the end when no place is given, and never
+    /// before the start or past the end (an extension can ask for any number).
+    nonisolated static func place(_ index: Int?, among count: Int) -> Int { max(0, min(index ?? count, count)) }
+
     @discardableResult
     func addBookmark(url: URL, title: String, icon: String? = nil, to spaceID: UUID, at index: Int? = nil, id: UUID = UUID()) -> Bookmark? {
         guard let s = self.index(of: spaceID) else { return nil }
         let bookmark = Bookmark(id: id, url: url, title: title, icon: icon)
-        let at = min(index ?? spaces[s].bookmarks.count, spaces[s].bookmarks.count)
+        let at = Self.place(index, among: spaces[s].bookmarks.count)
         spaces[s].bookmarks.insert(bookmark, at: at)
         // Landing between a folder's pages doesn't put it in the folder: it goes just after, where the sidebar shows it.
         tidyFolders(s)
@@ -1259,7 +1263,7 @@ final class Library {
         let members = (spaces[s].folders ?? []).pages(in: id)
         let moving = spaces[s].bookmarks.filter { members.contains($0.id) }
         spaces[s].bookmarks.removeAll { members.contains($0.id) }
-        spaces[target].bookmarks.insert(contentsOf: moving, at: min(at, spaces[target].bookmarks.count))
+        spaces[target].bookmarks.insert(contentsOf: moving, at: max(0, min(at, spaces[target].bookmarks.count)))
         folder.parentID = into
         spaces[s].folders?[f] = folder
         if let p = into, let pi = spaces[target].folders?.firstIndex(where: { $0.id == p }) { spaces[target].folders?[pi].isOpen = true; spaces[target].folders?[pi].tucked = nil }
@@ -1402,7 +1406,7 @@ final class Library {
     /// (whose pages are `marks`, in order), in one change.
     func addPinnedSplit(_ marks: [Bookmark], as layout: PinnedSplit, to spaceID: UUID, at index: Int? = nil) {
         guard let s = self.index(of: spaceID), marks.map(\.id) == layout.ids else { return }
-        let at = min(index ?? spaces[s].bookmarks.count, spaces[s].bookmarks.count)
+        let at = Self.place(index, among: spaces[s].bookmarks.count)
         spaces[s].bookmarks.insert(contentsOf: marks, at: at)
         spaces[s].pinnedSplits = (spaces[s].pinnedSplits ?? []) + [layout]
         tidyFolders(s)

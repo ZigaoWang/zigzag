@@ -24,7 +24,8 @@ nonisolated final class NativeAudioOut: @unchecked Sendable {
 
     /// Adds a source's samples (mono, at their own rate).
     func feed(_ source: String, samples: [Float], rate sourceRate: Double) {
-        guard !samples.isEmpty else { return }
+        // A rate that is not a sample rate (negative, zero, NaN, a few a second) would make no sense of the samples.
+        guard !samples.isEmpty, sourceRate.isFinite, sourceRate >= 1_000 else { return }
         let resampled: [Float]
         if abs(sourceRate - rate) < 1 {
             resampled = samples

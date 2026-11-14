@@ -687,3 +687,28 @@ nonisolated private final class SessionTestServer: @unchecked Sendable {
         }
     }
 }
+
+/// Numbers an extension passes become whole numbers without a trap, whatever they are, and a bookmark's index lands
+/// inside its list.
+struct ExtensionNumberTests {
+    @Test func anyNumberBecomesAnIntWithoutATrap() {
+        #expect(Int(saturating: 1e300) == .max)
+        #expect(Int(saturating: -1e300) == .min)
+        #expect(Int(saturating: .infinity) == .max)
+        #expect(Int(saturating: -.infinity) == .min)
+        #expect(Int(saturating: .nan) == 0)
+        #expect(Int(saturating: Double(Int.max)) == .max)
+        #expect(Int(saturating: 9.7) == 9)
+        #expect(Int(saturating: -3.2) == -3)
+        #expect(Int(saturating: 42) == 42)
+    }
+
+    @Test func aBookmarksIndexStaysInItsList() {
+        #expect(Library.place(-1, among: 3) == 0)
+        #expect(Library.place(Int(saturating: -1e300), among: 3) == 0)
+        #expect(Library.place(Int(saturating: 1e300), among: 3) == 3)
+        #expect(Library.place(nil, among: 3) == 3)
+        #expect(Library.place(1, among: 3) == 1)
+        #expect(Library.place(0, among: 0) == 0)
+    }
+}

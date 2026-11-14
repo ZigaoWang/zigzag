@@ -46,7 +46,7 @@ final class BridgeBookmarks: BridgeNamespace {
             return children(of: id).map { node($0, depth: 0) }
         case "getRecent":
             // Zigzag doesn't date its pins; the newest are the last added in each list, favorites first.
-            let count = max(1, Int(args.number(0) ?? 10))
+            let count = max(1, Int(saturating: args.number(0) ?? 10))
             return allPages().suffix(count).reversed().map { node($0, depth: 0) }
         case "search":
             return search(args.first).map { node($0, depth: 0) }
@@ -214,7 +214,7 @@ final class BridgeBookmarks: BridgeNamespace {
     private func create(_ details: [String: Any]) throws -> String {
         let parentID = details.string("parentId") ?? Self.spaces
         let title = details.string("title") ?? ""
-        let index = details.number("index").map(Int.init)
+        let index = details.number("index").map { max(0, Int(saturating: $0)) }
         if let text = details.string("url") {
             guard let url = URL(string: text), let scheme = url.scheme?.lowercased(), ["http", "https", "file"].contains(scheme) else {
                 throw BridgeError("Bookmarks hold web addresses")
@@ -273,7 +273,7 @@ final class BridgeBookmarks: BridgeNamespace {
     private func move(_ id: String, _ destination: [String: Any]) throws {
         guard let (kind, uuid) = parse(id), exists(id) else { throw BridgeError("Can't modify the root bookmark folders") }
         let target = destination.string("parentId") ?? parent(of: id) ?? Self.spaces
-        let index = destination.number("index").map(Int.init)
+        let index = destination.number("index").map { max(0, Int(saturating: $0)) }
         switch (kind, target) {
         case ("b", Self.favorites):
             if library.isFavorite(uuid) { library.moveFavorite(uuid, to: index ?? library.favorites(in: host.profile.id).count) } else { library.makeFavorite(uuid, at: index, in: host.profile.id) }

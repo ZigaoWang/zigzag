@@ -234,6 +234,22 @@ extension BridgeNamespace {
     func release(_ extensionID: String) {}
 }
 
+extension Int {
+    /// A number an extension passed, as a whole number: past Int's range it's the nearest end, NaN is 0, a fraction
+    /// is cut off. Never a trap, which `Int(_: Double)` is for any of those first two, so one call can't crash Zigzag.
+    init(saturating value: Double) {
+        if value.isNaN {
+            self = 0
+        } else if value >= Double(Int.max) {
+            self = .max
+        } else if value <= Double(Int.min) {
+            self = .min
+        } else {
+            self = Int(value)
+        }
+    }
+}
+
 /// Reading arguments as Chrome passes them: an options object, a string, a number.
 extension Array where Element == Any {
     func object(_ index: Int) -> [String: Any] { indices.contains(index) ? self[index] as? [String: Any] ?? [:] : [:] }

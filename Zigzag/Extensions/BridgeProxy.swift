@@ -264,7 +264,7 @@ enum ProxyRules {
         // An IPv6 address may come in brackets, as in an address.
         let bare = host.hasPrefix("[") && host.hasSuffix("]") ? String(host.dropFirst().dropLast()) : host
         guard !bare.isEmpty, !bare.contains(where: { $0.isWhitespace || $0 == "/" }) else { throw BridgeError("Invalid proxy host") }
-        let port = object.number("port").map(Int.init) ?? [.http: 80, .https: 443, .socks5: 1080][kind]!
+        let port = object.number("port").map(Int.init(saturating:)) ?? [.http: 80, .https: 443, .socks5: 1080][kind]!
         guard (1...65_535).contains(port) else { throw BridgeError("Invalid proxy port") }
         return ProxyServer(kind: kind, host: bare, port: port)
     }

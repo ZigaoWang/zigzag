@@ -29,7 +29,7 @@ final class BridgeDownloads: BridgeNamespace {
         case "search":
             return search(args.object(0)).map(describe)
         case "pause", "resume", "cancel":
-            guard let item = item(Int(args.number(0) ?? -1)) else { throw BridgeError("Invalid download id") }
+            guard let item = item(Int(saturating: args.number(0) ?? -1)) else { throw BridgeError("Invalid download id") }
             switch fn {
             case "pause": guard manager.canPause(item) else { throw BridgeError("Download can't be paused") }; manager.pause(item)
             case "resume": manager.resume(item)
@@ -41,26 +41,26 @@ final class BridgeDownloads: BridgeNamespace {
             for item in gone { manager.remove(item) }
             return gone.compactMap { numbers[$0.id] }
         case "removeFile":
-            guard let item = item(Int(args.number(0) ?? -1)), item.state == .finished, let file = item.destination else { throw BridgeError("Download must be complete") }
+            guard let item = item(Int(saturating: args.number(0) ?? -1)), item.state == .finished, let file = item.destination else { throw BridgeError("Download must be complete") }
             try FileManager.default.trashItem(at: file, resultingItemURL: nil)
             return nil
         case "open":
             guard host.bridge.allows("downloads.open", for: extensionID) else { throw BridgeError("Opening downloads needs the “downloads.open” permission") }
             // As in Chrome, only in answer to you: a click on the extension, or in its popup or pages, a moment ago.
             guard host.hasRecentGesture(extensionID) else { throw BridgeError("downloads.open() may only be called in response to a user gesture.") }
-            guard let item = item(Int(args.number(0) ?? -1)), item.state == .finished else { throw BridgeError("Download must be complete") }
+            guard let item = item(Int(saturating: args.number(0) ?? -1)), item.state == .finished else { throw BridgeError("Download must be complete") }
             manager.open(item)
             return nil
         case "show":
-            guard let item = item(Int(args.number(0) ?? -1)) else { throw BridgeError("Invalid download id") }
+            guard let item = item(Int(saturating: args.number(0) ?? -1)) else { throw BridgeError("Invalid download id") }
             manager.reveal(item)
             return true
         case "showDefaultFolder":
             NSWorkspace.shared.open(DownloadManager.folder)
             return nil
         case "getFileIcon":
-            guard let item = item(Int(args.number(0) ?? -1)), let file = item.destination else { throw BridgeError("Invalid download id") }
-            let size = Int(args.object(1).number("size") ?? 32)
+            guard let item = item(Int(saturating: args.number(0) ?? -1)), let file = item.destination else { throw BridgeError("Invalid download id") }
+            let size = min(max(Int(saturating: args.object(1).number("size") ?? 32), 1), 256)
             let icon = NSWorkspace.shared.icon(forFile: file.path)
             icon.size = NSSize(width: size, height: size)
             guard let tiff = icon.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { return nil }
@@ -136,7 +136,7 @@ final class BridgeDownloads: BridgeNamespace {
 
     private func search(_ query: [String: Any]) -> [DownloadItem] {
         var found = visible
-        if let id = query.number("id").map(Int.init) { found = found.filter { number(for: $0) == id } }
+        if let id = query.number("id").map(Int.init(saturating:)) { found = found.filter { number(for: $0) == id } }
         if let state = query.string("state") { found = found.filter { Self.state($0) == state } }
         if let url = query.string("url") { found = found.filter { $0.sourceURL?.absoluteString == url } }
         if let text = query.string("query") ?? (query["query"] as? [String])?.joined(separator: " ") {
@@ -147,7 +147,7 @@ final class BridgeDownloads: BridgeNamespace {
             found = found.filter { regex.firstMatch(in: $0.destination?.path ?? $0.filename, range: NSRange(location: 0, length: ($0.destination?.path ?? $0.filename).utf16.count)) != nil }
         }
         if (query["orderBy"] as? [String])?.first == "startTime" { found.sort { $0.started < $1.started } }
-        if let limit = query.number("limit").map(Int.init), limit > 0 { found = Array(found.prefix(limit)) }
+        if let limit = query.number("limit").map(Int.init(saturating:)), limit > 0 { found = Array(found.prefix(limit)) }
         return found
     }
 

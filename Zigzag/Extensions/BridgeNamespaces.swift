@@ -25,7 +25,7 @@ final class BridgeHistory: BridgeNamespace {
         switch fn {
         case "search":
             let query = args.object(0)
-            let limit = Int(query.number("maxResults") ?? 100)
+            let limit = Int(saturating: query.number("maxResults") ?? 100)
             // Chrome's default reaches back a day when there's no start time.
             let start = query.date("startTime") ?? (query["startTime"] == nil ? Date(timeIntervalSinceNow: -86_400) : nil)
             return store.items(matching: query.string("text") ?? "", from: start, to: query.date("endTime"), limit: limit).map(Self.item)
