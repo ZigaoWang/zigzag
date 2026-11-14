@@ -1812,7 +1812,26 @@ extension Tab: WKNavigationDelegate {
 extension Tab: WKUIDelegate {
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Zigzag's own Open in New Tab, New Window or Peek always opens; a page's own request needs a click or your say.
-        guard BrowserWebView.pendingDisposition(for: webView) != nil || PopupNotice.allows(navigationAction, from: url, isPrivate: isPrivate) else { return nil }
+        if BrowserWebView.pendingDisposition(for: webView) == nil, !PopupNotice.isUserInitiated(navigationAction) {
+            // A page's own pop-up: a destination remembered for the site opens there with no question, otherwise the
+            // banner asks and nothing opens now. Zigzag's own pages never open this way.
+            guard Self.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
+            if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(url)) {
+                switch stored {
+                case "deny":
+                    return nil
+                case "mini":
+                    return PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: webView.window, opener: self)
+                default:
+                    if let target = navigationAction.request.url, let promptHost = host as? PromptHost {
+                        PopupNotice.open(target, action: stored, from: self, in: promptHost)
+                    }
+                    return nil
+                }
+            }
+            PopupNotice.ask(navigationAction, from: url, isPrivate: isPrivate, tab: self, in: host as? PromptHost)
+            return nil
+        }
         // Zigzag's own pages never open as a page's new window: Settings would show over it before anything loaded.
         guard Self.mayOpenInNewWebView(navigationAction.request.url) else {
             _ = BrowserWebView.takePendingDisposition(for: webView)
