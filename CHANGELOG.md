@@ -1129,7 +1129,30 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.17...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.8.6...HEAD
+[0.9.0]: https://github.com/ZigaoWang/zigzag/compare/v0.8.6...HEAD
+[0.8.6]: https://github.com/ZigaoWang/zigzag/compare/v0.8.5...v0.8.6
+[0.8.5]: https://github.com/ZigaoWang/zigzag/compare/v0.8.4...v0.8.5
+[0.8.4]: https://github.com/ZigaoWang/zigzag/compare/v0.8.3...v0.8.4
+[0.8.3]: https://github.com/ZigaoWang/zigzag/compare/v0.8.2...v0.8.3
+[0.8.2]: https://github.com/ZigaoWang/zigzag/compare/v0.8.1...v0.8.2
+[0.8.1]: https://github.com/ZigaoWang/zigzag/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/ZigaoWang/zigzag/compare/v0.7.9...v0.8.0
+[0.7.9]: https://github.com/ZigaoWang/zigzag/compare/v0.7.8...v0.7.9
+[0.7.8]: https://github.com/ZigaoWang/zigzag/compare/v0.7.7...v0.7.8
+[0.7.7]: https://github.com/ZigaoWang/zigzag/compare/v0.7.6...v0.7.7
+[0.7.6]: https://github.com/ZigaoWang/zigzag/compare/v0.7.5...v0.7.6
+[0.7.5]: https://github.com/ZigaoWang/zigzag/compare/v0.7.4...v0.7.5
+[0.7.4]: https://github.com/ZigaoWang/zigzag/compare/v0.7.3...v0.7.4
+[0.7.3]: https://github.com/ZigaoWang/zigzag/compare/v0.7.2...v0.7.3
+[0.7.2]: https://github.com/ZigaoWang/zigzag/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/ZigaoWang/zigzag/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/ZigaoWang/zigzag/compare/v0.6.2...v0.7.0
+[0.6.2]: https://github.com/ZigaoWang/zigzag/compare/v0.6.1...v0.6.2
+[0.6.1]: https://github.com/ZigaoWang/zigzag/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/ZigaoWang/zigzag/compare/v0.5.19...v0.6.0
+[0.5.19]: https://github.com/ZigaoWang/zigzag/compare/v0.5.18...v0.5.19
+[0.5.18]: https://github.com/ZigaoWang/zigzag/compare/v0.5.17...v0.5.18
 [0.5.17]: https://github.com/ZigaoWang/zigzag/compare/v0.5.16...v0.5.17
 [0.5.16]: https://github.com/ZigaoWang/zigzag/compare/v0.5.15...v0.5.16
 [0.5.15]: https://github.com/ZigaoWang/zigzag/compare/v0.5.14...v0.5.15
