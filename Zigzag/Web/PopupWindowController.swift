@@ -189,6 +189,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     /// The address Zigzag's own page for a load that failed is showing at, if it's showing one.
     private var errorShownFor: URL?
+    /// What its pages may save, and which responses are shown: a tab's policy.
+    private let downloads = DownloadPolicy()
 
     /// The lock says what Site Controls' connection line says: a certificate let through on the warning page, or
     /// Zigzag's own warning in place of a page, is never secure.
@@ -254,7 +256,12 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
-        if navigationAction.shouldPerformDownload { return .download }
+        // Downloads as a tab's are: a stream of them nobody clicked for is refused.
+        if let policy = downloads.decide(shouldDownload: navigationAction.shouldPerformDownload, clicked: PopupNotice.isUserInitiated(navigationAction),
+                                         isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true) {
+            if policy == .cancel { Diagnostics.note("Download refused", site: webView.url?.host(), "A page started another download without a click", isPrivate: isPrivate) }
+            return policy
+        }
         // Zigzag's own pages (History) open in its tabs, never in a page's pop-up.
         if navigationAction.request.url?.scheme?.lowercased() == HistoryPage.scheme { return .cancel }
         if let url = navigationAction.request.url, ExternalLinks.isExternal(url), url.scheme?.lowercased() != "file" {
@@ -296,7 +303,11 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse) async -> WKNavigationResponsePolicy {
-        navigationResponse.canShowMIMEType ? .allow : .download
+        let response = navigationResponse.response
+        StrictTransport.note(response, in: webView.configuration.websiteDataStore)
+        // Shown or saved as in a tab: a file sent as an attachment is saved, never shown as the site's page.
+        return downloads.decide(mimeType: response.mimeType, contentDisposition: (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition"),
+                                canShowMIMEType: navigationResponse.canShowMIMEType, isMainFrame: navigationResponse.isForMainFrame)
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {

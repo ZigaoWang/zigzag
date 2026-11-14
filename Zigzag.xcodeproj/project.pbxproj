@@ -110,6 +110,7 @@
 		3B807A8BC2378803BB35B954 /* WebAppInstallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 946C16FE0634A5AE372B5725 /* WebAppInstallSheet.swift */; };
 		3BEF15777F24915D05FC1681 /* LocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B89CCE006086C641D713AAB /* LocalizationTests.swift */; };
 		3C594139A69C469E17BC1FA4 /* DeskController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D49789A1E612924BE5AD995 /* DeskController.swift */; };
+		3C7D596D2205FA8C83362D04 /* DownloadPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98160990FBB7DDACDE7DEF3E /* DownloadPolicyTests.swift */; };
 		3CBD062C1C7BADC2672D4998 /* webkit-differences.js in Resources */ = {isa = PBXBuildFile; fileRef = 3EA686DC56C7EA8E8C9FFD3D /* webkit-differences.js */; };
 		3CC1FECBB9087F53BF03AD3F /* key4.db in Resources */ = {isa = PBXBuildFile; fileRef = 17A229EAFF40049CACFF0C03 /* key4.db */; };
 		3D3B6AF550CC2E40D121A8F4 /* MotionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB66B99FEE7EFE1C0888001B /* MotionTests.swift */; };
@@ -256,6 +257,7 @@
 		8D5DA9B18AB78EDB306BDE3F /* ExternalLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2664CEA2397AB72FA6371E /* ExternalLinks.swift */; };
 		8E3C385DDEE5EEBB729EF55B /* BrowserRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 253D16FCBE561D267ED6957C /* BrowserRootView.swift */; };
 		8EA92F19466027B9503E537A /* ExtensionCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDEA633FD3B5DC3FC7268252 /* ExtensionCenter.swift */; };
+		8EA95217D924645FA2CB7FF8 /* DownloadPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DCD89005ED4EBEF80B7EA13 /* DownloadPolicy.swift */; };
 		8FA619C6E0E52F2938B92786 /* StrictTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBD3598C3CAC25C5334760E /* StrictTransport.swift */; };
 		8FC0847BA73A7DC315B4C5B7 /* web-store.js in Resources */ = {isa = PBXBuildFile; fileRef = BFA4024AB1ACBF6FB0BDD0BD /* web-store.js */; };
 		8FE22A2F18661ACD22105921 /* SplitRowAlignmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB383D1A0A96BBBED89873A /* SplitRowAlignmentTests.swift */; };
@@ -789,6 +791,7 @@
 		96D4CC131CEDF843998D604C /* DarkPages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPages.swift; sourceTree = "<group>"; };
 		979ECE3AE8285E787E972E3E /* PageCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageCardView.swift; sourceTree = "<group>"; };
 		97B89F5BC1A42191D2C02C66 /* CommandBarRankingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarRankingTests.swift; sourceTree = "<group>"; };
+		98160990FBB7DDACDE7DEF3E /* DownloadPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadPolicyTests.swift; sourceTree = "<group>"; };
 		9875E3DF61E5A98363065101 /* PasswordCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordCapture.swift; sourceTree = "<group>"; };
 		98C36FF6B8E4B6DBFC1DF273 /* Zigzag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zigzag.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		98C4AD0F5E55B24044483033 /* MaterialsShowcase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialsShowcase.swift; sourceTree = "<group>"; };
@@ -803,6 +806,7 @@
 		9C80F05AD463F7C84E00B1CE /* ProfileDirectory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileDirectory.swift; sourceTree = "<group>"; };
 		9D5275896F347F531AE3C184 /* BlockedScriptStandInsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlockedScriptStandInsTests.swift; sourceTree = "<group>"; };
 		9DA9C09A32B4F7885252E1D1 /* WebAppWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAppWindowTests.swift; sourceTree = "<group>"; };
+		9DCD89005ED4EBEF80B7EA13 /* DownloadPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadPolicy.swift; sourceTree = "<group>"; };
 		9E80883FE422D67AA3B61DDC /* BridgeDownloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeDownloads.swift; sourceTree = "<group>"; };
 		9EBBEADFD52A2AF79DAA47E0 /* SidebarSlideTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarSlideTests.swift; sourceTree = "<group>"; };
 		9F78ECBEF8A16738C2C9DF0C /* SidebarMenus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarMenus.swift; sourceTree = "<group>"; };
@@ -1323,6 +1327,7 @@
 				A69950C3F8014CFB7FAB861A /* DarkSeen.swift */,
 				CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */,
 				DAC9B2535F5F2C950BA4096B /* DownloadPlace.swift */,
+				9DCD89005ED4EBEF80B7EA13 /* DownloadPolicy.swift */,
 				059DC09EA2D5589CB98D676B /* ErrorPage.swift */,
 				BD2664CEA2397AB72FA6371E /* ExternalLinks.swift */,
 				D9FAF507728E18C4FC4266C5 /* FaviconStore.swift */,
@@ -1525,6 +1530,7 @@
 				1666E0C362D430512EB37C75 /* DevelopmentSitesTests.swift */,
 				14B44E3C60BDACED82D8B858 /* DiagnosticsTests.swift */,
 				53584D3A138EABED88285971 /* DialogPasswordFixesTests.swift */,
+				98160990FBB7DDACDE7DEF3E /* DownloadPolicyTests.swift */,
 				C81FFBD3A6B1DEE26D521B61 /* DownloadReplaceTests.swift */,
 				7F945D7E0BF21B2E2FD7A4C7 /* EmojiSearchTests.swift */,
 				B0DE85F403C80DB6286E463D /* EnergyWarningTests.swift */,
@@ -2057,6 +2063,7 @@
 				65BFE923B15D9B75D0349C50 /* DockProgress.swift in Sources */,
 				A297D44BA6B37496BC5287EC /* DownloadManager.swift in Sources */,
 				16533A8F18B300E1F88BEEB7 /* DownloadPlace.swift in Sources */,
+				8EA95217D924645FA2CB7FF8 /* DownloadPolicy.swift in Sources */,
 				3A01F2505087356C0221A1D0 /* DownloadsPanel.swift in Sources */,
 				6FF18123789D7B94380C69D5 /* EmojiSearch.swift in Sources */,
 				CD77ADCA81FF68CE94D13F63 /* EnergyWatch.swift in Sources */,
@@ -2294,6 +2301,7 @@
 				0EEAAFF8838DD30FD0607829 /* DevelopmentSitesTests.swift in Sources */,
 				4E5CF0E3E770AEFADC046339 /* DiagnosticsTests.swift in Sources */,
 				CE5616DC4C93BC6AEDB917D3 /* DialogPasswordFixesTests.swift in Sources */,
+				3C7D596D2205FA8C83362D04 /* DownloadPolicyTests.swift in Sources */,
 				54A9A3723030A1E1F7B634BB /* DownloadReplaceTests.swift in Sources */,
 				E137A0DE21BBDB974852712E /* EmojiSearchTests.swift in Sources */,
 				45B26CB65A31C4BEFCFB7CA2 /* EnergyWarningTests.swift in Sources */,
