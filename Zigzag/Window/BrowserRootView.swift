@@ -817,14 +817,18 @@ final class BrowserRootView: SpaceFrameView {
     func paintTopBar(_ color: NSColor?) {
         let before = (color: pageColor, painted: paintsTopBar)
         pageColor = color
-        topBar.pageColor = paintsTopBar ? color : nil
+        topBar.pageColor = paintsTopBar ? barColor : nil
         // The same color again (asked on every load, navigation and color report, mostly unchanged) leaves the
         // window's layout alone: laying the whole window out each time kept the main thread busy (#89).
         if before.color != color || before.painted != paintsTopBar { needsLayout = true }
         refreshGlassOcclusion()
     }
 
-    private var paintsTopBar: Bool { showsTopBar && pageColor != nil && tiles == nil && !isEmpty }
+    /// The bar's color: the page's, or framed, the card's own when the page has none (Settings, a PDF, Reader), so
+    /// the bar is still the top of the page's card rather than a strip on the glass with the card floating under it.
+    private var barColor: NSColor? { pageColor ?? (topBarInset > 0 ? Tokens.Color.cardBackground : nil) }
+
+    private var paintsTopBar: Bool { showsTopBar && barColor != nil && tiles == nil && !isEmpty }
 
     /// The page card's own frame for `pane`: under a bar in the page's color, it reaches up to the bar's top.
     private func cardViewFrame(_ pane: NSRect) -> NSRect {
@@ -840,7 +844,7 @@ final class BrowserRootView: SpaceFrameView {
         let left = cardViewFrame(frames[0])
         card.frame = left
         card.band = left.height - frames[0].height
-        topBar.pageColor = paintsTopBar ? pageColor : nil
+        topBar.pageColor = paintsTopBar ? barColor : nil
         let attached = sidebarVisible && Self.isBorderless
         squareCorners(of: card)
         card.isAttached = attached
