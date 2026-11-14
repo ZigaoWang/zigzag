@@ -69,7 +69,9 @@ is its presence:
   Deny plain on the left, alternatives plain in the middle, the ordinary yes prominent on the right in the accent. A
   question with more than three actions — the pop-up's four — puts its buttons on their own row under the request, at
   equal width, rather than shrinking them below a comfortable hit target. The dropdown picks the duration; the buttons
-  pick the action.
+  pick the action. When nothing can be remembered, the dropdown stays in place **greyed out**, with a tooltip saying why
+  — a private window, an insecure page, embedded content, or a page with no site. A control that vanishes explains
+  nothing; a greyed one teaches.
 - **Measured, two arrangements:** when the row fits, it is one line — question, then buttons, then dropdown. When the
   measured widths don't fit (narrow window, Zigzag Mini, longer translations), the dropdown and buttons move to a
   second line under the question. The breakpoint comes from `fittingWidth`, not a hard-coded number.
@@ -218,7 +220,8 @@ A marker also covers a pop-up waiting for its answer.
   never runs the rule and it is not the same as Deny, which cancels. Nothing is stored.
 - **App launches keep their extra gates.** Always-allow for an app is still kept only for an https page and never for a
   frame from another site, and a stored block still applies to foreign frames. The duration dropdown is therefore
-  hidden in private windows, on origin-less pages, off https, and inside a foreign frame.
+  greyed, with that reason as its tooltip, in private windows, on origin-less pages, off https, and inside a foreign
+  frame.
 - **Session guards.** `asking` stays (one question per site+scheme at a time). `declined` is replaced by the tab's
   page-scoped deny, which already lasts until the page navigates. `putOff` and its 60-second pause after Not Now stay.
 - **A handoff caught at new-window time.** Open in Browser opens a normal new tab, since there is no existing tab to
