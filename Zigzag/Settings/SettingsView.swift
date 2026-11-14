@@ -791,8 +791,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let flagSearch = FilledField.search(String(localized: "Find a flag", comment: "Placeholder of the search field beside Feature Flags in Settings › Developer: finds a WebKit feature flag by its name or key."))
     private let flagsReset = PillButton(title: String(localized: "Reset to Defaults", comment: "Button beside Feature Flags in Settings › Developer: every WebKit feature flag you changed goes back to WebKit's default. Also the button of the sheet that asks first."))
     private let flagsReload = PillButton(title: String(localized: "Reload All Tabs", comment: "Button in Settings › Developer › Feature Flags: reloads every open web page, so changed flags take effect."))
-    /// Mature, unstable and internal flags, folded away until wanted.
-    private let flagsMore = DisclosureRow(title: String(localized: "featureflags.showAll", defaultValue: "Show All",
+    /// Mature, unstable and internal flags, folded away until wanted. A fold names what it holds, as Effects does in the
+    /// space editor; Show All is the button that lists the rest of a long list (Privacy's sites).
+    private let flagsMore = DisclosureRow(title: String(localized: "featureflags.more", defaultValue: "More Flags",
                                                         comment: "A folding heading under the feature flags in Settings › Developer: shows WebKit's mature, unstable and internal flags too."))
     private var flagsShowAll = false
     private var flagsToken: SignalToken?

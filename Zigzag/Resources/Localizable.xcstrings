@@ -19197,20 +19197,20 @@
         }
       }
     },
-    "featureflags.showAll" : {
+    "featureflags.more" : {
       "comment" : "A folding heading under the feature flags in Settings › Developer: shows WebKit's mature, unstable and internal flags too.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Show All"
+            "value" : "More Flags"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "全部显示"
+            "value" : "更多功能标志"
           }
         }
       }
