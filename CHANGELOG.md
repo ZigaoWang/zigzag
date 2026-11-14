@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Tampermonkey works again once its popup has been opened. The open popup cut off every connection its scripts made to it, so they kept reconnecting, hundreds of times a second, and their menu commands never showed.
+- In split view with the address bar above the page and Borderless page off, each page and its strip of buttons and address are one card, in the page's own color, instead of a strip floating on the window over the page. The strip's buttons keep clear of the card's corners, and its address field fills the room between them.
 
 ## [0.9.0] - 2026-11-12
 

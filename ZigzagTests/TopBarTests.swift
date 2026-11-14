@@ -474,4 +474,95 @@ struct TopBarTests {
         #expect(strip.minX == toggle.maxX && toggle.minX > Tokens.Sidebar.lightsX + 52)
         #expect(root.card.frame.minX == 0 && root.card.frame.minY == root.topBar.frame.maxY)
     }
+
+    /// Runs `body` with Borderless page set to `borderless` for this process only (the arguments domain, never saved),
+    /// then as it was.
+    private func withBorderless(_ borderless: Bool, _ body: () -> Void) {
+        let defaults = UserDefaults.standard
+        let before = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = before
+        arguments["borderlessPage"] = borderless
+        defaults.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer { defaults.setVolatileDomain(before, forName: UserDefaults.argumentDomain) }
+        body()
+    }
+
+    /// Framed, each pane whose strip is up in the bar is one card with it: the card reaches up to the bar's top, its
+    /// page starts under the bar, and the gap between the panes stays open up to the window's top.
+    @Test func framedEachPaneInTheBarIsOneCardWithItsStrip() {
+        withBorderless(false) {
+            let (root, _) = splitRoot()
+            let barTop = root.topBarFrame.minY
+            #expect(barTop == inset)
+            let panes = root.tileFrames
+            for (card, pane) in zip([root.card, root.secondCard], panes) {
+                #expect(card.frame == NSRect(x: pane.minX, y: barTop, width: pane.width, height: pane.maxY - barTop))
+                #expect(card.pageFrame == pane && card.band == pane.minY - barTop)
+                #expect(card.header.isInBar && card.header.isOnCard)
+            }
+            #expect(root.secondCard.frame.minX - root.card.frame.maxX == root.paneGap)
+            // The bar has no color of its own across the gap.
+            #expect(root.topBar.pageColor == nil)
+        }
+    }
+
+    @Test func framedStackedOnlyTheTopPaneJoinsTheBar() {
+        withBorderless(false) {
+            let (root, _) = splitRoot(vertical: true)
+            let panes = root.tileFrames
+            #expect(root.card.frame.minY == root.topBarFrame.minY && root.card.pageFrame == panes[0])
+            #expect(root.secondCard.frame == panes[1] && root.secondCard.band == 0)
+            #expect(!root.secondCard.header.isOnCard)
+        }
+    }
+
+    @Test func framedTheTopRowOfFourJoinsTheBar() {
+        withBorderless(false) {
+            let (root, _) = splitRoot()
+            root.thirdCard.showsHeader = true
+            root.fourthCard.showsHeader = true
+            root.setTiles(TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight]), animated: false)
+            root.layoutSubtreeIfNeeded()
+            let panes = root.tileFrames, barTop = root.topBarFrame.minY
+            for i in 0..<2 { #expect(root.paneCards[i].frame.minY == barTop && root.paneCards[i].pageFrame == panes[i]) }
+            for i in 2..<4 { #expect(root.paneCards[i].frame == panes[i] && root.paneCards[i].band == 0) }
+        }
+    }
+
+    @Test func framedAZoomedPaneLeavesTheBarAndComesBack() {
+        withBorderless(false) {
+            let (root, _) = splitRoot()
+            root.setZoomedPane(1, animated: false)
+            root.layoutSubtreeIfNeeded()
+            #expect(root.secondCard.frame == root.zoomFrame && root.secondCard.band == 0)
+            #expect(root.card.frame.minY == root.topBarFrame.minY)
+            root.setZoomedPane(nil, animated: false)
+            root.layoutSubtreeIfNeeded()
+            #expect(root.secondCard.frame.minY == root.topBarFrame.minY && root.secondCard.pageFrame == root.tileFrames[1])
+        }
+    }
+
+    @Test func framedTheSidebarHiddenOrOnTheRightKeepsThePanesJoined() {
+        withBorderless(false) {
+            let (root, _) = splitRoot()
+            for (visible, onRight) in [(false, false), (true, true), (false, true)] {
+                root.setSidebarVisible(visible, animated: false)
+                root.setSidebarOnRight(onRight, animated: false)
+                root.layoutSubtreeIfNeeded()
+                for (card, pane) in zip([root.card, root.secondCard], root.tileFrames) {
+                    #expect(card.frame.minY == root.topBarFrame.minY && card.pageFrame == pane, "visible \(visible), right \(onRight)")
+                }
+            }
+        }
+    }
+
+    /// Borderless, the panes meet the bar in a straight line as ever, and the strips keep the bar's ink.
+    @Test func borderlessThePanesStartUnderTheBar() {
+        withBorderless(true) {
+            let (root, _) = splitRoot()
+            for (card, pane) in zip([root.card, root.secondCard], root.tileFrames) {
+                #expect(card.frame == pane && card.band == 0 && !card.header.isOnCard)
+            }
+        }
+    }
 }

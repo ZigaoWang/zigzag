@@ -31,6 +31,7 @@ final class PageCardView: NSView {
             guard liftsHeader != oldValue else { return }
             if !liftsHeader {
                 header.isInBar = false
+                header.isOnCard = false
                 header.addressCenter = nil
                 header.alphaValue = headerAlpha
                 clip.addSubview(header)

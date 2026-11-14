@@ -59,6 +59,9 @@ final class PaneHeaderView: NSView {
             needsLayout = true
         }
     }
+    /// Up in the bar with its pane's card reaching up behind it (framed, `BrowserRootView.joinsBar`): its ink reads
+    /// on the card's ground, its page's color, as on the card, rather than on the window's frame.
+    var isOnCard = false { didSet { if isOnCard != oldValue { refreshInk(); needsLayout = true } } }
     /// In the bar, where the address centers, from the strip's leading edge: over the middle of its pane, which can
     /// start under the traffic lights. Nil centers it on the strip.
     var addressCenter: CGFloat? { didSet { if addressCenter != oldValue { needsLayout = true } } }
@@ -137,9 +140,10 @@ final class PaneHeaderView: NSView {
     }
 
     private func refreshInk() {
-        // Up in the bar, the bar's own appearance is the strip's.
-        appearance = isInBar ? nil : PageBar.inkAppearance(on: ground).flatMap(NSAppearance.init(named:))
-        let onPage = !isInBar && ground != nil
+        // Up in the bar on the window's frame, the bar's own appearance is the strip's; over its card, its card's.
+        let overCard = !isInBar || isOnCard
+        appearance = overCard ? PageBar.inkAppearance(on: ground).flatMap(NSAppearance.init(named:)) : nil
+        let onPage = overCard && ground != nil
         [back, forward, reload, zoom, swap, orientation, close, more, closeTab, address.siteControls].forEach { $0.isOnPage = onPage }
     }
 
@@ -211,6 +215,8 @@ final class PaneHeaderView: NSView {
     }
 
     private var currentFit = Fit.all
+    /// The widest the address grows over its card, in the bar.
+    static let addressMaxWidth: CGFloat = 560
 
     /// The buttons the strip has no room for, in its own menu under ⋯.
     private func showMore() {
@@ -242,8 +248,9 @@ final class PaneHeaderView: NSView {
         super.layout()
         let b = Tokens.Pane.button
         // In the bar, the buttons start and end at the strip's edges (the bar sets them where its own would be), on its
-        // middle line, the traffic lights' line.
-        let edge = isInBar ? 0 : floor((bounds.height - Tokens.Metric.hairline - b) / 2)
+        // middle line, the traffic lights' line. Over its card's top, they keep the card's radius in from its edges, so
+        // the first and last clear its rounded corners and sit as far in from one edge as from the other.
+        let edge = isInBar ? (isOnCard ? Tokens.Radius.card : 0) : floor((bounds.height - Tokens.Metric.hairline - b) / 2)
         let y = isInBar ? round((bounds.height - b) / 2) : edge
         let fit = Self.fit(width: bounds.width, edge: edge, address: address.text.isEmpty ? 0 : address.fittingWidth, splitButtons: arrangesSplit)
         currentFit = fit
@@ -272,7 +279,9 @@ final class PaneHeaderView: NSView {
         let h = Tokens.Pane.addressHeight
         let center = addressCenter ?? bounds.midX
         let lo = x + Tokens.Space.x2, hi = trailing - Tokens.Space.x2
-        let pillWidth = max(0, min(hi - lo, address.fittingWidth))
+        // Over its card, the field takes the room between the two groups, up to a comfortable width, as an address
+        // field does, rather than a small pill adrift in it.
+        let pillWidth = max(0, min(hi - lo, isOnCard ? Self.addressMaxWidth : address.fittingWidth))
         let pillX = min(max(center - pillWidth / 2, lo), hi - pillWidth)
         address.frame = NSRect(x: round(pillX), y: y + (b - h) / 2, width: pillWidth, height: h)
         address.isHidden = address.text.isEmpty || pillWidth < PaneAddressView.padding * 3

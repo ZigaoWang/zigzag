@@ -352,7 +352,7 @@ final class BrowserRootView: SpaceFrameView {
         let leaving = after < before ? Array(cards[after..<before]) : []
         leavingCards.formUnion(leaving.map(ObjectIdentifier.init))
         layoutSubtreeIfNeeded()
-        let frames = tileFrames
+        let frames = tileFrames.indices.map { cardViewFrame(tileFrames[$0], at: $0) }
         for i in 0..<min(before, after) { cards[i].frame = old[i] }
         for i in before..<max(before, after) {
             let target = frames[i], region = shape?.regions[i]
@@ -418,7 +418,13 @@ final class BrowserRootView: SpaceFrameView {
         let frames = tileFrames
         // The pane that leaves the zoom goes back to its place; the one that comes in grows out of it.
         let moving = [old, index].compactMap { $0 }.filter { cards.indices.contains($0) && frames.indices.contains($0) }
-        let target = { (i: Int) -> NSRect in i == index ? self.zoomFrame : (i == 0 ? self.cardViewFrame(frames[0]) : frames[i]) }
+        let target = { (i: Int) -> NSRect in i == index ? self.zoomFrame : self.cardViewFrame(frames[i], at: i) }
+        // Framed under the bar, the pane coming in takes its strip from the bar onto its card's top as it leaves the
+        // bar's row, which its card's top was: the two go as one. Going back, the strip goes up again once it's there.
+        if let index, splitJoinsBar, cards.indices.contains(index) {
+            placeStrips(animated: false)
+            cards[index].band = 0
+        }
         guard animated, window != nil else {
             moving.forEach { cards[$0].frame = target($0) }
             needsLayout = true
@@ -831,10 +837,31 @@ final class BrowserRootView: SpaceFrameView {
 
     private var paintsTopBar: Bool { showsTopBar && barColor != nil && tiles == nil && !isEmpty }
 
-    /// The page card's own frame for `pane`: under a bar in the page's color, it reaches up to the bar's top.
-    private func cardViewFrame(_ pane: NSRect) -> NSRect {
-        guard paintsTopBar else { return pane }
-        let top = min(pane.minY, topBarFrame.minY)
+    /// Framed in split view under the bar, each pane whose strip is up in the bar's row is one card with it, as a page
+    /// alone is with the bar: its card reaches up to the bar's top, its own ground (its page's color, or the card's)
+    /// behind its strip, so no strip floats on the glass over a card. Between the panes the glass shows down to the
+    /// window's frame, and the bar has no fill of its own across them. Borderless and edge to edge, the panes meet the
+    /// bar in a straight line as before.
+    private var splitJoinsBar: Bool { showsTopBar && tiles != nil && topBarInset > 0 && !isEmpty }
+
+    /// Whether the card of the pane at `index` reaches up under the bar: a page alone under a bar in its color, or in
+    /// split view framed, a pane whose strip is up in the bar (not one enlarged over the rest).
+    private func joinsBar(_ index: Int) -> Bool {
+        guard tiles != nil else { return index == 0 && paintsTopBar }
+        guard splitJoinsBar, paneCards.indices.contains(index) else { return false }
+        return cardsForBar.contains { $0 === paneCards[index] }
+    }
+
+    /// The page card's own frame for the pane at `index`, `pane`: joined to the bar (`joinsBar`), it reaches up to
+    /// the bar's top.
+    private func cardViewFrame(_ pane: NSRect, at index: Int) -> NSRect {
+        guard joinsBar(index) else { return pane }
+        return Self.joined(pane, barTop: topBarFrame.minY)
+    }
+
+    /// `pane` reaching up to `barTop`, the top of the bar it's one card with.
+    static func joined(_ pane: NSRect, barTop: CGFloat) -> NSRect {
+        let top = min(pane.minY, barTop)
         return NSRect(x: pane.minX, y: top, width: pane.width, height: pane.maxY - top)
     }
 
@@ -842,7 +869,7 @@ final class BrowserRootView: SpaceFrameView {
         let frames = tileFrames
         emptyHint.frame = Self.markFrame(in: frames[0])
         paneCards.forEach { $0.isEdgeToEdge = isEdgeToEdge }
-        let left = cardViewFrame(frames[0])
+        let left = cardViewFrame(frames[0], at: 0)
         card.frame = left
         card.band = left.height - frames[0].height
         topBar.pageColor = paintsTopBar ? barColor : nil
@@ -855,7 +882,9 @@ final class BrowserRootView: SpaceFrameView {
             extra.isAttached = attached
             if let pane {
                 extra.isHidden = false
-                extra.frame = pane
+                let frame = cardViewFrame(pane, at: i + 1)
+                extra.frame = frame
+                extra.band = frame.height - pane.height
             } else {
                 extra.isHidden = !leavingCards.contains(ObjectIdentifier(extra))
             }
@@ -868,7 +897,7 @@ final class BrowserRootView: SpaceFrameView {
         if let row = lines?.row { rowHandle.frame = row }
         splitDropHint.frame = cardFrame
         if let zoomed = zoomedPane, tiles != nil, paneCards.indices.contains(zoomed) {
-            if zoomed == 0 { card.band = 0 }
+            paneCards[zoomed].band = 0
             paneCards[zoomed].frame = zoomFrame
             zoomScrim.frame = cardFrame
         }
@@ -986,6 +1015,7 @@ final class BrowserRootView: SpaceFrameView {
         let frames = tileFrames
         let over = liftedCards.map { lifted in paneCards.firstIndex { $0 === lifted }.flatMap { frames.indices.contains($0) ? frames[$0] : nil } ?? frames[0] }
         topBar.setStrips(liftedCards.map(\.header), panes: over.map { ($0.minX - bar.minX)...max($0.minX, $0.maxX) - bar.minX })
+        for lifted in liftedCards { lifted.header.isOnCard = splitJoinsBar }
         topBar.stripInset = TopBarView.edgeInset(page: cardFrame, window: bounds)
     }
 
@@ -1122,9 +1152,9 @@ final class BrowserRootView: SpaceFrameView {
         Tokens.Motion.animate(curve, evenFromKeyboard: true, moves: true, {
             if self.topBarSlideFrame == nil, self.showsTopBar { self.topBar.animator().frame = self.topBarFrame }
             let frames = self.tileFrames
-            self.card.animator().frame = self.cardViewFrame(frames[0])
+            self.card.animator().frame = self.cardViewFrame(frames[0], at: 0)
             self.emptyHint.animator().frame = Self.markFrame(in: frames[0])
-            for i in frames.indices.dropFirst() { self.paneCards[i].animator().frame = frames[i] }
+            for i in frames.indices.dropFirst() { self.paneCards[i].animator().frame = self.cardViewFrame(frames[i], at: i) }
         }, completion: {
             self.leavesDocked = false
             // Not if another slide took over meanwhile: that one ends it.

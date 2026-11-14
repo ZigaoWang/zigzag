@@ -76,6 +76,20 @@ import Testing
         header.isInBar = true
         #expect(moves(100, top) == true)
     }
+
+    /// Up in the bar on the window's frame the strip keeps the bar's ink; over its card's top, its page's.
+    @Test func inTheBarOverItsCardTheStripReadsOnItsPage() {
+        let header = PaneHeaderView()
+        header.ground = NSColor(srgbRed: 0.05, green: 0.07, blue: 0.09, alpha: 1)
+        header.isInBar = true
+        #expect(header.appearance == nil && !header.back.isOnPage)
+        header.isOnCard = true
+        #expect(header.appearance?.name == .darkAqua && header.back.isOnPage)
+        header.ground = .white
+        #expect(header.appearance?.name == .aqua)
+        header.isOnCard = false
+        #expect(header.appearance == nil)
+    }
 }
 
 /// The page area's ground, which moves the window wherever nothing on it takes the press.
