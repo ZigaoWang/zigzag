@@ -97,15 +97,19 @@ VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP/Co
 echo "Verifying signature…"
 codesign --verify --deep --strict --verbose=2 "$APP"
 codesign -dvv "$APP" 2>&1 | grep -E "Authority=Developer ID|TeamIdentifier"
-# The picture helper reads what websites send: it must be signed like the app, with the hardened runtime, and
-# sandboxed. Exporting signs it with the app; a release where it isn't stops here.
-HELPER="$APP/Contents/XPCServices/ZigzagImageDecoder.xpc"
-# Read codesign's answers first: with pipefail, grep -q quitting early fails codesign's write and the whole check.
-HELPER_SIGNATURE=$(codesign -dvv "$HELPER" 2>&1 || true)
-HELPER_ENTITLEMENTS=$(codesign -d --entitlements - --xml "$HELPER" 2>/dev/null || true)
-[[ "$HELPER_SIGNATURE" == *"Authority=Developer ID Application"* ]] || { echo "The picture helper isn't signed with Developer ID"; exit 1; }
-[[ "$HELPER_SIGNATURE" =~ "flags=[^ ]*runtime" ]] || { echo "The picture helper lacks the hardened runtime"; exit 1; }
-[[ "$HELPER_ENTITLEMENTS" == *"com.apple.security.app-sandbox"* ]] || { echo "The picture helper isn't sandboxed"; exit 1; }
+# The helpers read what websites send (the picture helper their pictures, the PDF helper their PDFs): each must be
+# signed like the app, with the hardened runtime, and sandboxed. Exporting signs them with the app; a release where
+# one isn't stops here.
+for HELPER_LABEL HELPER_BUNDLE in "picture helper" ZigzagImageDecoder "PDF helper" ZigzagPDFRenderer; do
+  HELPER="$APP/Contents/XPCServices/$HELPER_BUNDLE.xpc"
+  [[ -d "$HELPER" ]] || { echo "The $HELPER_LABEL is missing"; exit 1; }
+  # Read codesign's answers first: with pipefail, grep -q quitting early fails codesign's write and the whole check.
+  HELPER_SIGNATURE=$(codesign -dvv "$HELPER" 2>&1 || true)
+  HELPER_ENTITLEMENTS=$(codesign -d --entitlements - --xml "$HELPER" 2>/dev/null || true)
+  [[ "$HELPER_SIGNATURE" == *"Authority=Developer ID Application"* ]] || { echo "The $HELPER_LABEL isn't signed with Developer ID"; exit 1; }
+  [[ "$HELPER_SIGNATURE" =~ "flags=[^ ]*runtime" ]] || { echo "The $HELPER_LABEL lacks the hardened runtime"; exit 1; }
+  [[ "$HELPER_ENTITLEMENTS" == *"com.apple.security.app-sandbox"* ]] || { echo "The $HELPER_LABEL isn't sandboxed"; exit 1; }
+done
 
 if [[ "${1:-}" == "--local" ]]; then
   echo "Done (not notarized): $APP"

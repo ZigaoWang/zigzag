@@ -227,8 +227,8 @@ nonisolated private final class Kept: @unchecked Sendable {
     init(_ picture: SafePictures.Picture?) { self.picture = picture }
 }
 
-/// Turns to the helper, in order: a picture takes one, or all of them to be asked alone.
-nonisolated private final class Slots: @unchecked Sendable {
+/// Turns to a helper, in order: a request takes one, or all of them to be asked alone (SafePictures, SafePDF).
+nonisolated final class Slots: @unchecked Sendable {
     private let lock = NSLock()
     private var free: Int
     private var waiting: [(weight: Int, continuation: CheckedContinuation<Void, Never>)] = []
