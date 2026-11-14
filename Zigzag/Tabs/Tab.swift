@@ -124,7 +124,12 @@ final class Tab: NSObject {
     private(set) var isPlayingAudio = false
     private(set) var isMuted = false
     private(set) var hasLoadedOnce = false
-    private(set) var snapshot: NSImage?
+    private(set) var snapshot: NSImage? {
+        didSet { snapshotIsDark = snapshot == nil ? nil : webView?.effectiveAppearance.isDark }
+    }
+    /// Whether the page was dark (the app's appearance) when its picture was taken; nil when that isn't known, as
+    /// for a picture read back from disk. A picture taken in the other appearance is stale: the overview retakes it.
+    private(set) var snapshotIsDark: Bool?
     var lastActivated: Date
     let createdAt: Date
     /// True for a tab opened by a search from the command bar, until the user leaves the results page.
@@ -1080,6 +1085,30 @@ final class Tab: NSObject {
     /// only in a window. Its holder is put in `host` for a moment, at `size`, under everything else, to be drawn and
     /// pictured, then let go, unless something else took it meanwhile (you went to its tab).
     func captureSnapshotOutOfSight(in host: NSView, size: NSSize, _ completion: @escaping () -> Void) {
+        // Settings or Zigzag's PDF viewer, over the page: pictured as it is, set in the window for a moment, so it
+        // draws in the window's light or dark.
+        let cover: NSView? = pdfViewer ?? settingsView
+        if let cover, cover.window == nil, host.window != nil, size.width > 0, size.height > 0 {
+            let home = cover.superview, frame = cover.frame, resizing = cover.autoresizingMask
+            let above = home.flatMap { home in home.subviews.firstIndex(of: cover).map { home.subviews.dropFirst($0 + 1).first } } ?? nil
+            cover.autoresizingMask = []
+            cover.frame = NSRect(origin: .zero, size: size)
+            host.addSubview(cover)
+            cover.layoutSubtreeIfNeeded()
+            let image = pdfViewer?.snapshot() ?? settingsView?.snapshot()
+            cover.removeFromSuperview()
+            if let above { home?.addSubview(cover, positioned: .below, relativeTo: above) } else { home?.addSubview(cover) }
+            cover.frame = frame
+            cover.autoresizingMask = resizing
+            if let image {
+                snapshot = image
+                snapshotIsDark = host.effectiveAppearance.isDark
+                if !isPrivate { SnapshotStore.save(image, for: id) }
+                changed.send(.snapshot)
+            }
+            completion()
+            return
+        }
         guard let webView, let holder = pageHolder, webView.superview === holder, webView.window == nil, hasLoadedOnce,
               host.window != nil, size.width > 0, size.height > 0 else {
             completion()
@@ -1117,6 +1146,14 @@ final class Tab: NSObject {
     nonisolated static func needsPictureOutOfSight(hasWebView: Bool, onScreen: Bool, loaded: Bool, hasPicture: Bool) -> Bool {
         hasWebView && !onScreen && loaded && !hasPicture
     }
+
+    /// Whether the picture was taken in the other appearance (light or dark) from `dark`, so it no longer shows the
+    /// page as it looks now. Unknown counts as current.
+    nonisolated static func pictureIsStale(takenDark: Bool?, dark: Bool) -> Bool {
+        takenDark.map { $0 != dark } ?? false
+    }
+
+    func snapshotIsStale(dark: Bool) -> Bool { Self.pictureIsStale(takenDark: snapshotIsDark, dark: dark) }
 
     /// Saves the picture last taken in memory only, so it's there after a relaunch.
     func keepSnapshot() {

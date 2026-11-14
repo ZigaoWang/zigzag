@@ -87,6 +87,10 @@ final class DeskFrameView: NSView {
     private let paint = NSView()
     /// Liquid Glass for a clear space, once one asks for it.
     private var clearGlass: NSView?
+    /// What was last painted, to paint again in the new colors when the appearance changes.
+    private var painted: (space: SpaceInfo, isPrivate: Bool)?
+    /// Called after the appearance (light or dark) changed and the frame was painted again.
+    var appearanceChanged: (() -> Void)?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -113,8 +117,16 @@ final class DeskFrameView: NSView {
         Tokens.Motion.withoutAnimation { wash.frame = bounds; grain.frame = bounds }
     }
 
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        // The wash's colors were resolved for the old appearance.
+        if let painted { paint(painted.space, isPrivate: painted.isPrivate) }
+        appearanceChanged?()
+    }
+
     /// The same choices `BrowserWindowController.render` makes for the frame.
     func paint(_ space: SpaceInfo, isPrivate: Bool) {
+        painted = (space, isPrivate)
         let clear = !isPrivate && space.isSeeThrough && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
         let reduced = space.isSeeThrough && !clear
         let color = isPrivate ? SpaceColor.graphite.background : reduced ? space.background : space.frameColor
@@ -285,6 +297,7 @@ final class DeskController {
     init(window: BrowserWindowController) {
         controller = window
         canvas.desk = self
+        frameView.appearanceChanged = { [weak self] in self?.appearanceChanged() }
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
         scrollView.scrollerStyle = .overlay
@@ -488,9 +501,12 @@ final class DeskController {
         guard let controller, let manager else { return }
         let root = controller.root
         let size = root.cardFrame.size
+        // A picture taken in the other appearance (light or dark) counts as none: the page looks different now.
+        let dark = root.effectiveAppearance.isDark
         let pages = Library.shared.spaces.flatMap { manager.tabs(in: $0.id) }.filter {
             Tab.needsPictureOutOfSight(hasWebView: $0.webView != nil, onScreen: $0.webView?.window != nil, loaded: $0.hasLoadedOnce,
-                                       hasPicture: $0.snapshot != nil && TabThumbnailView.knownBlank($0.snapshot) != true)
+                                       hasPicture: $0.snapshot != nil && TabThumbnailView.knownBlank($0.snapshot) != true
+                                           && !$0.snapshotIsStale(dark: dark))
         }
         guard !pages.isEmpty, size.width > 0 else { return }
         // Beneath everything in the window, where the page is: drawn, but never seen.
@@ -508,6 +524,27 @@ final class DeskController {
                 }
                 waiting -= 1
                 if waiting == 0 { host?.removeFromSuperview() }
+            }
+        }
+    }
+
+    /// Light or dark changed while the desk is up: pages draw in the new colors, so their pictures are retaken, the
+    /// page under the desk and the loaded pages out of sight alike.
+    private func appearanceChanged() {
+        guard isVisible else { return }
+        pictureUnseenPages()
+        // A moment first, for the page under the desk to draw in its new colors.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { MainActor.assumeIsolated { [weak self] in self?.recaptureCurrentPage() } }
+    }
+
+    private func recaptureCurrentPage() {
+        guard isVisible else { return }
+        capturePages { [weak self] in
+            guard let self, self.isVisible, let tab = self.manager?.selectedTab else { return }
+            let shown = self.cards.values.filter { $0.pages.contains { $0 === tab } }
+            self.preparePictures(of: shown) { [weak self] in
+                guard let self, self.isVisible else { return }
+                shown.forEach { $0.waitsForReadyPictures = false; $0.refreshImage() }
             }
         }
     }

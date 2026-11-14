@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - With Protect IP address from WebRTC on, Site Controls no longer counts WebRTC as blocked on every site or offers Reset Permissions for it. Permissions still has the WebRTC row, so a site can be allowed before a call, under a line saying the site hasn't asked for anything when it hasn't. ([#229](https://github.com/ZigaoWang/zigzag/issues/229))
 - Pausing from the mini player keeps the sidebar's Now Playing card, showing Play, for as long as the video is in the mini player, and the mini player shows its play button while paused, with the pointer away. The card's play button and the mini player's now play and pause the same way.
 - The Now Playing card fades out a long title at its end, as sidebar rows do, instead of cutting it with an ellipsis, and Open Downloads Folder lines up with the file names above it in the Downloads panel.
+- Show All Tabs turns dark or light with the rest of Zigzag while it's open, instead of keeping the light color behind white text. Its cards show each page as it looks now, not a picture taken before light or dark changed.
 
 ## [0.9.1] - 2026-11-15
 
