@@ -92,6 +92,18 @@ final class SafePDF {
     }
 
     // The connection goes with this object (`XPCPDFLink` invalidates it), and the helper lets the PDF go with it.
+    // `close` ends it sooner, when the viewer goes, even while a request still holds this object.
+
+    private var isClosed = false
+
+    /// Its viewer went: the connection ends now, and the helper lets the PDF go. Nothing more is asked.
+    func close() {
+        guard !isClosed else { return }
+        isClosed = true
+        isOpen = false
+        link?.invalidate()
+        link = nil
+    }
 
     // MARK: Asking
 
@@ -99,7 +111,7 @@ final class SafePDF {
     /// helper failed on it): WebKit's viewer shows it instead.
     func open() async -> Info? {
         if let info { return info }
-        guard data.count <= Self.maxInputBytes, !hasFailed else { return nil }
+        guard data.count <= Self.maxInputBytes, !hasFailed, !isClosed else { return nil }
         if await isKnownHarmful() { fail(harmful: false); return nil }
         guard await reopen() else { return nil }
         return info
@@ -224,11 +236,11 @@ final class SafePDF {
         let opens = priority == .open
         var sent = 0
         while sent < 3 {
-            guard !hasFailed else { return nil }
+            guard !hasFailed, !isClosed else { return nil }
             if !opens, !isOpen { guard await reopen() else { return nil } }
             await gate.enter(priority)
             // While it waited, the helper may have started afresh without the PDF, or the PDF failed.
-            guard !hasFailed, opens || isOpen else { gate.leave(); continue }
+            guard !hasFailed, !isClosed, opens || isOpen else { gate.leave(); continue }
             sent += 1
             let alone = isSuspect
             let weight = alone ? Self.turns : 1
@@ -238,6 +250,8 @@ final class SafePDF {
             turn.end()
             Self.slots.release(weight)
             gate.leave()
+            // Closed while it was in the helper: whatever came back has nowhere to go.
+            guard !isClosed else { return nil }
             switch outcome {
             case .answered(let value, let held):
                 if alone { isSuspect = false }

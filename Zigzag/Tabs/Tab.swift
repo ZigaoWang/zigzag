@@ -1848,6 +1848,8 @@ extension Tab {
         // The old viewer's fetch has nowhere to go.
         pdfTask?.cancel()
         pdfTask = nil
+        // Its PDF's connection to the helper ends with it.
+        pdfViewer?.document?.close()
         pdfViewer = viewer
         changed.send(.pdf)
     }

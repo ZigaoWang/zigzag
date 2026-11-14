@@ -708,6 +708,17 @@ import WebKit
         #expect(text.links.map { $0.url?.lastPathComponent } == ["half", "a"])
     }
 
+    /// A closed PDF's connection ends at once, and it asks nothing more.
+    @Test @MainActor func aClosedPDFEndsItsConnection() async throws {
+        let link = CountingPDFLink(FakePDFHelper())
+        let document = SafePDF(data: Data("%PDF-fake".utf8)) { link }
+        _ = try #require(await document.open())
+        document.close()
+        #expect(link.invalidated)
+        #expect(await document.text(page: 0) == nil)
+        #expect(link.sent == 1)
+    }
+
     /// Nothing in the app reads a PDF's bytes: no PDFKit, no CoreGraphics PDF reader, no AppKit PDF picture. The
     /// helper does all of it. The one exception is the full-page screenshot, which reads the PDF WebKit itself makes
     /// of the page, never a site's.
@@ -905,6 +916,22 @@ nonisolated private final class MisclassedPDFLink: PDFLink, @unchecked Sendable 
         request(unsafeBitCast(answers as AnyObject, to: PDFRendering.self))
     }
     func invalidate() {}
+}
+
+/// A fake helper's link that counts what's sent and notes when it ends.
+nonisolated private final class CountingPDFLink: PDFLink, @unchecked Sendable {
+    private let helper: FakePDFHelper
+    private let lock = NSLock()
+    private var count = 0
+    private var ended = false
+    var sent: Int { lock.withLock { count } }
+    var invalidated: Bool { lock.withLock { ended } }
+    init(_ helper: FakePDFHelper) { self.helper = helper }
+    func send(_ request: @escaping @Sendable (PDFRendering) -> Void, failed: @escaping @Sendable (Bool) -> Void) {
+        lock.withLock { count += 1 }
+        request(helper)
+    }
+    func invalidate() { lock.withLock { ended = true } }
 }
 
 /// A local server for the viewer's own download: `/ua` notes the user agent and answers a small PDF; `/stream`
