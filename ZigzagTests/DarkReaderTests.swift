@@ -309,6 +309,10 @@ struct DarkReaderTests {
             #expect(await !DarkPages.fetchable(URL(string: text)), "\(text)")
         }
         #expect(IconAddress.isPublicName("8.8.8.8"))
+        // A name nothing resolves on this Mac (only an HTTP proxy reaches the web) goes by its name, as an icon does;
+        // a local one still doesn't.
+        #expect(await DarkPages.fetchable(URL(string: "https://zigzag-test-no-such-host.invalid/a.css")))
+        #expect(await !DarkPages.fetchable(URL(string: "http://zigzag-test-no-such-host.local/a.css")))
         #expect(DarkPages.fetchableType("text/css; charset=utf-8"))
         #expect(DarkPages.fetchableType("image/png"))
         #expect(!DarkPages.fetchableType("text/html"))

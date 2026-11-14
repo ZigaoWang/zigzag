@@ -2,6 +2,7 @@ import AppKit
 import UniformTypeIdentifiers
 import UserNotifications
 import WebKit
+import os
 
 /// Web notifications, for Gmail, Slack, Calendar and the like while their tab is open. WebKit gives an app's web
 /// views no Notification API of its own, so a page script stands in for it and macOS shows what it posts. Sites
@@ -439,7 +440,7 @@ nonisolated enum IconAddress {
     static func mayFetch(_ url: URL) async -> Bool {
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let host = url.host(percentEncoded: false), isPublicName(host) else { return false }
         if let literal = bytes(of: host) { return isPublic(literal) }
-        let addresses = await Task.detached { resolve(host) }.value
+        let addresses = await addresses(of: host)
         return !addresses.isEmpty && addresses.allSatisfy(isPublic)
     }
 
@@ -466,8 +467,31 @@ nonisolated enum IconAddress {
     static func mayFetchForPage(_ url: URL) async -> Bool {
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let host = url.host(percentEncoded: false), isPublicName(host) else { return false }
         if let literal = bytes(of: host) { return isPublic(literal) }
-        let addresses = await Task.detached { resolve(host) }.value
-        return !addresses.isEmpty && addresses.allSatisfy { isPublic($0) || isFakeIP($0) }
+        let addresses = await addresses(of: host)
+        // Nothing resolves on this Mac when only an HTTP proxy reaches the web (it looks names up itself): judged by
+        // the name, as an icon is, rather than refusing every style sheet.
+        guard !addresses.isEmpty else { return mayFetchByName(url) }
+        return addresses.allSatisfy { isPublic($0) || isFakeIP($0) }
+    }
+
+    /// Lookups wait on the network, so they run on a queue of their own, never the threads Swift's tasks share; a
+    /// page asks for many files from one host, so an answer is kept a minute.
+    private static let lookups = DispatchQueue(label: "app.zigzag.icon-address", qos: .utility, attributes: .concurrent)
+    private static let answers = OSAllocatedUnfairLock(initialState: [String: (addresses: [[UInt8]], at: Date)]())
+    static let answerLifetime: TimeInterval = 60
+
+    /// Every address `host` resolves to, from a lookup in the last minute or a new one.
+    static func addresses(of host: String, now: Date = Date()) async -> [[UInt8]] {
+        let key = host.lowercased()
+        if let kept = answers.withLock({ $0[key] }), now.timeIntervalSince(kept.at) < answerLifetime { return kept.addresses }
+        let found = await withCheckedContinuation { (done: CheckedContinuation<[[UInt8]], Never>) in
+            lookups.async { done.resume(returning: resolve(key)) }
+        }
+        answers.withLock { cache in
+            if cache.count > 256 { cache = cache.filter { now.timeIntervalSince($0.value.at) < answerLifetime } }
+            cache[key] = (found, now)
+        }
+        return found
     }
 
     private static func isFakeIP(_ a: [UInt8]) -> Bool { a.count == 4 && a[0] == 198 && (18...19).contains(a[1]) }
