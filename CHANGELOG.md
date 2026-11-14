@@ -24,6 +24,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A favorite that moved on from its page shows it, as a pinned tab does with Original / Current page: the tile shows the icon of the page it's on now with the favorite's own icon small on its corner, pointing at it names both, and Back to Favorite's Page in its menu takes it back, in a split favorite too.
 - A tab's or pinned tab's title no longer moves or gets cut shorter when the pointer brings up its close or back button: the button shows over the title's faded end.
 - The titles in the sidebar's rows, the address, Clear and the ⌘ number keys sit in the middle of their row by their capitals, level with the icons, where they were half a point low.
+- Settings, History and Zigzag's other windows have text and controls exactly centered and aligned.
 
 ## [0.9.0] - 2026-11-14
 
