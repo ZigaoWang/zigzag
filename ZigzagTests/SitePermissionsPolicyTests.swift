@@ -182,8 +182,8 @@ import WebKit
     }
 
     @Test func aForeignFrameNeverSeesThePagesAllow() {
-        #expect(ExternalLinks.decision(page: "https://zoom.us", scheme: "zoommtg", foreign: true, stored: "allow") == nil)
-        #expect(ExternalLinks.decision(page: "https://zoom.us", scheme: "zoommtg", foreign: true, stored: "deny") == "deny")
+        #expect(ExternalLinks.decision(page: "https://zoom.us", foreign: true, stored: "allow") == nil)
+        #expect(ExternalLinks.decision(page: "https://zoom.us", foreign: true, stored: "deny") == "deny")
     }
 
     @Test func aStoredPopupDestinationIsUsedWithoutAsking() throws {
@@ -201,6 +201,44 @@ import WebKit
                 SitePermissions.remember(action, subject: PermissionSubject.popups, origin: "https://example.com")
                 #expect(PopupNotice.storedAction(origin: "https://example.com") == action)
             }
+        }
+    }
+
+    /// Every stored or answered pop-up value has a destination, and an unknown one — an older build's "allow", from
+    /// when Always Allow meant an everyday pop-up — reads as the viewer, the ordinary yes, rather than opening
+    /// nothing at all and leaving the page's pop-up unseen.
+    @Test func everyPopupValueHasADestination() {
+        #expect(PopupNotice.destination(for: "deny") == .deny)
+        #expect(PopupNotice.destination(for: "thisTab") == .thisTab)
+        #expect(PopupNotice.destination(for: "newTab") == .newTab)
+        #expect(PopupNotice.destination(for: "mini") == .viewer)
+        #expect(PopupNotice.destination(for: "allow") == .viewer)
+        #expect(PopupNotice.destination(for: "") == .viewer)
+    }
+
+    /// A legacy `true` for a site's pop-ups becomes the destination it means, the viewer — not a bare "allow", which
+    /// is no destination and would have dropped every pop-up on a site the user had already allowed. Every other
+    /// subject's `true` is a plain "allow".
+    @Test func aLegacyPopupYesMeansTheViewer() throws {
+        try withDefaults { defaults in
+            defaults.set(["https://example.com|popups": true, "https://example.com|camera": true], forKey: "SitePermissions")
+            SitePermissions.migrateAnswersToActions()
+            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://example.com") == "mini")
+            #expect(SitePermissions.action(PermissionSubject.media(.camera), origin: "https://example.com") == "allow")
+        }
+    }
+
+    /// Whether a site's pop-ups were allowed is kept as the destination it means, so neither Site Controls nor the
+    /// debug bridge can write a bare "allow" that opens nothing.
+    @Test func allowingPopupsKeepsTheViewer() throws {
+        try withDefaults { _ in
+            SitePermissions.setPopups(true, origin: "https://example.com")
+            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://example.com") == "mini")
+            #expect(SitePermissions.popups(origin: "https://example.com") == true)
+            SitePermissions.setPopups(false, origin: "https://example.com")
+            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://example.com") == "deny")
+            SitePermissions.setPopups(nil, origin: "https://example.com")
+            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://example.com") == nil)
         }
     }
 

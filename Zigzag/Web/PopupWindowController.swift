@@ -254,10 +254,12 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         if !PopupNotice.isUserInitiated(navigationAction) {
             let parent = WindowManager.shared.controller(for: parentWindow)
             if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(webView.url)) {
-                switch stored {
-                case "deny": return nil
-                case "mini": return PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: window, opener: opener)
-                default:
+                switch PopupNotice.destination(for: stored) {
+                case .deny:
+                    return nil
+                case .viewer:
+                    return PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: window, opener: opener)
+                case .thisTab, .newTab:
                     if let url = navigationAction.request.url, let parent { PopupNotice.open(url, action: stored, from: nil, in: parent) }
                     return nil
                 }
