@@ -834,7 +834,10 @@
     if (addConnect) addConnect((port) => {
       const info = portInfo(port);
       if (!info || !fromItself(port.sender)) return;
-      if (!userConnect.listeners.size) { try { port.disconnect(); } catch (e) {} return; }
+      // A port reaches every page of the extension, and WebKit ends it for all of them when one disconnects: only the
+      // background turns away a port nothing listens for. Tampermonkey's popup, kept loaded, ended each port its
+      // scripts opened, and they opened them again, over and over.
+      if (!userConnect.listeners.size) { if (inBackground) { try { port.disconnect(); } catch (e) {} } return; }
       // The port as the user script named it; its events hand listeners this port, not WebKit's.
       const shown = { name: typeof info.name === 'string' ? info.name : '', sender: port.sender };
       const relayed = (event) => {

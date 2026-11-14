@@ -275,7 +275,7 @@ struct UserScriptsTests {
     // MARK: At the extension
 
     /// The bridge in an extension's background, with WebKit's API stood in for: what its listeners hear.
-    private func background(worker: Bool = false) -> JSContext {
+    private func background(worker: Bool = false, popup: Bool = false) -> JSContext {
         let context = JSContext()!
         context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
         context.evaluateScript("""
@@ -303,6 +303,8 @@ struct UserScriptsTests {
             var location = { protocol: 'webkit-extension:', origin: 'webkit-extension://x', href: 'webkit-extension://x/sw.js' };
             """)
         }
+        // One of the extension's own pages that isn't its background, such as its popup.
+        if popup { context.evaluateScript("var window = globalThis; chrome.extension = { getBackgroundPage: () => null };") }
         context.evaluateScript(ExtensionBridgeScript.source)
         // What runs after the bridge in a background, which wraps the same events again.
         if worker { context.evaluateScript(ExtensionBridgeScript.differences) }
@@ -359,6 +361,24 @@ struct UserScriptsTests {
         #expect(context.evaluateScript("__heard.join()").toString() == "1 same")
         #expect(context.evaluateScript("__port.sent.join()").toString() == "hi")
         #expect(context.evaluateScript("__own.join()").toString() == "plain")
+    }
+
+    /// A port reaches every page of the extension, and WebKit ends it for all when one page disconnects: a page that
+    /// doesn't listen for user scripts' ports leaves them be. Tampermonkey's popup, kept loaded, ended every port its
+    /// scripts opened, and they opened them again without end, so its menu commands never registered.
+    @Test func onlyTheBackgroundTurnsAwayAUserScriptsPort() {
+        let raw = "({ name: '__zigzagUserScript' + JSON.stringify({ name: 'tabInfo', key: 'k', world: 'w' }), sender: { id: 'x', tab: { id: 2 } }, onMessage: event(), onDisconnect: event(), ended: 0, postMessage() {}, disconnect() { this.ended++; } })"
+        let popup = background(popup: true)
+        popup.evaluateScript("var __port = \(raw); chrome.runtime.onConnect.fire(__port);")
+        #expect(popup.evaluateScript("__port.ended").toInt32() == 0)
+        // The background, with nothing listening: the port ends, as Chrome ends one nothing receives.
+        let worker = background()
+        worker.evaluateScript("var __port = \(raw); chrome.runtime.onConnect.fire(__port);")
+        #expect(worker.evaluateScript("__port.ended").toInt32() == 1)
+        // A popup that does listen gets it, and keeps it.
+        popup.evaluateScript("var __heard = []; chrome.runtime.onUserScriptConnect.addListener((p) => __heard.push(p.name)); var __second = \(raw); chrome.runtime.onConnect.fire(__second);")
+        #expect(popup.evaluateScript("__heard.join()").toString() == "tabInfo")
+        #expect(popup.evaluateScript("__second.ended").toInt32() == 0)
     }
 
     @Test func aTabsMessageAlsoReachesItsUserScripts() async throws {
