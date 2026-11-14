@@ -583,3 +583,13 @@ struct UserScriptsTests {
         #expect(context.evaluateScript("__six").toString() == "pending")
     }
 }
+
+extension UserScriptsTests {
+    /// A page that says it listens under new names again and again gets only so far, in the page and in all.
+    @Test func listenersAreBounded() {
+        #expect(BridgeUserScripts.fits(listeners: 0, all: 0))
+        #expect(!BridgeUserScripts.fits(listeners: BridgeUserScripts.maxListenersPerPage, all: BridgeUserScripts.maxListenersPerPage))
+        #expect(!BridgeUserScripts.fits(listeners: 1, all: BridgeUserScripts.maxListeners))
+        #expect(BridgeUserScripts.fits(listeners: BridgeUserScripts.maxListenersPerPage - 1, all: BridgeUserScripts.maxListeners - 1))
+    }
+}

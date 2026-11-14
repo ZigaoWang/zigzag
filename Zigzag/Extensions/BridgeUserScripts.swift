@@ -562,6 +562,19 @@ final class BridgeUserScripts: BridgeNamespace {
         var documentID: String?
     }
     private var frames: [String: Frame] = [:]
+    /// The most worlds that may listen at once in one page, and in all. A page that says it listens again and again
+    /// under new names gets no further than this.
+    static let maxListenersPerPage = 256
+    static let maxListeners = 2_000
+
+    /// Whether one more may listen: one already listening under the key always may; gone pages are let go first.
+    private static func mayListen(key: String, in webView: WKWebView, frames: inout [String: Frame]) -> Bool {
+        if frames[key] != nil { return true }
+        if frames.count >= maxListeners { frames = frames.filter { $0.value.webView != nil } }
+        return fits(listeners: frames.values.lazy.filter { $0.webView === webView }.count, all: frames.count)
+    }
+
+    static func fits(listeners inPage: Int, all: Int) -> Bool { inPage < maxListenersPerPage && all < maxListeners }
 
     /// A message from a user-script world (`world`) or from the extension's content-script world in that frame.
     fileprivate func receive(_ message: WKScriptMessage) async -> (Any?, String?) {
@@ -599,7 +612,7 @@ final class BridgeUserScripts: BridgeNamespace {
         case "post": op["port"] = body["port"] ?? 0; op["message"] = body["message"] ?? NSNull()
         case "disconnect": op["port"] = body["port"] ?? 0
         case "listen":
-            if frames.count > 2_000 { frames = frames.filter { $0.value.webView != nil } }
+            guard Self.mayListen(key: key, in: webView, frames: &frames) else { return (nil, "Too many listeners in this page.") }
             frames[key] = Frame(webView: webView, info: frame, extensionID: world.extensionID, world: worldName)
             op["kind"] = "hello"
         default: return (nil, "Unknown message")
@@ -618,8 +631,13 @@ final class BridgeUserScripts: BridgeNamespace {
         guard let tab = target["tabId"] as? Int else { return ["reached": 0] }
         let frameID = target["frameId"] as? Int, documentID = target.string("documentId")
         frames = frames.filter { $0.value.webView != nil }
+        // Only while the extension may still use user scripts, and to worlds it still lets talk: either can be
+        // taken back after a world first listened.
+        guard let context = host.context(for: extensionID), ExtensionBridge.allows(Self.permission, for: context) else { return ["reached": 0] }
+        let worlds = registry(for: extensionID).worlds
         let reached = frames.filter { _, frame in
             frame.extensionID == extensionID && frame.tabID == tab && (frameID == nil || frame.frameID == frameID) && (documentID == nil || frame.documentID == documentID)
+                && Self.parseWorld(frame.world).map { Self.settings(for: $0.worldID, in: worlds).messaging } == true
         }
         guard !reached.isEmpty else { return ["reached": 0] }
         final class First { var done = false; var left: Int; var heard = 0; init(_ left: Int) { self.left = left } }
