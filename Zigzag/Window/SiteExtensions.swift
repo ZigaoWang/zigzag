@@ -31,8 +31,12 @@ enum SiteExtensionAccess: Equatable {
     }
 }
 
-/// How the Extensions section of Site Controls is laid out for a number of extensions and a width: what the folded
-/// header's strip holds, whether the tiles carry names, and how many show before Show All (#215).
+
+/// How the Extensions section of Site Controls is laid out for a number of extensions and a text column: what the
+/// folded header's strip holds, whether they're rows with their names or a grid of icons, and where each goes (#215).
+/// Everything stands on the panel's text column, as its rows' words do: a row's icon starts on it, the grid's first
+/// icon starts on it and its last column's icon ends on its right edge, and their hover washes reach
+/// `PanelLinkRow.outset` past it on each side, as a row's does.
 enum SiteExtensionsLayout {
     /// A strip icon's target in the folded header, and the room between two.
     static let stripSide = Tokens.Metric.compactIconButton
@@ -41,10 +45,17 @@ enum SiteExtensionsLayout {
     static let stripSlots = 6
     /// The header's height: the strip's icons with a little room.
     static let headerHeight = Tokens.Space.x7Height
-    /// The space between the icon-only tiles of the grid.
-    static let gridGap = Tokens.Space.x2
-    /// Rows of the grid shown before Show All.
-    static let foldedRows = 2
+    /// Up to this many, each is a row with its name; more, a grid of icons.
+    static let listLimit = 3
+    /// An icon in the grid: the size of the actions' glyphs above it.
+    static let iconSide = Tokens.Space.x5
+    /// A grid tile: its icon with a row's outset on each side, so the icon's edge is where a row's words would start
+    /// and the hover wash reaches as far past it as a row's.
+    static let tileSide = iconSide + PanelLinkRow.outset * 2
+    /// The least room between two tiles' washes, as between two rows: a hovered one never touches its neighbor.
+    static let minGap = PanelLinkRow.gap
+    /// The most room between two rows of tiles: a grid that's wide apart across stays together down.
+    static let maxRowGap = Tokens.Space.x2
 
     /// Open until you choose: a few extensions are easy to show whole, many fold to their strip.
     static func isOpen(count: Int, chosen: Bool?) -> Bool { chosen ?? (count <= 4) }
@@ -60,46 +71,55 @@ enum SiteExtensionsLayout {
         return (icons, count - icons)
     }
 
-    /// A name under each icon while they all fit on one row with room for it: one, two or three extensions.
-    static func named(count: Int) -> Bool { count <= 3 }
+    /// Rows with their names while there are only a few, so each says what it is; past that, a grid of icons that
+    /// name themselves under the pointer.
+    static func listed(count: Int) -> Bool { count <= listLimit }
 
-    /// The grid's columns at a width: six in the sidebar's usual lane, fewer in a narrow one.
-    static func columns(width: CGFloat) -> Int { width >= 260 ? 6 : width >= 200 ? 5 : 4 }
-
-    /// How many tiles show, and whether Show All is offered: two rows' worth until you ask for all of them.
-    static func shown(count: Int, columns: Int, showsAll: Bool) -> (shown: Int, offersAll: Bool) {
-        let limit = columns * foldedRows
-        guard count > limit else { return (count, false) }
-        return (showsAll ? count : limit, true)
+    /// The grid's columns across a text column `width`: as many tiles as fit across it and its outsets, `minGap` apart.
+    static func columns(width: CGFloat) -> Int {
+        max(1, Int(floor((width + PanelLinkRow.outset * 2 + minGap) / (tileSide + minGap))))
     }
 
-    /// A named tile's width: half the row for one or two, so their names show whole, a third for three; they sit at
-    /// the left with no empty grid around them.
-    static func namedWidth(count: Int, width: CGFloat) -> CGFloat { floor(width / CGFloat(max(2, count))) }
+    /// From one column's tile to the next: the room left over is shared between them, so the last column's icon ends
+    /// on the text column's right edge as the first one's starts on its left.
+    static func pitch(width: CGFloat, columns: Int) -> CGFloat {
+        columns > 1 ? (width + PanelLinkRow.outset * 2 - tileSide) / CGFloat(columns - 1) : tileSide
+    }
 
-    /// An icon-only tile's side.
-    static func side(width: CGFloat, columns: Int) -> CGFloat { floor((width - gridGap * CGFloat(columns - 1)) / CGFloat(columns)) }
+    /// Between two rows of tiles: the room between columns, up to `maxRowGap`.
+    static func rowGap(width: CGFloat, columns: Int) -> CGFloat {
+        min(maxRowGap, max(minGap, pitch(width: width, columns: columns) - tileSide))
+    }
 
-    /// The grid's height for `shown` tiles.
-    static func gridHeight(shown: Int, named: Bool, width: CGFloat, columns: Int) -> CGFloat {
-        guard shown > 0 else { return 0 }
-        if named { return PanelTile.captionedHeight }
-        let rows = (shown + columns - 1) / columns
-        let side = side(width: width, columns: columns)
-        return CGFloat(rows) * side + CGFloat(rows - 1) * gridGap
+    /// Where tile `index` goes, in the section's terms: its left edge is the text column's less the outset.
+    static func tileFrame(_ index: Int, width: CGFloat) -> NSRect {
+        let columns = columns(width: width)
+        let pitch = pitch(width: width, columns: columns)
+        let row = index / columns, column = index % columns
+        return NSRect(x: (CGFloat(column) * pitch).rounded(), y: CGFloat(row) * (tileSide + rowGap(width: width, columns: columns)),
+                      width: tileSide, height: tileSide)
+    }
+
+    /// How tall the extensions themselves are: their rows, or the grid's.
+    static func bodyHeight(count: Int, width: CGFloat) -> CGFloat {
+        guard count > 0 else { return 0 }
+        if listed(count: count) { return CGFloat(count) * SiteExtensionRow.height + CGFloat(count - 1) * PanelLinkRow.gap }
+        let columns = columns(width: width)
+        let rows = (count + columns - 1) / columns
+        return CGFloat(rows) * tileSide + CGFloat(rows - 1) * rowGap(width: width, columns: columns)
     }
 }
 
-/// The extensions on Site Controls' first page, in reach without another page (#215). A header names them with their
-/// count and folds them away; folded, it still carries a strip of their icons, each one click from its popup. Open,
-/// they're a grid of tiles (named when there are only a few), two rows of them until Show All, then Manage Extensions.
-/// What it remembers (open or folded, all or two rows) is the same everywhere, once chosen.
+/// The extensions on Site Controls' first page, in reach without another page (#215), under a header in the panel's
+/// section-label voice that folds them away. Folded, the header still carries a strip of their icons, each one click
+/// from its popup. Open, a few are rows with their names and many are a grid of icons, all of them, then Manage
+/// Extensions. Whether it's open is remembered everywhere, once chosen.
 final class SiteExtensionsSection: NSView {
     struct Item {
         let id: String
-        /// The extension's name, under its tile and for VoiceOver.
+        /// The extension's name, on its row or in its tooltip, and for VoiceOver.
         let name: String
-        /// What its button says it does (Chrome's action title), for the tooltip.
+        /// What its button says it does (Chrome's action title).
         let label: String
         let icon: NSImage?
         let badge: String
@@ -116,90 +136,87 @@ final class SiteExtensionsSection: NSView {
         get { UserDefaults.standard.object(forKey: "SiteControlsExtensionsOpen") as? Bool }
         set { UserDefaults.standard.set(newValue, forKey: "SiteControlsExtensionsOpen") }
     }
-    /// Show All, kept as chosen.
-    static var showsAll: Bool {
-        get { UserDefaults.standard.bool(forKey: "SiteControlsExtensionsShowAll") }
-        set { UserDefaults.standard.set(newValue, forKey: "SiteControlsExtensionsShowAll") }
-    }
 
     let items: [Item]
-    /// On a new tab the section is the whole panel: always open, every tile, nothing to fold.
+    /// On a new tab the section is the whole panel: always open, nothing to fold.
     private let isWhole: Bool
     private(set) var isOpen: Bool
-    private(set) var showsAll: Bool
-    /// Tells the panel its height changed, folding or showing fewer (false) or opening or showing more (true).
+    /// Tells the panel its height changed, folding (false) or opening (true).
     var onResize: ((Bool) -> Void)?
 
     private let header = SectionHeader()
-    private let getButton = IconButton(symbol: "plus", size: .compact, toolTip: SiteExtensionsSection.getTitle)
     private let profileLabel = Label("", font: Tokens.Font.label(), color: Tokens.Color.textTertiary)
     private var stripTiles: [PanelTile] = []
     private let stripMore = StripMore()
-    private(set) var tiles: [PanelTile] = []
-    private var pins: [(id: String, tile: PanelTile, pin: HoverPin)] = []
-    private let showAllRow: PanelLinkRow
+    /// Each extension's button while open: a row, or a tile of the grid.
+    private(set) var buttons: [InteractiveView] = []
+    private var pins: [(id: String, button: InteractiveView, pin: HoverPin)] = []
     private let manageRow: PanelLinkRow
     /// With no extensions yet: one quiet way to the store.
     private let getRow: PanelLinkRow
 
     static let title = String(localized: "Extensions", comment: "Section label in Site Controls over your extensions, which folds them away; also the title of the panel on a new tab.")
-    static let getTitle = String(localized: "Get Extensions", comment: "Tooltip of the + by the Extensions section in Site Controls, and the row there when you have none: opens the Chrome Web Store.")
+    static let getTitle = String(localized: "Get Extensions", comment: "Row in the Extensions section of Site Controls when you have none: opens the Chrome Web Store.")
 
-    /// `pinState` and `togglePin` are the address's pins, offered on each tile's corner.
     init(items: [Item], isWhole: Bool, profile: String?, get: @escaping () -> Void, manage: @escaping () -> Void) {
         self.items = items
         self.isWhole = isWhole
         isOpen = isWhole || SiteExtensionsLayout.isOpen(count: items.count, chosen: Self.chosenOpen)
-        showsAll = isWhole || Self.showsAll
-        showAllRow = PanelLinkRow("") {}
         manageRow = PanelLinkRow(String(localized: "Manage Extensions", comment: "Row under the extensions in Site Controls: opens Settings › Extensions."), goes: true, run: manage)
         getRow = PanelLinkRow(Self.getTitle, goes: true, run: get)
         super.init(frame: .zero)
-        // Opening, the tiles are uncovered as the section grows, like a drawer, rather than spilling past it.
+        // Opening, the extensions are uncovered as the section grows, like a drawer, rather than spilling past it.
         clipsToBounds = true
         header.title = Self.title
-        header.count = items.isEmpty ? "" : "\(items.count)"
+        header.count = items.count
         header.isFoldable = !isWhole
         header.isOpen = isOpen
-        // Folded, the strip and its "+N" say how many; open, the count does.
-        header.showsCount = isOpen
         header.onClick = { [weak self] _ in self?.toggle() }
-        getButton.onClick = { _ in get() }
         profileLabel.stringValue = profile ?? ""
         profileLabel.alignment = .right
         profileLabel.lineBreakMode = .byTruncatingTail
         profileLabel.isHidden = profile == nil
         stripMore.onClick = { [weak self] _ in self?.setOpen(true) }
-        showAllRow.onClick = { [weak self] _ in self?.toggleShowAll() }
-        [header, profileLabel, getButton, stripMore, showAllRow, manageRow, getRow].forEach { addSubview($0) }
-        let named = SiteExtensionsLayout.named(count: items.count)
+        [header, profileLabel, stripMore, manageRow, getRow].forEach { addSubview($0) }
+        let listed = SiteExtensionsLayout.listed(count: items.count)
         for item in items {
-            let tip = [item.needsAttention ? String(localized: "\(item.name): needs attention", comment: "Tooltip of an extension's button in the site panel when the extension asks for attention. The name is the extension's.") : item.label,
+            // Its name first, always: an icon alone doesn't say whose it is. Then why it's dimmed, when it is.
+            let tip = [item.needsAttention ? String(localized: "\(item.name): needs attention", comment: "Tooltip of an extension's button in the site panel when the extension asks for attention. The name is the extension's.") : item.name,
                        item.access.note].compactMap { $0 }.joined(separator: "\n")
             let value = [item.needsAttention ? String(localized: "Needs attention", comment: "VoiceOver value of an extension's button in the site panel when the extension asks for attention.") : item.badge.isEmpty ? nil : item.badge,
                          item.access.note].compactMap { $0 }.joined(separator: ", ")
-            func make(caption: String?, small: Bool) -> PanelTile {
-                let tile = PanelTile(image: item.icon, symbol: "puzzlepiece.extension", caption: caption)
-                if small { tile.iconSide = Tokens.Space.x4 }
-                tile.toolTip = tip
-                tile.setAccessibilityLabel(item.name)
-                tile.setAccessibilityValue(value)
+            func wire(_ view: InteractiveView) {
+                view.toolTip = tip
+                view.setAccessibilityLabel(item.name)
+                view.setAccessibilityValue(value)
+                view.onClick = { [weak view] _ in if let view { item.run(view) } }
+                view.onRightClick = { _ in item.menu() }
+                addSubview(view)
+            }
+            func tile(side: CGFloat) -> PanelTile {
+                let tile = PanelTile(image: item.icon, symbol: "puzzlepiece.extension", caption: nil)
+                tile.iconSide = side
                 // Attention first: the badge takes its look from it.
                 tile.isAttention = item.needsAttention
                 tile.badge = item.needsAttention ? "!" : item.badge
                 tile.isDimmed = item.access.isDimmed
-                tile.onClick = { [weak tile] _ in if let tile { item.run(tile) } }
-                tile.onRightClick = { _ in item.menu() }
-                addSubview(tile)
+                wire(tile)
                 return tile
             }
-            let tile = make(caption: named ? item.name : nil, small: false)
-            tiles.append(tile)
-            let pin = HoverPin()
-            pins.append((item.id, tile, pin))
-            stripTiles.append(make(caption: nil, small: true))
+            let button: InteractiveView
+            if listed {
+                let row = SiteExtensionRow(image: item.icon, name: item.name, badge: item.needsAttention ? "!" : item.badge, attention: item.needsAttention)
+                row.isDimmed = item.access.isDimmed
+                wire(row)
+                button = row
+            } else {
+                button = tile(side: SiteExtensionsLayout.iconSide)
+            }
+            buttons.append(button)
+            pins.append((item.id, button, HoverPin()))
+            stripTiles.append(tile(side: Tokens.Space.x4))
         }
-        // Over its tile.
+        // Over its button.
         for entry in pins { addSubview(entry.pin) }
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
@@ -212,17 +229,17 @@ final class SiteExtensionsSection: NSView {
 
     // MARK: Pins
 
-    /// The address's pins on each tile's corner, as Settings and the tile's menu have them.
+    /// The address's pins on each extension's button, as Settings and its menu have them.
     func wirePins(state: @escaping (String) -> HoverPin.State, toggle: @escaping (String) -> Void, title: @escaping (String) -> String?) {
         for entry in pins {
             let id = entry.id
             entry.pin.onClick = { _ in toggle(id) }
-            let update: (Bool) -> Void = { [weak tile = entry.tile, weak pin = entry.pin] _ in
-                guard let tile, let pin else { return }
-                pin.isWanted = tile.isHovered || tile.hasKeyboardFocus || (pin.isShowing && pin.isHovered)
+            let update: (Bool) -> Void = { [weak button = entry.button, weak pin = entry.pin] _ in
+                guard let button, let pin else { return }
+                pin.isWanted = button.isHovered || button.hasKeyboardFocus || (pin.isShowing && pin.isHovered)
             }
-            entry.tile.hoverChanged = update
-            entry.tile.keyboardFocusChanged = update
+            entry.button.hoverChanged = update
+            entry.button.keyboardFocusChanged = update
             entry.pin.hoverChanged = update
         }
         pinState = state
@@ -241,12 +258,12 @@ final class SiteExtensionsSection: NSView {
             entry.pin.state = pinState(entry.id)
             let id = entry.id
             if let name = pinTitle?(id), let toggle = pinToggle, entry.pin.state != .atLimit {
-                entry.tile.setAccessibilityCustomActions([NSAccessibilityCustomAction(name: name) {
+                entry.button.setAccessibilityCustomActions([NSAccessibilityCustomAction(name: name) {
                     MainActor.assumeIsolated { toggle(id) }
                     return true
                 }])
             } else {
-                entry.tile.setAccessibilityCustomActions(nil)
+                entry.button.setAccessibilityCustomActions(nil)
             }
         }
         needsLayout = true
@@ -261,45 +278,28 @@ final class SiteExtensionsSection: NSView {
         isOpen = open
         Self.chosenOpen = open
         header.isOpen = open
-        header.showsCount = open
         apply(animated: true, opening: open)
         onResize?(open)
     }
 
-    private func toggleShowAll() {
-        showsAll.toggle()
-        Self.showsAll = showsAll
-        apply(animated: true, opening: showsAll)
-        onResize?(showsAll)
-    }
-
-    /// The columns at the width last laid out, before the first layout the panel's usual one.
-    private var columns: Int { SiteExtensionsLayout.columns(width: column) }
-
     /// Which views show for the state now; those that come or go fade, in step with the panel's drawer.
     private func apply(animated: Bool, opening: Bool = true) {
         let count = items.count
-        appliedColumns = columns
         appliedRoom = stripRoom
-        let layout = SiteExtensionsLayout.shown(count: count, columns: columns, showsAll: showsAll)
         let strip = SiteExtensionsLayout.strip(count: count, room: stripRoom)
         var wanted: [(NSView, Bool)] = [
             (header, count > 0),
-            (getButton, count > 0 && isOpen),
             (profileLabel, count > 0 && isOpen && !profileLabel.stringValue.isEmpty),
             (stripMore, count > 0 && !isOpen && strip.more > 0),
-            (showAllRow, isOpen && layout.offersAll && !isWhole),
             (manageRow, count > 0 ? isOpen : isWhole),
             (getRow, count == 0),
         ]
-        for (i, tile) in tiles.enumerated() { wanted.append((tile, isOpen && i < layout.shown)) }
+        for button in buttons { wanted.append((button, isOpen)) }
         for (i, tile) in stripTiles.enumerated() { wanted.append((tile, !isOpen && i < strip.icons)) }
         stripMore.text = "+\(strip.more)"
-        showAllRow.titleText = showsAll ? String(localized: "Show Less", comment: "Row under the extensions in Site Controls once they all show: back to two rows of them.")
-            : String(localized: "Show All (\(count))", comment: "Row under two rows of extensions in Site Controls: shows every one of them. The number is how many there are.")
         let fade = Tokens.Motion.Curve(duration: Self.drawer(opening: opening).duration)
         for (view, shows) in wanted { show(view, shows, animated: animated, fade: fade) }
-        for entry in pins where entry.tile.isHidden { entry.pin.isWanted = false }
+        for entry in pins where !isOpen { entry.pin.isWanted = false }
         needsLayout = true
     }
 
@@ -326,8 +326,7 @@ final class SiteExtensionsSection: NSView {
         }
     }
 
-    /// What the tiles shown were chosen for: a width that turns out other once laid out chooses again.
-    private var appliedColumns = 0
+    /// The strip's room the views shown were chosen for: a width that turns out other once laid out chooses again.
     private var appliedRoom: CGFloat = 0
 
     /// The drawer role (DESIGN.md › Motion): coming out a touch slower than going back.
@@ -335,23 +334,16 @@ final class SiteExtensionsSection: NSView {
 
     // MARK: Layout
 
-    /// The room after the header's name and count for the strip.
+    /// The room after the header's name and chevron for the strip.
     private var stripRoom: CGFloat { column - header.textWidth - Tokens.Space.x2 }
 
     /// How tall it is for a text column `width`, for the state it's in.
     func height(for width: CGFloat) -> CGFloat {
         let count = items.count
         guard count > 0 else { return isWhole ? PanelLinkRow.height * 2 + PanelLinkRow.gap : PanelLinkRow.height }
-        let columns = SiteExtensionsLayout.columns(width: width)
-        var h = SiteExtensionsLayout.headerHeight
+        let h = SiteExtensionsLayout.headerHeight
         guard isOpen else { return h }
-        let named = SiteExtensionsLayout.named(count: count)
-        let layout = SiteExtensionsLayout.shown(count: count, columns: columns, showsAll: showsAll)
-        h += Tokens.Space.x2 + SiteExtensionsLayout.gridHeight(shown: layout.shown, named: named, width: width, columns: columns)
-        h += Tokens.Space.x2
-        if layout.offersAll && !isWhole { h += PanelLinkRow.height + PanelLinkRow.gap }
-        h += PanelLinkRow.height
-        return h
+        return h + SiteExtensionsLayout.bodyHeight(count: count, width: width) + Tokens.Space.x2 + PanelLinkRow.height
     }
 
     /// The room under the last row's words, which the panel's bottom margin takes back.
@@ -359,7 +351,7 @@ final class SiteExtensionsSection: NSView {
     /// Folded, the room under the header's words inside it.
     var foldedSlack: CGFloat { (SiteExtensionsLayout.headerHeight - Label.section("E").lineHeight) / 2 }
 
-    /// The text column: the section reaches `PanelLinkRow.outset` past it on each side, for its rows' washes.
+    /// The text column: the section reaches `PanelLinkRow.outset` past it on each side, for its washes.
     private var column: CGFloat { (bounds.width > 0 ? bounds.width : SitePanel.width - Tokens.Space.x8 + PanelLinkRow.outset * 2) - PanelLinkRow.outset * 2 }
 
     override func layout() {
@@ -367,8 +359,8 @@ final class SiteExtensionsSection: NSView {
         let o = PanelLinkRow.outset
         let width = column
         let count = items.count
-        if appliedColumns != columns || abs(appliedRoom - stripRoom) > 0.5 { apply(animated: false) }
-        func row(_ r: PanelLinkRow, _ y: CGFloat) { r.frame = NSRect(x: 0, y: y, width: bounds.width, height: PanelLinkRow.height) }
+        if abs(appliedRoom - stripRoom) > 0.5 { apply(animated: false) }
+        func row(_ r: NSView, _ y: CGFloat) { r.frame = NSRect(x: 0, y: y, width: bounds.width, height: PanelLinkRow.height) }
         guard count > 0 else {
             row(getRow, 0)
             row(manageRow, PanelLinkRow.height + PanelLinkRow.gap)
@@ -377,11 +369,9 @@ final class SiteExtensionsSection: NSView {
         let side = SiteExtensionsLayout.stripSide
         let h = SiteExtensionsLayout.headerHeight
         header.frame = NSRect(x: o, y: 0, width: width, height: h)
-        // Trailing: the strip folded; the + (and whose they are) open. The +'s glyph ends on the text column.
-        let glyphInset = (side - Tokens.Symbol.compactGlyph) / 2
-        getButton.frame = NSRect(x: o + width - side + glyphInset, y: (h - side) / 2, width: side, height: side)
-        let room = max(0, getButton.frame.minX - Tokens.Space.x1 - (o + header.textWidth + Tokens.Space.x2))
-        profileLabel.frame = NSRect(x: getButton.frame.minX - Tokens.Space.x1 - room + Label.inset, y: (h - profileLabel.lineHeight) / 2, width: room, height: profileLabel.lineHeight)
+        // Trailing, on the text column's end: the strip folded; whose they are, open.
+        let room = max(0, width - header.textWidth - Tokens.Space.x2)
+        profileLabel.frame = NSRect(x: o + width - room + Label.inset, y: (h - profileLabel.lineHeight) / 2, width: room, height: profileLabel.lineHeight)
         let strip = SiteExtensionsLayout.strip(count: count, room: stripRoom)
         let slots = strip.icons + (strip.more > 0 ? 1 : 0)
         var sx = o + width - CGFloat(slots) * side - CGFloat(max(0, slots - 1)) * SiteExtensionsLayout.stripGap
@@ -392,119 +382,162 @@ final class SiteExtensionsSection: NSView {
         }
         stripMore.frame = NSRect(x: o + width - side, y: (h - side) / 2, width: side, height: side)
 
-        // Open: the grid, Show All, Manage.
-        var y = h + Tokens.Space.x2
-        let columns = SiteExtensionsLayout.columns(width: width)
-        let named = SiteExtensionsLayout.named(count: count)
-        let layout = SiteExtensionsLayout.shown(count: count, columns: columns, showsAll: showsAll)
-        if named {
-            let w = SiteExtensionsLayout.namedWidth(count: count, width: width)
-            for (i, tile) in tiles.enumerated() {
-                tile.frame = NSRect(x: o + CGFloat(i) * w, y: y, width: w, height: PanelTile.captionedHeight)
+        // Open: the extensions, then Manage.
+        let top = h
+        if SiteExtensionsLayout.listed(count: count) {
+            for (i, button) in buttons.enumerated() {
+                button.frame = NSRect(x: 0, y: top + CGFloat(i) * (SiteExtensionRow.height + PanelLinkRow.gap), width: bounds.width, height: SiteExtensionRow.height)
             }
         } else {
-            let s = SiteExtensionsLayout.side(width: width, columns: columns)
-            let gap = SiteExtensionsLayout.gridGap
-            for (i, tile) in tiles.enumerated() {
-                // Past what shows, a tile waits where it will appear, so Show All brings it in place.
-                tile.frame = NSRect(x: o + CGFloat(i % columns) * (s + gap), y: y + CGFloat(i / columns) * (s + gap), width: s, height: s)
+            for (i, button) in buttons.enumerated() {
+                button.frame = SiteExtensionsLayout.tileFrame(i, width: width).offsetBy(dx: 0, dy: top)
             }
         }
-        y += SiteExtensionsLayout.gridHeight(shown: layout.shown, named: named, width: width, columns: columns) + Tokens.Space.x2
-        if layout.offersAll && !isWhole {
-            row(showAllRow, y)
-            y += PanelLinkRow.height + PanelLinkRow.gap
-        }
-        row(manageRow, y)
+        row(manageRow, top + SiteExtensionsLayout.bodyHeight(count: count, width: width) + Tokens.Space.x2)
         for entry in pins {
-            entry.pin.frame = SitePanel.pinFrame(on: entry.tile.frame, left: !entry.tile.badge.isEmpty)
-            if entry.tile.isHidden { entry.pin.isHidden = true }
+            if let row = entry.button as? SiteExtensionRow {
+                entry.pin.frame = row.pinFrame.offsetBy(dx: row.frame.minX, dy: row.frame.minY)
+            } else if let tile = entry.button as? PanelTile {
+                entry.pin.frame = SitePanel.pinFrame(on: tile.frame, left: !tile.badge.isEmpty)
+            }
+            if entry.button.isHidden { entry.pin.isHidden = true }
         }
     }
 
     #if DEBUG
     var debugState: [String: Any] {
-        ["open": isOpen, "showsAll": showsAll, "count": items.count,
+        ["open": isOpen, "count": items.count, "listed": SiteExtensionsLayout.listed(count: items.count),
          "strip": stripTiles.filter { !$0.isHidden }.count, "more": stripMore.isHidden ? "" : stripMore.text,
-         "tiles": tiles.filter { !$0.isHidden }.count, "dimmed": zip(items, tiles).filter { $1.isDimmed }.map(\.0.name),
-         "showAll": showAllRow.isHidden ? "" : showAllRow.debugTitle]
+         "shown": buttons.filter { !$0.isHidden }.count,
+         "dimmed": zip(items, buttons).filter { ($1 as? PanelTile)?.isDimmed ?? ($1 as? SiteExtensionRow)?.isDimmed ?? false }.map(\.0.name)]
     }
 
-    /// sitext open|fold|all|less: the header, or Show All / Show Less, as a click would.
+    /// sitext open|fold: the header, as a click would.
     func debugCommand(_ arg: String) {
         switch arg {
         case "open": setOpen(true)
         case "fold": setOpen(false)
-        case "all": if !showsAll { toggleShowAll() }
-        case "less": if showsAll { toggleShowAll() }
         default: break
         }
     }
 
-    /// pinhover: the pointer on a tile, or its pin, as a real pointer would put it there.
+    /// pinhover: the pointer on an extension, or its pin, as a real pointer would put it there.
     func debugHover(_ arg: String) {
         let f = arg.split(separator: " ").map(String.init)
         for entry in pins where entry.id != f.first {
             entry.pin.isHovered = false
-            entry.tile.isHovered = false
+            entry.button.isHovered = false
         }
         guard let entry = pins.first(where: { $0.id == f.first }) else { return }
         if f.contains("limit") { entry.pin.state = .atLimit }
-        entry.tile.isHovered = true
+        entry.button.isHovered = true
         if f.contains("pin") { entry.pin.isHovered = true }
     }
     #endif
 }
 
-/// The Extensions section's header: its name and count in the section labels' quiet voice, and a chevron that says
-/// it folds, as Effects in the space editor does. The whole row is the control.
+/// One extension as a row, while there are only a few: its icon on the panel's text column, with its badge on the
+/// icon's corner as the address draws it, and its name after it. The row is its button, with the panel's row washes;
+/// its pin comes up at the trailing end, as a row's delete does. One that doesn't work on the site is faded, and says
+/// why under the pointer.
+final class SiteExtensionRow: InteractiveView {
+    static let height = PanelLinkRow.height
+    private let iconView = NSImageView()
+    private let title: Label
+    var isDimmed = false { didSet { stateDidChange(animated: false) } }
+
+    init(image: NSImage?, name: String, badge: String, attention: Bool) {
+        title = Label(name, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+        title.lineBreakMode = .byTruncatingTail
+        super.init(frame: .zero)
+        pressScales = true
+        layer?.cornerRadius = Tokens.Radius.row
+        layer?.cornerCurve = .continuous
+        iconView.image = image ?? Tokens.Symbol.image("puzzlepiece.extension", size: Tokens.Symbol.row)
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        iconView.contentTintColor = Tokens.Color.icon
+        [iconView, title].forEach { addSubview($0) }
+        if !badge.isEmpty {
+            // The address's pill, hanging off the icon's corner as on a captioned tile.
+            let view = BadgeView(text: badge, attention: attention)
+            view.inset = PanelTile.iconBadgeInset
+            iconView.addSubview(view)
+        }
+        setAccessibilityRole(.button)
+        setAccessibilityLabel(name)
+        stateDidChange(animated: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    #if DEBUG
+    var debugName: String { title.stringValue }
+    #endif
+
+    /// Where its pin goes, in its own terms: the chip's edge on the text column's end, in the middle of the row.
+    var pinFrame: NSRect {
+        let side = Tokens.Sidebar.hoverPin, chip = Tokens.Sidebar.hoverPinChip
+        let margin = (side - chip) / 2
+        return NSRect(x: bounds.width - PanelLinkRow.outset - chip - margin, y: (bounds.height - side) / 2, width: side, height: side)
+    }
+
+    override func layout() {
+        super.layout()
+        let side = Tokens.Metric.favicon
+        let x = PanelLinkRow.outset
+        iconView.frame = NSRect(x: x, y: (bounds.height - side) / 2, width: side, height: side)
+        let textX = x + side + Tokens.Space.x2
+        // Short of the pin, so the name never runs under it.
+        let right = pinFrame.minX - Tokens.Space.x1
+        title.frame = NSRect(x: textX - Label.inset, y: (bounds.height - title.lineHeight) / 2, width: max(0, right - textX + Label.inset * 2), height: title.lineHeight)
+        iconView.subviews.forEach { $0.needsLayout = true }
+    }
+
+    override func stateDidChange(animated: Bool) {
+        applyRowStyle(animated: animated)
+        let faded = !isEnabled || isDimmed
+        iconView.alphaValue = faded ? Tokens.Opacity.disabled : 1
+        title.alphaValue = faded ? Tokens.Opacity.disabled : 1
+    }
+}
+
+/// The Extensions section's header: its name in the panel's section-label voice, and a chevron that says it folds,
+/// as Effects in the space editor does. The whole row is the control, and the one way to show or hide them all.
 private final class SectionHeader: InteractiveView {
     private let label = Label.section("")
-    private let countLabel = Label("", font: Tokens.Font.label(), color: Tokens.Color.textTertiary)
     private let chevron = NSImageView()
     var title: String {
         get { label.stringValue }
-        set { label.stringValue = newValue; setAccessibilityLabel(newValue) }
+        set { label.stringValue = newValue; refreshAccessibility() }
     }
-    var count = "" {
-        didSet {
-            countLabel.stringValue = count
-            setAccessibilityLabel(count.isEmpty ? label.stringValue : "\(label.stringValue), \(count)")
-            needsLayout = true
-        }
-    }
-    var showsCount = true { didSet { countLabel.isHidden = !showsCount; needsLayout = true } }
-    private var shownCount: Bool { showsCount && !count.isEmpty }
+    /// How many: for VoiceOver. On screen, the strip or the extensions themselves say it.
+    var count = 0 { didSet { refreshAccessibility() } }
     var isOpen = false { didSet { refresh() } }
     var isFoldable = true { didSet { chevron.isHidden = !isFoldable; isEnabled = isFoldable; refresh() } }
 
-    /// Its name, count and chevron, and no more: what's after it is the strip's.
-    var textWidth: CGFloat {
-        label.inkWidth + (shownCount ? Tokens.Space.x1 + countLabel.inkWidth : 0) + (isFoldable ? Tokens.Space.x1 + Tokens.Space.x4 : 0)
-    }
+    /// Its name and chevron, and no more: what's after it is the strip's.
+    var textWidth: CGFloat { label.inkWidth + (isFoldable ? Tokens.Space.x1 + Tokens.Space.x4 : 0) }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         chevron.imageScaling = .scaleNone
-        [label, countLabel, chevron].forEach { addSubview($0) }
+        [label, chevron].forEach { addSubview($0) }
         setAccessibilityRole(.disclosureTriangle)
         refresh()
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
+    private func refreshAccessibility() {
+        setAccessibilityLabel(count > 0 ? "\(label.stringValue), \(count)" : label.stringValue)
+    }
+
     override func layout() {
         super.layout()
         let lh = label.lineHeight
         label.frame = NSRect(x: -Label.inset, y: (bounds.height - lh) / 2, width: label.inkWidth + Label.inset * 2, height: lh)
-        var x = label.inkWidth
-        if shownCount {
-            x += Tokens.Space.x1
-            countLabel.frame = NSRect(x: x - Label.inset, y: (bounds.height - lh) / 2, width: countLabel.inkWidth + Label.inset * 2, height: lh)
-            x += countLabel.inkWidth
-        }
         let side = Tokens.Space.x4
-        chevron.frame = NSRect(x: x + Tokens.Space.x1, y: (bounds.height - side) / 2, width: side, height: side)
+        chevron.frame = NSRect(x: label.inkWidth + Tokens.Space.x1, y: (bounds.height - side) / 2, width: side, height: side)
     }
 
     private func refresh() {
@@ -517,7 +550,6 @@ private final class SectionHeader: InteractiveView {
         // No wash: the words step up under the pointer, as the space editor's Effects does.
         let hot = isHovered && isFoldable
         label.textColor = hot ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
-        countLabel.textColor = Tokens.Color.textTertiary
         chevron.contentTintColor = hot ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
     }
 }

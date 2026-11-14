@@ -6801,7 +6801,7 @@
       }
     },
     "Get Extensions" : {
-      "comment" : "Button in Settings › Extensions: opens the Chrome Web Store.\nTooltip of the + by the Extensions section in Site Controls, and the row there when you have none: opens the Chrome Web Store.",
+      "comment" : "Button in Settings › Extensions: opens the Chrome Web Store.\nRow in the Extensions section of Site Controls when you have none: opens the Chrome Web Store.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13872,6 +13872,7 @@
     },
     "Show All (%lld)" : {
       "comment" : "Row under two rows of extensions in Site Controls: shows every one of them. The number is how many there are.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13927,6 +13928,7 @@
     },
     "Show Less" : {
       "comment" : "Row under the extensions in Site Controls once they all show: back to two rows of them.",
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

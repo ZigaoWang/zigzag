@@ -2,8 +2,8 @@ import AppKit
 import Testing
 @testable import Zigzag
 
-/// The Extensions section of Site Controls (#215): in the panel itself, folded to a strip or open as tiles, with
-/// badges and the extensions that don't work on the site dimmed.
+/// The Extensions section of Site Controls (#215): in the panel itself, folded to a strip or open as rows or a grid
+/// on the panel's text column, with badges and the extensions that don't work on the site dimmed.
 @MainActor
 @Suite(.serialized)
 struct SiteExtensionsTests {
@@ -18,13 +18,13 @@ struct SiteExtensionsTests {
         }
     }
 
-    /// A section laid out in the panel's column, its choices as they were before, put back after.
-    private func section(_ items: [SiteExtensionsSection.Item], open: Bool? = nil, showsAll: Bool = false, whole: Bool = false,
+    /// A section laid out in the panel's column, its choice as it was before, put back after.
+    private func section(_ items: [SiteExtensionsSection.Item], open: Bool? = nil, whole: Bool = false, column: CGFloat? = nil,
                          _ check: (SiteExtensionsSection) -> Void) {
-        let keptOpen = SiteExtensionsSection.chosenOpen, keptAll = SiteExtensionsSection.showsAll
-        defer { SiteExtensionsSection.chosenOpen = keptOpen; SiteExtensionsSection.showsAll = keptAll }
+        let column = column ?? self.column
+        let kept = SiteExtensionsSection.chosenOpen
+        defer { SiteExtensionsSection.chosenOpen = kept }
         SiteExtensionsSection.chosenOpen = open
-        SiteExtensionsSection.showsAll = showsAll
         let s = SiteExtensionsSection(items: items, isWhole: whole, profile: nil, get: {}, manage: {})
         let width = column + PanelLinkRow.outset * 2
         s.frame = NSRect(x: 0, y: 0, width: width, height: s.height(for: column))
@@ -32,60 +32,97 @@ struct SiteExtensionsTests {
         check(s)
     }
 
-    private func shownTiles(_ s: SiteExtensionsSection) -> [PanelTile] { s.tiles.filter { !$0.isHidden } }
+    private func shown(_ s: SiteExtensionsSection) -> [InteractiveView] { s.buttons.filter { !$0.isHidden } }
+    private func tiles(_ s: SiteExtensionsSection) -> [PanelTile] { s.buttons.compactMap { $0 as? PanelTile } }
 
     // MARK: Layout
 
     @Test func noneIsOneQuietRow() {
         section([]) { s in
             #expect(s.height(for: column) == PanelLinkRow.height)
-            #expect(shownTiles(s).isEmpty)
-            #expect(s.debugState["tiles"] as? Int == 0)
+            #expect(shown(s).isEmpty)
+            #expect(s.debugState["shown"] as? Int == 0)
         }
     }
 
-    @Test func oneOrTwoAreOpenAndNamed() {
-        for count in [1, 2] {
+    /// One to three are rows with their names, their icons on the panel's text column as its rows' words are.
+    @Test func aFewAreNamedRows() {
+        for count in [1, 3] {
             section(items(count)) { s in
                 #expect(s.isOpen)
-                #expect(shownTiles(s).count == count)
-                // Named, half the row each, side by side at the left: no empty grid around them.
-                #expect(SiteExtensionsLayout.named(count: count))
-                #expect(shownTiles(s).allSatisfy { $0.frame.height == PanelTile.captionedHeight })
-                #expect(shownTiles(s).first?.frame.minX == PanelLinkRow.outset)
-                #expect(shownTiles(s).first?.frame.width == floor(column / 2))
+                #expect(shown(s).count == count)
+                #expect(shown(s).allSatisfy { $0 is SiteExtensionRow })
+                // Full width, the rows' wash past the column on each side, one under the other.
+                #expect(shown(s).allSatisfy { $0.frame.minX == 0 && $0.frame.width == column + PanelLinkRow.outset * 2 })
+                #expect(Set(shown(s).map(\.frame.minY)).count == count)
+                #expect(shown(s).first?.frame.minY == SiteExtensionsLayout.headerHeight)
+                #expect(s.height(for: column) == SiteExtensionsLayout.headerHeight + CGFloat(count) * SiteExtensionRow.height
+                        + CGFloat(count - 1) * PanelLinkRow.gap + Tokens.Space.x2 + PanelLinkRow.height)
             }
         }
+    }
+
+    /// Four and more are a grid of icons: the first icon starts on the text column, the last column's ends on its
+    /// right edge, and every one of them shows once open; the header's fold is the one way to show fewer.
+    @Test func manyAreAGridOnTheTextColumn() {
+        let cases: [(Int, CGFloat)] = [(4, 200), (9, 200), (9, 176), (20, 200), (20, 268)]
+        for (count, columnWidth) in cases {
+            section(items(count), open: true, column: columnWidth) { s in
+                let grid = tiles(s)
+                #expect(grid.count == count)
+                #expect(shown(s).count == count)
+                let columns = SiteExtensionsLayout.columns(width: columnWidth)
+                let inset = (SiteExtensionsLayout.tileSide - SiteExtensionsLayout.iconSide) / 2
+                // The first icon's edge on the text column, which starts `outset` into the section.
+                #expect(grid[0].frame.minX + inset == PanelLinkRow.outset)
+                if count >= columns {
+                    // The last column's icon ends on the column's right edge, to the point.
+                    let last = grid[columns - 1].frame
+                    #expect(abs(last.maxX - inset - (PanelLinkRow.outset + columnWidth)) <= 0.5)
+                }
+                // Tiles never touch: at least the rows' gap apart, across and down.
+                let rows = (count + columns - 1) / columns
+                #expect(Set(grid.map(\.frame.minY)).count == rows)
+                if columns > 1 { #expect(grid[1].frame.minX - grid[0].frame.maxX >= SiteExtensionsLayout.minGap - 0.5) }
+                if rows > 1 { #expect(grid[columns].frame.minY - grid[0].frame.maxY >= SiteExtensionsLayout.minGap) }
+                #expect(s.height(for: columnWidth) == SiteExtensionsLayout.headerHeight
+                        + SiteExtensionsLayout.bodyHeight(count: count, width: columnWidth) + Tokens.Space.x2 + PanelLinkRow.height)
+            }
+        }
+    }
+
+    @Test func columnsFitTheTextColumn() {
+        // The sidebar at its narrowest, at its usual width, and a 300pt panel.
+        #expect(SiteExtensionsLayout.columns(width: 176) == 5)
+        #expect(SiteExtensionsLayout.columns(width: 200) == 5)
+        #expect(SiteExtensionsLayout.columns(width: 268) == 7)
+        let widths: [CGFloat] = [150, 176, 200, 233, 268]
+        for width in widths {
+            let columns = SiteExtensionsLayout.columns(width: width)
+            let pitch = SiteExtensionsLayout.pitch(width: width, columns: columns)
+            #expect(pitch - SiteExtensionsLayout.tileSide >= SiteExtensionsLayout.minGap)
+            // One more wouldn't fit with its gap.
+            #expect(CGFloat(columns + 1) * SiteExtensionsLayout.tileSide + CGFloat(columns) * SiteExtensionsLayout.minGap > width + PanelLinkRow.outset * 2)
+            let gap = SiteExtensionsLayout.rowGap(width: width, columns: columns)
+            #expect(gap >= SiteExtensionsLayout.minGap && gap <= SiteExtensionsLayout.maxRowGap)
+        }
+        #expect(SiteExtensionsLayout.listed(count: 3))
+        #expect(!SiteExtensionsLayout.listed(count: 4))
     }
 
     @Test func eightFoldToAStripUntilChosen() {
         section(items(8)) { s in
             #expect(!s.isOpen)
-            #expect(shownTiles(s).isEmpty)
+            #expect(shown(s).isEmpty)
             #expect(s.height(for: column) == SiteExtensionsLayout.headerHeight)
             let strip = s.debugState["strip"] as? Int ?? 0
             #expect(strip > 0 && strip < 8)
             #expect(s.debugState["more"] as? String == "+\(8 - strip)")
         }
-        // Opened, all eight in two rows of a grid, no Show All.
+        // Opened, all eight in a grid.
         section(items(8), open: true) { s in
-            #expect(shownTiles(s).count == 8)
-            #expect(s.debugState["showAll"] as? String == "")
-            #expect(Set(shownTiles(s).map(\.frame.minY)).count == 2)
-        }
-    }
-
-    @Test func fifteenShowTwoRowsThenShowAll() {
-        let columns = SiteExtensionsLayout.columns(width: column)
-        section(items(15), open: true) { s in
-            #expect(shownTiles(s).count == columns * 2)
-            #expect(s.debugState["showAll"] as? String == "Show All (15)")
-            #expect(Set(shownTiles(s).map(\.frame.minY)).count == 2)
-        }
-        section(items(15), open: true, showsAll: true) { s in
-            #expect(shownTiles(s).count == 15)
-            #expect(s.debugState["showAll"] as? String == "Show Less")
-            #expect(Set(shownTiles(s).map(\.frame.minY)).count == 3)
+            #expect(shown(s).count == 8)
+            #expect(s.debugState["more"] as? String == "")
         }
     }
 
@@ -94,17 +131,20 @@ struct SiteExtensionsTests {
             s.setOpen(false)
             #expect(SiteExtensionsSection.chosenOpen == false)
             #expect(!s.isOpen)
+            #expect(s.height(for: column) == SiteExtensionsLayout.headerHeight)
         }
         section(items(2), open: false) { s in #expect(!s.isOpen) }
-        section(items(15), open: true) { s in #expect(s.isOpen) }
+        section(items(15), open: true) { s in
+            #expect(s.isOpen)
+            #expect(shown(s).count == 15)
+        }
     }
 
-    /// On a new tab the section is the whole panel: open, every tile, nothing to fold.
+    /// On a new tab the section is the whole panel: open, every one, nothing to fold.
     @Test func aNewTabShowsThemAll() {
         section(items(15), open: false, whole: true) { s in
             #expect(s.isOpen)
-            #expect(shownTiles(s).count == 15)
-            #expect(s.debugState["showAll"] as? String == "")
+            #expect(shown(s).count == 15)
             s.setOpen(false)
             #expect(s.isOpen)
         }
@@ -128,33 +168,33 @@ struct SiteExtensionsTests {
         #expect(SiteExtensionsLayout.strip(count: 3, room: 0) == (0, 3))
     }
 
-    @Test func showAllAfterTwoRows() {
-        #expect(SiteExtensionsLayout.shown(count: 10, columns: 5, showsAll: false) == (10, false))
-        #expect(SiteExtensionsLayout.shown(count: 15, columns: 5, showsAll: false) == (10, true))
-        #expect(SiteExtensionsLayout.shown(count: 15, columns: 5, showsAll: true) == (15, true))
-        #expect(SiteExtensionsLayout.columns(width: 268) == 6)
-        #expect(SiteExtensionsLayout.columns(width: 200) == 5)
-        #expect(SiteExtensionsLayout.columns(width: 176) == 4)
-    }
-
     // MARK: Badge and access
 
     @Test func theBadgeShows() {
-        section(items(3, badge: { $0 == 1 ? "12" : "" }), open: true) { s in
-            #expect(s.tiles[1].badge == "12")
-            #expect(s.tiles[0].badge.isEmpty)
-            #expect(s.tiles[1].accessibilityValue() as? String == "12")
+        section(items(5, badge: { $0 == 1 ? "12" : "" }), open: true) { s in
+            #expect(tiles(s)[1].badge == "12")
+            #expect(tiles(s)[0].badge.isEmpty)
+            #expect(tiles(s)[1].accessibilityValue() as? String == "12")
+        }
+        // On a row, the same pill on its icon.
+        section(items(2, badge: { $0 == 1 ? "12" : "" }), open: true) { s in
+            #expect(s.buttons[1].accessibilityValue() as? String == "12")
         }
     }
 
     @Test func extensionsThatDontWorkHereAreDimmed() {
         let access: [SiteExtensionAccess] = [.runs, .onClick, .blocked, .offHere]
         section(items(4, access: { access[$0] }), open: true) { s in
-            #expect(s.tiles.map(\.isDimmed) == [false, true, true, true])
-            #expect(s.tiles[0].toolTip == "Extension 0")
-            #expect(s.tiles[2].toolTip == "Extension 2\nCan’t read this site")
+            #expect(tiles(s).map(\.isDimmed) == [false, true, true, true])
+            // Named under the pointer, and why it's dimmed.
+            #expect(tiles(s)[0].toolTip == "Extension 0")
+            #expect(tiles(s)[2].toolTip == "Extension 2\nCan’t read this site")
             // Still a button: a click on one that runs on click gives it the site.
-            #expect(s.tiles[1].isEnabled)
+            #expect(tiles(s)[1].isEnabled)
+        }
+        section(items(2, access: { access[$0 + 1] }), open: true) { s in
+            #expect(s.buttons.compactMap { ($0 as? SiteExtensionRow)?.isDimmed } == [true, true])
+            #expect(s.buttons[1].toolTip == "Extension 1\nCan’t read this site")
         }
     }
 

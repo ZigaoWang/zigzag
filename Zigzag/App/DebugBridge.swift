@@ -1943,12 +1943,12 @@ enum DebugBridge {
             debugLog("\(name) \(n): site controls \(header.address.showsSiteControls ? "in the address" : "in ⋯"), panel for \(SitePanel.shown.map { $0.describes(header.tab) } == true ? "this pane" : "another page")")
         // sitepage <main|connection|permissions>: the open site panel's page, as its rows and back button go.
         // sitezoom in|out|reset: its Zoom row. sitepermrow <row> <ask|allow|block> | reset: a permission row's
-        // dropdown, or Reset Permissions. sitepanelstate <path>: what it shows (JSON). sitext open|fold|all|less: its
-        // Extensions header, or Show All. sitextcount <n>: panels opened from now on show n extensions (0: as they are).
+        // dropdown, or Reset Permissions. sitepanelstate <path>: what it shows (JSON). sitext open|fold: its
+        // Extensions header. sitextcount <n>: panels opened from now on show n extensions (0: as they are).
         case "sitepage": SitePanel.shown?.debugPage(arg)
         case "sitext": SitePanel.shown?.extensionsSection?.debugCommand(arg)
         case "sitextcount": SitePanel.debugExtensionCount = Int(arg) ?? 0
-        case "sitextforget": SiteExtensionsSection.chosenOpen = nil; SiteExtensionsSection.showsAll = false
+        case "sitextforget": SiteExtensionsSection.chosenOpen = nil
         case "sitezoom": SitePanel.shown?.debugZoom(arg)
         case "sitepermrow": SitePanel.shown?.debugPermissionRow(arg)
         // sitedark <automatic|on|off|force>: the Dark page row's dropdown.
