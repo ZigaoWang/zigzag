@@ -3,6 +3,26 @@ import Testing
 import WebKit
 @testable import Zigzag
 
+/// A site's name for a file never reads as another kind of file once saved.
+struct DownloadNameTests {
+    @Test func invisibleMarksAreTakenOut() {
+        // A right-to-left override would show "invoice\u{202E}fdp.exe" as "invoiceexe.pdf".
+        #expect(DownloadManager.safeFilename("invoice\u{202E}fdp.exe") == "invoicefdp.exe")
+        #expect(DownloadManager.safeFilename("re\u{200B}port\u{2066}.pdf\u{2069}\u{FEFF}") == "report.pdf")
+        #expect(DownloadManager.safeFilename("a\u{200F}b\u{061C}c\u{200E}.txt") == "abc.txt")
+        #expect(DownloadManager.safeFilename("two\nlines\t.txt") == "twolines.txt")
+        // Separators, a leading dot that would hide it, and nothing left at all.
+        #expect(DownloadManager.safeFilename("../etc/passwd") == "-etc-passwd")
+        #expect(DownloadManager.safeFilename("a:b.txt") == "a-b.txt")
+        #expect(DownloadManager.safeFilename(".hidden") == "hidden")
+        #expect(DownloadManager.safeFilename("\u{202E}") == "Download")
+        // Names in any language stay as they are.
+        #expect(DownloadManager.safeFilename("报告 2026.pdf") == "报告 2026.pdf")
+        #expect(DownloadManager.safeFilename("café.png") == "café.png")
+        #expect(DownloadManager.uniqueDestination(for: "x\u{202E}gpj.exe").lastPathComponent.hasPrefix("xgpj"))
+    }
+}
+
 /// One policy for what tabs and pop-up windows show or save: an attachment is saved, never shown as the site's page,
 /// and downloads nobody clicked for can't come in a stream.
 @MainActor

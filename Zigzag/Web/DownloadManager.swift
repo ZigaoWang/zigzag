@@ -453,11 +453,29 @@ final class DownloadManager: NSObject {
         changed.send(nil)
     }
 
+    /// A site's name for a file, made safe to save and to read: no "/" or ":", no control characters, and none of the
+    /// invisible ones that reorder or hide text (a right-to-left override makes "invoice\u{202E}fdp.exe" read as
+    /// "invoiceexe.pdf"; a zero-width space hides between letters). Never hidden by a leading dot, never empty.
+    nonisolated static func safeFilename(_ filename: String) -> String {
+        var scalars = String.UnicodeScalarView()
+        for scalar in filename.unicodeScalars {
+            switch scalar.properties.generalCategory {
+            case .control, .format, .lineSeparator, .paragraphSeparator, .surrogate, .unassigned: continue
+            default: break
+            }
+            scalars.append(scalar == "/" || scalar == ":" ? "-" : scalar)
+        }
+        var name = String(scalars).trimmingCharacters(in: .whitespaces)
+        while name.hasPrefix(".") { name.removeFirst() }
+        name = name.trimmingCharacters(in: .whitespaces)
+        return name.isEmpty ? "Download" : name
+    }
+
     /// A free name in Downloads, also avoiding names given to downloads still in progress (their files don't
     /// exist yet), so two "report.pdf"s started together don't collide.
     static func uniqueDestination(for filename: String, avoiding taken: Set<String> = []) -> URL {
         let folder = Self.folder
-        let safe = filename.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+        let safe = safeFilename(filename)
         let base = (safe as NSString).deletingPathExtension
         let ext = (safe as NSString).pathExtension
         var candidate = folder.appendingPathComponent(safe)
