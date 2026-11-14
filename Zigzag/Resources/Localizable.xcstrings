@@ -10373,17 +10373,6 @@
         }
       }
     },
-    "Not run through a shell" : {
-      "comment" : "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不经由 shell 运行"
-          }
-        }
-      }
-    },
     "Not secure" : {
       "comment" : "How a page loaded over plain http, or with a certificate you chose to trust anyway, is marked, in the site panel and the address bar's tooltip.",
       "localizations" : {
@@ -13848,6 +13837,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "运行脚本"
+          }
+        }
+      }
+    },
+    "Run directly, never through a shell" : {
+      "comment" : "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line, since the script is run directly.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直接运行，不经过 shell"
           }
         }
       }

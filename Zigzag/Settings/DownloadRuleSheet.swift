@@ -96,8 +96,8 @@ enum DownloadRuleSheet {
             actionRows.append(.note(String(localized: "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES.",
                                            comment: "Under the arguments of a Run Script download rule: one argument a line, and the names the link and the cookies arrive under.")))
             actionRows.append(FormSheet.Row(label: nil,
-                                            view: StatusLabel(String(localized: "Not run through a shell",
-                                                                     comment: "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line."),
+                                            view: StatusLabel(String(localized: "Run directly, never through a shell",
+                                                                     comment: "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line, since the script is run directly."),
                                                               symbol: "checkmark.shield.fill"),
                                             height: Tokens.Metric.controlHeight))
         case .jsonRPC:
