@@ -5,10 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- Tampermonkey works again once its popup has been opened. The open popup cut off every connection its scripts made to it, so they kept reconnecting, hundreds of times a second, and their menu commands never showed.
-- In split view with the address bar above the page and Borderless page off, each page and its strip of buttons and address are one card, in the page's own color, instead of a strip floating on the window over the page. The strip's buttons keep clear of the card's corners, and its address field fills the room between them.
-
 ## [0.9.0] - 2026-11-12
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, and Site Controls is rebuilt.
@@ -73,6 +69,8 @@ Split view with up to four pages, sites installed as apps of their own, the side
 - In Change Icon, the first choice shows the site's own icon, so it's clear that it puts the site's icon back.
 
 ### Fixed
+- Tampermonkey works again once its popup has been opened. The open popup cut off every connection its scripts made to it, so they kept reconnecting, hundreds of times a second, and their menu commands never showed.
+- In split view with the address bar above the page and Borderless page off, each page and its strip of buttons and address are one card, in the page's own color, instead of a strip floating on the window over the page. The strip's buttons keep clear of the card's corners, and its address field fills the room between them.
 - Dark pages in the PDF viewer keep their pictures as they are: a photo is no longer shown as a negative. Text and lines still go dark, and so does a scanned page. ([#226](https://github.com/ZigaoWang/zigzag/issues/226))
 - A page's question to open an app comes up in Zigzag Mini or an installed app's window, over its own page. It used to come up in a browser window behind, so claude.ai's Open Claude seemed to do nothing in Zigzag Mini.
 - The hidden sidebar comes out sooner when you reach for the window's edge, and also when another screen sits beside the window and the pointer runs a little onto it. ([#206](https://github.com/ZigaoWang/zigzag/issues/206))
