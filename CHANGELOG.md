@@ -5,6 +5,15 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- Show All Tabs in a private window no longer takes a new picture of every tab loaded in the background each time it opens, on a Mac in light mode.
+- Site Controls, opened under the address with the sidebar on the right, stays under the address when the window is resized, instead of being cut off at the window's edge.
+- An extension's popup from its button pinned in the address stays under the button when the popup changes size after the address moved.
+- The warning for a site whose certificate it signed itself, like a router's reached at 192.168.1.1, says the certificate is self-signed instead of being for a different address. A certificate made out to an IP address counts for that address.
+- Two sentences joined in English keep the space between them when the first ends in a closing quotation mark.
+- A pop-up from a private window keeps the WebRTC choice made in the tab that opened it after that tab is closed.
+- Pages marked with an old language code, like iw for Hebrew or in for Indonesian, are offered translation from the right language.
+
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
