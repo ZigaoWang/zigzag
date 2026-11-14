@@ -80,7 +80,7 @@ struct ExtensionSecurityTests {
 
     /// A zip made byte by byte, as an attacker would: names, kinds and flags exactly as given, stored, no compression.
     private struct CraftedZip {
-        struct Item { var name: String; var data = Data(); var mode: UInt32 = 0o100644; var flags: UInt16 = 0; var method: UInt16 = 0 }
+        struct Item { var name: String; var data = Data(); var mode: UInt32 = 0o100644; var flags: UInt16 = 0; var method: UInt16 = 0; var claimedSize: UInt32? = nil }
         var items: [Item]
 
         var data: Data {
@@ -90,10 +90,10 @@ struct ExtensionSecurityTests {
             for item in items {
                 let name = Data(item.name.utf8), crc = PackageZip.crc32([UInt8](item.data)), offset = UInt32(out.count)
                 u32(0x0403_4B50, &out); u16(20, &out); u16(item.flags, &out); u16(item.method, &out); u16(0, &out); u16(0, &out)
-                u32(crc, &out); u32(UInt32(item.data.count), &out); u32(UInt32(item.data.count), &out)
+                u32(crc, &out); u32(UInt32(item.data.count), &out); u32(item.claimedSize ?? UInt32(item.data.count), &out)
                 u16(UInt16(name.count), &out); u16(0, &out); out.append(name); out.append(item.data)
                 u32(0x0201_4B50, &index); u16(0x0314, &index); u16(20, &index); u16(item.flags, &index); u16(item.method, &index)
-                u16(0, &index); u16(0, &index); u32(crc, &index); u32(UInt32(item.data.count), &index); u32(UInt32(item.data.count), &index)
+                u16(0, &index); u16(0, &index); u32(crc, &index); u32(UInt32(item.data.count), &index); u32(item.claimedSize ?? UInt32(item.data.count), &index)
                 u16(UInt16(name.count), &index); u16(0, &index); u16(0, &index); u16(0, &index); u16(0, &index)
                 u32(item.mode << 16, &index); u32(offset, &index); index.append(name)
             }
@@ -441,5 +441,27 @@ struct ExtensionSecurityTests {
         #expect(ExtensionHost.migratedGrants(["storage", "nativeMessaging", "scripting"], declared: ["storage", "history", "userScripts"])
                 == ["storage", "history", "userScripts"])
         #expect(ExtensionHost.migratedGrants(["storage", "nativeMessaging"], declared: ["storage", "nativeMessaging"]) == ["storage", "nativeMessaging"])
+    }
+}
+
+// MARK: Install sheets
+
+extension ExtensionSecurityTests {
+    /// The install sheet words what these permissions bring, as the later-request sheet does.
+    @Test func theInstallSheetNamesEveryRiskyPermission() async throws {
+        let id = "abcdefghijklmnopabcdefghijklmnop"
+        let expected: [(String, String)] = [
+            ("tabCapture", "Hear the sound of tabs you use it on"), ("clipboardRead", "Read what you copy"),
+            ("webRequest", "See what sites load as you browse"), ("identity", "Open sign-in pages and get what sites send back"),
+            ("scripting", "Run its own scripts on the sites it can access"), ("offscreen", "Run hidden pages of its own in the background"),
+        ]
+        for (permission, line) in expected {
+            let manifest: [String: Any] = ["manifest_version": 3, "name": "Test", "version": "1.0", "permissions": [permission]]
+            let context = try await Self.context(manifest)
+            let report = ExtensionReport(extension: context.webExtension, manifest: manifest, id: id)
+            #expect(report.abilities.map(\.text).contains(line), "\(permission)")
+            // Asked for later, it reads the same, once.
+            #expect(ExtensionReport(requesting: [permission], id: id).abilities.map(\.text) == [line], "\(permission)")
+        }
     }
 }

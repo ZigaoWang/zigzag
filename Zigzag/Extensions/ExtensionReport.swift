@@ -94,19 +94,11 @@ struct ExtensionReport {
         var worded: Set<String> = ["nativeMessaging", "history", "tabs", "webNavigation", "bookmarks", "downloads", "notifications",
                                    "declarativeNetRequest", "declarativeNetRequestWithHostAccess", "userScripts", "cookies", "proxy", "management"]
         if permissions.contains("downloads") { worded.insert("downloads.open") }
-        if permissions.contains("tabCapture") {
-            lines.append(Line(symbol: "waveform", text: String(localized: "Hear the sound of tabs you use it on", comment: "One thing an extension can do, in the sheet that asks before it gets more access.")))
-        }
         if permissions.contains("topSites"), !permissions.contains("history") {
             lines.append(Line(symbol: "clock", text: String(localized: "See the sites you visit most", comment: "One thing an extension can do, in the sheet that asks before it gets more access.")))
         }
-        if !permissions.isDisjoint(with: ["webRequest", "webRequestBlocking", "webRequestAuthProvider"]) {
-            lines.append(Line(symbol: "network", text: String(localized: "See what sites load as you browse", comment: "One thing an extension can do, in the sheet that asks before it gets more access: watch the requests pages make.")))
-        }
-        if permissions.contains("clipboardRead") {
-            lines.append(Line(symbol: "doc.on.clipboard", text: String(localized: "Read what you copy", comment: "One thing an extension can do, in the sheet that asks before it gets more access.")))
-        }
-        worded.formUnion(["tabCapture", "topSites", "webRequest", "webRequestBlocking", "webRequestAuthProvider", "clipboardRead"])
+        worded.formUnion(["tabCapture", "topSites", "webRequest", "webRequestBlocking", "webRequestAuthProvider", "clipboardRead",
+                          "identity", "scripting", "offscreen"])
         if !permissions.subtracting(worded).isEmpty {
             lines.append(Line(symbol: "puzzlepiece.extension", text: String(localized: "Use more of Zigzag’s features", comment: "One thing an extension can do, in the sheet that asks before it gets more access: stands in for permissions with no line of their own.")))
         }
@@ -180,6 +172,24 @@ struct ExtensionReport {
         }
         if permissions.contains("management") {
             lines.append(Line(symbol: "puzzlepiece.extension", text: String(localized: "See your other extensions", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
+        }
+        if permissions.contains("tabCapture") {
+            lines.append(Line(symbol: "waveform", text: String(localized: "Hear the sound of tabs you use it on", comment: "One thing an extension can do, listed in its install sheet and in Settings, and in the sheet that asks before it gets more access.")))
+        }
+        if !permissions.isDisjoint(with: ["webRequest", "webRequestBlocking", "webRequestAuthProvider"]) {
+            lines.append(Line(symbol: "network", text: String(localized: "See what sites load as you browse", comment: "One thing an extension can do, listed in its install sheet and in Settings, and in the sheet that asks before it gets more access: watch the requests pages make.")))
+        }
+        if permissions.contains("clipboardRead") {
+            lines.append(Line(symbol: "doc.on.clipboard", text: String(localized: "Read what you copy", comment: "One thing an extension can do, listed in its install sheet and in Settings, and in the sheet that asks before it gets more access.")))
+        }
+        if permissions.contains("scripting") {
+            lines.append(Line(symbol: "curlybraces", text: String(localized: "Run its own scripts on the sites it can access", comment: "One thing an extension can do, listed in its install sheet and in Settings: the scripting permission.")))
+        }
+        if permissions.contains("identity") || permissions.contains("identity.email") {
+            lines.append(Line(symbol: "person.crop.circle", text: String(localized: "Open sign-in pages and get what sites send back", comment: "One thing an extension can do, listed in its install sheet and in Settings: the identity permission, which opens a site's sign-in page and hands the extension the answer.")))
+        }
+        if permissions.contains("offscreen") {
+            lines.append(Line(symbol: "rectangle.dashed", text: String(localized: "Run hidden pages of its own in the background", comment: "One thing an extension can do, listed in its install sheet and in Settings: the offscreen permission, for pages you never see that can play sound or use the clipboard.")))
         }
         return lines
     }
