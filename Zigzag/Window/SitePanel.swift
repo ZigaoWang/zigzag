@@ -1414,7 +1414,7 @@ final class PanelGroup: NSView {
     var height: CGFloat { CGFloat(rows.count) * PanelRow.height }
     /// The room left under the last row's words inside its row: the panel's bottom margin counts from the words,
     /// as its top does, so this much less is added there.
-    var bottomSlack: CGFloat { rows.last.map { (PanelRow.height - $0.contentHeight) / 2 } ?? 0 }
+    var bottomSlack: CGFloat { rows.last?.bottomSlack ?? 0 }
 
     override var isFlipped: Bool { true }
 
@@ -1435,6 +1435,11 @@ final class PanelRow: NSView {
     private let value: Label?
     /// The words' height: the title, and the line under it when there is one.
     var contentHeight: CGFloat { title.lineHeight + (value.flatMap { $0.isHidden ? nil : $0.lineHeight } ?? 0) }
+    /// The room under its words inside the row: one line sits by its capitals, two as a block.
+    var bottomSlack: CGFloat {
+        guard value?.isHidden ?? true else { return (Self.height - contentHeight) / 2 }
+        return Self.height - title.centeredY(in: Self.height) - title.lineHeight
+    }
 
     private init(_ title: String, control: NSView, value: String? = nil) {
         self.title = Label(title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
@@ -1520,7 +1525,7 @@ final class PanelRow: NSView {
             title.lineBreakMode = twoLines ? .byWordWrapping : .byTruncatingTail
             title.cell?.wraps = twoLines
             let h = twoLines ? min(ceil(title.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: right, height: 200)).height ?? title.lineHeight), bounds.height) : title.lineHeight
-            title.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: right, height: h)
+            title.frame = NSRect(x: x, y: twoLines ? (bounds.height - h) / 2 : title.centeredY(in: bounds.height), width: right, height: h)
             return
         }
         let top = (bounds.height - title.lineHeight - value.lineHeight) / 2
@@ -1542,7 +1547,7 @@ final class PanelLinkRow: InteractiveView {
     private let chevron = NSImageView()
     private let run: () -> Void
     /// The room under the words inside the row: the panel's bottom margin counts from the words.
-    var bottomSlack: CGFloat { (Self.height - title.lineHeight) / 2 }
+    var bottomSlack: CGFloat { Self.height - title.centeredY(in: Self.height) - title.lineHeight }
     private var fullText = ""
     var value: String {
         get { fullText }
@@ -1597,9 +1602,9 @@ final class PanelLinkRow: InteractiveView {
             valueLabel.stringValue = fullValue(fits: room) ? value : shortValue
         }
         let valueWidth = value.isEmpty ? 0 : max(0, min(valueLabel.textWidth, max(room, (right - Self.outset) / 3)))
-        valueLabel.frame = NSRect(x: right - valueWidth + Label.inset, y: (bounds.height - valueLabel.lineHeight) / 2, width: valueWidth, height: valueLabel.lineHeight)
+        valueLabel.frame = NSRect(x: right - valueWidth + Label.inset, y: valueLabel.centeredY(in: bounds.height), width: valueWidth, height: valueLabel.lineHeight)
         let titleRight = value.isEmpty ? right : right - valueWidth - Tokens.Space.x1
-        title.frame = NSRect(x: Self.outset - Label.inset, y: (bounds.height - title.lineHeight) / 2,
+        title.frame = NSRect(x: Self.outset - Label.inset, y: title.centeredY(in: bounds.height),
                              width: titleRight - Self.outset + Label.inset * 2, height: title.lineHeight)
     }
 
@@ -1729,7 +1734,7 @@ final class ConnectionLine: InteractiveView {
         let x = side + Tokens.Space.x1
         let room = max(0, bounds.width - x - (opens ? 2 + side : 0))
         let w = min(label.inkWidth, room)
-        label.frame = NSRect(x: x - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: w + Label.inset * 2, height: label.lineHeight)
+        label.frame = NSRect(x: x - Label.inset, y: label.centeredY(in: bounds.height), width: w + Label.inset * 2, height: label.lineHeight)
         chevron.frame = NSRect(x: x + w + 2, y: (bounds.height - side) / 2, width: side, height: side)
     }
 

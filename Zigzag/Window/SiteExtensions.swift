@@ -348,7 +348,10 @@ final class SiteExtensionsSection: NSView {
     /// The room under the last row's words, which the panel's bottom margin takes back.
     var bottomSlack: CGFloat { isOpen || items.isEmpty ? manageRow.bottomSlack : 0 }
     /// Folded, the room under the header's words inside it.
-    var foldedSlack: CGFloat { (SiteExtensionsLayout.headerHeight - Label.section("E").lineHeight) / 2 }
+    var foldedSlack: CGFloat {
+        let probe = Label.section("E"), h = SiteExtensionsLayout.headerHeight
+        return h - probe.centeredY(in: h) - probe.lineHeight
+    }
 
     /// The text column: the section reaches `PanelLinkRow.outset` past it on each side, for its washes.
     private var column: CGFloat { (bounds.width > 0 ? bounds.width : SitePanel.width - Tokens.Space.x8 + PanelLinkRow.outset * 2) - PanelLinkRow.outset * 2 }
@@ -370,7 +373,7 @@ final class SiteExtensionsSection: NSView {
         header.frame = NSRect(x: o, y: 0, width: width, height: h)
         // Trailing, on the text column's end: the strip folded; whose they are, open.
         let room = max(0, width - header.textWidth - Tokens.Space.x2)
-        profileLabel.frame = NSRect(x: o + width - room + Label.inset, y: (h - profileLabel.lineHeight) / 2, width: room, height: profileLabel.lineHeight)
+        profileLabel.frame = NSRect(x: o + width - room + Label.inset, y: profileLabel.centeredY(in: h), width: room, height: profileLabel.lineHeight)
         let strip = SiteExtensionsLayout.strip(count: count, room: stripRoom)
         let slots = strip.icons + (strip.more > 0 ? 1 : 0)
         var sx = o + width - CGFloat(slots) * side - CGFloat(max(0, slots - 1)) * SiteExtensionsLayout.stripGap
@@ -488,7 +491,7 @@ final class SiteExtensionRow: InteractiveView {
         let textX = x + side + Tokens.Space.x2
         // Short of the pin, so the name never runs under it.
         let right = pinFrame.minX - Tokens.Space.x1
-        title.frame = NSRect(x: textX - Label.inset, y: (bounds.height - title.lineHeight) / 2, width: max(0, right - textX + Label.inset * 2), height: title.lineHeight)
+        title.frame = NSRect(x: textX - Label.inset, y: title.centeredY(in: bounds.height), width: max(0, right - textX + Label.inset * 2), height: title.lineHeight)
         iconView.subviews.forEach { $0.needsLayout = true }
     }
 
@@ -534,7 +537,7 @@ private final class SectionHeader: InteractiveView {
     override func layout() {
         super.layout()
         let lh = label.lineHeight
-        label.frame = NSRect(x: -Label.inset, y: (bounds.height - lh) / 2, width: label.inkWidth + Label.inset * 2, height: lh)
+        label.frame = NSRect(x: -Label.inset, y: label.centeredY(in: bounds.height), width: label.inkWidth + Label.inset * 2, height: lh)
         let side = Tokens.Space.x4
         chevron.frame = NSRect(x: label.inkWidth + Tokens.Space.x1, y: (bounds.height - side) / 2, width: side, height: side)
     }
@@ -581,7 +584,7 @@ private final class StripMore: InteractiveView {
     override func layout() {
         super.layout()
         let lh = label.lineHeight
-        label.frame = NSRect(x: -Label.inset, y: (bounds.height - lh) / 2, width: bounds.width + Label.inset * 2, height: lh)
+        label.frame = NSRect(x: -Label.inset, y: label.centeredY(in: bounds.height), width: bounds.width + Label.inset * 2, height: lh)
     }
 
     override func stateDidChange(animated: Bool) {

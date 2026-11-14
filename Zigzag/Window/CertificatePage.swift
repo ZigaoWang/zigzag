@@ -222,9 +222,9 @@ private final class ChainRow: InteractiveView {
         super.layout()
         let outset = PanelLinkRow.outset
         let roleWidth = role.textWidth
-        role.frame = NSRect(x: bounds.width - outset - roleWidth + Label.inset, y: (bounds.height - role.lineHeight) / 2, width: roleWidth, height: role.lineHeight)
+        role.frame = NSRect(x: bounds.width - outset - roleWidth + Label.inset, y: role.centeredY(in: bounds.height), width: roleWidth, height: role.lineHeight)
         let x = outset
-        name.frame = NSRect(x: x - Label.inset, y: (bounds.height - name.lineHeight) / 2, width: max(0, role.frame.minX - Tokens.Space.x2 - x + Label.inset * 2), height: name.lineHeight)
+        name.frame = NSRect(x: x - Label.inset, y: name.centeredY(in: bounds.height), width: max(0, role.frame.minX - Tokens.Space.x2 - x + Label.inset * 2), height: name.lineHeight)
     }
 
     override func stateDidChange(animated: Bool) { applyRowStyle(animated: animated) }
