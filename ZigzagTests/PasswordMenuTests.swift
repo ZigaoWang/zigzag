@@ -219,6 +219,9 @@ struct PasswordMenuTests {
         #expect(!AutofillMenu.takesInput(shownFor: 0.1))
         #expect(!AutofillMenu.takesInput(shownFor: 0.5))
         #expect(AutofillMenu.takesInput(shownFor: 0.6))
+        // Only Return waits; the arrows move the selection at once.
+        #expect(!AutofillMenu.takesKey("Enter", shownFor: 0.1) && AutofillMenu.takesKey("Enter", shownFor: 0.6))
+        #expect(AutofillMenu.takesKey("ArrowDown", shownFor: 0.1) && AutofillMenu.takesKey("ArrowUp", shownFor: 0.1))
         #expect(Autofill.enterMayFill(focusedByUser: true, menuOnScreen: false))
         #expect(Autofill.enterMayFill(focusedByUser: false, menuOnScreen: true))
         #expect(!Autofill.enterMayFill(focusedByUser: false, menuOnScreen: false))

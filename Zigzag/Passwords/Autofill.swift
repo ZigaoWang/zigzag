@@ -137,9 +137,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         case "key":
             guard let menu, let key = body["key"] as? String else { return }
             if key == "Escape" { hide(); return }
-            // As with clicks, the first half second takes no keys: a page that just put the menu up can't have
-            // Down, Down, Return already on their way pick from it.
-            guard menu.takesInput else { return }
+            // As with clicks, the first half second takes no Return: a page that just put the menu up can't have
+            // Down, Down, Return already on their way pick from it. The arrows only move the selection.
+            guard menu.takesKey(key) else { return }
             switch key {
             case "ArrowDown": menu.move(1); markSelected(menu.selected != nil)
             case "ArrowUp": menu.move(-1); markSelected(menu.selected != nil)
@@ -976,11 +976,14 @@ final class AutofillMenu: FloatingPanelView {
 
     /// When it came up. For the first half second it takes no clicks, so a page can't bring it up just as you click
     /// (a "click here, fast" game) and catch that click on a login.
-    /// Keys wait the same half second (`Autofill`'s key handling).
+    /// Return waits the same half second (`Autofill`'s key handling); the arrows only move the selection, so they
+    /// work at once.
     private let shownAt = ProcessInfo.processInfo.systemUptime
     static let quietFor: TimeInterval = 0.5
 
     static func takesInput(shownFor: TimeInterval) -> Bool { shownFor > quietFor }
+    static func takesKey(_ key: String, shownFor: TimeInterval) -> Bool { key != "Enter" || takesInput(shownFor: shownFor) }
+    func takesKey(_ key: String) -> Bool { Self.takesKey(key, shownFor: ProcessInfo.processInfo.systemUptime - shownAt) }
     var takesInput: Bool { Self.takesInput(shownFor: ProcessInfo.processInfo.systemUptime - shownAt) }
 
     /// In a window you can see, the one in front, and wholly inside the page it floats over.
