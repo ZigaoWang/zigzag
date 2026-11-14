@@ -2854,15 +2854,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                               detail: "\(rule.matchSummary) · \(rule.actionSummary)", control: controls)
             row.keywords = "\(rule.pattern) \(rule.action.textFields.joined(separator: " "))"
             downloadRulesGroup.add(row)
-            // The sites this rule has a standing answer on: each can be forgotten on its own, so one site is asked
-            // again without touching the others.
-            let decided = SitePermissions.sites(prefix: PermissionSubject.handoff(rule.id))
-            if !decided.isEmpty {
+            // The sites this rule has a standing answer on, grouped by what was answered — handed off, left to the
+            // browser, or refused — so a site the rule was refused on doesn't read like one it was handed off on.
+            // Each can be forgotten on its own, so one site is asked again without touching the others.
+            for group in Self.handoffAnswerGroups(SitePermissions.decisions(prefix: PermissionSubject.handoff(rule.id))) {
                 let perSite = NSStackView()
                 perSite.orientation = .horizontal
                 perSite.spacing = Tokens.Space.x2
                 perSite.alignment = .centerY
-                for site in decided {
+                for site in group.sites {
                     let forget = IconButton(symbol: "xmark", size: .compact,
                                             toolTip: String(localized: "Forget \(SiteOrigin.label(site))", comment: "Tooltip of the button that forgets one site's answer about a download rule. The placeholder is the site's name."))
                     forget.onClick = { [weak self] _ in
@@ -2871,9 +2871,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                     }
                     perSite.addArrangedSubview(forget)
                 }
-                let sitesRow = FormRow(title: String(localized: "Sites answered", comment: "In Settings › Downloads, under a rule: the sites you answered the rule's question on."),
-                                       detail: decided.map(SiteOrigin.label).joined(separator: ", "), control: perSite)
-                sitesRow.keywords = decided.joined(separator: " ")
+                let sitesRow = FormRow(title: group.title,
+                                       detail: group.sites.map(SiteOrigin.label).joined(separator: ", "), control: perSite)
+                sitesRow.keywords = group.sites.joined(separator: " ")
                 downloadRulesGroup.add(sitesRow)
             }
         }
@@ -2882,6 +2882,25 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                           comment: "Explanation under the download rules in Settings › Downloads."),
                            control: NSView())
         downloadRulesGroup.add(hint)
+    }
+
+    /// A rule's answered sites, grouped by the answer in the order the question offers them — handed off, left to the
+    /// browser, then refused — with only the groups that have sites. So the list reads as the decision it records,
+    /// and a site the rule was refused on never looks like one it was handed off on.
+    static func handoffAnswerGroups(_ decided: [(origin: String, action: String)]) -> [(title: String, sites: [String])] {
+        ["handOff", "browser", "deny"].compactMap { action in
+            let sites = decided.filter { $0.action == action }.map(\.origin)
+            return sites.isEmpty ? nil : (handoffAnswerName(action), sites)
+        }
+    }
+
+    /// What a handoff answer is called in that list: the very words the question's button used.
+    static func handoffAnswerName(_ action: String) -> String {
+        switch action {
+        case "handOff": String(localized: "Hand Off", comment: "Button that runs the named download rule for a link or download.")
+        case "browser": String(localized: "Open in Browser", comment: "Button that lets a link or download stay in the browser instead of running a download rule.")
+        default: String(localized: "Don’t Allow", comment: "Button on a site's permission question.")
+        }
     }
 
     /// The test address, as a link and then as a download: the first rule either way, and what its first field becomes.
