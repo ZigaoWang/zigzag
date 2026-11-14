@@ -849,6 +849,10 @@ final class TextButton: InteractiveView {
     /// `textWidth` already carries the label's own inset; the label is centered, so the padding is even.
     var fittingWidth: CGFloat { label.textWidth + (showsFillAtRest ? Tokens.Space.x6 : Tokens.Space.x3) }
 
+    /// From the button's edge to its words at its fitting width: how far text alone reaches out past a column's edge,
+    /// so its words line up with the text and controls above and below it.
+    var textInset: CGFloat { (fittingWidth - label.inkWidth) / 2 }
+
     /// So stacks and form rows can size it like any control.
     override var intrinsicContentSize: NSSize {
         NSSize(width: ceil(fittingWidth), height: showsFillAtRest ? Tokens.Page.controlHeight : Tokens.Space.x7Height)

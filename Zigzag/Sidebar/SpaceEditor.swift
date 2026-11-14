@@ -1084,7 +1084,7 @@ final class DisclosureRow: InteractiveView {
     override func layout() {
         super.layout()
         let h = label.lineHeight
-        label.frame = NSRect(x: 0, y: (bounds.height - h) / 2, width: label.textWidth, height: h)
+        label.frame = NSRect(x: 0, y: label.centeredY(in: bounds.height), width: label.textWidth, height: h)
         let side = Tokens.Space.x4
         chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x1, y: (bounds.height - side) / 2, width: side, height: side)
         turn(animated: false)
@@ -1445,13 +1445,14 @@ final class SpaceLookEditor: NSView {
         y += sliderHeight + Tokens.Space.x3
         // Use Default Colors at the end of the Effects row, out of the way until wanted.
         let resetWidth = min(ceil(defaultsButton.fittingWidth), width / 2)
-        defaultsButton.frame = NSRect(x: width - resetWidth, y: y + (disclosureHeight - Tokens.Space.x7Height) / 2,
+        // Its words end on the column's edge, where the sliders and swatches do: the button reaches out by its padding.
+        defaultsButton.frame = NSRect(x: width - resetWidth + defaultsButton.textInset, y: y + (disclosureHeight - Tokens.Space.x7Height) / 2,
                                       width: resetWidth, height: Tokens.Space.x7Height)
         effects.frame = NSRect(x: 0, y: y, width: width - resetWidth - Tokens.Space.x2, height: disclosureHeight)
         y += disclosureHeight + Tokens.Space.x2
         // Colors: the space's own, then the slot for a second or, with two, which way they run.
         let lh = ceil(colorsLabel.intrinsicContentSize.height)
-        colorsLabel.frame = NSRect(x: 0, y: y + (dialSize - lh) / 2, width: labelWidth, height: lh)
+        colorsLabel.frame = NSRect(x: 0, y: y + colorsLabel.centeredY(in: dialSize), width: labelWidth, height: lh)
         var x = labelWidth
         let chipY = y + (dialSize - chipSize) / 2
         chips[0].frame = NSRect(x: x, y: chipY, width: chipSize, height: chipSize)
@@ -1475,7 +1476,7 @@ final class SpaceLookEditor: NSView {
     private func row(_ label: Label, _ control: NSView, y: CGFloat, height: CGFloat) {
         let lh = ceil(label.intrinsicContentSize.height)
         let x = labelWidth
-        label.frame = NSRect(x: 0, y: y + (height - lh) / 2, width: x, height: lh)
+        label.frame = NSRect(x: 0, y: y + label.centeredY(in: height), width: x, height: lh)
         control.frame = NSRect(x: x, y: y, width: bounds.width - x, height: height)
     }
 }
@@ -1621,7 +1622,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         // The profile, under the name: its label in the column the look's labels share, its menu after it.
         let rowY = pad + nameHeight + Tokens.Space.x3, rowH = Tokens.Page.controlHeight
         let lh = ceil(profileLabel.intrinsicContentSize.height)
-        profileLabel.frame = NSRect(x: pad, y: rowY + round((rowH - lh) / 2), width: editor.labelWidth, height: lh)
+        profileLabel.frame = NSRect(x: pad, y: rowY + profileLabel.centeredY(in: rowH), width: editor.labelWidth, height: lh)
         let menuWidth = min(profileButton.intrinsicContentSize.width, width - editor.labelWidth)
         profileButton.frame = NSRect(x: pad + width - menuWidth, y: rowY, width: menuWidth, height: rowH)
         profileNote.frame = NSRect(x: pad, y: rowY + rowH + Tokens.Space.x1, width: width, height: profileNoteHeight)
