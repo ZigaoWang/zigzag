@@ -25,7 +25,8 @@ final class PDFViewerView: NSView {
     /// The profile of the tab it's in: a copy downloaded from it is that profile's.
     private let profile: UUID
     let pdfView = ZigzagPDFView()
-    private let spinner = NSProgressIndicator()
+    /// Zigzag's own spinner, the ribbon flowing, as everywhere else in the app.
+    private let spinner = Spinner()
 
     private let sidebar = NSView()
     private let sidebarEdge = ColorView(color: Tokens.Color.separator)
@@ -85,9 +86,6 @@ final class PDFViewerView: NSView {
         pdfView.onThumbnail = { [weak self] page in self?.thumbnails.thumbnailArrived(page) }
         addSubview(pdfView)
 
-        spinner.style = .spinning
-        spinner.controlSize = .small
-        spinner.isDisplayedWhenStopped = false
         addSubview(spinner)
         // Most PDFs are here before a spinner would mean anything.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -180,7 +178,7 @@ final class PDFViewerView: NSView {
     override func layout() {
         super.layout()
         layoutPanes()
-        let s = NSSize(width: 16, height: 16)
+        let s = NSSize(width: 24, height: 24)
         spinner.frame = NSRect(x: (bounds.width - s.width) / 2, y: (bounds.height - s.height) / 2, width: s.width, height: s.height)
     }
 
