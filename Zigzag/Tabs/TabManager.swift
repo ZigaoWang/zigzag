@@ -645,22 +645,31 @@ final class TabManager {
     }
 
     /// What Clear closes in a space and why. `unused`: the tabs you've drifted away from, keeping the ones you're
-    /// working with now; once there are none, `others`: every tab but the one you're on (and the page beside it in a
-    /// split); once those are all that's left, `last`: them too, leaving the space empty. Never a tab playing sound
-    /// or in a call.
+    /// working with now; once there are none, `others`: every tab but the one you're on (and the pages beside it in a
+    /// split or tile group); once those are all that's left, `last`: them too, leaving the space empty.
+    ///
+    /// A split or tile group is one unit throughout: its age is its newest page's, and it's kept or closed whole,
+    /// never in part. So is a tab with the tabs nested under it while Clear looks for what you've drifted away from:
+    /// a nest you've used any of lately stays, folded tabs and all, and one you've left alone goes together. Every
+    /// tab but yours means just that, nests included: the tabs nested with yours go then too. Never a unit with a
+    /// tab playing sound or in a call, nor one with a pinned page in it (a pinned page beside a tab): pinned pages
+    /// are bookmarks, and Clear leaves them alone.
     enum ClearKind { case unused, others, last }
 
     func tabsToClear(in spaceID: UUID, now: Date = Date()) -> (tabs: [Tab], kind: ClearKind) {
         let tabs = self.tabs(in: spaceID)
         let current = selectedTab(in: spaceID)
-        let partners = current.map { self.partners(of: $0).map(\.id) } ?? []
+        let ids = Set(tabs.map(\.id))
+        // Every split or group with a page in this list, a pinned page beside a tab and all.
+        let groups = splits.filter { !ids.isDisjoint(with: $0.ids) }.map(\.ids)
+        let parents = Dictionary(tabs.compactMap { tab in tab.parentID.map { (tab.id, $0) } }, uniquingKeysWith: { a, _ in a })
         let busy = Set(tabs.filter { $0.isPlayingAudio || $0.isInUse }.map(\.id))
-        let ages = Dictionary(uniqueKeysWithValues: tabs.map { ($0.id, now.timeIntervalSince($0.lastActivated)) })
-        let (ids, kind) = Self.clearing(tabs.map(\.id), current: current?.id, partners: partners, busy: busy, ages: ages)
-        return (tabs.filter { ids.contains($0.id) }, kind)
+        let ages = Dictionary(tabs.map { ($0.id, now.timeIntervalSince($0.lastActivated)) }, uniquingKeysWith: { a, _ in a })
+        let (closing, kind) = Self.clearing(tabs.map(\.id), current: current?.id, groups: groups, parents: parents, busy: busy, ages: ages)
+        return (tabs.filter { closing.contains($0.id) }, kind)
     }
 
-    /// Clear's choice, by id. While other tabs are left, even only busy ones, yours stay.
+    /// Clear's choice, by id, for a lone tab or a split of two (`partner`, beside `current`).
     nonisolated static func clearing(_ tabs: [UUID], current: UUID?, partner: UUID?, busy: Set<UUID>,
                                      ages: [UUID: TimeInterval]) -> (ids: Set<UUID>, kind: ClearKind) {
         clearing(tabs, current: current, partners: partner.map { [$0] } ?? [], busy: busy, ages: ages)
@@ -669,13 +678,62 @@ final class TabManager {
     /// The same, with every page beside yours in a split or tile group (`partners`) kept as yours.
     nonisolated static func clearing(_ tabs: [UUID], current: UUID?, partners: [UUID], busy: Set<UUID>,
                                      ages: [UUID: TimeInterval]) -> (ids: Set<UUID>, kind: ClearKind) {
-        let others = tabs.filter { $0 != current && !partners.contains($0) }
-        guard !others.isEmpty else { return (Set(tabs.filter { !busy.contains($0) }), .last) }
-        let closable = others.filter { !busy.contains($0) }
-        let newestFirst = closable.sorted { ages[$0, default: 0] < ages[$1, default: 0] }
-        let kept = keptByActivity(newestFirst.map { ages[$0, default: 0] })
-        let unused = Set(newestFirst.dropFirst(kept))
-        return unused.isEmpty ? (Set(closable), .others) : (unused, .unused)
+        let groups = current.map { partners.isEmpty ? [] : [[$0] + partners] } ?? []
+        return clearing(tabs, current: current, groups: groups, parents: [:], busy: busy, ages: ages)
+    }
+
+    /// Clear's choice, by id. `groups`: the splits and tile groups, each page by id, any of them not among `tabs` (a
+    /// pinned page) holding the rest open. `parents`: the tab each nested tab sits under. While other tabs are left,
+    /// even only busy ones, yours stay.
+    nonisolated static func clearing(_ tabs: [UUID], current: UUID?, groups: [[UUID]], parents: [UUID: UUID],
+                                     busy: Set<UUID>, ages: [UUID: TimeInterval]) -> (ids: Set<UUID>, kind: ClearKind) {
+        let listed = Set(tabs)
+        let pinnedIn = groups.filter { !$0.allSatisfy(listed.contains) }.flatMap { $0 }
+        // A unit stays whole while any page of it plays, is in a call, or sits beside a pinned page.
+        let held = { (unit: [UUID]) in unit.contains { busy.contains($0) || pinnedIn.contains($0) } }
+        // Yours: the tab you're on and every page on screen with it.
+        let yours = Set(current.map { id in groups.first { $0.contains(id) } ?? [id] } ?? [])
+        let isYours = { (unit: [UUID]) in unit.contains(where: yours.contains) }
+        let inGroups = units(tabs, groups: groups, parents: [:])
+        let others = inGroups.filter { !isYours($0) }
+        guard !others.isEmpty else { return (Set(inGroups.filter { !held($0) }.joined()), .last) }
+        // What you've drifted away from: whole nests, newest first by their newest tab, past the break in how long
+        // ago they were seen. The nest yours is in is yours here.
+        let age = { (unit: [UUID]) in unit.map { ages[$0, default: 0] }.min() ?? 0 }
+        let nests = units(tabs, groups: groups, parents: parents).filter { !isYours($0) && !held($0) }
+        let newestFirst = nests.sorted { age($0) < age($1) }
+        let unused = Set(newestFirst.dropFirst(keptByActivity(newestFirst.map(age))).joined())
+        guard unused.isEmpty else { return (unused, .unused) }
+        return (Set(others.filter { !held($0) }.joined()), .others)
+    }
+
+    /// The tabs Clear keeps or closes as one, in list order: each split or group's pages together, and with
+    /// `parents`, each tab with the tabs nested under it. Pages not among `tabs` (pinned ones) are left out.
+    nonisolated static func units(_ tabs: [UUID], groups: [[UUID]], parents: [UUID: UUID]) -> [[UUID]] {
+        var root = Dictionary(tabs.map { ($0, $0) }, uniquingKeysWith: { a, _ in a })
+        func find(_ id: UUID) -> UUID {
+            var id = id
+            while let up = root[id], up != id { root[id] = root[up]; id = up }
+            return id
+        }
+        func join(_ a: UUID, _ b: UUID) {
+            guard root[a] != nil, root[b] != nil else { return }
+            let (ra, rb) = (find(a), find(b))
+            if ra != rb { root[rb] = ra }
+        }
+        for group in groups {
+            let pages = group.filter { root[$0] != nil }
+            for id in pages.dropFirst() { join(pages[0], id) }
+        }
+        for (child, parent) in parents { join(parent, child) }
+        var order: [UUID] = []
+        var members: [UUID: [UUID]] = [:]
+        for id in tabs {
+            let r = find(id)
+            if members[r] == nil { order.append(r) }
+            members[r, default: []].append(id)
+        }
+        return order.map { members[$0] ?? [] }
     }
 
     /// How many tabs to keep as the ones you're working with now, given how long ago each was last looked at (or
@@ -684,13 +742,14 @@ final class TabManager {
     /// jump in age from one tab to the next, measured as a ratio, so 15 minutes against 45 counts as much as 1 hour
     /// against 3. What counts as "a short while" follows your own pace rather than a fixed time: ages closer together
     /// than an eighth of the span looked at count as equal, so after hours away a few minutes between tabs is never a
-    /// break, while in a quick session a few minutes can be. The break is looked for among the newest dozen, since no
-    /// one works with more at once; a jump of less than 3 times is just steady browsing, with no break, and then the
-    /// newest five stay.
+    /// break, while in a quick session a quarter of an hour can be. Anything seen in the last ten minutes counts as
+    /// now, so a tab you left a few minutes ago is never one you "haven't used in a while", however quick you are.
+    /// The break is looked for among the newest dozen, since no one works with more at once; a jump of less than 3
+    /// times is just steady browsing, with no break, and then the newest five stay.
     nonisolated static func keptByActivity(_ ages: [TimeInterval]) -> Int {
         let clearJump = 3.0, mostAtOnce = 12, keptWithoutBreak = 5
         guard let span = ages.prefix(mostAtOnce + 1).last else { return 0 }
-        let floor = max(2 * 60, span / 8)
+        let floor = max(10 * 60, span / 8)
         let a = ages.map { max($0, floor) }
         var best = (ratio: clearJump, kept: -1)
         for i in 0..<min(mostAtOnce, max(a.count - 1, 0)) {
