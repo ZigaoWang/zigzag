@@ -252,7 +252,10 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         guard Tab.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
         // A pop-up a page inside this one opened on its own: only a remembered destination opens it, or it asks.
         if !PopupNotice.isUserInitiated(navigationAction) {
-            let parent = WindowManager.shared.controller(for: parentWindow)
+            // The window this pop-up came from, of any kind. A page inside Zigzag Mini or an installed app's window
+            // asks there too; with a browser window's controller alone, that lookup found nothing, so a pop-up a page
+            // inside one of them opened on its own was dropped with nothing said.
+            let parent = WindowManager.shared.promptHost(for: parentWindow)
             if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(webView.url)) {
                 switch PopupNotice.destination(for: stored) {
                 case .deny:
