@@ -15,6 +15,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - Zigzag Mini has Site Controls, the same button as by a browser window's address, at the right of its strip before Keep on Top, so you can turn Dark page on or off for a site, set its zoom, ad blocking or permissions, and clear its data, without opening the page in a browser window first. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#225](https://github.com/ZigaoWang/zigzag/issues/225))
 - Site Controls' Certificate page scrolls when its details are taller than the window has room for, its back button and title staying at the top; choosing another certificate in the chain no longer leaves its details cut off at the panel's edge. ([#220](https://github.com/ZigaoWang/zigzag/issues/220))
+- A quick move to the window's edge, with the desktop or another display beside it, brings the hidden sidebar out in one slide. It could run on past the edge and send the sidebar back before your hand came back, or go out too far for the window to notice it at all; now the pointer has a moment to come back, and the sidebar stays out. ([#206](https://github.com/ZigaoWang/zigzag/issues/206))
 
 ## [0.9.0] - 2026-11-12
 

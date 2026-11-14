@@ -1220,11 +1220,11 @@ final class BrowserRootView: SpaceFrameView {
     private func recentSpeed(at time: TimeInterval) -> CGFloat { time - lastMoveTime < 0.05 ? lastMoveSpeed : 0 }
 
     /// Leaving through the sidebar's edge of the window counts too: a quick move may never land a moved event
-    /// inside the edge strip, and at the screen's own edge the pointer stops there. Where it goes in the moment
-    /// after decides (`pointerAtEdge`).
+    /// inside the edge strip, and may be out past the edge's reach by the time the window hears it leave. Where it
+    /// goes in the moment after decides (`pointerAtEdge`): nothing more comes from out there.
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
-        if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge(at: event.timestamp, speed: recentSpeed(at: event.timestamp)) }
+        if edgeZone.meetsLeaving(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge(at: event.timestamp, speed: recentSpeed(at: event.timestamp)) }
     }
 
     override func mouseEntered(with event: NSEvent) {
@@ -1403,9 +1403,13 @@ final class BrowserRootView: SpaceFrameView {
         if let point, let last = debugPointer, now - debugPointerTime < 0.1 {
             speed = (sidebarOnRight ? point.x - last.x : last.x - point.x) / max(now - debugPointerTime, 1.0 / 240)
         }
+        // Leaving the window counts as its exited event would: out past the reach already, after a quick move.
+        let leaves = debugPointer.map { bounds.contains($0) } ?? true
         debugPointer = point
         debugPointerTime = now
-        if let point, edgeZone.opens(at: point) { pointerAtEdge(at: now, speed: speed) }
+        if let point, edgeZone.opens(at: point) || (leaves && !bounds.contains(point) && edgeZone.meetsLeaving(at: point)) {
+            pointerAtEdge(at: now, speed: speed)
+        }
     }
     private var debugPointerTime: TimeInterval = 0
 
@@ -1473,6 +1477,12 @@ struct SidebarEdgeZone: Equatable {
         let point = turned(point)
         return point.x < bounds.minX - reach && point.y >= bounds.minY && point.y <= bounds.maxY
     }
+
+    /// Leaving the window here meets the edge: through the strip, or out past the reach already, as a quick move
+    /// leaves it, the window hearing nothing of it between one moved event inside and the next one far out.
+    func meetsLeaving(at point: NSPoint) -> Bool {
+        opens(at: point) || (isPast(point) && point.y >= bounds.minY + reservedTop)
+    }
 }
 
 /// The hidden sidebar's edge over time, as the pointer meets it and leaves it: whether it meant to bring the sidebar
@@ -1482,7 +1492,8 @@ struct SidebarEdgeZone: Equatable {
 /// (a web app's own list along that side) leaves the sidebar be. A quick move counts as meaning it: it may run on
 /// past the edge for a moment and come back (`comeBack`), or, stopped by the screen's edge, bounce back onto where
 /// the sidebar lands, and either way the sidebar comes out once. Gone on past the edge to the next display, it
-/// stays hidden. Once out, it waits for the slide to end before the pointer can send it back.
+/// stays hidden. Once out, it waits for the slide to end before the pointer can send it back, and out past the edge
+/// the pointer has as long again to come back.
 struct SidebarEdgeReveal: Equatable {
     enum Phase: Equatable {
         case hidden
@@ -1537,7 +1548,9 @@ struct SidebarEdgeReveal: Equatable {
     }
 
     /// While it's out, with the pointer at `point`: true once it should go back. `held`: something keeps it out (a
-    /// menu from it, a button pressed).
+    /// menu from it, a button pressed). Off toward the page it goes back at once; out past the edge it waits as long
+    /// as a quick move has to come back (`comeBack`), since the move that brought it out may still be running on out
+    /// there when the slide ends, and the hand on its way back.
     mutating func follow(at point: NSPoint, time: TimeInterval, in zone: SidebarEdgeZone, held: Bool) -> Bool {
         guard case let .out(settles, leftAt) = phase else { return false }
         if time < settles || held || zone.keeps(at: point) {
@@ -1548,7 +1561,7 @@ struct SidebarEdgeReveal: Equatable {
             phase = .out(settles: settles, leftAt: time)
             return false
         }
-        return time - leftAt > Tokens.Motion.edgeHideDelay
+        return time - leftAt > (zone.isPast(point) ? Self.comeBack : Tokens.Motion.edgeHideDelay)
     }
 }
 

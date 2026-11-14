@@ -78,6 +78,22 @@ struct SidebarEdgeTests {
         #expect(!right.keeps(at: NSPoint(x: -10, y: 400)))
     }
 
+    /// A quick move is out past the reach already when the window hears it leave: that still met the edge (#206).
+    @Test func leavingStraightPastTheReachMeetsTheEdge() {
+        for onRight in [false, true] {
+            let zone = zone(onRight: onRight, reservedTop: TopBarView.height), edge = onRight ? window.maxX : 0
+            func at(_ out: CGFloat, _ y: CGFloat = 400) -> NSPoint { NSPoint(x: onRight ? edge + out : edge - out, y: y) }
+            #expect(zone.meetsLeaving(at: at(1)))
+            #expect(zone.meetsLeaving(at: at(reach + 60)))
+            // Not leaving above or below the window, nor through the bar's strip that holds the traffic lights.
+            #expect(!zone.meetsLeaving(at: at(reach + 60, -1)))
+            #expect(!zone.meetsLeaving(at: at(reach + 60, 801)))
+            #expect(!zone.meetsLeaving(at: at(reach + 60, TopBarView.height - 1)))
+            // Nor through the window's other edge.
+            #expect(!zone.meetsLeaving(at: NSPoint(x: onRight ? -60 : window.maxX + 60, y: 400)))
+        }
+    }
+
     /// Or it would open and slide straight back.
     @Test func whereverItOpensItStays() {
         for onRight in [false, true] {
@@ -208,5 +224,146 @@ struct SidebarEdgeRevealTests {
         #expect(edge.phase == .deciding(since: 1, flick: true))
         #expect(edge.decide(at: NSPoint(x: 0, y: 400), time: 1.09, in: zone()) == nil)
         #expect(edge.decide(at: NSPoint(x: 0, y: 400), time: 1.1, in: zone()) == true)
+    }
+}
+
+/// The pointer meeting the hidden sidebar's edge as the window hears it (#206): moved events only while the pointer is
+/// inside the window, one exited event as it leaves and one entered as it comes back, and nothing at all while it's out
+/// past the window's edge, where only the edge's own timers look at it. A quick move to a window with the desktop or
+/// another display beside it runs on past the edge's reach and comes back: it brings the sidebar out once.
+@MainActor
+struct SidebarEdgeEventTests {
+    let window = NSRect(x: 0, y: 0, width: 1280, height: 800)
+    let slide = Tokens.Motion.edgeSlideDuration
+
+    func zone(width: CGFloat, onRight: Bool) -> SidebarEdgeZone {
+        let out = BrowserRootView.sidebarFrame(in: window, width: width, visible: false, revealed: true, onRight: onRight)
+        return SidebarEdgeZone(bounds: window, sidebar: out, onRight: onRight)
+    }
+
+    /// Every side and size of sidebar.
+    var zones: [SidebarEdgeZone] {
+        [false, true].flatMap { onRight in
+            [Tokens.Metric.sidebarMinWidth, Tokens.Metric.sidebarWidth, Tokens.Metric.sidebarMaxWidth].map { zone(width: $0, onRight: onRight) }
+        }
+    }
+
+    /// Where the pointer is at `time`, moving straight between `keys`: from the sidebar's edge of the window
+    /// (negative: out past it).
+    func position(_ keys: [(time: TimeInterval, x: CGFloat)], at time: TimeInterval) -> CGFloat {
+        guard let next = keys.firstIndex(where: { $0.time > time }) else { return keys.last!.x }
+        guard next > 0 else { return keys[0].x }
+        let a = keys[next - 1], b = keys[next]
+        return a.x + (b.x - a.x) * CGFloat((time - a.time) / (b.time - a.time))
+    }
+
+    /// What the sidebar did, "out" or "in", and when: the pointer sampled 120 times a second as the Mac sends moved
+    /// events, the events as `BrowserRootView` hears and handles them, and its timers as it runs them.
+    func replay(_ keys: [(time: TimeInterval, x: CGFloat)], zone: SidebarEdgeZone, until end: TimeInterval = 2) -> [(String, TimeInterval)] {
+        var edge = SidebarEdgeReveal()
+        var log: [(String, TimeInterval)] = []
+        var revealed = false
+        var last: (x: CGFloat, inside: Bool)?
+        var lastMoveTime: TimeInterval = -1, lastMoveSpeed: CGFloat = 0
+        var nextFollow = TimeInterval.infinity
+        for sample in 0...Int(end * 120) {
+            let time = Double(sample) / 120
+            let x = position(keys, at: time)
+            let point = NSPoint(x: zone.onRight ? window.maxX - x : x, y: 400)
+            let inside = x >= 0 && x < window.width
+            func meet(_ speed: CGFloat) { if !revealed { edge.met(at: time, speed: speed) } }
+            let recent = time - lastMoveTime < 0.05 ? lastMoveSpeed : 0
+            if let last {
+                // mouseEntered and mouseExited: the speed of the last moved event, if it came just now.
+                if inside, !last.inside, zone.opens(at: point) { meet(recent) }
+                if !inside, last.inside, zone.meetsLeaving(at: point) { meet(recent) }
+                // mouseMoved, inside the window only.
+                if inside, x != last.x {
+                    let elapsed = time - lastMoveTime
+                    lastMoveSpeed = elapsed < 0.1 ? (last.x - x) / max(elapsed, 1.0 / 240) : 0
+                    lastMoveTime = time
+                    if zone.opens(at: point) { meet(lastMoveSpeed) }
+                }
+            }
+            last = (x, inside)
+            switch edge.phase {
+            case .hidden: break
+            case .deciding:
+                switch edge.decide(at: point, time: time, in: zone) {
+                case true?:
+                    revealed = true
+                    edge.shown(true, at: time, settling: slide)
+                    nextFollow = time + 0.1
+                    log.append(("out", time))
+                case false?: edge.dismiss()
+                case nil: break
+                }
+            case .out:
+                // Every tenth of a second while the pointer is on it, every frame once it has left.
+                guard time >= nextFollow else { break }
+                let wasLeaving = edge.isLeaving
+                if edge.follow(at: point, time: time, in: zone, held: false) {
+                    revealed = false
+                    edge.shown(false, at: time, settling: 0)
+                    nextFollow = .infinity
+                    log.append(("in", time))
+                } else {
+                    let interval = edge.isLeaving ? 1.0 / 60 : 0.1
+                    nextFollow = (edge.isLeaving != wasLeaving ? time : nextFollow) + interval
+                }
+            }
+        }
+        return log
+    }
+
+    @Test func aQuickMoveThatRunsOnPastTheReachAndComesBackAfterTheSlideBringsItOutOnce() {
+        for zone in zones {
+            // Out past the edge just as the sidebar comes out, a beat out on the desktop, and back onto the sidebar.
+            let onto = replay([(0, 400), (0.12, -5), (0.24, -30), (0.4, -100), (0.55, -100), (0.7, 30)], zone: zone)
+            #expect(onto.map(\.0) == ["out"], "\(onto)")
+            // Or back to the edge itself.
+            let edge = replay([(0, 400), (0.12, -5), (0.24, -30), (0.4, -100), (0.55, -100), (0.7, 4)], zone: zone)
+            #expect(edge.map(\.0) == ["out"], "\(edge)")
+        }
+    }
+
+    @Test func aMoveThatLeavesStraightPastTheReachAndComesBackBringsItOut() {
+        for zone in zones {
+            // So quick the window hears it leave already further out than the edge reaches.
+            let log = replay([(0, 700), (0.1, -50), (0.25, -70), (0.4, 30)], zone: zone)
+            #expect(log.map(\.0) == ["out"], "\(log)")
+        }
+    }
+
+    @Test func aSlowMoveAndAQuickOneAgainstTheScreensEdgeBothBringItOutOnce() {
+        for zone in zones {
+            let slow = replay([(0, 40), (0.3, 4)], zone: zone)
+            // Full screen, or a window against the screen's edge: the pointer stops dead there.
+            let quick = replay([(0, 600), (0.15, 0)], zone: zone)
+            #expect(slow.map(\.0) == ["out"])
+            #expect(quick.map(\.0) == ["out"])
+        }
+    }
+
+    @Test func brushingTheEdgeOrGoingOnToTheNextDisplayLeavesItHidden() {
+        for zone in zones {
+            #expect(replay([(0, 40), (0.2, 4), (0.25, 30)], zone: zone).isEmpty)
+            #expect(replay([(0, 600), (0.2, 0), (0.25, 600)], zone: zone).isEmpty)
+            #expect(replay([(0, 300), (0.1, -30), (0.3, -600)], zone: zone).isEmpty)
+            #expect(replay([(0, 700), (0.1, -50), (0.2, -600)], zone: zone).isEmpty)
+        }
+    }
+
+    @Test func onceOutLeavingForThePageOrTheNextDisplaySendsItBack() {
+        for zone in zones {
+            // To the page: at once.
+            let page = replay([(0, 40), (0.3, 4), (1, 4), (1.05, 600)], zone: zone)
+            #expect(page.map(\.0) == ["out", "in"])
+            if page.count == 2 { #expect(page[1].1 - 1 < 0.15) }
+            // On to the next display: a moment later, as long as a quick move has to come back.
+            let display = replay([(0, 40), (0.3, 4), (1, 4), (1.05, -600)], zone: zone)
+            #expect(display.map(\.0) == ["out", "in"])
+            if display.count == 2 { #expect(display[1].1 - 1 < SidebarEdgeReveal.comeBack + 0.15) }
+        }
     }
 }
