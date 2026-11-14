@@ -145,7 +145,6 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         // A new page finished loading in the tab: the site's answer to a login sent before it, if one is waiting.
         if kind == "page" {
             guard message.frameInfo.isMainFrame else { return }
-            tidyStandInsOnce()
             let page = PageAfterLogin(host: origin.host, hasPasswordField: body["form"] as? Bool ?? false, passwordFilled: body["filled"] as? Bool ?? false)
             if held[key] != nil { judge(key, page: page) }
             pageChanged(in: tab, page: page)
@@ -288,34 +287,24 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
     /// perhaps sent by a clickable box Zigzag can't tell from the rest) stays: the site may have taken it.
     nonisolated static func replacesPending(attempted: Date?, sameForm: Bool) -> Bool { sameForm && attempted == nil }
 
-    /// How long a strong password the site was never seen taking, and that was never used, stays in Passwords.
-    nonisolated static let standInsKeptFor: TimeInterval = 14 * 24 * 3600
+    /// Strong passwords are never tidied away by age: one the site took without Zigzag seeing it (a verification
+    /// step that outlasted the watch, or a site you only ever sign in to by cookie afterwards) may be the only copy
+    /// of the account's password. One goes only once a later strong password for the same site and account has
+    /// settled in its place (`dropEarlierStandIns`); until then Passwords lists it as a generated password.
 
-    /// Whether a pending strong password is tidied away: one never used (settling, filling and the update prompt
-    /// mark one used) and untouched for `standInsKeptFor`.
-    nonisolated static func isStale(_ credential: Credential, now: Date) -> Bool {
-        credential.isPendingGenerated && credential.lastUsed == nil && now.timeIntervalSince(credential.modified) > standInsKeptFor
-    }
-
-    /// Deletes the stale pending strong passwords (`isStale`), except any in `keeping`. Returns how many went.
+    /// Deletes the pending strong passwords on `origin` made for `account` no later than `settled`, the one that has
+    /// just taken the account's place. Ones for no account, or for another, stay: which account they're for is
+    /// yours to say. Returns how many went.
     @discardableResult
-    static func tidyStandIns(in store: PasswordStore, now: Date = Date(), keeping: Set<UUID> = []) async -> Int {
-        guard let all = try? await store.all() else { return 0 }
+    static func dropEarlierStandIns(origin: Origin, account: String, settled: Credential, in store: PasswordStore) async -> Int {
+        guard !account.isEmpty else { return 0 }
+        let saved = (try? await store.credentials(for: origin)) ?? []
         var removed = 0
-        for credential in all where isStale(credential, now: now) && !keeping.contains(credential.id) {
-            if (try? await store.delete(credential.id)) != nil { removed += 1 }
+        for candidate in saved where candidate.isPendingGenerated && candidate.id != settled.id && candidate.created <= settled.created
+            && candidate.generatedFor.caseInsensitiveCompare(account) == .orderedSame {
+            if (try? await store.delete(candidate.id)) != nil { removed += 1 }
         }
         return removed
-    }
-
-    private var tidied = false
-
-    /// Once a launch, with the first page that loads.
-    private func tidyStandInsOnce() {
-        guard !tidied else { return }
-        tidied = true
-        let keeping = Set(generated.map { $0.id })
-        Task { await Self.tidyStandIns(in: PasswordStore.shared, keeping: keeping) }
     }
 
     /// Saves a strong password as a pending login: over the pending one `replacing` names when it's still there and
@@ -415,13 +404,13 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         // Email addresses are the same login whatever their capitals ("Sam@x.com" is "sam@x.com").
         if !name.isEmpty, let account = accounts.first(where: { $0.username.caseInsensitiveCompare(name) == .orderedSame }) {
             guard let current = try? await store.password(for: account.id), current.matches(password) else {
-                // Marked used, so it's never tidied away while the question is open, or after Not Now.
                 try? await store.markUsed(generated.id)
                 return .ask(account)
             }
             // The account has it already: the pending one has done its job.
             try? await store.markUsed(account.id)
             try? await store.delete(generated.id)
+            await dropEarlierStandIns(origin: origin, account: account.username, settled: generated, in: store)
         } else if !name.isEmpty || accounts.isEmpty {
             var named = generated
             named.username = name
@@ -430,6 +419,7 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
             named.modified = Date()
             named.lastUsed = Date()
             try? await store.update(named)
+            await dropEarlierStandIns(origin: origin, account: name, settled: generated, in: store)
         } else {
             // Which of the site's accounts it's for is yours to say; it stays, listed as a generated password.
             try? await store.markUsed(generated.id)
@@ -445,10 +435,13 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         return nil
     }
 
-    /// An account given a pending strong password by hand (the update prompt): the pending one has done its job.
-    static func dropGenerated(origin: Origin, password: SecretString, in store: PasswordStore) async {
+    /// An account given a pending strong password by hand (the update prompt): the pending one has done its job,
+    /// and so have any made for that account before it.
+    static func dropGenerated(origin: Origin, password: SecretString, account: String, in store: PasswordStore) async {
         let saved = (try? await store.credentials(for: origin)) ?? []
-        if let generated = await pendingGenerated(matching: password, among: saved, in: store) { try? await store.delete(generated.id) }
+        guard let generated = await pendingGenerated(matching: password, among: saved, in: store) else { return }
+        try? await store.delete(generated.id)
+        await dropEarlierStandIns(origin: origin, account: account, settled: generated, in: store)
     }
 
     /// Saves nothing by itself: decides whether to ask, and what. A strong password Zigzag filled is settled even
