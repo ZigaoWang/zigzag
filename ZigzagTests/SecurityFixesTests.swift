@@ -465,6 +465,25 @@ struct PasswordSafetyTests {
         #expect(PasswordExport.field("=secret", neutralized: false) == "=secret")
     }
 
+    /// An export is readable by you alone from its first byte, replaces a file that wasn't, and leaves nothing beside it.
+    @Test func anExportIsYoursAloneFromTheStart() throws {
+        let fm = FileManager.default
+        let folder = fm.temporaryDirectory.appendingPathComponent("PasswordExport-\(UUID().uuidString)", isDirectory: true)
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("Passwords.csv")
+        try Data("old".utf8).write(to: file)
+        try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file.path)
+        try PasswordExport.writePrivately(Data("name,url\n".utf8), to: file)
+        #expect((try fm.attributesOfItem(atPath: file.path))[.posixPermissions] as? Int == 0o600)
+        #expect(try String(contentsOf: file, encoding: .utf8) == "name,url\n")
+        #expect(try fm.contentsOfDirectory(atPath: folder.path) == ["Passwords.csv"])
+        // Somewhere it can't be written: an error, and nothing left.
+        let nowhere = folder.appendingPathComponent("missing/Passwords.csv")
+        #expect(throws: (any Error).self) { try PasswordExport.writePrivately(Data("x".utf8), to: nowhere) }
+        #expect(try fm.contentsOfDirectory(atPath: folder.path) == ["Passwords.csv"])
+    }
+
     @Test func importCopiesAreYoursAloneAndLeftoversGo() throws {
         let fm = FileManager.default
         let parent = fm.temporaryDirectory.appendingPathComponent("PasswordSafetyTests-\(UUID().uuidString)", isDirectory: true)

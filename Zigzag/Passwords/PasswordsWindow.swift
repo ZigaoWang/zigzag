@@ -1167,9 +1167,37 @@ enum PasswordExport {
             data.append(Data(line.utf8))
             written += 1
         }
-        try data.write(to: url, options: [.atomic, .completeFileProtection])
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        try writePrivately(data, to: url)
         return written
+    }
+
+    /// Writes `data` to `url` readable by you alone (0600) from the first byte: into a new file beside it, made with
+    /// those permissions, then moved into place. Whatever goes wrong, nothing is left behind, not even a file whose
+    /// permissions couldn't be set.
+    nonisolated static func writePrivately(_ data: Data, to url: URL) throws {
+        let temporary = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString)")
+        let descriptor = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+        guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        var moved = false
+        defer { if !moved { unlink(temporary.path) } }
+        do {
+            let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+            // The umask can only take permissions away; this makes sure of exactly 0600.
+            guard fchmod(descriptor, 0o600) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EPERM) }
+            try handle.write(contentsOf: data)
+            try handle.synchronize()
+            try handle.close()
+        }
+        guard rename(temporary.path, url.path) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        moved = true
+        // Checked where it landed: a file anyone else could read is removed rather than left.
+        do {
+            let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber
+            if mode?.int16Value != 0o600 { try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path) }
+        } catch {
+            try? FileManager.default.removeItem(at: url)
+            throw error
+        }
     }
 
     /// One CSV field, quoted when it must be. Text a spreadsheet would run as a formula (starting with =, +, -, @,
