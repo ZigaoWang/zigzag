@@ -518,6 +518,11 @@ final class SitePanel: FloatingPanelView {
     /// scrolls.
     override func resize(withOldSuperviewSize oldSize: NSSize) {
         guard let superview, maxHeight < .greatestFiniteMagnitude else { return }
+        // Narrower now: as narrow as it must be, and back inside the window's right edge, as it opened.
+        let inset = Tokens.Metric.cardInset
+        width = max(Self.minimumWidth, min(Self.width, superview.bounds.width - inset * 2))
+        frame.origin.x = max(inset, min(frame.minX, superview.bounds.width - inset - width))
+        frame.size.width = width
         maxHeight = SitePanelSizing.maxHeight(overlayHeight: superview.bounds.height, top: frame.minY)
         resize()
     }

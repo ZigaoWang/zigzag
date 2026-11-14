@@ -31,7 +31,6 @@ enum SiteExtensionAccess: Equatable {
     }
 }
 
-
 /// How the Extensions section of Site Controls is laid out for a number of extensions and a text column: what the
 /// folded header's strip holds, whether they're rows with their names or a grid of icons, and where each goes (#215).
 /// Everything stands on the panel's text column, as its rows' words do: a row's icon starts on it, the grid's first
