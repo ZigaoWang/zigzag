@@ -18378,6 +18378,17 @@
         }
       }
     },
+    "Zigzag couldn’t find fields for your card that it can see here." : {
+      "comment" : "Toast when Fill from My Card was picked but no visible name, email, phone or address field on the page could take it. My Card is the person's own card in Contacts, as macOS calls it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 在这里找不到看得见的、能填写名片信息的输入框。"
+          }
+        }
+      }
+    },
     "Zigzag couldn’t move it to the Trash. Show it in Finder and delete it there." : {
       "comment" : "Import window, when the exported passwords file couldn't be moved to the Trash.",
       "localizations" : {

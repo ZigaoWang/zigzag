@@ -584,6 +584,38 @@ struct PasswordSafetyTests {
         #expect(await value("inForm", in: webView) == "")
     }
 
+    /// A field in no form, in a part of the page with others for your card: that part is filled, not the page.
+    @Test func myCardWithNoFormFillsTheFieldsAroundIt() async throws {
+        let (webView, _, _) = await page("""
+        <section><div><label>First <input id="name" name="first_name"></label></div>
+        <div><div><input id="email" name="email"></div></div></section>
+        <section><input id="other" name="phone"></section>
+        """)
+        try await fillMyCard(webView, focusing: "name")
+        #expect(await value("name", in: webView) == "Ada")
+        #expect(await value("email", in: webView) == "ada@example.com")
+        #expect(await value("other", in: webView) == "")
+    }
+
+    /// Fields inside a page's component (an open shadow root), where the page's focus is only the component.
+    @Test func myCardFillsInsideShadowRoots() async throws {
+        let (webView, _, _) = await page("""
+        <div id="host"></div>
+        <script>document.getElementById('host').attachShadow({ mode: 'open' }).innerHTML =
+          '<div><div><input id="name" name="first_name"></div><div><input id="email" name="email"></div></div>';</script>
+        """)
+        _ = try await webView.evaluateJavaScript("document.getElementById('host').shadowRoot.getElementById('name').focus()")
+        let values: [String: String] = ["given-name": "Ada", "email": "ada@example.com"]
+        let filled = try await webView.callAsyncJavaScript(Autofill.formFiller, arguments: ["values": values, "expectedOrigin": "https://example.com"],
+                                                           in: nil, contentWorld: .defaultClient) as? Int
+        #expect(filled == 2)
+        let inside = { (id: String) async in
+            try? await webView.evaluateJavaScript("document.getElementById('host').shadowRoot.getElementById('\(id)').value") as? String
+        }
+        #expect(await inside("name") == "Ada")
+        #expect(await inside("email") == "ada@example.com")
+    }
+
     /// What the page looks like after a sign-in, as the password watcher reads it.
     private func passwordState(_ html: String, scrollTo: Double = 0) async throws -> [String: Any]? {
         let configuration = WKWebViewConfiguration()

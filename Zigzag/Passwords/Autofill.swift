@@ -442,7 +442,12 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             }
             guard stillThere() else { return }
             let arguments: [String: Any] = ["values": values, "expectedOrigin": target.origin.description]
-            _ = try? await target.webView.callAsyncJavaScript(Self.formFiller, arguments: arguments, in: target.frame, contentWorld: .defaultClient)
+            let filled = try? await target.webView.callAsyncJavaScript(Self.formFiller, arguments: arguments, in: target.frame, contentWorld: .defaultClient)
+            // Nothing it could see to fill (or the page moved on as it filled): said, rather than nothing happening.
+            if (filled as? NSNumber)?.intValue ?? 0 == 0, stillThere() {
+                Self.tell(String(localized: "Zigzag couldn’t find fields for your card that it can see here.", comment: "Toast when Fill from My Card was picked but no visible name, email, phone or address field on the page could take it. My Card is the person's own card in Contacts, as macOS calls it."),
+                          about: target.webView)
+            }
         }
     }
 
@@ -769,11 +774,15 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     static let formFiller = """
     // Checked here, at the moment of filling: only the site the card was offered on gets it.
     if (location.origin !== expectedOrigin) return 0;
-    const active = document.activeElement;
+    // The field you're in, inside any open shadow roots (where the page's activeElement is only their host).
+    let active = document.activeElement;
+    while (active && active.shadowRoot && active.shadowRoot.activeElement) active = active.shadowRoot.activeElement;
+    // An element's box, across a shadow root's edge to its host.
+    const up = (el) => el.parentElement || (el.parentNode && el.parentNode.host) || null;
     // Your phone and address go only where you can see them land: the field you're in, and the others of its form
-    // (with no form, just that field), at a size you'd see (not a sliver), on screen now (a field far down the page
-    // is one you'd never notice filled), not faded out, not clipped away inside a tiny box, and not covered by
-    // something else.
+    // (with no form, of the part of the page around it), at a size you'd see (not a sliver), on screen now (a field
+    // far down the page is one you'd never notice filled), not faded out, not clipped away inside a tiny box, and
+    // not covered by something else.
     const visible = (el) => {
       if (el.disabled || el.readOnly || el.type === 'hidden') return false;
       const r = el.getBoundingClientRect();
@@ -785,9 +794,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       if (style.visibility !== 'visible') return false;
       // Its own opacity and every box's around it: what you'd see of it.
       let opacity = 1;
-      for (let box = el; box; box = box.parentElement) opacity *= parseFloat(getComputedStyle(box).opacity);
+      for (let box = el; box; box = up(box)) opacity *= parseFloat(getComputedStyle(box).opacity);
       if (opacity < 0.5) return false;
-      for (let box = el.parentElement; box && box !== document.body; box = box.parentElement) {
+      for (let box = up(el); box && box !== document.body; box = up(box)) {
         const o = getComputedStyle(box);
         const overflow = o.overflow + o.overflowX + o.overflowY;
         if (!/(hidden|clip|scroll|auto)/.test(overflow)) continue;
@@ -797,7 +806,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         const w = Math.min(r.right, b.right) - Math.max(r.left, b.left), h = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top);
         if (w < 8 || h < 8) return false;
       }
-      const hit = document.elementFromPoint(Math.min(cx, innerWidth - 1), Math.min(cy, innerHeight - 1));
+      // Asked of its own shadow root, if it's in one: the page itself would answer with the host.
+      const root = el.getRootNode();
+      const hit = (root && root.elementFromPoint ? root : document).elementFromPoint(Math.min(cx, innerWidth - 1), Math.min(cy, innerHeight - 1));
       if (hit && hit !== el && !el.contains(hit) && !(hit.control === el)) return false;
       return true;
     };
@@ -838,7 +849,42 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       el.dispatchEvent(new Event('change', { bubbles: true }));
     };
     if (!active || !['INPUT', 'SELECT'].includes(active.tagName) || !visible(active)) return 0;
-    const fields = active.form ? [...active.form.elements].filter((el) => ['INPUT', 'SELECT'].includes(el.tagName)) : [active];
+    // With no form, the part of the page around the field: the nearest box (a few levels up at most, never the
+    // whole page) that holds other fields for your details, widened to the section it's in when that's close by.
+    // Fields of some form inside it are that form's, not this one's.
+    const around = () => {
+      const part = 'section, fieldset, dialog, [role="group"], [role="form"], [role="dialog"], [role="region"]';
+      const outside = (box) => !box || box === document.body || box === document.documentElement;
+      // Its fields, inside open shadow roots too (a page's own components).
+      const loose = (box) => {
+        const found = [];
+        const walk = (node) => {
+          for (const el of node.querySelectorAll('*')) {
+            if (el.matches('input, select') && !el.form) found.push(el);
+            if (el.shadowRoot) walk(el.shadowRoot);
+          }
+        };
+        if (box.shadowRoot) walk(box.shadowRoot);
+        walk(box);
+        return found;
+      };
+      let box = up(active);
+      for (let level = 0; level < 4 && !outside(box); level++, box = up(box)) {
+        if (!loose(box).some((el) => el !== active && guess(el))) {
+          if (box.matches(part)) return [active];
+          continue;
+        }
+        let wider = box;
+        for (let more = 0; more < 3 && !wider.matches(part); more++) {
+          const next = up(wider);
+          if (outside(next)) break;
+          wider = next;
+        }
+        return loose(wider.matches(part) ? wider : box);
+      }
+      return [active];
+    };
+    const fields = active.form ? [...active.form.elements].filter((el) => ['INPUT', 'SELECT'].includes(el.tagName)) : around();
     window.__zigzagFilling = true;
     let filled = 0;
     try {
