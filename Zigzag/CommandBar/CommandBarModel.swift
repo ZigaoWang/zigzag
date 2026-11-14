@@ -112,8 +112,10 @@ enum CommandRanker {
         tabs.filter { !(leavingOutFailed && failed($0)) }.prefix(6).filter { $0 !== selected }
     }
 
+    /// An address to read in a row, the pane strip or a tab's hover card: no "https://", no "www.", never a user
+    /// name and password ahead of the host (`AddressText`).
     static func displayURL(_ url: URL) -> String {
-        var text = url.absoluteString
+        var text = AddressText.withoutUserInfo(url).absoluteString
         for prefix in ["https://", "http://"] where text.hasPrefix(prefix) { text.removeFirst(prefix.count) }
         text = text.withoutWWW
         if text.hasSuffix("/") { text.removeLast() }

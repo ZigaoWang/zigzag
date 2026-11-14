@@ -431,9 +431,13 @@ final class AddressView: InteractiveView {
     /// How a site's name too long for its room is shortened. Its subdomains go first, from the start, so the domain
     /// that says whose site it is stays whole ("…mail.google.com"). A domain that alone is too long keeps its start and
     /// its end ("physicsandm…tutor.com"), so it reads as itself and its ending still shows.
+    /// A host whose domain can't be told (a port, an "xn--" label the list doesn't spell) still loses its start, never
+    /// its end: "accounts.google.com.…evil.example" must never read as "accounts.google.com…".
     static func lineBreak(forName name: String) -> NSLineBreakMode {
-        guard name.contains("."), let domain = PublicSuffix.registrableDomain(name.lowercased()) else { return .byTruncatingTail }
-        return domain == name.lowercased() ? .byTruncatingMiddle : .byTruncatingHead
+        guard name.contains("."), !name.contains(" ") else { return .byTruncatingTail }
+        let parts = HostText.parts(of: name.lowercased())
+        guard parts.subdomain.isEmpty, HostText.registrableDomain(of: parts.domain) != nil else { return .byTruncatingHead }
+        return .byTruncatingMiddle
     }
 
     func show(url: URL?, notSecure: Bool) {

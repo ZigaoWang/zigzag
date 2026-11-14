@@ -1,5 +1,78 @@
 import AppKit
 
+/// An address as Zigzag shows it in a line of text (the pane strip, a tab's hover card, the command bar's rows, the
+/// link pill). Its host always in the form WebKit loads it with (an international name as its "xn--" spelling), the
+/// same everywhere, so a name made of lookalike letters can't read as another site's in one place and not another.
+nonisolated enum AddressText {
+    /// The address without a user name and password ("user:pass@" before the host), which can put another site's
+    /// name ahead of the real one: "paypal.com@evil.example".
+    static func withoutUserInfo(_ url: URL) -> URL {
+        guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false), parts.percentEncodedUser != nil || parts.percentEncodedPassword != nil
+        else { return url }
+        parts.percentEncodedUser = nil
+        parts.percentEncodedPassword = nil
+        return parts.url ?? url
+    }
+
+    /// Percent escapes decoded to read as text, except those that would change how the address reads: separators
+    /// ("/", "?", "#", "@", ":", "\" and "%" itself), spaces, controls, and the invisible marks that reorder or hide
+    /// text (right-to-left overrides, zero-width spaces). Those stay as they are, escaped.
+    static func readable(_ text: String) -> String {
+        let bytes = Array(text.utf8)
+        var out = ""
+        var i = 0
+        func hex(_ b: UInt8) -> UInt8? {
+            switch b {
+            case 0x30...0x39: b - 0x30
+            case 0x41...0x46: b - 0x41 + 10
+            case 0x61...0x66: b - 0x61 + 10
+            default: nil
+            }
+        }
+        while i < bytes.count {
+            // A run of escapes, decoded together (one character can take several bytes).
+            var run: [UInt8] = [], raw = ""
+            var j = i
+            while j + 2 < bytes.count, bytes[j] == 0x25, let high = hex(bytes[j + 1]), let low = hex(bytes[j + 2]) {
+                run.append(high << 4 | low)
+                raw += String(decoding: bytes[j...(j + 2)], as: UTF8.self)
+                j += 3
+            }
+            guard !run.isEmpty else {
+                // Up to the next escape, as it is.
+                var k = i + 1
+                while k < bytes.count, bytes[k] != 0x25 { k += 1 }
+                out += String(decoding: bytes[i..<k], as: UTF8.self)
+                i = k
+                continue
+            }
+            if let decoded = String(validating: run, as: UTF8.self) {
+                // Each character decoded unless it's one that must stay escaped, which keeps its own bytes' escapes.
+                var offset = 0
+                for character in decoded {
+                    let length = String(character).utf8.count
+                    let escapes = raw.utf8.dropFirst(offset * 3).prefix(length * 3)
+                    out += character.unicodeScalars.contains(where: staysEscaped) ? String(decoding: escapes, as: UTF8.self) : String(character)
+                    offset += length
+                }
+            } else {
+                out += raw
+            }
+            i = j
+        }
+        return out
+    }
+
+    private static func staysEscaped(_ scalar: Unicode.Scalar) -> Bool {
+        if "/?#@:\\%".unicodeScalars.contains(scalar) { return true }
+        if scalar.properties.isWhitespace { return true }
+        switch scalar.properties.generalCategory {
+        case .control, .format, .lineSeparator, .paragraphSeparator, .spaceSeparator, .privateUse, .surrogate, .unassigned: return true
+        default: return false
+        }
+    }
+}
+
 /// A site's host as a header shows it (#189): its subdomains quiet, the registrable domain (google.com, bbc.co.uk) in
 /// the text's own ink, as that's the part that proves whose site it is. Too long for its room, it first shrinks a
 /// little, then drops whole subdomain labels from the start ("…mail." stays out, a cut word reads like another), and

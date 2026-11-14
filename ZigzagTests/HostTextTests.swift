@@ -88,3 +88,37 @@ struct HostTextTests {
         #expect(panel.string == "gemini.google.com")
     }
 }
+
+/// An address shown in a line of text never reads as another site's: no user name ahead of the host, the start of a
+/// long host cut rather than its end, and escapes never decoded into a "/" or "@" of their own.
+@MainActor
+struct AddressTextTests {
+    @Test func aLongHostKeepsItsEndEvenWithoutAKnownDomain() {
+        // A port, or an international label the list can't spell: still cut at the start.
+        #expect(AddressView.lineBreak(forName: "accounts.google.com.aaaaaaaaaaaaaaaa.xn--80ak6aa92e.example") == .byTruncatingHead)
+        #expect(AddressView.lineBreak(forName: "accounts.google.com.aaaaaaaaaaaaaaaa.evil.example:8443") == .byTruncatingHead)
+        #expect(AddressView.lineBreak(forName: "xn--80ak6aa92e.com") == .byTruncatingMiddle)
+        #expect(AddressView.lineBreak(forName: "physicsandmathstutor.com:8443") == .byTruncatingMiddle)
+        #expect(AddressView.lineBreak(forName: "New Tab") == .byTruncatingTail)
+    }
+
+    @Test func noUserNameAheadOfTheHost() throws {
+        let tricky = try #require(URL(string: "https://paypal.com:secret@evil.example/login"))
+        #expect(CommandRanker.displayURL(tricky) == "evil.example/login")
+        #expect(LinkStatusController.describe(tricky) == "evil.example/login")
+        let plain = try #require(URL(string: "https://www.example.com/a?b=1"))
+        #expect(CommandRanker.displayURL(plain) == "example.com/a?b=1")
+        #expect(AddressText.withoutUserInfo(plain) == plain)
+    }
+
+    @Test func theLinkPillNeverDecodesASeparator() throws {
+        let link = try #require(URL(string: "https://good.example%2F@evil.example/"))
+        #expect(LinkStatusController.describe(link) == "evil.example")
+        let path = try #require(URL(string: "https://evil.example/%2F%2Fgood.example%40x/caf%C3%A9?q=a%20b%E2%80%AEfdp.exe"))
+        #expect(LinkStatusController.describe(path) == "evil.example/%2F%2Fgood.example%40x/café?q=a%20b%E2%80%AEfdp.exe")
+        // An international host shows as the address shows it, never decoded into lookalike letters.
+        let idn = try #require(URL(string: "https://xn--pple-43d.com/caf%C3%A9"))
+        #expect(LinkStatusController.describe(idn) == "xn--pple-43d.com/café")
+        #expect(AddressText.readable("%E2%80%8Bx%zz%") == "%E2%80%8Bx%zz%")
+    }
+}
