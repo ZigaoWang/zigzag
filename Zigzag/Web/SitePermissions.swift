@@ -72,16 +72,23 @@ struct PagePermissionAnswers {
 }
 
 /// Camera, microphone, location, notification, pop-up and open-an-app decisions, remembered per origin (see
-/// `SiteOrigin`), stored as "origin|kind". Only Allow and Block are kept, chosen in Site Controls or Settings; a
-/// question's answer holds for the page that asked (`PagePermissionAnswers`). Asked in a sheet, never as a surprise
-/// popup.
+/// `SiteOrigin`), stored as an action id under "origin|subject". Site Controls and Settings still expose Allow and
+/// Block; a question's one-time answer holds for the page that asked (`PagePermissionAnswers`). Asked in a sheet,
+/// never as a surprise popup.
 enum SitePermissions {
     private static let key = "SitePermissions"
     /// Where the answers are kept; tests use their own.
     static var defaults: UserDefaults = .standard
 
-    private static var all: [String: Bool] {
-        get { defaults.dictionary(forKey: key) as? [String: Bool] ?? [:] }
+    private static var stored: [String: String] {
+        get {
+            var actions: [String: String] = [:]
+            for (key, value) in defaults.dictionary(forKey: key) ?? [:] {
+                if let action = value as? String { actions[key] = action }
+                else if let allowed = value as? Bool { actions[key] = allowed ? "allow" : "deny" }
+            }
+            return actions
+        }
         set { defaults.set(newValue, forKey: key) }
     }
 
@@ -95,6 +102,45 @@ enum SitePermissions {
         }
     }
 
+    /// Converts any answers written by the old Bool store in place, and the old combined camera-and-microphone key
+    /// into the two questions the split asks. Reading also understands them, so this is safe to run once at launch
+    /// and harmless to run again.
+    static func migrateAnswersToActions() {
+        var now = stored
+        for key in now.keys where key.hasSuffix("|cameraAndMicrophone") {
+            let origin = String(key.dropLast("|cameraAndMicrophone".count))
+            let action = now[key]
+            for kind in ["camera", "microphone"] where now["\(origin)|\(kind)"] == nil {
+                now["\(origin)|\(kind)"] = action
+            }
+            now[key] = nil
+        }
+        defaults.set(now, forKey: key)
+    }
+
+    static func action(_ subject: String, origin: String) -> String? {
+        let now = stored
+        if subject.hasPrefix("app:"), now["\(origin)|\(PermissionSubject.apps)"] == "deny" { return "deny" }
+        return now["\(origin)|\(subject)"]
+    }
+
+    static func remember(_ action: String?, subject: String, origin: String) { stored["\(origin)|\(subject)"] = action }
+
+    static func actions(origin: String) -> [String: String] {
+        var found: [String: String] = [:]
+        for (key, action) in stored where key.hasPrefix(origin + "|") {
+            found[String(key.dropFirst(origin.count + 1))] = action
+        }
+        return found
+    }
+
+    static func forgetActions(prefix: String) {
+        var now = stored
+        for key in now.keys where key.contains("|" + prefix) { now[key] = nil }
+        stored = now
+    }
+
+    private static func allowed(_ action: String?) -> Bool? { action.map { $0 != "deny" } }
     static func kind(_ type: WKMediaCaptureType) -> String {
         switch type {
         case .camera: "camera"
@@ -110,19 +156,19 @@ enum SitePermissions {
     /// site it almost always was, and any other just asks. Runs at launch; a key with no "://" is an old one, so
     /// running again finds nothing to do. Nothing but this one entry is touched.
     static func migrateHostOnlyAnswers() {
-        let before = all
+        let before = stored
         guard before.keys.contains(where: { !$0.contains("://") }) else { return }
-        var after: [String: Bool] = [:]
+        var after: [String: String] = [:]
         for (k, v) in before where k.contains("://") { after[k] = v }
         let denials: Set<String> = ["camera", "microphone", "cameraAndMicrophone", "location", "notifications"]
-        for (k, v) in before where !k.contains("://") && !v {
+        for (k, v) in before where !k.contains("://") && v == "deny" {
             let parts = k.split(separator: "|", maxSplits: 1).map(String.init)
             guard parts.count == 2, denials.contains(parts[1]),
                   let origin = SiteOrigin.make(scheme: "https", host: parts[0], port: nil) else { continue }
             let migrated = "\(origin)|\(parts[1])"
-            if after[migrated] == nil { after[migrated] = false }
+            if after[migrated] == nil { after[migrated] = "deny" }
         }
-        all = after
+        stored = after
     }
 
     /// One answer kept for the camera and the microphone together becomes one for each: the same answer for both,
@@ -167,105 +213,107 @@ enum SitePermissions {
         return String(localized: "Embedded content from \(SiteOrigin.label(frame)) on \(SiteOrigin.label(page))", comment: "Who asks, in a site's permission question, for a frame from another site: the frame's site, then the page's site it's on.")
     }
 
+    private static func action(for allowed: Bool?) -> String? { allowed.map { $0 ? "allow" : "deny" } }
+
     /// The keys for these kinds on a site's own page: its own answers and those of frames from elsewhere on it.
     private static func keys(_ kinds: [String], on origin: String) -> [String] {
         let suffixes = kinds.map { "|" + $0 }
-        return all.keys.filter { k in
+        return stored.keys.filter { k in
             kinds.contains { k == "\(origin)|\($0)" } || (k.hasPrefix(origin + "|embed:") && suffixes.contains { k.hasSuffix($0) })
         }
     }
 
     /// Camera and microphone answers given on a site's page: its own, and those of frames from elsewhere on it.
     static func mediaDecisions(origin: String) -> [Bool] {
-        let now = all
+        let now = stored
         // Sorted, so the camera comes before the microphone whatever order the store returns.
-        return keys(["camera", "microphone"], on: origin).sorted().compactMap { now[$0] }
+        return keys(["camera", "microphone"], on: origin).sorted().compactMap { allowed(now[$0]) }
     }
 
     /// Location answers given on a site's page, its frames' included.
     static func locationDecisions(origin: String) -> [Bool] {
-        let now = all
-        return keys(["location"], on: origin).compactMap { now[$0] }
+        let now = stored
+        return keys(["location"], on: origin).compactMap { allowed(now[$0]) }
     }
 
     /// What is kept for `type`: its own answer. A request for the camera and the microphone together is answered only
     /// when both are kept, and a no in either is a no.
     static func decision(origin: String, type: WKMediaCaptureType) -> Bool? {
-        let now = all
+        let now = stored
         let types = mediaTypes(for: type)
-        let answers = types.compactMap { now["\(origin)|\(kind($0))"] }
+        let answers = types.compactMap { allowed(now["\(origin)|\(kind($0))"]) }
         guard answers.count == types.count else { return nil }
         return answers.allSatisfy { $0 }
     }
 
     static func remember(_ allowed: Bool, origin: String, type: WKMediaCaptureType) {
-        var now = all
-        for type in mediaTypes(for: type) { now["\(origin)|\(kind(type))"] = allowed }
-        all = now
+        var now = stored
+        for type in mediaTypes(for: type) { now["\(origin)|\(kind(type))"] = action(for: allowed) }
+        stored = now
     }
 
     /// Every remembered answer for one site: kind ("camera", "location", "notifications"…) to allowed or not.
     static func choices(origin: String) -> [String: Bool] {
         var found: [String: Bool] = [:]
-        for (k, v) in all where k.hasPrefix(origin + "|") { found[String(k.dropFirst(origin.count + 1))] = v }
+        for (key, action) in actions(origin: origin) { found[key] = allowed(action) }
         return found
     }
 
     /// Forgets everything about a site, notifications included.
     static func forgetEverything(origin: String) {
-        var now = all
+        var now = stored
         for k in now.keys where k.hasPrefix(origin + "|") { now[k] = nil }
-        all = now
+        stored = now
     }
 
     /// Sites (origins) with a remembered choice of any kind.
     static var sites: Set<String> {
-        Set(all.keys.compactMap { $0.split(separator: "|").first.map(String.init) })
+        Set(stored.keys.compactMap { $0.split(separator: "|").first.map(String.init) })
     }
 
     static func forgetAll() { defaults.removeObject(forKey: key) }
 
     /// A site's answer about your location, if it ever asked.
-    static func location(origin: String) -> Bool? { all["\(origin)|location"] }
+    static func location(origin: String) -> Bool? { allowed(action(PermissionSubject.location, origin: origin)) }
 
     /// Frames from elsewhere on the site's page forget theirs too.
     static func forgetLocation(origin: String) {
-        var now = all
+        var now = stored
         for k in keys(["location"], on: origin) { now[k] = nil }
-        all = now
+        stored = now
     }
 
     /// "Ask again" for the camera and microphone only: location, notifications and apps to open each have their own
     /// row, and stay as they are. Frames from elsewhere on the site's page forget theirs too.
     static func forget(origin: String) {
-        var now = all
+        var now = stored
         for k in keys(["camera", "microphone", "cameraAndMicrophone"], on: origin) { now[k] = nil }
-        all = now
+        stored = now
     }
 
     /// Notifications: nil until the site has asked and you've answered.
-    static func notifications(origin: String) -> Bool? { all["\(origin)|notifications"] }
+    static func notifications(origin: String) -> Bool? { allowed(action(PermissionSubject.notifications, origin: origin)) }
 
-    static func setNotifications(_ allowed: Bool?, origin: String) { all["\(origin)|notifications"] = allowed }
+    static func setNotifications(_ allowed: Bool?, origin: String) { remember(action(for: allowed), subject: PermissionSubject.notifications, origin: origin) }
 
     /// Whether a site may open links for another app (zoommtg:, itms-apps:): Allow or Block kept for the site, chosen
     /// in Site Controls or Settings, comes first; else yes for an app it was told Always Open to on its question;
     /// else nil, asked each time.
     static func appDecision(origin: String, scheme: String) -> Bool? {
-        let now = all
-        if let site = now["\(origin)|apps"] { return site }
-        return now["\(origin)|app:\(scheme)"] == true ? true : nil
+        let now = stored
+        if let site = now["\(origin)|\(PermissionSubject.apps)"] { return allowed(site) }
+        return allowed(now["\(origin)|\(PermissionSubject.app(scheme))"])
     }
 
     static func opensApp(origin: String, scheme: String) -> Bool { appDecision(origin: origin, scheme: scheme) == true }
 
     /// Always Open on a site's question: that one app, for that site.
-    static func allowOpeningApp(origin: String, scheme: String) { all["\(origin)|app:\(scheme)"] = true }
+    static func allowOpeningApp(origin: String, scheme: String) { remember("allow", subject: PermissionSubject.app(scheme), origin: origin) }
 
     /// Pop-ups a site opens on its own: allowed once you've said Always Allow, blocked (nil) otherwise.
-    static func popups(origin: String) -> Bool { all["\(origin)|popups"] == true }
+    static func popups(origin: String) -> Bool { allowed(action(PermissionSubject.popups, origin: origin)) == true }
 
-    static func setPopups(_ allowed: Bool?, origin: String) { all["\(origin)|popups"] = allowed }
+    static func setPopups(_ allowed: Bool?, origin: String) { remember(action(for: allowed), subject: PermissionSubject.popups, origin: origin) }
 
     /// WebRTC (`WebRTCProtection`): Allow or Block kept for the site, nil to follow the setting.
     static func webRTC(origin: String) -> Bool? { all["\(origin)|webRTC"] }
@@ -273,7 +321,9 @@ enum SitePermissions {
     /// Every site's notification choice by origin, for the page script: it knows the answer before the page asks.
     static var notificationDecisions: [String: Bool] {
         var out: [String: Bool] = [:]
-        for (k, v) in all where k.hasSuffix("|notifications") { out[String(k.dropLast("|notifications".count))] = v }
+        for (key, action) in stored where key.hasSuffix("|notifications") {
+            out[String(key.dropLast("|notifications".count))] = allowed(action)
+        }
         return out
     }
 
@@ -296,7 +346,7 @@ enum SitePermissions {
     private static func keys(for permission: SitePermission, on origin: String) -> [String] {
         let own = keys(permission.kinds, on: origin)
         guard permission == .apps else { return own }
-        return own + all.keys.filter { $0.hasPrefix(origin + "|app:") }
+        return own + stored.keys.filter { $0.hasPrefix(origin + "|app:") }
     }
 
     /// Whether anything is kept for `permission` on the site's page.
@@ -307,22 +357,23 @@ enum SitePermissions {
     /// WebRTC is never Ask: with nothing kept it's what the setting says (`WebRTCProtection`).
     static func choice(_ permission: SitePermission, origin: String) -> PermissionChoice {
         if permission == .webRTC { return WebRTCProtection.choice(origin: origin, in: nil) }
-        let now = all
-        return PermissionChoice(answers: keys(for: permission, on: origin).compactMap { now[$0] })
+        let now = stored
+        return PermissionChoice(answers: keys(for: permission, on: origin).compactMap { allowed(now[$0]) })
     }
 
     /// Ask forgets every answer kept for it on the site's page, its frames' too. Allow or Block is kept for the site,
     /// for both camera and microphone at once, and for every frame from elsewhere that answered there before.
     static func setChoice(_ choice: PermissionChoice, for permission: SitePermission, origin: String) {
-        var now = all
+        var now = stored
         let existing = keys(for: permission, on: origin)
         for k in existing { now[k] = nil }
         if let allowed = choice.allowed {
+            let action = allowed && permission == .popups ? "mini" : action(for: allowed)
             // Frames from elsewhere keep a key of their own; the site's own answer is one key for the permission.
-            for k in existing where k.hasPrefix(origin + "|embed:") { now[k] = allowed }
-            now["\(origin)|\(permission.primaryKind)"] = allowed
+            for k in existing where k.hasPrefix(origin + "|embed:") { now[k] = action }
+            now["\(origin)|\(permission.primaryKind)"] = action
         }
-        all = now
+        stored = now
         if permission == .notifications, choice != .allow { WebNotifications.shared.removeAll(origin: origin) }
         if permission == .apps { ExternalLinks.forgetAnswers(origin: origin) }
     }
