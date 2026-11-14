@@ -73,7 +73,14 @@ jobs:
             -only-testing:ZigzagTests/DownloadRuleTests \
             -only-testing:ZigzagTests/SitePermissionsPolicyTests \
             -only-testing:ZigzagTests/PermissionPromptTests \
-            -only-testing:ZigzagTests/SiteControlsTests | tee test.log
+            -only-testing:ZigzagTests/SiteControlsPermissionTests | tee test.log
+
+      - name: Check the tests that matter really ran
+        # A selector that matches nothing passes silently, so name one test per area.
+        run: |
+          for t in eachMatchKind remembersAnActionPerSubjectAndOrigin theAnswerCarriesTheChosenActionAndDuration openAppsIsAPermission; do
+            grep -q "✔ Test $t() passed" test.log || { echo "did not run: $t"; exit 1; }
+          done
 
       - uses: actions/upload-artifact@v4
         if: always()
