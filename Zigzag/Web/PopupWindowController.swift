@@ -251,7 +251,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         if navigationAction.request.url?.scheme?.lowercased() == HistoryPage.scheme { return .cancel }
         if let url = navigationAction.request.url, ExternalLinks.isExternal(url), url.scheme?.lowercased() != "file" {
             ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
-                               isClick: PopupNotice.isUserInitiated(navigationAction), from: webView,
+                               isClick: PopupNotice.isUserInitiated(navigationAction),
+                               linkClick: navigationAction.navigationType == .linkActivated, from: webView,
                                asker: navigationAction.sourceFrame.securityOrigin)
             return .cancel
         }

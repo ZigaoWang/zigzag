@@ -731,7 +731,7 @@ final class Tab: NSObject {
             load(url, by: .page)
         case .app:
             guard let webView else { return }
-            ExternalLinks.open(url, isMainFrame: true, isClick: isClick, from: webView, asker: asker, byYou: false)
+            ExternalLinks.open(url, isMainFrame: true, isClick: isClick, linkClick: false, from: webView, asker: asker, byYou: false)
         case .refuse:
             Diagnostics.note("Refused a page's link", site: self.url?.host(), "\(url.scheme ?? "no scheme"):", isPrivate: isPrivate)
         }
@@ -1304,7 +1304,8 @@ extension Tab: WKNavigationDelegate {
         }
         if ExternalLinks.isExternal(url) {
             ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
-                               isClick: PopupNotice.isUserInitiated(navigationAction), from: webView,
+                               isClick: PopupNotice.isUserInitiated(navigationAction),
+                               linkClick: navigationAction.navigationType == .linkActivated, from: webView,
                                asker: navigationAction.sourceFrame.securityOrigin, byYou: ownSender == .you)
             return (.cancel, preferences)
         }

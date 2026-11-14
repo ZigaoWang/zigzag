@@ -36,3 +36,44 @@ struct PageLinkTests {
         #expect(ExternalLinks.verdict(byYou: false, decision: nil, clickedHere: false, scheme: "mailto") == .ask)
     }
 }
+
+/// When a page's link for another app may put its question up again.
+struct ExternalLinkAskingTests {
+    let key = "https://zoom.us|zoommtg"
+
+    /// Two quick clicks never stack two questions: one is up, so the second waits for nothing.
+    @Test func oneQuestionAtATimeEvenForClicks() {
+        var asked = ExternalLinks.Asked()
+        asked.asking.insert(key)
+        let ask1 = asked.mayAsk(key, clickedHere: true, linkClick: true)
+        #expect(!ask1)
+        let ask2 = asked.mayAsk(key, clickedHere: false, linkClick: false)
+        #expect(!ask2)
+    }
+
+    /// Put off: the page on its own waits a minute, but a click of yours asks at once (claude.ai's Open Claude).
+    @Test func aClickAsksRightAfterAQuestionWasPutOff() {
+        var asked = ExternalLinks.Asked()
+        let now = Date()
+        asked.putOff[key] = now.addingTimeInterval(60)
+        let ask3 = asked.mayAsk(key, clickedHere: false, linkClick: false, now: now)
+        #expect(!ask3)
+        let ask4 = asked.mayAsk(key, clickedHere: true, linkClick: false, now: now)
+        #expect(ask4)
+        #expect(asked.putOff[key] == nil)
+    }
+
+    /// Don't Open holds against a page's script riding on a click; only a link you click asks again.
+    @Test func onlyALinkClickUndoesDontOpen() {
+        var asked = ExternalLinks.Asked()
+        asked.declined.insert(key)
+        let ask5 = asked.mayAsk(key, clickedHere: false, linkClick: false)
+        #expect(!ask5)
+        let ask6 = asked.mayAsk(key, clickedHere: true, linkClick: false)
+        #expect(!ask6)
+        #expect(asked.declined.contains(key))
+        let ask7 = asked.mayAsk(key, clickedHere: true, linkClick: true)
+        #expect(ask7)
+        #expect(!asked.declined.contains(key))
+    }
+}

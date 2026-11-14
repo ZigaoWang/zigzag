@@ -11,13 +11,34 @@ enum ExternalLinks {
     /// What the web view handles itself; everything else is for another app.
     static let webSchemes: Set<String> = ["http", "https", "about", "data", "blob", "file", "javascript", "webkit-extension", "zigzag"]
     private static let everyday: Set<String> = ["mailto", "tel", "facetime", "facetime-audio", "sms"]
-    /// One question at a time: meeting pages fire the same link a few times while they wait.
-    private static var asking: Set<String> = []
-    /// Asked and turned down this session: the page doesn't get to ask again until Zigzag restarts.
-    private static var declined: Set<String> = []
-    /// Asked and put off (closed, or the tab moved on): not again from that site for a minute, so a page can't
-    /// keep putting the question back up.
-    private static var putOff: [String: Date] = [:]
+    /// What's been asked this session, by site and scheme.
+    struct Asked {
+        /// One question at a time: meeting pages fire the same link a few times while they wait, and two quick
+        /// clicks don't stack two questions.
+        var asking: Set<String> = []
+        /// Asked and turned down this session: the page doesn't get to ask again until Zigzag restarts, unless you
+        /// click a link or button for it.
+        var declined: Set<String> = []
+        /// Asked and put off (closed, or the tab moved on): not again from that site for a minute, so a page can't
+        /// keep putting the question back up.
+        var putOff: [String: Date] = [:]
+
+        /// Whether `key` may ask now. A page asking again on its own, after you put it off or said Don't Open, is let
+        /// be for now. A click of yours in the page asks even right after a question was put off: the click that
+        /// dismissed the last question (claude.ai asks on load, and its Open Claude button asks again) must not be
+        /// what silences this one. Only a click on a link (`linkClick`) undoes Don't Open: a click is also what a
+        /// page's own script rides on while you press anything.
+        mutating func mayAsk(_ key: String, clickedHere: Bool, linkClick: Bool, now: Date = Date()) -> Bool {
+            guard !asking.contains(key) else { return false }
+            if clickedHere {
+                if linkClick { declined.remove(key) } else if declined.contains(key) { return false }
+                putOff[key] = nil
+                return true
+            }
+            return !declined.contains(key) && (putOff[key].map { now > $0 } ?? true)
+        }
+    }
+    private static var asked = Asked()
 
     static func isExternal(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased() else { return false }
@@ -27,11 +48,13 @@ enum ExternalLinks {
     /// Frames count too: meeting pages often open their app from a hidden frame, and the question keeps that honest.
     /// Only a page you can see asks; one in a background tab never puts a question over another site.
     /// `isClick`: a real click or key started it (not a script's click()).
+    /// `linkClick`: it's a link you clicked (`.linkActivated`), not a page's script running on your click; nil when
+    /// that's what `isClick` already means (a link in Reader or a PDF).
     /// `asker`: the frame that asked, when it's from another site than the page (an ad on a meeting page): it's named,
     /// and it never gets the page's saved answer, though the page's Block holds for it too.
     /// `byYou`: you typed it in the address bar or chose it in the command bar, never a page or Zigzag on its own: it
     /// opens without asking, unless the site is set to Block.
-    static func open(_ url: URL, isMainFrame: Bool, isClick: Bool, from webView: WKWebView, asker: WKSecurityOrigin? = nil, byYou: Bool = false) {
+    static func open(_ url: URL, isMainFrame: Bool, isClick: Bool, linkClick: Bool? = nil, from webView: WKWebView, asker: WKSecurityOrigin? = nil, byYou: Bool = false) {
         let scheme = url.scheme?.lowercased() ?? ""
         // Only a site installed as an app sends these, from its own small app: never a page.
         if scheme == WebAppLink.scheme { return }
@@ -72,15 +95,8 @@ enum ExternalLinks {
         case .ask:
             break
         }
-        // A page asking again on its own, after you put it off or said Don't Open, is let be for now. A click of
-        // yours in the page is asked every time: it's you asking, and the click that dismissed the last question
-        // (claude.ai asks on load, and its Open Claude button asks again) must not be what silences this one.
-        guard let controller, webView.window != nil else { return }
-        if !clickedHere {
-            guard !asking.contains(key), !declined.contains(key), putOff[key].map({ Date() > $0 }) ?? true else { return }
-        }
-        putOff[key] = nil
-        declined.remove(key)
+        guard let controller, webView.window != nil,
+              asked.mayAsk(key, clickedHere: clickedHere, linkClick: linkClick ?? isClick) else { return }
         let name = appName(app)
         // Private windows, popups included, never remember the answer.
         let isPrivate = !webView.configuration.websiteDataStore.isPersistent
@@ -88,7 +104,7 @@ enum ExternalLinks {
         let saves = !isPrivate && origin != nil && canRemember
         let tab = (webView as? BrowserWebView)?.owner
         if !foreign { SitePermissions.noteAsked(.apps, origin: pageOrigin, isPrivate: isPrivate) }
-        asking.insert(key)
+        asked.asking.insert(key)
         // Asked where the page is: in Zigzag Mini or an installed app's window, over its own page, not in a browser
         // window behind it, where it couldn't be seen (a report: claude.ai's Open Claude did nothing in Mini).
         let promptHost: PromptHost = (webView.window?.windowController as? PromptHost).flatMap { $0 is BrowserWindowController ? nil : $0 } ?? controller
@@ -102,7 +118,7 @@ enum ExternalLinks {
                                                     alwaysTitle: saves ? String(localized: "Always Open", comment: "Button on a page's question to open an app: opens it, and the site may open this app without asking from now on.") : nil,
                                                     denyTitle: String(localized: "Don’t Open", comment: "Button on a page's question to open an app."),
                                                     answered: { decision().map { $0 ? .allow : .deny } })
-            asking.remove(key)
+            asked.asking.remove(key)
             switch answer {
             case .allow, .alternate:
                 NSWorkspace.shared.open(url)
@@ -110,9 +126,9 @@ enum ExternalLinks {
                 if saves, let origin { SitePermissions.allowOpeningApp(origin: origin, scheme: scheme) }
                 NSWorkspace.shared.open(url)
             case .deny:
-                declined.insert(key)
+                asked.declined.insert(key)
             case .notNow:
-                putOff[key] = Date().addingTimeInterval(60)
+                asked.putOff[key] = Date().addingTimeInterval(60)
             }
         }
     }
@@ -139,8 +155,8 @@ enum ExternalLinks {
     /// A site's choice changed in Site Controls or Settings (or was reset): its Don't Open and Not Now for this
     /// session go too, so Ask asks again.
     static func forgetAnswers(origin: String) {
-        declined = declined.filter { !$0.hasPrefix(origin + "|") }
-        putOff = putOff.filter { !$0.key.hasPrefix(origin + "|") }
+        asked.declined = asked.declined.filter { !$0.hasPrefix(origin + "|") }
+        asked.putOff = asked.putOff.filter { !$0.key.hasPrefix(origin + "|") }
     }
 
     /// "Tencent Meeting" for the app that opens a scheme, as Finder names it.
