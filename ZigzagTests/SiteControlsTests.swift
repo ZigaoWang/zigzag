@@ -210,6 +210,18 @@ struct SiteControlsPermissionTests {
         }
     }
 
+    /// A page with no site (about:blank its opener wrote) is held by the opener's Block, never let in by its Allow.
+    @Test func aPageWithNoSiteKeepsItsOpenersBlock() throws {
+        try withDefaults {
+            #expect(ExternalLinks.decision(page: nil, standIns: [site], scheme: "zoommtg", foreign: false) == nil)
+            SitePermissions.setChoice(.allow, for: .apps, origin: site)
+            #expect(ExternalLinks.decision(page: nil, standIns: [site], scheme: "zoommtg", foreign: false) == nil)
+            SitePermissions.setChoice(.block, for: .apps, origin: site)
+            #expect(ExternalLinks.decision(page: nil, standIns: [site], scheme: "zoommtg", foreign: false) == false)
+            #expect(ExternalLinks.decision(page: nil, standIns: [], scheme: "zoommtg", foreign: false) == nil)
+        }
+    }
+
     @Test func resetReturnsTheSiteToNoRows() throws {
         try withDefaults {
             let other = "https://other.example.com"

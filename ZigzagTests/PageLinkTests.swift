@@ -35,6 +35,37 @@ struct PageLinkTests {
         #expect(ExternalLinks.verdict(byYou: false, decision: nil, clickedHere: true, scheme: "mailto") == .open)
         #expect(ExternalLinks.verdict(byYou: false, decision: nil, clickedHere: false, scheme: "mailto") == .ask)
     }
+
+    @Test func everydayAppsOpenOnlyForALinkClickInThePage() {
+        #expect(ExternalLinks.isEverydayClick(clickedHere: true, linkClick: true, sourceIsMainFrame: true, fromPDF: false))
+        // A script on your click, a frame's link, a PDF's link, a page not in front: they ask.
+        #expect(!ExternalLinks.isEverydayClick(clickedHere: true, linkClick: false, sourceIsMainFrame: true, fromPDF: false))
+        #expect(!ExternalLinks.isEverydayClick(clickedHere: true, linkClick: true, sourceIsMainFrame: false, fromPDF: false))
+        #expect(!ExternalLinks.isEverydayClick(clickedHere: true, linkClick: true, sourceIsMainFrame: true, fromPDF: true))
+        #expect(!ExternalLinks.isEverydayClick(clickedHere: false, linkClick: true, sourceIsMainFrame: true, fromPDF: false))
+    }
+
+    @Test func aFrameWithNoHostIsNotThePage() {
+        // The page itself, or a frame of the same site.
+        #expect(!ExternalLinks.isForeign(askerHost: nil, pageHost: "zoom.us"))
+        #expect(!ExternalLinks.isForeign(askerHost: "us02web.zoom.us", pageHost: "zoom.us"))
+        #expect(ExternalLinks.isForeign(askerHost: "ads.example", pageHost: "zoom.us"))
+        // A sandboxed or data: frame has no host: never the page's Always Open.
+        #expect(ExternalLinks.isForeign(askerHost: "", pageHost: "zoom.us"))
+        #expect(!ExternalLinks.isForeign(askerHost: "", pageHost: ""))
+    }
+
+    @Test func ownLoadMatchesOnlyItsAddress() throws {
+        let typed = try #require(URL(string: "https://Example.com"))
+        let own = Tab.OwnLoad(sender: .you, url: typed)
+        #expect(Tab.ownSender(of: own, for: URL(string: "https://example.com/")) == .you)
+        #expect(Tab.ownSender(of: own, for: typed) == .you)
+        // The page's own navigation in flight when you pressed Return isn't yours.
+        #expect(Tab.ownSender(of: own, for: URL(string: "ssh://example.com")) == nil)
+        #expect(Tab.ownSender(of: own, for: URL(string: "https://example.com/other")) == nil)
+        #expect(Tab.ownSender(of: nil, for: typed) == nil)
+        #expect(Tab.ownSender(of: own, for: nil) == nil)
+    }
 }
 
 /// When a page's link for another app may put its question up again.

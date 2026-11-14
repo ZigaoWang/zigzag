@@ -260,7 +260,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         if let url = navigationAction.request.url, ExternalLinks.isExternal(url), url.scheme?.lowercased() != "file" {
             ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
                                isClick: PopupNotice.isUserInitiated(navigationAction),
-                               linkClick: navigationAction.navigationType == .linkActivated, from: webView,
+                               linkClick: navigationAction.navigationType == .linkActivated, sourceIsMainFrame: navigationAction.sourceFrame.isMainFrame, from: webView,
                                asker: navigationAction.sourceFrame.securityOrigin)
             return .cancel
         }

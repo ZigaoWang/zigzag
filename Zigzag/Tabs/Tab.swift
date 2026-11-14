@@ -759,7 +759,13 @@ final class Tab: NSObject {
     private var openedByPage = false
     /// Zigzag itself is loading this tab (the address bar, a link from elsewhere): its address shows at once. `.you`
     /// when you typed or chose it, so an app's link opens without asking. Never `.page`: a page's own load is nil.
-    private var ownLoadPending: LoadSender?
+    /// Carries the address it was for: only the main frame's decision for that address is Zigzag's (or yours), never
+    /// one the page had on its way when you pressed Return.
+    private var ownLoadPending: OwnLoad?
+    struct OwnLoad: Equatable {
+        let sender: LoadSender
+        let url: URL
+    }
     /// Who the address this tab was made with came from, for its first load (a link a page opened in a new tab).
     var firstLoadSender: LoadSender = .zigzag
     /// Where Zigzag itself is taking this tab back or forward (its buttons, a swipe, the keyboard, restored history):
@@ -818,8 +824,28 @@ final class Tab: NSObject {
 
     /// Loads a page in this tab's web view for `sender`: only Zigzag's own loads, and yours, count as its own.
     private func load(_ url: URL, in webView: WKWebView, by sender: LoadSender) {
-        ownLoadPending = sender == .page ? nil : sender
+        ownLoadPending = sender == .page ? nil : OwnLoad(sender: sender, url: url)
         Self.load(url, in: webView)
+    }
+
+    /// Who sent the main frame's navigation to `request`: Zigzag's (or your) pending load only when it's for that
+    /// very address. WebKit may tidy the address on the way (a lowercased host, a "/" for an empty path).
+    static func ownSender(of pending: OwnLoad?, for request: URL?) -> LoadSender? {
+        guard let pending, let request else { return nil }
+        return sameAddress(pending.url, request) ? pending.sender : nil
+    }
+
+    nonisolated static func sameAddress(_ a: URL, _ b: URL) -> Bool {
+        if a == b || a.absoluteString == b.absoluteString { return true }
+        func tidy(_ url: URL) -> String? {
+            guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: true) else { return nil }
+            parts.scheme = parts.scheme?.lowercased()
+            parts.host = parts.host?.lowercased()
+            if parts.host != nil, parts.path.isEmpty { parts.path = "/" }
+            return parts.string
+        }
+        guard let left = tidy(a), let right = tidy(b) else { return false }
+        return left == right
     }
 
     /// The first load of a tab made with an address, as whoever gave it.
@@ -1234,14 +1260,14 @@ final class Tab: NSObject {
 extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
         let userInitiated = PopupNotice.isUserInitiated(navigationAction)
-        // Zigzag's own load counts for the main frame's next decision only, whatever comes of it (a download, an
-        // app's link): never for a later one the page starts.
+        // Zigzag's own load counts for the main frame's decision for its address only, once, whatever comes of it (a
+        // download, an app's link): never for another the page started, before or after.
         let decidesMainFrame = navigationAction.targetFrame?.isMainFrame == true
-        let ownSender = decidesMainFrame ? ownLoadPending : nil
+        let ownSender = decidesMainFrame ? Self.ownSender(of: ownLoadPending, for: navigationAction.request.url) : nil
         let ownLoad = ownSender != nil
         let ownHistory = decidesMainFrame && ownHistoryTarget != nil && navigationAction.request.url == ownHistoryTarget
         if decidesMainFrame {
-            ownLoadPending = nil
+            if ownLoad { ownLoadPending = nil }
             ownHistoryTarget = nil
         }
         if navigationAction.shouldPerformDownload {
@@ -1309,7 +1335,7 @@ extension Tab: WKNavigationDelegate {
         if ExternalLinks.isExternal(url) {
             ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
                                isClick: PopupNotice.isUserInitiated(navigationAction),
-                               linkClick: navigationAction.navigationType == .linkActivated, from: webView,
+                               linkClick: navigationAction.navigationType == .linkActivated, sourceIsMainFrame: navigationAction.sourceFrame.isMainFrame, from: webView,
                                asker: navigationAction.sourceFrame.securityOrigin, byYou: ownSender == .you)
             return (.cancel, preferences)
         }

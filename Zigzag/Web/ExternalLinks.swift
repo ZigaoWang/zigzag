@@ -54,7 +54,9 @@ enum ExternalLinks {
     /// and it never gets the page's saved answer, though the page's Block holds for it too.
     /// `byYou`: you typed it in the address bar or chose it in the command bar, never a page or Zigzag on its own: it
     /// opens without asking, unless the site is set to Block.
-    static func open(_ url: URL, isMainFrame: Bool, isClick: Bool, linkClick: Bool? = nil, from webView: WKWebView, asker: WKSecurityOrigin? = nil, byYou: Bool = false, fromPDF: Bool = false) {
+    /// `sourceIsMainFrame`: the link or script that asked is the page's own document, not a frame in it.
+    static func open(_ url: URL, isMainFrame: Bool, isClick: Bool, linkClick: Bool? = nil, sourceIsMainFrame: Bool = true, from webView: WKWebView,
+                     asker: WKSecurityOrigin? = nil, byYou: Bool = false, fromPDF: Bool = false) {
         let scheme = url.scheme?.lowercased() ?? ""
         // Only a site installed as an app sends these, from its own small app: never a page.
         if scheme == WebAppLink.scheme { return }
@@ -74,7 +76,7 @@ enum ExternalLinks {
         }
         let pageHost = webView.url?.host()?.lowercased() ?? ""
         let askerHost = asker?.host.lowercased() ?? ""
-        let foreign = !askerHost.isEmpty && (PublicSuffix.registrableDomain(askerHost) ?? askerHost) != (PublicSuffix.registrableDomain(pageHost) ?? pageHost)
+        let foreign = isForeign(askerHost: asker == nil ? nil : askerHost, pageHost: pageHost)
         // Always Open is kept for secure pages only. Choices are kept per origin, so one for https://zoom.us is not
         // one for http://zoom.us or https://zoom.us:8443.
         let pageOrigin = SiteOrigin.of(webView.url)
@@ -84,12 +86,17 @@ enum ExternalLinks {
         let key = "\(origin ?? host)|\(scheme)"
         // The page's Allow or Block, or the app it was told Always Open to. A frame from elsewhere gets only Block, and
         // so does a link in a PDF (`fromPDF`), whose links are the PDF's, not the site's: it always asks.
+        // A page with no site of its own (about:blank its opener wrote) is held to the Block of the site that made
+        // it: the frame that asked, which has its origin, or the tab that opened it.
+        let openerOrigin = (webView as? BrowserWebView)?.owner?.opener.flatMap { SiteOrigin.of($0.url) }
+        let standIns = pageOrigin == nil ? [asker.flatMap { SiteOrigin.of($0) }, openerOrigin].compactMap { $0 } : []
         let decision: () -> Bool? = {
-            let found = Self.decision(page: pageOrigin, scheme: scheme, foreign: foreign)
+            let found = Self.decision(page: pageOrigin, standIns: standIns, scheme: scheme, foreign: foreign)
             return fromPDF && found == true ? nil : found
         }
         let clickedHere = isClick && isMainFrame && webView.window != nil
-        switch verdict(byYou: byYou, decision: decision(), clickedHere: clickedHere && !fromPDF, scheme: scheme) {
+        let everydayClick = isEverydayClick(clickedHere: clickedHere, linkClick: linkClick ?? isClick, sourceIsMainFrame: sourceIsMainFrame, fromPDF: fromPDF)
+        switch verdict(byYou: byYou, decision: decision(), clickedHere: everydayClick, scheme: scheme) {
         case .block:
             Diagnostics.note("Blocked opening an app", site: host, "\(scheme):", isPrivate: !webView.configuration.websiteDataStore.isPersistent)
             return
@@ -155,6 +162,27 @@ enum ExternalLinks {
     static func decision(page: String?, scheme: String, foreign: Bool) -> Bool? {
         guard let page, let found = SitePermissions.appDecision(origin: page, scheme: scheme) else { return nil }
         return foreign ? (found ? nil : false) : found
+    }
+
+    /// Whether mail, phone and FaceTime may open at once: only for a link you clicked in the page in front itself,
+    /// never from a frame in it, a script riding on your click, or a PDF.
+    static func isEverydayClick(clickedHere: Bool, linkClick: Bool, sourceIsMainFrame: Bool, fromPDF: Bool) -> Bool {
+        clickedHere && linkClick && sourceIsMainFrame && !fromPDF
+    }
+
+    /// The same, where a page with no site (`page` nil) answers to the Block of the sites standing in for it.
+    static func decision(page: String?, standIns: [String], scheme: String, foreign: Bool) -> Bool? {
+        if let page { return decision(page: page, scheme: scheme, foreign: foreign) }
+        return standIns.contains { decision(page: $0, scheme: scheme, foreign: true) == false } ? false : nil
+    }
+
+    /// Whether the frame that asked is someone other than the page: another site, or a frame with no host of its own
+    /// (sandboxed, data:) on a page that has one, which never gets the page's Always Open. `askerHost` nil: no
+    /// frame was named, the page asked.
+    static func isForeign(askerHost: String?, pageHost: String) -> Bool {
+        guard let askerHost else { return false }
+        if askerHost.isEmpty { return !pageHost.isEmpty }
+        return (PublicSuffix.registrableDomain(askerHost) ?? askerHost) != (PublicSuffix.registrableDomain(pageHost) ?? pageHost)
     }
 
     /// A site's choice changed in Site Controls or Settings (or was reset): its Don't Open and Not Now for this
