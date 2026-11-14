@@ -300,6 +300,13 @@ enum SitePermissions {
         }
     }
 
+    /// Whether the site has an answer of its own for `permission`, kept or asked for this session (`here`: a private
+    /// tab's own WebRTC choice), rather than only the setting every site follows. With the protection on, WebRTC's row
+    /// shows for every site so you can allow it before a call, but it's the site's only once chosen there or asked.
+    static func isOwn(_ permission: SitePermission, origin: String, here: Bool? = nil) -> Bool {
+        hasDecision(permission, origin: origin) || hasAsked(permission, origin: origin) || (permission == .webRTC && here != nil)
+    }
+
     /// Reset Permissions: the site back to how it started, as if it never asked. Every answer kept for it goes (its
     /// frames' and apps to open included), and its rows with them.
     static func reset(origin: String) {

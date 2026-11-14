@@ -83,6 +83,29 @@ struct WebRTCProtectionTests {
         }
     }
 
+    @Test func theSettingAloneIsNotTheSitesChoice() async throws {
+        guard WebRTCProtection.isAvailable else { return }
+        try await withDefaults {
+            // On, every site has the row, so a call can be allowed before it starts, but Block from the setting is
+            // nobody's answer: not counted on the Permissions row, and nothing to reset.
+            WebRTCProtection.isOn = true
+            #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.webRTC])
+            #expect(!SitePermissions.isOwn(.webRTC, origin: site))
+            // A private tab's own choice is the site's, there.
+            #expect(SitePermissions.isOwn(.webRTC, origin: site, here: true))
+            // Asked (a call tried to start), or chosen: the site's own.
+            SitePermissions.noteAsked(.webRTC, origin: site, isPrivate: false)
+            #expect(SitePermissions.isOwn(.webRTC, origin: site))
+            SitePermissions.forgetAsked()
+            SitePermissions.setChoice(.allow, for: .webRTC, origin: site)
+            #expect(SitePermissions.isOwn(.webRTC, origin: site))
+            // Reset takes it back to the setting's.
+            SitePermissions.reset(origin: site)
+            #expect(!SitePermissions.isOwn(.webRTC, origin: site))
+            #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.webRTC])
+        }
+    }
+
     @Test func aPrivateWindowKeepsNothing() async throws {
         guard WebRTCProtection.isAvailable else { return }
         try await withDefaults {

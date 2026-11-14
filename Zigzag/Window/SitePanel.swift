@@ -943,11 +943,15 @@ final class SitePanel: FloatingPanelView {
         }
         if permissionsGroup.superview == nil { permissionsBox.addSubview(permissionsGroup) }
         permissionsGroup.rows = permissionRows
+        // WebRTC's row with the protection on is the setting's, not the site's: under the line saying it hasn't
+        // asked for anything, and with no Reset.
+        let own = permissionKinds.filter { isOwn($0) }
         if permissionsEmpty.superview == nil { permissionsBox.addSubview(permissionsEmpty) }
-        permissionsEmpty.isHidden = !permissionRows.isEmpty
+        permissionsEmpty.isHidden = !own.isEmpty
         if resetPermissions == nil, let origin {
             let row = PanelLinkRow(String(localized: "Reset Permissions", comment: "Row under a site's permissions in the site panel: forgets every answer given to the site, so it asks again.")) { [weak self] in
                 SitePermissions.reset(origin: origin)
+                self?.tab.webRTCHere[origin] = nil
                 self?.rebuildRows()
                 // Nothing left to show there.
                 self?.show(.main)
@@ -955,7 +959,7 @@ final class SitePanel: FloatingPanelView {
             permissionsBox.addSubview(row)
             resetPermissions = row
         }
-        resetPermissions?.isHidden = permissionRows.isEmpty
+        resetPermissions?.isHidden = own.isEmpty
         if permissionsRow == nil, origin != nil {
             let row = PanelLinkRow(permissionsHeader.title, value: "", goes: true) { [weak self] in self?.show(.permissions) }
             addSubview(row)
@@ -969,9 +973,11 @@ final class SitePanel: FloatingPanelView {
         guard let origin, let row = permissionsRow else { return }
         let shown = SitePermissions.shown(origin: origin, isPrivate: isPrivate || tab.isPrivate)
         row.isHidden = shown.isEmpty
-        let choices = shown.map { choice($0, origin: origin) }
-        row.value = PermissionChoice.summary(choices)
-        row.shortValue = PermissionChoice.shortSummary(choices)
+        // Only the site's own answers count: WebRTC blocked by the setting alone says nothing about this site.
+        let own = shown.filter { isOwn($0) }
+        let choices = own.map { choice($0, origin: origin) }
+        row.value = own.isEmpty ? "" : PermissionChoice.summary(choices)
+        row.shortValue = own.isEmpty ? "" : PermissionChoice.shortSummary(choices)
         needsLayout = true
     }
 
@@ -982,6 +988,12 @@ final class SitePanel: FloatingPanelView {
 
     /// The permissions of the rows on the Permissions page, top to bottom.
     private var permissionKinds: [SitePermission] = []
+
+    /// The site has an answer of its own for it, not just the setting (a private tab's WebRTC choice counts).
+    private func isOwn(_ permission: SitePermission) -> Bool {
+        guard let origin else { return false }
+        return SitePermissions.isOwn(permission, origin: origin, here: tab.webRTCHere[origin])
+    }
 
     /// What a permission's row shows: WebRTC as this tab has it, a private window's own choice included.
     private func choice(_ permission: SitePermission, origin: String) -> PermissionChoice {
@@ -1050,13 +1062,16 @@ final class SitePanel: FloatingPanelView {
 
         switch page {
         case .permissions:
-            group(permissionsGroup)
             if !permissionsEmpty.isHidden {
                 let w = inner + Label.inset * 2
                 let h = ceil(permissionsEmpty.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: w, height: 10_000)).height ?? permissionsEmpty.lineHeight)
+                // Alone, it sits a step under the header; with WebRTC's row under it, that row follows a step down.
                 place(permissionsEmpty, NSRect(x: pad - Label.inset, y: y + Tokens.Space.x2, width: w, height: h))
                 y += Tokens.Space.x2 + h
+                if !permissionsGroup.rows.isEmpty { y += Tokens.Space.x3 }
             }
+            group(permissionsGroup)
+            if !permissionsGroup.rows.isEmpty { end(0, slack: permissionsGroup.bottomSlack) }
             if let resetPermissions, !resetPermissions.isHidden {
                 y += Tokens.Space.x2
                 link(resetPermissions)
