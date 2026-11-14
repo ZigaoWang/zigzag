@@ -81,7 +81,10 @@ struct MCPToolsTests {
         // An empty tab can still be sent somewhere.
         #expect(MCPSafety.refusal(url: nil, isPrivate: false, needsPage: false) == nil)
         #expect(MCPSafety.refusal(url: nil, isPrivate: true, needsPage: false) == .privateWindow)
-        for refusal in [MCPSafety.Refusal.privateWindow, .ownPage, .extensionPage, .notAWebPage, .emptyTab, .stopped] {
+        // Zigzag's error or certificate warning page: its "Visit anyway" is the person's to choose.
+        #expect(MCPSafety.refusal(url: site, isPrivate: false, errorPage: true) == .errorPage)
+        #expect(MCPSafety.refusal(url: site, isPrivate: false, errorPage: true, needsPage: false) == .errorPage)
+        for refusal in [MCPSafety.Refusal.privateWindow, .ownPage, .extensionPage, .notAWebPage, .emptyTab, .stopped, .errorPage] {
             #expect(!MCPSafety.message(refusal).isEmpty)
         }
     }

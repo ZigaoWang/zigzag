@@ -54,6 +54,14 @@ struct ScriptingTests {
         #expect(Scripting.javaScriptRefusal(url: nil, isPrivate: false, allowed: true) == .notAWebPage)
     }
 
+    /// The error and certificate warning page is Zigzag's, shown at the site's address: its "Visit anyway" is the person's.
+    @Test func javaScriptNeverInTheErrorPage() {
+        let page = URL(string: "https://expired.example")
+        #expect(Scripting.javaScriptRefusal(url: page, isPrivate: false, allowed: true, errorPage: true) == .errorPage)
+        #expect(Scripting.javaScriptRefusal(url: page, isPrivate: false, allowed: false, errorPage: true) == .turnedOff)
+        #expect(!Scripting.message(for: .errorPage).isEmpty)
+    }
+
     @Test func readsOnlyWebPagesOutsidePrivateWindows() {
         #expect(Scripting.isReadable(url: URL(string: "https://example.com"), isPrivate: false))
         #expect(!Scripting.isReadable(url: URL(string: "https://example.com"), isPrivate: true))

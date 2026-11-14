@@ -70,14 +70,16 @@ enum Scripting {
 
     /// Why JavaScript from a script can't run in a page, or nil when it can.
     enum Refusal: Equatable {
-        case turnedOff, privateWindow, notAWebPage
+        case turnedOff, privateWindow, notAWebPage, errorPage
     }
 
     /// Only in a web page or a local file, never in Zigzag's own pages or an extension's, which can do more than a page.
-    static func javaScriptRefusal(url: URL?, isPrivate: Bool, allowed: Bool) -> Refusal? {
+    /// Nor in Zigzag's error or certificate warning page (`errorPage`), whose "Visit anyway" only the person may choose.
+    static func javaScriptRefusal(url: URL?, isPrivate: Bool, allowed: Bool, errorPage: Bool = false) -> Refusal? {
         if !allowed { return .turnedOff }
         if isPrivate { return .privateWindow }
-        return isWebPage(url) ? nil : .notAWebPage
+        guard isWebPage(url) else { return .notAWebPage }
+        return errorPage ? .errorPage : nil
     }
 
     /// A page whose text and source a script may read: a website or a local file, outside private windows.
@@ -94,6 +96,9 @@ enum Scripting {
             String(localized: "Scripts can’t run JavaScript in a private window.", comment: "Error a script gets when it runs JavaScript in a private window's tab.")
         case .notAWebPage:
             String(localized: "Scripts can run JavaScript only in web pages.", comment: "Error a script gets when it runs JavaScript in Settings, History or an extension's page.")
+        case .errorPage:
+            String(localized: "Scripts can’t run JavaScript in Zigzag’s error or certificate warning page.",
+                   comment: "Error a script gets when it runs JavaScript in a tab showing a page that couldn't load or a certificate warning.")
         }
     }
 
@@ -435,7 +440,8 @@ extension Scripting {
             fail(errAENoSuchObject, String(localized: "There’s no tab to run it in.", comment: "Error a script gets when it runs JavaScript with no window open."))
             return nil
         }
-        if let refusal = javaScriptRefusal(url: scripted.tab.url, isPrivate: scripted.tab.isPrivate, allowed: allowsJavaScript) {
+        if let refusal = javaScriptRefusal(url: scripted.tab.url, isPrivate: scripted.tab.isPrivate, allowed: allowsJavaScript,
+                                           errorPage: scripted.tab.showsErrorPage) {
             fail(refusal == .turnedOff ? errAEEventNotPermitted : errAEEventFailed, message(for: refusal))
             return nil
         }
@@ -443,7 +449,8 @@ extension Scripting {
         whenAwake(scripted.tab) { webView in
             // Asked while it slept or loaded, it may be on another page now: one of Zigzag's own (History, an
             // extension's page), where JavaScript could do more than a website's. Checked again, on that page.
-            if let refusal = javaScriptRefusal(url: webView.url, isPrivate: scripted.tab.isPrivate, allowed: allowsJavaScript) {
+            if let refusal = javaScriptRefusal(url: webView.url, isPrivate: scripted.tab.isPrivate, allowed: allowsJavaScript,
+                                               errorPage: scripted.tab.showsErrorPage) {
                 command.scriptErrorNumber = refusal == .turnedOff ? errAEEventNotPermitted : errAEEventFailed
                 command.scriptErrorString = message(for: refusal)
                 command.resumeExecution(withResult: nil)

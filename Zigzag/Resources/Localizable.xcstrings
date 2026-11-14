@@ -13309,6 +13309,17 @@
         }
       }
     },
+    "Scripts can’t run JavaScript in Zigzag’s error or certificate warning page." : {
+      "comment" : "Error a script gets when it runs JavaScript in a tab showing a page that couldn't load or a certificate warning.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本不能在 Zigzag 的错误页面或证书警告页面中运行 JavaScript。"
+          }
+        }
+      }
+    },
     "Search" : {
       "comment" : "A section of Settings: the search engine and suggestions.\nAction label at the right of the selected command bar result, saying what Return does: searches for it.",
       "localizations" : {

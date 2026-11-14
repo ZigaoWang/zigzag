@@ -32,12 +32,14 @@ enum MCPBrowser {
         case .success(let value): found = value
         }
         let tab = found.tab
-        let needsPage: Bool
+        let needsPage: Bool, actsOnPage: Bool
         switch command {
-        case .activate, .close, .navigate: needsPage = false
-        default: needsPage = true
+        case .activate, .close, .goBack, .goForward, .reload: (needsPage, actsOnPage) = (false, false)
+        case .navigate: (needsPage, actsOnPage) = (false, true)
+        default: (needsPage, actsOnPage) = (true, true)
         }
-        if let refusal = MCPSafety.refusal(url: tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id), needsPage: needsPage) {
+        if let refusal = MCPSafety.refusal(url: tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id),
+                                           errorPage: actsOnPage && tab.showsErrorPage, needsPage: needsPage) {
             return .error(MCPSafety.message(refusal))
         }
         AgentControl.shared.touch(tab, by: client)
@@ -158,7 +160,7 @@ enum MCPBrowser {
     private static func waitFor(_ condition: MCPWaitCondition, timeout: TimeInterval, in tab: Tab, controller: BrowserWindowController) async -> MCPToolResult {
         let webView: WKWebView
         if let awakeView = tab.webView { webView = awakeView } else { webView = await awake(tab) }
-        if let refusal = MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id)) {
+        if let refusal = MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id), errorPage: tab.showsErrorPage) {
             return .error(MCPSafety.message(refusal))
         }
         let wait = MCPWait(condition, in: webView, timeout: timeout) { [weak tab, weak webView] in
@@ -166,7 +168,7 @@ enum MCPBrowser {
             guard let webView, tab.webView === webView else { return "The tab went to sleep while waiting, so the wait ended." }
             if !MCPService.isOn { return MCPWait.stoppedMessage }
             // Stopped, or now on a page no tool may use (the load it waited for went to one).
-            if let refusal = MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id)) {
+            if let refusal = MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id), errorPage: tab.showsErrorPage) {
                 return MCPSafety.message(refusal)
             }
             return nil
@@ -250,7 +252,7 @@ enum MCPBrowser {
     private static func page(_ tab: Tab, _ body: @MainActor (WKWebView) async -> MCPToolResult) async -> MCPToolResult {
         let webView = await awake(tab)
         // Woken or done loading, it may be on another page now: checked again, on that page.
-        if let refusal = MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id)) {
+        if let refusal = MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id), errorPage: tab.showsErrorPage) {
             return .error(MCPSafety.message(refusal))
         }
         return await body(webView)
