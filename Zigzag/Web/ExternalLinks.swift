@@ -139,21 +139,21 @@ enum ExternalLinks {
             let answer = await PermissionPrompt.ask(host: SitePermissions.askerName(origin), origin: origin, what: name, symbol: "arrow.up.forward.app",
                                                     icon: NSWorkspace.shared.icon(forFile: app.path), in: promptHost,
                                                     tab: tab, title: String(localized: "Open \(name)", comment: "A page's question to open an app, without its question mark. The placeholder is the app's name, like “zoom.us”."),
-                                                    allowTitle: String(localized: "Open", comment: "Button on a page's question to open an app: opens it this time."),
-                                                    alwaysTitle: saves ? String(localized: "Always Open", comment: "Button on a page's question to open an app: opens it, and the site may open this app without asking from now on.") : nil,
-                                                    denyTitle: String(localized: "Don’t Open", comment: "Button on a page's question to open an app."),
-                                                    answered: { decision().map { $0 ? .allow : .deny } })
-            asked.asking.remove(key)
-            switch answer {
-            case .allow, .alternate:
+                                                    actions: [.deny, .allow], canRemember: saves,
+                                                    answered: { decision().map { PermissionAnswer(action: $0 ? "allow" : "deny", remember: true) } })
+            asking.remove(key)
+            guard let answer else {
+                putOff[key] = Date().addingTimeInterval(60)
+                return
+            }
+            switch answer.action {
+            case "allow":
+                if answer.remember, saves, let origin { SitePermissions.allowOpeningApp(origin: origin, scheme: scheme) }
                 NSWorkspace.shared.open(url)
-            case .always:
-                if saves, let origin { SitePermissions.allowOpeningApp(origin: origin, scheme: scheme) }
-                NSWorkspace.shared.open(url)
-            case .deny:
-                asked.declined.insert(key)
-            case .notNow:
-                asked.putOff[key] = Date().addingTimeInterval(60)
+            case "deny":
+                declined.insert(key)
+            default:
+                break
             }
         }
     }

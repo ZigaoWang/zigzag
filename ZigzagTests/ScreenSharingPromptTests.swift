@@ -14,13 +14,13 @@ struct ScreenSharingPromptTests {
 
     @Test func promptAnswersMapToChoices() {
         // The filled answer shares a window; the one beside it, a screen.
-        #expect(DisplayCaptureChoice(.allow) == .window)
-        #expect(DisplayCaptureChoice(.alternate) == .screen)
+        #expect(DisplayCaptureChoice(PermissionAnswer(action: "allow", remember: false)) == .window)
+        #expect(DisplayCaptureChoice(PermissionAnswer(action: "screen", remember: false)) == .screen)
         // Don't Allow, and putting it off (Esc, ×, a click elsewhere, the tab moving on), are no.
-        #expect(DisplayCaptureChoice(.deny) == .deny)
-        #expect(DisplayCaptureChoice(.notNow) == .deny)
+        #expect(DisplayCaptureChoice(PermissionAnswer(action: "deny", remember: false)) == .deny)
+        #expect(DisplayCaptureChoice(nil) == .deny)
         // The question never offers Always: screen sharing is asked every time.
-        #expect(DisplayCaptureChoice(.always) == .deny)
+        #expect(DisplayCaptureChoice(PermissionAnswer(action: "always", remember: true)) == .deny)
     }
 
     @Test func promptOffersWindowScreenAndNo() {

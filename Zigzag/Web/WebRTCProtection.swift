@@ -176,8 +176,9 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
         if bringingForward { controller.window?.makeKeyAndOrderFront(nil) }
         let answer = await PermissionPrompt.ask(host: SitePermissions.askerName(origin), origin: origin, what: "WebRTC", symbol: "phone.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use WebRTC for calls", comment: "A site's permission question, without its question mark: WebRTC is off for the site (Settings › Privacy › Protect IP address from WebRTC), and it tried to start a call. WebRTC is a name: keep it as it is."),
-                                                allowTitle: String(localized: "Allow and Reload", comment: "Button on the question to use WebRTC for calls on a site: allows it for the site and reloads the page."))
-        return answer == .allow || answer == .always ? origin : nil
+                                                actions: [.deny, PermissionAction(id: "allow", title: String(localized: "Allow and Reload", comment: "Button on the question to use WebRTC for calls on a site: allows it for the site and reloads the page."), isDeny: false, isProminent: true)],
+                                                canRemember: false)
+        return answer?.action == "allow" ? origin : nil
     }
 
     private static let kind = "webRTC"
