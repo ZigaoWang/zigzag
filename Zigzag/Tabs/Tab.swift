@@ -1676,16 +1676,17 @@ extension Tab: WKUIDelegate {
 
     /// A page's own Print button (`window.print()`): WebKit asks the browser to print through this (WKUIDelegatePrivate,
     /// unpublished, as Safari answers it); without it the button does nothing. The print panel comes up as for ⌘P, and
-    /// the page waits until it's done, so its own "after print" steps run when they should.
+    /// the page waits until it's done, so its own "after print" steps run when they should. An iframe's print()
+    /// prints that frame; a background tab's is let be.
     @objc(_webView:printFrame:pdfFirstPageSize:completionHandler:)
     func webView(_ webView: WKWebView, printFrame frame: AnyObject?, pdfFirstPageSize size: CGSize, completionHandler: @escaping () -> Void) {
-        PagePrinting.print(webView, in: host?.hostWindow, completion: completionHandler)
+        PagePrinting.printForPage(webView, frame: frame, in: host?.hostWindow, completion: completionHandler)
     }
 
     /// The same request from older WebKit, which doesn't wait.
     @objc(_webView:printFrame:)
     func webView(_ webView: WKWebView, printFrame frame: AnyObject?) {
-        PagePrinting.print(webView, in: host?.hostWindow, completion: {})
+        PagePrinting.printForPage(webView, frame: frame, in: host?.hostWindow, completion: {})
     }
 
     /// The window the page is told it's in (`window.outerWidth` and the rest): the page's own place on screen
