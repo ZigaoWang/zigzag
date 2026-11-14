@@ -4336,7 +4336,7 @@
         }
       }
     },
-    "Close %lld tabs you haven’t been using" : {
+    "Close %lld tabs you haven’t used in a while" : {
       "comment" : "Tooltip of the sidebar's Clear button: closes the tabs you haven't looked at in a while, keeping the ones you're working with now.",
       "localizations" : {
         "en" : {
@@ -4345,13 +4345,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Close the tab you haven’t been using"
+                  "value" : "Close the tab you haven’t used in a while"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Close %lld tabs you haven’t been using"
+                  "value" : "Close %lld tabs you haven’t used in a while"
                 }
               }
             }
@@ -4363,7 +4363,7 @@
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "关闭 %lld 个你最近没在用的标签页"
+                  "value" : "关闭 %lld 个有一阵子没用的标签页"
                 }
               }
             }
@@ -4470,6 +4470,41 @@
         }
       }
     },
+    "Close the last %lld tabs, leaving the space empty" : {
+      "comment" : "Tooltip of the sidebar's Clear button when the only tabs left are the one you're on (and the pages beside it in a split).",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Close the last tab, leaving the space empty"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Close the last %lld tabs, leaving the space empty"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "关闭最后 %lld 个标签页，空间将变为空"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Close the other %lld tabs" : {
       "comment" : "Tooltip of the sidebar's Clear button: closes every tab but the one you're on.",
       "localizations" : {
@@ -4501,28 +4536,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "Close these tabs too, leaving the space empty" : {
-      "comment" : "Tooltip of the sidebar's Clear button when the only tabs left are the split view you're on.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "把这些标签页也关闭，空间将变为空"
-          }
-        }
-      }
-    },
-    "Close this tab too, leaving the space empty" : {
-      "comment" : "Tooltip of the sidebar's Clear button when the only tab left is the one you're on.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "把这个标签页也关闭，空间将变为空"
           }
         }
       }

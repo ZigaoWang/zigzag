@@ -107,10 +107,12 @@ class SidebarRowView: InteractiveView {
         }
     }
 
-    private func applyFreshness(animated: Bool = false) {
+    /// What fades: the icon and title, and on a split's row every page's.
+    var fadingViews: [NSView] { [icon, title] }
+
+    func applyFreshness(animated: Bool = false) {
         let visible = isAboutToClear ? 0.18 : isSelected || isHovered || isLifted || isMarked ? 1 : freshness
-        (animated ? icon.animator() : icon).alphaValue = visible
-        (animated ? title.animator() : title).alphaValue = visible
+        for view in fadingViews { (animated ? view.animator() : view).alphaValue = visible }
     }
 }
 
@@ -278,6 +280,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         // A group's other parts, set aside while one of them had the whole row.
         partViews.flatMap { $0 }.forEach { $0.alphaValue = 1 }
         ([divider] + (extraViews ?? []).map(\.divider)).forEach { $0.alphaValue = 1 }
+        applyFreshness()
         refreshAccessories()
         if commit { onRename?(name) }
         renamingPage = nil
@@ -289,6 +292,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private var partViews: [[NSView]] {
         [[icon, title], [partnerIcon, partnerTitle]] + (extraViews ?? []).map { [$0.icon, $0.title] }
     }
+    /// A split or group fades as one, every page with the first; while one part is being renamed, the others stay
+    /// set aside.
+    override var fadingViews: [NSView] { renameField == nil ? partViews.flatMap { $0 } : super.fadingViews }
 
     /// The pinned page's own name, shown before the mark while it's away: "Apple / MacBook Pro".
     var pinName: String? { didSet { pinLabel.stringValue = pinName ?? ""; needsLayout = true } }
@@ -1267,13 +1273,21 @@ final class SeparatorRowView: NSView {
     /// With Full Keyboard Access on, Clear stays in the Tab order while there are tabs to clear, see-through until
     /// focus reaches it; otherwise it's hidden whenever it isn't shown.
     private var clearInTabOrder: Bool { NSApp.isFullKeyboardAccessEnabled && hasTabs }
+    /// With the pointer on Clear, or keyboard focus, the list shows what it would close (true) or stops (false).
+    var onPreview: ((Bool) -> Void)?
+    var isPreviewingClear: Bool { clearButton.isHovered || clearButton.hasKeyboardFocus }
+    private func previewChanged() { onPreview?(isPreviewingClear) }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         addSubview(label)
         clearButton.alphaValue = 0
         clearButton.isHidden = true
-        clearButton.keyboardFocusChanged = { [weak self] _ in self?.refreshClear() }
+        clearButton.keyboardFocusChanged = { [weak self] _ in
+            self?.refreshClear()
+            self?.previewChanged()
+        }
+        clearButton.hoverChanged = { [weak self] _ in self?.previewChanged() }
         addSubview(clearButton)
     }
 
@@ -1396,12 +1410,11 @@ final class ClearTabsButton: InteractiveView {
         didSet {
             switch step {
             case .unused(let n):
-                toolTip = String(localized: "Close \(n) tabs you haven’t been using", comment: "Tooltip of the sidebar's Clear button: closes the tabs you haven't looked at in a while, keeping the ones you're working with now.")
+                toolTip = String(localized: "Close \(n) tabs you haven’t used in a while", comment: "Tooltip of the sidebar's Clear button: closes the tabs you haven't looked at in a while, keeping the ones you're working with now.")
             case .others(let n):
                 toolTip = String(localized: "Close the other \(n) tabs", comment: "Tooltip of the sidebar's Clear button: closes every tab but the one you're on.")
             case .last(let n):
-                toolTip = n == 1 ? String(localized: "Close this tab too, leaving the space empty", comment: "Tooltip of the sidebar's Clear button when the only tab left is the one you're on.")
-                                 : String(localized: "Close these tabs too, leaving the space empty", comment: "Tooltip of the sidebar's Clear button when the only tabs left are the split view you're on.")
+                toolTip = String(localized: "Close the last \(n) tabs, leaving the space empty", comment: "Tooltip of the sidebar's Clear button when the only tabs left are the one you're on (and the pages beside it in a split).")
             }
             setAccessibilityLabel(toolTip)
         }

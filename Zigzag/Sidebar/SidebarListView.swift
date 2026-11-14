@@ -749,15 +749,19 @@ final class SidebarListView: NSView {
         }
     }
 
-    /// With the pointer on Clear, the rows it would close sink back; off it, they come back up.
+    /// While the pointer or keyboard focus is on Clear, the pages it would close: their rows sink back.
+    private var clearPreview: Set<UUID>?
+
+    /// With the pointer on Clear (or Tab's focus), the rows it would close sink back; off it, they come back up.
     private func previewClear(_ on: Bool) {
         guard let manager else { return }
-        let closing = on ? manager.tabsToClear(in: shownSpaceID ?? manager.currentSpaceID).tabs : []
-        for view in rows.values {
-            guard let row = view as? TabRowView, !row.isBookmark else { continue }
-            let pages = row.pages
-            row.isAboutToClear = closing.contains { page in pages.contains { $0 === page } }
-        }
+        clearPreview = on ? Set(manager.tabsToClear(in: shownSpaceID ?? manager.currentSpaceID).tabs.map(\.id)) : nil
+        for case let row as TabRowView in rows.values { showClearPreview(row) }
+    }
+
+    private func showClearPreview(_ row: TabRowView) {
+        let pages = row.pages
+        row.isAboutToClear = !row.isBookmark && clearPreview.map { ids in pages.contains { ids.contains($0.id) } } == true
     }
 
     /// Starts renaming a folder's row (a new folder, or Rename in its menu).
@@ -799,6 +803,13 @@ final class SidebarListView: NSView {
     override func mouseEntered(with event: NSEvent) { isPointerInside = true }
     #if DEBUG
     func debugHover(_ on: Bool) { isPointerInside = on }
+    /// The pointer on Clear, or off it: the rows it would close sink back. Returns what its tooltip says.
+    func debugClearHover(_ on: Bool) -> String {
+        isPointerInside = on
+        let separator = rows[.separator] as? SeparatorRowView
+        separator?.clearButton.isHovered = on
+        return separator?.clearButton.toolTip ?? "-"
+    }
     #endif
     override func mouseExited(with event: NSEvent) { isPointerInside = false }
 
@@ -849,8 +860,13 @@ final class SidebarListView: NSView {
                 separator?.rearmClear()
                 self?.previewClear(false)
                 self?.delegate?.listClearTabs()
+                // Still on it: once the closed rows have gone, what the next press would close shows.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self, weak separator] in
+                    guard let separator, separator.isPreviewingClear, separator.window != nil else { return }
+                    self?.previewClear(true)
+                }
             }
-            separator.clearButton.hoverChanged = { [weak self] on in self?.previewClear(on) }
+            separator.onPreview = { [weak self] on in self?.previewClear(on) }
             separator.showsClear = showsClear
             return separator
         case .placeholder:
@@ -982,6 +998,8 @@ final class SidebarListView: NSView {
             case .others: .others(closing.count)
             case .last: .last(closing.count)
             }
+            // What it would close changed under the pointer (a tab opened, one started playing): the rows follow.
+            if clearPreview != nil, Set(closing.map(\.id)) != clearPreview { previewClear(true) }
 
         case .tab(let id):
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }
@@ -995,8 +1013,10 @@ final class SidebarListView: NSView {
             row.focusedHalf = partners.firstIndex { $0 === selected }.map { $0 + 1 } ?? 0
             // The pane zoomed over the rest: its part of the row is lit (#160).
             row.zoomedPart = zoomedTabID.flatMap { zoomed in row.pages.firstIndex { $0.id == zoomed } }
-            row.freshness = SiteTint.freshness(lastActivated: tab.lastActivated)
+            // A split is as fresh as its newest page, as Clear sees it.
+            row.freshness = SiteTint.freshness(lastActivated: ([tab] + partners).map(\.lastActivated).max() ?? tab.lastActivated)
             row.isMarked = marked.contains(item)
+            showClearPreview(row)
             // A tab with tabs nested under it carries the folder's chevron, to fold them away.
             row.nestedTabs = manager.hasNestedTabs(tab) ? (tab.isCollapsed ? .collapsed : .expanded) : nil
             row.setAccessibilityDisclosureLevel(tabLevels[id] ?? 0)
