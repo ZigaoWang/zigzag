@@ -280,16 +280,25 @@ enum MCPPageScript {
       return seen === SHOWS && !strip ? ALL : { seen, strip };
     };
     // The answer for an element: `under`, from the top of the page down to it. Up first, one at a time (never by
-    // recursion: a page can nest as deep as it likes), then back down. `style`, `box`: the element's own, when
-    // whoever asks has them already.
+    // recursion: a page can nest as deep as it likes), to the top or to one whose answer is kept; then back down.
+    // While a snapshot runs each answer is kept, so each element is looked at once, whoever asks and in whatever
+    // order. (Only what's asked as the person sees it is kept: a click's reach never is.) `style`, `box`: the
+    // element's own, when whoever asks has them already.
+    let known = null;
     const whatIs = (e, opacity, style, box) => {
+      const keeps = known && opacity;
       const chain = [];
-      for (let at = e; at && at !== document.body && at !== document.documentElement; at = drawnIn(at)) chain.push(at);
       let above = ALL;
+      for (let at = e; at && at !== document.body && at !== document.documentElement; at = drawnIn(at)) {
+        const kept = keeps ? known.get(at) : undefined;
+        if (kept) { above = kept; break; }
+        chain.push(at);
+      }
       for (let i = chain.length - 1; i >= 0; i--) {
         const at = chain[i];
         above = above.seen === GONE ? NONE
           : under(at, at === e && style ? style : getComputedStyle(at), at === e && box ? box : at.getBoundingClientRect(), above, opacity);
+        if (keeps) known.set(at, above);
       }
       return above;
     };
@@ -651,6 +660,15 @@ enum MCPPageScript {
       }
       return !inModal;
     };
+    // Out of the person's sight: it doesn't show (checkVisibility looks at what holds it too), or something holding it
+    // is hidden from screen readers or made inert, looking through shadow roots on the way up.
+    const outOfSight = (el) => {
+      if (!shown(el)) return true;
+      for (let at = el; at; at = composedParent(at)) {
+        if (at.nodeType === Node.ELEMENT_NODE && (at.getAttribute('aria-hidden') === 'true' || at.hasAttribute('inert'))) return true;
+      }
+      return false;
+    };
     // What keeps the person from using an element at all, by pointer or keyboard: it's disabled (itself, by what
     // holds it, or by the page's word), or set aside (inert, or behind an open dialog). { error } or null.
     const blocked = (el, who) => {
@@ -941,6 +959,270 @@ enum MCPPageScript {
         addEventListener('keyup', up, true);
         timer = setTimeout(finish, 1000);
       });
+    }
+    case 'snapshot': {
+      // The page as a screen reader has it, for an app to read and act on: its landmarks, headings and text, and each
+      // element it can use, with a ref. Only what shows. MCPSnapshot writes it out; a budget keeps a huge page from
+      // holding the page's thread for long.
+      const started = performance.now();
+      // The dialog on top, if it's one the person sees; otherwise the whole page.
+      const modal = args.ref ? null : [topModal()].find((open) => open && !outOfSight(open)) || null;
+      let root = null;
+      if (args.ref) {
+        const found = resolve(args);
+        if (found.error) return found;
+        if (outOfSight(found.el)) return { error: shownRef + ' doesn’t show on the page now, so there’s nothing of it to read.' };
+        root = found.el;
+      } else if (modal) root = modal;
+      known = new Map();
+      // [new]: not listed in this page's last snapshot.
+      const before = zz.listed, listed = new Set();
+      let visited = 0, refs = 0, cut = false;
+      const styles = new Map();
+      const styleOf = (el) => { let style = styles.get(el); if (!style) { style = getComputedStyle(el); styles.set(el, style); } return style; };
+      const STRUCTURE = new Set(['alert', 'alertdialog', 'article', 'banner', 'cell', 'columnheader', 'complementary', 'contentinfo', 'dialog',
+        'grid', 'heading', 'list', 'listitem', 'main', 'menu', 'menubar', 'navigation', 'radiogroup', 'row', 'rowheader', 'search', 'status',
+        'table', 'tablist', 'tabpanel', 'toolbar', 'tree']);
+      const NAMED_ONLY = new Set(['form', 'region', 'group']);
+      const VALUED = new Set(['textbox', 'searchbox', 'combobox', 'spinbutton', 'slider']);
+      // Listed with nothing in them, as their name says what they hold; any other landmark or list only when it holds something.
+      const ON_THEIR_OWN = new Set(['heading', 'dialog', 'alertdialog', 'alert', 'status']);
+      const mixedScripts = (s) => /(?=\S*\p{Script=Latin})(?=\S*\p{Script=Cyrillic}|\S*\p{Script=Greek})\S+/u.test(s || '');
+      // Left out with all it holds, before what the person sees of it is asked (`whatIs`): what a snapshot never
+      // reads, and what isn't drawn at all (what a closed shadow root leaves out has a style like any other, and no
+      // box).
+      const leftOut = (el, style, box) => {
+        if (SKIPPED.has(el.localName) || el.getAttribute('aria-hidden') === 'true' || el.hasAttribute('inert')) return true;
+        if (style.display === 'none' || style.contentVisibility === 'hidden') return true;
+        if (style.display === 'contents') return false;
+        return box.width === 0 && box.height === 0 && !!el.checkVisibility && !el.checkVisibility();
+      };
+      const statesOf = (el, role) => {
+        const states = {};
+        const aria = (name) => el.getAttribute('aria-' + name);
+        if (['checkbox', 'radio', 'switch', 'menuitemcheckbox', 'menuitemradio'].includes(role)) {
+          const native = el.localName === 'input' && (el.type === 'checkbox' || el.type === 'radio');
+          const checked = native ? (el.indeterminate ? 'mixed' : el.checked) : (aria('checked') === 'mixed' ? 'mixed' : aria('checked') === 'true');
+          if (checked) states.checked = checked;
+        }
+        if (el.matches(':disabled') || aria('disabled') === 'true') states.disabled = true;
+        if (aria('expanded') === 'true' || (el.localName === 'summary' && el.parentElement && el.parentElement.open)) states.expanded = true;
+        if (aria('selected') === 'true' || (el.localName === 'option' && el.selected)) states.selected = true;
+        if (aria('pressed') === 'true') states.pressed = true; else if (aria('pressed') === 'mixed') states.pressed = 'mixed';
+        if (role === 'heading') { const tag = /^h([1-6])$/.exec(el.localName); states.level = Number(aria('level')) || (tag ? Number(tag[1]) : 2); }
+        if (el.required || aria('required') === 'true') states.required = true;
+        if (el.getRootNode().activeElement === el) states.active = true;
+        return states;
+      };
+      const linkURL = (el) => {
+        const href = el.href ? String(el.href) : '';
+        return /^(https?|mailto|tel):/i.test(href) ? href.slice(0, 2000) : null;
+      };
+      // A run of text is a line: at most this long, and one cut short says so.
+      const RUN = 1000;
+      const flush = (out, ctx) => {
+        const text = clip(ctx.run, RUN);
+        ctx.run = '';
+        if (!text || ctx.mute) return;
+        const item = { role: 'text', text }, flags = [];
+        if (text.length > RUN && [...text].length > RUN) flags.push('shortened');
+        if (mixedScripts(text)) flags.push('mixedScripts');
+        if (flags.length) item.flags = flags;
+        out.push(item);
+      };
+      // What's in `parent`, into `out`: text gathered across inline elements, flushed at each block and node.
+      const walk = (parent, out, ctx) => {
+        // A details that's closed shows its summary, and of the rest only what the page still draws.
+        const closed = parent.localName === 'details' && !parent.open;
+        for (const child of childrenOf(parent)) {
+          if (cut) return;
+          if (closed && child.nodeType === Node.ELEMENT_NODE && child.checkVisibility && !child.checkVisibility()) continue;
+          if (child.nodeType === Node.TEXT_NODE) {
+            const owner = host(child);
+            if (owner) {
+              const style = styleOf(owner);
+              // The text right in an element shows when all of the element does (in a thin box, it doesn't), and so
+              // does where it's drawn, when that's a slot it was given to (`parent`, then).
+              if (style.visibility === 'visible' && readableStyle(style) && (known.get(owner) || ALL).seen === SHOWS
+                && (parent === owner || (known.get(parent) || ALL).seen === SHOWS) && textHasBox(child, owner, style)) ctx.run += child.data;
+            }
+          } else if (child.nodeType === Node.ELEMENT_NODE) {
+            visit(child, out, ctx);
+          }
+        }
+      };
+      // What's inside an element. One named by what it holds (a link, a button, a heading) lists only what can be used
+      // in it: the rest is its name already.
+      const usableOnly = (list) => list.flatMap((item) => {
+        if (!item.ref) return usableOnly(item.children || []);
+        if (item.children) { const kept = usableOnly(item.children); if (kept.length) item.children = kept; else delete item.children; }
+        return [item];
+      });
+      const inside = (el, mute) => {
+        const children = [], ctx = { run: '', mute };
+        walk(el, children, ctx);
+        flush(children, ctx);
+        return mute ? usableOnly(children) : children;
+      };
+      // Whether an element's name stands for all it holds, so only what can be used in it is listed under it. Not when
+      // the name was cut short (a link around a whole card, a long cell), and not a table's row, whose cells are
+      // what's read: what it holds is then listed under it.
+      const rowOfCells = (role, named) => role === 'row' && !!named.fromContent;
+      const saysItAll = (role, named) => !!named.name && !named.partial && !rowOfCells(role, named);
+      // The name it's listed with. A row goes without the name its cells' text would give it, and so does anything
+      // an app can't use (a cell, a heading) whose name was cut short: all of it is right under it, once. What can
+      // be used keeps its cut name: it's what the app is told it clicked.
+      const shownName = (role, named, usable) => rowOfCells(role, named) || (named.partial && !usable)
+        ? Object.assign({}, named, { name: '' }) : named;
+      // An element's node, with a ref if it's one an app can use.
+      const node = (el, role, named, usable, extra, more) => {
+        const item = { role: role || 'generic' };
+        if (named.name) item.name = named.name;
+        const flags = more ? more.slice() : [];
+        if (named.labelDiffers) flags.push('labelDiffers');
+        if (mixedScripts(named.name)) flags.push('mixedScripts');
+        const states = statesOf(el, role);
+        if (Object.keys(states).length) item.states = states;
+        if (usable) {
+          item.ref = refFor(usable);
+          refs += 1;
+          listed.add(item.ref);
+          if (before && !before.has(item.ref)) flags.push('new');
+        }
+        if (flags.length) item.flags = flags;
+        return Object.assign(item, extra || {});
+      };
+      // Never deeper than 400 elements: what's under that is left out, and the snapshot says it's cut.
+      let depth = 0, deep = false;
+      const visit = (el, out, ctx) => {
+        if (depth >= 400) { deep = true; return; }
+        depth += 1;
+        try { visitElement(el, out, ctx); } finally { depth -= 1; }
+      };
+      const visitElement = (el, out, ctx) => {
+        if (++visited > 20000 || performance.now() - started > 1000) { cut = true; return; }
+        const style = styleOf(el);
+        const box = el.getBoundingClientRect();
+        if (leftOut(el, style, box)) return;
+        // What the person sees of it, by the one rule (kept, so its name and what's in it find it there).
+        const seen = whatIs(el, true, style, box).seen;
+        if (seen === GONE) return;
+        // Under a thin box: nothing of it is listed, but something in it may have escaped that box.
+        if (seen === CLIPPED) { walk(el, out, ctx); return; }
+        const tag = el.localName;
+        if (tag === 'br') { ctx.run += ' '; return; }
+        const shows = box.width > 0 && box.height > 0 && style.visibility === 'visible';
+        const role = roleOf(el);
+        if (tag === 'iframe' || tag === 'frame') {
+          if (shows) {
+            flush(out, ctx);
+            const item = { role: 'iframe' };
+            const title = clip(el.getAttribute('title'), 100);
+            if (title) item.name = title;
+            try { const origin = new URL(el.src, location.href).origin; if (origin && origin !== 'null') item.url = origin; } catch (e) {}
+            out.push(item);
+          }
+          return;
+        }
+        // A label's words are its field's name, so they aren't listed again, but what can be used in it is (its field,
+        // a link to the terms it agrees to). A checkbox or radio a page hides and draws itself is listed where its
+        // label is, as what the person clicks.
+        if (tag === 'label' && el.control) {
+          const control = el.control;
+          if (shown(control)) {
+            flush(out, ctx);
+            out.push(...inside(el, true));
+            return;
+          }
+          if (shows && (control.type === 'checkbox' || control.type === 'radio')) {
+            flush(out, ctx);
+            out.push(node(control, roleOf(control), nameOf(control), control), ...inside(el, true));
+            return;
+          }
+        }
+        const editing = role === 'textbox' && el.isContentEditable;
+        const pointer = style.cursor === 'pointer' && !(el.parentElement && styleOf(el.parentElement).cursor === 'pointer');
+        const usable = shows && role !== 'presentation'
+          && (INTERACTIVE.has(role) || editing || (el.hasAttribute('tabindex') && el.tabIndex >= 0) || el.hasAttribute('onclick') || pointer);
+        // A picture or an icon: listed when it has a name, with a ref when it can be used. What's inside isn't read.
+        if (tag === 'svg' || role === 'img') {
+          const named = nameOf(el);
+          if (usable) {
+            flush(out, ctx);
+            out.push(node(el, role || 'img', named, el, null, pointer && !INTERACTIVE.has(role) ? ['pointer'] : null));
+          } else if (shows && role === 'img' && named.name) {
+            flush(out, ctx);
+            out.push(node(el, 'img', named));
+          }
+          return;
+        }
+        const scrolls = shows && el !== document.scrollingElement && el !== document.body
+          && ((/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 1) || (/(auto|scroll)/.test(style.overflowX) && el.scrollWidth > el.clientWidth + 1));
+        if (usable) {
+          flush(out, ctx);
+          const extra = {};
+          if (tag === 'select') {
+            const value = valueOf(el, 100);
+            Object.assign(extra, value);
+            // The choices on offer; which one is chosen only when the value may be given.
+            const options = [...el.options], chosen = value.value !== undefined;
+            extra.children = options.slice(0, 30).map((o) => chosen && o.selected ? { role: 'option', name: clip(o.text, 100), states: { selected: true } } : { role: 'option', name: clip(o.text, 100) });
+            if (options.length > 30) extra.more = options.length - 30;
+          } else if (editing) {
+            Object.assign(extra, valueOf(el, 100));
+          } else if (VALUED.has(role) && 'value' in el) {
+            Object.assign(extra, valueOf(el, 100));
+          }
+          const url = role === 'link' ? linkURL(el) : null;
+          if (url) extra.url = url;
+          const named = nameOf(el);
+          const item = node(el, role, shownName(role, named, true), el, extra, pointer && !INTERACTIVE.has(role) ? ['pointer'] : null);
+          // Its text is its name, when it has one that says it all; otherwise what it holds is listed under it.
+          // A field holds a value, given above under the rules for values, and nothing else to list.
+          if (!isField(el) && !editing) {
+            const children = inside(el, saysItAll(role, named));
+            if (children.length) item.children = children;
+          }
+          out.push(item);
+          return;
+        }
+        // A field that doesn't show: nothing of it, least of all the text a page put in it.
+        if (isField(el)) return;
+        if (scrolls) {
+          flush(out, ctx);
+          const left = Math.max(0, Math.round(el.scrollHeight - el.clientHeight - el.scrollTop));
+          const item = node(el, STRUCTURE.has(role) ? role : 'generic', nameOf(el), el);
+          item.states = Object.assign(item.states || {}, { scrollable: left });
+          const children = inside(el, false);
+          if (children.length) item.children = children;
+          out.push(item);
+          return;
+        }
+        if (STRUCTURE.has(role) || (NAMED_ONLY.has(role) && nameOf(el).name)) {
+          flush(out, ctx);
+          const named = nameOf(el);
+          const item = node(el, role, shownName(role, named, false));
+          const children = inside(el, saysItAll(role, named) && (role === 'heading' || NAMED_BY_CONTENT.has(role)));
+          if (children.length) item.children = children;
+          if (item.children || (item.name && (ON_THEIR_OWN.has(role) || NAMED_BY_CONTENT.has(role)))) out.push(item);
+          return;
+        }
+        // Nothing of its own (a div, a span): what it holds, in its place.
+        if (INLINE.has(tag) && style.display.startsWith('inline')) {
+          walk(el, out, ctx);
+        } else {
+          flush(out, ctx);
+          walk(el, out, ctx);
+          flush(out, ctx);
+        }
+      };
+      const nodes = [], ctx = { run: '', mute: false };
+      if (root) visit(root, nodes, ctx); else walk(document.body || document.documentElement, nodes, ctx);
+      flush(nodes, ctx);
+      // A snapshot of a part (by ref, or only an open dialog) adds to what was seen; one of the page replaces it.
+      zz.listed = root && before ? new Set([...before, ...listed]) : listed;
+      known = null;
+      return { title: clip(document.title, 200), url: String(location.href).slice(0, 2000), nodes, refs, cut: cut || deep, modal: !!modal };
     }
     case 'state':
       return { title: document.title, url: location.href, readyState: document.readyState };

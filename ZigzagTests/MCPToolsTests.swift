@@ -17,7 +17,7 @@ struct MCPToolsTests {
 
     @Test func everyToolHasASchemaAndAName() {
         #expect(MCPTools.names == ["list_tabs", "open_tab", "activate_tab", "close_tab", "navigate", "go_back", "go_forward", "reload",
-                                   "read_page", "get_links", "screenshot", "click", "type", "scroll", "wait_for", "press_key"])
+                                   "read_page", "get_links", "snapshot", "screenshot", "click", "type", "scroll", "wait_for", "press_key"])
         for tool in MCPTools.definitions {
             #expect(tool["inputSchema"]?["type"] == "object")
             #expect(tool["description"]?.string?.isEmpty == false)
@@ -37,9 +37,9 @@ struct MCPToolsTests {
         #expect(try parse("read_page").get() == .read(nil, maxChars: MCPTools.readDefault))
         #expect(try parse("read_page", ["max_chars": 10_000_000]).get() == .read(nil, maxChars: MCPTools.readMax))
         #expect(try parse("get_links", ["max": 5]).get() == .links(nil, max: 5))
-        #expect(try parse("click", ["text": "Sign up"]).get() == .click(nil, selector: nil, text: "Sign up"))
-        #expect(try parse("type", ["selector": "#q", "text": ""]).get() == .type(nil, selector: "#q", text: "", clear: true, submit: false))
-        #expect(try parse("scroll", ["dy": 400.5]).get() == .scroll(nil, dy: 400.5, selector: nil))
+        #expect(try parse("click", ["text": "Sign up"]).get() == .click(nil, .text("Sign up")))
+        #expect(try parse("type", ["selector": "#q", "text": ""]).get() == .type(nil, .selector("#q"), text: "", clear: true, submit: false))
+        #expect(try parse("scroll", ["dy": 400.5]).get() == .scroll(nil, dy: 400.5, nil))
     }
 
     @Test func refusesBadArguments() {

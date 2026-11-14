@@ -93,15 +93,27 @@ enum MCPBrowser {
                 case .success(let object): return .data(json(object))
                 }
             }
+        case .snapshot(_, let filter, let depth, let ref, let maxChars):
+            return await page(tab, since: generation) { webView in
+                var args: [String: Any] = [:]
+                if let ref { args["ref"] = ref }
+                switch await MCPPageScript.run("snapshot", args, in: webView) {
+                case .failure(let error): return .error(error.message)
+                case .success(let object):
+                    guard let answer = JSON(foundation: object), let snapshot = MCPSnapshot(answer) else { return .error("The page gave no snapshot.") }
+                    let written = snapshot.text(filter: filter, depth: depth, maxChars: maxChars)
+                    // The page's own text goes once, as text; the structured part only says what it is.
+                    let about: JSON = ["title": .string(snapshot.title), "url": .string(MCPSnapshot.withoutFragment(snapshot.url)),
+                                       "refs": .int(snapshot.refs), "truncated": .bool(written.truncated || snapshot.cut)]
+                    return MCPToolResult(content: [["type": "text", "text": .string(written.text)]], structured: about)
+                }
+            }
         case .screenshot:
             return await page(tab, since: generation) { webView in await screenshot(webView, tab: tab, in: found.controller) }
-        case .click(_, let selector, let text):
+        case .click(_, let target):
             return await page(tab, since: generation) { webView in
                 let before = webView.backForwardList.currentItem
-                var args: [String: Any] = [:]
-                if let selector { args["selector"] = selector }
-                if let text { args["text"] = text }
-                switch await MCPPageScript.run("click", args, in: webView) {
+                switch await MCPPageScript.run("click", target.args, in: webView) {
                 case .failure(let error): return .error(error.message)
                 case .success(let object):
                     // A click often starts a page load: given a moment to begin, then waited for.
@@ -111,10 +123,11 @@ enum MCPBrowser {
                     return .data(.object(result))
                 }
             }
-        case .type(_, let selector, let text, let clear, let submit):
+        case .type(_, let target, let text, let clear, let submit):
             return await page(tab, since: generation) { webView in
                 let before = webView.backForwardList.currentItem
-                switch await MCPPageScript.run("type", ["selector": selector, "text": text, "clear": clear, "submit": submit], in: webView) {
+                let args = target.args.merging(["text": text, "clear": clear, "submit": submit]) { $1 }
+                switch await MCPPageScript.run("type", args, in: webView) {
                 case .failure(let error):
                     return .error(error.message == "password" ? "That's a password field. Zigzag never lets AI apps type passwords; ask the person to type it." : error.message)
                 case .success(let object):
@@ -122,10 +135,9 @@ enum MCPBrowser {
                     return .data(json(object))
                 }
             }
-        case .scroll(_, let dy, let selector):
+        case .scroll(_, let dy, let target):
             return await page(tab, since: generation) { webView in
-                var args: [String: Any] = ["dy": dy]
-                if let selector { args["selector"] = selector }
+                let args = (target?.args ?? [:]).merging(["dy": dy]) { $1 }
                 switch await MCPPageScript.run("scroll", args, in: webView) {
                 case .failure(let error): return .error(error.message)
                 case .success(let object): return .data(json(object))
@@ -133,13 +145,11 @@ enum MCPBrowser {
             }
         case .waitFor(_, let condition, let timeoutMs):
             return await waitFor(condition, timeout: TimeInterval(timeoutMs) / 1000, in: tab, controller: found.controller, since: generation)
-        case .pressKey(_, let press, let selector):
+        case .pressKey(_, let press, let element):
             return await page(tab, since: generation) { webView in
                 let before = webView.backForwardList.currentItem
-                var args: [String: Any] = [:]
-                if let selector { args["selector"] = selector }
                 let target: [String: Any]
-                switch await MCPPageScript.run("keyTarget", args, in: webView) {
+                switch await MCPPageScript.run("keyTarget", element?.args ?? [:], in: webView) {
                 case .failure(let error): return .error(error.message)
                 case .success(let object): target = object
                 }
