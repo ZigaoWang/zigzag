@@ -121,8 +121,7 @@ import WebKit
         }
     }
 
-    @Test func screenSharingOffersThreeActionsAndKeepsNothing() {
-        #expect(DisplayCaptureChoice.actions.map(\.id) == ["deny", "screen", "allow"])
+    @Test func screenSharingOffersThreeActionsAndKeepsNothing() {        #expect(DisplayCaptureChoice.actions.map(\.id) == ["deny", "screen", "allow"])
         #expect(DisplayCaptureChoice.actions.last?.isProminent == true)
     }
 
@@ -167,5 +166,23 @@ import WebKit
             #expect(SitePermissions.actions(origin: "https://a.com").isEmpty)
             #expect(SitePermissions.actions(origin: "https://b.com").isEmpty)
         }
+    }
+
+    /// An app answer is kept only for a secure page, and never for a frame from another site.
+    @Test func anHttpPageCannotRememberAnAppQuestion() {
+        #expect(ExternalLinks.canRemember(url: URL(string: "http://example.com"), foreign: false) == false)
+        #expect(ExternalLinks.canRemember(url: URL(string: "https://example.com"), foreign: false) == true)
+        #expect(ExternalLinks.canRemember(url: URL(string: "https://example.com"), foreign: true) == false)
+    }
+
+    @Test func aStoredAllowSkipsTheQuestionAndABlockStopsIt() {
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: "allow", canRemember: true) == .open)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: "deny", canRemember: true) == .block)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: nil, canRemember: true) == .ask)
+    }
+
+    @Test func aForeignFrameNeverSeesThePagesAllow() {
+        #expect(ExternalLinks.decision(page: "https://zoom.us", scheme: "zoommtg", foreign: true, stored: "allow") == nil)
+        #expect(ExternalLinks.decision(page: "https://zoom.us", scheme: "zoommtg", foreign: true, stored: "deny") == "deny")
     }
 }
