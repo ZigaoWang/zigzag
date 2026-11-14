@@ -64,6 +64,18 @@ final class FaviconView: NSView {
     private var renderedOriginal: (side: CGFloat, scale: CGFloat, image: NSImage)?
     /// The globe a site without an icon shows, for a badge.
     static var globeIcon: NSImage { globe }
+    /// A question is waiting for this page that cannot be shown yet (it is in a background tab, or the window is
+    /// hidden): a filled dot in this color at the developer chip's place, with nothing cut out of the icon for it.
+    /// One dot per page, however many questions are waiting.
+    var attentionColor: NSColor? {
+        didSet {
+            guard oldValue !== attentionColor else { return }
+            Tokens.Motion.withoutAnimation { attentionDot.isHidden = attentionColor == nil }
+            needsLayout = true
+        }
+    }
+    private let attentionDot = CALayer()
+    private var renderedAttention: (side: CGFloat, scale: CGFloat, color: CGColor)?
 
     /// Where the chip sits for an icon of `side` points (x right, y up, from the icon's bottom-left), its side a share
     /// of the icon's and reaching a little past the icon's corner.
@@ -113,6 +125,9 @@ final class FaviconView: NSView {
         badge.contentsGravity = .resizeAspect
         badge.isHidden = true
         layer?.addSublayer(badge)
+        attentionDot.contentsGravity = .resizeAspect
+        attentionDot.isHidden = true
+        layer?.addSublayer(attentionDot)
 
         spinner.weight = 0.3
         // A page that never says it's done (long polling, a hung load) would keep it flowing forever: after a
@@ -137,6 +152,7 @@ final class FaviconView: NSView {
             spinner.ribbonWidth = bounds.width * 0.62
             fallback.frame = bounds
             layoutBadge()
+            layoutAttention()
         }
         refreshColors()
     }
@@ -200,6 +216,31 @@ final class FaviconView: NSView {
                        hints: [.interpolation: NSNumber(value: NSImageInterpolation.high.rawValue)])
         }
         NSGraphicsContext.restoreGraphicsState()
+        return context.makeImage()
+    }
+
+    /// The dot a page wears when a question is waiting for it that can't be shown yet, at the chip's own place.
+    private func layoutAttention() {
+        guard let color = attentionColor, bounds.width > 0 else { return }
+        let frame = Self.badgeFrame(side: bounds.width)
+        attentionDot.frame = frame
+        let scale = window?.backingScaleFactor ?? 2
+        var resolved = color.cgColor
+        effectiveAppearance.performAsCurrentDrawingAppearance { resolved = color.cgColor }
+        if let last = renderedAttention, last.side == frame.width, last.scale == scale, last.color == resolved { return }
+        renderedAttention = (frame.width, scale, resolved)
+        attentionDot.contents = Self.renderDot(side: frame.width, scale: scale, color: resolved)
+        attentionDot.contentsScale = scale
+    }
+
+    /// A plain disc, at exactly the pixels it fills: the badge without the hammer, and without the cut in the icon.
+    private static func renderDot(side: CGFloat, scale: CGFloat, color: CGColor) -> CGImage? {
+        let pixels = Int((side * scale).rounded())
+        guard pixels > 0, let context = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
+                                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        context.setFillColor(color)
+        context.fillEllipse(in: CGRect(x: 0, y: 0, width: pixels, height: pixels))
         return context.makeImage()
     }
 

@@ -73,12 +73,13 @@ jobs:
             -only-testing:ZigzagTests/DownloadRuleTests \
             -only-testing:ZigzagTests/SitePermissionsPolicyTests \
             -only-testing:ZigzagTests/PermissionPromptTests \
+            -only-testing:ZigzagTests/PendingQuestionsTests \
             -only-testing:ZigzagTests/SiteControlsPermissionTests | tee test.log
 
       - name: Check the tests that matter really ran
         # A selector that matches nothing passes silently, so name one test per area; and a red test is a red build.
         run: |
-          for t in eachMatchKind remembersAnActionPerSubjectAndOrigin theAnswerCarriesTheChosenActionAndDuration openAppsIsAPermission; do
+          for t in eachMatchKind remembersAnActionPerSubjectAndOrigin theAnswerCarriesTheChosenActionAndDuration openAppsIsAPermission aBackgroundTabHoldsItsQuestion; do
             grep -q "✔ Test $t() passed" test.log || { echo "did not run: $t"; exit 1; }
           done
           if grep -q "✘" test.log; then echo "a test failed"; exit 1; fi
