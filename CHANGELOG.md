@@ -5,6 +5,13 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Site permissions are one banner everywhere: camera, microphone, location, notifications, pop-ups, opening an app and a download rule's handoff all ask in the same card, in the page's own window, with Deny first and the ordinary yes prominent. Every answer is a choice, not a yes or no: **Deny / Open in Browser / Hand Off** for a download rule, **Deny / This Tab / New Tab / Mini** for a pop-up, so a page's pop-up can be sent to the tab you're in, a new tab, or the small viewer.
+- An answer is now either **This time** or **Always on this site**, chosen from a dropdown above the buttons. This time holds on the page that asked; Always is kept for the site until you forget it in Site Controls or Settings › Privacy. Where an answer can't be kept — a private window, an insecure page, a frame from another site, a page with no site — the dropdown stays visible but greyed, with a tooltip saying why, instead of vanishing.
+- A Deny is remembered like an Allow: blocking one app, pop-up destination, notification or download rule for a site sticks, instead of asking again every time. Deleting a download rule forgets the sites it was decided on, and Settings › Downloads lists those sites under the rule, each with its own Forget.
+- Download rules ask before they run, naming the rule and the site: **Deny** cancels the link or leaves the download to Zigzag, **Open in Browser** carries on as if no rule matched, and **Hand Off** runs it. The question is about the page that produced the link or download, not the file's own host, and a remembered answer keeps it to one question per site.
+- A remembered pop-up destination opens with no question the next time; otherwise the pop-up question's answer is remembered for the site.
+
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
