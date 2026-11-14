@@ -590,6 +590,40 @@ final class Label: NSTextField {
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
+    /// Text too long for its room fades out at its end instead of ending in "…": the same cut whether a button
+    /// covers its end (a sidebar row under the pointer) or not, so nothing about the text changes as the pointer
+    /// comes and goes. Its owner calls `fadeTail` once it's placed.
+    var fadesTail = false {
+        didSet { lineBreakMode = fadesTail ? .byClipping : .byTruncatingTail }
+    }
+
+    /// How far the fade at the end runs.
+    static let tailFade = Tokens.Space.x4
+
+    /// Fades the text out just before `end` (in its own terms; a button over its end), or, with none, at its own
+    /// end when the text doesn't fit. Text that fits, with nothing over it, has no fade.
+    func fadeTail(endingAt end: CGFloat? = nil) {
+        let room = bounds.width - Label.inset * 2
+        let stop = end ?? (inkWidth > room + 0.5 ? bounds.width - Label.inset : nil)
+        guard let stop, bounds.width > 0 else {
+            if layer?.mask != nil { layer?.mask = nil }
+            return
+        }
+        wantsLayer = true
+        guard let layer else { return }
+        let fade = (layer.mask as? CAGradientLayer) ?? CAGradientLayer()
+        let start = max(0, stop - Self.tailFade)
+        Tokens.Motion.withoutAnimation {
+            fade.frame = layer.bounds
+            fade.startPoint = CGPoint(x: 0, y: 0.5)
+            fade.endPoint = CGPoint(x: 1, y: 0.5)
+            fade.colors = [NSColor.black.cgColor, NSColor.black.cgColor, NSColor.clear.cgColor, NSColor.clear.cgColor]
+            let width = bounds.width
+            fade.locations = [0, NSNumber(value: Double(start / width)), NSNumber(value: Double(max(start, stop) / width)), 1]
+        }
+        if layer.mask !== fade { layer.mask = fade }
+    }
+
     /// Moved to a screen of another scale: where `centeredY` puts it is on the old screen's pixels, so the view
     /// that places it does so again.
     override func viewDidChangeBackingProperties() {

@@ -24,6 +24,8 @@ class SidebarRowView: InteractiveView {
         layer?.cornerRadius = Tokens.Sidebar.rowRadius
         layer?.cornerCurve = .continuous
         title.font = Tokens.Font.sidebarRow()
+        // A long title fades out at its end, under the pointer or not (`Label.fadesTail`).
+        title.fadesTail = true
         addSubview(icon)
         addSubview(title)
         setAccessibilityRole(.button)
@@ -53,6 +55,7 @@ class SidebarRowView: InteractiveView {
         let trailing = trailingAccessoryWidth > 0 ? trailingAccessoryWidth + Self.buttonEdge : Self.inset - Label.inset
         // Its capitals in the middle of the row, level with the icon's middle, not its line box (which sits them low).
         title.frame = NSRect(x: titleX, y: title.centeredY(in: bounds.height), width: max(0, bounds.width - titleX - trailing), height: titleHeight)
+        title.fadeTail()
         if layer?.sublayers?.contains(where: { $0.name == "rim" && !$0.isHidden }) == true { setCardRim(true) }
         refreshCardShadowPath()
     }
@@ -301,6 +304,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     var pinName: String? { didSet { pinLabel.stringValue = pinName ?? ""; needsLayout = true } }
     private lazy var pinLabel: Label = {
         let label = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textSecondary)
+        label.fadesTail = true
         addSubview(label)
         return label
     }()
@@ -390,7 +394,11 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     var partnerLeads = false { didSet { if oldValue != partnerLeads { needsLayout = true } } }
     private var partnerToken: SignalToken?
     private let partnerIcon = FaviconView()
-    private let partnerTitle = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
+    private let partnerTitle: Label = {
+        let label = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
+        label.fadesTail = true
+        return label
+    }()
     private let divider = ColorView(color: Tokens.Color.separator)
     /// A tile group's third and fourth pages, after the partner (#160): each its own part of the row, as the
     /// partner's half is, with its icon, its title while there's room for it, and its speaker.
@@ -403,6 +411,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         if let extraViews { return extraViews }
         let made: [ExtraViews] = (0..<2).map { i in
             let icon = FaviconView(), title = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
+            title.fadesTail = true
             let divider = ColorView(color: Tokens.Color.separator)
             let audio = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
             audio.onClick = { [weak self] _ in
@@ -855,28 +864,15 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         layoutTitleFade()
     }
 
-    /// While the close button shows over the title's end (`closeOverlays`), the title fades out just before it.
+    /// While the close button shows over the title's end (`closeOverlays`), the title fades out just before it; at
+    /// rest a long title fades out at its own end, the same way, so the cut looks alike either way.
     private func layoutTitleFade() {
         let covered = closeOverlays && !closeButton.isHidden && title.frame.maxX > closeButton.frame.minX
-        guard covered else {
-            if title.layer?.mask != nil { title.layer?.mask = nil }
-            return
-        }
-        title.wantsLayer = true
-        guard let layer = title.layer, title.bounds.width > 0 else { return }
-        let fade = (layer.mask as? CAGradientLayer) ?? CAGradientLayer()
         // Clear from a little before the button, so the text never runs into it.
-        let end = closeButton.frame.minX - Self.buttonGap - title.frame.minX
-        let start = max(0, end - Tokens.Space.x4)
-        Tokens.Motion.withoutAnimation {
-            fade.frame = layer.bounds
-            fade.startPoint = CGPoint(x: 0, y: 0.5)
-            fade.endPoint = CGPoint(x: 1, y: 0.5)
-            fade.colors = [NSColor.black.cgColor, NSColor.black.cgColor, NSColor.clear.cgColor, NSColor.clear.cgColor]
-            let width = title.bounds.width
-            fade.locations = [0, NSNumber(value: Double(start / width)), NSNumber(value: Double(max(start, end) / width)), 1]
-        }
-        if layer.mask !== fade { layer.mask = fade }
+        title.fadeTail(endingAt: covered ? closeButton.frame.minX - Self.buttonGap - title.frame.minX : nil)
+        if isAway { pinLabel.fadeTail() }
+        partnerTitle.fadeTail()
+        extraViews?.forEach { $0.title.fadeTail() }
     }
 
     private func layoutButtonsAndHalves() {
