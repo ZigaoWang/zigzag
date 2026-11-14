@@ -921,6 +921,16 @@ enum DebugBridge {
             if let tab = controller.tabManager.currentTabs.first(where: { $0.title.contains(arg) }) {
                 (controller.sidebar.list.row(for: tab) as? SidebarRowView)?.isHovered = true
             }
+        case "pinhovernamed":
+            // pinhovernamed <title>: the pinned row or favorite tile of the page whose saved title starts so as if the
+            // pointer were over it; anything else: none.
+            for case let row as SidebarRowView in controller.sidebar.list.subviews { row.isHovered = false }
+            for mark in Library.shared.favorites { (controller.sidebar.favorites.tile(for: mark.id) as? InteractiveView)?.isHovered = false }
+            if let mark = (Library.shared.spaces.flatMap(\.bookmarks) + Library.shared.favorites).first(where: { $0.title.hasPrefix(arg) }) {
+                let view = Library.shared.isFavorite(mark.id) ? controller.sidebar.favorites.tile(for: mark.id) : controller.sidebar.list.bookmarkRow(mark.id)
+                (view as? InteractiveView)?.isHovered = true
+                debugLog("pinhovernamed \(arg) => \(view.map { String(describing: type(of: $0)) } ?? "none")")
+            }
         case "zoompane":
             // zoompane <n>: the shown group's pane n zoomed over the rest, or put back, as ⇧-clicking its part of the
             // row does; zoompane alone puts any zoomed pane back.
@@ -2403,8 +2413,8 @@ enum DebugBridge {
                 }
             }
         case "unload":
-            // unload <title>: a pinned page or favorite goes back to not loaded.
-            if let id = (Library.shared.spaces.flatMap(\.bookmarks) + Library.shared.favorites).first(where: { $0.title == arg })?.id,
+            // unload <title or host>: a pinned page or favorite goes back to not loaded.
+            if let id = (Library.shared.spaces.flatMap(\.bookmarks) + Library.shared.favorites).first(where: { $0.title == arg || $0.url.host() == arg })?.id,
                let tab = controller.tabManager.bookmarkTab(for: id) { controller.tabManager.close(tab) }
         case "renamepin":
             // renamepin <old>|<new>
