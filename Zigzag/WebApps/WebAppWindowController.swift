@@ -336,7 +336,7 @@ extension WebAppWindowController: TabHost {
         }
         // Sign-in and payment popups: their own small window, over this one.
         if pending == nil, features.width != nil || features.height != nil || features.toolbarsVisibility?.boolValue == false {
-            return PopupWindowController.open(configuration: configuration, features: features, parent: window)
+            return PopupWindowController.open(configuration: configuration, features: features, parent: window, opener: tab)
         }
         // A plain click on a link to the same site that asks for a new tab: it opens here, as the app is that site.
         // An app's link from it (no site to leave) asks, as the page's own doing, and the site's Block holds.

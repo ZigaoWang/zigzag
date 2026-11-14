@@ -59,14 +59,19 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
     /// alone. Pages of it open in `tab` reload into it at once; any other tab, once it next loads.
     static func choose(_ allowed: Bool, origin: String, in tab: Tab?) {
         let before = tab.map { allows(page(of: $0), in: $0) }
+        keep(allowed, origin: origin, in: tab)
+        guard let tab, SiteOrigin.of(page(of: tab)) == origin, let before, before != allows(page(of: tab), in: tab) else { return }
+        Diagnostics.note("WebRTC", site: SiteOrigin.label(origin), allowed ? "allowed, reloaded" : "blocked, reloaded", isPrivate: tab.isPrivate)
+        tab.reload()
+    }
+
+    /// The choice alone, kept for the site, or in a private window for `tab` alone.
+    private static func keep(_ allowed: Bool, origin: String, in tab: Tab?) {
         if let tab, tab.isPrivate {
             tab.webRTCHere[origin] = allowed
         } else {
             SitePermissions.setChoice(allowed ? .allow : .block, for: .webRTC, origin: origin)
         }
-        guard let tab, SiteOrigin.of(page(of: tab)) == origin, let before, before != allows(page(of: tab), in: tab) else { return }
-        Diagnostics.note("WebRTC", site: SiteOrigin.label(origin), allowed ? "allowed, reloaded" : "blocked, reloaded", isPrivate: tab.isPrivate)
-        tab.reload()
     }
 
     /// Sets the web view's switch for the page it's going to. Each tab's web view has its own preferences
@@ -78,8 +83,8 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
         if (preferences.value(forKey: preferenceKey) as? Bool) != wanted { preferences.setValue(wanted, forKey: preferenceKey) }
     }
 
-    /// A page's new window comes with its opener's preferences, the same object: it gets a copy, so the switch set
-    /// for one never changes the other.
+    /// A page's new window (a tab, or a pop-up window) comes with its opener's preferences, the same object: it gets
+    /// a copy, so the switch set for one never changes the other.
     static func isolate(_ configuration: WKWebViewConfiguration) {
         guard isAvailable, let copy = configuration.preferences.copy() as? WKPreferences else { return }
         configuration.preferences = copy
@@ -124,30 +129,55 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
     }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.name == Self.messageName, let webView = message.webView as? BrowserWebView, let tab = webView.owner,
-              tab.webView === webView else { return }
+        guard message.name == Self.messageName, let webView = message.webView else { return }
         // Only right after a click or a key in a page: what the page says of itself isn't enough.
         guard Date().timeIntervalSince(UndoClock.lastPageInput) < 5 else { return }
-        Task { _ = await Self.offer(in: tab) }
+        if let tab = (webView as? BrowserWebView)?.owner, tab.webView === webView {
+            Task { _ = await Self.offer(in: tab) }
+        } else if let popup = PopupWindowController.all.first(where: { $0.webView === webView }) {
+            // A pop-up's page (a call that opens in a window of its own): asked in the window of the tab that
+            // opened it, whose private choices it follows.
+            Task { _ = await Self.offer(in: popup) }
+        }
     }
 
     /// "Use WebRTC for calls?" for the page in `tab`, when WebRTC is off for it: once a page, Allow keeping it for
     /// the site (in a private window, the tab) and reloading the page into it. Says whether it was allowed.
     @discardableResult
     static func offer(in tab: Tab) async -> Bool {
-        let here = page(of: tab)
+        guard let origin = await ask(for: page(of: tab), in: tab) else { return false }
+        guard SiteOrigin.of(page(of: tab)) == origin else { return false }
+        choose(true, origin: origin, in: tab)
+        return true
+    }
+
+    /// The same for a pop-up window's page, asked in its opener tab's window: Allow reloads the pop-up.
+    @discardableResult
+    static func offer(in popup: PopupWindowController) async -> Bool {
+        guard let tab = popup.opener, let origin = await ask(for: popup.webView.url, in: tab, bringingForward: true) else { return false }
+        keep(true, origin: origin, in: tab)
+        let webView = popup.webView
+        guard SiteOrigin.of(webView.url) == origin else { return true }
+        Diagnostics.note("WebRTC", site: SiteOrigin.label(origin), "allowed in a pop-up, reloaded", isPrivate: tab.isPrivate)
+        apply(to: webView, for: webView.url, in: tab)
+        webView.reload()
+        return true
+    }
+
+    /// Asks about the page at `here`, in `tab`'s window: the origin you allowed, or nil.
+    private static func ask(for here: URL?, in tab: Tab, bringingForward: Bool = false) async -> String? {
         guard isAvailable, !allows(here, in: tab), let origin = SiteOrigin.of(here),
-              tab.permissionAnswers.answer(key: origin, kind: kind) == nil else { return false }
+              tab.permissionAnswers.answer(key: origin, kind: kind) == nil else { return nil }
         // Asked once a page, whatever the answer: a site trying again and again never asks again.
         tab.permissionAnswers.note(false, key: origin, kind: kind)
         SitePermissions.noteAsked(.webRTC, origin: origin, isPrivate: tab.isPrivate)
-        guard let controller = WindowManager.shared.promptHost(for: tab.host?.hostWindow) else { return false }
+        guard let controller = WindowManager.shared.promptHost(for: tab.host?.hostWindow) else { return nil }
+        // From a pop-up: the window that asks comes forward, so the question isn't hidden behind it.
+        if bringingForward { controller.window?.makeKeyAndOrderFront(nil) }
         let answer = await PermissionPrompt.ask(host: SitePermissions.askerName(origin), origin: origin, what: "WebRTC", symbol: "phone.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use WebRTC for calls", comment: "A site's permission question, without its question mark: WebRTC is off for the site (Settings › Privacy › Protect IP address from WebRTC), and it tried to start a call. WebRTC is a name: keep it as it is."),
                                                 allowTitle: String(localized: "Allow and Reload", comment: "Button on the question to use WebRTC for calls on a site: allows it for the site and reloads the page."))
-        guard answer == .allow || answer == .always, SiteOrigin.of(page(of: tab)) == origin else { return false }
-        choose(true, origin: origin, in: tab)
-        return true
+        return answer == .allow || answer == .always ? origin : nil
     }
 
     private static let kind = "webRTC"

@@ -2195,7 +2195,7 @@ extension BrowserWindowController: TabHost {
         }
         // Sized window.open() calls are sign-in and payment popups: give them a real small window.
         if features.width != nil || features.height != nil || features.toolbarsVisibility?.boolValue == false {
-            return PopupWindowController.open(configuration: configuration, features: features, parent: window)
+            return PopupWindowController.open(configuration: configuration, features: features, parent: window, opener: tab)
         }
         let flags = action.modifierFlags
         let background = flags.contains(.command) && !flags.contains(.shift)

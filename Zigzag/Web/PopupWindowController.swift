@@ -33,11 +33,14 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     private var parentObserver: Any?
     /// The browser window that opened it, where news about it (a pop-up it tried to open) is shown.
     private(set) weak var parentWindow: NSWindow?
+    /// The tab whose page opened it: WebRTC's question for its page is asked in that tab's window, and a private
+    /// window's choices made there hold for it too (`WebRTCProtection`).
+    private(set) weak var opener: Tab?
     /// The strip at the top with the traffic lights and whose page it is.
     static let headerHeight = Tokens.Space.x8 + Tokens.Space.x1
     private var lastCrash: Date?
 
-    static func open(configuration: WKWebViewConfiguration, features: WKWindowFeatures, parent: NSWindow?) -> WKWebView {
+    static func open(configuration: WKWebViewConfiguration, features: WKWindowFeatures, parent: NSWindow?, opener: Tab?) -> WKWebView {
         let size = NSSize(width: features.width.map { CGFloat($0.doubleValue) } ?? Tokens.Metric.popupDefaultSize.width,
                           height: features.height.map { CGFloat($0.doubleValue) } ?? Tokens.Metric.popupDefaultSize.height)
         // A page's screenX and screenY count from the top left of the main display.
@@ -45,7 +48,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         if let x = features.x, let y = features.y, let top = NSScreen.screens.first?.frame.maxY {
             origin = NSPoint(x: CGFloat(x.doubleValue), y: top - CGFloat(y.doubleValue) - size.height)
         }
-        let controller = PopupWindowController(configuration: configuration, pageSize: size, origin: origin, parent: parent)
+        let controller = PopupWindowController(configuration: configuration, pageSize: size, origin: origin, parent: parent, opener: opener)
         Self.open.insert(controller)
         // Sign-ins and payments run through these: which site opened one is often the clue.
         let opener = WindowManager.shared.controller(for: parent)?.tabManager.selectedTab?.url?.host()
@@ -71,8 +74,11 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         return controller
     }
 
-    private init(configuration: WKWebViewConfiguration, pageSize: NSSize, origin: NSPoint?, parent: NSWindow?) {
+    private init(configuration: WKWebViewConfiguration, pageSize: NSSize, origin: NSPoint?, parent: NSWindow?, opener: Tab? = nil) {
+        // Its own WebRTC switch, never its opener's (`WebRTCProtection`), set for each page it goes to.
+        WebRTCProtection.isolate(configuration)
         webView = WKWebView(frame: .zero, configuration: configuration)
+        self.opener = opener
         let placed = Self.frame(for: NSSize(width: max(320, pageSize.width), height: max(240, pageSize.height) + Self.headerHeight), origin: origin, parent: parent)
         let size = placed.size
         let origin = placed.origin
@@ -236,7 +242,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             controller.window?.makeKeyAndOrderFront(nil)
             return tab.ensureWebView()
         }
-        return PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: window)
+        return PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: window, opener: opener)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo) async {
@@ -264,6 +270,10 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         }
         // Zigzag's own pages (History) open in its tabs, never in a page's pop-up.
         if navigationAction.request.url?.scheme?.lowercased() == HistoryPage.scheme { return .cancel }
+        // WebRTC on or off for where it's going, before its page is made, as in a tab.
+        if navigationAction.targetFrame?.isMainFrame == true, let url = navigationAction.request.url, !ExternalLinks.isExternal(url) {
+            WebRTCProtection.apply(to: webView, for: url, in: opener)
+        }
         if let url = navigationAction.request.url, ExternalLinks.isExternal(url), url.scheme?.lowercased() != "file" {
             ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
                                isClick: PopupNotice.isUserInitiated(navigationAction),
@@ -309,6 +319,10 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         let policy = downloads.decide(mimeType: response.mimeType, contentDisposition: (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition"),
                                       canShowMIMEType: navigationResponse.canShowMIMEType, isMainFrame: navigationResponse.isForMainFrame)
         if policy == .cancel, navigationResponse.isForMainFrame { refusedDownload() }
+        // WebRTC follows the page that's to show, where a redirect took it.
+        if navigationResponse.isForMainFrame {
+            WebRTCProtection.apply(to: webView, for: policy == .allow ? response.url : webView.url, in: opener)
+        }
         return policy
     }
 

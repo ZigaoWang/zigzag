@@ -796,7 +796,7 @@ extension MiniWindowController: TabHost {
         }
         // Sized window.open() calls are sign-in and payment popups: their own small window, over this one.
         if pending == nil, features.width != nil || features.height != nil || features.toolbarsVisibility?.boolValue == false {
-            return PopupWindowController.open(configuration: configuration, features: features, parent: window)
+            return PopupWindowController.open(configuration: configuration, features: features, parent: window, opener: tab)
         }
         // A link for a new tab (target=_blank, ⌘-click, Open Link in New Tab) opens in the browser window; ⌘-click
         // and the menu's own items leave you here, a plain click takes you there.
