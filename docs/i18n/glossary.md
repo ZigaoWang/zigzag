@@ -44,12 +44,15 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Favorites | 收藏 | 个人收藏, 常用 | Zigzag's Favorites are the row of icons on top, and 收藏 fits it and tight places. Safari's 个人收藏 is longer and names a different thing; 常用 sounds like most visited. |
 | Bookmarks | 书签 | | Safari, Chrome. |
 | Folder | 文件夹 | | macOS. |
+| Group (tabs grouped in the sidebar) | 分组 | | Short beside 文件夹 in the sidebar: 新建分组, 取消分组, 关闭分组, and 编组 as the verb (将 3 个标签页编组). Chrome's tab groups API, named in an extension's limits, is 标签页组, as Safari names its Tab Groups. |
 | Sidebar | 边栏 | 侧边栏 | macOS and Safari say 边栏 (显示边栏). |
 | Window | 窗口 | | macOS. |
 | Private window | 无痕浏览窗口 | 隐私浏览窗口, 无痕窗口 | Safari's New Private Window is 新建无痕浏览窗口. |
 | Split View | 分屏浏览 | 分栏 | macOS calls its Split View 分屏浏览. |
 | Peek | 速览 | 预览, keep "Peek" | No Apple word; Quick Look is 快速查看, so 速览 is close without clashing. 预览 clashes with the Preview app; English would read as untranslated. |
 | Zigzag Mini | Zigzag Mini | 迷你窗口, 小窗口, 迷你 Arc | A name, like the app's, so it stays in Latin letters (新建 Zigzag Mini). Arc called it Little Arc. Where a plain noun reads better in a sentence, 迷你窗口. |
+| Mini player (a video that follows you) | 小播放器 | | Plain and short; not 画中画, which is macOS's Picture in Picture and a separate thing. |
+| App (a site installed as one, an app on the Mac) | App | 应用, 应用程序 | As Apple's zh-Hans writes it (App Store): 安装为 App, 打开 App. |
 | Command Bar | 命令栏 | 指令栏 | Arc's Chinese users say 命令栏; 指令栏 is seen less. |
 | Site controls (the site panel) | 网站设置 | 网站控制 | Safari's per-site settings are 网站设置; "控制" sounds technical. |
 | Address (field) | 地址栏 | 智能搜索栏 | Safari calls it 智能搜索栏, but Zigzag's field is plainer; 地址栏 is what people say. |
@@ -82,6 +85,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | English | 简体中文 | Not used | Why |
 |---|---|---|---|
 | Clear (history, cache, cookies) | 清除 | 清空 | Safari: 清除历史记录. |
+| Ask / Allow / Block (a site's permission) | 询问 / 允许 / 阻止 | | The same three words wherever a permission is set: Site Controls and Settings › Privacy › Sites. |
 | Close Tab | 关闭标签页 | | Safari. |
 | Reopen Closed Tab | 重新打开已关闭的标签页 | | Safari's 重新打开最近关闭的标签页, shortened. |
 | Duplicate Tab | 复制标签页 | | Safari. |
