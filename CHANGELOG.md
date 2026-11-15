@@ -18,6 +18,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Translating a page after closing macOS's Download Languages sheet without downloading now says the language isn't downloaded, with Translate to bring the sheet back, instead of saying to try again in a moment.
 - Password saved stays long enough to see after the Save password? prompt slides away, and toasts with Undo, like Closed 3 tabs, Removed pinned pages or History cleared, stay 7 seconds instead of 4, longer while the pointer is on them.
 - Ad blocking's site filters are built once the filter lists have all downloaded, together with their scriptlets. On a first launch they could be built a moment early, from the lists that had come and the copy of Zigzag's own fixes in the app, and then built again. ([#129](https://github.com/ZigaoWang/zigzag/issues/129))
+- Restart to Update says it couldn't check for updates when Zigzag can't install the update right then, instead of doing nothing.
+- Find on page marks the matches in text that shows up as you open a section, like an accordion or Show more, not only in text a page adds.
 
 ## [0.9.1] - 2026-11-15
 
