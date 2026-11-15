@@ -131,6 +131,35 @@ struct DownloadRuleTests {
         #expect(Paths.scriptName(for: URL(fileURLWithPath: "/opt/tools/dl.sh")) == "/opt/tools/dl.sh")
     }
 
+    /// A script rule's notice says what it is doing while it runs, and how it went when it stops: green when it exited
+    /// 0, the script's own last words when it didn't.
+    @Test func aScriptNoticeSaysHowItWent() {
+        let running = ScriptNotice(script: "yt-dlp.sh", state: .running)
+        #expect(running.title == "Running script: yt-dlp.sh")
+        #expect(running.detail == nil)
+        #expect(running.symbol == "terminal")
+        #expect(running.tone == .plain)
+        #expect(!running.isOver)
+
+        let ran = ScriptNotice(script: "yt-dlp.sh", state: .ran)
+        #expect(ran.title == "Ran script: yt-dlp.sh")
+        #expect(ran.detail == nil)
+        #expect(ran.symbol == "checkmark.circle.fill")
+        #expect(ran.tone == .good)
+        #expect(ran.isOver)
+
+        let failed = ScriptNotice(script: "yt-dlp.sh", state: .failed("  ERROR: no such video\n"))
+        #expect(failed.title == "Script failed: yt-dlp.sh")
+        #expect(failed.detail == "ERROR: no such video")
+        #expect(failed.symbol == "exclamationmark.triangle.fill")
+        #expect(failed.tone == .bad)
+        #expect(failed.isOver)
+
+        // A script that said nothing has nothing to show under the title.
+        #expect(ScriptNotice(script: "yt-dlp.sh", state: .failed("   \n")).detail == nil)
+    }
+
+    /// A rule names a script in its one folder, and the notice names it the way the rule does.
     @Test func theLinksOwnPartsAreTokensOfTheirOwn() {
         let values = HandoffValues(link: URL(string: "https://www.google.com/search/deep?a=1&b=two%20words")!)
         let expanded = DownloadTokens.expand("https://www.bing.com{path}?{query}", with: values)

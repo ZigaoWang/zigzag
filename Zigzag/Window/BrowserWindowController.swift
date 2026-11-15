@@ -76,6 +76,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.peek.reposition()
             self.miniPlayer.place()
             PermissionPrompt.reposition(in: self)
+            NoticeCard.reposition(in: self)
             Toast.reposition(in: self)
             AgentControl.shared.reposition(in: self)
             if self.floatingDownloads.superview != nil {
@@ -87,6 +88,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let self else { return }
             self.sidebarSliding(duration)
             PermissionPrompt.reposition(in: self, slide: duration, timing: timing)
+            NoticeCard.reposition(in: self, slide: duration, timing: timing)
             Toast.reposition(in: self, slide: duration, timing: timing)
             AgentControl.shared.reposition(in: self)
         }
