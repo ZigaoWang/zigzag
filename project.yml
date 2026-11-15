@@ -116,7 +116,8 @@ targets:
         ZigzagKeychainGroup: $(AppIdentifierPrefix)app.zigzag.passwords
         SUEnableAutomaticChecks: true
         SUAutomaticallyUpdate: true
-        SUScheduledCheckInterval: 86400
+        # Every four hours while Zigzag runs (Updater adds a look on waking from sleep).
+        SUScheduledCheckInterval: 14400
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSPrincipalClass: $(PRODUCT_MODULE_NAME).ZigzagApplication
         NSHighResolutionCapable: true
