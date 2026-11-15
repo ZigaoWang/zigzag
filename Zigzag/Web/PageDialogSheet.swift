@@ -176,7 +176,7 @@ final class PageDialogSheet: NSView {
     /// Answered another way (an extension gave the sign-in it asks for): the sheet tagged so goes, with these values.
     static func answer(tag: String, with values: [String]) {
         for box in open where box.sheet?.answers == tag { box.sheet?.finish(.confirmed(values)) }
-        open = open.filter { $0.sheet != nil && $0.sheet?.superview != nil }
+        open = open.filter { $0.sheet?.isUp == true }
     }
 
     // MARK: Saved passwords
@@ -194,6 +194,7 @@ final class PageDialogSheet: NSView {
         let x = min(max(anchor.minX, Tokens.Space.x2), bounds.maxX - width - Tokens.Space.x2)
         menu.frame = NSRect(x: x, y: max(Tokens.Space.x2, y), width: width, height: height)
         addSubview(menu)
+        menu.grow(from: anchor)
         menu.present()
         savedMenu = menu
     }
@@ -216,7 +217,7 @@ final class PageDialogSheet: NSView {
     #if DEBUG
     /// For the debug bridge: each dialog showing, its title and fields, a secure field only as its length.
     static func debugState() -> [[String: Any]] {
-        open.compactMap(\.sheet).filter { $0.superview != nil }.map { sheet in
+        open.compactMap(\.sheet).filter(\.isUp).map { sheet in
             ["title": sheet.header.title.stringValue, "fields": sheet.inputs.map { $0.field is NSSecureTextField ? "\($0.stringValue.count) characters" : $0.stringValue },
              "savedButton": sheet.saved.superview != nil, "savedMenu": sheet.savedMenu != nil]
         }
@@ -226,18 +227,23 @@ final class PageDialogSheet: NSView {
     static func debugShowSaved() {
         open.compactMap(\.sheet).first { $0.savedMenu == nil && $0.saved.superview != nil }?.toggleSavedMenu()
     }
+
+    /// Answers every dialog showing with Cancel (OK for an alert), as Escape does.
+    static func debugCancel() {
+        for sheet in open.compactMap(\.sheet) where sheet.isUp { sheet.finish(sheet.cancel.superview == nil ? .confirmed([]) : .cancelled) }
+    }
     #endif
 
     /// A page's dialog (an alert, a sign-in) is showing in `window`: over the window, or over a page in front there.
     static func isShowing(in window: NSWindow?) -> Bool {
         guard let window else { return false }
-        return open.contains { $0.sheet?.superview != nil && $0.sheet?.window === window }
+        return open.contains { $0.sheet?.isUp == true && $0.sheet?.window === window }
     }
 
     /// The page closed (its tab, or a new process): its dialogs answer "cancel" and go.
     static func cancel(for page: WKWebView) {
         for box in open where box.sheet?.page === page { box.sheet?.finish(.cancelled) }
-        open = open.filter { $0.sheet != nil && $0.sheet?.superview != nil }
+        open = open.filter { $0.sheet?.isUp == true }
     }
 
     private func finish(_ result: Result) {
@@ -251,9 +257,24 @@ final class PageDialogSheet: NSView {
         }
         let completion = self.completion
         self.completion = { _ in }
-        removeFromSuperview()
+        // It goes as the other sheets do, quicker than it came, letting clicks through at once; out of sight (its tab
+        // behind, its window closing), at once.
+        if window != nil {
+            isLeaving = true
+            panel.dismiss()
+            Tokens.Motion.fadeBackdrop(self, entering: false) { self.removeFromSuperview() }
+        } else {
+            removeFromSuperview()
+        }
         completion(result)
     }
+
+    /// Answered and fading away: it's no longer up, and clicks reach the page under it.
+    private var isLeaving = false
+    private var isUp: Bool { superview != nil && !isLeaving }
+    override func hitTest(_ point: NSPoint) -> NSView? { isLeaving ? nil : super.hitTest(point) }
+    /// Shown once: coming back with its tab, it's simply there again, as the page is.
+    private var hasShown = false
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -265,7 +286,17 @@ final class PageDialogSheet: NSView {
             return
         }
         needsLayout = true
-        panel.present()
+        layoutSubtreeIfNeeded()
+        // The first time, as any sheet: its dimming fades in as it grows from a little below its middle.
+        if hasShown {
+            panel.present(arrival: .instant)
+        } else {
+            hasShown = true
+            alphaValue = 0
+            Tokens.Motion.fadeBackdrop(self, entering: true)
+            panel.growsFrom = Tokens.Motion.sheetOrigin
+            panel.present(arrival: .pop)
+        }
         // The card puts the keyboard on the page as the tab comes in front; the dialog's field takes it after that.
         DispatchQueue.main.async { [weak self] in
             guard let self, self.window === window else { return }
