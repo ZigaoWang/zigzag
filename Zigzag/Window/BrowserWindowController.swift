@@ -159,18 +159,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             ]
             // An answer to the question holds for this page only (Ask); Always Allow keeps it for the site, and
             // Ask Every Time takes that back. A private window keeps nothing for a site.
-            if !tab.isPrivate {
-                let both = SitePermissions.choice(.camera, origin: origin) == .allow
-                    && SitePermissions.choice(.microphone, origin: origin) == .allow
-                if both {
+            // Only what the page is using now: an audio call never grants the camera for good, nor overrides a Block.
+            let inUse = [tab.isUsingCamera ? SitePermission.camera : nil, tab.isUsingMicrophone ? SitePermission.microphone : nil].compactMap { $0 }
+            if !tab.isPrivate, !inUse.isEmpty {
+                let allAllowed = inUse.allSatisfy { SitePermissions.choice($0, origin: origin) == .allow }
+                if allAllowed {
                     items.append(.item(.init(title: String(localized: "Ask Every Time", comment: "Menu item of the address bar's camera button: the site, allowed the camera and microphone for good, asks again on every visit."), symbol: "arrow.counterclockwise") {
-                        SitePermissions.setChoice(.ask, for: .camera, origin: origin)
-                        SitePermissions.setChoice(.ask, for: .microphone, origin: origin)
+                        inUse.forEach { SitePermissions.setChoice(.ask, for: $0, origin: origin) }
                     }))
                 } else {
                     items.append(.item(.init(title: String(localized: "Always Allow on This Site", comment: "Menu item of the address bar's camera button: the site may use the camera and microphone from now on without asking."), symbol: "checkmark.circle") {
-                        SitePermissions.setChoice(.allow, for: .camera, origin: origin)
-                        SitePermissions.setChoice(.allow, for: .microphone, origin: origin)
+                        inUse.forEach { SitePermissions.setChoice(.allow, for: $0, origin: origin) }
                     }))
                 }
             }
