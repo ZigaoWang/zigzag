@@ -572,6 +572,17 @@ class FloatingPanelView: NSView {
     /// middle. Set it to the side nearest what opened it.
     var growsFrom = CGPoint(x: 0.5, y: 0)
 
+    /// Grows out of `anchor` (in its superview's coordinates, once its frame is set): from its side facing it, the
+    /// top when it opened below (a field's menu) and the bottom when it opened above, across from where the anchor
+    /// starts.
+    func grow(from anchor: NSRect) {
+        guard frame.width > 0, frame.height > 0 else { return }
+        let flipped = superview?.isFlipped ?? true
+        let below = flipped ? anchor.midY <= frame.minY : anchor.midY >= frame.maxY
+        let x = (anchor.minX + min(anchor.width, frame.width) / 2 - frame.minX) / frame.width
+        growsFrom = CGPoint(x: min(max(x, 0), 1), y: below ? 0 : 1)
+    }
+
     /// For a bar that hangs from an edge rather than a button (the find bar, from the page's top): it slides in from
     /// that edge and back toward it. `.minY` is the top as you look at it.
     var attachedEdge: NSRectEdge?

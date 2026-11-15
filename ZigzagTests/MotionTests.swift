@@ -208,4 +208,19 @@ struct MotionTests {
         #expect(scrim.alphaValue == 1)
         #expect(scrim.hitTest(inside) != nil)
     }
+
+    @MainActor @Test func aFieldsMenuGrowsOutOfItsField() {
+        let host = FlippedView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        let field = NSRect(x: 40, y: 40, width: 120, height: 24)
+        // Under the field: out of its top, across from the field's middle.
+        let below = FloatingPanelView(frame: NSRect(x: 40, y: 68, width: 240, height: 100))
+        host.addSubview(below)
+        below.grow(from: field)
+        #expect(below.growsFrom == CGPoint(x: 0.25, y: 0))
+        // No room under it, so above: out of its bottom.
+        let above = FloatingPanelView(frame: NSRect(x: 40, y: -64, width: 240, height: 100))
+        host.addSubview(above)
+        above.grow(from: field)
+        #expect(above.growsFrom.y == 1)
+    }
 }

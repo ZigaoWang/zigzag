@@ -210,6 +210,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         let fieldInOverlay = overlay.convert(webView.convert(field, to: nil), from: nil)
         menu.frame = Self.menuFrame(under: fieldInOverlay, in: overlay.bounds, height: menu.contentHeight)
         overlay.addSubview(menu)
+        menu.grow(from: fieldInOverlay)
         menu.present()
         self.menu = menu
         target = (webView, frame, origin)
