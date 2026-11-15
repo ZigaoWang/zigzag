@@ -522,4 +522,13 @@ struct PageLanguageChoiceTests {
         // An error page shown for a site is in your language, whatever the site's is.
         #expect(!PageTranslator.readsLanguage(of: URL(string: "https://expired.badssl.com"), errorPage: true))
     }
+
+    @Test func aLanguageNotDownloadedIsNamedWhenTranslatingFails() {
+        // The download sheet closed without downloading French: it says so, not to try again in a moment.
+        let french = Locale.Language(identifier: "fr")
+        let missing = PageTranslator.failureMessage(notDownloaded: french)
+        #expect(missing.contains(PageTranslator.name(of: french)))
+        #expect(missing != PageTranslator.failureMessage(notDownloaded: nil))
+        #expect(PageTranslator.failureMessage(notDownloaded: nil) == String(localized: "Couldn’t translate this page. Try again in a moment.", comment: "Toast when translating a page fails."))
+    }
 }

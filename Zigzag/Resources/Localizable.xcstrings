@@ -325,6 +325,17 @@
         }
       }
     },
+    "%@ isn’t downloaded for translation. Choose Translate again to download it." : {
+      "comment" : "Toast when a page couldn't be translated because macOS's download of its language was closed without downloading it. The language is its name, like French.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有下载%@的翻译语言。再选一次“翻译”即可下载。"
+          }
+        }
+      }
+    },
     "%@ keeps its %lld passwords in a newer format Zigzag can’t read yet. Export them from %@’s Passwords page as a CSV file, then choose it here." : {
       "comment" : "Problem in the Import window. The placeholders are a browser's name, like Firefox, and how many passwords it has.",
       "localizations" : {

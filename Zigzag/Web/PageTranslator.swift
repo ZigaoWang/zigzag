@@ -240,6 +240,23 @@ enum PageTranslator {
         return kept
     }
 
+    /// The first of `sources` macOS hasn't downloaded for translating into `target` yet, when a translation failed:
+    /// its download sheet was closed without downloading it. Nil when they're all here, or can't be translated at all.
+    static func notDownloaded(_ sources: [Locale.Language], into target: Locale.Language) async -> Locale.Language? {
+        for source in sources where await status(from: source, to: target) == .supported { return source }
+        return nil
+    }
+
+    /// What a failed translation says: a language not downloaded yet is named, with how to get it; anything else, to
+    /// try again.
+    static func failureMessage(notDownloaded language: Locale.Language?) -> String {
+        guard let language else {
+            return String(localized: "Couldn’t translate this page. Try again in a moment.", comment: "Toast when translating a page fails.")
+        }
+        return String(localized: "\(name(of: language)) isn’t downloaded for translation. Choose Translate again to download it.",
+                      comment: "Toast when a page couldn't be translated because macOS's download of its language was closed without downloading it. The language is its name, like French.")
+    }
+
     /// Which groups to translate now, given what's on this Mac for each (`status`, in the same order). Languages
     /// Apple can't translate are left out and named. A language still to download is translated only when it's
     /// the page's own (the first group) and you asked: macOS's download sheet comes up only from something you

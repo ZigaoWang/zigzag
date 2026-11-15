@@ -1645,9 +1645,27 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 // Half done is no use to read: the page goes back to how it was.
                 if let webView = tab.webView { PageTranslator.restore(in: webView) }
                 guard inView else { return }
-                Toast.show(String(localized: "Couldn’t translate this page. Try again in a moment.", comment: "Toast when translating a page fails."), symbol: "exclamationmark.triangle", duration: 3, in: self)
+                self.showTranslationFailed(tab, from: groups.map(\.source), into: target)
             }
         })
+    }
+
+    /// Says a translation failed. When macOS's download sheet was closed without downloading the language, it says
+    /// so and offers Translate again, which brings the sheet back; anything else, to try again in a moment.
+    private func showTranslationFailed(_ tab: Tab, from sources: [Locale.Language], into target: Locale.Language) {
+        Task { @MainActor [weak self, weak tab] in
+            let missing = await PageTranslator.notDownloaded(sources, into: target)
+            guard let self, let tab, !tab.isClosed, self.translationInView(tab) else { return }
+            let message = PageTranslator.failureMessage(notDownloaded: missing)
+            guard missing != nil else {
+                Toast.show(message, symbol: "exclamationmark.triangle", duration: 3, in: self)
+                return
+            }
+            Toast.show(message, symbol: "translate",
+                       action: (title: String(localized: "Translate", comment: "Button in the toast that offers to translate a page."), run: { [weak self, weak tab] in
+                           if let tab { self?.translatePage(tab: tab) }
+                       }), duration: 6, in: self)
+        }
     }
 
     /// No answer in time: it stops, the page goes back to how it was, and it says it couldn't. While macOS asks
@@ -1664,7 +1682,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.endTranslation(run, for: key)
             if let webView = run.webView, webView.url == run.page { PageTranslator.restore(in: webView) }
             guard self.translationInView(tab) else { return }
-            Toast.show(String(localized: "Couldn’t translate this page. Try again in a moment.", comment: "Toast when translating a page fails."), symbol: "exclamationmark.triangle", duration: 3, in: self)
+            self.showTranslationFailed(tab, from: run.source.map { [$0] } ?? [], into: PageTranslator.readerLanguage)
         }
         run.timeout = work
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.translationTimeout, execute: work)
