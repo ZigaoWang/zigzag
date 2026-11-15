@@ -5,10 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- The camera and the microphone are two permissions in Site Controls: a site asks for each on its own, one question after the other (a no to the first, or a Block for either, settles it without asking the other), and a call that wants both is allowed only when you've allowed both. Sites you allowed both before keep both. ([#243](https://github.com/ZigaoWang/zigzag/issues/243))
-- Find on Page (⌘F) highlights every match on the page at once, in a soft yellow (amber on a dark page), with the one you're on in a stronger orange. A tick for each match runs along the page's right edge, over the scroll bar, so you can see where they all are; click one to go to that match. The marks follow the page as it changes and go away when you close the bar. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#244](https://github.com/ZigaoWang/zigzag/issues/244))
-
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
@@ -21,6 +17,8 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - Groups of tabs: pick some tabs (⌘-click or ⇧-click their rows) and choose Group Tabs, or New Group with Tab on one tab, and they become a folder in the Tabs part of the sidebar, as pinned tabs have. It opens and closes with a click, renames from its menu, and keeps its tabs together: drag tabs onto it or among its tabs to put them in, drag them out to take them out, or drag the whole group somewhere else. Its menu also has Ungroup, Move to Space and Close Group, which closes its tabs, with Undo. Groups come back when you open Zigzag again, Clear keeps or closes a group as one, split views work inside one, and a group with no tabs left goes. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#209](https://github.com/ZigaoWang/zigzag/issues/209))
 - A new tab comes into the sidebar the way a closed one leaves it: the tabs below glide down to make room and its row opens as it fades in, whether you opened it with the keyboard, the pointer or a link. The same goes for a tab moved in and for a folder or group opening. With Reduce Motion it only fades in.
 - The address bar above the page shows the page's whole address, the site's name dark and the rest gray, as there's room for it; pop-up windows and Zigzag Mini do the same when they're wide enough. The sidebar keeps the site's name alone. A long address loses the end of its path first, never the site's name.
+- The camera and the microphone are two permissions in Site Controls: a site asks for each on its own, one question after the other (a no to the first, or a Block for either, settles it without asking the other), and a call that wants both is allowed only when you've allowed both. Sites you allowed both before keep both. ([#243](https://github.com/ZigaoWang/zigzag/issues/243))
+- Find on Page (⌘F) highlights every match on the page at once, in a soft yellow (amber on a dark page), with the one you're on in a stronger orange. A tick for each match runs along the page's right edge, over the scroll bar, so you can see where they all are; click one to go to that match. The marks follow the page as it changes and go away when you close the bar. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#244](https://github.com/ZigaoWang/zigzag/issues/244))
 
 ### Fixed
 - Text across Zigzag sits exactly in the middle of its buttons, fields and rows, measured by its capital letters, with icons lined up beside it and even spacing: the sidebar, panels, prompts, toasts, Settings, History and the other windows. Some of it sat up to a point low.
