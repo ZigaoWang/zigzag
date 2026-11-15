@@ -204,6 +204,60 @@ struct PageTranslatorTests {
         #expect(PageTranslator.keeping(Self.chinese, over: nil) == nil)
     }
 
+    // MARK: Titles mixing scripts
+
+    /// A GitHub issue in Chinese: its title names a product in English, the page says lang="en", and its template's
+    /// headings and the replies are English, so the page reads as English.
+    static let chineseIssue = """
+    <html lang="en"><body>
+    <h1><bdi class="markdown-title">类似Little Arc功能</bdi><span> #246</span></h1>
+    <h3>What you're trying to do</h3>
+    <p>我的当前默认浏览器已改为zigzag</p>
+    <ol><li>运行一个py脚本，里面使用了vectorbt.Portfolio画曲线图</li>
+    <li>最后vectorbt.Portfolio.plot().show()时，打开的网页显示在主窗口(增加了一个标签)，而不是弹出桌面小窗口</li></ol>
+    <h3>What you'd like</h3>
+    <p>当在其他应用需要授权登录的时候，希望弹出一个类似Little Arc的小窗口。这是一个非常实用的功能。</p>
+    <p>Thank you for setting Zigzag as the default browser! This is actually already available, it's just not turned on by default.</p>
+    </body></html>
+    """
+
+    @Test func aChineseTitleNamingAnEnglishProductIsTranslated() async throws {
+        let (webView, loading) = await page(Self.chineseIssue)
+        defer { _ = loading }
+        let text = await PageTranslator.text(in: webView)
+        let title = try #require(text.pieces.firstIndex(of: "类似Little Arc功能"))
+        let groups = PageTranslator.plan(text, page: Self.english, into: Self.english)
+        #expect(groups.count == 1)
+        #expect(groups.first?.pieces.contains(title) == true)
+        // From the Simplified Chinese the issue is in, never a Traditional download for its title alone (#231).
+        #expect(groups.first?.source.minimalIdentifier == Self.chinese.minimalIdentifier)
+        // Into Chinese, the title is already in it; the English is what's translated.
+        let intoChinese = PageTranslator.plan(text, page: Self.english, into: Self.chinese)
+        #expect(!intoChinese.flatMap(\.pieces).contains(title))
+        #expect(texts(text, intoChinese.first).contains("What you're trying to do"))
+    }
+
+    @Test func textMostlyInAnotherScriptIsInALanguageWrittenInIt() {
+        // Read as a little English, with too little confidence; the ideographs say it's Chinese.
+        #expect(PageTranslator.blockLanguage("类似Little Arc功能", page: Self.english)?.languageCode == .chinese)
+        #expect(PageTranslator.blockLanguage("功能", page: Self.english)?.languageCode == .chinese)
+        // On a page in that script, it's the page's language, script and all.
+        #expect(PageTranslator.blockLanguage("类似Little Arc功能", page: Self.chinese) == Self.chinese)
+        #expect(PageTranslator.blockLanguage("東京", page: Locale.Language(identifier: "ja"))?.languageCode == .japanese)
+        // On an English page with Chinese in it, it goes with that Chinese.
+        #expect(PageTranslator.blockLanguage("功能", page: Self.english, onPage: [Self.english, Self.chinese]) == Self.chinese)
+        // English that quotes a name in Chinese is still English.
+        #expect(PageTranslator.blockLanguage("An interview with 张艺谋 about his new film and the city he grew up in", page: Self.english)?.languageCode == .english)
+    }
+
+    @Test func scriptsAreToldByTheLanguagesWrittenInThem() {
+        let han = Array("功能".unicodeScalars), kana = Array("ニュース".unicodeScalars), cyrillic = Array("Новости".unicodeScalars)
+        #expect(PageTranslator.writes(Self.chinese, han) && PageTranslator.writes(Self.traditional, han))
+        #expect(PageTranslator.writes(Locale.Language(identifier: "ja"), han + kana))
+        #expect(!PageTranslator.writes(Self.chinese, kana) && !PageTranslator.writes(Self.english, han))
+        #expect(PageTranslator.writes(Locale.Language(identifier: "ru"), cyrillic))
+    }
+
     private func groups(_ codes: [String]) -> [PageTranslator.Group] {
         codes.enumerated().map { PageTranslator.Group(source: Locale.Language(identifier: $0.element), pieces: [$0.offset]) }
     }

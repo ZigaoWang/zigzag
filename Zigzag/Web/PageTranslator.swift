@@ -268,15 +268,28 @@ enum PageTranslator {
     /// already in the target language is left as it is, so a page in English with a paragraph of Chinese has just
     /// that paragraph translated.
     nonisolated static func plan(_ text: PageText, page: Locale.Language?, into target: Locale.Language) -> [Group] {
+        // First the blocks whose own words tell their language for sure, so a block that can't be told (a title
+        // mixing Chinese and a product's name) can go with the page's text in its script.
+        let used = Set(text.blocks.filter { $0 < text.blockTexts.count })
+        var told: [Int: Locale.Language] = [:]
+        var amounts: [String: (language: Locale.Language, amount: Int)] = [:]
+        for block in used.sorted() {
+            guard let language = surely(text.blockTexts[block]) else { continue }
+            told[block] = language
+            amounts[language.minimalIdentifier, default: (language, 0)].amount += measure(text.blockTexts[block]).amount
+        }
+        let onPage = amounts.values.sorted { $0.amount > $1.amount }.map(\.language)
         var languages: [Int: Locale.Language?] = [:]
         var order: [String] = []
-        var groups: [String: (source: Locale.Language, pieces: [Int], size: Int)] = [:]
+        var groups: [String: (variants: [String: (language: Locale.Language, size: Int)], pieces: [Int], size: Int)] = [:]
         for (index, piece) in text.pieces.enumerated() {
             guard index < text.blocks.count else { break }
             let block = text.blocks[index]
             let language: Locale.Language?
             if let known = languages[block] { language = known } else {
-                language = block < text.blockTexts.count ? blockLanguage(text.blockTexts[block], page: page) : page
+                if let sure = told[block] { language = sure }
+                else if block < text.blockTexts.count { language = blockLanguage(text.blockTexts[block], page: page, onPage: onPage) }
+                else { language = page }
                 languages[block] = language
             }
             guard var language, language.languageCode != target.languageCode else { continue }
@@ -285,32 +298,104 @@ enum PageTranslator {
             // download macOS asks for (#231).
             if let page, page.languageCode == language.languageCode { language = page }
             let key = code(of: language)
-            if groups[key] == nil { order.append(key); groups[key] = (language, [], 0) }
+            if groups[key] == nil { order.append(key); groups[key] = ([:], [], 0) }
+            groups[key]?.variants[language.minimalIdentifier, default: (language, 0)].size += piece.count
             groups[key]?.pieces.append(index)
             groups[key]?.size += piece.count
         }
+        // A language's pieces are translated together, from the script most of them are in: a Traditional title
+        // over a Simplified issue is translated as Simplified, never asking for a second download (#231).
         return order.compactMap { groups[$0] }.enumerated()
             .sorted { $0.element.size != $1.element.size ? $0.element.size > $1.element.size : $0.offset < $1.offset }
-            .map { Group(source: $0.element.source, pieces: $0.element.pieces) }
+            .compactMap { entry in
+                entry.element.variants.values.max { $0.size != $1.size ? $0.size < $1.size : $0.language.minimalIdentifier > $1.language.minimalIdentifier }
+                    .map { Group(source: $0.language, pieces: entry.element.pieces) }
+            }
     }
 
     /// The language a block of text reads as. Long enough, it's told from its own words. A few words in the page's
     /// alphabet ("Home", "Inicio") can't be told apart reliably, so they're taken as the page's language; a few in
     /// another script ("首页", "ニュース") can, and they're told from their own.
-    nonisolated static func blockLanguage(_ text: String, page: Locale.Language?) -> Locale.Language? {
-        let letters = text.unicodeScalars.filter { $0.properties.isAlphabetic }
+    ///
+    /// Text mostly in a script other than Latin that can't be told for sure (a title like "类似Little Arc功能", which
+    /// reads as a little English) is in a language written in that script, the Latin words in it being names: the
+    /// page's when it's written so, else the one with most text on the page that is (`onPage`, most first), else
+    /// what those letters alone read as.
+    nonisolated static func blockLanguage(_ text: String, page: Locale.Language?, onPage: [Locale.Language] = []) -> Locale.Language? {
+        let letters = Array(text.unicodeScalars.filter { $0.properties.isAlphabetic })
         guard !letters.isEmpty else { return nil }
-        let latin = letters.allSatisfy(isLatin)
-        // Ideographs carry a word each: a few are as much to go on as a sentence of letters.
-        let long = measure(text).long
-        if !long, latin, page != nil { return page }
+        let others = letters.filter { !isLatin($0) }
+        if others.isEmpty, !measure(text).long, page != nil { return page }
+        if let told = surely(text) { return told }
+        guard mostlyOtherScript(letters) else { return page }
+        if let fitting = ([page].compactMap { $0 } + onPage).first(where: { writes($0, others) }) { return fitting }
         let recognizer = NLLanguageRecognizer()
-        recognizer.processString(String(text.prefix(600)))
-        if let (code, confidence) = recognizer.languageHypotheses(withMaximum: 1).first, code != .undetermined,
-           confidence >= (long ? 0.5 : 0.8) {
-            return Locale.Language(identifier: code.rawValue)
+        recognizer.processString(String(String.UnicodeScalarView(text.unicodeScalars.map { isLatin($0) ? " " : $0 }).prefix(600)))
+        if let (code, _) = recognizer.languageHypotheses(withMaximum: 1).first, code != .undetermined {
+            let alone = Locale.Language(identifier: code.rawValue)
+            if script(of: alone) != "Latn", !contradicts(alone, others) { return alone }
         }
         return page
+    }
+
+    /// The language a block reads as, when its own words say so clearly: enough of them, told with confidence, and,
+    /// for text mostly in another script than Latin, a language written in it.
+    private nonisolated static func surely(_ text: String) -> Locale.Language? {
+        let letters = Array(text.unicodeScalars.filter { $0.properties.isAlphabetic })
+        guard !letters.isEmpty else { return nil }
+        // Ideographs carry a word each: a few are as much to go on as a sentence of letters.
+        let long = measure(text).long
+        if !long, letters.allSatisfy(isLatin) { return nil }
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(String(text.prefix(600)))
+        guard let (code, confidence) = recognizer.languageHypotheses(withMaximum: 1).first, code != .undetermined,
+              confidence >= (long ? 0.5 : 0.8) else { return nil }
+        let language = Locale.Language(identifier: code.rawValue)
+        if mostlyOtherScript(letters), script(of: language) == "Latn" || contradicts(language, letters.filter { !isLatin($0) }) { return nil }
+        return language
+    }
+
+    /// Whether most of these letters, by how much they say, aren't Latin.
+    private nonisolated static func mostlyOtherScript(_ letters: [Unicode.Scalar]) -> Bool {
+        var latin = 0, other = 0
+        for scalar in letters {
+            if isLatin(scalar) { latin += 1 } else { other += isWordLike(scalar) ? 3 : 1 }
+        }
+        return other > 0 && other >= latin
+    }
+
+    /// Whether the language is written in the script of all these letters (Chinese in ideographs, Japanese in them
+    /// and kana, Russian in Cyrillic), by the script it's usually written in.
+    nonisolated static func writes(_ language: Locale.Language, _ letters: [Unicode.Scalar]) -> Bool {
+        guard !letters.isEmpty, let script = script(of: language) else { return false }
+        return letters.allSatisfy { scripts(of: $0).contains(script) }
+    }
+
+    /// Whether some of these letters are in a script told apart here that the language isn't written in.
+    private nonisolated static func contradicts(_ language: Locale.Language, _ letters: [Unicode.Scalar]) -> Bool {
+        guard let script = script(of: language) else { return false }
+        return letters.contains { let known = scripts(of: $0); return !known.isEmpty && !known.contains(script) }
+    }
+
+    /// The script a language is usually written in ("Hans" for Chinese, "Jpan" for Japanese, "Latn" for English).
+    private nonisolated static func script(of language: Locale.Language) -> String? {
+        (language.script ?? Locale.Language(identifier: language.maximalIdentifier).script)?.identifier
+    }
+
+    /// The scripts (ISO 15924) a letter is written in, for the scripts told apart here; none for others.
+    private nonisolated static func scripts(of scalar: Unicode.Scalar) -> Set<String> {
+        if scalar.properties.isIdeographic { return ["Hans", "Hant", "Jpan", "Kore"] }
+        switch scalar.value {
+        case 0x3040...0x30FF, 0x31F0...0x31FF, 0xFF66...0xFF9F: return ["Jpan"]
+        case 0x1100...0x11FF, 0x3130...0x318F, 0xA960...0xA97F, 0xAC00...0xD7AF: return ["Kore"]
+        case 0x0400...0x052F, 0x1C80...0x1C8F: return ["Cyrl"]
+        case 0x0370...0x03FF, 0x1F00...0x1FFF: return ["Grek"]
+        case 0x0590...0x05FF, 0xFB1D...0xFB4F: return ["Hebr"]
+        case 0x0600...0x06FF, 0x0750...0x077F, 0x08A0...0x08FF, 0xFB50...0xFDFF, 0xFE70...0xFEFF: return ["Arab"]
+        case 0x0E00...0x0E7F: return ["Thai"]
+        case 0x0900...0x097F: return ["Deva"]
+        default: return []
+        }
     }
 
     private nonisolated static func isLatin(_ scalar: Unicode.Scalar) -> Bool {
