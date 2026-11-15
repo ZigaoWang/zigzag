@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - The camera and the microphone are two permissions in Site Controls: a site asks for each on its own, one question after the other (a no to the first, or a Block for either, settles it without asking the other), and a call that wants both is allowed only when you've allowed both. Sites you allowed both before keep both. ([#243](https://github.com/ZigaoWang/zigzag/issues/243))
+- Find on Page (⌘F) highlights every match on the page at once, in a soft yellow (amber on a dark page), with the one you're on in a stronger orange. A tick for each match runs along the page's right edge, over the scroll bar, so you can see where they all are; click one to go to that match. The marks follow the page as it changes and go away when you close the bar. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#244](https://github.com/ZigaoWang/zigzag/issues/244))
 
 ## [0.9.1] - 2026-11-15
 
