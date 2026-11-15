@@ -18,6 +18,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - Zigzag Mini 会按你上次调整的大小打开。([#246](https://github.com/ZigaoWang/zigzag/issues/246))
 
 ### 修复
+- 脚本或其他 App 打开 Mac 上保存的网页（比如 Python 用 `webbrowser.open("file:///…/plot.html")` 打开的图表）时，会在 Zigzag（或 Zigzag Mini）里打开，不再没反应。只限 HTML、SVG 和 PDF 文件，不会打开文件夹或其他文件。
 - 翻译页面时，夹着英文名称的中文、日文、俄文等标题或短句（比如标题为“类似Little Arc功能”的 GitHub 议题）也会被翻译，不再因为看起来有点像英文而保持原样。
 - Zigzag Mini 里的登录页把你送回打开它的 App 后，等那个 App 打开，Zigzag Mini 就会关闭；直接跳到某个 App 的链接也不会再留下一个空的 Zigzag Mini 窗口。([#246](https://github.com/ZigaoWang/zigzag/issues/246))
 

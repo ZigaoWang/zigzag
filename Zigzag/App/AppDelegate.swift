@@ -269,6 +269,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: Opening URLs from elsewhere
 
+    /// A `file:` link to a page on this Mac that a browser shows as a page: HTML, SVG or PDF, a file that's there and
+    /// readable, never a folder (which would list its files) or anything a page could run as an app.
+    nonisolated static func localPage(_ string: String) -> URL? {
+        guard let url = URL(string: string.trimmingCharacters(in: .whitespacesAndNewlines)), url.isFileURL,
+              ["html", "htm", "xhtml", "svg", "pdf"].contains(url.pathExtension.lowercased()) else { return nil }
+        let file = url.standardizedFileURL
+        guard let values = try? file.resourceValues(forKeys: [.isRegularFileKey, .isReadableKey]),
+              values.isRegularFile == true, values.isReadable == true else { return nil }
+        return file
+    }
+
     @objc private func handleGetURL(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
         guard let string = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue else { return }
         // A site installed as an app, opened or quit (only its small app sends these).
@@ -277,9 +288,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if launched { WebAppStore.handle(link, from: sender) } else { pendingWebApps.append(link) }
             return
         }
-        // A link another app hands over (or a script's `open location`) is a web address: never one of Zigzag's own
-        // pages, an extension's, or a file.
-        guard let url = Scripting.webAddress(string) else { return }
+        // A link another app hands over (or a script's `open location`) is a web address, or a page saved on this Mac
+        // (a plot a script wrote, `webbrowser.open("file:///…/plot.html")`): never one of Zigzag's own pages, an
+        // extension's, a folder, or any other kind of file.
+        guard let url = Scripting.webAddress(string) ?? Self.localPage(string) else { return }
         // Zigzag handing a link to macOS (as the default browser) gets it straight back: that's a link from inside
         // Zigzag, so it opens in a tab here, not in Zigzag Mini as one from another app would.
         if launched, Self.isFromZigzag(event) { WindowManager.shared.openFromZigzag(url); return }

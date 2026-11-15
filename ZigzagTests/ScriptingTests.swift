@@ -14,6 +14,23 @@ struct ScriptingTests {
         }
     }
 
+    /// A page saved on this Mac that another app or a script hands over opens; a folder, a missing file or any
+    /// other kind of file doesn't.
+    @Test func opensLocalPagesFromOtherApps() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zz-localpage-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let page = folder.appendingPathComponent("plot.html"), app = folder.appendingPathComponent("run.command")
+        try Data("<p>plot</p>".utf8).write(to: page)
+        try Data("echo hi".utf8).write(to: app)
+        #expect(AppDelegate.localPage(page.absoluteString) == page.standardizedFileURL)
+        #expect(AppDelegate.localPage(app.absoluteString) == nil)
+        #expect(AppDelegate.localPage(folder.absoluteString) == nil)
+        #expect(AppDelegate.localPage(folder.appendingPathComponent("missing.html").absoluteString) == nil)
+        #expect(AppDelegate.localPage("https://example.com/plot.html") == nil)
+        #expect(AppDelegate.localPage("zigzag://settings") == nil)
+    }
+
     @Test func tabsInSidebarOrder() {
         let favorite = UUID(), pinnedA = UUID(), pinnedB = UUID(), closedPin = UUID(), spaceA = UUID(), spaceB = UUID()
         let live: [UUID: String] = [favorite: "favorite", pinnedA: "pinned A", pinnedB: "pinned B"]

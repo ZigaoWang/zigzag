@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Zigzag Mini opens at the size you last made it. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
 
 ### Fixed
+- A page saved on your Mac that a script or another app opens, like a chart from Python's `webbrowser.open("file:///…/plot.html")`, opens in Zigzag (or Zigzag Mini) instead of nothing. Only HTML, SVG and PDF files, never folders or other files.
 - Translating a page translates a title or short line in Chinese, Japanese, Russian or another script that names something in English, like a GitHub issue titled 类似Little Arc功能, instead of leaving it as it was because it read a little like English.
 - A sign-in page in Zigzag Mini that sends you back to the app that opened it closes once that app opens, and a link that goes straight to an app no longer leaves an empty Zigzag Mini window behind. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
 
