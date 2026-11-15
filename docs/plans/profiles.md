@@ -1,5 +1,10 @@
 # Profiles in Zigzag
 
+**Status: shipped in 0.8.0** ([#61](https://github.com/ZigaoWang/zigzag/issues/61)). This is the plan as it was
+written, kept as the record of why profiles work the way they do; "As built" at the end says where the result
+differs. Still open from it: two copies of 1Password's helper running at once hasn't been tried by hand, and site
+permissions are still shared by every profile.
+
 Goal: a profile owns its extensions, sign-ins, history and favorites, and each space is attached to one profile, so two spaces can run two different wallets or two accounts of the same site. Saved passwords are one vault for every profile. Branch `feat/profiles`, a series of small commits on `main`. Ships once two wallets have been used side by side by hand and nothing changes for someone who never makes a second profile.
 
 ## What exists today

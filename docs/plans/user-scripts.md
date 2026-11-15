@@ -1,5 +1,13 @@
 # chrome.userScripts in Zigzag
 
+**Status: shipped in 0.5.18** (Tampermonkey), with Violentmonkey's install pages and buttons in 0.7.0. This is the
+plan as it was written. What was built in the end is close to the fallback below, not the recommended approach: since
+0.9.0 each user script runs in a `WKContentWorld` of the extension's own, apart from the page and from the
+extension's content scripts, with only what Chrome gives that world (`runtime.sendMessage` and `connect` to
+`onUserScriptMessage` and `onUserScriptConnect`), and the registry is kept in `UserScripts.json` beside the
+extension. `Zigzag/Extensions/BridgeUserScripts.swift` describes how it works now. The trade-off below, scripts
+sharing the extension's world, no longer holds.
+
 Goal: Tampermonkey, Violentmonkey and ScriptCat run user scripts in Zigzag as they do in Chrome. Branch `feat/user-scripts`, ships in 0.5.18 once it's been used by hand and feels solid.
 
 ## What Tampermonkey actually does (5.5.1, read from its MV3 package)

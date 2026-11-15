@@ -1,5 +1,13 @@
 # Developer tools
 
+**Status: shipped in 0.9.0 as Developer Mode**, with Disable Images and Disable Styles in 0.9.1
+([#141](https://github.com/ZigaoWang/zigzag/issues/141)). This is the plan as it was written. Some names changed on
+the way: the Developer tools switch is Developer Mode in Settings › Developer, a development tab is a tab in
+Developer Mode, and Add This Site to Development Sites is Turn On Developer Mode for This Site (⌥⇧⌘D). The grips to
+drag a page to a size, which step 6 left out, were built. Not built, and still open: the pixel ratio, reloading when
+files change, counting `console.error`, a user agent typed by hand, and the tools in a split's own strips (in a
+split they're in Site Controls, the menu bar and the command bar).
+
 Goal: the tools someone building a website reaches for, on the sites they build and nowhere else. Issue [#141](https://github.com/ZigaoWang/zigzag/issues/141). Branch `feat/developer-tools`, in small pull requests.
 
 ## What exists today
