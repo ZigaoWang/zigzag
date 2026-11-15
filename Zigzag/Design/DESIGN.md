@@ -280,11 +280,13 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   simply gone: the command bar (⌘T, ⌘L), the tab and space switchers (⌃Tab), the link under the pointer, and anything
   shown while ⌘T is handled (`Arrival.instant`, `Motion.isKeyboardDriven`). Typing, moving through a list with the
   arrows, and switching tabs never animate; the find bar following its tab comes and goes with the page, at once.
-  Changes made with `Motion.animate` (layout, hovers, lists) are still instant from a key, except the window's
-  layout (the sidebar, splits, switching spaces), which moves so you see where things went (`evenFromKeyboard`).
+  Changes made with `Motion.animate` (layout, hovers) are still instant from a key, except the window's layout (the
+  sidebar, splits, switching spaces), which moves so you see where things went (`evenFromKeyboard`), and the
+  sidebar's rows coming and going, which move the same from a key as from the pointer.
 - Light and dark cross-fade with the space's color when a space changes the window's mode: one fade, no flicker.
 - A closed tab's row folds away: it takes no more clicks, and its height closes as it fades, in step with the rows
-  below gliding up.
+  below gliding up. A new one (a new tab, a link opened in one, a tab moved in, a group or folder opened) does the
+  same backwards: the rows below glide down and its height opens as it fades in.
 - Reduce Motion (the Mac's, or Settings › Appearance › Reduce motion for Zigzag alone): nothing slides, scales or
   travels; fades and color changes still play (`Motion.animate(moves:)`), anything showing up or going crossfades
   in place in `crossfade` (120ms), and a space switch cross-fades the list in place instead of sliding it.

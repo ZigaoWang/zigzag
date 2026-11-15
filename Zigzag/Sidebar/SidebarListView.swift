@@ -487,17 +487,12 @@ final class SidebarListView: NSView {
             }
         }
         // Rows slide on the render server, so a gap that moves again mid-slide carries on from where things are.
-        // The rest make room at the same pace as a page being carried.
+        // The rest make room at the same pace as a page being carried. From a key too: a tab opened from the command
+        // bar comes in as one closed with ⌘W goes, and typing is never held up by it (the list isn't where you type).
         for (view, frame) in moves {
-            if Tokens.Motion.isKeyboardDriven {
-                // A new tab (⌘T) is for typing at once: the list simply is in its new order.
-                view.layer?.removeAnimation(forKey: "glide")
-                Tokens.Motion.withoutAnimation { view.frame = frame }
-            } else {
-                Tokens.Motion.glide(view, to: frame, duration: Tokens.Motion.standard, timing: Tokens.Motion.drawer)
-            }
+            Tokens.Motion.glide(view, to: frame, duration: Tokens.Motion.standard, timing: Tokens.Motion.drawer)
         }
-        if !changes.isEmpty { Tokens.Motion.animate { changes.forEach { $0() } } }
+        if !changes.isEmpty { Tokens.Motion.animate(evenFromKeyboard: true) { changes.forEach { $0() } } }
         // The carried row's faint stand-in, and the rows going with it, show only in its own space.
         drag?.view.isHidden = !carriedRowShown
         if carriedRowShown { for item in drag?.faint ?? [] { rows[item]?.alphaValue = CarriedCopy.faint } }
@@ -530,10 +525,11 @@ final class SidebarListView: NSView {
         CATransaction.commit()
     }
 
-    /// A row that arrives (a new tab opened with the pointer) opens its height from nothing as it fades in, in step
-    /// with the rows below making room. From the keyboard or with Reduce Motion it's simply there.
+    /// A row that arrives (a new tab, a link opened in one, a tab moved in, a group opened) opens its height from
+    /// nothing as it fades in, in step with the rows below making room: `collapse` played backwards, from a key as
+    /// from the pointer. With Reduce Motion it only fades in.
     private func grow(_ view: NSView) {
-        guard let layer = view.layer, !Tokens.Motion.isFromKey, !Tokens.Motion.reduceMotion else { return }
+        guard let layer = view.layer, !Tokens.Motion.reduceMotion else { return }
         CATransaction.begin()
         CATransaction.setCompletionBlock { [weak layer] in layer?.mask = nil }
         reveal(layer, from: 0, to: layer.bounds.height)
