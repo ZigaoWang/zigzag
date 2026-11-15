@@ -205,20 +205,24 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### EasyList and EasyPrivacy
+### EasyList, EasyPrivacy and EasyList China
 
 Built-in ad and tracker blocking. `Zigzag/Resources/Blocklists/blocklist.json.lzfse` is made from
 [EasyList](https://easylist.to/easylist/easylist.txt) and
 [EasyPrivacy](https://easylist.to/easylist/easyprivacy.txt) by The EasyList authors
-([easylist.to](https://easylist.to)). `blocklist.info.json` records the list versions it was made from.
+([easylist.to](https://easylist.to)), and from
+[EasyList China](https://easylist-downloads.adblockplus.org/easylistchina.txt), the Chinese supplement to EasyList
+([github.com/easylist/easylistchina](https://github.com/easylist/easylistchina)), under the same license.
+`blocklist.info.json` records the list versions it was made from.
 
-License: [Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0)](https://creativecommons.org/licenses/by-sa/3.0/).
-(EasyList is also offered under the GNU GPL v3 or later; Zigzag uses it under CC BY-SA 3.0.)
+License: [Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0)](https://creativecommons.org/licenses/by-sa/3.0/),
+as [easylist.to/pages/licence.html](https://easylist.to/pages/licence.html) gives it. (The lists are also offered
+under the GNU GPL v3 or later; Zigzag uses them under CC BY-SA 3.0.)
 
-Changes made: `scripts/update_blocklists.sh` downloads both lists, joins them, converts the filters to WebKit
+Changes made: `scripts/update_blocklists.sh` downloads the three lists, joins them, converts the filters to WebKit
 content-blocker rules, and compresses the result with LZFSE. The converted WebKit content-blocker JSON is an
-adaptation of EasyList and EasyPrivacy, and is likewise licensed under CC BY-SA 3.0, not under Zigzag's
-license. Zigzag credits the lists in Settings and in About Zigzag › Acknowledgments.
+adaptation of EasyList, EasyPrivacy and EasyList China, and is likewise licensed under CC BY-SA 3.0, not under
+Zigzag's license. Zigzag credits the lists in Settings and in About Zigzag › Acknowledgments.
 
 ### Ghostery adblocker
 
@@ -368,7 +372,7 @@ documented formats, with one made-up login. It contains no third-party code or r
 
 ## Names and marks
 
-Zigzag mentions other browsers (Arc, Chrome, Safari, Firefox, Zen, Edge, Brave, Dia, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium) to import
+Zigzag mentions other browsers (Arc, Chrome, Safari, Firefox, Zen, Edge, Brave, Dia, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Orion) to import
 from them, and popular websites in onboarding and site search. The bundled `Zigzag/Resources/Onboarding/avoidxray.png`
 is the logo of AvoidXray, which is also made by Zigao Wang; it's used to show that site in onboarding. Some site
 icons are loaded from their owners' servers when shown. These names, logos and icons belong to their owners; their use here doesn't mean an
