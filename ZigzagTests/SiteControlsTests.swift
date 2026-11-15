@@ -93,6 +93,32 @@ struct SiteControlsPermissionTests {
         }
     }
 
+    /// A rule's answer is the caller's to write: it goes to the rule, never into the site's store, and a caller that
+    /// offered the rule scope without passing its rule loses nothing — the same answer still holds for the page.
+    @Test func aRuleAnswerIsWrittenOnTheRule() throws {
+        try withDefaults {
+            let rule = UUID()
+            let subject = PermissionSubject.handoff(rule)
+            var told: [String] = []
+            let kept = SitePermissions.rememberAnswer(
+                PermissionAnswer(action: "handOff", scope: .rule),
+                subject: subject, origin: site, tab: nil, isPrivate: false,
+                onRule: { told.append($0) })
+            #expect(kept)
+            #expect(told == ["handOff"])
+            #expect(SitePermissions.action(subject, origin: site) == nil)
+
+            // The same answer in a private window is kept nowhither, the rule included.
+            told = []
+            SitePermissions.rememberAnswer(
+                PermissionAnswer(action: "handOff", scope: .rule),
+                subject: subject, origin: site, tab: nil, isPrivate: true,
+                onRule: { told.append($0) })
+            #expect(told.isEmpty)
+            #expect(SitePermissions.action(subject, origin: site) == nil)
+        }
+    }
+
     /// Screen sharing follows the same rule as everything else now: **a kept no is a no for the site, and "this time"
     /// leaves the site asking.** It used to be the one question that kept nothing at all — the same two answers
     /// meaning something different there than on every other card.

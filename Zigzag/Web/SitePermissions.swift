@@ -114,18 +114,26 @@ enum SitePermissions {
 
     static func remember(_ action: String?, subject: String, origin: String) { stored["\(origin)|\(subject)"] = action }
 
-    /// Writes down what a question was answered. "Always" is kept for the site, under `origin` and `subject`; anything
-    /// else, and everything a private window answers, holds for `tab`'s page only. A private window keeps nothing at
-    /// all, whatever the answer says, which is why it must say so here rather than be trusted to have masked it.
-    /// Returns whether the answer allows what was asked (`action` other than "deny").
+    /// Writes down what a question was answered. "Always on this site" is kept under `origin` and `subject`;
+    /// "This time" holds for `tab`'s page only; "Always for this rule" is the caller's to write, since only it owns
+    /// the rule, and gets it as `onRule`'s argument. A private window keeps nothing at all, whatever the answer says,
+    /// and a kept answer there falls back to the page — which is why it must say so here rather than be trusted to
+    /// have masked it. Returns whether the answer allows what was asked (`action` other than "deny").
     @discardableResult
-    static func rememberAnswer(_ answer: PermissionAnswer, subject: String, origin: String, tab: Tab?, isPrivate: Bool) -> Bool {
+    static func rememberAnswer(_ answer: PermissionAnswer, subject: String, origin: String, tab: Tab?, isPrivate: Bool,
+                               onRule: ((String) -> Void)? = nil) -> Bool {
         // The tab knows best: a caller that forgets to pass its own privacy is still not allowed to store.
         let keepsNothing = isPrivate || (tab?.isPrivate ?? false)
-        if answer.remember, !keepsNothing {
-            remember(answer.action, subject: subject, origin: origin)
-        } else if let tab {
-            tab.permissionAnswers.note(answer.action, key: origin, kind: subject)
+        func noteOnThePage() { tab?.permissionAnswers.note(answer.action, key: origin, kind: subject) }
+        switch answer.scope {
+        case .once:
+            noteOnThePage()
+        case .site:
+            if keepsNothing { noteOnThePage() } else { remember(answer.action, subject: subject, origin: origin) }
+        case .rule:
+            // Where a private window asked, or a caller that offered the rule scope didn't pass the rule, the same
+            // answer still holds for the page: an answer is never dropped on the floor.
+            if !keepsNothing, let onRule { onRule(answer.action) } else { noteOnThePage() }
         }
         return answer.action != "deny"
     }
@@ -506,7 +514,7 @@ enum SitePermissions {
         // one, in Zigzag. "Always" keeps it for the site like every other answer — the no included — and "This time"
         // keeps it for the page.
         let place: NotificationPlace = answer.action == "deny" ? .blocked : (NotificationPlace(action: answer.choice) ?? .inZigzag)
-        _ = rememberAnswer(PermissionAnswer(action: place.action, remember: answer.remember), subject: PermissionSubject.notifications,
+        _ = rememberAnswer(PermissionAnswer(action: place.action, scope: answer.scope), subject: PermissionSubject.notifications,
                            origin: origin, tab: tab, isPrivate: isPrivate)
         return place
     }
@@ -599,7 +607,7 @@ enum SitePermissions {
                                                 actions: DisplayCaptureChoice.actions, canRemember: site != nil)
         let choice = DisplayCaptureChoice(answer)
         if let site {
-            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: choice.action, remember: answer?.remember ?? false),
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: choice.action, scope: answer?.scope ?? .once),
                                               subject: PermissionSubject.screen, origin: site, tab: tab,
                                               isPrivate: tab?.isPrivate ?? false)
         }
@@ -851,6 +859,9 @@ final class PermissionPrompt: FloatingPanelView {
     private let asker = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let closeButton = IconButton(symbol: "xmark", toolTip: String(localized: "Not Now", comment: "Tooltip of the × on a site's permission question."))
     private let duration = DropdownButton()
+    /// What each index of the duration control means: this page and this site, and — where the rule that asked named
+    /// itself — the rule. Its options are built from the same list (`durationChoices`), so the two can't drift.
+    private var scopeChoices: [PermissionScope] = [.once, .site]
     /// Answers of the same kind, offered as one dropdown rather than a button each (where a pop-up opens): choosing
     /// one answers the question, so the card stays a line.
     private let answerMenu = DropdownButton()
@@ -934,6 +945,25 @@ final class PermissionPrompt: FloatingPanelView {
         }
     }
 
+    /// What the duration control offers, in the order the scope is chosen: this page, this site, and — where the
+    /// caller names the rule that asked — that rule, for every site. One list, so the control and the answer it hands
+    /// back can never disagree about what the third index means.
+    static func durationChoices(ruleScope: String? = nil) -> [(title: String, scope: PermissionScope)] {
+        var choices: [(title: String, scope: PermissionScope)] = [
+            (String(localized: "This time", comment: "Duration choice on a site's permission question: the answer applies only to this page."), .once),
+            (String(localized: "Always on this site", comment: "Duration choice on a site's permission question: the answer is remembered for this site."), .site)
+        ]
+        if let ruleScope { choices.append((ruleScope, .rule)) }
+        return choices
+    }
+
+    /// The answer the card hands back: what was chosen, with the entry the chooser had picked, and — only where the
+    /// duration control is live — how long it lasts. A disabled control (a private window, or a question with nothing
+    /// it may keep) never returns more than this time.
+    static func handBack(_ answer: PermissionAnswer, keeping: Bool) -> PermissionAnswer {
+        PermissionAnswer(action: answer.action, scope: keeping ? answer.scope : .once, choice: answer.choice)
+    }
+
     /// `title` is the request ("Use your camera" by default). `icon` stands in for the symbol (an app's icon).
     /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
     /// `tab` is the tab whose page asked; without one, it's the tab in front when the question comes up.
@@ -941,16 +971,15 @@ final class PermissionPrompt: FloatingPanelView {
     /// `menu` is answers of one kind offered as a single dropdown after the buttons (where a pop-up opens); choosing
     /// one answers the question, and it stands in as the question's own filled answer.
     /// `chooser` is the other way round: contents of one kind (where a web address opens) that the dropdown only
-    /// *picks*, while the buttons answer. The answer carries the chosen entry as `choice`, and the duration is left
-    /// out — the buttons are what say how long it lasts.
-    /// The duration choice is This time unless `canRemember` offers Always on this site. A disabled choice keeps
-    /// `rememberNote` as its explanation. Nil means Not Now. `rememberLabel` words that second choice where the
-    /// answer is kept somewhere else than the site (a download rule keeps its own).
+    /// *picks*, while the buttons answer. The answer carries the chosen entry as `choice`.
+    /// The duration choice is This time unless `canRemember` offers Always on this site, and gains a third choice
+    /// where `ruleScope` names the rule that asked ("Always for “YouTube”"): the same shape on every card, with only
+    /// what the answer lasts on changing. A disabled choice keeps `rememberNote` as its explanation. Nil means Not Now.
     static func ask(host: String, origin: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil,
                     actions: [PermissionAction] = [.deny, .allow], menu: [PermissionAction] = [],
                     chooser: [PermissionAction] = [],
-                    canRemember: Bool = true, rememberNote: String? = nil, rememberLabel: String? = nil,
+                    canRemember: Bool = true, rememberNote: String? = nil, ruleScope: String? = nil,
                     answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         let key = ObjectIdentifier(controller)
         let before = queue[key]
@@ -961,12 +990,12 @@ final class PermissionPrompt: FloatingPanelView {
         let task = Task<PermissionAnswer?, Never> { @MainActor in
             _ = await before?.value
             if let known = answered() {
-                return PermissionAnswer(action: known.action, remember: known.remember && remembers)
+                return PermissionAnswer(action: known.action, scope: remembers ? known.scope : .once)
             }
             return await show(host: host, request: title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English."),
                               symbol: symbol, icon: icon, actions: actions, menu: menu, chooser: chooser,
                               canRemember: remembers, rememberNote: rememberNote,
-                              rememberLabel: rememberLabel,
+                              ruleScope: ruleScope,
                               origin: origin, in: controller, tab: tab)
         }
         queue[key] = task
@@ -983,7 +1012,7 @@ final class PermissionPrompt: FloatingPanelView {
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, actions: [PermissionAction],
                              menu: [PermissionAction], chooser: [PermissionAction], canRemember: Bool,
-                             rememberNote: String?, rememberLabel: String?,
+                             rememberNote: String?, ruleScope: String?,
                              origin: String?, in controller: PromptHost, tab: Tab?) async -> PermissionAnswer? {
         // Never under What's New, where it couldn't be seen: it waits until the notes close.
         await withCheckedContinuation { continuation in
@@ -1020,9 +1049,12 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.badge.color = .clear
             }
             prompt.duration.isEnabled = canRemember
-            // Where the answer is kept somewhere else than the site (a download rule keeps its own), the choice says so.
-            if let rememberLabel {
-                prompt.duration.options[1] = DropdownButton.Option(title: rememberLabel)
+            // A question a rule asked gains the third duration: the same shape as every card, with only what "Always"
+            // lasts on changing. Everywhere else the two choices are already right.
+            if let ruleScope {
+                let choices = Self.durationChoices(ruleScope: ruleScope)
+                prompt.duration.options = choices.map { DropdownButton.Option(title: $0.title) }
+                prompt.scopeChoices = choices.map(\.scope)
             }
             if !canRemember {
                 prompt.duration.toolTip = rememberNote ?? (controller.promptIsPrivate
@@ -1034,7 +1066,7 @@ final class PermissionPrompt: FloatingPanelView {
                 if action.isProminent { button.tint = accent }
                 button.onClick = { [weak prompt] _ in
                     guard let prompt, action.isDeny || prompt.acceptsAllow else { return }
-                    prompt.finish(PermissionAnswer(action: action.id, remember: canRemember && prompt.duration.selectedIndex == 1,
+                    prompt.finish(PermissionAnswer(action: action.id, scope: canRemember ? prompt.chosenScope : .once,
                                                    choice: prompt.chosenChoice))
                 }
                 return button
@@ -1053,18 +1085,17 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.answerMenu.tint = accent
                 prompt.answerMenu.onSelect = { [weak prompt] index in
                     guard let prompt, prompt.acceptsAllow, menu.indices.contains(index) else { return }
-                    prompt.finish(PermissionAnswer(action: menu[index].id, remember: canRemember && prompt.duration.selectedIndex == 1))
+                    prompt.finish(PermissionAnswer(action: menu[index].id, scope: canRemember ? prompt.chosenScope : .once))
                 }
                 prompt.addSubview(prompt.answerMenu)
             }
             // Contents of one kind (where a web address opens), which the dropdown only picks: the buttons answer, and
-            // the duration goes, since the buttons are what say how long it lasts. Nothing is answered here — the
-            // dropdown keeps the chosen index itself, and `chosenChoice` is read when a button is pressed.
+            // the duration says how long. Nothing is answered here — the dropdown keeps the chosen index itself, and
+            // `chosenChoice` is read when a button is pressed.
             if !chooser.isEmpty {
                 prompt.menuChoices = chooser
                 prompt.answerMenu.options = chooser.map { DropdownButton.Option(title: $0.title) }
                 prompt.addSubview(prompt.answerMenu)
-                prompt.duration.isHidden = true
             }
             prompt.setAccessibilityLabel(String(localized: "\(host): \(request)?", comment: "VoiceOver label of a site's permission question: the site, then its request, like “zoom.us: Use your camera?”."))
             prompt.answer = { response in
@@ -1182,10 +1213,7 @@ final class PermissionPrompt: FloatingPanelView {
         request.usesSingleLineMode = false
         request.maximumNumberOfLines = 2
         closeButton.onClick = { [weak self] _ in self?.finish(nil) }
-        duration.options = [
-            DropdownButton.Option(title: String(localized: "This time", comment: "Duration choice on a site's permission question: the answer applies only to this page.")),
-            DropdownButton.Option(title: String(localized: "Always on this site", comment: "Duration choice on a site's permission question: the answer is remembered for this site."))
-        ]
+        duration.options = Self.durationChoices().map { DropdownButton.Option(title: $0.title) }
         duration.selectedIndex = 0
         [badge, picture, request, asker, closeButton, duration].forEach { addSubview($0) }
         onLayout = { [weak self] in self?.layoutContent() }
@@ -1199,9 +1227,14 @@ final class PermissionPrompt: FloatingPanelView {
         return menuChoices[min(max(0, answerMenu.selectedIndex), menuChoices.count - 1)].id
     }
 
+    /// The duration the card was left on, read when a button or the menu answers.
+    var chosenScope: PermissionScope {
+        scopeChoices[min(max(0, duration.selectedIndex), scopeChoices.count - 1)]
+    }
+
     private func finish(_ choice: PermissionAnswer?) {
         // The disabled duration control also guards debug answers: a private or one-time question never returns Always.
-        let choice = choice.map { PermissionAnswer(action: $0.action, remember: $0.remember && duration.isEnabled) }
+        let choice = choice.map { Self.handBack($0, keeping: duration.isEnabled) }
         stopListening()
         let answer = self.answer
         self.answer = nil

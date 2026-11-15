@@ -27,14 +27,42 @@ nonisolated struct PermissionAction {
     }
 }
 
-/// The action chosen for a permission question and whether it is kept for the site or only its current page.
+/// How long a question's answer holds: for the page that asked, for its site, or for the rule that asked. Every card
+/// offers the same shape — "This time", "Always on this site", and, where an automation is what asked, "Always for"
+/// it — and only what the answer lasts *on* changes.
+nonisolated enum PermissionScope: String, Codable, CaseIterable, Sendable {
+    /// The page that asked: its tab, until it loads another page or reloads.
+    case once
+    /// Every page of the site that asked.
+    case site
+    /// Every site, for the rule that asked. Only a question a download rule asks offers this.
+    case rule
+}
+
+/// The action chosen for a permission question and how long it lasts.
 nonisolated struct PermissionAnswer {
     let action: String
-    let remember: Bool
+    let scope: PermissionScope
     /// The entry a question's own dropdown had chosen, where it offers one as a *chooser* rather than as the answer
     /// itself — "where should this open" picks a place, and the buttons then say how long it lasts. Nil for a question
     /// with no such dropdown, and for the answers that are the dropdown's own (a pop-up's destination).
     var choice: String? = nil
+
+    init(action: String, scope: PermissionScope = .once, choice: String? = nil) {
+        self.action = action
+        self.scope = scope
+        self.choice = choice
+    }
+
+    /// A question that has only this page and this site to keep its answer on, which is every question but a rule's
+    /// own: "kept" there means the site.
+    init(action: String, remember: Bool, choice: String? = nil) {
+        self.init(action: action, scope: remember ? .site : .once, choice: choice)
+    }
+
+    /// Whether the answer is kept beyond the page — on the site, or on the rule. This is what a question *says*; where
+    /// the answer is written reads `scope`, since only that tells the two apart.
+    var remember: Bool { scope != .once }
 }
 
 /// Stable identifiers under which permission actions are remembered.

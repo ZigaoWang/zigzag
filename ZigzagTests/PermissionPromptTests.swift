@@ -32,7 +32,31 @@ struct PermissionPromptTests {
         let always = PermissionAnswer(action: "newTab", remember: true)
         #expect(always.action == "newTab")
         #expect(always.remember == true)
+        #expect(always.scope == .site)
         #expect(PermissionAnswer(action: "newTab", remember: false).remember == false)
+        // A rule's own answer is kept just as long, on the rule: the same shape, one more place to keep it on.
+        #expect(PermissionAnswer(action: "handOff", scope: .rule).remember == true)
+    }
+
+    /// Every card offers this page and this site; a question a rule asked adds the rule, and the third index means it.
+    @Test func aRuleQuestionAsksHowLongForThreeScopes() {
+        #expect(PermissionPrompt.durationChoices().map(\.scope) == [.once, .site])
+        let choices = PermissionPrompt.durationChoices(ruleScope: "Always for YouTube")
+        #expect(choices.map(\.scope) == [.once, .site, .rule])
+        #expect(choices.last?.title == "Always for YouTube")
+        #expect(Set(choices.map(\.title)).count == choices.count)
+    }
+
+    /// The card hands back what was chosen: the chooser's entry survives (a picked place used to be dropped on the
+    /// way out), and a live duration says how long it lasts. A disabled one never returns more than this time.
+    @Test func theAnswerKeepsItsEntryAndItsScope() {
+        let picked = PermissionAnswer(action: "allow", scope: .rule, choice: "mini")
+        let kept = PermissionPrompt.handBack(picked, keeping: true)
+        #expect(kept.scope == .rule)
+        #expect(kept.choice == "mini")
+        let once = PermissionPrompt.handBack(picked, keeping: false)
+        #expect(once.scope == .once)
+        #expect(once.choice == "mini")
     }
 
     @Test func aKnownSiteAnswerIsAlwaysAndTakesPrecedence() {
