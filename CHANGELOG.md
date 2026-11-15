@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- A long download name or command bar title no longer cuts shorter when you point at its row or move onto it, and a cut download name shows whole in a tooltip. Not secure in Site Controls and a failed extension install read clearly on light backgrounds, and a profile without extensions no longer says 0 extensions.
+
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
