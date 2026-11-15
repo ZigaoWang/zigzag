@@ -102,4 +102,24 @@ struct DownloadPolicyTests {
         _ = policy.decide(shouldDownload: false, clicked: false, isMainFrame: true)
         #expect(policy.decide(mimeType: "application/octet-stream", contentDisposition: "attachment; filename=a.dmg", canShowMIMEType: false, isMainFrame: true) == .download)
     }
+
+    /// A refused download's notice offers to ask for the file again only where it can be asked for: a plain GET. A
+    /// file a form sent can't be re-made from here — the page would have to send it again — so that notice just says
+    /// what happened, and nothing to ask with is nothing to offer.
+    @Test func onlyAPlainGETIsAskedForAgain() {
+        #expect(DownloadPolicy.canBeAskedAgain(URLRequest(url: URL(string: "https://files.example/a.dmg")!)))
+        var get = URLRequest(url: URL(string: "https://files.example/a.dmg")!)
+        get.httpMethod = "GET"
+        #expect(DownloadPolicy.canBeAskedAgain(get))
+
+        var posted = URLRequest(url: URL(string: "https://files.example/report")!)
+        posted.httpMethod = "POST"
+        posted.httpBody = Data("kind=zip".utf8)
+        #expect(!DownloadPolicy.canBeAskedAgain(posted))
+        var postWithNoBody = URLRequest(url: URL(string: "https://files.example/report")!)
+        postWithNoBody.httpMethod = "POST"
+        #expect(!DownloadPolicy.canBeAskedAgain(postWithNoBody))
+
+        #expect(!DownloadPolicy.canBeAskedAgain(nil))
+    }
 }
