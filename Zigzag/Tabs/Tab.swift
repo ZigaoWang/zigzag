@@ -967,10 +967,14 @@ final class Tab: NSObject {
 
     /// What a local page may read: its folder, for its pictures and styles beside it. Not when it sits loose in
     /// Downloads, or the folder Settings saves downloads to, which hold everything you've ever downloaded: there
-    /// only the file, unless it was saved as a whole page with its "_files" folder.
-    static func readAccess(for file: URL, downloadFolders: [URL] = Tab.downloadFolders) -> URL {
+    /// only the file, unless it was saved as a whole page with its "_files" folder. Nor when it sits in your home
+    /// folder, or above it (`/`, /Users): its folder would be every file you have.
+    static func readAccess(for file: URL, downloadFolders: [URL] = Tab.downloadFolders,
+                           home: URL = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)) -> URL {
         let folder = file.deletingLastPathComponent()
         let path = folder.resolvingSymlinksInPath().standardizedFileURL.path
+        let homePath = home.resolvingSymlinksInPath().standardizedFileURL.path
+        if path == "/" || homePath == path || homePath.hasPrefix(path.hasSuffix("/") ? path : path + "/") { return file }
         guard downloadFolders.contains(where: { $0.resolvingSymlinksInPath().standardizedFileURL.path == path }) else { return folder }
         let saved = folder.appendingPathComponent(file.deletingPathExtension().lastPathComponent + "_files")
         return FileManager.default.fileExists(atPath: saved.path) ? folder : file

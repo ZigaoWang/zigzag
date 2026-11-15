@@ -190,6 +190,21 @@ struct SecurityFixesTests {
         let index = project.appendingPathComponent("index.html")
         #expect(Tab.readAccess(for: index, downloadFolders: folders).path == project.path)
     }
+
+    /// A page loose in the home folder, or above it, reads only itself: its folder would be every file you have.
+    @Test func aPageInTheHomeFolderOrAboveReadsOnlyItself() {
+        let home = URL(fileURLWithPath: "/Users/someone", isDirectory: true)
+        for path in ["/Users/someone/page.html", "/Users/page.html", "/page.html"] {
+            let file = URL(fileURLWithPath: path)
+            #expect(Tab.readAccess(for: file, downloadFolders: [], home: home).path == file.path)
+        }
+        // Inside a folder of its own there: that folder, as before.
+        let site = URL(fileURLWithPath: "/Users/someone/site/index.html")
+        #expect(Tab.readAccess(for: site, downloadFolders: [], home: home).path == "/Users/someone/site")
+        // A folder that only starts like home is another folder.
+        let other = URL(fileURLWithPath: "/Users/someone2/index.html")
+        #expect(Tab.readAccess(for: other, downloadFolders: [], home: home).path == "/Users/someone2")
+    }
 }
 
 /// Site permissions are kept per origin (scheme, host and port), never per host: an answer given to
