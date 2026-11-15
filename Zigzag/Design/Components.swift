@@ -216,7 +216,7 @@ extension InteractiveView {
             }
         case .quiet:
             fill = pressed ? Tokens.Color.pressedFill : hovered || isSelected ? Tokens.Color.hoverFill : nil
-            text = hovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+            text = !isEnabled ? Tokens.Color.textDisabled : hovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         }
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
         let edged = look == .secondary
@@ -228,7 +228,8 @@ extension InteractiveView {
             layer?.shadowRadius = Tokens.Shadow.controlRadius
             layer?.shadowOffset = CGSize(width: 0, height: isFlipped ? Tokens.Shadow.controlDrop : -Tokens.Shadow.controlDrop)
         }
-        alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
+        // Words alone can't be faded further and still read: a quiet one takes the disabled ink instead.
+        alphaValue = isEnabled || look == .quiet ? 1 : Tokens.Opacity.disabled
         return text
     }
 
@@ -338,13 +339,14 @@ final class PillButton: InteractiveView {
         case .prominent:
             ink = isDestructive ? applyButtonLook(.primary, tint: Tokens.Color.destructive, ink: .white)
                 // The space's own accent, as a switch that's on: one color for "this is the thing to do".
-                : applyButtonLook(.primary, tint: tint ?? Brand.Theme.for(self).accent, ink: tint.map { _ in .white } ?? Brand.Theme.for(self).onAccent)
+                : applyButtonLook(.primary, tint: tint ?? Brand.Theme.for(self).accent, ink: tint.map(Brand.ink(on:)) ?? Brand.Theme.for(self).onAccent)
         case .plain: ink = applyButtonLook(.secondary)
         case .quiet: ink = applyButtonLook(.quiet)
         }
         let tinted = style == .prominent || customFill != nil
-        label.textColor = isDestructive && !tinted ? Tokens.Color.destructive : ink
-        iconView.contentTintColor = tinted ? ink : isHovered || isSelected || style == .plain ? Tokens.Color.textPrimary : Tokens.Color.icon
+        label.textColor = isDestructive && !tinted && isEnabled ? Tokens.Color.destructive : ink
+        iconView.contentTintColor = tinted ? ink : !isEnabled && style == .quiet ? Tokens.Color.textDisabled
+            : isHovered || isSelected || style == .plain ? Tokens.Color.textPrimary : Tokens.Color.icon
     }
 }
 

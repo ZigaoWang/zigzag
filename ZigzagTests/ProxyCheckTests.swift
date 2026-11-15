@@ -25,6 +25,17 @@ struct ProxyCheckTests {
         #expect(ProxyCheck.localProxy(in: clash, scheme: "file") == nil)
     }
 
+    /// Any proxy at all, here or elsewhere, for the address's scheme, SOCKS, or set up automatically.
+    @Test func anyProxyIsFound() {
+        #expect(ProxyCheck.anyProxy(in: clash, scheme: "https"))
+        #expect(ProxyCheck.anyProxy(in: ["HTTPSEnable": 1, "HTTPSProxy": "proxy.corp.example", "HTTPSPort": 3128], scheme: "https"))
+        #expect(ProxyCheck.anyProxy(in: ["SOCKSEnable": 1, "SOCKSProxy": "10.0.0.2"], scheme: "http"))
+        #expect(ProxyCheck.anyProxy(in: ["ProxyAutoConfigEnable": 1, "ProxyAutoConfigURLString": "http://wpad/proxy.pac"], scheme: "https"))
+        #expect(!ProxyCheck.anyProxy(in: [:], scheme: "https"))
+        #expect(!ProxyCheck.anyProxy(in: ["HTTPSEnable": 0, "HTTPSProxy": "127.0.0.1"], scheme: "https"))
+        #expect(!ProxyCheck.anyProxy(in: ["HTTPEnable": 1, "HTTPProxy": "127.0.0.1"], scheme: "https"))
+    }
+
     @Test func aSOCKSProxyCountsForBoth() {
         let socks: [String: Any] = ["SOCKSEnable": 1, "SOCKSProxy": "127.0.0.1", "SOCKSPort": 7891]
         #expect(ProxyCheck.localProxy(in: socks, scheme: "https") == "127.0.0.1:7891")

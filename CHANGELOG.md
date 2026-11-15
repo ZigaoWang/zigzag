@@ -54,6 +54,21 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - An extension's popup opened from the sidebar stays inside the window, instead of hanging past its left edge.
 - In onboarding, the note that no other browsers were found sits in the middle of its card.
 - Install as App's name field shows it's ready for typing in light mode too, as it does in dark. In the sheet for adding an extension, a site's name no longer breaks across two lines at a hyphen.
+- Show All Tabs in a private window no longer takes a new picture of every tab loaded in the background each time it opens, on a Mac in light mode.
+- Site Controls, opened under the address with the sidebar on the right, stays under the address when the window is resized, instead of being cut off at the window's edge.
+- An extension's popup from its button pinned in the address stays under the button when the popup changes size after the address moved.
+- The warning for a site whose certificate it signed itself, like a router's reached at 192.168.1.1, says the certificate is self-signed instead of being for a different address. A certificate made out to an IP address counts for that address.
+- Two sentences joined in English keep the space between them when the first ends in a closing quotation mark.
+- A pop-up from a private window keeps the WebRTC choice made in the tab that opened it after that tab is closed.
+- Pages marked with an old language code, like iw for Hebrew or in for Indonesian, are offered translation from the right language.
+- In dark mode, buttons filled with the space's color, like Allow on a site's question and Done in What's New, have dark text that reads on them, instead of white text that was hard to read.
+- The offer to translate a page no longer shows over History or Settings.
+- A site's question and Save password? take turns at the top of the page instead of showing one over the other, and a toast that comes while one is up shows under it. What's New closes when you switch tabs, and makes way for Install as App and other sheets instead of staying under them.
+- Simplified Chinese reads more naturally across Settings, Site Controls and onboarding.
+- Calendar and Drive in the welcome window, and the Laptop, Desktop and Full HD page sizes in the developer tools, are named in your language.
+- A tab showing an error page, like a certificate warning, shows a warning icon instead of the icon of the page before it.
+- Buttons that can't be used yet, like Use Default Colors in the space editor, keep their text readable.
+- History lists a PDF by its file name instead of its site.
 
 - A one-page PDF stays in the middle with Two Pages on, instead of sitting alone on the right like a book's first page.
 - A strong password from Use Strong Password stays in Passwords until a newer one for the same account takes its place, however long the site takes to confirm it. Unconfirmed ones are no longer deleted after two weeks.

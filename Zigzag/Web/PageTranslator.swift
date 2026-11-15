@@ -147,8 +147,13 @@ enum PageTranslator {
         let tag = declared.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "_", with: "-")
         guard let first = tag.split(separator: "-").first?.lowercased(), (2...3).contains(first.count),
               first.allSatisfy({ $0.isASCII && $0.isLetter }), !["und", "mul", "zxx", "mis"].contains(first) else { return nil }
-        return Locale.Language(identifier: tag)
+        // Old codes pages still use, as the language recognizer names them: Hebrew, Indonesian, Yiddish, and
+        // Norwegian, which it reads as Bokmål.
+        guard let modern = legacyCodes[first] else { return Locale.Language(identifier: tag) }
+        return Locale.Language(identifier: ([modern] + tag.split(separator: "-").dropFirst().map(String.init)).joined(separator: "-"))
     }
+
+    private nonisolated static let legacyCodes = ["iw": "he", "in": "id", "ji": "yi", "no": "nb"]
 
     /// How much text of each language the blocks have, by how much each says, and in all; blocks too short to
     /// tell, or told with too little confidence, aren't counted.
@@ -454,6 +459,13 @@ struct TranslationRuns<Key: Hashable, Run: AnyObject> {
 }
 
 extension PageTranslator {
+    /// Whether a page is one that's read for its language and offered a translation: a site's page, never Zigzag's
+    /// own (History, Settings, which list other pages' titles in their languages) nor an error page in its place.
+    nonisolated static func readsLanguage(of url: URL?, errorPage: Bool) -> Bool {
+        guard let scheme = url?.scheme?.lowercased(), !errorPage else { return false }
+        return ["http", "https", "file"].contains(scheme)
+    }
+
     /// Whether an offer to translate, made for the page at `offeredFor`, still stands for the tab's page now: the same
     /// page (a jump within it, by `#`, is the same page), still seen in another language, and not translated yet.
     nonisolated static func offerStands(offeredFor: URL?, now: URL?, foreign: Bool, translated: Bool) -> Bool {

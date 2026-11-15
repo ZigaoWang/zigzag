@@ -13,6 +13,19 @@ struct HistoryStoreTests {
         #expect(HistoryStore.normalizedHost(URL(string: "https://WWW.Example.com/a")!) == "example.com")
     }
 
+    @Test func aPDFIsListedByItsFileName() throws {
+        // A PDF from the web has no title of its own: History calls it by its file's name, not its site.
+        let pdf = try #require(URL(string: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"))
+        #expect(HistoryStore.shownTitle("", url: pdf) == "dummy.pdf")
+        let spaced = try #require(URL(string: "https://example.com/files/Shanghai%20Guide.PDF"))
+        #expect(HistoryStore.shownTitle("", url: spaced) == "Shanghai Guide.PDF")
+        #expect(HistoryStore.shownTitle("", url: URL(fileURLWithPath: "/Users/me/notes.html")) == "notes.html")
+        // A title it has wins; a page with neither goes by its site.
+        #expect(HistoryStore.shownTitle("Dummy PDF file", url: pdf) == "Dummy PDF file")
+        #expect(HistoryStore.shownTitle("", url: try #require(URL(string: "https://www.w3.org/"))) == "www.w3.org")
+        #expect(HistoryStore.fileName(of: try #require(URL(string: "https://example.com/about"))) == nil)
+    }
+
     @Test func startsAfreshFromADamagedFile() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-history-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

@@ -138,4 +138,15 @@ struct ErrorPageTests {
         // Only the network coming back after being gone.
         #expect(retries == [false, false, false, true, false])
     }
+
+    @MainActor @Test func anErrorPagesTabWearsAWarning() throws {
+        // The certificate warning in place of a page: the tab shows the warning, never the last page's icon.
+        let page = try #require(URL(string: "https://expired.badssl.com/"))
+        #expect(Tab.immediateIcon(for: page, errorPage: true) === Tab.errorPageIcon)
+        #expect(Tab.errorPageIcon != nil)
+        // Any other page wears its own (Settings its gear), never the warning.
+        let settings = try #require(URL(string: "zigzag://settings"))
+        #expect(Tab.immediateIcon(for: settings, errorPage: false) !== Tab.errorPageIcon)
+        #expect(Tab.immediateIcon(for: settings, errorPage: false) != nil)
+    }
 }

@@ -207,7 +207,8 @@ One look for each state, everywhere:
   `Metric.focusGap` (2pt) outside it, following its shape. Only the keyboard brings it; a click never does.
 - Pointer: the arrow on every control, as on the Mac; the I-beam in text; the pointing hand only for links in a
   page's text. Hover feedback is the fill, not the cursor.
-- Disabled: `Opacity.disabled`.
+- Disabled: `Opacity.disabled` (50%) on a control with a fill; words alone take `Color.textDisabled`. Either way
+  its words keep 3:1 on a panel or page.
 - Increase Contrast (the Mac's, `Tokens.Contrast`): hairlines, edges, separators, quiet text, icons, the chrome's
   fills and the controls' borders take their stronger versions (`Color.dynamic(light:dark:highLight:highDark:)`),
   quiet and tertiary text at AA or better on every surface and frame; every window draws again when it changes.

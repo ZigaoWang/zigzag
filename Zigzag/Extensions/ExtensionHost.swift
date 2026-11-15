@@ -270,9 +270,11 @@ final class ExtensionHost: NSObject {
     func repositionPinPopups(of controller: BrowserWindowController) {
         for popup in openPopups.values where popup.fromPin && popup.window === controller.window && popup.popover.isShown {
             let anchor = controller.popupAnchor(forPin: popup.extensionID)
-            if anchor.view === controller.sidebar.address {
-                let place = keptInWindow(popup.popover, anchor.rect, of: anchor.view)
-                if place.view === anchor.view { popup.popover.positioningRect = place.rect }
+            // Where it's asked to show from moves with the button, so a later resize of the popup keeps to it too.
+            let key = ObjectIdentifier(popup.popover)
+            if anchor.view === controller.sidebar.address, popupPlaces[key]?.view === anchor.view {
+                popupPlaces[key]?.rect = anchor.rect
+                keepInWindow(popup.popover)
             }
         }
     }

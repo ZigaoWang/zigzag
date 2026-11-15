@@ -95,6 +95,20 @@ struct CertificateTrustTests {
         #expect(StrictTransport.isKnown("secure.example", in: store))
     }
 
+    /// The bundled list is searched byte by byte (`StrictTransport.listed`): it must be sorted that way, one name a
+    /// line, with no carriage return a checkout could have added (.gitattributes keeps git from it).
+    @Test func thePreloadListIsSortedByteByByte() throws {
+        let url = try #require(Bundle.main.url(forResource: "hsts_preload", withExtension: "txt"))
+        let data = try Data(contentsOf: url)
+        #expect(!data.contains(0x0D))
+        #expect(data.last == 0x0A)
+        let lines = data.split(separator: 0x0A, omittingEmptySubsequences: false).dropLast()
+        #expect(lines.count > 1_000)
+        #expect(!lines.contains { $0.isEmpty })
+        let unsorted = zip(lines, lines.dropFirst()).first { !$0.lexicographicallyPrecedes($1) }
+        #expect(unsorted == nil, "\(unsorted.map { String(decoding: $0.0, as: UTF8.self) + " ≥ " + String(decoding: $0.1, as: UTF8.self) } ?? "")")
+    }
+
     @Test func knowsThePreloadList() {
         #expect(StrictTransport.isPreloadLoaded)
         // Searched in place: every line is found, and nothing between them.
@@ -265,7 +279,11 @@ struct CertificateProblemTests {
         #expect(Calendar(identifier: .gregorian).component(.year, from: until) == 2126)
         let now = Date(timeIntervalSince1970: 1_900_000_000)
         #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: facts, host: "nas.router.example", now: now) == .selfSigned)
-        #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: facts, host: "192.168.1.1", now: now) == .wrongHost("router.example"))
+        // Signed by itself, it says so for any address: anyone could have made it out to any name.
+        #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: facts, host: "192.168.1.1", now: now) == .selfSigned)
+        var signed = facts
+        signed.selfSigned = false
+        #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: signed, host: "192.168.1.1", now: now) == .wrongHost("router.example"))
         // Its trust, as WebKit hands it over with the error, reads the same, and the warning says so.
         var trust: SecTrust?
         SecTrustCreateWithCertificates(certificate, SecPolicyCreateSSL(true, "router.example" as CFString), &trust)
@@ -274,6 +292,48 @@ struct CertificateProblemTests {
         #expect(ErrorPage.certificateFacts(of: error) == facts)
         let page = ErrorPage.html(error: error, url: URL(string: "https://router.example/")!, canGoBack: false, proceedLink: nil, style: "", nonce: "n")
         #expect(page.contains(ErrorPage.escape(ErrorPage.certificateReason(.selfSigned))))
+    }
+
+    /// A made-up self-signed certificate for router.local, made out to 192.168.1.1 and fd00::1 by address, valid
+    /// until 2126.
+    static let addressedCertificate = "MIIBpzCCAU6gAwIBAgIUGeZA8ikvkexD6f+4Ht6cLd0Eow0wCgYIKoZIzj0EAwIwFzEVMBMGA1UEAwwMcm91dGVyLmxvY2FsMCAXDTI2MTExNDIyMTMxOFoYDzIxMjYxMDIxMjIxMzE4WjAXMRUwEwYDVQQDDAxyb3V0ZXIubG9jYWwwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAT+FYMBW6/UJfAkaG24/biEBCwlQGdAxhRtg+0df3M/7XxCBgX7aIZ2ODhEjLW5B4nWg0aIUh2/TuIVCOdseZPHo3YwdDAdBgNVHQ4EFgQUKUS89MkUDX2t7B4ef8rdsp1Y8EswHwYDVR0jBBgwFoAUKUS89MkUDX2t7B4ef8rdsp1Y8EswDwYDVR0TAQH/BAUwAwEB/zAhBgNVHREEGjAYhwTAqAEBhxD9AAAAAAAAAAAAAAAAAAABMAoGCCqGSM49BAMCA0cAMEQCIGD6cgWlWoalnZcswYRxrl0p7qFjOWP8LVWC7iolInWYAiADzodBoweOui0Cz50lgk/QBFydDBGn8PoXaJCJR6O9Cw=="
+
+    /// A router's certificate names it by address: reached at that address, it isn't "for a different address".
+    @Test func aCertificateForAnAddressCoversIt() throws {
+        let data = try #require(Data(base64Encoded: Self.addressedCertificate))
+        let certificate = try #require(SecCertificateCreateWithData(nil, data as CFData))
+        #expect(CertificateDetails.ipAddresses(of: certificate).count == 2)
+        let facts = try #require(ErrorPage.certificateFacts(of: [certificate], checkingIssuer: false))
+        #expect(facts.names == ["router.local"])
+        #expect(facts.issuerTrusted == nil)
+        #expect(ErrorPage.certificate(facts, covers: "192.168.1.1"))
+        #expect(ErrorPage.certificate(facts, covers: "[fd00::1]"))
+        #expect(ErrorPage.certificate(facts, covers: "router.local"))
+        #expect(!ErrorPage.certificate(facts, covers: "192.168.1.2"))
+        #expect(!ErrorPage.certificate(facts, covers: "nas.local"))
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: facts, host: "192.168.1.1", now: now) == .selfSigned)
+        // Signed by someone else, the address it names is what counts.
+        var signed = facts
+        signed.selfSigned = false
+        signed.issuerTrusted = false
+        #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: signed, host: "192.168.1.1", now: now) == .untrustedIssuer)
+        #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: signed, host: "192.168.1.2", now: now) == .wrongHost("router.local"))
+        // Who signed it, asked on its own, off the main thread.
+        #expect(ErrorPage.issuerTrusted([certificate], validFrom: facts.validFrom, validUntil: facts.validUntil) == false)
+    }
+
+    /// The error page never waits on who signed the certificate: what it shows is filled in after, where that
+    /// changes it.
+    @Test func theWarningDoesntWaitOnTheIssuer() throws {
+        let data = try #require(Data(base64Encoded: Self.routerCertificate))
+        let certificate = try #require(SecCertificateCreateWithData(nil, data as CFData))
+        let facts = try #require(ErrorPage.certificateFacts(of: [certificate], checkingIssuer: false))
+        #expect(facts.issuerTrusted == nil && facts.selfSigned)
+        let error = NSError(domain: NSURLErrorDomain, code: NSURLErrorServerCertificateUntrusted,
+                            userInfo: ["NSErrorPeerCertificateChainKey": [certificate]])
+        let page = ErrorPage.html(error: error, url: URL(string: "https://router.example/")!, canGoBack: false, proceedLink: nil, style: "", nonce: "n0")
+        #expect(page.contains(#"<p class="why" id="why" data-page="n0">"#))
     }
 
     @Test func aFingerprintBreaksAfterItsColons() {

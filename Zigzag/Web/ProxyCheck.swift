@@ -24,7 +24,20 @@ enum ProxyCheck {
         return nil
     }
 
-    private static func flag(_ value: Any?) -> Bool {
+    /// Whether the system sends a page at `url` through a proxy of any kind, on this Mac or elsewhere: the one for
+    /// its scheme, a SOCKS proxy, or an automatic configuration (a PAC file, or one found on the network).
+    nonisolated static func anyProxy(for url: URL) -> Bool {
+        guard let settings = CFNetworkCopySystemProxySettings()?.takeRetainedValue() as? [String: Any] else { return false }
+        return anyProxy(in: settings, scheme: url.scheme ?? "")
+    }
+
+    nonisolated static func anyProxy(in settings: [String: Any], scheme: String) -> Bool {
+        let kinds = scheme.lowercased() == "https" ? ["HTTPS", "SOCKS"] : scheme.lowercased() == "http" ? ["HTTP", "SOCKS"] : []
+        if kinds.contains(where: { flag(settings["\($0)Enable"]) && !((settings["\($0)Proxy"] as? String) ?? "").isEmpty }) { return true }
+        return flag(settings["ProxyAutoConfigEnable"]) || flag(settings["ProxyAutoDiscoveryEnable"])
+    }
+
+    nonisolated private static func flag(_ value: Any?) -> Bool {
         (value as? NSNumber)?.boolValue ?? (value as? Bool) ?? false
     }
 

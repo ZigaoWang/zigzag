@@ -203,7 +203,7 @@ private final class StepPage: NSView {
     private var dots: [ColorView] = []
     private var title = Onboard.title("")
     private var body = Onboard.subtitle("")
-    private let back = Onboard.quietLight(String(localized: "Back", comment: "Button of a step in the welcome window: the step before."))
+    private let back = Onboard.quietLight(String(localized: "onboarding.back", defaultValue: "Back", comment: "Button of a step in the welcome window: the step before. Not the browser’s Back: in Chinese, the previous step (上一步)."))
     private let next = Onboard.light(String(localized: "Continue", comment: "Main button of a step in the welcome window."))
     private let skip = Onboard.quietLight(String(localized: "Skip", comment: "Button of a step in the welcome window: go on without choosing."))
     private var content = StepContent()
@@ -1732,10 +1732,10 @@ final class SitesPicker: StepContent {
     private static let all: [Suggestion] = [
         Suggestion(name: "Gmail", url: URL(string: "https://mail.google.com")!, app: nil,
                    icon: URL(string: "https://www.gstatic.com/images/branding/product/2x/gmail_2020q4_48dp.png")),
-        Suggestion(name: "Calendar", url: URL(string: "https://calendar.google.com")!, app: nil,
+        Suggestion(name: String(localized: "onboarding.site.calendar", defaultValue: "Calendar", comment: "A site to pin in the welcome window: Google Calendar, named as Google names it in your language."), url: URL(string: "https://calendar.google.com")!, app: nil,
                    icon: URL(string: "https://ssl.gstatic.com/calendar/images/dynamiclogo_2020q4/calendar_31_2x.png")),
         Suggestion(name: "YouTube", url: URL(string: "https://www.youtube.com")!, app: nil),
-        Suggestion(name: "Drive", url: URL(string: "https://drive.google.com")!, app: "com.google.drivefs",
+        Suggestion(name: String(localized: "onboarding.site.drive", defaultValue: "Drive", comment: "A site to pin in the welcome window: Google Drive, named as Google names it in your language."), url: URL(string: "https://drive.google.com")!, app: "com.google.drivefs",
                    icon: URL(string: "https://www.gstatic.com/images/branding/product/2x/drive_2020q4_48dp.png")),
         Suggestion(name: "Notion", url: URL(string: "https://www.notion.so")!, app: "notion.id"),
         Suggestion(name: "ChatGPT", url: URL(string: "https://chatgpt.com")!, app: "com.openai.chat"),

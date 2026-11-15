@@ -36,6 +36,14 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     /// The tab whose page opened it: WebRTC's question for its page is asked in that tab's window, and a private
     /// window's choices made there hold for it too (`WebRTCProtection`).
     private(set) weak var opener: Tab?
+    /// The opener's choices for sites (a private window's, made for that tab alone), as they were last seen: they
+    /// still hold once that tab has closed.
+    private var openerWebRTCChoices: [String: Bool] = [:]
+    /// What WebRTC follows here: the opener's choices while it's open, the ones kept from it after.
+    var webRTCChoices: [String: Bool] {
+        if let opener { openerWebRTCChoices = opener.webRTCHere }
+        return openerWebRTCChoices
+    }
     /// The strip at the top with the traffic lights and whose page it is.
     static let headerHeight = Tokens.Space.x8 + Tokens.Space.x1
     private var lastCrash: Date?
@@ -91,6 +99,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         WebRTCProtection.isolate(configuration)
         webView = WKWebView(frame: .zero, configuration: configuration)
         self.opener = opener
+        openerWebRTCChoices = opener?.webRTCHere ?? [:]
         let placed = Self.frame(for: NSSize(width: max(320, pageSize.width), height: max(240, pageSize.height) + Self.headerHeight), origin: origin, parent: parent)
         let size = placed.size
         let origin = placed.origin
@@ -321,7 +330,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         if navigationAction.request.url?.scheme?.lowercased() == HistoryPage.scheme { return .cancel }
         // WebRTC on or off for where it's going, before its page is made, as in a tab.
         if navigationAction.targetFrame?.isMainFrame == true, let url = navigationAction.request.url, !ExternalLinks.isExternal(url) {
-            WebRTCProtection.apply(to: webView, for: url, in: opener)
+            WebRTCProtection.apply(to: webView, for: url, here: webRTCChoices)
         }
         if let url = navigationAction.request.url, ExternalLinks.isExternal(url), url.scheme?.lowercased() != "file" {
             ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
@@ -381,7 +390,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         if policy == .cancel, navigationResponse.isForMainFrame { refusedDownload() }
         // WebRTC follows the page that's to show, where a redirect took it.
         if navigationResponse.isForMainFrame {
-            WebRTCProtection.apply(to: webView, for: policy == .allow ? response.url : webView.url, in: opener)
+            WebRTCProtection.apply(to: webView, for: policy == .allow ? response.url : webView.url, here: webRTCChoices)
         }
         return policy
     }

@@ -429,6 +429,22 @@ struct PageLanguageChoiceTests {
         }
     }
 
+    /// Old codes still in pages' `lang` (iw for Hebrew, in for Indonesian, ji for Yiddish, no for Norwegian) read as
+    /// the codes the language recognizer gives, so the page's own word agrees with its text.
+    @Test func anOldLanguageCodeReadsAsTheNewOne() {
+        #expect(PageTranslator.language(declared: "iw")?.languageCode?.identifier == "he")
+        #expect(PageTranslator.language(declared: "iw-IL")?.region?.identifier == "IL")
+        #expect(PageTranslator.language(declared: "in")?.languageCode?.identifier == "id")
+        #expect(PageTranslator.language(declared: "JI")?.languageCode?.identifier == "yi")
+        #expect(PageTranslator.language(declared: "no_NO")?.languageCode?.identifier == "nb")
+        #expect(PageTranslator.language(declared: "nn")?.languageCode?.identifier == "nn")
+        // A Hebrew page marked the old way, with a fair part of it in Hebrew, is Hebrew, as one marked "he" is.
+        let hebrew = Array(repeating: "שלום לכולם, זהו עמוד בעברית שמספר על מזג האוויר ועל החדשות של היום בעיר.", count: 2)
+        let english = Array(repeating: "Hello everyone, this page tells you about the weather and the news of the day in town.", count: 3)
+        #expect(PageTranslator.pageLanguage(blocks: hebrew + english, declared: "he")?.languageCode?.identifier == "he")
+        #expect(PageTranslator.pageLanguage(blocks: hebrew + english, declared: "iw")?.languageCode?.identifier == "he")
+    }
+
     @Test func anOfferIsForItsOwnPage() {
         let page = URL(string: "https://zh.wikipedia.org/wiki/%E4%B8%8A%E6%B5%B7%E5%B8%82")!
         #expect(PageTranslator.offerStands(offeredFor: page, now: page, foreign: true, translated: false))
@@ -439,5 +455,17 @@ struct PageLanguageChoiceTests {
         #expect(!PageTranslator.offerStands(offeredFor: page, now: page, foreign: false, translated: false))
         #expect(!PageTranslator.offerStands(offeredFor: page, now: page, foreign: true, translated: true))
         #expect(!PageTranslator.offerStands(offeredFor: nil, now: page, foreign: true, translated: false))
+    }
+
+    @Test func onlyASitesPageIsReadForItsLanguage() {
+        #expect(PageTranslator.readsLanguage(of: URL(string: "https://en.wikipedia.org/wiki/Shanghai"), errorPage: false))
+        #expect(PageTranslator.readsLanguage(of: URL(fileURLWithPath: "/tmp/notes.html"), errorPage: false))
+        // History and Settings list pages' titles in other languages: they're Zigzag's own, never offered.
+        #expect(!PageTranslator.readsLanguage(of: URL(string: "zigzag://history"), errorPage: false))
+        #expect(!PageTranslator.readsLanguage(of: URL(string: "zigzag://settings/general"), errorPage: false))
+        #expect(!PageTranslator.readsLanguage(of: URL(string: "about:blank"), errorPage: false))
+        #expect(!PageTranslator.readsLanguage(of: nil, errorPage: false))
+        // An error page shown for a site is in your language, whatever the site's is.
+        #expect(!PageTranslator.readsLanguage(of: URL(string: "https://expired.badssl.com"), errorPage: true))
     }
 }

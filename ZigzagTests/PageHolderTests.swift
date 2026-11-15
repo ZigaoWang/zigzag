@@ -161,6 +161,34 @@ struct PageHolderTests {
         #expect(Tab.needsPictureOutOfSight(hasWebView: true, onScreen: page.window != nil, loaded: true, hasPicture: false))
     }
 
+    /// A page draws in its own look (the app's, or Dark Pages'), which a window can differ from (a private window is
+    /// always dark): its picture is checked against that, or the overview would take every picture in a private
+    /// window on a light Mac for stale, and retake it each time it opens.
+    @Test func aPictureTakenOutOfSightIsCurrentInAWindowOfAnotherLook() async throws {
+        let tab = tab()
+        let page = tab.ensureWebView()
+        page.loadHTMLString("<html><body style='background:#c33'><h1>Picture</h1></body></html>", baseURL: nil)
+        for _ in 0..<200 where !tab.hasLoadedOnce { try await Task.sleep(for: .milliseconds(50)) }
+        try #require(tab.hasLoadedOnce)
+        let appDark = NSApp.effectiveAppearance.isDark
+        let window = NSWindow(contentRect: NSRect(x: -4000, y: -4000, width: 400, height: 300), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.appearance = NSAppearance(named: appDark ? .aqua : .darkAqua)
+        let host = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        window.contentView = host
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            tab.captureSnapshotOutOfSight(in: host, size: host.bounds.size) { done.resume() }
+        }
+        try #require(tab.snapshot != nil)
+        #expect(page.window == nil)
+        // Drawn in the page's own look, not the window's; and current, asked from that window.
+        #expect(tab.snapshotIsDark == page.effectiveAppearance.isDark)
+        #expect(!tab.snapshotIsStale(windowDark: !appDark))
+        #expect(!tab.snapshotIsStale(windowDark: appDark))
+    }
+
     @Test func aClosedTabsHolderLeavesTheCard() throws {
         let card = card(), tab = tab()
         card.show(tab.ensureWebView())

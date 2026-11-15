@@ -506,7 +506,7 @@ final class DeskController {
         let pages = Library.shared.spaces.flatMap { manager.tabs(in: $0.id) }.filter {
             Tab.needsPictureOutOfSight(hasWebView: $0.webView != nil, onScreen: $0.webView?.window != nil, loaded: $0.hasLoadedOnce,
                                        hasPicture: $0.snapshot != nil && TabThumbnailView.knownBlank($0.snapshot) != true
-                                           && !$0.snapshotIsStale(dark: dark))
+                                           && !$0.snapshotIsStale(windowDark: dark))
         }
         guard !pages.isEmpty, size.width > 0 else { return }
         // Beneath everything in the window, where the page is: drawn, but never seen.

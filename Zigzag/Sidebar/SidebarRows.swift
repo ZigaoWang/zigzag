@@ -36,6 +36,10 @@ class SidebarRowView: InteractiveView {
     /// Space reserved at the trailing edge for accessory buttons.
     var trailingAccessoryWidth: CGFloat { 0 }
 
+    /// Whether `layout` fades the title's end itself; false for a row that places its title further and fades it
+    /// once it's where it goes (a tab's, under its close button).
+    var fadesTitleInLayout: Bool { true }
+
     /// From the row's edge to its icon.
     static let inset = Tokens.Sidebar.rowInset
     /// Where a title's text frame starts after an icon frame ends: the icon gap, less the label's own padding, so the
@@ -55,7 +59,7 @@ class SidebarRowView: InteractiveView {
         let trailing = trailingAccessoryWidth > 0 ? trailingAccessoryWidth + Self.buttonEdge : Self.inset - Label.inset
         // Its capitals in the middle of the row, level with the icon's middle, not its line box (which sits them low).
         title.frame = NSRect(x: titleX, y: title.centeredY(in: bounds.height), width: max(0, bounds.width - titleX - trailing), height: titleHeight)
-        title.fadeTail()
+        if fadesTitleInLayout { title.fadeTail() }
         if layer?.sublayers?.contains(where: { $0.name == "rim" && !$0.isHidden }) == true { setCardRim(true) }
         refreshCardShadowPath()
     }
@@ -727,6 +731,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// A speaker or a nested tabs' chevron beside it stays put while the close button comes and goes: the button's
     /// room is kept for it, as a row of several pages keeps it.
     private var reservesClose: Bool { !isSplit && (showsAudio || showsNested) }
+
+    /// Faded once it's placed (`layoutTitleFade`), never first where the plain row puts it.
+    override var fadesTitleInLayout: Bool { false }
 
     override var trailingAccessoryWidth: CGFloat {
         let close = closeOverlays ? 0 : reservesClose ? max(endSlot, closeButton.frame.width) : endSlot

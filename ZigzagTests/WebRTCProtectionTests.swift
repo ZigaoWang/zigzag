@@ -124,6 +124,25 @@ struct WebRTCProtectionTests {
         }
     }
 
+    /// A private tab's pop-up keeps the tab's choices once the tab has closed (`PopupWindowController.webRTCChoices`):
+    /// they're kept as a copy, which WebRTC follows as it would the tab.
+    @Test func aPopUpKeepsItsPrivateOpenersChoice() async throws {
+        guard WebRTCProtection.isAvailable else { return }
+        try await withDefaults {
+            WebRTCProtection.isOn = true
+            var tab: Tab? = Tab(url: URL(string: site), title: "Meet", spaceID: UUID())
+            tab?.privateStore = .nonPersistent()
+            WebRTCProtection.choose(true, origin: site, in: tab)
+            let kept = tab?.webRTCHere
+            tab = nil
+            #expect(WebRTCProtection.allows(URL(string: site + "/call"), here: kept))
+            #expect(!WebRTCProtection.allows(URL(string: site + "/call"), here: nil))
+            let page = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
+            WebRTCProtection.apply(to: page, for: URL(string: site), here: kept)
+            #expect(page.configuration.preferences.value(forKey: "peerConnectionEnabled") as? Bool == true)
+        }
+    }
+
     @Test func aNewWindowGetsItsOwnSwitch() throws {
         guard WebRTCProtection.isAvailable else { return }
         let configuration = WKWebViewConfiguration()

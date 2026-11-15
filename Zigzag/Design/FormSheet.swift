@@ -97,6 +97,8 @@ final class FormSheet: NSView, NSTextFieldDelegate {
                      destructive: Bool = false, canConfirm: @escaping () -> Bool = { true }, completion: @escaping (Bool) -> Void) -> FormSheet {
         let sheet = FormSheet(title: title, symbol: symbol, message: message, rows: rows, confirmTitle: confirmTitle, destructive: destructive,
                               canConfirm: canConfirm, completion: completion)
+        // One sheet at a time: What's New, which only informs, makes way.
+        WhatsNewSheet.makeRoom(in: host.window)
         sheet.frame = host.bounds
         sheet.autoresizingMask = [.width, .height]
         host.addSubview(sheet)

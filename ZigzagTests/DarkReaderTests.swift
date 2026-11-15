@@ -300,7 +300,7 @@ struct DarkReaderTests {
 
     // MARK: Fetching for it
 
-    @Test func onlyStyleAndPicturesOnTheWebAreFetched() async {
+    @Test func onlyStyleAndPicturesOnTheWebAreFetched() async throws {
         #expect(await DarkPages.fetchable(URL(string: "https://8.8.8.8/a.css")))
         // This Mac and its network in every spelling a resolver takes, and names that are its network's.
         for text in ["file:///etc/hosts", "http://localhost:8080/a.css", "http://localhost./a.css", "http://192.168.1.1/a.css", "http://10.0.0.2/a.css",
@@ -309,10 +309,16 @@ struct DarkReaderTests {
             #expect(await !DarkPages.fetchable(URL(string: text)), "\(text)")
         }
         #expect(IconAddress.isPublicName("8.8.8.8"))
-        // A name nothing resolves on this Mac (only an HTTP proxy reaches the web) goes by its name, as an icon does;
-        // a local one still doesn't.
-        #expect(await DarkPages.fetchable(URL(string: "https://zigzag-test-no-such-host.invalid/a.css")))
-        #expect(await !DarkPages.fetchable(URL(string: "http://zigzag-test-no-such-host.local/a.css")))
+        // A name nothing resolves on this Mac goes by its name, as an icon does, only behind a proxy (which looks
+        // names up itself); a local one never. Without one, it could be a site rebinding its name to this network.
+        // (Its lookup answered nothing, as it would with no DNS here: a proxy's fake-IP DNS answers every name.)
+        let nowhere = "zigzag-test-\(UUID().uuidString.lowercased()).invalid"
+        let unresolved = try #require(URL(string: "https://\(nowhere)/a.css"))
+        _ = await IconAddress.addresses(of: nowhere, resolver: { _ in [] })
+        #expect(await IconAddress.mayFetchForPage(unresolved, proxied: true))
+        #expect(await !IconAddress.mayFetchForPage(unresolved, proxied: false))
+        #expect(await DarkPages.fetchable(unresolved, proxied: true))
+        #expect(await !IconAddress.mayFetchForPage(try #require(URL(string: "http://zigzag-test-no-such-host.local/a.css")), proxied: true))
         #expect(DarkPages.fetchableType("text/css; charset=utf-8"))
         #expect(DarkPages.fetchableType("image/png"))
         #expect(!DarkPages.fetchableType("text/html"))

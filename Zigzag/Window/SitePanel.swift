@@ -271,7 +271,8 @@ final class SitePanel: FloatingPanelView {
         // the field, with the favorite under it peeking out at its corner.
         let alongAddress = !aboveThePage && !pane && anchorFrame.minX >= 0
         panel.isAlongAddress = alongAddress
-        panel.frame.origin = NSPoint(x: SitePanelSizing.x(x, alongAddress: alongAddress, inset: inset), y: anchorFrame.maxY + 4)
+        panel.frame.origin = NSPoint(x: SitePanelSizing.x(x, alongAddress: alongAddress, inset: inset, width: panel.width, overlayWidth: overlay.bounds.width),
+                                     y: anchorFrame.maxY + 4)
         // Never past the window's bottom: what doesn't fit scrolls.
         panel.maxHeight = SitePanelSizing.maxHeight(overlayHeight: overlay.bounds.height, top: panel.frame.minY)
         panel.frame.size = NSSize(width: panel.width, height: panel.fittedHeight)
@@ -552,6 +553,13 @@ final class SitePanel: FloatingPanelView {
             width = max(Self.minimumWidth, min(Self.width, superview.bounds.width - inset * 2))
             frame.origin.x = max(inset, min(frame.minX, superview.bounds.width - inset - width))
             frame.size.width = width
+        } else if let anchor, anchor.window === window {
+            // Under the sidebar's address: still edge to edge with it, wherever the window's edge took it (a sidebar
+            // on the right moves with that edge), and kept inside the window.
+            let along = anchor.convert(anchor.bounds, to: superview)
+            if along.width > 0 { width = along.width }
+            frame.origin.x = SitePanelSizing.x(along.minX, alongAddress: true, inset: inset, width: width, overlayWidth: superview.bounds.width)
+            frame.size.width = width
         }
         maxHeight = SitePanelSizing.maxHeight(overlayHeight: superview.bounds.height, top: frame.minY)
         resize()
@@ -645,7 +653,9 @@ final class SitePanel: FloatingPanelView {
          "rows": rows.map(\.debugTitle), "permissions": permissionsGroup.rows.map(\.debugTitle),
          "extensions": extensionsSection?.debugState ?? [:],
          "zoom": zoomStepper.map { ZoomLevels.percent($0.zoom) } ?? "",
-         "scroll": ["panel": frame.height, "viewport": scroll.frame.height, "body": content.frame.height, "offset": scroll.contentView.bounds.minY]]
+         "scroll": ["panel": frame.height, "viewport": scroll.frame.height, "body": content.frame.height, "offset": scroll.contentView.bounds.minY],
+         "place": ["x": frame.minX, "width": frame.width, "window": superview?.bounds.width ?? 0,
+                   "anchor": anchor.flatMap { a in superview.map { a.convert(a.bounds, to: $0).minX } } ?? -1]]
     }
 
     /// sitedark <automatic|on|off|force>: chooses in the Dark page row's dropdown.
@@ -1818,8 +1828,12 @@ enum SitePanelSizing {
     /// Where the panel's left edge goes. Under the sidebar's address (`alongAddress`), at the field's own edge, so the
     /// two line up both sides and nothing under the panel shows past its corner; with that address off screen (the
     /// sidebar hidden), kept in from the window's edge by `inset`, as anything else is.
-    static func x(_ x: CGFloat, alongAddress: Bool, inset: CGFloat) -> CGFloat {
-        alongAddress && x >= 0 ? x : max(inset, x)
+    /// With `width` and `overlayWidth` given, one that would run past the window's right edge is brought back in
+    /// from it by `inset`.
+    static func x(_ x: CGFloat, alongAddress: Bool, inset: CGFloat, width: CGFloat = 0, overlayWidth: CGFloat = .greatestFiniteMagnitude) -> CGFloat {
+        let placed = alongAddress && x >= 0 ? x : max(inset, x)
+        guard placed + width > overlayWidth else { return placed }
+        return max(inset, overlayWidth - inset - width)
     }
 
     /// The tallest the panel can be from `top` in a window's overlay `overlayHeight` tall: down to the window's bottom

@@ -1484,6 +1484,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func offerTranslation() {
         withdrawStaleTranslationOffer()
         guard let tab = tabManager.selectedTab, let language = tab.foreignLanguage, !tab.isTranslated,
+              PageTranslator.readsLanguage(of: tab.url, errorPage: tab.showsErrorPage),
               let site = ContentBlocker.site(of: tab.url) else { return }
         // Languages you always translate, and sites you translated a moment ago, translate on their own.
         if translatedSites[site] != nil || PageTranslator.translatesAlways(language) { translatePage(asked: false); return }

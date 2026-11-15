@@ -828,7 +828,8 @@ enum Toast {
         let reserved = AgentControl.shared.reservedHeight(in: controller)
         page.origin.y += reserved
         page.size.height -= reserved
-        return page
+        // Under a page's question or the update note at the top of the page, never over it.
+        return PageQuestions.area(page, below: PageQuestions.occupied(in: controller.root.overlay))
     }
 
     /// Something that takes a moment: the spinner and what's happening, up until the next toast or `hide` replaces it.
