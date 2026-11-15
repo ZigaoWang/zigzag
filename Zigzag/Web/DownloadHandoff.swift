@@ -43,8 +43,10 @@ enum DownloadHandoff {
         DownloadRulesStore.shared.firstMatch(url: url, appliesToLinks: appliesToLinks)
     }
 
-    static func gate(stored: String?, isPrivate: Bool) -> HandoffGate {
-        guard !isPrivate else { return .ask }
+    /// A stored answer as a gate. A private window is not the site the answer was given to, so one kept **for the
+    /// site** doesn't reach it; one kept **on the rule** belongs to the rule, not the session, and does.
+    static func gate(stored: String?, scope: PermissionScope = .site, isPrivate: Bool) -> HandoffGate {
+        if isPrivate, scope == .site { return .ask }
         return switch stored {
         case "handOff": .handOff
         case "browser": .browser
@@ -62,14 +64,17 @@ enum DownloadHandoff {
     static func decide(_ rule: DownloadRule, request: Request, tab: Tab? = nil) async -> HandoffGate {
         let origin = questionOrigin(for: request)
         let subject = PermissionSubject.handoff(rule.id)
+        // The more specific answer first: this site's, then the rule's own for every site. A private window neither
+        // reads nor keeps the site's — that answer is about the site this session is on — but the rule's own answer
+        // travels with the rule, which private browsing doesn't put away, so it stands there as it does anywhere.
         let storedAnswer: () -> PermissionAnswer? = {
-            guard !request.isPrivate, let origin, let action = SitePermissions.action(subject, origin: origin) else { return nil }
-            return switch action {
-            case "handOff", "browser", "deny": PermissionAnswer(action: action, remember: true)
-            default: nil
+            if !request.isPrivate, let origin, let action = SitePermissions.action(subject, origin: origin) {
+                return Self.known(action, scope: .site)
             }
+            return rule.handoffAnswer.flatMap { Self.known($0, scope: .rule) }
         }
-        let standing = gate(stored: storedAnswer()?.action, isPrivate: request.isPrivate)
+        let kept = storedAnswer()
+        let standing = gate(stored: kept?.action, scope: kept?.scope ?? .site, isPrivate: request.isPrivate)
         guard standing == .ask else { return standing }
         // What this page already answered for this rule, "this time": a link and the download it starts are one
         // question, not two. A private window keeps its own answers in its tab like any other.
@@ -84,7 +89,7 @@ enum DownloadHandoff {
         let controller = tab.flatMap { WindowManager.shared.promptHost(holding: $0) }
             ?? (request.window?.windowController as? PromptHost)
             ?? WindowManager.shared.promptHost(for: request.window)
-            ?? WindowManager.shared.promptHost(for: NSApp.keyWindow)
+            ?? WindowManager.shared.promptHost(for: NSApplication.shared.keyWindow)
             ?? WindowManager.shared.keyController
         // With no window open at all to ask in, the rule simply does not run: nothing may happen unseen.
         guard let controller else { return .browser }
@@ -95,20 +100,38 @@ enum DownloadHandoff {
             actions: [.deny,
                       .alternate("browser", String(localized: "Open in Browser", comment: "Button that lets a link or download stay in the browser instead of running a download rule.")),
                       .alternate("handOff", String(localized: "Hand Off", comment: "Button that runs the named download rule for a link or download."))],
-            canRemember: !request.isPrivate && origin != nil,
+            canRemember: !request.isPrivate,
+            ruleScope: Self.alwaysFor(rule),
             answered: storedAnswer
         )
         guard let answer else { return .browser }
-        if answer.remember, !request.isPrivate, let origin {
-            SitePermissions.remember(answer.action, subject: subject, origin: origin)
-        } else if let origin, let tab {
-            tab.permissionAnswers.note(answer.action, key: origin, kind: pageKind)
-        }
+        _ = SitePermissions.rememberAnswer(answer, subject: subject, origin: origin, tab: tab, isPrivate: request.isPrivate,
+                                           onRule: { action in
+            var remembered = rule
+            remembered.handoffAnswer = action
+            DownloadRulesStore.shared.update(remembered)
+        })
         return switch answer.action {
         case "handOff": .handOff
         case "deny": .cancel
         default: .browser
         }
+    }
+
+    /// A stored handoff answer, where it is one of the three the gate understands.
+    private static func known(_ action: String, scope: PermissionScope) -> PermissionAnswer? {
+        switch action {
+        case "handOff", "browser", "deny": PermissionAnswer(action: action, scope: scope)
+        default: nil
+        }
+    }
+
+    /// The third duration choice on a question a rule asks: the rule by name, or "this rule" where it has none.
+    static func alwaysFor(_ rule: DownloadRule) -> String {
+        let name = rule.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty
+            ? String(localized: "Always for this rule", comment: "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The rule has no name.")
+            : String(localized: "Always for “\(name)”", comment: "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The placeholder is the rule's name.")
     }
 
     /// The key a rule's page answer is kept under: per rule, so two rules on one page keep their own answers.

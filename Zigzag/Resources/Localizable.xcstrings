@@ -2945,6 +2945,28 @@
         }
       }
     },
+    "Always for this rule" : {
+      "comment" : "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The rule has no name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终为此规则"
+          }
+        }
+      }
+    },
+    "Always for “%@”" : {
+      "comment" : "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The placeholder is the rule's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终为“%@”"
+          }
+        }
+      }
+    },
     "Always on this site" : {
       "comment" : "Duration choice on a site's permission question: the answer is remembered for this site.",
       "localizations" : {
@@ -6906,6 +6928,17 @@
         }
       }
     },
+    "Every site" : {
+      "comment" : "Under a download rule in Settings › Downloads: the answer beside it was given for every site, not just one.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有网站"
+          }
+        }
+      }
+    },
     "Every tab, at a glance" : {
       "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
       "localizations" : {
@@ -7533,6 +7566,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "忘记 %@"
+          }
+        }
+      }
+    },
+    "Forget the answer for every site" : {
+      "comment" : "Tooltip of the button that forgets a download rule's standing answer about handing off, which it was given for every site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "忘记所有网站的答案"
           }
         }
       }

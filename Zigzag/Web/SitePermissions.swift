@@ -120,16 +120,21 @@ enum SitePermissions {
     /// and a kept answer there falls back to the page — which is why it must say so here rather than be trusted to
     /// have masked it. Returns whether the answer allows what was asked (`action` other than "deny").
     @discardableResult
-    static func rememberAnswer(_ answer: PermissionAnswer, subject: String, origin: String, tab: Tab?, isPrivate: Bool,
+    static func rememberAnswer(_ answer: PermissionAnswer, subject: String, origin: String?, tab: Tab?, isPrivate: Bool,
                                onRule: ((String) -> Void)? = nil) -> Bool {
         // The tab knows best: a caller that forgets to pass its own privacy is still not allowed to store.
         let keepsNothing = isPrivate || (tab?.isPrivate ?? false)
-        func noteOnThePage() { tab?.permissionAnswers.note(answer.action, key: origin, kind: subject) }
+        // A page without a host of its own (file:, data:) has nothing to keep an answer under; it is asked each time.
+        func noteOnThePage() {
+            guard let origin else { return }
+            tab?.permissionAnswers.note(answer.action, key: origin, kind: subject)
+        }
         switch answer.scope {
         case .once:
             noteOnThePage()
         case .site:
-            if keepsNothing { noteOnThePage() } else { remember(answer.action, subject: subject, origin: origin) }
+            if !keepsNothing, let origin { remember(answer.action, subject: subject, origin: origin) }
+            else { noteOnThePage() }
         case .rule:
             // Where a private window asked, or a caller that offered the rule scope didn't pass the rule, the same
             // answer still holds for the page: an answer is never dropped on the floor.

@@ -2915,6 +2915,23 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             downloadRulesGroup.add(row)
             downloadRuleRows.append((rule.id, row))
+            // The rule's own answer, for every site: the third scope its question offers, kept on the rule itself, so
+            // it travels with the rule and is forgotten here rather than in a site's row.
+            if let own = rule.handoffAnswer {
+                let forget = IconButton(symbol: "xmark", size: .compact,
+                                        toolTip: String(localized: "Forget the answer for every site", comment: "Tooltip of the button that forgets a download rule's standing answer about handing off, which it was given for every site."))
+                forget.onClick = { [weak self] _ in
+                    var remembered = rule
+                    remembered.handoffAnswer = nil
+                    DownloadRulesStore.shared.update(remembered)
+                    self?.reloadDownloadRules()
+                }
+                let everySite = FormRow(title: Self.handoffAnswerName(own),
+                                        detail: String(localized: "Every site", comment: "Under a download rule in Settings › Downloads: the answer beside it was given for every site, not just one."),
+                                        control: forget)
+                everySite.keywords = Self.handoffAnswerName(own)
+                downloadRulesGroup.add(everySite)
+            }
             // The sites this rule has a standing answer on, grouped by what was answered — handed off, left to the
             // browser, or refused — so a site the rule was refused on doesn't read like one it was handed off on.
             // Each can be forgotten on its own, so one site is asked again without touching the others.
