@@ -374,14 +374,13 @@ final class FavoriteTile: InteractiveView {
             dropHalf.isHidden = splitSide == nil
         }
     }
-    /// Its page is loaded in the background: a fine edge and its icon at full strength, so you can tell at a glance
-    /// which are. Not for a page put to sleep or not loaded yet since Zigzag reopened: that looks like a favorite never
-    /// opened, its icon faded back (#205).
+    /// Its page is loaded in the background: a fine edge, so you can tell at a glance which are. Not for a page put to
+    /// sleep or not loaded yet since Zigzag reopened: that looks like a favorite never opened, with no edge (#205).
     private(set) var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
 
     /// How a favorite's tile looks, in the tab rows' terms: the one you're on has the selected tab's card; one whose
-    /// page is loaded has the open edge, its icons at full strength; one that isn't running is faded back, as a tab
-    /// left alone fades in the list, until the pointer comes to it.
+    /// page is loaded has the open edge; one that isn't running has neither. Its icon is always at full strength: a
+    /// favorite is a site you chose to keep in view, and a faded one read as washed out rather than as closed.
     enum Look: Equatable { case closed, open, selected }
 
     static func look(selected: Bool, loaded: [Bool]) -> Look {
@@ -390,7 +389,7 @@ final class FavoriteTile: InteractiveView {
 
     /// How strong a tile's icons are drawn.
     static func iconAlpha(_ look: Look, hovered: Bool) -> CGFloat {
-        look == .closed && !hovered ? Tokens.Opacity.fadedFloor : 1
+        1
     }
 
     /// Whether a favorite's open page has moved on from the address it was saved with, as a pinned tab's row tells
@@ -632,8 +631,7 @@ final class FavoriteTile: InteractiveView {
         refreshAway()
         let name = self.name
         // A favorite has no hover card, so one whose page isn't running says why in its tooltip: asleep, and what
-        // that freed, or not loaded since Zigzag reopened. It looks like a favorite never opened: no edge, its icon
-        // faded back.
+        // that freed, or not loaded since Zigzag reopened. It looks like a favorite never opened: no edge.
         let notes = [inDeveloperMode ? TabRowView.developerTip(for: tab?.url) : nil, tab?.notLoadedNote].compactMap { $0 }
         toolTip = ([name].filter { !$0.isEmpty } + notes).joined(separator: "\n")
         if awayParts.first != true, let image = tab?.displayIcon, !(tab?.isLoading ?? false) { icon.image = image; needsLayout = true }
