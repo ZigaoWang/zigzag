@@ -23,7 +23,9 @@ Open Settings › Automation and turn on **Let AI apps use Zigzag**. Two rows ap
   clipboard; Reset Key makes a new one.
 
 The key is made the first time it's needed and kept in a file only your user account can read, in Zigzag's folder in
-`~/Library/Application Support`. It's never in the Keychain.
+`~/Library/Application Support`. It's never in the Keychain. Zigzag only takes a key it made itself from that file:
+anything else written there is replaced with a new one. Whatever Settings copies with the key in it is marked as
+concealed on the clipboard, so clipboard managers and history apps leave it out.
 
 ### Connecting an app
 
@@ -61,11 +63,21 @@ is, which header to send, and what the app may do. Paste it into the app's chat 
 
 Either one holds your key. Treat it as you would a password: paste it only into apps you trust, on this Mac.
 
+### Sessions and connections
+
+An app starts with MCP's `initialize`, and Zigzag answers with a session id in the `Mcp-Session-Id` header. Every
+request after that has to send it back, as the transport says; one without it gets 400, and one with a session that
+has ended (after Reset Key, say) gets 404 and starts over with `initialize`. MCP apps do this on their own.
+
+A request without the right key, from a web page or to the wrong path is answered and its connection closed. Zigzag
+keeps at most 64 connections open, and only a few of them may be ones that haven't sent the key yet, so connections
+that never send it can't crowd out the apps that do.
+
 ### What an app can do
 
 | Tool | What it does |
 |---|---|
-| `list_tabs` | Lists the open tabs, front window first: id, title, address, whether it's the tab in front, its window and space. |
+| `list_tabs` | Lists the open tabs, front window first: id, title, address, whether it's the tab in front, its window and space. Private windows are never listed. |
 | `open_tab` | Opens an http or https page in a new tab of the front window, in front or in the background. |
 | `activate_tab` | Switches to a tab, and to its space. |
 | `close_tab` | Closes a tab. |
@@ -73,7 +85,7 @@ Either one holds your key. Treat it as you would a password: paste it only into 
 | `go_back` | Goes back a page in a tab. |
 | `go_forward` | Goes forward a page in a tab. |
 | `reload` | Reloads a tab. |
-| `read_page` | Gives the page's title, address and readable text, and its form fields, without password values. |
+| `read_page` | Gives the page's title, address and readable text, and its form fields, without the values of password, hidden, card number, card code and one-time code fields. |
 | `get_links` | Gives the links on the page, their text and address. |
 | `screenshot` | Gives a picture of the page as it shows now. The tab has to be on screen. |
 | `click` | Clicks an element, found by a CSS selector or by the text it shows. |
@@ -83,6 +95,34 @@ Either one holds your key. Treat it as you would a password: paste it only into 
 | `press_key` | Presses a key in the page, like Enter, Escape, Tab or an arrow, with Shift, Alt, Ctrl or Meta if wanted. |
 
 A tool given no tab acts on the tab in front of you. There is no tool that runs an app's own JavaScript in a page.
+
+| Tool | Arguments |
+|---|---|
+| `list_tabs` | none |
+| `open_tab` | `url` (required), `background` (default false) |
+| `activate_tab` | `id` (required) |
+| `close_tab` | `id` (required) |
+| `navigate` | `url` (required), `id` |
+| `go_back`, `go_forward`, `reload` | `id` |
+| `read_page` | `id`, `max_chars` (500 to 100,000, default 20,000) |
+| `get_links` | `id`, `max` (1 to 1,000, default 200) |
+| `screenshot` | `id` |
+| `click` | `id`, and one of `selector` or `text` |
+| `type` | `selector` and `text` (both required), `id`, `clear` (default true), `submit` (default false) |
+| `scroll` | `dy` (required: points, positive down, negative up), `id`, `selector` |
+| `wait_for` | one of `text`, `text_gone`, `selector`, `selector_gone` or `load`, and `id`, `timeout_ms` |
+| `press_key` | `key` (required), `id`, `modifiers`, `selector` |
+
+`id` is a tab's id from `list_tabs`; leave it out for the tab in front. A tool given an argument it doesn't take says
+which ones it takes. Addresses can be written without `https://`, like `example.com`; only http and https pages open.
+
+### What pages write
+
+Titles, addresses, page text, links and fields are written by whoever made the site, and a page can word them as
+orders to the model. So every tool result that carries them comes with a line saying the content is the sites',
+untrusted and never to be taken as instructions, and the content itself goes between two `page-content-…` lines
+whose tag is random each time, so a page can't close the block early. Zigzag's own words in a result, like an error,
+aren't marked.
 
 ### Waiting for a page
 
@@ -126,10 +166,13 @@ field.
 ### What an app can never do
 
 - See or use **private windows**. They aren't listed, and nothing reaches them.
-- Read or type **passwords**. `read_page` never gives a password field's value, and `type` refuses password fields,
-  so the app has to ask you to type one.
+- Read or type **passwords**. `read_page` never gives a password field's value, and `type` and `press_key` refuse
+  password fields, so the app has to ask you to type one. Hidden fields, card numbers and codes, and one-time codes
+  are left out of `read_page` too.
 - Use **Zigzag's own pages** (Settings, History) or **extension pages**. They're listed, so the app knows they're
   there, but every tool on them is refused.
+- Use Zigzag's **error or certificate warning page**. Only you can choose Visit anyway; the app has to go back or
+  open another page.
 - Open anything but a website. Only http and https addresses open; `file:`, `javascript:`, `data:` and Zigzag's own
   addresses are refused.
 - Be reached from another computer, or from a web page. Zigzag listens on 127.0.0.1 only, and refuses any request
@@ -138,21 +181,26 @@ field.
 ### The bar over a tab, and Stop
 
 While an app uses a tab, a bar over the page says so: "*App* is using this tab", with the name the app gives, or "An
-AI app is using this tab". The bar goes when the app hasn't touched the tab for five minutes, or its connection ends.
+AI app is using this tab". `list_tabs` puts it over the tab in front too. The bar goes when the app hasn't touched
+the tab for five minutes, or its connection ends.
 
-**Stop** on the bar takes the tab back at once: the app is disconnected, and that tab stays out of its reach until
-Zigzag quits or you turn the setting off. The app can connect again, but not to that tab.
+**Stop** on the bar cuts off every AI app at once, not only the one on that tab: every session ends, the key is
+replaced, and Let AI apps use Zigzag turns off, so nothing listens. A toast says where to turn it back on. When you
+do, copy the setup again and give your apps the new key; the old one opens nothing.
 
 ### Resetting the key
 
 Reset Key in Settings › Automation makes a new key. Every app connected with the old one is cut off at once, so
 copy the setup again and give the new key to the apps you still want. Turning the setting off also disconnects
-every app, and frees every tab you stopped.
+every app.
 
 ### Troubleshooting
 
-- **"Couldn't start. Port 39217 may be in use by another app."** Something else on your Mac has the port. Quit it, or
-  give Zigzag another port, then turn the setting off and on again:
+- **"Couldn't start. Port 39217 may be in use by another app."** Something else on your Mac has the port. An app
+  that connects there would hand that program its key, so when the key may already be with your apps, Zigzag
+  replaces it and Settings says "Port 39217 is in use by another app, so Zigzag made a new key. Give your AI apps
+  the new key." A key that was never copied out of Settings stays as it is. Quit what holds the port, or give
+  Zigzag another port, then turn the setting off and on again:
 
   ```sh
   defaults write wang.zigao.zigzag MCPPort -int 39218
@@ -163,11 +211,11 @@ every app, and frees every tab you stopped.
   `Authorization: Bearer <key>`, and copy it again after a Reset Key.
 - **403 Forbidden.** The request came with a web page's `Origin` header, or to an address other than `127.0.0.1`
   or `localhost`. Zigzag answers apps on this Mac only, never pages in a browser. Use the address exactly as Settings
-  gives it.
+  gives it. Right after Stop, every request gets 403 too, until the setting is turned on again.
+- **400 Mcp-Session-Id is required, or 404 Session not found.** The app sent a request without the session
+  `initialize` gave it, or with one that has ended. It has to initialize again; most apps do when they reconnect.
 - **The app can't connect at all.** Check that Let AI apps use Zigzag is on and Zigzag is open: the server runs only
   while it is. Check that the app uses the HTTP transport, not stdio or SSE.
-- **A tool says the tab was stopped.** You (or someone at your Mac) pressed Stop on that tab. Ask the app to use
-  another tab, or turn the setting off and on to free it.
 - **`screenshot` fails.** The tab has to be on screen. Ask the app to switch to it with `activate_tab` first.
 - **`wait_for` times out.** What it waited for never happened in time: the text may be spelled differently on the
   page, or the element may be there but hidden. Ask the app to read the page with `read_page`, or to wait longer
