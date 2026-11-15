@@ -642,7 +642,9 @@ class FloatingPanelView: NSView {
         layer.add(grow, forKey: "presence.transform")
     }
 
-    private(set) var dismissing = false
+    /// On its way out: it takes no more clicks, which reach what's under it at once (`MenuPanel` sets it as it leaves).
+    var dismissing = false
+    override func hitTest(_ point: NSPoint) -> NSView? { dismissing ? nil : super.hitTest(point) }
     /// Counts the times it's been sent off, so only the latest going takes it away.
     private var exits = 0
 

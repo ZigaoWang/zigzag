@@ -174,4 +174,21 @@ struct MotionTests {
         #expect(panel.superview == nil)
         #expect(panel.layer?.opacity == 1)
     }
+
+    @MainActor @Test func aLeavingPanelLetsClicksThrough() {
+        let host = FlippedView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        host.wantsLayer = true
+        let panel = FloatingPanelView(frame: NSRect(x: 20, y: 20, width: 200, height: 40))
+        host.addSubview(panel)
+        let inside = NSPoint(x: 40, y: 30)
+        panel.present()
+        #expect(panel.hitTest(inside) != nil)
+        // On its way out it's still drawn, but a click lands on what's under it.
+        panel.dismiss()
+        #expect(panel.superview === host)
+        #expect(panel.hitTest(inside) == nil)
+        // Shown again while leaving: it takes clicks again.
+        panel.present()
+        #expect(panel.hitTest(inside) != nil)
+    }
 }

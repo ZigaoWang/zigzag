@@ -1860,6 +1860,7 @@ final class MenuPanel: FloatingPanelView {
     /// Leaves quicker and subtler than it came: a fade as it eases a touch smaller toward its control, from wherever
     /// it is, so a quick open and close never jumps.
     private func leave() {
+        dismissing = true
         Tokens.Motion.present(self, from: .point(growsFrom), entering: false) { [weak self] in self?.removeFromSuperview() }
     }
 
