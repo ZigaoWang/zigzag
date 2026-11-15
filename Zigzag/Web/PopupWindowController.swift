@@ -322,7 +322,12 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                       wasClicked: PopupNotice.isUserInitiated(navigationAction)) { return .cancel }
             // No rule took it: whether this site may save files at all is asked once, and remembered per site.
             if policy == .download, let url = navigationAction.request.url, await !mayDownload(url) { return .cancel }
-            if policy == .cancel { refusedDownload() }
+            if policy == .cancel {
+                // The page started this one on its own. Allow Once asks again from the same page — the gesture the
+                // flow policy wanted — and a request that can't be asked for again leaves the notice as it was.
+                let origin = SiteOrigin.of(webView.url) ?? SiteOrigin.of(navigationAction.request.url)
+                refusedDownload(action: origin.flatMap { askAgain(origin: $0, request: navigationAction.request) })
+            }
             return policy
         }
         // A link a rule wants opens in its app, never a popup page that would be blank.
@@ -399,11 +404,29 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     /// A download the page started on its own, refused: said over the page, under the header, never silently.
-    private func refusedDownload(text: String = DownloadPolicy.refusedText, note: String = "A page started another download without a click") {
+    private func refusedDownload(text: String = DownloadPolicy.refusedText, note: String = "A page started another download without a click",
+                                 action: (title: String, run: () -> Void)? = nil) {
         Diagnostics.note("Download refused", site: webView.url?.host(), note, isPrivate: isPrivate)
         guard let content = window?.contentView, window?.isVisible == true else { return }
         let area = NSRect(x: 0, y: Self.headerHeight, width: content.bounds.width, height: max(0, content.bounds.height - Self.headerHeight))
-        Toast.show(text, symbol: "arrow.down.circle", duration: 3, over: content, area: area)
+        // A notice with something to offer stays long enough to read and act on, and can be put away, as in a tab.
+        Toast.show(text, symbol: "arrow.down.circle", action: action, duration: action == nil ? 3 : 6,
+                   closes: action != nil, over: content, area: area)
+    }
+
+    /// What a refused download's notice offers, as in a tab: by then WebKit's "no" can't be taken back, so Allow Once
+    /// asks for it again through this page — the session the site expects — and keeps the answer for the page. What
+    /// comes back is tracked like any other download. Only a plain GET can be asked for again.
+    private func askAgain(origin: String, request: URLRequest?) -> (title: String, run: () -> Void)? {
+        guard let request, DownloadPolicy.canBeAskedAgain(request) else { return nil }
+        return (String(localized: "Allow Once", comment: "Button in the notice saying a site’s download was blocked: asks the site for the file again and saves it."),
+                { [weak webView, opener] in
+                    guard let webView else { return }
+                    SitePermissions.allowThisDownload(origin: origin, tab: opener)
+                    webView.startDownload(using: request) { download in
+                        DownloadManager.shared.track(download, window: webView.window)
+                    }
+                })
     }
 
     /// Whether this site may save a file, as in a tab: asked once, "This time" for this page and "Always" for the

@@ -1495,7 +1495,13 @@ extension Tab: WKNavigationDelegate {
                await !mayDownload(target, in: webView, retry: navigationAction.request) {
                 return (.cancel, preferences)
             }
-            if policy == .cancel { refusedDownload(in: webView) }
+            if policy == .cancel {
+                // The page started this one on its own. Allow Once asks for it again from the same page, which is the
+                // gesture the flow policy wanted to see — and a request that can't be asked for again (a POST) leaves
+                // the notice as it was, rather than fetching something else in its place.
+                let origin = SiteOrigin.of(webView.url) ?? SiteOrigin.of(navigationAction.request.url)
+                refusedDownload(in: webView, action: origin.flatMap { askAgain(origin: $0, request: navigationAction.request, in: webView) })
+            }
             return (policy, preferences)
         }
 
