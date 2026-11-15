@@ -105,14 +105,15 @@ final class SpaceChoiceRow: InteractiveView {
             dot.cornerRadius = d / 2
         }
         let nw = number.textWidth
-        number.frame = NSRect(x: bounds.width - inset - nw + Label.inset, y: (bounds.height - number.lineHeight) / 2, width: nw, height: number.lineHeight)
+        number.frame = NSRect(x: bounds.width - inset - nw + Label.inset, y: number.centeredY(in: bounds.height), width: nw, height: number.lineHeight)
         let x = CommandRowView.titleX - Label.inset
         let right = number.stringValue.isEmpty ? bounds.width - inset : number.frame.minX - Tokens.Space.x2
         // The name first; the profile's after it in what room is left, cut short before the name is.
         let room = right - x
         let profileWidth = profile.stringValue.isEmpty ? 0 : min(profile.textWidth, max(0, room - name.textWidth - Tokens.Space.x3))
         let nameWidth = max(0, min(name.textWidth, room - (profileWidth > 0 ? profileWidth + Tokens.Space.x3 : 0)))
-        name.frame = NSRect(x: x, y: round((bounds.height - name.lineHeight) / 2), width: nameWidth, height: name.lineHeight)
+        // Its capitals in the row's middle, level with the icon, as the sidebar's rows have theirs.
+        name.frame = NSRect(x: x, y: name.centeredY(in: bounds.height), width: nameWidth, height: name.lineHeight)
         profile.frame = NSRect(x: name.frame.maxX + Tokens.Space.x3, y: name.frame.minY, width: profileWidth, height: profile.lineHeight)
         profile.isHidden = profile.stringValue.isEmpty || profileWidth < SpaceHeaderView.profileRoom
     }
