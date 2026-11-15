@@ -36,6 +36,8 @@ nonisolated struct PermissionAnswer {
 /// Stable identifiers under which permission actions are remembered.
 nonisolated enum PermissionSubject {
     static let location = "location", notifications = "notifications", popups = "popups", apps = "apps"
+    /// Screen sharing, whose yes is *which* picker macOS shows rather than a plain allow.
+    static let screen = "screen"
 
     static func media(_ type: WKMediaCaptureType) -> String {
         switch type {

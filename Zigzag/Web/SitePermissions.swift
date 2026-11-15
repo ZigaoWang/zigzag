@@ -474,19 +474,13 @@ enum SitePermissions {
         notifications(origin: origin) ?? tab?.permissionAnswers.answer(key: origin, kind: "notifications")
     }
 
-    /// Asked like the camera, the answer kept for the page that asked. A private window never shows them anyway.
-    static func requestNotifications(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool? {
-        if let known = notifications(origin: origin, tab: tab) { return known }
-        guard let controller = WindowManager.shared.promptHost(for: window) else { return nil }
-        let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
-                                                title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
-                                                actions: [.deny, .allow], canRemember: true,
+    case camera, microphone, location, notifications, popups, apps, webRTC, screen
                                                 answered: {
                                                     knownAnswer(site: notifications(origin: origin),
                                                                 page: tab?.permissionAnswers.answer(key: origin, kind: "notifications"))
                                                 })
         guard let answer else { return nil }
-        return rememberAnswer(answer, subject: PermissionSubject.notifications, origin: origin, tab: tab, isPrivate: isPrivate)
+    var inPrivate: Bool { self == .camera || self == .microphone || self == .location || self == .apps || self == .webRTC || self == .screen }
     }
 
     /// The location answer for `key` on `tab`'s page: Allow or Block kept, else the answer given on this page.
@@ -578,15 +572,34 @@ enum SitePermissions {
         }
         return allowed ? .grant : .deny    }
 
-    /// Screen sharing (getDisplayMedia): asked every time, as Safari does, and nothing kept. Don't Allow, Share
-    /// Screen…, then Share Window… filled, as Safari offers them; either share hands over to macOS's own picker (ScreenCaptureKit's) for a window or a display, where you pick which.
+    /// Screen sharing (getDisplayMedia): Don't Allow, Share Screen…, then Share Window… filled, as Safari offers them;
+    /// either share hands over to macOS's own picker (ScreenCaptureKit's) for a window or a display, where you pick
+    /// which — so even an answer kept for the site does not capture anything without macOS asking.
+    ///
+    /// Answered like every other question: **"Always" keeps it for the site, a no included, and "This time" holds for
+    /// the page.** It used to be asked every single time with nothing kept, which made it the one card where the same
+    /// two answers meant something different from every other card's.
     static func requestDisplayCapture(origin securityOrigin: WKSecurityOrigin, window: NSWindow?, tab: Tab?) async -> DisplayCaptureChoice {
         guard let controller = WindowManager.shared.promptHost(for: window) else { return .deny }
         let site = SiteOrigin.of(securityOrigin)
+        // Already answered for the site, or for this page: go the same way without asking again.
+        if let site, let kept = DisplayCaptureChoice(action: SitePermissions.action(PermissionSubject.screen, origin: site)) {
+            return kept
+        }
+        if let site, let page = tab?.permissionAnswers.action(key: site, kind: PermissionSubject.screen),
+           let kept = DisplayCaptureChoice(action: page) {
+            return kept
+        }
         let answer = await PermissionPrompt.ask(host: askerName(site), origin: site, what: "your screen", symbol: "rectangle.on.rectangle",
                                                 in: controller, tab: tab, title: DisplayCaptureChoice.title,
-                                                actions: DisplayCaptureChoice.actions, canRemember: false)
-        return DisplayCaptureChoice(answer)
+                                                actions: DisplayCaptureChoice.actions, canRemember: site != nil)
+        let choice = DisplayCaptureChoice(answer)
+        if let site {
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: choice.action, remember: answer?.remember ?? false),
+                                              subject: PermissionSubject.screen, origin: site, tab: tab,
+                                              isPrivate: tab?.isPrivate ?? false)
+        }
+        return choice
     }
 }
 
@@ -602,6 +615,26 @@ enum DisplayCaptureChoice: Int, CaseIterable {
         case "allow": self = .window
         case "screen": self = .screen
         default: self = .deny
+        }
+    }
+
+    /// What it's kept as, in the same place every other permission answer is kept. "allow" is the filled answer's id,
+    /// which means Share Window…, so a kept window is the same answer the button gives.
+    var action: String {
+        switch self {
+        case .deny: "deny"
+        case .screen: "screen"
+        case .window: "allow"
+        }
+    }
+
+    /// The answer this was kept as, or nil where nothing has been kept.
+    init?(action: String?) {
+        switch action {
+        case "deny": self = .deny
+        case "screen": self = .screen
+        case "allow", "window": self = .window
+        default: return nil
         }
     }
 
@@ -627,7 +660,6 @@ enum DisplayCaptureChoice: Int, CaseIterable {
 /// permissions, so a call asks for each and can have a row for each.
 enum SitePermission: String, CaseIterable {
     case camera, microphone, location, notifications, popups, apps, webRTC
-
     /// The kinds of answer kept for it.
     var kinds: [String] {
         switch self {
@@ -638,6 +670,7 @@ enum SitePermission: String, CaseIterable {
         case .popups: ["popups"]
         case .apps: ["apps"]
         case .webRTC: ["webRTC"]
+        case .screen: ["screen"]
         }
     }
 
@@ -652,7 +685,6 @@ enum SitePermission: String, CaseIterable {
     /// never shows notifications or opens pop-ups on its own. WebRTC follows the setting there, chosen for the tab
     /// alone.
     var inPrivate: Bool { self == .camera || self == .microphone || self == .location || self == .apps || self == .webRTC }
-
     var title: String {
         switch self {
         case .camera: String(localized: "Camera", comment: "Row in the site panel's This Site group.")
@@ -662,6 +694,7 @@ enum SitePermission: String, CaseIterable {
         case .popups: String(localized: "Pop-ups", comment: "Row in the site panel's This Site group.")
         case .apps: String(localized: "Open apps", comment: "Row in the site panel's This Site group: whether the site's links may open apps on this Mac, like Zoom or the App Store.")
         case .webRTC: String(localized: "WebRTC", comment: "Row in the site panel's This Site group: whether the site may use WebRTC, which calls need, and which can show sites your real IP address. A name: keep it as it is.")
+        case .screen: String(localized: "Screen sharing", comment: "Row in the site panel's This Site group: whether the site may share the screen. macOS still asks which window or display.")
         }
     }
 }

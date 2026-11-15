@@ -122,8 +122,17 @@ import WebKit
         }
     }
 
-    @Test func screenSharingOffersThreeActionsAndKeepsNothing() {        #expect(DisplayCaptureChoice.actions.map(\.id) == ["deny", "screen", "allow"])
+    /// The three ways WebKit can answer, and the answer each is kept as — so a kept one can be read back as the same
+    /// choice. It used to be the one question that kept nothing; now a no, a display and a window are all keepable.
+    @Test func screenSharingOffersThreeActionsAndKeepsThem() {
+        #expect(DisplayCaptureChoice.actions.map(\.id) == ["deny", "screen", "allow"])
         #expect(DisplayCaptureChoice.actions.last?.isProminent == true)
+        for choice in DisplayCaptureChoice.allCases {
+            #expect(DisplayCaptureChoice(action: choice.action) == choice)
+        }
+        // A kept "allow" is Share Window…, the action the filled button has, and nothing else is a choice.
+        #expect(DisplayCaptureChoice(action: "allow") == .window)
+        #expect(DisplayCaptureChoice(action: "toast") == nil)
     }
 
     /// The screen-sharing buttons reach the three ways WebKit can answer, and nothing else is a yes.

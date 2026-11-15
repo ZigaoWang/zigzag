@@ -14334,6 +14334,17 @@
         }
       }
     },
+    "Screen sharing" : {
+      "comment" : "Row in the site panel's This Site group: whether the site may share the screen. macOS still asks which window or display.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "屏幕共享"
+          }
+        }
+      }
+    },
     "Screenshot copied" : {
       "comment" : "Toast after taking a screenshot of the whole page.",
       "localizations" : {
