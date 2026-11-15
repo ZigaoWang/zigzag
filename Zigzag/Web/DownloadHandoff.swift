@@ -44,8 +44,8 @@ enum DownloadHandoff {
     }
 
     /// The rule that catches `url`, if any, and whether it wants a link (true) or a download (false).
-    static func firstMatch(_ url: URL, appliesToLinks: Bool) -> DownloadRule? {
-        DownloadRulesStore.shared.firstMatch(url: url, appliesToLinks: appliesToLinks)
+    static func firstMatch(_ url: URL, appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
+        DownloadRulesStore.shared.firstMatch(url: url, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
     }
 
     /// A stored answer as a gate. A private window is not the site the answer was given to, so one kept **for the
@@ -67,6 +67,9 @@ enum DownloadHandoff {
 
     /// Resolves a rule's standing answer, or asks in the page's window. No action or cookie read happens here.
     static func decide(_ rule: DownloadRule, request: Request, tab: Tab? = nil) async -> HandoffGate {
+        // A rule kept out of private windows never runs there, whatever a caller hands us: selection already skips it,
+        // and this is the last line that keeps the promise.
+        guard !request.isPrivate || rule.runsInPrivateWindows else { return .browser }
         let origin = questionOrigin(for: request)
         let subject = PermissionSubject.handoff(rule.id)
         // The more specific answer first: this site's, then the rule's own for every site. A private window neither
@@ -172,7 +175,7 @@ enum DownloadHandoff {
 
     @discardableResult
     static func route(_ url: URL, appliesToLinks: Bool, request: Request) async -> Outcome {
-        guard let rule = firstMatch(url, appliesToLinks: appliesToLinks) else { return .noMatch }
+        guard let rule = firstMatch(url, appliesToLinks: appliesToLinks, isPrivate: request.isPrivate) else { return .noMatch }
         return switch await decide(rule, request: request) {
         case .handOff: await perform(rule, request: request)
         case .browser, .ask: .noMatch

@@ -821,9 +821,12 @@ extension DownloadRuleTests {
         rule.handoffAnswer = "deny"
         #expect(await DownloadHandoff.decide(rule, request: request) == .cancel)
 
-        // A private window keeps nothing of its own, but the rule's answer travels with the rule and still stands.
+        // A private window keeps nothing of its own, and a rule it hasn't been let into doesn't run there at all. Let
+        // in, the rule's answer travels with the rule and still stands.
         var privateRequest = request
         privateRequest.isPrivate = true
+        #expect(await DownloadHandoff.decide(rule, request: privateRequest) == .browser)
+        rule.runsInPrivateWindows = true
         #expect(await DownloadHandoff.decide(rule, request: privateRequest) == .cancel)
         rule.handoffAnswer = "handOff"
         #expect(await DownloadHandoff.decide(rule, request: privateRequest) == .handOff)
@@ -938,6 +941,44 @@ extension DownloadRuleTests {
         DownloadRulesStore.forgetSiteAnswers(for: id)
         #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(id)).isEmpty)
         #expect(SitePermissions.decisions(prefix: PermissionSubject.openIn(id)).isEmpty)
+    }
+
+    /// A private window is left alone by default: the rule doesn't even match there. Its own switch opts it in — and
+    /// the decision path refuses one handed to it anyway, so selection can't be the only thing keeping the promise.
+    @MainActor @Test func aRuleStaysOutOfPrivateWindowsUnlessItSaysOtherwise() async {
+        var rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
+                                action: DownloadRuleAction(kind: .openURL))
+        let url = URL(string: "https://cdn.example/file.zip")!
+        #expect(DownloadRulesStore.firstMatch(in: [rule], url: url, appliesToLinks: false, isPrivate: true) == nil)
+        #expect(DownloadRulesStore.firstMatch(in: [rule], url: url, appliesToLinks: false)?.id == rule.id)
+        rule.runsInPrivateWindows = true
+        #expect(DownloadRulesStore.firstMatch(in: [rule], url: url, appliesToLinks: false, isPrivate: true)?.id == rule.id)
+
+        // Told to hand off for every site, a private window still neither asks nor runs until the rule allows it.
+        rule.handoffAnswer = "handOff"
+        rule.runsInPrivateWindows = false
+        var request = DownloadHandoff.Request(url: url, referrer: URL(string: "https://site.example/page")!,
+                                              pageOrigin: "https://site.example")
+        request.isPrivate = true
+        #expect(await DownloadHandoff.decide(rule, request: request) == .browser)
+        rule.runsInPrivateWindows = true
+        #expect(await DownloadHandoff.decide(rule, request: request) == .handOff)
+    }
+
+    /// The switch is saved with the rule, and a rule that never had it reads as off.
+    @Test func aRuleKeepsWhetherItRunsInPrivateWindows() throws {
+        var rule = DownloadRule(name: "Files", match: .any, action: DownloadRuleAction(kind: .openURL))
+        #expect(!rule.runsInPrivateWindows)
+        #expect(try JSONDecoder().decode(DownloadRule.self, from: JSONEncoder().encode(rule)).runsInPrivateWindows == false)
+        rule.runsInPrivateWindows = true
+        #expect(try JSONDecoder().decode(DownloadRule.self, from: JSONEncoder().encode(rule)).runsInPrivateWindows)
+    }
+
+    /// A destination decides where a file lands, never a handoff: it is never matched as one, so it can never ask.
+    @Test func aDestinationIsNeverAHandoff() {
+        let save = destination("pdf", folder: "/Users/me/Documents")
+        #expect(DownloadRulesStore.destination(in: [save], url: file, filename: "report.pdf")?.rule.id == save.id)
+        #expect(DownloadRulesStore.firstMatch(in: [save], url: file, filename: "report.pdf", appliesToLinks: false) == nil)
     }
 
     @Test func aHandoffQuestionUsesThePageOrigin() {

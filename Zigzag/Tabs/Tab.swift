@@ -1645,7 +1645,7 @@ extension Tab: WKNavigationDelegate {
         // Nor is the address a rule itself opened, while it is still arriving: a rule that caught what it just sent
         // the tab to would ask, or open, over and over.
         guard !awaitsRuleLoad else { return false }
-        guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks) else { return false }
+        guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, isPrivate: isPrivate) else { return false }
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
         let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: SiteOrigin.of(webView.url ?? self.url),
                                               filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
@@ -1928,7 +1928,7 @@ extension Tab: WKUIDelegate {
         // Zigzag's own Open in New Window or Tab still opens: you asked for a window, not for the rule.
         if BrowserWebView.pendingDisposition(for: webView) == nil,
            let url = navigationAction.request.url, PopupNotice.isUserInitiated(navigationAction),
-           let rule = DownloadHandoff.firstMatch(url, appliesToLinks: true) {
+           let rule = DownloadHandoff.firstMatch(url, appliesToLinks: true, isPrivate: isPrivate) {
             _ = BrowserWebView.takePendingDisposition(for: webView)
             handOffInNewWindow(rule, url: url, request: navigationAction.request, webView: webView)
             return nil

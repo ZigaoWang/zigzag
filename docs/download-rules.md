@@ -23,6 +23,11 @@ Rules run from the top of the list and the **first match wins**; drag one to reo
 without deleting it. A new rule can start from a preset — Send to aria2, Motrix or rTorrent, Send to yt-dlp, Play in mpv
 or IINA — or from Custom.
 
+**Private windows are left alone.** A rule doesn't run there unless **Run in private windows** in its sheet is on: no
+question, no script, and the link or download carries on as if no rule had matched. A handoff can give another app a
+private window's address — and its cookies, when the rule names them — which is why it's off until you say otherwise.
+Destinations aren't handoffs, so a private download still goes to the folder its type says.
+
 **Destinations** are the other kind of rule in the same list: *Save to Folder* and *Open in Zigzag*. They never take a
 download away from Zigzag. They decide where a file of a given type lands, or that Zigzag opens and shows it, when
 WebKit makes the download. They're listed under Save downloads to, and they don't ask a question.
@@ -49,7 +54,8 @@ Every answer has a duration, chosen from the dropdown beside the buttons:
 
 A **no** is kept exactly like a yes. *Don't Allow* with *Always on this site* is a standing block for that site, and
 *Don't Allow* with *Always for "YouTube"* means the rule doesn't run anywhere until you change it. A private window
-keeps nothing and reads no site's answer; the rule's own answer belongs to the rule, so it still stands there.
+keeps nothing and reads no site's answer; the rule's own answer belongs to the rule, so it still stands there once the
+rule has been allowed into private windows at all. Until then it doesn't run there.
 
 ### Where those answers are kept
 

@@ -14359,6 +14359,28 @@
         }
       }
     },
+    "Run in private windows" : {
+      "comment" : "Label of the switch in a download rule's sheet that lets the rule run in private windows.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在无痕浏览窗口中运行"
+          }
+        }
+      }
+    },
+    "Run in private windows: off, this rule is left out of private windows — nothing runs, and the link or download carries on as if no rule matched. A handoff can give another app a private window's address, and its cookies when the rule names them." : {
+      "comment" : "Explanation under the run-in-private-windows switch in a download rule's sheet: what off means, and why it is off.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在无痕浏览窗口中运行：关闭时，此规则不会在无痕浏览窗口中运行——什么都不执行，链接或下载会像没有匹配到规则一样继续。交出去的链接或下载可能会把无痕浏览窗口的地址，以及规则点名要用的 Cookie，交给另一个 App。"
+          }
+        }
+      }
+    },
     "Run its own scripts on the sites it can access" : {
       "comment" : "One thing an extension can do, listed in its install sheet and in Settings: the scripting permission.",
       "localizations" : {

@@ -43,6 +43,8 @@ enum DownloadRuleSheet {
         matchCase.setAccessibilityLabel(String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."))
         let stopsThePage = Toggle(isOn: source.stopsThePage)
         stopsThePage.setAccessibilityLabel(String(localized: "Stop the page", comment: "Label of the switch in a download rule's sheet that keeps the page from loading on after the rule has taken a link."))
+        let runsInPrivate = Toggle(isOn: source.runsInPrivateWindows)
+        runsInPrivate.setAccessibilityLabel(String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."))
 
         // The action's own fields, one set per kind.
         var actionRows: [FormSheet.Row] = []
@@ -261,6 +263,7 @@ enum DownloadRuleSheet {
             FormSheet.Row(label: String(localized: "Address", comment: "Label of the address pattern in a download rule's sheet."), view: pattern),
             FormSheet.Row(label: String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."), view: matchCase),
             FormSheet.Row(label: String(localized: "Stop the page", comment: "Label of the switch in a download rule's sheet that keeps the page from loading on after the rule has taken a link."), view: stopsThePage),
+            FormSheet.Row(label: String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
         ]
         let rows = matchRows + actionRows + (isDestination ? [
             FormSheet.Row.note(String(localized: "Files of this type skip the folder downloads are saved to, and go where you say instead. The first file type that matches wins.",
@@ -269,6 +272,8 @@ enum DownloadRuleSheet {
         ] : [
             FormSheet.Row.note(String(localized: "Stop the page: a link this rule takes goes no further — nothing else loads, and the page's own redirects don't run the rule again.",
                                                  comment: "Explanation under the stop-the-page switch in a download rule's sheet.")),
+            FormSheet.Row.note(String(localized: "Run in private windows: off, this rule is left out of private windows — nothing runs, and the link or download carries on as if no rule matched. A handoff can give another app a private window's address, and its cookies when the rule names them.",
+                                                 comment: "Explanation under the run-in-private-windows switch in a download rule's sheet: what off means, and why it is off.")),
             tokens
         ])
 
@@ -302,6 +307,7 @@ enum DownloadRuleSheet {
             rule.pattern = pattern.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             rule.isCaseSensitive = matchCase.isOn
             rule.stopsThePage = stopsThePage.isOn
+            rule.runsInPrivateWindows = runsInPrivate.isOn
             rule.action = action
             return rule
         }

@@ -71,6 +71,10 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     /// nowhere at all where the rule handed it off. On is for a rule that catches a whole site's clicks, where the
     /// page's own loads and redirects would otherwise keep matching it.
     var stopsThePage = false
+    /// Whether this rule runs in a private window. **Off by default**: a private window is a promise that what happens
+    /// there leaves no trace, and a rule that hands a link to a script or another app is exactly the kind of thing that
+    /// could break it. A destination is not a handoff, so this doesn't keep a private download from its own folder.
+    var runsInPrivateWindows = false
     /// What this rule was told about handing off, for **every site**: "handOff", "browser" or "deny". Nil is a rule
     /// that has only been answered per site (kept under `handoff:<id>` in `SitePermissions`) or not at all. It is the
     /// third scope a question about a rule offers, and it belongs here because it is the rule's own answer: it travels
@@ -198,7 +202,8 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, isEnabled, applies, match, pattern, isCaseSensitive, stopsThePage, handoffAnswer, action
+        case id, name, isEnabled, applies, match, pattern, isCaseSensitive, stopsThePage, runsInPrivateWindows,
+             handoffAnswer, action
     }
 
     /// Older files may lack a key a newer Zigzag added: the defaults stand in, so one unreadable rule never throws
@@ -213,6 +218,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         pattern = try container.decodeIfPresent(String.self, forKey: .pattern) ?? ""
         isCaseSensitive = try container.decodeIfPresent(Bool.self, forKey: .isCaseSensitive) ?? false
         stopsThePage = try container.decodeIfPresent(Bool.self, forKey: .stopsThePage) ?? false
+        runsInPrivateWindows = try container.decodeIfPresent(Bool.self, forKey: .runsInPrivateWindows) ?? false
         handoffAnswer = try container.decodeIfPresent(String.self, forKey: .handoffAnswer)
         action = try container.decodeIfPresent(DownloadRuleAction.self, forKey: .action) ?? DownloadRuleAction(kind: .openURL)
     }
@@ -782,16 +788,21 @@ final class DownloadRulesStore {
     }
 
     /// The first rule that catches `url`, or none. `appliesToLinks` is false for a download. `filename` is the
-    /// download's own name, for a rule that matches a file's type; a link passes none.
-    func firstMatch(url: URL, filename: String = "", appliesToLinks: Bool) -> DownloadRule? {
-        Self.firstMatch(in: rules, url: url, filename: filename, appliesToLinks: appliesToLinks)
+    /// download's own name, for a rule that matches a file's type; a link passes none. `isPrivate` leaves out the rules
+    /// that haven't been allowed into a private window.
+    func firstMatch(url: URL, filename: String = "", appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
+        Self.firstMatch(in: rules, url: url, filename: filename, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
     }
 
-    /// The same order, apart from the file, for a list being tested or previewed.
+    /// The same order, apart from the file, for a list being tested or previewed. A destination is never a handoff —
+    /// it decides where a file lands, and `destination(for:)` is what reads it — and a rule that hasn't been allowed
+    /// into private windows is left out there.
     nonisolated static func firstMatch(in rules: [DownloadRule], url: URL, filename: String = "",
-                                       appliesToLinks: Bool) -> DownloadRule? {
+                                       appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
         rules.first { rule in
+            guard !rule.action.kind.isDestination else { return false }
             guard rule.applies == .linksAndDownloads || !appliesToLinks else { return false }
+            guard !isPrivate || rule.runsInPrivateWindows else { return false }
             return rule.matches(url, filename: filename)
         }
     }

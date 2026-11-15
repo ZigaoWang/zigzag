@@ -174,6 +174,11 @@ final class DownloadManager: NSObject {
     /// Where a download was already told to go (Save Page As picked the place), so it isn't asked again.
     private var chosenDestinations: [ObjectIdentifier: URL] = [:]
 
+    /// Whether this download came from a private window, as its data store tells it.
+    private func isPrivate(_ download: WKDownload) -> Bool {
+        !(download.webView?.configuration.websiteDataStore.isPersistent ?? false)
+    }
+
     @discardableResult
     func track(_ download: WKDownload, window: NSWindow?, saveTo destination: URL? = nil) -> DownloadItem {
         if let destination { chosenDestinations[ObjectIdentifier(download)] = destination }
@@ -550,7 +555,7 @@ extension DownloadManager: WKDownloadDelegate {
         // copy and takes its row out of the list.
         if chosenDestinations[ObjectIdentifier(download)] == nil,
            let url = download.originalRequest?.url,
-           let rule = DownloadHandoff.firstMatch(url, appliesToLinks: false) {
+           let rule = DownloadHandoff.firstMatch(url, appliesToLinks: false, isPrivate: isPrivate(download)) {
             let owner = (download.webView as? BrowserWebView)?.owner
             let referrer = download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) }
             let handoff = DownloadHandoff.Request(url: url, referrer: referrer,
@@ -558,7 +563,7 @@ extension DownloadManager: WKDownloadDelegate {
                                                   filename: DownloadTokens.filename(for: url, suggested: name),
                                                   space: owner.flatMap { Library.shared.space($0.spaceID)?.name } ?? "",
                                                   dataStore: download.webView?.configuration.websiteDataStore,
-                                                  isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false),
+                                                  isPrivate: isPrivate(download),
                                                   window: window, tab: owner)
             switch await DownloadHandoff.decide(rule, request: handoff, tab: owner) {
             case .handOff:
