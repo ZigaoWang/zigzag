@@ -119,6 +119,21 @@ struct MiniWindowTests {
         #expect(MiniWindowController.size(remembered: .zero) == Tokens.Metric.miniWindowSize)
     }
 
+    // MARK: A page that opens an app (#246)
+
+    @Test func closesOnceItsPageHandedOffToAnApp() {
+        // A sign-in page from another app sending you back to that app on its own: done.
+        #expect(MiniWindowController.closesAfterOpeningApp(hasPage: true, fromAnotherApp: true, isMainFrame: true, linkClick: false))
+        // A link that went straight to an app leaves nothing to show, wherever the window came from.
+        #expect(MiniWindowController.closesAfterOpeningApp(hasPage: false, fromAnotherApp: false, isMainFrame: true, linkClick: true))
+        // A link you click (mailto:, an Open in App link) leaves the page you were reading.
+        #expect(!MiniWindowController.closesAfterOpeningApp(hasPage: true, fromAnotherApp: true, isMainFrame: true, linkClick: true))
+        // A frame in the page opening an app isn't the page ending there.
+        #expect(!MiniWindowController.closesAfterOpeningApp(hasPage: true, fromAnotherApp: true, isMainFrame: false, linkClick: false))
+        // One you opened yourself, for a quick look, stays.
+        #expect(!MiniWindowController.closesAfterOpeningApp(hasPage: true, fromAnotherApp: false, isMainFrame: true, linkClick: false))
+    }
+
     // MARK: Back, forward and reload (#213)
 
     @Test func backAndForwardFollowTheHistory() {

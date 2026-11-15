@@ -110,12 +110,17 @@ enum ExternalLinks {
         }
         let clickedHere = isClick && isMainFrame && webView.window != nil
         let everydayClick = isEverydayClick(clickedHere: clickedHere, linkClick: linkClick ?? isClick, sourceIsMainFrame: sourceIsMainFrame, fromPDF: fromPDF)
+        func openApp() {
+            NSWorkspace.shared.open(url)
+            // A sign-in page in Zigzag Mini sending you back to the app that asked: that window's done (#246).
+            MiniWindowController.pageOpenedApp(webView, isMainFrame: isMainFrame, linkClick: linkClick ?? isClick)
+        }
         switch verdict(byYou: byYou, decision: decision(), clickedHere: everydayClick, scheme: scheme) {
         case .block:
             Diagnostics.note("Blocked opening an app", site: host, "\(scheme):", isPrivate: !webView.configuration.websiteDataStore.isPersistent)
             return
         case .open:
-            NSWorkspace.shared.open(url)
+            openApp()
             return
         case .ask:
             break
@@ -147,10 +152,10 @@ enum ExternalLinks {
             asked.asking.remove(key)
             switch answer {
             case .allow, .alternate:
-                NSWorkspace.shared.open(url)
+                openApp()
             case .always:
                 if saves, let origin { SitePermissions.allowOpeningApp(origin: origin, scheme: scheme) }
-                NSWorkspace.shared.open(url)
+                openApp()
             case .deny:
                 asked.declined.insert(key)
             case .notNow:

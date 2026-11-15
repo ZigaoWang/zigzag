@@ -38,6 +38,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private var isClosing = false
     /// Fading away before it closes or moves into Zigzag: nothing more to do in it.
     private var isLeaving = false
+    /// Opened for a link from another app.
+    private var fromAnotherApp = false
 
     /// Settings › Zigzag Mini: links from other apps open here instead of in a tab. Off unless you turn it on.
     static var opensExternalLinks: Bool {
@@ -109,6 +111,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         if fromAnotherApp {
             // From a link in another app, as Little Arc: only this window comes forward, the browser windows stay
             // where they were, and closing it goes back to the app the link came from.
+            controller.fromAnotherApp = true
             controller.returnTo = AppSwitching.lastOtherApp
             if !NSApp.isActive { NSRunningApplication.current.activate(options: []) }
             MiniLinkWake.linkOpenedInMini()
@@ -707,6 +710,26 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     func windowDidEndLiveResize(_ notification: Notification) {
         guard let size = window?.frame.size else { return }
         Self.rememberedSize = size
+    }
+
+    // MARK: Handing off to an app
+
+    /// Whether a Zigzag Mini closes once its page has opened an app on the Mac: always when it has no page to show
+    /// (a link that went straight to the app), and when one from another app ends there by itself, not by a link you
+    /// clicked: a sign-in page sending you back to the app that asked, a meeting link opening the meeting's app.
+    nonisolated static func closesAfterOpeningApp(hasPage: Bool, fromAnotherApp: Bool, isMainFrame: Bool, linkClick: Bool) -> Bool {
+        !hasPage || (fromAnotherApp && isMainFrame && !linkClick)
+    }
+
+    /// A page opened an app (`ExternalLinks`): its Zigzag Mini, if it's in one, goes when there's nothing more for it
+    /// to do, leaving the app it opened in front.
+    static func pageOpenedApp(_ webView: WKWebView, isMainFrame: Bool, linkClick: Bool) {
+        guard let mini = all.first(where: { $0.tab.webView === webView }), !mini.isLeaving, !mini.movedOut else { return }
+        let hasPage = webView.backForwardList.currentItem != nil && webView.url.map { $0.absoluteString != "about:blank" } ?? false
+        guard closesAfterOpeningApp(hasPage: hasPage, fromAnotherApp: mini.fromAnotherApp, isMainFrame: isMainFrame, linkClick: linkClick) else { return }
+        // The app it opened comes forward: not the one the link came from.
+        mini.returnTo = nil
+        mini.window?.performClose(nil)
     }
 }
 
