@@ -747,6 +747,7 @@ final class PermissionPrompt: FloatingPanelView {
             place(in: controller)
             isHidden = false
             slideIn()
+            PageQuestions.cameUp(in: controller)
         } else if !inFront, !isHidden {
             isHidden = true
             PageQuestions.turnFreed(in: controller)

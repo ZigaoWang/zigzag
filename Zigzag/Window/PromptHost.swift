@@ -103,9 +103,11 @@ extension BrowserWindowController: PromptHost {
         return below
     }
 
-    /// A question came up: a toast showing moves under it.
+    /// A question came up: the update note, which only informs, makes way for it, and a toast showing moves under it.
     static func cameUp(in host: PromptHost) {
-        if let controller = host as? BrowserWindowController { Toast.reposition(in: controller) }
+        guard let controller = host as? BrowserWindowController else { return }
+        WhatsNewOffer.close(in: controller)
+        Toast.reposition(in: controller)
     }
 
     /// A question went, or stepped aside for another tab: the oldest one waiting for this page comes up, and a toast
