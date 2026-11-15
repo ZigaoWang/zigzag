@@ -283,6 +283,19 @@ final class ExtensionHost: NSObject {
     private var actionClicks: [String: Date] = [:]
     func lastActionClick(_ id: String) -> Date { actionClicks[id] ?? .distantPast }
 
+    /// When each extension last sent a tab to an address (tabs.update). Downie's button sends the tab to its app's
+    /// link: the tab count stays the same, yet the click did something.
+    private var tabLoads: [String: Date] = [:]
+    func noteTabLoad(_ id: String) { tabLoads[id] = Date() }
+
+    /// Whether a click on an extension's button showed nothing at all, so its options page opens instead: no popup,
+    /// no side panel, no new tab, and no tab sent anywhere since the click.
+    static func clickShowedNothing(clickedAt: Date, popupShown: Bool, sidePanelShown: Bool, tabsBefore: Int, tabsNow: Int, tabLoadedAt: Date?) -> Bool {
+        if popupShown || sidePanelShown || tabsNow != tabsBefore { return false }
+        if let tabLoadedAt, tabLoadedAt >= clickedAt { return false }
+        return true
+    }
+
     /// What you last did with each extension: the tab you used it on, and when you last touched its own pages. Some
     /// APIs act only in answer to that (tab capture, opening a download, asking for more access), as in Chrome.
     private(set) var use = ExtensionUse()
@@ -914,14 +927,18 @@ final class ExtensionHost: NSObject {
             }
             return
         }
+        let clickedAt = Date()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
-            guard let self, self.popupShownAt == nil else { return }
-            // Its side panel opening (Claude's, from its own click handler) is it doing something.
-            if WindowManager.shared.controllers.contains(where: { $0.root.showsSidePanel && $0.root.sidePanel.extensionID == item.id }) { return }
+            guard let self else { return }
+            // Its side panel opening (Claude's, from its own click handler) is it doing something. So is sending the tab
+            // to an address: Downie sends it to its app's link, which opens Downie or asks first (#239).
+            let sidePanelShown = WindowManager.shared.controllers.contains { $0.root.showsSidePanel && $0.root.sidePanel.extensionID == item.id }
             let tabsNow = WindowManager.shared.controllers.map(\.tabManager.allTabs.count).reduce(0, +)
+            guard Self.clickShowedNothing(clickedAt: clickedAt, popupShown: self.popupShownAt != nil, sidePanelShown: sidePanelShown,
+                                          tabsBefore: tabsBefore, tabsNow: tabsNow, tabLoadedAt: self.tabLoads[item.id]) else { return }
             // This profile's copy of its options, in a space on this profile, never in a private window.
             let key = WindowManager.shared.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
-            guard tabsNow == tabsBefore, let options = context.optionsPageURL, let controller = key ?? self.openWindows.first,
+            guard let options = context.optionsPageURL, let controller = key ?? self.openWindows.first,
                   let space = controller.tabManager.space(for: self.profile) else { return }
             ExtensionLog.write("click did nothing; opening its options")
             controller.tabManager.newTab(url: options, spaceID: space)
@@ -1542,6 +1559,7 @@ extension Tab: WKWebExtensionTab {
             completionHandler(nil)
             return
         }
+        profile.extensions.noteTabLoad(context.uniqueIdentifier)
         load(url)
         completionHandler(nil)
     }

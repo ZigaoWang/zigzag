@@ -118,4 +118,17 @@ struct ExtensionMenuItemsTests {
         #expect(!BridgeContextMenus.addsItemsAgain(neverKept: true, isNewInstall: true, persistentBackground: false))
         #expect(!BridgeContextMenus.addsItemsAgain(neverKept: true, isNewInstall: false, persistentBackground: true))
     }
+
+    /// Downie's button sends the tab to its app's link: no popup, no new tab, but not nothing, so its options stay shut.
+    @available(macOS 15.4, *)
+    @Test func aClickThatSendsTheTabSomewhereDidSomething() {
+        let clicked = Date()
+        let soon = clicked.addingTimeInterval(0.1), earlier = clicked.addingTimeInterval(-60)
+        #expect(!ExtensionHost.clickShowedNothing(clickedAt: clicked, popupShown: false, sidePanelShown: false, tabsBefore: 2, tabsNow: 2, tabLoadedAt: soon))
+        #expect(ExtensionHost.clickShowedNothing(clickedAt: clicked, popupShown: false, sidePanelShown: false, tabsBefore: 2, tabsNow: 2, tabLoadedAt: earlier))
+        #expect(ExtensionHost.clickShowedNothing(clickedAt: clicked, popupShown: false, sidePanelShown: false, tabsBefore: 2, tabsNow: 2, tabLoadedAt: nil))
+        #expect(!ExtensionHost.clickShowedNothing(clickedAt: clicked, popupShown: true, sidePanelShown: false, tabsBefore: 2, tabsNow: 2, tabLoadedAt: nil))
+        #expect(!ExtensionHost.clickShowedNothing(clickedAt: clicked, popupShown: false, sidePanelShown: true, tabsBefore: 2, tabsNow: 2, tabLoadedAt: nil))
+        #expect(!ExtensionHost.clickShowedNothing(clickedAt: clicked, popupShown: false, sidePanelShown: false, tabsBefore: 2, tabsNow: 3, tabLoadedAt: nil))
+    }
 }
