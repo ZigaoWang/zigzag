@@ -424,9 +424,16 @@ enum SitePermissions {
             return types.allSatisfy { decision(key: key, type: $0, tab: tab) == true } ? .grant : .deny
         }
         guard let controller = WindowManager.shared.promptHost(for: window) else {
-            // Nowhere to ask (a sign-in popup): say no this time, without remembering it.
+            // Nowhere to ask (a sign-in popup): say no this time, without remembering it, but the site did ask, so
+            // Site Controls has a row to allow it from.
+            for type in types where key.flatMap({ decision(key: $0, type: type, tab: tab) }) == nil {
+                noteAsked(type == .microphone ? .microphone : .camera, origin: page, isPrivate: isPrivate)
+            }
             return .deny
         }
+        // A no already kept for either kind (Blocked in Site Controls, or answered on this page) settles it: the call
+        // can't go ahead, so the other isn't asked about for nothing.
+        if let key, types.contains(where: { decision(key: key, type: $0, tab: tab) == false }) { return .deny }
         var allowed = true
         for type in types {
             if let key, let known = decision(key: key, type: type, tab: tab) {
@@ -454,7 +461,8 @@ enum SitePermissions {
                 if let key { tab?.permissionAnswers.note(true, key: key, kind: kind(type)) }
             case .deny:
                 if let key { tab?.permissionAnswers.note(false, key: key, kind: kind(type)) }
-                allowed = false
+                // No to one is no to the call: the other isn't asked.
+                return .deny
             case .notNow:
                 // Put off: the rest of this request isn't asked, and nothing is kept.
                 return .deny
