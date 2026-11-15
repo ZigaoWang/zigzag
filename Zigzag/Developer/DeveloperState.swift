@@ -147,8 +147,9 @@ enum PageStyles {
 /// It shows from the page's next load, either way.
 ///
 /// The rule blocks only on a page whose site is on the development list (`if-top-url`), so it never touches any
-/// other site's page, whatever shares it: a page and the pop-ups it opened share one set of scripts and rules (as
-/// dark pages' scripts), and a pop-up on a development site goes without images while its opener does. It's
+/// other site's page, whatever shares it: a page and the tabs and pop-ups it opened share one set of scripts and
+/// rules (as dark pages' scripts), so the choice is theirs together. A tab it opens starts with it, and turned on
+/// or off in any of them it is in all (`Tab.shareImagesChoice`), so each one's menu says what its pages get. It's
 /// compiled for the list as it is, the first time it's wanted and again when the list changes, then looked up.
 enum PageImages {
     static let prefix = "zigzag-developer-images-off-"
@@ -192,6 +193,23 @@ enum PageImages {
     private static let installed = NSMapTable<WKUserContentController, WKContentRuleList>.weakToStrongObjects()
     /// Pages waiting for the rule before they load again (`defersReload`).
     private static let waiting = NSHashTable<WKWebView>.weakObjects()
+    /// Per set of scripts and rules, every tab's web view made with it: a page and the ones it opened.
+    private static let members = NSMapTable<WKUserContentController, NSHashTable<WKWebView>>.weakToStrongObjects()
+
+    /// A tab's new web view, among the others with its set of scripts and rules (`sharing`).
+    static func join(_ webView: WKWebView) {
+        let controller = webView.configuration.userContentController
+        let webViews = members.object(forKey: controller) ?? NSHashTable<WKWebView>.weakObjects()
+        webViews.add(webView)
+        members.setObject(webViews, forKey: controller)
+    }
+
+    /// The other tabs' web views that share a web view's set of scripts and rules, and so its images rule: the page
+    /// that opened it, and the ones it or they opened. WebKit makes a page's new window with its opener's set, and
+    /// it can't be given its own: the opener's scripts, handlers and rules can't be read back to fill one.
+    static func sharing(with webView: WKWebView) -> [WKWebView] {
+        (members.object(forKey: webView.configuration.userContentController)?.allObjects ?? []).filter { $0 !== webView }
+    }
 
     /// Images off or back on for a web view's pages: from its next load. A web view that goes (`Tab.tearDown`) is
     /// set back on, so the rule never stays for the pages it shared it with.

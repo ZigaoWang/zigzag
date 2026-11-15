@@ -389,6 +389,18 @@ final class Tab: NSObject {
             // What a page is told and allowed as it loads shows once it has loaded again.
             if isDevelopment, developer.needsReload(from: oldValue) { reloadForDeveloperChoices() }
             changed.send(.developer)
+            if developer.imagesOff != oldValue.imagesOff { shareImagesChoice() }
+        }
+    }
+
+    /// Disable Images is one choice for a page and the tabs it opened, or that opened it: they share the rule that
+    /// keeps their images off (`PageImages`). Turned on or off here, it is in each of them too, and their pages load
+    /// again as this one does.
+    private func shareImagesChoice() {
+        guard let webView else { return }
+        for other in PageImages.sharing(with: webView) {
+            guard let tab = (other as? BrowserWebView)?.owner, tab !== self, tab.developer.imagesOff != developer.imagesOff else { continue }
+            tab.developer.imagesOff = developer.imagesOff
         }
     }
 
@@ -522,6 +534,13 @@ final class Tab: NSObject {
         observe(webView)
         DarkPages.attach(to: webView)
         PageFullScreen.attach(to: webView)
+        PageImages.join(webView)
+        // A page another opened shares its images rule: it starts with that page's Disable Images, so its menu says
+        // what its pages get (`shareImagesChoice`).
+        if fromWebKit, !developer.imagesOff,
+           PageImages.sharing(with: webView).contains(where: { ($0 as? BrowserWebView)?.owner?.developer.imagesOff == true }) {
+            developer.imagesOff = true
+        }
         // What you chose for this tab with the developer tools comes with a new web view, before its first page is
         // asked for: it's asked for as the browser chosen, and starts with the look chosen.
         if !developer.isUnchanged { applyDeveloperState() }

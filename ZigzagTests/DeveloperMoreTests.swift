@@ -270,6 +270,37 @@ struct DeveloperMoreTests {
         }
     }
 
+    @Test func aTabAPageOpenedSharesItsImagesChoice() {
+        withDefaults {
+            let opener = Tab(url: URL(string: "http://localhost:1/"), spaceID: UUID())
+            let openerView = opener.ensureWebView()
+            opener.developer.imagesOff = true
+            // WebKit hands the new tab a configuration with the opener's scripts and rules, the images rule with them.
+            let handed = openerView.configuration.copy() as! WKWebViewConfiguration
+            #expect(handed.userContentController === openerView.configuration.userContentController)
+            let opened = Tab(url: nil, spaceID: UUID(), configuration: handed)
+            let openedView = opened.ensureWebView()
+            #expect(PageImages.sharing(with: openedView).contains { $0 === openerView })
+            // It starts with the opener's choice, so its menu says what its pages get.
+            #expect(opened.developer.imagesOff)
+            // Turned back on in the tab opened: on in both, and the rule goes.
+            opened.developer.imagesOff = false
+            #expect(!opener.developer.imagesOff && !PageImages.isOff(in: openerView))
+            // And the other way: off in the opener is off in the tab it opened.
+            opener.developer.imagesOff = true
+            #expect(opened.developer.imagesOff)
+            // A tab of its own shares nothing with them.
+            let other = Tab(url: URL(string: "http://localhost:1/"), spaceID: UUID())
+            let otherView = other.ensureWebView()
+            #expect(!other.developer.imagesOff && PageImages.sharing(with: otherView).isEmpty)
+            other.developer.imagesOff = true
+            other.developer.imagesOff = false
+            #expect(opener.developer.imagesOff && opened.developer.imagesOff)
+            opener.developer.imagesOff = false
+            [opener, opened, other].forEach { $0.close() }
+        }
+    }
+
     @Test func aPageAnotherOpenedHasPreferencesOfItsOwn() {
         withDefaults {
             // The page that opens it has styles off; WebKit hands over a configuration sharing its preferences.
