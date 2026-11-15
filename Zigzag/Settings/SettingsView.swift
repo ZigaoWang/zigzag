@@ -3000,9 +3000,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// Custom…: the four actions a rule can take, with nothing already chosen — the second panel Add Rule opens.
+    /// Custom…: the actions a rule can take — the four handoffs, with nothing already chosen. The two destinations
+    /// (a folder, Zigzag showing it) aren't here: they never cancel a download, and belong to the per-extension panel.
     private func showCustomRuleMenu() {
-        let entries: [MenuPanel.Entry] = DownloadRuleAction.Kind.allCases.map { kind in
+        let entries: [MenuPanel.Entry] = DownloadRuleAction.Kind.allCases.filter { !$0.isDestination }.map { kind in
             .item(MenuPanel.Item(title: kind.title, symbol: kind.symbol) { [weak self] in
                 guard let self else { return }
                 DownloadRuleSheet.show(in: self, kind: kind)

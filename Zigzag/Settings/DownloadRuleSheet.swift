@@ -24,9 +24,12 @@ enum DownloadRuleSheet {
         let applies = DropdownButton()
         applies.options = DownloadRule.Applies.allCases.map { DropdownButton.Option(title: $0.title) }
         applies.selectedIndex = DownloadRule.Applies.allCases.firstIndex(of: source.applies) ?? 0
+        // The Match dropdown offers the address matches: a file-type rule is a per-extension destination, made and
+        // edited in the panel under Save downloads to, not here. One that arrives anyway keeps what it had.
+        let matchChoices = DownloadRule.Match.allCases.filter { $0 != .fileType }
         let match = DropdownButton()
-        match.options = DownloadRule.Match.allCases.map { DropdownButton.Option(title: $0.title) }
-        match.selectedIndex = DownloadRule.Match.allCases.firstIndex(of: source.match) ?? 1
+        match.options = matchChoices.map { DropdownButton.Option(title: $0.title) }
+        match.selectedIndex = matchChoices.firstIndex(of: source.match) ?? 1
         let matchCase = Toggle(isOn: source.isCaseSensitive)
         matchCase.setAccessibilityLabel(String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."))
 
@@ -131,6 +134,10 @@ enum DownloadRuleSheet {
                                             comment: "Beside an icon, under the parameters of a JSON-RPC download rule whose endpoint is on this Mac: the site's cookies would go no further than it."))
             cookieStatus = status
             actionRows.append(FormSheet.Row(label: nil, view: status, height: Tokens.Metric.controlHeight))
+        case .saveToFolder, .showInZigzag:
+            // A destination is made in the panel under Save downloads to, which is where its folder lives: this
+            // sheet is only ever opened for a handoff action.
+            break
         }
 
         let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}.",
@@ -157,11 +164,14 @@ enum DownloadRuleSheet {
                 action.rpcMethod = methodField?.stringValue ?? ""
                 action.rpcParameters = parametersView?.text ?? "[]"
                 action.rpcStyle = DownloadRuleAction.RPCStyle.allCases[stylePicker?.selectedIndex ?? 0]
+            case .saveToFolder, .showInZigzag:
+                // A destination never reaches this sheet; should one, its own fields are left as they were.
+                break
             }
             var rule = existing ?? source
             rule.name = name.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             rule.applies = DownloadRule.Applies.allCases[applies.selectedIndex]
-            rule.match = DownloadRule.Match.allCases[match.selectedIndex]
+            rule.match = matchChoices.indices.contains(match.selectedIndex) ? matchChoices[match.selectedIndex] : source.match
             rule.pattern = pattern.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             rule.isCaseSensitive = matchCase.isOn
             rule.action = action
@@ -192,7 +202,8 @@ enum DownloadRuleSheet {
         func markHeldUp(_ rule: DownloadRule?) {
             let held = rule.map { Self.heldUp($0, all: addHovered) } ?? []
             let notes = Dictionary(held.map { ($0.field, $0.note) }, uniquingKeysWith: { first, _ in first })
-            // The fields this sheet holds. Every one this sheet can show is marked.
+            // The fields this sheet holds. A `.folder` is a destination's, and the panel that makes one keeps its own;
+            // nothing this sheet can show is left unmarked.
             let fields: [HeldField: FilledField?] = [.name: name, .pattern: pattern, .action(.app): appField,
                                                      .action(.url): urlField, .action(.script): scriptField,
                                                      .action(.endpoint): endpointField, .action(.method): methodField]
@@ -296,7 +307,9 @@ enum DownloadRuleSheet {
         }
         if rule.match != .any, rule.pattern.isEmpty {
             if all {
-                held.append((.pattern, String(localized: "Type what this rule catches.", comment: "Tooltip on the address field of a download rule with no pattern yet, so its Add button can't be pressed.")))
+                held.append((.pattern, rule.match == .fileType
+                             ? String(localized: "List the file extensions this rule catches, like pdf, epub.", comment: "Tooltip on the extensions field of a download rule with none yet, so its Add button can't be pressed.")
+                             : String(localized: "Type what this rule catches.", comment: "Tooltip on the address field of a download rule with no pattern yet, so its Add button can't be pressed.")))
             }
         } else if !rule.isValidPattern {
             held.append((.pattern, String(localized: "That isn’t a working regular expression. Zigzag saves nothing it can’t read.", comment: "Tooltip on the address field of a download rule whose regular expression doesn't compile.")))
@@ -313,7 +326,7 @@ enum DownloadRuleSheet {
     }
 
     /// Which of a rule action's own fields is holding its Add button back, if one is.
-    enum ActionField: Equatable { case app, url, script, endpoint, method }
+    enum ActionField: Equatable { case app, url, script, endpoint, method, folder }
 
     /// The field a rule's action still needs something in, and what to say about it: nil when the action can run.
     /// Kept out of the sheet so the one thing that decides it — `isComplete` — is tested against every kind, and so a
@@ -342,6 +355,12 @@ enum DownloadRuleSheet {
             return action.rpcMethod.isEmpty
                 ? (.method, String(localized: "Name the method to call on the service.", comment: "Tooltip on the method field of a JSON-RPC download rule that names no method, so its Add button is greyed."))
                 : nil
+        case .saveToFolder:
+            return action.folderPath.isEmpty
+                ? (.folder, String(localized: "Choose the folder these files are saved into.", comment: "Tooltip on the folder field of a per-extension destination that has no folder yet, so it can't be saved."))
+                : nil
+        case .showInZigzag:
+            return nil
         }
     }
 }

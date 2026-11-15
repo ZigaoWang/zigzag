@@ -136,6 +136,23 @@
         }
       }
     },
+    "%@ are saved to %@" : {
+      "comment" : "A download rule in a sentence: what it catches, then the folder it is saved into. The placeholders are the two parts, as in “Files of type pdf” and “Documents”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ are saved to %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@会保存到 %2$@"
+          }
+        }
+      }
+    },
     "%@ at %lld%%" : {
       "comment" : "Beside Page Size among the developer tools above the page, while a page larger than the window is shown smaller to fit: its size, then how large it's shown, like “1440 × 900 at 72%”.",
       "localizations" : {
@@ -544,6 +561,23 @@
         }
       }
     },
+    "%@ of type %@" : {
+      "comment" : "Part of a download rule's sentence: what it catches by file extension. The first placeholder is “Files” or “Files and links”, the second the extensions, like “pdf, epub”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of type %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "类型为 %2$@ 的%1$@"
+          }
+        }
+      }
+    },
     "%@ on %@" : {
       "comment" : "Under an installed app in Settings › General with more than one profile: the site, then the profile it uses, like “github.com on Work”.",
       "localizations" : {
@@ -574,6 +608,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@在 %2$@ 中打开"
+          }
+        }
+      }
+    },
+    "%@ open in Zigzag" : {
+      "comment" : "A download rule in a sentence: what it catches, then that Zigzag opens and shows it. The placeholder is what it catches, like “Files of type pdf”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@在 Zigzag 中打开"
           }
         }
       }
@@ -4200,6 +4245,17 @@
         }
       }
     },
+    "Choose the folder these files are saved into." : {
+      "comment" : "Tooltip on the folder field of a per-extension destination that has no folder yet, so it can't be saved.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择这些文件保存到的文件夹。"
+          }
+        }
+      }
+    },
     "Choose the script this rule runs." : {
       "comment" : "Tooltip on the script field of a download rule whose action has no script yet, so its Add button is greyed.",
       "localizations" : {
@@ -6920,6 +6976,17 @@
         }
       }
     },
+    "File Extension" : {
+      "comment" : "How a download rule matches a file, in its editor: by the extensions of its own name, such as pdf or epub.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件扩展名"
+          }
+        }
+      }
+    },
     "Files" : {
       "comment" : "The subject of a download rule's sentence, for a rule that catches downloads but not links.",
       "localizations" : {
@@ -8949,6 +9016,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "来自其他 App 的链接会在这里打开。"
+          }
+        }
+      }
+    },
+    "List the file extensions this rule catches, like pdf, epub." : {
+      "comment" : "Tooltip on the extensions field of a download rule with none yet, so its Add button can't be pressed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列出这条规则要匹配的文件扩展名，例如 pdf、epub。"
           }
         }
       }
@@ -14090,6 +14168,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要存储密码吗？"
+          }
+        }
+      }
+    },
+    "Save to Folder" : {
+      "comment" : "A destination a file of a given type can have: saved into a folder of its own, instead of the one everything else goes to.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存到文件夹"
           }
         }
       }

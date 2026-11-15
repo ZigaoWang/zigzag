@@ -188,6 +188,104 @@ struct DownloadRuleTests {
         #expect(body.contains("<string></string>"))
     }
 
+    // MARK: Per-extension destinations
+
+    /// A per-extension destination as the panel makes one: a download rule whose match is the file's type, and an
+    /// action that says where a file of it lands.
+    private func destination(_ extensions: String, _ kind: DownloadRuleAction.Kind = .saveToFolder,
+                             folder: String = "/Users/me/Documents", enabled: Bool = true) -> DownloadRule {
+        var action = DownloadRuleAction(kind: kind)
+        action.folderPath = kind == .saveToFolder ? folder : ""
+        var rule = DownloadRule(name: "", applies: .downloads, match: .fileType, pattern: extensions, action: action)
+        rule.isEnabled = enabled
+        return rule
+    }
+
+    /// A file's type is its own name, never the address: that is what lets a per-extension destination be written as
+    /// an ordinary rule and still read the right thing.
+    @Test func aFileTypeMatchesByNameAndNeverByAddress() {
+        let type = rule(.fileType, "pdf, epub")
+        #expect(type.matches(filename: "report.pdf"))
+        #expect(type.matches(filename: "report.PDF"))
+        #expect(type.matches(filename: "book.EPUB"))
+        #expect(!type.matches(filename: "report.txt"))
+        // An address on its own is never a file's name, so a type rule catches nothing without one.
+        #expect(!type.matches(file))
+        #expect(!type.matches(file, filename: ""))
+    }
+
+    @Test func aFileTypeTakesADotAndTwoParts() {
+        #expect(rule(.fileType, ".pdf").matches(filename: "a.pdf"))
+        #expect(rule(.fileType, "pdf").matches(filename: "a.pdf"))
+        #expect(rule(.fileType, "pdf,epub").matches(filename: "b.epub"))
+        #expect(rule(.fileType, "tar.gz").matches(filename: "backup.tar.gz"))
+        #expect(!rule(.fileType, "gz").matches(filename: "backup.tar.xz"))
+        // The dot is what makes an extension an extension.
+        #expect(!rule(.fileType, "pdf").matches(filename: "pdf"))
+        #expect(!rule(.fileType, "").matches(filename: "a.pdf"))
+        #expect(!rule(.fileType, "pdf", enabled: false).matches(filename: "a.pdf"))
+    }
+
+    @Test func aFileTypeFollowsTheCaseSwitch() {
+        #expect(rule(.fileType, "PDF", caseSensitive: true).matches(filename: "a.PDF"))
+        #expect(!rule(.fileType, "PDF", caseSensitive: true).matches(filename: "a.pdf"))
+        #expect(rule(.fileType, "PDF", caseSensitive: false).matches(filename: "a.pdf"))
+    }
+
+    /// The download path reads the file's name, so a type rule catches its download — and, since a link has no name,
+    /// never a link.
+    @Test func aDownloadIsCaughtByItsTypeAndALinkIsNot() {
+        let type = rule(.fileType, "pdf")
+        #expect(DownloadRulesStore.firstMatch(in: [type], url: file, filename: "report.pdf", appliesToLinks: false)?.id == type.id)
+        #expect(DownloadRulesStore.firstMatch(in: [type], url: file, filename: "", appliesToLinks: false) == nil)
+        #expect(DownloadRulesStore.firstMatch(in: [type], url: file, filename: "report.pdf", appliesToLinks: true) == nil)
+    }
+
+    /// Where a download lands is the first destination that matches, in the same order a handoff is tried — and a
+    /// handoff rule for the same file is not a destination, so it is left to the handoff path.
+    @Test func aDestinationIsTheFirstThatMatches() {
+        let pdf = destination("pdf", folder: "/Users/me/Documents")
+        let books = destination("pdf, epub", .showInZigzag)
+        #expect(DownloadRulesStore.destination(in: [pdf, books], url: file, filename: "a.pdf")?.destination == .folder("/Users/me/Documents"))
+        #expect(DownloadRulesStore.destination(in: [books, pdf], url: file, filename: "a.pdf")?.destination == .show)
+        #expect(DownloadRulesStore.destination(in: [rule(.fileType, "pdf")], url: file, filename: "a.pdf") == nil)
+        #expect(DownloadRulesStore.destination(in: [], url: file, filename: "a.pdf") == nil)
+        #expect(DownloadRulesStore.destination(in: [destination("pdf")], url: file, filename: "a.epub") == nil)
+        #expect(DownloadRulesStore.destination(in: [destination("pdf", enabled: false)], url: file, filename: "a.pdf") == nil)
+    }
+
+    /// A destination is a destination, and needs what it needs: a folder to save into, nothing to be shown by Zigzag.
+    @Test func aDestinationSaysWhatItIsAndNeedsItsFolder() {
+        #expect(DownloadRuleAction.Kind.saveToFolder.isDestination)
+        #expect(DownloadRuleAction.Kind.showInZigzag.isDestination)
+        #expect(!DownloadRuleAction.Kind.openURL.isDestination)
+        #expect(!DownloadRuleAction.Kind.runScript.isDestination)
+
+        var folder = DownloadRuleAction(kind: .saveToFolder)
+        #expect(!folder.isComplete)
+        #expect(DownloadRuleSheet.actionHoldUp(folder)?.field == .folder)
+        folder.folderPath = "/Users/me/Documents"
+        #expect(folder.isComplete)
+        #expect(DownloadRuleSheet.actionHoldUp(folder) == nil)
+        #expect(DownloadRuleAction(kind: .showInZigzag).isComplete)
+    }
+
+    @Test func aDestinationReadsAsASentence() {
+        #expect(destination("pdf, epub", folder: "/Users/me/Documents").summarySentence
+                == "Files of type pdf, epub are saved to Documents")
+        #expect(destination("pdf", .showInZigzag).summarySentence == "Files of type pdf open in Zigzag")
+    }
+
+    @Test func aDestinationSurvivesItsJSON() throws {
+        var rule = destination("pdf")
+        rule.action.folderPath = "/Users/me/Downloads/PDFs"
+        let data = try JSONEncoder().encode([rule])
+        let decoded = try JSONDecoder().decode([DownloadRule].self, from: data)
+        #expect(decoded == [rule])
+        #expect(decoded.first?.action.kind == .saveToFolder)
+        #expect(decoded.first?.action.destination == .folder("/Users/me/Downloads/PDFs"))
+    }
+
     /// Everything holding a rule's Add button back, in the order the form is filled in: the button's own words and the
     /// fields it marks come from this one list, so the two can never disagree.
     @Test func aRuleSaysEverythingHoldingAddBack() {
