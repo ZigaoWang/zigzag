@@ -78,14 +78,20 @@ struct DialogPasswordFixesTests {
 
     // MARK: Page dialogs
 
-    @Test func pageDialogWaitsOnItsOwnPageAndGoesWithIt() async {
+    /// Waits up to two seconds for `condition`, letting the main run loop (and the animations on it) go on meanwhile.
+    private func until(_ condition: () -> Bool) async throws {
+        let deadline = Date().addingTimeInterval(2)
+        while !condition(), Date() < deadline { try await Task.sleep(for: .milliseconds(10)) }
+    }
+
+    @Test func pageDialogWaitsOnItsOwnPageAndGoesWithIt() async throws {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: true)
         window.isReleasedWhenClosed = false
         // A page whose tab isn't in front: not in any window.
         let page = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 600))
         let asking = Task { await PageDialogSheet.ask(in: window, title: "example.com says", message: "Hello", showsCancel: true,
                                                       offersBlock: false, page: page) }
-        for _ in 0..<50 where !page.subviews.contains(where: { $0 is PageDialogSheet }) { await Task.yield() }
+        try await until { page.subviews.contains { $0 is PageDialogSheet } }
         // It sits on its page, not over the window (and so never over the sidebar or another tab's page).
         #expect(page.subviews.contains { $0 is PageDialogSheet })
         #expect(window.contentView?.subviews.contains { $0 is PageDialogSheet } != true)
@@ -98,6 +104,9 @@ struct DialogPasswordFixesTests {
         PageDialogSheet.cancel(for: page)
         let result = await asking.value
         if case .cancelled = result {} else { Issue.record("expected cancelled, got \(result)") }
+        // On a page in sight it fades out as other sheets do, then goes; it's no longer up as soon as it's answered.
+        #expect(!PageDialogSheet.isShowing(in: window))
+        try await until { !page.subviews.contains { $0 is PageDialogSheet } }
         #expect(!page.subviews.contains { $0 is PageDialogSheet })
     }
 }
