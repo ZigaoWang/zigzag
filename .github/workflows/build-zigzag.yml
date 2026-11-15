@@ -70,23 +70,19 @@ jobs:
           xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag \
             -destination 'platform=macOS' -derivedDataPath test-build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            -only-testing:ZigzagTests/DownloadRuleTests \
-            -only-testing:ZigzagTests/DownloadPolicyTests \
-            -only-testing:ZigzagTests/SitePermissionsPolicyTests \
-            -only-testing:ZigzagTests/PermissionPromptTests \
-            -only-testing:ZigzagTests/PendingQuestionsTests \
-            -only-testing:ZigzagTests/PageLinkTests \
             -only-testing:ZigzagTests/SiteControlsPermissionTests \
-            -only-testing:ZigzagTests/FormSheetTests \
-            -only-testing:ZigzagTests/SettingsLayoutTests | tee test.log
-          # labelsCenterTheirCapitals is upstream's own test and measures a sub-pixel offset, which rounds away on a
-          # runner with no Retina display: it stands aside there itself, at the top of the test. `-skip-testing:` with
-          # a single test's name is not honoured for this suite, so the test is what knows (see SettingsLayoutTests).
+            -only-testing:ZigzagTests/SecurityFixesTests \
+            -only-testing:ZigzagTests/SiteOriginPermissionTests \
+            -only-testing:ZigzagTests/EmbeddedPermissionTests \
+            -only-testing:ZigzagTests/WebRTCProtectionTests \
+            -only-testing:ZigzagTests/PageQuestionsTests \
+            -only-testing:ZigzagTests/PaneSiteControlsTests \
+            -only-testing:ZigzagTests/ScreenSharingPromptTests | tee test.log
 
       - name: Check the tests that matter really ran
         # A selector that matches nothing passes silently, so name one test per area; and a red test is a red build.
         run: |
-          for t in eachMatchKind remembersAnActionPerSubjectAndOrigin migratesOldBoolsOnce theAnswerCarriesTheChosenActionAndDuration openAppsIsAPermission aTabWearsTheMarkerOnlyWhileItsQuestionCannotBeShown everyPopupValueHasADestination anAppLinkReadsTheSiteWideRowThenTheAppThenThePage theDownloadsListGroupsSitesByTheirAnswer anAnswerIsKeptOnlyWhereItMayBe aStoredAllowSkipsTheQuestionAndABlockStopsIt aLegacyPopupYesMeansTheViewer allowingPopupsKeepsTheViewer anAnsweredDenyIsKeptForTheWholeSite aPopUpGoesThroughTheTabThatAskedNotABrowserWindow aPagesOwnThisTimePopUpAnswerIsReadBack aCardSaysHowManyWaitBehindIt fitsThePageItIsGivenInsideAnAnimation aFieldInARowIsGivenRoomToDraw aFieldHasASizeOfItsOwn aFieldBesideAButtonKeepsTheButtonInsideTheRow anActionThatCannotRunNamesTheFieldHoldingItUp aRuleSaysEverythingHoldingAddBack aFileTypeMatchesByNameAndNeverByAddress aFileTypeTakesADotAndTwoParts aFileTypeFollowsTheCaseSwitch aDownloadIsCaughtByItsTypeAndALinkIsNot aDestinationIsTheFirstThatMatches aDestinationSaysWhatItIsAndNeedsItsFolder aDestinationReadsAsASentence aDestinationSurvivesItsJSON aDestinationIsReadAsAPlaceToSave aWebAddressIsZigzagsAndAnythingElseItsAppsOwn aRuleRemembersWhereItsWebAddressOpens everyPlaceIsOneTheQuestionKnows whereAWebAddressOpensNeverHoldsTheRuleBack aRuleLetsThePageGoOnUntilItIsToldNotTo aStoredDownloadAnswerIsUsedWithoutAskingAnything thisTimeDownloadAnswerHoldsForThePageNotTheSite aDownloadDenyIsKeptForTheSiteAndAPrivateTabKeepsNothing theSiteControlsDownloadRowIsTheSameAnswerAsTheQuestion downloadsAreARowInSiteControlsOnceTheSiteHasAnAnswer aFormThatCannotBeConfirmedSaysWhatHoldsItUp theLinksOwnPartsAreTokensOfTheirOwn aRuleNamesAScriptInItsOneFolder onlyAPlainGETIsAskedForAgain allowOnceOnANoticeHoldsForThePage storedHandoffAnswersMapToGates aHandoffQuestionUsesThePageOrigin aHandoffQuestionFallsBackToTheReferrerThenTheTarget aHandoffAnsweredThisTimeIsNotAskedAgain aNotificationsAnswerIsThePlaceItShowsIn bothPlacesCountAsAllowed aScriptNoticeSaysHowItWent aFileTypeNeedsItsExtensionsAndOnlyAFolderToSaveInto aRuleMovesToSitBeforeTheOneItWasDroppedOn aScriptsAnswerNamesOneActionAndNeverAnotherScript everyFiringThatWouldBeSilentIsAnnounced theSameNoticeAgainIsOneWithACount aWebAddressOpensWhereTheNoticeSaysItDoes aNotificationsAnswerCanBeKeptForTheSite aScreenSharingNoCanBeKeptForTheSite theAppMenuListsApplicationsOneLevelDeep aRuleQuestionAsksHowLongForThreeScopes theAnswerKeepsItsEntryAndItsScope aRuleAnswerIsWrittenOnTheRule aRulesOwnAnswerStandsForEverySite aSitesAnswerOutranksTheRulesOwn aRulesOwnAnswerSurvivesItsJSON theThirdDurationChoiceNamesTheRule anOpenInDecisionReadsSiteThenRuleThenPage deletingARuleForgetsBothKindsOfSiteAnswer aRuleStaysOutOfPrivateWindowsUnlessItSaysOtherwise aRuleKeepsWhetherItRunsInPrivateWindows aDestinationIsNeverAHandoff aDownloadAnswerKnowsHowFarItReaches aTorrentPresetCatchesTorrentsAndMagnets; do
+          for t in theCameraAndMicrophoneHaveTwoAnswers aRequestForBothTakesTwoAnswers anAnswerForBothBecomesOneForEach theCameraAndMicrophoneHaveARowEach anAnswerStaysWithItsOrigin embeddedFramesFollowTheSitesChoice itsRowInSiteControls questionsTakeTurns; do
             grep -q "✔ Test $t() passed" test.log || { echo "did not run: $t"; exit 1; }
           done
           if grep -q "✘" test.log; then echo "a test failed"; exit 1; fi
