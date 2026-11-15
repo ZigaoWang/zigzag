@@ -196,7 +196,7 @@ enum HistoryPage {
     nonisolated private static func row(_ entry: HistoryEntry) -> [String: Any] {
         [
             "url": entry.url.absoluteString,
-            "title": entry.title.isEmpty ? (entry.url.host() ?? entry.url.absoluteString) : entry.title,
+            "title": HistoryStore.shownTitle(entry.title, url: entry.url),
             "time": entry.lastVisit.timeIntervalSince1970 * 1000,
         ]
     }

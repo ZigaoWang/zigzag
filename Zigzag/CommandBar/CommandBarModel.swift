@@ -380,7 +380,7 @@ enum CommandRanker {
         if query.isEmpty {
             if historyOnly {
                 for entry in profile.history.recent(limit: 8) {
-                    let title = entry.title.isEmpty ? displayURL(entry.url) : entry.title
+                    let title = entry.title.isEmpty ? HistoryStore.fileName(of: entry.url) ?? displayURL(entry.url) : entry.title
                     add(CommandResult(kind: .history(entry.url), title: title,
                                       detail: detail(displayURL(entry.url), under: title), icon: FaviconStore.shared.cachedIcon(for: entry.url)),
                         key: TabManager.normalize(entry.url))

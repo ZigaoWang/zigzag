@@ -430,9 +430,7 @@ final class Tab: NSObject {
         if HistoryPage.isHistory(url) { return String(localized: "History", comment: "The name of the tab showing Zigzag's History.") }
         if !title.isEmpty { return title }
         // A file on your Mac, or a PDF from the web, is called by its name: it has no title of its own.
-        if let url, url.isFileURL || url.pathExtension.lowercased() == "pdf", !url.lastPathComponent.isEmpty, url.lastPathComponent != "/" {
-            return url.lastPathComponent
-        }
+        if let url, let name = HistoryStore.fileName(of: url) { return name }
         return url?.host() ?? String(localized: "New Tab", comment: "The name of a tab with no page yet.")
     }
     var isBlank: Bool { url == nil }
@@ -1185,7 +1183,9 @@ final class Tab: NSObject {
         // Zigzag's own pages (History, Settings) aren't visits, and neither is a page that failed to load.
         guard !isPrivate, url != lastRecorded, url != errorShownFor, !HistoryPage.isInternal(url) else { return }
         lastRecorded = url
-        profile.history.recordVisit(url: url, title: title, count: Self.visitCount(countsVisit: countsVisit))
+        // A PDF has no title of its own: one at an address that doesn't end in .pdf goes by the last part of it.
+        let named = (title ?? "").isEmpty && pdfResponseURL == url && !url.lastPathComponent.isEmpty && url.lastPathComponent != "/" ? url.lastPathComponent : title
+        profile.history.recordVisit(url: url, title: named, count: Self.visitCount(countsVisit: countsVisit))
     }
 
     /// What a page counts for in History's ranking: a load is a visit; an address the page changed itself, none.
