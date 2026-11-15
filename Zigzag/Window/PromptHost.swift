@@ -78,15 +78,20 @@ extension BrowserWindowController: PromptHost {
 /// there: one shows, the next waits hidden until it's answered or set aside. A toast that comes while a question is
 /// up shows under it, and moves up once the question goes.
 @MainActor enum PageQuestions {
-    /// The question showing at the top of a page in `overlay`, other than `except`.
-    static func showing(in overlay: NSView, except: NSView? = nil) -> FloatingPanelView? {
+    /// The question showing at the top of a page in `overlay`, other than `except`; with `over`, only one where it
+    /// would cover that frame.
+    static func showing(in overlay: NSView, except: NSView? = nil, over frame: NSRect? = nil) -> FloatingPanelView? {
         overlay.subviews.lazy.compactMap { $0 as? FloatingPanelView }.first { view in
             view !== except && (view is PermissionPrompt || view is SavePasswordPrompt) && !view.isHidden && !view.dismissing
+                && frame.map { view.frame.intersects($0) } != false
         }
     }
 
-    /// Whether `question` may come up now: no other question is showing in its overlay.
-    static func mayShow(_ question: NSView, in overlay: NSView) -> Bool { showing(in: overlay, except: question) == nil }
+    /// Whether `question`, placed where it would show, may come up now: no other question is showing there. Questions
+    /// on different panes of a split show together.
+    static func mayShow(_ question: NSView, in overlay: NSView) -> Bool {
+        showing(in: overlay, except: question, over: question.frame) == nil
+    }
 
     /// What a toast at the top of `area` keeps clear of: a question or the update note showing there.
     static func occupied(in overlay: NSView) -> NSRect? {

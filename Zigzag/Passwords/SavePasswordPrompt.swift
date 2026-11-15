@@ -176,9 +176,10 @@ final class SavePasswordPrompt: FloatingPanelView {
                 guard let self, self.superview != nil, let area = controller.pageFrame(showing: tab) else { return }
                 if self.isHidden {
                     // One question at a time at the top of the page (`PageQuestions`): a site's question showing
-                    // there goes first, and this comes up once it's answered.
-                    guard PageQuestions.mayShow(self, in: controller.promptOverlay) else { return }
+                    // there goes first, and this comes up once it's answered. Placed first, hidden still: one over
+                    // another pane of a split doesn't hold it up.
                     self.place(in: area)
+                    guard PageQuestions.mayShow(self, in: controller.promptOverlay) else { return }
                     self.isHidden = false
                     self.present()
                     self.scheduleHide()
