@@ -1779,10 +1779,10 @@ final class ConnectionLine: InteractiveView {
     override func stateDidChange(animated: Bool) {
         // No wash: the words step up under the pointer. Not secure always stands out.
         let hot = isHovered && isEnabled
-        let ink = warns ? Tokens.Color.warning : hot ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
+        let ink = warns ? Tokens.Color.caution : hot ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
         label.textColor = ink
         glyph.contentTintColor = ink
-        chevron.contentTintColor = hot ? (warns ? Tokens.Color.warning : Tokens.Color.textSecondary) : Tokens.Color.textTertiary
+        chevron.contentTintColor = hot ? (warns ? Tokens.Color.caution : Tokens.Color.textSecondary) : Tokens.Color.textTertiary
     }
 }
 

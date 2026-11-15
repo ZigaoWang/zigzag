@@ -102,7 +102,7 @@ final class WebStoreOffer: FloatingPanelView {
                 self.add.isHidden = false
                 self.add.title = String(localized: "Try Again", comment: "Button on the bar over a Chrome Web Store page after installing failed.")
                 self.line.stringValue = message
-                self.line.textColor = Tokens.Color.warning
+                self.line.textColor = Tokens.Color.caution
             case .cancelled:
                 self.spinner.stopAnimation(nil)
                 self.add.isHidden = false
