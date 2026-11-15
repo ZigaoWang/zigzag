@@ -111,6 +111,26 @@ struct DownloadRuleTests {
 
     /// The link's own parts, so a rule can send an address somewhere else: the host, the path and the query on their
     /// own, exactly as the address has them.
+    /// A rule names its script, and a name alone means the scripts folder in your Documents: one place for them, which
+    /// is what makes them findable, and a script kept elsewhere is still reachable by its own path.
+    @Test func aRuleNamesAScriptInItsOneFolder() {
+        let folder = Paths.scripts.standardizedFileURL
+        #expect(folder.deletingLastPathComponent().lastPathComponent == "Zigzag")
+        #expect(folder.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "Documents")
+        #expect(folder.lastPathComponent == "Scripts")
+
+        // A bare name is in the folder; a path of its own is taken as it stands, `~` and all.
+        #expect(Paths.script(named: "yt-dlp.sh").standardizedFileURL == folder.appendingPathComponent("yt-dlp.sh"))
+        #expect(Paths.script(named: "/opt/tools/dl.sh").path == "/opt/tools/dl.sh")
+        let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
+        #expect(Paths.script(named: "~/bin/dl.sh").standardizedFileURL == home.appendingPathComponent("bin/dl.sh"))
+
+        // Picked from the folder, a script is stored by its name, so the rule reads `yt-dlp.sh` and goes on working;
+        // picked anywhere else it keeps its path.
+        #expect(Paths.scriptName(for: folder.appendingPathComponent("yt-dlp.sh")) == "yt-dlp.sh")
+        #expect(Paths.scriptName(for: URL(fileURLWithPath: "/opt/tools/dl.sh")) == "/opt/tools/dl.sh")
+    }
+
     @Test func theLinksOwnPartsAreTokensOfTheirOwn() {
         let values = HandoffValues(link: URL(string: "https://www.google.com/search/deep?a=1&b=two%20words")!)
         let expanded = DownloadTokens.expand("https://www.bing.com{path}?{query}", with: values)

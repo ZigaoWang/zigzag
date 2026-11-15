@@ -193,7 +193,9 @@ enum DownloadHandoff {
     /// anything else must be executable. Never `/bin/sh -c`, and never a joined command line.
     private static func runScript(_ action: DownloadRuleAction, values: HandoffValues, secret: String,
                                   request: Request, rule: DownloadRule?) -> Outcome {
-        let path = (DownloadTokens.expand(action.scriptPath, with: values, secret: secret) as NSString).expandingTildeInPath
+        // A rule names its script, and a name alone means the scripts folder in your Documents: one place for them,
+        // and a path still works for a script kept somewhere else.
+        let path = Paths.script(named: DownloadTokens.expand(action.scriptPath, with: values, secret: secret)).path
         guard FileManager.default.fileExists(atPath: path) else {
             return .failed(String(localized: "The script is no longer there.", comment: "Why a download rule failed: the script it was told to run is gone."))
         }

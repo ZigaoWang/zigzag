@@ -4223,6 +4223,17 @@
         }
       }
     },
+    "Choose a Script…" : {
+      "comment" : "Item in the menu beside a Run Script rule's script field: picks a script kept outside the scripts folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择脚本…"
+          }
+        }
+      }
+    },
     "Choose a password export (a .csv file) or Safari’s browsing data export (a .zip file)." : {
       "comment" : "Message of the open panel from the Import window's Choose File… button.",
       "localizations" : {
@@ -14486,6 +14497,17 @@
         }
       }
     },
+    "Scripts live in Documents/Zigzag/Scripts." : {
+      "comment" : "Under the script field of a Run Script download rule: where a script named by its file name is looked for.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本存放在 Documents/Zigzag/Scripts。"
+          }
+        }
+      }
+    },
     "Search" : {
       "comment" : "A section of Settings: the search engine and suggestions.\nAction label at the right of the selected command bar result, saying what Return does: searches for it.",
       "localizations" : {
@@ -15285,6 +15307,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示报告"
+          }
+        }
+      }
+    },
+    "Show Scripts Folder" : {
+      "comment" : "Item in the menu beside a Run Script rule's script field: opens the folder the scripts live in, in Finder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示脚本文件夹"
           }
         }
       }
