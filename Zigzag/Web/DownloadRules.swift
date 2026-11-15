@@ -54,6 +54,10 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     var pattern = ""
     /// Regex and text both follow the case switch. A host is case-insensitive, so a rule for YouTube needn't say so.
     var isCaseSensitive = false
+    /// **Off by default**: a private window promises that what happens there leaves no trace, and handing its address,
+    /// or its cookies, to another app or script is exactly what could break that promise. A private window runs no
+    /// rule that hasn't been let in, and the link or download carries on as if no rule had matched.
+    var runsInPrivateWindows = false
     var action: DownloadRuleAction
 
     /// A regex that doesn't compile is kept as typed but never matches, so a half-written rule can't catch anything.
@@ -118,7 +122,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, isEnabled, applies, match, pattern, isCaseSensitive, action
+        case id, name, isEnabled, applies, match, pattern, isCaseSensitive, runsInPrivateWindows, action
     }
 
     /// Older files may lack a key a newer Zigzag added: the defaults stand in, so one unreadable rule never throws
@@ -132,6 +136,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         match = try container.decodeIfPresent(Match.self, forKey: .match) ?? .contains
         pattern = try container.decodeIfPresent(String.self, forKey: .pattern) ?? ""
         isCaseSensitive = try container.decodeIfPresent(Bool.self, forKey: .isCaseSensitive) ?? false
+        runsInPrivateWindows = try container.decodeIfPresent(Bool.self, forKey: .runsInPrivateWindows) ?? false
         action = try container.decodeIfPresent(DownloadRuleAction.self, forKey: .action) ?? DownloadRuleAction(kind: .openURL)
     }
 }
@@ -300,7 +305,8 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
             action.rpcParameters = """
             [["{link}"], {"header": ["Cookie: {cookie_header}", "Referer: {referrer}"], "out": "{filename}"}]
             """
-            return DownloadRule(name: title, applies: .linksAndDownloads, match: .any, action: action)
+            // A download manager takes downloads only: a link you click stays a link unless it is itself a file.
+            return DownloadRule(name: title, applies: .downloads, match: .any, action: action)
         case .rTorrent:
             var action = DownloadRuleAction(kind: .jsonRPC)
             action.rpcEndpoint = "http://127.0.0.1:8080/RPC2"
@@ -309,13 +315,13 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
             ["", "{link}"]
             """
             action.rpcStyle = .xmlrpc
-            return DownloadRule(name: title, applies: .linksAndDownloads, match: .any, action: action)
+            return DownloadRule(name: title, applies: .downloads, match: .any, action: action)
         case .ytdlp:
             var action = DownloadRuleAction(kind: .runScript)
             // Through env, so it's found under either Homebrew prefix, and anywhere else on PATH.
             action.scriptPath = "/usr/bin/env"
             action.arguments = ["yt-dlp", "--no-playlist", "--cookies", "{cookies}", "{link}"]
-            return DownloadRule(name: title, applies: .linksAndDownloads, match: .any, action: action)
+            return DownloadRule(name: title, applies: .downloads, match: .any, action: action)
         case .mpv:
             var action = DownloadRuleAction(kind: .openURL)
             action.urlTemplate = "mpv://{encoded_link}"
@@ -520,14 +526,16 @@ final class DownloadRulesStore {
     }
 
     /// The first rule that catches `url`, or none. `appliesToLinks` is false for a download.
-    func firstMatch(url: URL, appliesToLinks: Bool) -> DownloadRule? {
-        Self.firstMatch(in: rules, url: url, appliesToLinks: appliesToLinks)
+    func firstMatch(url: URL, appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
+        Self.firstMatch(in: rules, url: url, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
     }
 
-    /// The same order, apart from the file, for a list being tested or previewed.
-    nonisolated static func firstMatch(in rules: [DownloadRule], url: URL, appliesToLinks: Bool) -> DownloadRule? {
+    /// The same order, apart from the file, for a list being tested or previewed. A rule not let into private windows
+    /// is left out there, so a private window never even asks about it.
+    nonisolated static func firstMatch(in rules: [DownloadRule], url: URL, appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
         rules.first { rule in
             guard rule.applies == .linksAndDownloads || !appliesToLinks else { return false }
+            guard !isPrivate || rule.runsInPrivateWindows else { return false }
             return rule.matches(url)
         }
     }

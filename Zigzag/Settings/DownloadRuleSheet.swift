@@ -26,6 +26,8 @@ enum DownloadRuleSheet {
         caseSensitive.options = [DropdownButton.Option(title: String(localized: "Off", comment: "A choice in a download rule: the address's case doesn't matter.")),
                                  DropdownButton.Option(title: String(localized: "On", comment: "A choice in a download rule: the address's case matters."))]
         caseSensitive.selectedIndex = source.isCaseSensitive ? 1 : 0
+        let runsInPrivate = Toggle(isOn: source.runsInPrivateWindows)
+        runsInPrivate.setAccessibilityLabel(String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."))
 
         // The action's own fields, one set per kind.
         var actionRows: [FormSheet.Row] = []
@@ -121,6 +123,7 @@ enum DownloadRuleSheet {
             FormSheet.Row(label: String(localized: "Match", comment: "Label of the choice of how a download rule matches an address, in its sheet."), view: match),
             FormSheet.Row(label: String(localized: "Address", comment: "Label of the address pattern in a download rule's sheet."), view: pattern),
             FormSheet.Row(label: String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."), view: caseSensitive),
+            FormSheet.Row(label: String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
         ]
         let rows = matchRows + actionRows + [tokens]
 
@@ -144,6 +147,7 @@ enum DownloadRuleSheet {
             rule.match = DownloadRule.Match.allCases[match.selectedIndex]
             rule.pattern = pattern.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             rule.isCaseSensitive = caseSensitive.selectedIndex == 1
+            rule.runsInPrivateWindows = runsInPrivate.isOn
             rule.action = action
             return rule
         }

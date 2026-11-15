@@ -206,6 +206,59 @@ struct DownloadRuleTests {
         #expect(decoded.first?.applies == .downloads)
         #expect(decoded.first?.match == .contains)
         #expect(decoded.first?.isEnabled == true)
+        #expect(decoded.first?.runsInPrivateWindows == false)
         #expect(decoded.first?.action.kind == .openURL)
+    }
+
+    // MARK: The handoff question
+
+    @Test func downloadServicesTakeDownloadsOnly() {
+        for preset in [DownloadPreset.aria2, .motrix, .rTorrent, .ytdlp] {
+            #expect(preset.rule.applies == .downloads)
+        }
+        // A player is for the links you click, and for files that turn out to be media.
+        for preset in [DownloadPreset.mpv, .iina] {
+            #expect(preset.rule.applies == .linksAndDownloads)
+        }
+    }
+
+    @Test func aHandoffAnswerReadsBackAsItsGate() {
+        #expect(DownloadHandoff.gate(stored: "handOff") == .handOff)
+        #expect(DownloadHandoff.gate(stored: "browser") == .browser)
+        #expect(DownloadHandoff.gate(stored: "deny") == .cancel)
+        #expect(DownloadHandoff.gate(stored: nil) == .browser)
+    }
+
+    @Test func cookiesGoOnlyToThePagesOwnSiteOrAClick() {
+        let page = "https://news.example"
+        let own = DownloadHandoff.Request(url: URL(string: "https://news.example/file.zip")!, pageOrigin: page)
+        let elsewhere = DownloadHandoff.Request(url: URL(string: "https://other.example/file.zip")!, pageOrigin: page)
+        #expect(DownloadHandoff.maySendCookies(own))
+        #expect(!DownloadHandoff.maySendCookies(elsewhere))
+        // A link you clicked may carry the page's sign-in to where it points.
+        var clicked = elsewhere
+        clicked.wasClicked = true
+        #expect(DownloadHandoff.maySendCookies(clicked))
+        // With no page to name, there is nothing to send.
+        #expect(!DownloadHandoff.maySendCookies(DownloadHandoff.Request(url: own.url)))
+    }
+
+    @Test func privateWindowsRunOnlyTheRulesLetIn() {
+        var rule = rule(.any)
+        #expect(DownloadRulesStore.firstMatch(in: [rule], url: file, appliesToLinks: false) != nil)
+        #expect(DownloadRulesStore.firstMatch(in: [rule], url: file, appliesToLinks: false, isPrivate: true) == nil)
+        rule.runsInPrivateWindows = true
+        #expect(DownloadRulesStore.firstMatch(in: [rule], url: file, appliesToLinks: false, isPrivate: true) != nil)
+    }
+
+    @Test func aPageKeepsAHandoffAction() {
+        var answers = PagePermissionAnswers()
+        let kind = DownloadHandoff.handoffKind(DownloadRule(name: "aria2", applies: .downloads, match: .any,
+                                                             action: DownloadRuleAction(kind: .jsonRPC)))
+        answers.note("handOff", key: "https://news.example", kind: kind)
+        #expect(answers.action(key: "https://news.example", kind: kind) == "handOff")
+        #expect(!answers.isEmpty)
+        answers.forget()
+        #expect(answers.isEmpty)
     }
 }

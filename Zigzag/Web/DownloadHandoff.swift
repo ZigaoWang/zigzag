@@ -11,12 +11,20 @@ enum DownloadHandoff {
     struct Request {
         var url: URL
         var referrer: URL?
+        /// The site the page that asked is on, when there is one: what a handoff question is keyed to, and the only
+        /// site whose cookies may go to a target of its own.
+        var pageOrigin: String?
         var filename = ""
         var mime = ""
         var space = ""
         var dataStore: WKWebsiteDataStore?
         var isPrivate = false
         var window: NSWindow?
+        /// The tab that asked, where one did: its page keeps the answer for as long as it is on the page.
+        var tab: Tab?
+        /// Whether you clicked the link that led here. A click may send this page's cookies to the target; a page
+        /// that starts a download or a navigation on its own may not.
+        var wasClicked = false
     }
 
     enum Outcome: Equatable {
@@ -24,18 +32,78 @@ enum DownloadHandoff {
         case handedOff
         /// No rule wanted it: carry on as if there were none.
         case noMatch
+        /// A link was refused at the handoff question: cancel its navigation without running the rule. A download
+        /// has nowhere to go on to, so a refusal there leaves it to be saved as usual.
+        case cancelled
         case failed(String)
     }
 
     /// The rule that catches `url`, if any, and whether it wants a link (true) or a download (false).
-    static func firstMatch(_ url: URL, appliesToLinks: Bool) -> DownloadRule? {
-        DownloadRulesStore.shared.firstMatch(url: url, appliesToLinks: appliesToLinks)
+    static func firstMatch(_ url: URL, appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
+        DownloadRulesStore.shared.firstMatch(url: url, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
+    }
+
+    /// Where a handoff stands: run the rule, leave it in the browser, or cancel the link.
+    enum HandoffGate: Equatable { case handOff, browser, cancel }
+
+    static func gate(stored: String?) -> HandoffGate {
+        switch stored {
+        case "handOff": .handOff
+        case "browser": .browser
+        case "deny": .cancel
+        default: .browser
+        }
+    }
+
+    /// The key a page answer is kept under: per rule, so two rules on one page keep their own answers.
+    static func handoffKind(_ rule: DownloadRule) -> String { "handoff:\(rule.id.uuidString)" }
+
+    /// Asks where a handoff should go, unless this page already answered for this rule. The question asks in the
+    /// page's own window; with no window to ask in, nothing is handed off and the link or download stays as it is.
+    /// The answer holds for the page: a link that starts a download is one question, not two.
+    static func decide(_ rule: DownloadRule, request: Request, tab: Tab? = nil) async -> HandoffGate {
+        // A private window runs no rule that hasn't been let in, even if a caller hands one over directly.
+        guard !request.isPrivate || rule.runsInPrivateWindows else { return .browser }
+        let origin = request.pageOrigin ?? SiteOrigin.of(request.referrer) ?? SiteOrigin.of(request.url)
+        let kind = handoffKind(rule)
+        if let origin, let tab, let kept = tab.permissionAnswers.action(key: origin, kind: kind) {
+            return gate(stored: kept)
+        }
+        guard let controller = tab.flatMap({ WindowManager.shared.promptHost(holding: $0) })
+                ?? WindowManager.shared.promptHost(for: request.window)
+                ?? WindowManager.shared.promptHost(for: NSApp.keyWindow) else { return .browser }
+        let answer = await PermissionPrompt.ask(
+            host: SitePermissions.askerName(origin), origin: origin, what: rule.name, symbol: "arrow.up.forward.app",
+            in: controller, tab: tab,
+            title: String(localized: "Hand Off \(rule.name)", comment: "A page's question before a download rule handles a link or download. The placeholder is the rule's name."),
+            allowTitle: String(localized: "Hand Off", comment: "Button that runs the named download rule for a link or download."),
+            alternateTitle: String(localized: "Open in Browser", comment: "Button that lets a link or download stay in the browser instead of running a download rule."),
+            denyTitle: String(localized: "Don’t Allow", comment: "Button that refuses a download rule's handoff."))
+        let action: String
+        switch answer {
+        case .allow, .always: action = "handOff"
+        case .alternate: action = "browser"
+        case .deny: action = "deny"
+        case .notNow: return .browser
+        }
+        if let origin, let tab { tab.permissionAnswers.note(action, key: origin, kind: kind) }
+        return gate(stored: action)
+    }
+
+    /// Whether a rule may read this page's cookies for its target: only when the target is the page's own site, or
+    /// when you clicked the link that led to it. A page that names another site on its own gets none of its cookies.
+    static func maySendCookies(_ request: Request) -> Bool {
+        request.wasClicked || (request.pageOrigin != nil && SiteOrigin.of(request.url) == request.pageOrigin)
     }
 
     @discardableResult
-    static func route(_ url: URL, appliesToLinks: Bool, request: Request) async -> Outcome {
+    static func route(_ url: URL, appliesToLinks: Bool, request: Request, tab: Tab? = nil) async -> Outcome {
         guard let rule = firstMatch(url, appliesToLinks: appliesToLinks) else { return .noMatch }
-        return await perform(rule, request: request)
+        switch await decide(rule, request: request, tab: tab ?? request.tab) {
+        case .handOff: return await perform(rule, request: request)
+        case .browser: return .noMatch
+        case .cancel: return appliesToLinks ? .cancelled : .noMatch
+        }
     }
 
     /// Runs one rule. Cookies are read only when its action names one, and the files it makes are gone by the end.
@@ -45,7 +113,9 @@ enum DownloadHandoff {
                                    mime: request.mime, space: request.space)
         let secret = rule.action.kind == .jsonRPC ? (HandoffSecrets.secret(for: rule.id) ?? "") : ""
         var cookieFile: URL?
-        if rule.needsCookies {
+        // The site's sign-in may go to a target of its own, or to one you clicked through to. A page that names
+        // another site on its own gets none of this site's cookies, whichever rule it names.
+        if rule.needsCookies, maySendCookies(request) {
             let cookies = await cookies(from: request.dataStore, for: request.url)
             values.cookieHeader = HandoffCookies.header(cookies)
             if rule.usesCookieFile, let file = try? HandoffCookies.writeFile(cookies) {
@@ -111,7 +181,8 @@ enum DownloadHandoff {
     // MARK: Actions
 
     private static func openApp(_ action: DownloadRuleAction, values: HandoffValues, secret: String) async -> Outcome {
-        let path = (DownloadTokens.expand(action.appPath, with: values, secret: secret) as NSString).expandingTildeInPath
+        // A path is literal: what a page says in a link may become an argument, never the program that runs.
+        let path = (action.appPath as NSString).expandingTildeInPath
         let app = URL(fileURLWithPath: path, isDirectory: true)
         guard FileManager.default.fileExists(atPath: app.path) else {
             return .failed(String(localized: "The app is no longer there.", comment: "Why a download rule failed: the app it was told to open is gone."))
@@ -139,7 +210,8 @@ enum DownloadHandoff {
     /// anything else must be executable. Never `/bin/sh -c`, and never a joined command line.
     private static func runScript(_ action: DownloadRuleAction, values: HandoffValues, secret: String,
                                   request: Request, rule: DownloadRule?) -> Outcome {
-        let path = (DownloadTokens.expand(action.scriptPath, with: values, secret: secret) as NSString).expandingTildeInPath
+        // Literal, as an app's path is: a link may fill an argument, never choose the script.
+        let path = (action.scriptPath as NSString).expandingTildeInPath
         guard FileManager.default.fileExists(atPath: path) else {
             return .failed(String(localized: "The script is no longer there.", comment: "Why a download rule failed: the script it was told to run is gone."))
         }
@@ -201,11 +273,11 @@ enum DownloadHandoff {
     // MARK: JSON-RPC and XML-RPC
 
     private static func callService(_ action: DownloadRuleAction, values: HandoffValues, secret: String) async -> Outcome {
-        let endpointText = DownloadTokens.expand(action.rpcEndpoint, with: values, secret: secret)
-        guard let endpoint = URL(string: endpointText) else {
+        // The service and its method are literal too: a page can fill the parameters, not pick where they are sent.
+        guard let endpoint = URL(string: action.rpcEndpoint) else {
             return .failed(String(localized: "The service’s address isn’t valid.", comment: "Why a download rule failed: the JSON-RPC endpoint can't be made into a URL."))
         }
-        let method = DownloadTokens.expand(action.rpcMethod, with: values, secret: secret)
+        let method = action.rpcMethod
         guard let parameters = parameters(action.rpcParameters, values: values, secret: secret) else {
             return .failed(String(localized: "The parameters aren’t valid JSON.", comment: "Why a download rule failed: the JSON-RPC parameters don't parse."))
         }

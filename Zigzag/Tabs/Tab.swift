@@ -1433,7 +1433,8 @@ extension Tab: WKNavigationDelegate {
                                          isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true) {
             // A rule for downloads may take it instead: then WebKit makes no download at all.
             if policy == .download, let target = navigationAction.request.url,
-               await handOffIfWanted(target, request: navigationAction.request, appliesToLinks: false, webView: webView) {
+               await handOffIfWanted(target, request: navigationAction.request, appliesToLinks: false, webView: webView,
+                                     wasClicked: userInitiated) {
                 return (.cancel, preferences)
             }
             if policy == .cancel { refusedDownload(in: webView) }
@@ -1466,7 +1467,8 @@ extension Tab: WKNavigationDelegate {
         // or a magnet reaches rTorrent without a page loading first. Redirects, reloads, history and a page's own
         // scripted navigation are left alone.
         if userInitiated, navigationAction.navigationType == .linkActivated, navigationAction.targetFrame?.isMainFrame ?? true,
-           await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: true, webView: webView) {
+           await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: true, webView: webView,
+                                 wasClicked: true) {
             return (.cancel, preferences)
         }
 
@@ -1666,21 +1668,29 @@ extension Tab: WKNavigationDelegate {
     /// Runs the first rule that catches `url`, if there is one. True means the rule took it: the navigation is
     /// cancelled. Cookies come from this tab's own store, and the space is the one it sits in.
     private func handOffIfWanted(_ url: URL, request: URLRequest, appliesToLinks: Bool, webView: WKWebView,
-                                 filename: String? = nil, mime: String = "") async -> Bool {
+                                 filename: String? = nil, mime: String = "", wasClicked: Bool = false) async -> Bool {
         // Zigzag's own pages and an extension's are never a rule's to take.
         guard url.scheme?.lowercased() != HistoryPage.scheme, !Self.isExtensionPage(url) else { return false }
-        guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks) else { return false }
+        guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, isPrivate: isPrivate) else { return false }
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
-        let handoff = DownloadHandoff.Request(url: url, referrer: referrer,
+        let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: SiteOrigin.of(webView.url ?? self.url),
                                               filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
                                               mime: mime, space: Library.shared.space(spaceID)?.name ?? "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
-                                              window: host?.hostWindow)
-        let outcome = await DownloadHandoff.perform(rule, request: handoff)
-        if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
-        // A tab opened just for this link has nothing left to show.
-        closeIfOnlyADownload(webView)
-        return true
+                                              window: host?.hostWindow, tab: self, wasClicked: wasClicked)
+        switch await DownloadHandoff.decide(rule, request: handoff, tab: self) {
+        case .handOff:
+            let outcome = await DownloadHandoff.perform(rule, request: handoff)
+            if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+            // A tab opened just for this link has nothing left to show.
+            closeIfOnlyADownload(webView)
+            return true
+        case .browser:
+            return false
+        case .cancel:
+            // A link asked for and refused goes nowhere; a download has nowhere else to go, so it is saved as usual.
+            return appliesToLinks
+        }
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -1928,7 +1938,7 @@ extension Tab: WKUIDelegate {
         // Zigzag's own Open in New Window or Tab still opens: you asked for a window, not for the rule.
         if BrowserWebView.pendingDisposition(for: webView) == nil,
            let url = navigationAction.request.url, PopupNotice.isUserInitiated(navigationAction),
-           let rule = DownloadHandoff.firstMatch(url, appliesToLinks: true) {
+           let rule = DownloadHandoff.firstMatch(url, appliesToLinks: true, isPrivate: isPrivate) {
             _ = BrowserWebView.takePendingDisposition(for: webView)
             handOffInNewWindow(rule, url: url, request: navigationAction.request, webView: webView)
             return nil
@@ -1939,14 +1949,22 @@ extension Tab: WKUIDelegate {
     /// A new-window link a rule caught: the handoff is asynchronous, so the window is simply never made.
     private func handOffInNewWindow(_ rule: DownloadRule, url: URL, request: URLRequest, webView: WKWebView) {
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
-        let handoff = DownloadHandoff.Request(url: url, referrer: referrer,
+        let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: SiteOrigin.of(webView.url ?? self.url),
                                               filename: DownloadTokens.filename(for: url, suggested: ""),
                                               space: Library.shared.space(spaceID)?.name ?? "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
-                                              window: host?.hostWindow)
+                                              window: host?.hostWindow, tab: self, wasClicked: true)
         Task { @MainActor in
-            let outcome = await DownloadHandoff.perform(rule, request: handoff)
-            if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+            switch await DownloadHandoff.decide(rule, request: handoff, tab: self) {
+            case .handOff:
+                let outcome = await DownloadHandoff.perform(rule, request: handoff)
+                if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+            case .browser:
+                // The window WebKit asked for was refused, so the link opens the tab it was going to open anyway.
+                self.host?.tab(self, openURL: url, disposition: .foregroundTab)
+            case .cancel:
+                break
+            }
         }
     }
 

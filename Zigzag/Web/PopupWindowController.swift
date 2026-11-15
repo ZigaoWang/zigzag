@@ -281,13 +281,14 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                          isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true) {
             // A rule for downloads may take it instead: then WebKit makes no download at all.
             if policy == .download, let url = navigationAction.request.url,
-               await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: false) { return .cancel }
+               await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: false,
+                                      wasClicked: PopupNotice.isUserInitiated(navigationAction)) { return .cancel }
             if policy == .cancel { refusedDownload() }
             return policy
         }
         // A link a rule wants opens in its app, never a popup page that would be blank.
         if PopupNotice.isUserInitiated(navigationAction), let url = navigationAction.request.url,
-           await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: true) { return .cancel }
+           await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: true, wasClicked: true) { return .cancel }
         // Zigzag's own pages (History) open in its tabs, never in a page's pop-up.
         if navigationAction.request.url?.scheme?.lowercased() == HistoryPage.scheme { return .cancel }
         // WebRTC on or off for where it's going, before its page is made, as in a tab.
@@ -364,19 +365,28 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     /// Runs the first rule that catches `url`. True means the popup's page should not load or download it.
-    private func handOffIfWanted(_ url: URL, request: URLRequest, appliesToLinks: Bool, filename: String? = nil, mime: String = "") async -> Bool {
+    private func handOffIfWanted(_ url: URL, request: URLRequest, appliesToLinks: Bool, filename: String? = nil,
+                                 mime: String = "", wasClicked: Bool = false) async -> Bool {
         // Zigzag's own pages and an extension's are never a rule's to take.
         guard url.scheme?.lowercased() != HistoryPage.scheme, !Tab.isExtensionPage(url) else { return false }
-        guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks) else { return false }
+        guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, isPrivate: isPrivate) else { return false }
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? webView.url
-        let handoff = DownloadHandoff.Request(url: url, referrer: referrer,
+        let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: SiteOrigin.of(webView.url),
                                               filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
                                               mime: mime, space: "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
-                                              window: parentWindow)
-        let outcome = await DownloadHandoff.perform(rule, request: handoff)
-        if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
-        return true
+                                              window: parentWindow, tab: opener, wasClicked: wasClicked)
+        switch await DownloadHandoff.decide(rule, request: handoff, tab: opener) {
+        case .handOff:
+            let outcome = await DownloadHandoff.perform(rule, request: handoff)
+            if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+            return true
+        case .browser:
+            return false
+        case .cancel:
+            // A link asked for and refused goes nowhere; a download is saved as usual.
+            return appliesToLinks
+        }
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
