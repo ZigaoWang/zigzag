@@ -52,6 +52,9 @@ struct HistoryClustersTests {
         #expect(shape(sessions) == [["github.com 2"], ["github.com 1"], ["github.com 1"], ["github.com 1"]])
         #expect(HistoryClusters.continues(visit("https://a.com", 30, 12, 40), with: visit("https://b.com", 30, 12, 0), calendar: calendar))
         #expect(!HistoryClusters.continues(visit("https://a.com", 30, 12, 41), with: visit("https://b.com", 30, 12, 0), calendar: calendar))
+        // Browsing straight on from the afternoon into the evening starts a new session, so its heading is right.
+        #expect(!HistoryClusters.continues(visit("https://a.com", 30, 17, 5), with: visit("https://b.com", 30, 16, 55), calendar: calendar))
+        #expect(HistoryClusters.continues(visit("https://a.com", 30, 16, 59), with: visit("https://b.com", 30, 16, 30), calendar: calendar))
     }
 
     /// Search hands back matches by rank; History still shows them newest first.

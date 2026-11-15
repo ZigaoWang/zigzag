@@ -43,22 +43,30 @@ nonisolated enum HistoryClusters {
         return sessions
     }
 
-    /// Whether `entry`, visited before `last`, belongs to the same session: the same day, without a long break.
+    /// Whether `entry`, visited before `last`, belongs to the same session: the same day and the same time of day
+    /// (morning, afternoon, evening, night), without a long break. A session is named by when it began, so one that
+    /// ran on from morning into the evening would show its evening pages under "morning"; split there, every heading
+    /// says when the pages under it were seen.
     static func continues(_ last: HistoryEntry, with entry: HistoryEntry, calendar: Calendar = .current) -> Bool {
         last.lastVisit.timeIntervalSince(entry.lastVisit) <= sessionGap && calendar.isDate(last.lastVisit, inSameDayAs: entry.lastVisit)
+            && part(of: last.lastVisit, calendar: calendar) == part(of: entry.lastVisit, calendar: calendar)
     }
 
-    /// A session's name, from the day and the time of day it began: "This afternoon", "Yesterday evening",
-    /// "Last night", "Tuesday morning", "Sunday afternoon, October 18".
-    static func title(startingAt start: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
-        let hour = calendar.component(.hour, from: start)
-        let part: Part = switch hour {
+    /// The time of day an instant falls in.
+    private static func part(of date: Date, calendar: Calendar) -> Part {
+        switch calendar.component(.hour, from: date) {
         case 5..<12: .morning
         case 12..<17: .afternoon
         case 17..<21: .evening
         case 21...: .night
         default: .lateNight
         }
+    }
+
+    /// A session's name, from the day and the time of day it began: "This afternoon", "Yesterday evening",
+    /// "Last night", "Tuesday morning", "Sunday afternoon, October 18".
+    static func title(startingAt start: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
+        let part = part(of: start, calendar: calendar)
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: start), to: calendar.startOfDay(for: now)).day ?? 0
         // Visited after midnight while it's still that night: it's tonight, not last night, until the morning.
         if days <= 0, part == .lateNight, calendar.component(.hour, from: now) < 5 {
