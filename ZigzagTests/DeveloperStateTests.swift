@@ -26,16 +26,20 @@ struct DeveloperStateTests {
             #expect(tab.developerInEffect == DeveloperState())
             tab.developer.appearance = .dark
             tab.developer.printStyles = true
+            tab.developer.imagesOff = true
+            tab.developer.stylesOff = true
             #expect(tab.developerInEffect.appearance == .dark && tab.developerInEffect.printStyles)
+            #expect(tab.developerInEffect.imagesOff && tab.developerInEffect.stylesOff)
             // No longer a development tab: nothing of them applies, and they're kept.
             DeveloperTools.isOn = false
             tab.refreshDevelopment()
             #expect(tab.developerInEffect == DeveloperState())
-            #expect(tab.developer.appearance == .dark && tab.developer.printStyles)
+            #expect(tab.developer.appearance == .dark && tab.developer.printStyles && tab.developer.imagesOff && tab.developer.stylesOff)
             // Back: they apply again.
             DeveloperTools.isOn = true
             tab.refreshDevelopment()
             #expect(tab.developerInEffect.appearance == .dark && tab.developerInEffect.printStyles)
+            #expect(tab.developerInEffect.imagesOff && tab.developerInEffect.stylesOff)
         }
     }
 

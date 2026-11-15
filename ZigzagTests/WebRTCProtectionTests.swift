@@ -147,7 +147,7 @@ struct WebRTCProtectionTests {
         guard WebRTCProtection.isAvailable else { return }
         let configuration = WKWebViewConfiguration()
         let opener = WKWebView(frame: .zero, configuration: configuration)
-        WebRTCProtection.isolate(configuration)
+        WebKitSetup.separatePreferences(of: configuration)
         let popup = WKWebView(frame: .zero, configuration: configuration)
         #expect(opener.configuration.preferences !== popup.configuration.preferences)
         popup.configuration.preferences.setValue(false, forKey: "peerConnectionEnabled")

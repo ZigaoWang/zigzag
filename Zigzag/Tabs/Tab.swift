@@ -366,7 +366,14 @@ final class Tab: NSObject {
         // Its choices come into effect with it, and are lifted with it.
         if !developer.isUnchanged { applyDeveloperState(); applyDeveloperStateToPage() }
         changed.send(.developer)
-        if settingsChanged, developer.needsReload(from: DeveloperState()) { reload() }
+        if settingsChanged, developer.needsReload(from: DeveloperState()) { reloadForDeveloperChoices() }
+    }
+
+    /// Loads the page again for a change to what the developer tools chose for it, unless it waits for the rule
+    /// that keeps its images off (`PageImages.defersReload`), which loads it again once the rule is in.
+    private func reloadForDeveloperChoices() {
+        if let webView, PageImages.defersReload(of: webView) { return }
+        reload()
     }
 
     /// What you chose for this tab with the developer tools (`DeveloperState`). Read through `developerInEffect`.
@@ -380,7 +387,7 @@ final class Tab: NSObject {
             applyDeveloperState()
             applyDeveloperStateToPage()
             // What a page is told and allowed as it loads shows once it has loaded again.
-            if isDevelopment, developer.needsReload(from: oldValue) { reload() }
+            if isDevelopment, developer.needsReload(from: oldValue) { reloadForDeveloperChoices() }
             changed.send(.developer)
         }
     }
@@ -451,8 +458,8 @@ final class Tab: NSObject {
         let extensionConfiguration = fromWebKit ? nil : Self.extensionConfiguration(for: url, in: profile)
         let configuration = pendingConfiguration ?? extensionConfiguration ?? WebKitSetup.makeConfiguration(for: profile)
         pendingConfiguration = nil
-        // A page's new window would share its opener's WebRTC switch otherwise.
-        if fromWebKit { WebRTCProtection.isolate(configuration) }
+        // A page's new window would share its opener's preferences otherwise: its WebRTC switch, its styles.
+        if fromWebKit { WebKitSetup.separatePreferences(of: configuration) }
         if extensionConfiguration != nil {
             configuration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
         } else if !fromWebKit {
@@ -639,6 +646,8 @@ final class Tab: NSObject {
 
     private func tearDown(_ webView: BrowserWebView) {
         Autofill.shared.forget(webView)
+        // The pages it shared its rules with keep their images.
+        PageImages.set(false, in: webView)
         setPDFViewer(nil)
         if settingsView != nil {
             settingsView = nil

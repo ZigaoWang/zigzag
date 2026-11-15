@@ -21,6 +21,8 @@ enum DeveloperTool: String, CaseIterable {
     case sizeCustom = "size-custom"
     case rotate
     case javaScript = "javascript"
+    case images
+    case styles
     case outlines
     case userAgentZigzag = "user-agent-zigzag"
     case userAgentPhone = "user-agent-iphone"
@@ -51,6 +53,8 @@ enum DeveloperTool: String, CaseIterable {
         case .sizeCustom: String(localized: "Custom Page Size…", comment: "View › Developer menu item and command, on a development site: asks for a width and height for the page.")
         case .rotate: String(localized: "Rotate Page", comment: "View › Developer menu item and command, on a development site whose page has a size of its own: swaps its width and height.")
         case .javaScript: String(localized: "Disable JavaScript", comment: "View › Developer menu item and command, on a development site, checked while so: the page's scripts don't run.")
+        case .images: String(localized: "Disable Images", comment: "View › Developer menu item and command, on a development site, checked while so: the page loads none of its images.")
+        case .styles: String(localized: "Disable Styles", comment: "View › Developer menu item and command, on a development site, checked while so: the page is drawn without its styles, as bare HTML.")
         case .outlines: String(localized: "Outline Every Element", comment: "View › Developer menu item and command, on a development site, checked while on: draws a line around each element of the page.")
         case .userAgentZigzag: String(localized: "User Agent: Zigzag", comment: "View › Developer menu item and command, on a development site: the page is told it's in Zigzag, as any page.")
         case .userAgentPhone: String(localized: "User Agent: Safari on iPhone", comment: "View › Developer menu item and command, on a development site: the page is told it's in Safari on an iPhone.")
@@ -127,6 +131,16 @@ enum DeveloperTool: String, CaseIterable {
     /// or something to do.
     var isChoice: Bool { appearance != nil || userAgent != nil || self == .sizeFill }
 
+    /// The choice of its kind that leaves the page as any page: following the Mac, Zigzag's own user agent, filling
+    /// the window.
+    var isDefaultChoice: Bool { self == .appearanceFollowsMac || self == .userAgentZigzag || self == .sizeFill }
+
+    /// Whether something among `tools` is in effect for a page with these choices: a choice other than the one any
+    /// page has, or something turned on.
+    static func hasChoiceInEffect(among tools: [DeveloperTool], in state: DeveloperState) -> Bool {
+        tools.contains { $0.isDefaultChoice ? !$0.isChecked(in: state) : !$0.isChoice && $0.isChecked(in: state) }
+    }
+
     /// Whether the tool is one that's on or chosen now, for the check beside it.
     func isChecked(in state: DeveloperState) -> Bool {
         if let appearance { return state.appearance == appearance }
@@ -135,13 +149,31 @@ enum DeveloperTool: String, CaseIterable {
         case .sizeFill: return state.size == nil
         case .printStyles: return state.printStyles
         case .javaScript: return state.javaScriptOff
+        case .images: return state.imagesOff
+        case .styles: return state.stylesOff
         case .outlines: return state.outlines
         default: return false
         }
     }
 
-    /// Whether the tool has something to do with the choices as they are: only a page with a size of its own turns.
-    func applies(in state: DeveloperState) -> Bool { self != .rotate || state.size != nil }
+    /// Whether the tool has something to do with the choices as they are: only a page with a size of its own turns,
+    /// and a page drawn without its styles has none for print and keeps none of the outlines' style.
+    func applies(in state: DeveloperState) -> Bool {
+        switch self {
+        case .rotate: state.size != nil
+        case .printStyles, .outlines: !state.stylesOff
+        default: true
+        }
+    }
+
+    /// Whether this Mac's WebKit has what the tool needs: one that goes through WebKit's own unpublished preferences is
+    /// left out wherever it no longer does, rather than offered and doing nothing.
+    var isAvailable: Bool {
+        switch self {
+        case .styles: PageStyles.isAvailable
+        default: true
+        }
+    }
 
     /// A word or two under its tile in Site Controls; its title is the tile's tooltip.
     var caption: String {
@@ -191,6 +223,8 @@ enum DeveloperTool: String, CaseIterable {
         case .sizeCustom: "ruler"
         case .rotate: "rotate.right"
         case .javaScript: "curlybraces.square"
+        case .images: "photo"
+        case .styles: "paintbrush"
         case .outlines: "square.dashed"
         case .userAgentZigzag: "globe"
         case .userAgentPhone: "iphone"
@@ -219,6 +253,8 @@ enum DeveloperTool: String, CaseIterable {
         case .sizeCustom: #selector(BrowserWindowController.pageSizeCustom(_:))
         case .rotate: #selector(BrowserWindowController.rotatePage(_:))
         case .javaScript: #selector(BrowserWindowController.toggleJavaScript(_:))
+        case .images: #selector(BrowserWindowController.toggleImages(_:))
+        case .styles: #selector(BrowserWindowController.toggleStyles(_:))
         case .outlines: #selector(BrowserWindowController.toggleOutlines(_:))
         case .userAgentZigzag: #selector(BrowserWindowController.userAgentZigzag(_:))
         case .userAgentPhone: #selector(BrowserWindowController.userAgentPhone(_:))
@@ -258,6 +294,8 @@ enum DeveloperTool: String, CaseIterable {
         case .sizeCustom: ["custom", "page", "size", "width", "height", "responsive", "device", "developer"]
         case .rotate: ["rotate", "page", "landscape", "portrait", "turn", "developer"]
         case .javaScript: ["disable", "javascript", "scripts", "off", "noscript", "developer"]
+        case .images: ["disable", "images", "pictures", "photos", "off", "alt", "developer"]
+        case .styles: ["disable", "styles", "css", "stylesheets", "unstyled", "html", "off", "developer"]
         case .outlines: ["outline", "every", "element", "layout", "boxes", "borders", "developer"]
         case .userAgentZigzag: ["user", "agent", "zigzag", "default", "developer"]
         case .userAgentPhone: ["user", "agent", "safari", "iphone", "mobile", "phone", "developer"]
@@ -293,11 +331,12 @@ enum DeveloperTool: String, CaseIterable {
     /// The tools with a tile of their own in Site Controls, where a development page doesn't have them above it.
     static let tiles: [DeveloperTool] = [.console, .inspect, .reloadIgnoringCache]
 
-    /// The tools Developer tools adds to View › Developer. The others have had their items there all along.
+    /// The tools Developer tools adds to View › Developer, those this Mac's WebKit has. The others have had their
+    /// items there all along.
     static let menuItems: [DeveloperTool] = [.site, .clearCache, .clearCookies, .appearanceFollowsMac, .appearanceLight, .appearanceDark, .printStyles,
                                            .sizeFill, .sizeCustom, .rotate, .sizeToggle,
                                            .userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox,
-                                           .javaScript, .outlines, .phone]
+                                           .javaScript, .images, .styles, .outlines, .phone].filter(\.isAvailable)
 
     /// Its id among the command bar's commands.
     var commandID: String { Self.commandPrefix + rawValue }
@@ -311,13 +350,15 @@ enum DeveloperTool: String, CaseIterable {
     /// any web page, and not in a private window. Every other tool: on a development tab; clearing has nothing to clear in a
     /// private window, which keeps nothing.
     /// A page's own size is for a page shown on its own: not in a split, whose panes share the window as they are.
+    /// Nothing this Mac's WebKit doesn't have is offered (`isAvailable`).
     static func isOffered(_ tool: DeveloperTool, isOn: Bool, isDevelopment: Bool, url: URL?, isPrivate: Bool, inSplit: Bool = false) -> Bool {
-        switch tool {
+        guard tool.isAvailable else { return false }
+        return switch tool {
         case .site: isOn && DevelopmentSites.isOffered(for: url, isPrivate: isPrivate)
         case .clearCache, .clearCookies: isDevelopment && !isPrivate
         case .sizeFill, .sizeCustom, .rotate, .sizeToggle: isDevelopment && !inSplit
         case .console, .inspect, .reloadIgnoringCache, .viewSource, .settings,
-             .appearanceFollowsMac, .appearanceLight, .appearanceDark, .printStyles, .javaScript, .outlines,
+             .appearanceFollowsMac, .appearanceLight, .appearanceDark, .printStyles, .javaScript, .images, .styles, .outlines,
              .userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox, .phone: isDevelopment
         }
     }

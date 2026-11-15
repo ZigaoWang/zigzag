@@ -3794,7 +3794,7 @@
       }
     },
     "Choices in effect" : {
-      "comment" : "Spoken by VoiceOver after More Developer Tools while something chosen in its menu is in effect: JavaScript off, another user agent, or outlines.",
+      "comment" : "Spoken by VoiceOver after More Developer Tools while something chosen in its menu is in effect, like JavaScript off, another user agent, or a look the page was asked for while its button is in the menu.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5711,6 +5711,17 @@
         }
       }
     },
+    "Disable Images" : {
+      "comment" : "View › Developer menu item and command, on a development site, checked while so: the page loads none of its images.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停用图像"
+          }
+        }
+      }
+    },
     "Disable JavaScript" : {
       "comment" : "View › Developer menu item and command, on a development site, checked while so: the page's scripts don't run.",
       "localizations" : {
@@ -5718,6 +5729,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "停用 JavaScript"
+          }
+        }
+      }
+    },
+    "Disable Styles" : {
+      "comment" : "View › Developer menu item and command, on a development site, checked while so: the page is drawn without its styles, as bare HTML.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停用样式"
           }
         }
       }

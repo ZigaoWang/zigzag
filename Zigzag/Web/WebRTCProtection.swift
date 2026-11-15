@@ -78,21 +78,12 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
     }
 
     /// Sets the web view's switch for the page it's going to. Each tab's web view has its own preferences
-    /// (`isolate`), so one page's choice never reaches another's.
+    /// (`WebKitSetup.separatePreferences`), so one page's choice never reaches another's.
     static func apply(to webView: WKWebView, for url: URL?, in tab: Tab?) { apply(to: webView, for: url, here: tab?.webRTCHere) }
 
     static func apply(to webView: WKWebView, for url: URL?, here choices: [String: Bool]?) {
         guard isAvailable else { return }
-        let preferences = webView.configuration.preferences
-        let wanted = allows(url, here: choices)
-        if (preferences.value(forKey: preferenceKey) as? Bool) != wanted { preferences.setValue(wanted, forKey: preferenceKey) }
-    }
-
-    /// A page's new window (a tab, or a pop-up window) comes with its opener's preferences, the same object: it gets
-    /// a copy, so the switch set for one never changes the other.
-    static func isolate(_ configuration: WKWebViewConfiguration) {
-        guard isAvailable, let copy = configuration.preferences.copy() as? WKPreferences else { return }
-        configuration.preferences = copy
+        WebKitSetup.setIfAvailable(allows(url, here: choices), key: preferenceKey, in: webView.configuration.preferences)
     }
 
     // MARK: Telling when a page tries

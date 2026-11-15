@@ -471,6 +471,19 @@ enum DebugBridge {
         DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 80, y: view.isFlipped ? 60 : view.bounds.height - 60), in: view) }
     }
 
+    /// One line on what the developer tools did to a tab's page, for the scripted checks (`devjs`, `devpage`).
+    static func logDeveloperPage(of tab: Tab) {
+        let script = "[navigator.userAgent.includes('iPhone') ? 'iPhone' : navigator.userAgent.includes('iPad') ? 'iPad' : navigator.userAgent.includes('Chrome') ? 'Chrome' : navigator.userAgent.includes('Firefox') ? 'Firefox' : 'Zigzag', document.title, !!document.getElementById('\(PageOutlines.styleID)'), 'img=' + (document.images[0] ? document.images[0].naturalWidth : '-'), 'sheets=' + document.styleSheets.length].join(' | ')"
+        let preferences = tab.webView.map { webView in
+            "styles=\(webView.configuration.preferences.value(forKey: PageStyles.key) as? Bool ?? true) imagesWanted=\(PageImages.isOff(in: webView)) imageRule=\(PageImages.isOn(in: webView))"
+        } ?? "-"
+        let state = tab.developer
+        tab.webView?.evaluateJavaScript(script, in: nil, in: PageOutlines.world) { result in
+            let page = (try? result.get()) as? String ?? "-"
+            debugLog("devpage => tab=\(tab.url?.host() ?? "-") js=\(state.javaScriptOff ? "off" : "on") images=\(state.imagesOff ? "off" : "on") styles=\(state.stylesOff ? "off" : "on") ua=\(state.userAgent) outline=\(state.outlines) prefs: \(preferences) page: \(page)")
+        }
+    }
+
     static func run(_ command: String) {
         let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
         guard let name = parts.first else { return }
@@ -1112,23 +1125,25 @@ enum DebugBridge {
                     debugLog("devlook => chose=\(chosen.appearance) print=\(chosen.printStyles) effect=\(effect.appearance) print=\(effect.printStyles) view=\(tab.webView?.appearance?.name.rawValue ?? "-") media=\(tab.webView?.mediaType ?? "-") page: \(result as? String ?? "-") darkened=\(tab.darkPage?.darkened ?? false)")
                 }
             }
-        // devjs on|off, devua zigzag|iphone|ipad|chrome|firefox, devoutline on|off: the developer tools' Disable
-        // JavaScript, User Agent and Outline Every Element for the tab in front. Then, once the page has loaded again,
-        // what the page was told and whether its scripts ran, in the debug log.
-        case "devjs", "devua", "devoutline":
+        // devjs on|off, devimages on|off, devstyles on|off, devua zigzag|iphone|ipad|chrome|firefox, devoutline on|off:
+        // the developer tools' Disable JavaScript, Disable Images, Disable Styles, User Agent and Outline Every Element
+        // for the tab in front. Then, once the page has loaded again, what the page was told, whether its scripts ran,
+        // its first image's width (0: not loaded), how many style sheets it has, and its preferences, in the debug log.
+        case "devjs", "devimages", "devstyles", "devua", "devoutline":
             guard let tab = controller.tabManager.selectedTab else { break }
             if name == "devjs", arg == "on" || arg == "off" { tab.developer.javaScriptOff = arg == "off" }
+            if name == "devimages", arg == "on" || arg == "off" { tab.developer.imagesOff = arg == "off" }
+            if name == "devstyles", arg == "on" || arg == "off" { tab.developer.stylesOff = arg == "off" }
             if name == "devoutline", arg == "on" || arg == "off" { tab.developer.outlines = arg == "on" }
             if name == "devua", let agent = ["zigzag": DeveloperState.UserAgent.zigzag, "iphone": .iPhone, "ipad": .iPad, "chrome": .chrome, "firefox": .firefox][arg] {
                 tab.developer.userAgent = agent
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                let script = "[navigator.userAgent.includes('iPhone') ? 'iPhone' : navigator.userAgent.includes('iPad') ? 'iPad' : navigator.userAgent.includes('Chrome') ? 'Chrome' : navigator.userAgent.includes('Firefox') ? 'Firefox' : 'Zigzag', document.title, !!document.getElementById('\(PageOutlines.styleID)')].join(' | ')"
-                tab.webView?.evaluateJavaScript(script, in: nil, in: PageOutlines.world) { result in
-                    let page = (try? result.get()) as? String ?? "-"
-                    debugLog("devpage => tab=\(tab.url?.host() ?? "-") js=\(tab.developer.javaScriptOff ? "off" : "on") ua=\(tab.developer.userAgent) outline=\(tab.developer.outlines) page: \(page)")
-                }
-            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { DebugBridge.logDeveloperPage(of: tab) }
+        // devpage: the same line for the tab in front, changing nothing; devpage <n> for the tab at that place.
+        case "devpage":
+            let tabs = controller.tabManager.currentTabs
+            guard let tab = Int(arg).flatMap({ tabs.indices.contains($0) ? tabs[$0] : nil }) ?? controller.tabManager.selectedTab else { break }
+            DebugBridge.logDeveloperPage(of: tab)
         // devsize <width> <height> | fill | rotate: the developer tools' Page Size for the tab in front; then the
         // page's size and its holder's, and what's docked in it, in the debug log.
         case "devsize":

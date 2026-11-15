@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Disable Images and Disable Styles, under ⋯ among the developer tools, in View › Developer and the command bar, show how a page in Developer Mode holds up without its pictures or without its CSS. Like the other choices they're that tab's alone. ([#141](https://github.com/ZigaoWang/zigzag/issues/141))
+
 ### Fixed
 - A PDF at an address without a file name, like a download link, is called by the name its site gave it, in its tab and in History, or by the site when it gave none, instead of the last part of the address.
 - Sign-in fields no longer show the key icon when Fill saved passwords is off in Settings › Passwords, or when a password manager extension like Bitwarden or 1Password is on, where it sat over the extension's own icon. ([#236](https://github.com/ZigaoWang/zigzag/issues/236))
