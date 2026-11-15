@@ -462,7 +462,8 @@ enum FindMarks {
 
       // Only a change to the text can change the matches: a node with text added or taken away, or text edited
       // (not a script's or style's). A details opened or something unhidden can show text there was. A class
-      // changing, which busy pages do all the time, is left alone.
+      // changing, which busy pages do all the time, is left alone: one that shows or hides text (an accordion, Show more)
+      // changes the page's size, and that's looked at again, as calmly as any change.
       const QUIET = new Set(['script', 'style', 'noscript', 'template']);
       const hasText = (node) => (node.nodeType === 3 || node.nodeType === 1) && !QUIET.has(node.localName) && /\S/.test(node.textContent || '');
       const touchesText = (records) => records.some((r) => {
@@ -484,9 +485,12 @@ enum FindMarks {
           mutations.observe(doc, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'open'] });
           F.observers.push(mutations);
         }
-        let first = true;
-        const sizes = new ResizeObserver(() => { if (first) { first = false; return; } changed(false); });
-        sizes.observe(document.documentElement);
+        // Measured now, so the observer's first report (the size as it is) is told from a change made before it came.
+        const root = document.documentElement;
+        const measure = () => { const r = root.getBoundingClientRect(); return r.width + 'x' + r.height; };
+        let size = measure();
+        const sizes = new ResizeObserver(() => { const now = measure(); if (now !== size) { size = now; changed(true); } });
+        sizes.observe(root);
         F.observers.push(sizes);
       };
       const sleep = () => {

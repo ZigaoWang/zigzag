@@ -231,6 +231,27 @@ struct FindMarksTests {
         #expect(try await webView.runOwnScript("return globalThis.__zigzagFind.state().observers", asFunction: true) as? Int == 0)
     }
 
+    /// Text shown by a class changing, as an accordion or Show more does: the page grows, and the match is marked.
+    @Test func marksFollowTextAClassShows() async throws {
+        let (webView, window) = await page("""
+        <style>.shut { display: none }</style><p>pear</p><div id=more class=shut><p>another pear</p></div>
+        """)
+        defer { window.close() }
+        // On screen (off to the side), so the page is laid out and its size can change.
+        window.setFrameOrigin(NSPoint(x: -6000, y: 200))
+        window.orderFrontRegardless()
+        FindMarks.install(in: webView)
+        _ = await PageFind.find("pear", in: webView, backwards: false, showsIndicator: false)
+        #expect(try #require(await FindMarks.mark("pear", in: webView)).count == 1)
+        var heard: FindMarks.Snapshot?
+        FindMarks.listen(to: webView) { heard = $0 }
+        _ = try await pageScript(webView, "document.getElementById('more').className = ''")
+        let end = Date().addingTimeInterval(4)
+        while Date() < end, heard?.count != 2 { try? await Task.sleep(for: .milliseconds(50)) }
+        #expect(heard?.count == 2)
+        FindMarks.clear(in: webView)
+    }
+
     private func findState(_ webView: WKWebView, _ key: String) async throws -> Any? {
         try await webView.runOwnScript("return globalThis.__zigzagFind.state()[key]", asFunction: true, arguments: ["key": key])
     }
