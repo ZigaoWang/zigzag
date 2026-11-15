@@ -24,8 +24,11 @@ final class ExtensionInstalls {
         var siteAccess: SiteAccess?
         /// For `.sites`: the sites it may use ("github.com"), and for `.click`, the ones clicked on so far.
         var accessSites: [String]?
+        /// Sites where it's off, whatever its site access: turned off there from the notice that it was using a lot of
+        /// energy (EnergyWatch).
+        var offSites: [String]?
 
-        fileprivate static let keys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "bridgeRecorded", "siteAccess", "accessSites"]
+        fileprivate static let keys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "bridgeRecorded", "siteAccess", "accessSites", "offSites"]
 
         /// What another profile starts with when it gets this extension too: what was approved here and where it
         /// may run, so it gets nothing it wasn't allowed without the install sheet. Sites it was clicked on stay
@@ -34,6 +37,7 @@ final class ExtensionInstalls {
             var next = self
             next.enabled = enabled
             if siteAccess == .click { next.accessSites = nil }
+            next.offSites = nil
             return next
         }
     }
@@ -114,6 +118,18 @@ final class ExtensionInstalls {
     func isEnabled(_ id: String) -> Bool { state(id)?.enabled ?? false }
     func siteAccess(_ id: String) -> SiteAccess { state(id)?.siteAccess ?? .all }
     func accessSites(_ id: String) -> [String] { state(id)?.accessSites ?? [] }
+    func offSites(_ id: String) -> [String] { state(id)?.offSites ?? [] }
+
+    /// Turns the extension off on one site (and its subdomains), or back on there.
+    func setOff(_ id: String, on site: String, _ off: Bool) {
+        update(id) {
+            var sites = $0.offSites ?? []
+            sites.removeAll { $0 == site }
+            if off { sites.append(site) }
+            $0.offSites = sites.isEmpty ? nil : sites
+        }
+        profile.extensions.applySiteAccess(id)
+    }
 
     func setSiteAccess(_ id: String, _ access: SiteAccess, sites: [String]? = nil) {
         update(id) {

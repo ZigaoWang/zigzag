@@ -5,7 +5,8 @@ import WebKit
 /// before it sleeps (it wakes where it was when you go back to it). Nothing sleeps without that warning. The page
 /// in front isn't flagged: you can see what it's doing, and a busy one is usually busy on purpose (an animation, a
 /// game). Nor is an extension blamed just for being on the page: password managers are on every page, so naming one
-/// would mostly be wrong. Nothing about the page is recorded; only how busy its process is.
+/// would mostly be wrong. One is named only when it was caught in a loop there (ExtensionStorms). Nothing about the
+/// page is recorded; only how busy its process is.
 @MainActor
 final class EnergyWatch {
     static let shared = EnergyWatch()
@@ -41,6 +42,8 @@ final class EnergyWatch {
     private var pending: [Int32: Date] = [:]
     /// Tabs you chose to keep awake from the warning: left alone for as long as Zigzag is open.
     private var spared: Set<UUID> = []
+    /// Extensions already named, by profile and ID: each is pointed out once for as long as Zigzag is open.
+    private var toldExtensions: Set<String> = []
 
     func start() {
         guard timer == nil else { return }
@@ -93,6 +96,11 @@ final class EnergyWatch {
                 case .calm: pending[pid] = nil
                 case .warn:
                     streak[pid] = 0
+                    // An extension caught looping in one of its tabs is the one named, not the site.
+                    if #available(macOS 15.4, *), let held = Self.heldBack(in: pid) {
+                        extensionIsBusy(held.id, name: held.host.displayName(for: held.id), in: held.tab, host: held.host)
+                        continue
+                    }
                     warnSoon(pid, tab: tab, url: url, in: controller)
                 case .sleep:
                     pending[pid] = nil
@@ -113,6 +121,49 @@ final class EnergyWatch {
         let manager = controller.tabManager
         guard let front = manager.selectedTab else { return false }
         return manager.panes(of: front).contains { $0 === tab }
+    }
+
+    /// A tab of this process where an extension was held back for reconnecting in a loop, and which extension.
+    @available(macOS 15.4, *)
+    private static func heldBack(in pid: Int32) -> (tab: Tab, id: String, host: ExtensionHost)? {
+        for controller in WindowManager.shared.controllers {
+            for tab in controller.tabManager.allTabs where tab.webView.flatMap(processID) == pid {
+                guard !tab.isPrivate, let host = tab.profile.startedExtensions, let id = host.storms.extensions(in: tab).sorted().first else { continue }
+                return (tab, id, host)
+            }
+        }
+        return nil
+    }
+
+    /// An extension kept a tab busy, caught reconnecting in a loop there (ExtensionStorms): named once, with a way to
+    /// turn it off on that site or everywhere. It's already held back, so nothing sleeps for it.
+    @available(macOS 15.4, *)
+    func extensionIsBusy(_ id: String, name: String, in tab: Tab, host: ExtensionHost) {
+        guard Self.sleepsBusyTabs, let controller = Self.window(holding: tab), !controller.tabManager.isPrivate,
+              toldExtensions.insert("\(host.profile.id)|\(id)").inserted else { return }
+        let site = tab.url.flatMap { ContentBlocker.site(of: $0) }
+        let text = site.map { String(localized: "\(name) is using a lot of energy on \($0)", comment: "Toast when an extension keeps a tab busy, caught in a loop there. The name is the extension's; the site is a domain, like example.com.") }
+            ?? String(localized: "\(name) is using a lot of energy", comment: "Toast when an extension keeps a tab busy, caught in a loop there. The name is the extension's.")
+        let installs = host.profile.installs
+        let profile = host.profile
+        Toast.show(text, symbol: "bolt",
+                   action: (String(localized: "Turn Off…", comment: "Button in the toast saying an extension is using a lot of energy: shows where to turn it off, on the site or everywhere."), {
+                       let menu = NSMenu()
+                       menu.autoenablesItems = false
+                       if let site {
+                           menu.addItem(SidebarMenus.Item(String(localized: "Turn Off on \(site)", comment: "Menu item from the toast saying an extension is using a lot of energy: turns the extension off on this site only. The site is a domain.")) {
+                               installs.setOff(id, on: site, true)
+                               // Its scripts leave the site's open pages as they load again.
+                               for owner in WindowManager.shared.controllers {
+                                   for tab in owner.tabManager.allTabs where tab.webView != nil && tab.profile === profile && ContentBlocker.site(of: tab.url) == site { tab.reload() }
+                               }
+                           })
+                       }
+                       menu.addItem(SidebarMenus.Item(String(localized: "Turn Off Everywhere", comment: "Menu item from the toast saying an extension is using a lot of energy: turns the extension off on every site.")) {
+                           installs.setEnabled(id, false)
+                       })
+                       menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+                   }), duration: 20, closes: true, in: controller)
     }
 
     /// The page's process, if WebKit still says (it's not public API, so asked carefully).

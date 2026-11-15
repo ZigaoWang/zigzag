@@ -292,6 +292,34 @@
         }
       }
     },
+    "%@ is using a lot of energy" : {
+      "comment" : "Toast when an extension keeps a tab busy, caught in a loop there. The name is the extension's.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 耗电较多"
+          }
+        }
+      }
+    },
+    "%@ is using a lot of energy on %@" : {
+      "comment" : "Toast when an extension keeps a tab busy, caught in a loop there. The name is the extension's; the site is a domain, like example.com.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ is using a lot of energy on %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 在 %2$@ 上耗电较多"
+          }
+        }
+      }
+    },
     "%@ is using this tab" : {
       "comment" : "On the bar over a tab an AI app is using through MCP. The placeholder is the app's name, as it gives it.",
       "localizations" : {
@@ -10249,6 +10277,17 @@
         }
       }
     },
+    "Off on %@" : {
+      "comment" : "Site Access choice, checked: the extension is turned off on this site. Choosing it turns it back on there. The site is a domain.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在 %@ 上关闭"
+          }
+        }
+      }
+    },
     "Off while %@ handles passwords. Turn on to use both." : {
       "comment" : "Under a password setting in Settings › Passwords, while a password manager extension (its name, like 1Password) is on.",
       "localizations" : {
@@ -17063,6 +17102,17 @@
         }
       }
     },
+    "Turn Off Everywhere" : {
+      "comment" : "Menu item from the toast saying an extension is using a lot of energy: turns the extension off on every site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在所有网站上关闭"
+          }
+        }
+      }
+    },
     "Turn Off Mini Player" : {
       "comment" : "Item in the mini player's right-click menu: videos stop following you into a mini player when you switch tabs (Settings › Tabs).",
       "localizations" : {
@@ -17070,6 +17120,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "关闭小播放器"
+          }
+        }
+      }
+    },
+    "Turn Off on %@" : {
+      "comment" : "Menu item from the toast saying an extension is using a lot of energy: turns the extension off on this site only. The site is a domain.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 %@ 上关闭"
+          }
+        }
+      }
+    },
+    "Turn Off…" : {
+      "comment" : "Button in the toast saying an extension is using a lot of energy: shows where to turn it off, on the site or everywhere.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭…"
           }
         }
       }

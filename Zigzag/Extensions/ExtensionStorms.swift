@@ -216,5 +216,6 @@ final class ExtensionStorms {
             lines += 1
             ExtensionLog.write("\(name) reconnected to its background \(rate) times a second on \(site); held back there to one try a second or less")
         }
+        EnergyWatch.shared.extensionIsBusy(id, name: name, in: tab, host: host)
     }
 }

@@ -185,4 +185,9 @@ struct ExtensionStormTests {
         #expect(guarded[3]["js"] as? [String] == [ConnectGuard.file, "again.js"])
     }
 
+    @Test func sitesTurnedOffStayInTheirProfile() {
+        var state = ExtensionInstalls.State()
+        state.offSites = ["youtube.com"]
+        #expect(state.carried(enabled: true).offSites == nil)
+    }
 }

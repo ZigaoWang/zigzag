@@ -698,7 +698,7 @@ final class ExtensionHost: NSObject {
                 for pattern in Self.patterns(for: site) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
             }
         }
-        for site in ExtensionStore.extensionsOffSites {
+        for site in ExtensionStore.extensionsOffSites.union(profile.installs.offSites(id)) {
             for pattern in Self.patterns(for: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
         }
     }
