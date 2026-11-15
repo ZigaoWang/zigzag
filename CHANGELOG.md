@@ -5,6 +5,16 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- In dark mode, buttons filled with the space's color, like Allow on a site's question and Done in What's New, have dark text that reads on them, instead of white text that was hard to read.
+- The offer to translate a page no longer shows over History or Settings.
+- A site's question and Save password? take turns at the top of the page instead of showing one over the other, and a toast that comes while one is up shows under it. What's New closes when you switch tabs, and makes way for Install as App and other sheets instead of staying under them.
+- Simplified Chinese reads more naturally across Settings, Site Controls and onboarding.
+- Calendar and Drive in the welcome window, and the Laptop, Desktop and Full HD page sizes in the developer tools, are named in your language.
+- A tab showing an error page, like a certificate warning, shows a warning icon instead of the icon of the page before it.
+- Buttons that can't be used yet, like Use Default Colors in the space editor, keep their text readable.
+- History lists a PDF by its file name instead of its site.
+
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
