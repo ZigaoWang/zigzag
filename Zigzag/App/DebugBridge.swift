@@ -1628,6 +1628,12 @@ enum DebugBridge {
             // slowmo <factor>: every animation in the window runs that many times slower, to film and judge it.
             let factor = max(1, Float(arg) ?? 1)
             controller.window?.contentView?.layer?.speed = 1 / factor
+        case "motionlog":
+            // motionlog <path> [ms]: every frame for that long (3000 by default), what's drawn of each panel, sheet and
+            // scrim in the window (its on-screen opacity, scale and offset), as lines of text, to judge a movement.
+            let f = arg.split(separator: " ").map(String.init)
+            guard let path = f.first, let root = controller.window?.contentView else { break }
+            DebugBridge.logMotion(in: root, for: (f.count > 1 ? Double(f[1]) : nil) ?? 3000, to: path)
         case "quit": NSApp.terminate(nil)
         case "updaterelaunch":
             // updaterelaunch: quits as Sparkle does to restart for an update (its willRelaunch first); launching the
@@ -2087,6 +2093,7 @@ enum DebugBridge {
             // dialogstate <path>: the page dialogs showing, with what's in their fields (a password only as its length).
             if let data = try? JSONSerialization.data(withJSONObject: PageDialogSheet.debugState(), options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "dialogsaved": PageDialogSheet.debugShowSaved()
+        case "dialogcancel": PageDialogSheet.debugCancel()
         case "windowshot":
             // windowshot <path>: the window's own drawing, as a PNG; web content may be blank.
             guard let view = controller.window?.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }
@@ -2591,6 +2598,51 @@ enum DebugBridge {
     private static var isTestCopy: Bool {
         ProcessInfo.processInfo.environment["ZIGZAG_DATA_DIR"] != nil && PasswordStore.isTestVault
     }
+
+    /// `motionlog`: samples what the render server draws of the window's panels, sheets and scrims about every frame,
+    /// and writes one line per sample per view: milliseconds since the start, the view, opacity (its own and its
+    /// layer's on screen, times its ancestors'), scale and offset of its transform, and whether clicks reach it.
+    static func logMotion(in root: NSView, for milliseconds: Double, to path: String) {
+        let start = CACurrentMediaTime()
+        var lines: [String] = []
+        func watched(_ view: NSView) -> [NSView] {
+            let mine = view is FloatingPanelView || view is ScrimView || view is ConfirmSheet || view is FormSheet
+                || view is PageDialogSheet || view is WhatsNewSheet || view is TabPreviewView || view is EmptySpaceMark
+            return (mine ? [view] : []) + view.subviews.flatMap(watched)
+        }
+        func shownOpacity(_ view: NSView) -> Float {
+            var opacity: Float = 1
+            var current: NSView? = view
+            while let v = current, v !== root {
+                let layer = v.layer?.presentation() ?? v.layer
+                opacity *= (layer?.opacity ?? 1) * (v.isHidden ? 0 : 1)
+                current = v.superview
+            }
+            return opacity
+        }
+        motionTimer?.invalidate()
+        let timer = Timer(timeInterval: 1.0 / 120, repeats: true) { _ in
+            MainActor.assumeIsolated {
+                let ms = (CACurrentMediaTime() - start) * 1000
+                // Not yet committed to the render server (just added): nothing of it is on screen to read.
+                for view in watched(root) where view.layer?.presentation() != nil {
+                    let t = (view.layer?.presentation() ?? view.layer)?.transform ?? CATransform3DIdentity
+                    let window = view.convert(NSPoint(x: view.bounds.midX, y: view.bounds.midY), to: nil)
+                    let hit = root.window?.contentView?.superview?.hitTest(root.window?.contentView?.superview?.convert(window, from: nil) ?? .zero)
+                    let reaches = hit.map { $0 === view || $0.isDescendant(of: view) } ?? false
+                    lines.append(String(format: "%7.1f %@ opacity=%.3f scale=%.4f dx=%.1f dy=%.1f clicks=%d", ms, String(describing: type(of: view)),
+                                        shownOpacity(view), t.m11, t.m41, t.m42, reaches ? 1 : 0))
+                }
+                guard ms >= milliseconds else { return }
+                motionTimer?.invalidate()
+                motionTimer = nil
+                try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
+            }
+        }
+        motionTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+    private static var motionTimer: Timer?
 
     @available(macOS 15.4, *)
     static func extensionTest(_ id: String, page: URL, in controller: BrowserWindowController) async {
