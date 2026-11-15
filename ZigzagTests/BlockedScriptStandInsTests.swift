@@ -152,6 +152,26 @@ struct BlockedScriptStandInsTests {
         #expect(try await run(Self.telemetry, in: bare) == "failed failed")
     }
 
+    /// One XMLHttpRequest answered for the telemetry, then opened again for another call: it reads as that call's
+    /// own, not as the telemetry's answer.
+    @Test func aReusedRequestForgetsTheTelemetryAnswer() async throws {
+        let deepSeek = try await page("<p>DeepSeek</p>", at: "https://chat.deepseek.com/")
+        let reused = """
+        const xhr = new XMLHttpRequest();
+        const first = await new Promise((done) => {
+          xhr.open('POST', '/api/v0/telemetry');
+          xhr.onload = () => done(xhr.status);
+          xhr.send('x');
+        });
+        xhr.onload = null;
+        xhr.open('GET', '/api/v0/blocked-call');
+        const own = ['status', 'readyState', 'responseURL'].filter((name) => Object.prototype.hasOwnProperty.call(xhr, name));
+        return first + ' ' + xhr.readyState + ' ' + xhr.status + ' ' + own.length;
+        """
+        // Opened again: readyState 1 (opened) and status 0, as any request that hasn't been sent.
+        #expect(try await run(reused, in: deepSeek) == "200 1 0 0")
+    }
+
     @Test func anotherSitesTelemetryStaysBlocked() async throws {
         let other = try await page("<p>Other</p>", at: "https://deepseek.com/")
         #expect(try await run(Self.telemetry, in: other) == "failed failed")

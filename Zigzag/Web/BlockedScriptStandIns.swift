@@ -62,8 +62,12 @@ enum BlockedScriptStandIns {
       });
       const proto = XMLHttpRequest.prototype;
       const opened = new WeakMap();
+      // The ones given an answer of their own: opened again, they read as a request of their own again.
+      const answeredWith = new WeakMap();
       proto.open = new Proxy(proto.open, {
         apply(target, self, args) {
+          const names = answeredWith.get(self);
+          if (names) { for (const name of names) delete self[name]; answeredWith.delete(self); }
           if (answered(args[1])) opened.set(self, new URL(String(args[1]), location.href).href); else opened.delete(self);
           return Reflect.apply(target, self, args);
         },
@@ -74,6 +78,7 @@ enum BlockedScriptStandIns {
           if (!url) return Reflect.apply(target, self, args);
           const answer = { readyState: 4, status: 200, statusText: 'OK', responseText: '', response: '', responseURL: url };
           for (const [name, value] of Object.entries(answer)) Object.defineProperty(self, name, { value, configurable: true });
+          answeredWith.set(self, Object.keys(answer));
           setTimeout(() => { for (const type of ['readystatechange', 'load', 'loadend']) self.dispatchEvent(new ProgressEvent(type)); });
         },
       });
