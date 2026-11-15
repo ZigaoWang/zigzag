@@ -40,6 +40,9 @@ nonisolated struct PermissionAnswer {
 /// Stable identifiers under which permission actions are remembered.
 nonisolated enum PermissionSubject {
     static let location = "location", notifications = "notifications", popups = "popups", apps = "apps"
+    /// Whether a site may save files at all. The destination an allowed file goes to is a separate decision, made per
+    /// file type by the download rules.
+    static let downloads = "downloads"
 
     static func media(_ type: WKMediaCaptureType) -> String {
         switch type {

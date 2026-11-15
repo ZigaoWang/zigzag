@@ -139,6 +139,31 @@ A private window asks but stores nothing, as today. A frame from another site ke
 Every call site reads the stored action first, so an always-yes runs without a banner and a "deny" never runs. Handoff
 asks in `DownloadHandoff.perform`'s callers (or in `perform` itself) before any side effect, including reading cookies.
 
+## Downloads, added after this design
+
+The design above put the downloads prompt out of scope; it was asked for later, so it is here now as the eighth
+question, and it uses the same answer shape, the same sheet and no new mechanism.
+
+| Question | Actions (plain → prominent) | What each does |
+|---|---|---|
+| Downloads | Don't Allow / Allow | refuse the file, and say so over the page; let it be saved, and decided as usual |
+
+- Asked for a new site's first download, **from either direction**: a file a page starts on its own, and a link you
+  clicked that turns out to be one. "This time" answers for the page that asked; "Always" is kept for the site, so
+  Settings › Privacy lists it like every other choice, and its Site Controls row offers Ask / Allow / Block.
+- A deny blocks the file wherever it came from, and a toast says so where the page is — a click that quietly saves
+  nothing is the one outcome nobody can see.
+- **The question is permission only.** Where an allowed file lands is a separate decision, already made per file type
+  (the `fileType` rules and their destinations), falling back to Save downloads to.
+- `DownloadPolicy` keeps its own rules, and they are asked first: a frame's file with no click near it, or a page's
+  second file inside half a minute, is refused for the reason it always was and never reaches the question. An
+  "Always allowed" site is not a licence for a stream.
+- **A rule you wrote beats the question.** A handoff rule takes the file before the policy decides, so nothing is
+  asked; a destination rule is not a handoff, and the question comes first.
+- A put-off question refuses the file, as every put-off question refuses what it asked. With nowhere to ask (a window
+  that has gone) the download is left as WebKit decided it rather than silently eaten.
+- Private windows ask and keep nothing, as every question does.
+
 ## Goals
 
 - One answer shape and one sheet for all seven questions.
@@ -154,7 +179,8 @@ asks in `DownloadHandoff.perform`'s callers (or in `perform` itself) before any 
 ## Non-goals
 
 - No per-rule default permission in the rule editor; the answer is always about a site.
-- No new permission kinds (screen recording, downloads prompt, and so on).
+- No new permission kinds. (The downloads prompt was asked for after this design and is delivered: see "Downloads,
+  added after this design".)
 - No change to ContentBlocker, extensions, zoom, dark pages, keep-awake or other site choices.
 - No redesign of the Settings › Privacy page beyond wording that refers to the unified answers.
 - No change to how the handoff rules match URLs or run actions.
