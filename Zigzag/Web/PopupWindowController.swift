@@ -377,17 +377,11 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 private final class PopupWindow: NSWindow {
     var commandHandler: ((NSEvent) -> Bool)?
     private var buttonSpacing: CGFloat?
-    private var isPlacing = false
 
     override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
         super.init(contentRect: contentRect, styleMask: style, backing: backingStoreType, defer: flag)
         // AppKit puts the buttons back whenever it relays the title bar; they go back where they belong.
-        let views = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap { standardWindowButton($0) }
-            + [standardWindowButton(.closeButton)?.superview?.superview].compactMap { $0 }
-        for view in views {
-            view.postsFrameChangedNotifications = true
-            NotificationCenter.default.addObserver(self, selector: #selector(buttonsMoved), name: NSView.frameDidChangeNotification, object: view)
-        }
+        TrafficLightKeeper.install(in: self) { [weak self] in self?.placeTrafficLights() }
     }
 
     /// Centered on the header, as far in from the left as the browser window's.
@@ -395,14 +389,6 @@ private final class PopupWindow: NSWindow {
         guard !styleMask.contains(.fullScreen), let close = standardWindowButton(.closeButton) else { return }
         let origin = NSPoint(x: Tokens.Sidebar.lightsX, y: round((PopupWindowController.headerHeight - close.frame.height) / 2))
         buttonSpacing = placeTrafficLights(at: origin, spacing: buttonSpacing)
-    }
-
-    @objc private func buttonsMoved() {
-        guard !isPlacing else { return }
-        isPlacing = true
-        placeTrafficLights()
-        isPlacing = false
-        DispatchQueue.main.async { [weak self] in self?.placeTrafficLights() }
     }
 
     override func sendEvent(_ event: NSEvent) {
