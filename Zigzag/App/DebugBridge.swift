@@ -719,6 +719,32 @@ enum DebugBridge {
             if let root = controller.tabManager.selectedTab?.settingsView { rows(root).first?.openEditor() }
         case "saveprompt": if arg == "close" { SavePasswordPrompt.debugClose() } else { SavePasswordPrompt.debugPreview(in: controller) }
         case "select": controller.tabManager.select(at: Int(arg) ?? 0)
+        // lightswatch <seconds> <path>: where the traffic lights are in each frame that goes to the screen, and every
+        // move AppKit makes to them, for that long (`TrafficLightWatch`).
+        case "lightswatch":
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            if f.count == 2, let seconds = Double(f[0]), let window = controller.window {
+                TrafficLightWatch.start(seconds: seconds, path: f[1], window: window)
+            }
+        // retile <count> <interval>: AppKit lays the title bar out again that many times (by changing the window's
+        // subtitle, which Zigzag doesn't watch), as it does on its own for a title, a key change or full screen.
+        case "retile":
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            guard f.count == 2, let window = controller.window else { break }
+            for i in 0..<Int(f[0]) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * f[1]) {
+                    MainActor.assumeIsolated { window.subtitle = i % 2 == 0 ? " " : "" }
+                }
+            }
+        // selectloop <count> <interval>: selects the first tabs in turn (up to four) that many times, that far apart (seconds).
+        case "selectloop":
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            guard f.count == 2 else { break }
+            for i in 0..<Int(f[0]) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * f[1]) {
+                    MainActor.assumeIsolated { controller.tabManager.select(at: i % max(1, min(controller.tabManager.currentTabs.count, 4))) }
+                }
+            }
         // groundprobe select <index> | load <url> | open <url>: does that, then for 1.5 s writes to the debug log what's
         // behind the page in front every 50 ms (#134): the web view's own ground, its under-page color, the card's, and
         // what the page script has put in (Dark Reader's mode, the prepaint ground, darkened).
@@ -2841,5 +2867,93 @@ extension NSApplication {
     // After the exchange, these names call AppKit's own.
     @objc func zz_keyWindow() -> NSWindow? { DebugKeyWindow.window ?? zz_keyWindow() }
     @objc func zz_mainWindow() -> NSWindow? { DebugKeyWindow.window ?? zz_mainWindow() }
+}
+#endif
+
+#if DEBUG
+/// Debug builds only: `lightswatch <seconds> <path>` writes where the traffic lights are as each Core Animation commit
+/// goes out (what reaches the screen), whenever that changes, and every time AppKit moves one of them, with who moved
+/// it, so a one-frame jump shows up as a commit with the wrong place.
+@MainActor
+enum TrafficLightWatch {
+    private static var observer: CFRunLoopObserver?
+    private static var lines: [String] = []
+    private static var last = ""
+    private static var commits = 0
+    private static var start = Date()
+
+    static var isWatching: Bool { observer != nil }
+
+    /// Called when AppKit moves a button, before it's put back.
+    static func moved(_ view: NSView, in window: NSWindow) {
+        guard isWatching else { return }
+        let stack = Thread.callStackReturnAddresses.dropFirst(5).prefix(32).map { address -> String in
+            var info = Dl_info()
+            guard dladdr(UnsafeRawPointer(bitPattern: address.uintValue), &info) != 0, let name = info.dli_sname else { return "?" }
+            return String(cString: name)
+        }.joined(separator: " < ")
+        lines.append(String(format: "%.4f moved %@ to %@ by %@", Date().timeIntervalSince(start),
+                            String(describing: type(of: view)), NSStringFromRect(view.convert(view.bounds, to: nil)), stack))
+    }
+
+    static func start(seconds: Double, path: String, window: NSWindow) {
+        stop(path: nil)
+        lines = []; last = ""; commits = 0; start = Date()
+        watched = window
+        // What reaches the screen is what Core Animation commits, so the lights are read as each commit goes out: at
+        // every step of the run loop, the transaction open then is asked to call back just before it commits.
+        let observer = CFRunLoopObserverCreateWithHandler(nil, CFRunLoopActivity.allActivities.rawValue, true, 0) { _, _ in
+            MainActor.assumeIsolated { askForCommit() }
+        }
+        self.observer = observer
+        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { MainActor.assumeIsolated { stop(path: path) } }
+    }
+
+    private static weak var watched: NSWindow?
+    private static var asked = false
+
+    /// `+[CATransaction addCommitHandler:forPhase:]` (private; phase 1 is just before the commit).
+    private static func askForCommit() {
+        guard observer != nil, !asked else { return }
+        let selector = NSSelectorFromString("addCommitHandler:forPhase:")
+        guard let method = class_getClassMethod(CATransaction.self, selector) else { return }
+        typealias Add = @convention(c) (AnyClass, Selector, AnyObject, Int32) -> Void
+        let add = unsafeBitCast(method_getImplementation(method), to: Add.self)
+        let handler: @convention(block) () -> Void = {
+            guard Thread.isMainThread else { return }
+            MainActor.assumeIsolated {
+                asked = false
+                guard let window = watched else { return }
+                commits += 1
+                let state = describe(window)
+                if state != last {
+                    lines.append(String(format: "%.4f commit %d %@", Date().timeIntervalSince(start), commits, state))
+                    last = state
+                }
+            }
+        }
+        asked = true
+        add(CATransaction.self, selector, unsafeBitCast(handler, to: AnyObject.self), 1)
+    }
+
+    private static func stop(path: String?) {
+        if let observer { CFRunLoopObserverInvalidate(observer) }
+        observer = nil
+        guard let path else { return }
+        lines.append("commits \(commits)")
+        try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
+    }
+
+    private static func describe(_ window: NSWindow) -> String {
+        let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap { window.standardWindowButton($0) }
+        let frames = buttons.map { b -> String in
+            let r = b.convert(b.bounds, to: nil)
+            return "\(Int(r.minX)),\(Int(r.minY))\(b.isHidden ? "h" : "")"
+        }
+        let container = buttons.first?.superview?.superview?.frame ?? .zero
+        let titlebar = buttons.first?.superview?.frame ?? .zero
+        return "lights=\(frames.joined(separator: " ")) container=\(NSStringFromRect(container)) titlebar=\(NSStringFromRect(titlebar))"
+    }
 }
 #endif

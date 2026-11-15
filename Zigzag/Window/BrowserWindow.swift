@@ -364,7 +364,7 @@ final class TrafficLightKeeper: NSView {
         let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap { window.standardWindowButton($0) }
         for view in buttons + [titlebar.superview].compactMap({ $0 }) {
             view.postsFrameChangedNotifications = true
-            NotificationCenter.default.addObserver(keeper, selector: #selector(moved), name: NSView.frameDidChangeNotification, object: view)
+            NotificationCenter.default.addObserver(keeper, selector: #selector(moved(_:)), name: NSView.frameDidChangeNotification, object: view)
         }
         return keeper
     }
@@ -379,8 +379,11 @@ final class TrafficLightKeeper: NSView {
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-    @objc private func moved() {
+    @objc private func moved(_ note: Notification) {
         guard !isPlacing else { return }
+        #if DEBUG
+        if let view = note.object as? NSView, let window { TrafficLightWatch.moved(view, in: window) }
+        #endif
         placeNow()
         needsLayout = true
     }
