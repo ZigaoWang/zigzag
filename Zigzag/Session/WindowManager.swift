@@ -16,6 +16,8 @@ nonisolated struct SessionState: Codable, Sendable {
         /// have neither, and their tabs come back at the top level.
         var parentID: UUID? = nil
         var collapsed: Bool? = nil
+        /// The group of tabs it's in (#209); older sessions have none.
+        var groupID: UUID? = nil
     }
 
     nonisolated struct SpaceTabs: Codable, Sendable {
@@ -38,6 +40,8 @@ nonisolated struct SessionState: Codable, Sendable {
         var bookmarkTabs: [BookmarkTabState]
         var isFullScreen: Bool?
         var splits: [TabManager.SplitPair]?
+        /// The window's groups of tabs (#209), their names and whether they're open. Nil: none (older sessions too).
+        var tabGroups: [TabGroup]? = nil
     }
 
     var windows: [WindowState]
@@ -389,7 +393,15 @@ final class WindowManager {
                                         currentSpaceID: manager.currentSpaceID,
                                         spaces: spaces, bookmarkTabs: bookmarkTabs,
                                         isFullScreen: controller.window?.styleMask.contains(.fullScreen),
-                                        splits: manager.splits)
+                                        splits: manager.splits,
+                                        tabGroups: Self.savedGroups(spaces, in: manager))
+    }
+
+    /// The groups the saved tabs are in, top to bottom; nil when there are none.
+    private static func savedGroups(_ spaces: [SessionState.SpaceTabs], in manager: TabManager) -> [TabGroup]? {
+        var seen: Set<UUID> = []
+        let groups = spaces.flatMap(\.tabs).compactMap { tab in tab.groupID.flatMap { seen.insert($0).inserted ? manager.group($0) : nil } }
+        return groups.isEmpty ? nil : groups
     }
 
     // MARK: Restoring
@@ -443,6 +455,8 @@ final class WindowManager {
     private func restoreWindow(_ windowState: SessionState.WindowState, history: [UUID: Data] = [:]) -> Set<UUID> {
             var allIDs = Set<UUID>()
             let manager = TabManager(spaceID: windowState.currentSpaceID)
+            // Before the tabs, so the tabs find the groups they're in.
+            manager.restoreGroups(windowState.tabGroups ?? [])
             var selection: [UUID: UUID] = [:]
             // A space that's gone (the library couldn't be read and started over) keeps its tabs: they join the space
             // the window was on, or the first one, rather than vanish and be overwritten by the next save.
@@ -502,7 +516,7 @@ final class WindowManager {
     init(_ tab: Tab, parent: UUID? = nil) {
         self.init(id: tab.id, url: tab.url, title: tab.title.isEmpty ? tab.displayTitle : tab.title, lastActivated: tab.lastActivated,
                   createdAt: tab.createdAt, customTitle: tab.customTitle, customIcon: tab.customIcon, parentID: parent,
-                  collapsed: tab.isCollapsed ? true : nil)
+                  collapsed: tab.isCollapsed ? true : nil, groupID: tab.bookmarkID == nil ? tab.groupID : nil)
     }
 
     /// What the session kept beyond the page itself, back on the tab made from it.
@@ -511,5 +525,6 @@ final class WindowManager {
         tab.customIcon = customIcon
         tab.parentID = parentID
         tab.isCollapsed = collapsed ?? false
+        tab.groupID = groupID
     }
 }

@@ -1011,7 +1011,7 @@ final class NewTabRowView: SidebarRowView {
 }
 
 /// A folder of pinned pages: a chevron that turns as it opens, a folder, and its name. Click to open or close it;
-/// double-click to rename it. Pinned pages dropped on it go in.
+/// double-click to rename it. Pinned pages dropped on it go in. A group of tabs (#209) is drawn the same, among the tabs.
 final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
     private let chevron = NSImageView()
     private let folderIcon = NSImageView()
@@ -1037,11 +1037,16 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func configure(name: String, open: Bool, count: Int, icon: String? = nil) {
+    /// A group of tabs rather than a folder of pinned pages: it says so to VoiceOver and as it's renamed.
+    private var isTabGroup = false
+
+    func configure(name: String, open: Bool, count: Int, icon: String? = nil, tabGroup: Bool = false) {
         title.stringValue = name
         folderIcon.image = IconChoice.folder(icon, open: open, size: Tokens.Sidebar.favicon)
         isOpen = open
-        setAccessibilityLabel(String(localized: "\(name), folder, \(count) pinned", comment: "Accessibility label of a folder in the sidebar: its name, then how many pinned tabs it holds."))
+        isTabGroup = tabGroup
+        setAccessibilityLabel(tabGroup ? String(localized: "\(name), group, \(count) tabs", comment: "Accessibility label of a group of tabs in the sidebar: its name, then how many tabs it holds.")
+                              : String(localized: "\(name), folder, \(count) pinned", comment: "Accessibility label of a folder in the sidebar: its name, then how many pinned tabs it holds."))
         setAccessibilityValue(open ? 1 : 0)
         needsLayout = true
     }
@@ -1098,7 +1103,8 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 
     func beginRename() {
         guard renameField == nil, let window else { return }
-        let field = PlainTextField(font: title.font ?? Tokens.Font.body(), placeholder: String(localized: "Folder name", comment: "Placeholder of the field that renames a folder, in its sidebar row."))
+        let field = PlainTextField(font: title.font ?? Tokens.Font.body(), placeholder: isTabGroup ? String(localized: "Group name", comment: "Placeholder of the field that renames a group of tabs, in its sidebar row.")
+                                   : String(localized: "Folder name", comment: "Placeholder of the field that renames a folder, in its sidebar row."))
         field.stringValue = title.stringValue
         field.delegate = self
         field.onCancel = { [weak self] in self?.endRename(commit: false) }

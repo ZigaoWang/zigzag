@@ -458,6 +458,7 @@
 		F7D93036C3CDCBF8FC71B036 /* MiniLinkWakeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8679BD8FFD9BC3825E36199 /* MiniLinkWakeTests.swift */; };
 		F83EF7EEEA88AB7ECB4DBB05 /* ghostery-adblocker-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = D302D7F28821481E9ABC2148 /* ghostery-adblocker-LICENSE.txt */; };
 		F87FB422A0C80874C1D4A3E3 /* SafePictures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84EF39EB77F65E6AB08E2E52 /* SafePictures.swift */; };
+		F8BAD69B0AEF4F2C36990D07 /* TabGroupsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E17F78D0B738DB960F8BD8EF /* TabGroupsTests.swift */; };
 		F93332479C4E8E444308AC31 /* LocalServerTrustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41C76DAA9705D717D9D98902 /* LocalServerTrustTests.swift */; };
 		F972A38781338935BAF22135 /* WebsiteData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B5A4CDA29A214770AB79A6 /* WebsiteData.swift */; };
 		F9A91C05B07D863474CC6DEB /* MCPBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2904F433A0EC465A91389CF8 /* MCPBrowser.swift */; };
@@ -939,6 +940,7 @@
 		DFB1B0DA956C3C2FEED46E90 /* RowDeleteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowDeleteTests.swift; sourceTree = "<group>"; };
 		DFEB02EB619B5441AC6DED95 /* web-locks.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-locks.js"; sourceTree = "<group>"; };
 		E0657DD4DA14F56BD051BC34 /* Signal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Signal.swift; sourceTree = "<group>"; };
+		E17F78D0B738DB960F8BD8EF /* TabGroupsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabGroupsTests.swift; sourceTree = "<group>"; };
 		E18895E549507CE748D20047 /* TabDropIndexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabDropIndexTests.swift; sourceTree = "<group>"; };
 		E314E1B3C6242087C5B2B7E3 /* CSVImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVImporter.swift; sourceTree = "<group>"; };
 		E35F3B1C28D9313BCCFA9CA4 /* LICENSE */ = {isa = PBXFileReference; path = LICENSE; sourceTree = "<group>"; };
@@ -1656,6 +1658,7 @@
 				298850B8A3EE1B52397F62B3 /* StrongPasswordTests.swift */,
 				84DC4BF1B68F50F24CC6EF1E /* SystemPasswordsTests.swift */,
 				E18895E549507CE748D20047 /* TabDropIndexTests.swift */,
+				E17F78D0B738DB960F8BD8EF /* TabGroupsTests.swift */,
 				C07FFC0A0F58B379C40EE66C /* TabMuteTests.swift */,
 				18A3CEE886C0270C9A5BE70C /* TabSleepTests.swift */,
 				88D86346DE78193D507DCECC /* TabStateCacheTests.swift */,
@@ -2433,6 +2436,7 @@
 				0671150B02144B3F6A0545B2 /* StrongPasswordTests.swift in Sources */,
 				7E8182058C1A204FEFEC999B /* SystemPasswordsTests.swift in Sources */,
 				686B2764EE4C4C1D72AF1B54 /* TabDropIndexTests.swift in Sources */,
+				F8BAD69B0AEF4F2C36990D07 /* TabGroupsTests.swift in Sources */,
 				28E294D56D1D8EBE737612AF /* TabMuteTests.swift in Sources */,
 				AF0091F08138B34E47C07295 /* TabSleepTests.swift in Sources */,
 				72796F999AA54249F5465613 /* TabStateCacheTests.swift in Sources */,

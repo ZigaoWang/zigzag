@@ -18,6 +18,10 @@ struct PinnedSpaceNameResizeTests {
         func listNewTab() {}
         func listClearTabs() {}
         func listSetFolderOpen(_ id: UUID, _ open: Bool) {}
+        func listSetGroupOpen(_ id: UUID, _ open: Bool) {}
+        func listRenameGroup(_ id: UUID, to name: String) {}
+        func listMoveGroup(_ id: UUID, to index: Int, in spaceID: UUID) {}
+        func listAddToGroup(_ tabs: [Tab], group: UUID) {}
         func listRenameFolder(_ id: UUID, to name: String) {}
         func listSetFolder(of bookmarkID: UUID, to folderID: UUID?) {}
         func listAsOne(_ name: String, _ body: @escaping () -> Void) { body() }
@@ -29,9 +33,9 @@ struct PinnedSpaceNameResizeTests {
         func listDragHoverSpace(at windowPoint: NSPoint) -> UUID? { nil }
         func listDragEnded() {}
         func listDropFinished() {}
-        func listMove(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting) {}
+        func listMove(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting, grouping: TabManager.Grouping) {}
         func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) {}
-        func listUnbookmark(_ bookmarkID: UUID, to index: Int, under parent: UUID?) {}
+        func listUnbookmark(_ bookmarkID: UUID, to index: Int, under parent: UUID?, group: UUID?) {}
         func listSetNestedTabsCollapsed(_ tab: Tab, _ collapsed: Bool) {}
         func listSwitchSpaceDuringDrag(_ spaceID: UUID) {}
         func listDropOutside(_ tabs: [Tab], at screenPoint: NSPoint) -> Bool { false }

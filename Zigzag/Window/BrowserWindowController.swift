@@ -617,8 +617,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         AutoPictureInPicture.shared.reconsider()
         sidebar.update(tab: tab)
         paintTopBar()
-        // A collapsed pinned section shows the pinned page you're on, so it changes with the selection.
-        if SidebarListView.isCollapsed(tabManager.currentSpaceID) { sidebar.list.reload(animated: true) } else { sidebar.list.refreshRows() }
+        // A collapsed pinned section shows the pinned page you're on, so it changes with the selection; so does a shut
+        // group of tabs (#209), which shows only the tab you're on.
+        let space = tabManager.currentSpaceID
+        if SidebarListView.isCollapsed(space) || tabManager.groups(in: space).contains(where: { !$0.isOpen }) {
+            sidebar.list.reload(animated: true)
+        } else {
+            sidebar.list.refreshRows()
+        }
         reloadFavorites()
         sidebar.address.setCapture(camera: tab?.isUsingCamera ?? false, microphone: tab?.isUsingMicrophone ?? false)
         updateWindowTitle()
@@ -2369,11 +2375,12 @@ extension BrowserWindowController: SidebarDelegate {
 
     /// Moves a tab within or between spaces, undoably. Within its space, the tabs nested under it come along; to
     /// another space it goes alone, and they move up a level where they are.
-    func moveWithUndo(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting = .fit, then done: (() -> Void)? = nil) {
+    func moveWithUndo(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting = .fit, grouping: TabManager.Grouping = .fit,
+                      then done: (() -> Void)? = nil) {
         // To a space on another profile, an open page reloads there: that's asked first, wherever the move began (a
         // menu, a drag, the command bar).
         confirmProfileCrossing(tabManager.panes(of: tab), to: spaceID) { [weak self] in
-            self?.moveNow(tab, to: index, in: spaceID, nesting: nesting)
+            self?.moveNow(tab, to: index, in: spaceID, nesting: nesting, grouping: grouping)
             done?()
         }
     }
@@ -2392,11 +2399,11 @@ extension BrowserWindowController: SidebarDelegate {
         confirmProfileCrossing(ids.compactMap { tabManager.bookmarkTab(for: $0) }, to: spaceID, then: move)
     }
 
-    private func moveNow(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting) {
+    private func moveNow(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting, grouping: TabManager.Grouping) {
         pageChange(spaceID == tab.spaceID ? String(localized: "Move Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Tab.") : String(localized: "Move to Space", comment: "Undo action name, shown in the Edit menu as Undo Move to Space.")) { [weak self] in
             guard let self else { return }
             let oldSpace = tab.spaceID
-            if spaceID == oldSpace { tabManager.move(tab, to: index, nesting: nesting) } else { tabManager.moveTabToSpace(tab, spaceID: spaceID, at: index) }
+            if spaceID == oldSpace { tabManager.move(tab, to: index, nesting: nesting, grouping: grouping) } else { tabManager.moveTabToSpace(tab, spaceID: spaceID, at: index, grouping: grouping) }
             // Dropped into the space a drag opened, with the old page still showing: you're there now, so it's this tab.
             if spaceID != oldSpace, spaceID == tabManager.currentSpaceID, shownTab !== tabManager.selectedTab { tabManager.select(tab) }
         }
@@ -2512,6 +2519,36 @@ extension BrowserWindowController: SidebarDelegate {
         let tucking = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
         Library.shared.setFolderOpen(id, open, tucking: tucking)
     }
+    func listSetGroupOpen(_ id: UUID, _ open: Bool) {
+        // Opening and closing isn't an edit to undo, as for a folder.
+        tabManager.setGroupOpen(id, open)
+    }
+    func listRenameGroup(_ id: UUID, to name: String) {
+        pageChange(String(localized: "Rename Group", comment: "Undo action name, shown in the Edit menu as Undo Rename Group.")) { [tabManager] in tabManager.renameGroup(id, to: name) }
+    }
+    func listMoveGroup(_ id: UUID, to index: Int, in spaceID: UUID) {
+        let tabs = tabManager.tabs(inGroup: id)
+        confirmProfileCrossing(tabs.flatMap(tabManager.panes(of:)), to: spaceID) { [weak self] in
+            guard let self else { return }
+            pageChange(spaceID == tabs.first?.spaceID ? String(localized: "Move Group", comment: "Undo action name, shown in the Edit menu as Undo Move Group.")
+                       : String(localized: "Move to Space", comment: "Undo action name, shown in the Edit menu as Undo Move to Space.")) { [tabManager] in
+                tabManager.moveGroup(id, to: index, in: spaceID)
+            }
+        }
+    }
+    func listAddToGroup(_ tabs: [Tab], group: UUID) {
+        let space = tabManager.tabs(inGroup: group).first?.spaceID ?? tabManager.currentSpaceID
+        confirmProfileCrossing(tabs.filter { $0.spaceID != space }.flatMap(tabManager.panes(of:)), to: space) { [weak self] in
+            guard let self else { return }
+            pageChange(String(localized: "Add to Group", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
+                for tab in tabs where tab.bookmarkID == nil {
+                    // From another space the drag opened: into the group's first.
+                    if tab.spaceID != space { tabManager.moveTabToSpace(tab, spaceID: space, at: 0) }
+                    tabManager.setGroup(of: tab, to: group)
+                }
+            }
+        }
+    }
     func listRenameFolder(_ id: UUID, to name: String) {
         libraryChange(String(localized: "Rename Folder", comment: "Undo action name, shown in the Edit menu as Undo Rename Folder.")) { Library.shared.renameFolder(id, to: name) }
     }
@@ -2538,14 +2575,16 @@ extension BrowserWindowController: SidebarDelegate {
         sidebar.list.reload(animated: true)
         DispatchQueue.main.async { [weak self] in self?.sidebar.list.renameFolder(id) }
     }
-    func listMove(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting) { moveWithUndo(tab, to: index, in: spaceID, nesting: nesting) }
+    func listMove(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting, grouping: TabManager.Grouping) {
+        moveWithUndo(tab, to: index, in: spaceID, nesting: nesting, grouping: grouping)
+    }
     func listSetNestedTabsCollapsed(_ tab: Tab, _ collapsed: Bool) { tabManager.setNestedTabsCollapsed(tab, collapsed) }
     func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) {
         // Pins are shared by every window: a private one's tabs stay out of them.
         guard !tabManager.isPrivate else { return }
         confirmProfileCrossing([tab], to: spaceID) { [weak self] in self?.bookmarkWithUndo(tab, at: index, in: spaceID) }
     }
-    func listUnbookmark(_ bookmarkID: UUID, to index: Int, under parent: UUID?) {
+    func listUnbookmark(_ bookmarkID: UUID, to index: Int, under parent: UUID?, group: UUID?) {
         // Pins are shared by every window: a private one doesn't take them away.
         guard !tabManager.isPrivate else { return }
         let space = tabManager.currentSpaceID
@@ -2553,7 +2592,7 @@ extension BrowserWindowController: SidebarDelegate {
             self?.pageChange(String(localized: "Unpin Tab", comment: "Undo action name, shown in the Edit menu as Undo Unpin Tab.")) {
                 // Carried here from another space: into this one first, so it comes down among the tabs you're looking at.
                 if Library.shared.spaceID(ofBookmark: bookmarkID) != space { Library.shared.moveBookmark(bookmarkID, to: Int.max, in: space) }
-                tabManager.unbookmark(bookmarkID, toIndex: index, under: parent)
+                tabManager.unbookmark(bookmarkID, toIndex: index, under: parent, group: group)
             }
         }
     }
@@ -2877,6 +2916,7 @@ extension BrowserWindowController: SidebarDelegate {
         case .tab(let id): return tabManager.tab(with: id).map { SidebarMenus.tabMenu(for: $0, controller: self) }
         case .bookmark(let id): return Library.shared.bookmark(id).map { SidebarMenus.bookmarkMenu(for: $0, controller: self) }
         case .folder(let id): return Library.shared.folder(id).map { SidebarMenus.folderMenu(for: $0, controller: self) }
+        case .tabGroup(let id): return tabManager.group(id).map { SidebarMenus.groupMenu(for: $0, controller: self) }
         default: return nil
         }
     }

@@ -561,6 +561,28 @@ enum DebugBridge {
         case "foldtab":
             let tabs = controller.tabManager.currentTabs
             if let i = Int(arg), tabs.indices.contains(i) { controller.tabManager.setNestedTabsCollapsed(tabs[i], !tabs[i].isCollapsed) }
+        // grouptabs <i,j,…>: the tabs at those places in the space's list grouped, as Group Tabs does (#209).
+        case "grouptabs":
+            let tabs = controller.tabManager.currentTabs
+            controller.groupWithUndo(arg.split(separator: ",").compactMap { Int($0) }.filter(tabs.indices.contains).map { tabs[$0] })
+        // groupfold <n>: the space's nth group folded or shown, as a click on its row does.
+        case "groupfold":
+            let groups = controller.tabManager.groups(in: controller.tabManager.currentSpaceID)
+            if let i = Int(arg), groups.indices.contains(i) { controller.listSetGroupOpen(groups[i].id, !groups[i].isOpen) }
+        // groupmenu <n> <title>: runs that item of the space's nth group's menu, as choosing it would.
+        case "groupmenu":
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            let groups = controller.tabManager.groups(in: controller.tabManager.currentSpaceID)
+            guard f.count == 2, let i = Int(f[0]), groups.indices.contains(i) else { break }
+            let menu = SidebarMenus.groupMenu(for: groups[i], controller: controller)
+            if case let index = menu.indexOfItem(withTitle: f[1]), index >= 0 { menu.performActionForItem(at: index) }
+        // groups <path>: the space's groups of tabs, top to bottom, each with its name, whether it's open and its tabs.
+        case "groups":
+            let m = controller.tabManager
+            let json: [[String: Any]] = m.groups(in: m.currentSpaceID).map { group in
+                ["name": group.name, "open": group.isOpen, "tabs": m.tabs(inGroup: group.id).map(\.displayTitle)]
+            }
+            if let data = try? JSONSerialization.data(withJSONObject: json) { try? data.write(to: URL(fileURLWithPath: arg)) }
         // tree <path>: the current space's tabs, each with how deep it's nested and whether it's folded.
         case "tree":
             let m = controller.tabManager

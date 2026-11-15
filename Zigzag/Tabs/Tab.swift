@@ -68,6 +68,9 @@ final class Tab: NSObject {
     var parentID: UUID?
     /// The tabs under this one are folded away in the sidebar.
     var isCollapsed = false
+    /// The group of tabs it's in (#209); nil for none. Pinned pages and favorites never have one. TabManager keeps it
+    /// right (see TabGroups).
+    var groupID: UUID?
 
     private(set) var url: URL? { didSet { refreshDevelopment() } }
     private(set) var title: String
