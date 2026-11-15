@@ -109,6 +109,16 @@ struct MiniWindowTests {
         #expect(defaults.bool(forKey: "MiniOfferShown"))
     }
 
+    // MARK: Its size
+
+    @Test func opensAtTheSizeLastLeftAt() {
+        #expect(MiniWindowController.size(remembered: nil) == Tokens.Metric.miniWindowSize)
+        #expect(MiniWindowController.size(remembered: NSSize(width: 700.4, height: 820)) == NSSize(width: 700, height: 820))
+        // Never smaller than it can be made.
+        #expect(MiniWindowController.size(remembered: NSSize(width: 100, height: 820)) == Tokens.Metric.miniWindowSize)
+        #expect(MiniWindowController.size(remembered: .zero) == Tokens.Metric.miniWindowSize)
+    }
+
     // MARK: Back, forward and reload (#213)
 
     @Test func backAndForwardFollowTheHistory() {

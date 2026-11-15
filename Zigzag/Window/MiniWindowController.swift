@@ -72,13 +72,30 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         return quiet && quietBefore ? .now : .wait
     }
 
+    /// How big a new one opens: as big as you last made one, as Little Arc does, never smaller than it can be; the
+    /// usual size until then.
+    static func size(remembered: NSSize?) -> NSSize {
+        guard let remembered, remembered.width >= Tokens.Metric.miniWindowMinSize.width,
+              remembered.height >= Tokens.Metric.miniWindowMinSize.height else { return Tokens.Metric.miniWindowSize }
+        return NSSize(width: round(remembered.width), height: round(remembered.height))
+    }
+
+    /// The size the last one was left at, after you resized it.
+    private static var rememberedSize: NSSize? {
+        get { UserDefaults.standard.string(forKey: "MiniWindowSize").map(NSSizeFromString) }
+        set { UserDefaults.standard.set(newValue.map(NSStringFromSize), forKey: "MiniWindowSize") }
+    }
+
+    /// The size the next one opens at.
+    static var openingSize: NSSize { size(remembered: rememberedSize) }
+
     /// Opens one on `url`. `origin`: where on screen it grows from (the quick open bar it came out of); without
     /// one it takes the middle of the screen, a step down from any already there.
     @discardableResult
     static func open(url: URL, isSearch: Bool = false, from origin: NSRect? = nil, overFullScreen: Bool? = nil, fromAnotherApp: Bool = false) -> MiniWindowController {
         let screen = origin.flatMap { o in NSScreen.screens.first { $0.frame.intersects(o) } } ?? NSApp.keyWindow?.screen ?? NSScreen.main
         let area = screen?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
-        let size = Tokens.Metric.miniWindowSize
+        let size = openingSize
         let frame = origin.map { Self.frame(size: size, under: $0, in: area) }
             ?? Self.frame(size: size, in: area, taken: Self.all.compactMap { $0.window?.frame })
         let tab = Tab(url: url, spaceID: MiniQuickOpen.space.id)
@@ -107,7 +124,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     static func open(moving tab: Tab, from browser: NSWindow?, at point: NSPoint? = nil) -> MiniWindowController {
         let screen = point.flatMap { p in NSScreen.screens.first { NSMouseInRect(p, $0.frame, false) } } ?? browser?.screen ?? NSScreen.main
         let area = screen?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
-        let size = Tokens.Metric.miniWindowSize
+        let size = openingSize
         let taken = Self.all.compactMap { $0.window?.frame }
         let frame = point.map { Self.frame(size: size, under: NSRect(origin: $0, size: .zero), in: area) }
             ?? Self.frame(size: size, in: area, taken: taken, around: browser.map { NSPoint(x: $0.frame.midX, y: $0.frame.midY) })
@@ -685,6 +702,12 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     func windowDidBecomeKey(_ notification: Notification) {
         if #available(macOS 15.4, *) { ExtensionCenter.miniFocused(self) }
     }
+
+    /// Resized by hand: the next one opens this big.
+    func windowDidEndLiveResize(_ notification: Notification) {
+        guard let size = window?.frame.size else { return }
+        Self.rememberedSize = size
+    }
 }
 
 // MARK: - Through an update's restart
@@ -709,7 +732,7 @@ extension MiniWindowController {
         let area = NSScreen.main?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
         var frame = f.count == 4 ? NSRect(x: f[0], y: f[1], width: f[2], height: f[3]) : nil
         if let rect = frame, !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(rect) }) { frame = nil }
-        let controller = MiniWindowController(tab: tab, frame: frame ?? Self.frame(size: Tokens.Metric.miniWindowSize, in: area, taken: all.compactMap { $0.window?.frame }),
+        let controller = MiniWindowController(tab: tab, frame: frame ?? Self.frame(size: openingSize, in: area, taken: all.compactMap { $0.window?.frame }),
                                               overFullScreen: false)
         all.append(controller)
         controller.appear(from: nil)
