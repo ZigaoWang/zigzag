@@ -151,7 +151,7 @@ struct OnePasswordTrust {
     }
     private var unknownTypes: Set<String> = []
 
-    /// Something got through, and nothing's been turned away since.
+    /// Something trusted got through this session.
     private(set) var connected = false
     /// When it was first turned away, with nothing through since.
     private(set) var turnedAwayAt: Date?
@@ -163,9 +163,10 @@ struct OnePasswordTrust {
             connected = true
             turnedAwayAt = nil
         case .turnedAway:
-            // Even after a connection: if nothing gets through within `grace`, 1Password stopped trusting Zigzag.
-            connected = false
-            if turnedAwayAt == nil { turnedAwayAt = now }
+            // Never once something trusted got through this session: a working 1Password turns one-off messages
+            // away too (slow to check the signature on waking or unlocking), and the note to add Zigzag, shown then,
+            // was the false alarm people reported. Removing Zigzag from 1Password's list shows after a relaunch.
+            if !connected, turnedAwayAt == nil { turnedAwayAt = now }
         case .other:
             break
         }
@@ -173,7 +174,7 @@ struct OnePasswordTrust {
 
     /// Whether Zigzag needs adding in 1Password: turned away at least `grace` ago, and nothing through since.
     func needsAdding(at now: Date = Date()) -> Bool {
-        guard let turnedAwayAt else { return false }
+        guard !connected, let turnedAwayAt else { return false }
         return now.timeIntervalSince(turnedAwayAt) >= Self.grace
     }
 
@@ -1056,13 +1057,16 @@ final class ExtensionHost: NSObject {
         Self.onePasswordTrust.heard(reply)
         switch reply {
         case .connected:
-            // It trusts Zigzag: no note about adding it, in any profile, unless it turns Zigzag away again.
+            // It trusts Zigzag: no note about adding it, in any profile, for the rest of the session.
             guard !wasConnected else { return }
             for profile in Profiles.shared.all {
                 profile.startedExtensions?.setAttention(nil, for: id)
             }
         case .turnedAway:
-            if wasConnected { ExtensionLog.write("1Password turned a connection away after another got through; asking only if nothing gets through") }
+            if wasConnected {
+                ExtensionLog.write("1Password turned one connection away after another got through; not asking to add Zigzag")
+                return
+            }
             // Given a moment: another connection getting through means this was the app being slow, not untrusting.
             DispatchQueue.main.asyncAfter(deadline: .now() + OnePasswordTrust.grace + 0.1) { [weak self] in
                 self?.askToAddIfStillTurnedAway(for: id)
