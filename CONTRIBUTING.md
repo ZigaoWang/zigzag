@@ -3,6 +3,9 @@
 Thanks for helping. Bug reports, fixes and ideas are all welcome. For anything bigger than a small fix, please
 open an issue first so we can agree on the shape of it before you spend time on code.
 
+Security problems don't go in issues or pull requests: see [SECURITY.md](SECURITY.md) for how to report them
+privately.
+
 ## Build and run
 
 You need macOS 15.4 or later, Xcode 26 or later and XcodeGen. Before the first build, set your own
@@ -24,16 +27,23 @@ cloning and after adding, removing or renaming files, and change build settings 
 ## Tests
 
 ```sh
-xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
+TEST_RUNNER_ZIGZAG_TEST_VAULT=memory xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag \
+  -skip-testing:ZigzagTests/SettingsLayoutTests/fitsThePageItIsGivenInsideAnAnimation\(\)
 ```
+
+The tests run inside a Debug build of Zigzag. `ZIGZAG_TEST_VAULT=memory`, which xcodebuild passes on through its
+`TEST_RUNNER_` prefix, gives that build a password vault held in memory for the run, so it never reads, writes or
+asks for passwords in your keychain. It works the same when you launch a Debug build by hand. The skipped test,
+Settings' layout inside an animation, can hang the run; run it on its own if you change Settings' layout.
 
 Logic you add or change needs tests in `ZigzagTests`, especially importing, passwords, extensions and anything
 that parses data from outside. Test fixtures must be made up: never commit real logins, browsing data or
 profiles.
 
-A few `CRXPackageTests` use a real Chrome Web Store package, `ZigzagTests/Fixtures/custom-progress-bar.crx`, that
-isn't in the repository (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)). Without it they're skipped and
-everything else runs.
+Two fixtures aren't in the repository, and `.gitignore` keeps them out: `ZigzagTests/Fixtures/custom-progress-bar.crx`,
+a real Chrome Web Store package that a few `CRXPackageTests` use (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)),
+and `ZigzagTests/Fixtures/ublock-scriptlets.json`, uBlock Origin's scriptlets for one `AdFiltersTests` test. Without
+them those tests are skipped and everything else runs. Don't commit them.
 
 ## Code style
 
@@ -63,17 +73,25 @@ the words to use and the typography rules. If you can't write the Chinese, say s
 
 Release notes are localized too. Each release adds its section to [CHANGELOG.md](CHANGELOG.md) and the same
 section in Chinese to [CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md), with the same version heading and date,
-`### 新功能` and `### 修复` for New and Fixed, and the issue links and credited names left as they are. What's New
+`### 新功能` and `### 修复` for New and Fixed, the same number of points in each, in the same order, and the issue
+links and credited names left as they are. `WhatsNewTests` fails when the two don't match. What's New
 and the update window show the Chinese notes when Zigzag is in Chinese, and the English ones for a version that
 has none; `scripts/release.sh` warns when the version it releases has no Chinese section.
 
 ## Commits and pull requests
 
 - [Conventional Commits](https://www.conventionalcommits.org) without a scope: `feat: …`, `fix: …`, `docs: …`,
-  `chore: …`. Subjects are short and plain, and say what changed for the person using Zigzag.
+  `test: …`, `chore: …`. Subjects are short and plain, and say what changed for the person using Zigzag. `style:`
+  is for code formatting only, never for how something looks.
 - Add `(#N)` to the subject when the commit is for an issue, as in `fix: scripts check the page again once it has loaded (#26)`.
-- **Small commits**, one logical change each, and one change per pull request.
+- No trailers: no `Co-Authored-By` or other lines at the end of the message.
+- **Small commits**, one logical change each.
+- **Small, focused pull requests**: one feature or fix each, so it can be reviewed and tried in the app. A pull
+  request that changes a lot at once, or moves code around while changing it, is hard to review and slow to land;
+  split it up, and talk big changes through in an issue before you start.
+- Don't add CI workflows or other files under `.github/workflows`.
 - Write `Fixes #N` in the pull request so the issue closes with it.
+- If your change is something people will notice, add a line for it under `## [Unreleased]` in both changelogs.
 - Make sure the app builds and the tests pass, and say in the pull request how you checked your change. For UI,
   add screenshots in light and dark.
 
