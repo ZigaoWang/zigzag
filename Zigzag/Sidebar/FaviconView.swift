@@ -153,10 +153,14 @@ final class FaviconView: NSView {
         path.addRect(reach)
         let round = developerBadge == nil ? Self.originalRadius(side: frame.width) + gap : frame.width / 2 + gap
         path.addRoundedRect(in: frame.insetBy(dx: -gap, dy: -gap), cornerWidth: round, cornerHeight: round)
+        let scale = window?.backingScaleFactor ?? 2
         badgeCut.frame = body.bounds
         badgeCut.path = path
+        // A masked layer is drawn off screen at the mask's scale: left at 1, the icon under the badge's cut would be
+        // drawn at half the screen's pixels and come out soft on a Retina display.
+        badgeCut.contentsScale = scale
+        body.contentsScale = scale
         if body.mask !== badgeCut { body.mask = badgeCut }
-        let scale = window?.backingScaleFactor ?? 2
         guard let color = developerBadge else {
             guard let original = originalIcon else { return }
             if let last = renderedOriginal, last.side == frame.width, last.scale == scale, last.image === original { return }
