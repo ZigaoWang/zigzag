@@ -734,7 +734,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     func refresh() {
         title.stringValue = fixedTitle ?? tab?.displayTitle ?? ""
-        icon.image = tab?.displayIcon ?? (fixedTitle != nil ? bookmarkIcon : nil)
+        // A pinned page's own icon until its page has one: away too, never the globe for a page whose icon is coming.
+        icon.image = tab?.displayIcon ?? (fixedTitle != nil || isAway ? bookmarkIcon : nil)
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
         // Why it isn't running (asleep, and what that freed, or not loaded since Zigzag reopened) is in its hover card
         // (`TabPreviewView`), not a tooltip on top of it.

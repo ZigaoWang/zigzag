@@ -363,7 +363,7 @@ final class FavoriteTile: InteractiveView {
     /// A tile group's third and fourth pages' icons.
     private var extraIcons: [FaviconView] = []
     /// Every page's icon view, in order.
-    private var pageIcons: [FaviconView] { [icon, partnerIcon] + extraIcons }
+    var pageIcons: [FaviconView] { [icon, partnerIcon] + extraIcons }
     /// While a tab is held over this tile's middle: the half it would open in, as a tab row shows it.
     private let dropHalf = ColorView()
     /// 0: would open on the left, 1: on the right, nil: not a split target.
@@ -665,18 +665,26 @@ final class FavoriteTile: InteractiveView {
 
     /// A page that moved on shows the icon of the page it's on now, as its pinned row does, with the icon it was
     /// saved with small on the corner, the way an icon wears its app's badge, so the tile still says which favorite
-    /// it is. Pointing at it names both; its menu goes back.
+    /// it is. Pointing at it names both; its menu goes back. Only once that page's own icon is known
+    /// (`awayIcon`): until then the favorite's own, with no badge, never a stand-in for the page's.
     private func refreshAwayIcons() {
         guard let bookmark else { return }
         let live = livePages
         for (i, (page, view)) in zip([bookmark] + partners, pageIcons).enumerated() {
-            let away = isAway(part: i)
-            view.originalIcon = away ? page.displayIcon ?? FaviconView.globeIcon : nil
-            guard away, let now = live[i] else { continue }
-            // While it loads, the last icon stays under the loader rather than the globe flashing.
-            if now.favicon != nil || !now.isLoading, view.image !== now.favicon { view.image = now.favicon; needsLayout = true }
+            let now = Self.awayIcon(away: isAway(part: i), current: live[i]?.favicon)
+            view.originalIcon = now == nil ? nil : page.displayIcon ?? FaviconView.globeIcon
+            if let now {
+                if view.image !== now { view.image = now; needsLayout = true }
+            } else if isAway(part: i) {
+                guard let own = page.displayIcon else { FaviconStore.shared.prefetch(for: page.url); continue }
+                if view.image !== own { view.image = own; needsLayout = true }
+            }
         }
     }
+
+    /// The icon a favorite's page that moved on is drawn with: the page's own, once it's known; nil draws the
+    /// favorite as it was saved, its own icon and no badge.
+    static func awayIcon(away: Bool, current: NSImage?) -> NSImage? { away ? current : nil }
 
     override func layout() {
         super.layout()

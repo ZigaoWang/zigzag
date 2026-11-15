@@ -340,6 +340,19 @@ final class Tab: NSObject {
     /// calendar.google.com) counts as the pinned page, so it's never "moved on" before you've done anything.
     var landingUntil: Date?
     var pinnedLanding: URL?
+
+    /// Pinned or made a favorite while its page is still on its way: where that load ends up (a redirect, as
+    /// en.wikipedia.org to its Main Page) counts as the saved page too, as when a pinned page is opened. However long
+    /// the load takes, then the usual while after it, for a page that sends itself on.
+    func settleLandingIfLoading() {
+        guard isLoading else { return }
+        landingUntil = .distantFuture
+    }
+
+    /// Where the page is, as it lands, while a pinned page is settling in (`landingUntil`).
+    private func noteLanding(_ url: URL?) {
+        if let until = landingUntil, Date() < until, let url { pinnedLanding = url }
+    }
     var customTitle: String? { didSet { if oldValue != customTitle { changed.send(.title); changed.send(.renamed) } } }
     /// An icon you gave the tab (an SF Symbol's name, or an emoji), drawn instead of its site's. The page of a pinned
     /// tab or a favorite shows that one's icon instead (`chosenIcon`).
@@ -1262,6 +1275,9 @@ final class Tab: NSObject {
                     self.isLoading = wv.isLoading
                     // Nothing on its way any more (a download, a load that stopped without a word).
                     if !wv.isLoading { self.isLeavingPage = false }
+                    // The load it was pinned during is over, however it ended: the usual while for a page that sends
+                    // itself on (`settleLandingIfLoading`).
+                    if !wv.isLoading, self.landingUntil == .distantFuture { self.landingUntil = Date().addingTimeInterval(8) }
                     self.changed.send(.loading)
                     // Back and Forward can bring a PDF back from memory without a finished load: check here too.
                     if !wv.isLoading { self.checkForPDF(wv) }
@@ -1624,6 +1640,8 @@ extension Tab: WKNavigationDelegate {
         forgetPageErrors()
         // The new page is here: its address shows.
         addressWaitsForCommit = false
+        // Before the address shows: a pinned page landing where it was sent is never "moved on" in between.
+        noteLanding(webView.url)
         if webView.url != url { followAddress(of: webView) }
         // Answers to the last page's questions were for that page: this one asks again.
         permissionAnswers.forget()
@@ -1692,7 +1710,7 @@ extension Tab: WKNavigationDelegate {
         // The page is all here now: what the developer tools put into it is too.
         if !developer.isUnchanged { applyDeveloperStateToPage() }
         addressWaitsForCommit = false
-        if let until = landingUntil, Date() < until, let url = webView.url { pinnedLanding = url }
+        noteLanding(webView.url)
         checkForPDF(webView)
         refreshFavicon()
         restorePageState(in: webView)

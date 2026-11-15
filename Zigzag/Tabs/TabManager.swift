@@ -547,6 +547,7 @@ final class TabManager {
         let id = UUID()
         tab.bookmarkID = id
         tab.isFavorite = true
+        tab.settleLandingIfLoading()
         bookmarkTabs[id] = tab
         Library.shared.addFavorite(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), icon: tab.customIcon, at: index, id: id, in: profile.id)
     }
@@ -575,6 +576,7 @@ final class TabManager {
             removeFromList(tab)
             mark = Bookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), icon: tab.customIcon)
             tab.bookmarkID = mark.id
+            tab.settleLandingIfLoading()
             bookmarkTabs[mark.id] = tab
         }
         tab.isFavorite = true
@@ -607,6 +609,7 @@ final class TabManager {
                 removeFromList(page)
                 let mark = Bookmark(url: url, title: Self.bookmarkTitle(page.displayTitle, url: url), icon: page.customIcon)
                 page.bookmarkID = mark.id
+                page.settleLandingIfLoading()
                 bookmarkTabs[mark.id] = page
                 marks.append(mark)
             }
@@ -897,6 +900,7 @@ final class TabManager {
                 let mark = Bookmark(url: page.url ?? url, title: Self.bookmarkTitle(page.displayTitle, url: page.url ?? url), icon: page.customIcon)
                 removeFromList(page)
                 page.bookmarkID = mark.id
+                page.settleLandingIfLoading()
                 page.setSpace(space)
                 bookmarkTabs[mark.id] = page
                 return mark
@@ -914,6 +918,7 @@ final class TabManager {
         removeFromList(tab)
         let bookmarkID = UUID()
         tab.bookmarkID = bookmarkID
+        tab.settleLandingIfLoading()
         tab.setSpace(space)
         bookmarkTabs[bookmarkID] = tab
         Library.shared.addBookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), icon: tab.customIcon, to: space, at: index, id: bookmarkID)
@@ -927,6 +932,7 @@ final class TabManager {
         let mark = Bookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), icon: tab.customIcon)
         removeFromList(tab)
         tab.bookmarkID = mark.id
+        tab.settleLandingIfLoading()
         tab.setSpace(space)
         bookmarkTabs[mark.id] = tab
         Library.shared.pinBeside(mark, bookmarkID, onRight: tabOnRight)
