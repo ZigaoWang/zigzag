@@ -160,7 +160,7 @@ enum DownloadRuleSheet {
             break
         }
 
-        let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}.",
+        let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {host}, {path}, {query}, {encoded_link}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}.",
                                              comment: "The tokens a download rule's fields may use, listed in its sheet."))
         let matchRows: [FormSheet.Row] = [
             FormSheet.Row(label: String(localized: "Name", comment: "Label of the name field in a download rule's sheet."), view: name),

@@ -17826,13 +17826,13 @@
         }
       }
     },
-    "Tokens: {link}, {encoded_link}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}." : {
+    "Tokens: {link}, {host}, {path}, {query}, {encoded_link}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}." : {
       "comment" : "The tokens a download rule's fields may use, listed in its sheet.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "可用标记：{link}、{encoded_link}、{referrer}、{cookies}、{cookie_header}、{filename}、{mime}、{space}。"
+            "value" : "可用标记：{link}、{host}、{path}、{query}、{encoded_link}、{referrer}、{cookies}、{cookie_header}、{filename}、{mime}、{space}。"
           }
         }
       }

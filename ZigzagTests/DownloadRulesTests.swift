@@ -109,6 +109,24 @@ struct DownloadRuleTests {
         #expect(!expanded.contains("{link}"))
     }
 
+    /// The link's own parts, so a rule can send an address somewhere else: the host, the path and the query on their
+    /// own, exactly as the address has them.
+    @Test func theLinksOwnPartsAreTokensOfTheirOwn() {
+        let values = HandoffValues(link: URL(string: "https://www.google.com/search/deep?a=1&b=two%20words")!)
+        let expanded = DownloadTokens.expand("https://www.bing.com{path}?{query}", with: values)
+        #expect(expanded == "https://www.bing.com/search/deep?a=1&b=two%20words")
+        #expect(DownloadTokens.expand("{host}", with: values) == "www.google.com")
+        #expect(DownloadTokens.expand("{path}", with: values) == "/search/deep")
+        #expect(DownloadTokens.expand("{query}", with: values) == "a=1&b=two%20words")
+
+        // An address with no path and no query has neither to give, and one with a space in its path keeps the
+        // address's own spelling, so what is put back together is still one valid URL.
+        let bare = HandoffValues(link: URL(string: "https://example.com")!)
+        #expect(DownloadTokens.expand("{host}|{path}|{query}", with: bare) == "example.com||")
+        let spaced = HandoffValues(link: URL(string: "https://example.com/a%20b/c")!)
+        #expect(DownloadTokens.expand("{path}", with: spaced) == "/a%20b/c")
+    }
+
     @Test func jsonTokensAreQuotedForTheBody() {
         let values = HandoffValues(link: video, filename: "a \"quoted\" \\ name.mp4")
         let expanded = DownloadTokens.expand(#"{"name":"{filename}"}"#, with: values, json: true)

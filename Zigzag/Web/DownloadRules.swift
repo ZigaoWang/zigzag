@@ -550,6 +550,12 @@ nonisolated enum DownloadTokens {
             ("{mime}", value(values.mime)),
             ("{space}", value(values.space)),
             ("{secret}", value(secret)),
+            // The parts of the link on their own, so a rule can send an address somewhere else: `https://bing.com{path}`
+            // takes a match on google.com to the same page on bing.com. Both are the address's own, percent-encoded, so
+            // what is put back together is still one valid URL.
+            ("{host}", value(values.link.host() ?? "")),
+            ("{path}", value(values.link.path(percentEncoded: true))),
+            ("{query}", value(values.link.query(percentEncoded: true) ?? "")),
             ("{link}", value(values.link.absoluteString)),
         ]
         for (token, replacement) in replacements {
