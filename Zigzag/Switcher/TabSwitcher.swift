@@ -456,23 +456,39 @@ final class TabSwitcher {
         panel.radius = Tokens.Radius.thumbnail + Tokens.Space.x1 * 2
     }
 
+    enum Ending: Equatable { case cancel, commit, letGo }
+
+    /// A key that ends the switch while it's up. Esc and Return are the switcher's, Control held or not, so nothing
+    /// under it (Reader, find, a full-screen page) takes them too. Any other key with Control let go somewhere we
+    /// didn't see (another app) ends it too, and goes on to the page.
+    static func ending(keyCode: UInt16, controlHeld: Bool) -> Ending? {
+        switch keyCode {
+        case 53 /* esc */: .cancel
+        case 36, 76 /* return, enter */: .commit
+        default: controlHeld ? nil : .letGo
+        }
+    }
+
     /// Returns true if the event was handled.
     func handle(_ event: NSEvent) -> Bool {
         switch event.type {
         case .keyDown:
-            // Control was let go somewhere we didn't see (another app): the switch is over, and the key is yours.
-            if isActive, !event.modifierFlags.contains(.control) { cancel(); return false }
+            if isActive, let ending = Self.ending(keyCode: event.keyCode, controlHeld: event.modifierFlags.contains(.control)) {
+                switch ending {
+                case .cancel: cancel(); return true
+                case .commit: commit(); return true
+                case .letGo: cancel(); return false
+                }
+            }
             guard event.keyCode == 48 /* tab */, event.modifierFlags.contains(.control) else {
                 guard isActive else { return false }
                 // While it's up, the arrows step through the tabs and Return switches, as well as letting go.
                 switch event.keyCode {
-                case 53 /* esc */: cancel()
                 case 123 /* ← */: step(-1)
                 case 124 /* → */: step(1)
                 // Up and down by rows once the cards are on screen; the last row may be shorter, so down lands on its end.
                 case 126 /* ↑ */: if shown, index - columns >= 0 { index -= columns; updateSelection() }
                 case 125 /* ↓ */: if shown, index / columns < (tabs.count - 1) / columns { index = min(index + columns, tabs.count - 1); updateSelection() }
-                case 36, 76 /* return, enter */: commit()
                 default: break
                 }
                 return true

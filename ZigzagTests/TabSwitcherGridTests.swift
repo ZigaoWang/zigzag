@@ -76,4 +76,17 @@ struct TabSwitcherGridTests {
         #expect(DeskController.shape(three, first: 2).regions == [.bottomRight, .left, .topRight])
         #expect(DeskController.shape(three, first: 5) == three)
     }
+
+    @Test func escAndReturnBelongToTheSwitcherWhileItsUp() {
+        // Control held or not: Esc puts the switcher away and Return switches, and neither reaches Reader under it.
+        for held in [true, false] {
+            #expect(TabSwitcher.ending(keyCode: 53, controlHeld: held) == .cancel)
+            #expect(TabSwitcher.ending(keyCode: 36, controlHeld: held) == .commit)
+            #expect(TabSwitcher.ending(keyCode: 76, controlHeld: held) == .commit)
+        }
+        // Arrows and Tab with Control held step; another key with Control let go ends it and goes on to the page.
+        #expect(TabSwitcher.ending(keyCode: 124, controlHeld: true) == nil)
+        #expect(TabSwitcher.ending(keyCode: 48, controlHeld: true) == nil)
+        #expect(TabSwitcher.ending(keyCode: 0, controlHeld: false) == .letGo)
+    }
 }

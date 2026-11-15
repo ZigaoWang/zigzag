@@ -124,6 +124,8 @@ final class Tab: NSObject {
     private var pdfResponseName: String?
     /// Settings, over the page while the tab is at zigzag://settings; nil for any other page.
     private(set) var settingsView: SettingsView?
+    /// Reader's article, while it covers this tab's page: the tab's picture is of it, as you see it.
+    weak var readerWebView: WKWebView?
     /// The profile Settings was asked to show before this tab had its page: shown once it has.
     private var settingsProfileAsked: UUID?
     private(set) var isPlayingAudio = false
@@ -1118,10 +1120,12 @@ final class Tab: NSObject {
             completion?()
             return
         }
+        // In Reader, the article over the page is what you see, so the switcher and the tab overview show it.
+        let shown = readerWebView.flatMap { $0.window != nil && $0.bounds.width > 0 ? $0 : nil } ?? webView
         let config = WKSnapshotConfiguration()
         config.afterScreenUpdates = false
-        config.snapshotWidth = NSNumber(value: Double(min(webView.bounds.width, 1280)))
-        webView.takeSnapshot(with: config) { [weak self] image, _ in
+        config.snapshotWidth = NSNumber(value: Double(min(shown.bounds.width, 1280)))
+        shown.takeSnapshot(with: config) { [weak self] image, _ in
             guard let self else { return }
             if let image {
                 self.snapshot = image
