@@ -176,9 +176,10 @@ final class SavePasswordPrompt: FloatingPanelView {
                 guard let self, self.superview != nil, let area = controller.pageFrame(showing: tab) else { return }
                 if self.isHidden {
                     // One question at a time at the top of the page (`PageQuestions`): a site's question showing
-                    // there goes first, and this comes up once it's answered.
-                    guard PageQuestions.mayShow(self, in: controller.promptOverlay) else { return }
+                    // there goes first, and this comes up once it's answered. Placed first, hidden still: one over
+                    // another pane of a split doesn't hold it up.
                     self.place(in: area)
+                    guard PageQuestions.mayShow(self, in: controller.promptOverlay) else { return }
                     self.isHidden = false
                     self.present()
                     self.scheduleHide()
@@ -273,7 +274,13 @@ final class SavePasswordPrompt: FloatingPanelView {
         DispatchQueue.main.asyncAfter(deadline: .now() + 20, execute: work)
     }
 
+    /// Set once it starts closing: closing frees the turn for the other questions, which asks this one to follow its
+    /// tab again, and with its tab gone that would close it again, without end.
+    private var isClosing = false
+
     private func close(saved: Bool) {
+        guard !isClosing else { return }
+        isClosing = true
         hideWork?.cancel()
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil

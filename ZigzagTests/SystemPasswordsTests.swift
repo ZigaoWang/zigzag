@@ -341,6 +341,33 @@ struct SystemPasswordsTests {
         #expect(try await icons(false) == ["none", "none", "none", "none"])
     }
 
+    @Test func theKeyIconIsOnlyZigzagsWhenItFills() {
+        guard #available(macOS 27, *) else { return }
+        #expect(AutofillKeyIcon.shows(fills: true, managerOn: false, panelAvailable: true))
+        // Fill passwords off: no key, even with the Mac's panel there (#236).
+        #expect(!AutofillKeyIcon.shows(fills: false, managerOn: false, panelAvailable: true))
+        // A password-manager extension draws its own icon in the field; Zigzag's would sit on it.
+        #expect(!AutofillKeyIcon.shows(fills: true, managerOn: true, panelAvailable: true))
+        #expect(!AutofillKeyIcon.shows(fills: false, managerOn: true, panelAvailable: true))
+        #expect(!AutofillKeyIcon.shows(fills: true, managerOn: false, panelAvailable: false))
+        // Not a browser tab's page (an extension's own, a test's): never.
+        #expect(!AutofillKeyIcon.shows(in: WKWebView()))
+    }
+
+    @Test func theKeyIconFollowsFillPasswords() async throws {
+        guard #available(macOS 27, *) else { return }
+        let profile = Profiles.shared.profile(ofPage: nil)
+        let key = ProfileKey.fillsPasswords.name(in: profile.id)
+        let before = UserDefaults.standard.object(forKey: key)
+        defer { UserDefaults.standard.set(before, forKey: key) }
+        let webView = BrowserWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let managerOn = PasswordManagers.active(in: profile) != nil
+        Autofill.setOn(false, in: profile)
+        #expect(!AutofillKeyIcon.shows(in: webView))
+        Autofill.setOn(true, in: profile)
+        #expect(AutofillKeyIcon.shows(in: webView) == (SystemAutoFillPanel.isAvailable && !managerOn))
+    }
+
     @Test func aClickOnTheKeyIconOpensTheMenu() async throws {
         guard #available(macOS 27, *) else { return }
         let heard = Heard()

@@ -10060,7 +10060,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在此网站上关闭"
+            "value" : "已为此网站关闭"
           }
         }
       }
@@ -10148,7 +10148,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在此网站上打开"
+            "value" : "已为此网站打开"
           }
         }
       }
@@ -13468,7 +13468,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "替你拒绝网站弹窗要的 Cookie，只用隐藏的弹窗直接隐藏。绝不替你同意。"
+            "value" : "替你拒绝网站弹窗要的 Cookie，只需隐藏的弹窗则直接隐藏。绝不替你同意。"
           }
         }
       }

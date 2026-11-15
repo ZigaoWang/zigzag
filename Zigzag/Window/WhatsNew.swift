@@ -436,9 +436,24 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
             return sheet.handle(event)
         }
         // The notes are about the app, not a tab, but they cover the page: another tab or space chosen (from the
-        // menu bar, a link from another app), they go rather than sit over a page they weren't opened on.
-        sheet.tabsToken = controller.tabManager.changed.observe { [weak sheet] change in
-            if change == .selection || change == .space { sheet?.close() }
+        // menu bar, a link from another app), they go rather than sit over a page they weren't opened on. A tab
+        // closing behind, or a split rearranged, says "selection" too while the same tab stays in front: they stay.
+        let tabs = controller.tabManager
+        let openedOn = Front(of: tabs)
+        sheet.tabsToken = tabs.changed.observe { [weak sheet, weak tabs] change in
+            guard let tabs, change == .selection || change == .space else { return }
+            if Front(of: tabs) != openedOn { sheet?.close() }
+        }
+    }
+
+    /// The tab and space in front: the notes stay while these do.
+    struct Front: Equatable {
+        var tab: UUID?
+        var space: UUID
+
+        init(of tabs: TabManager) {
+            tab = tabs.selectedTab?.id
+            space = tabs.currentSpaceID
         }
     }
 
@@ -446,7 +461,9 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
     /// window: the notes don't stack on it.
     private static func otherSheetIsUp(in controller: BrowserWindowController) -> Bool {
         let hosts = [controller.window?.contentView, controller.root.overlay].compactMap { $0 }
-        return hosts.contains { $0.subviews.contains { $0 is FormSheet || $0 is ConfirmSheet || $0 is ExtensionSheet || $0 is PageDialogSheet } }
+        // A page's dialog sits over its page, not the window: it's asked for by window.
+        return hosts.contains { $0.subviews.contains { $0 is FormSheet || $0 is ConfirmSheet || $0 is ExtensionSheet } }
+            || PageDialogSheet.isShowing(in: controller.window)
     }
 
     /// Another sheet is coming up in `window`: the notes, which only inform, make way for it rather than sit under it.
@@ -773,6 +790,8 @@ final class WhatsNewOffer: FloatingPanelView {
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
         dismiss()
+        // A toast that went under it moves back up to the top of the page.
+        if let controller { Toast.reposition(in: controller) }
     }
 
     private func layoutContent() {

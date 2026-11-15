@@ -201,6 +201,21 @@ final class HistoryStore {
         return name.isEmpty || name == "/" ? nil : name
     }
 
+    /// What a PDF from the web is called, having no title of its own: the name its server gave it
+    /// (`Content-Disposition`'s filename, as `suggested`), else its file's name where the address has one
+    /// (`fileName(of:)`), else its site. A PDF at /download?id=5 is never called "download".
+    nonisolated static func pdfName(of url: URL, suggested: String?) -> String {
+        if let suggested = suggested?.trimmingCharacters(in: .whitespacesAndNewlines), !suggested.isEmpty { return suggested }
+        return fileName(of: url) ?? url.host() ?? ""
+    }
+
+    /// The file name a response's `Content-Disposition` gives, when it gives one.
+    nonisolated static func suggestedName(of response: URLResponse) -> String? {
+        guard let disposition = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition"),
+              disposition.range(of: "filename", options: .caseInsensitive) != nil else { return nil }
+        return response.suggestedFilename
+    }
+
     nonisolated static func normalizedHost(_ url: URL) -> String {
         let host = url.host()?.lowercased() ?? ""
         return host.withoutWWW

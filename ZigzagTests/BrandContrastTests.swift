@@ -144,4 +144,32 @@ struct BrandContrastTests {
         #expect(Brand.contrast(resolved(Brand.ink(on: Brand.ribbon), dark: false), Brand.ribbon) >= 4.5)
         #expect(Brand.contrast(resolved(Brand.ink(on: Brand.navy), dark: true), Brand.navy) >= 4.5)
     }
+
+    /// Text in its own color over `ground`, as drawn: its alpha laid over the ground.
+    private func over(_ ink: NSColor, _ ground: NSColor) -> NSColor {
+        let i = ink.usingColorSpace(.sRGB)!, g = ground.usingColorSpace(.sRGB)!
+        func mix(_ a: CGFloat, _ b: CGFloat) -> CGFloat { b + (a - b) * i.alphaComponent }
+        return NSColor(srgbRed: mix(i.redComponent, g.redComponent), green: mix(i.greenComponent, g.greenComponent),
+                       blue: mix(i.blueComponent, g.blueComponent), alpha: 1)
+    }
+
+    /// Back and Skip in the welcome window (the ribbon at 0.75, `Onboard.quietLight`) while an import runs: fainter
+    /// than when they can be used, never the neutral gray, and still 3:1 on the welcome's blue, its lit corner too.
+    @Test func disabledTextInItsOwnColorStaysReadable() {
+        let ink = Brand.ribbon.withAlphaComponent(0.75)
+        let button = TextButton(title: "Back", font: Tokens.Font.body(.medium))
+        button.textColor = ink
+        button.isEnabled = false
+        for dark in [false, true] {
+            let deep = resolved(Brand.Theme.brand.deep, dark: dark)
+            let lit = deep.blended(withFraction: 0.12, of: .white)!
+            let disabled = resolved(TextButton.disabledInk(ink), dark: dark)
+            #expect(resolved(button.label.textColor!, dark: dark) == disabled)
+            for ground in [deep, lit] {
+                let off = Brand.contrast(over(disabled, ground), ground), on = Brand.contrast(over(ink, ground), ground)
+                #expect(off >= 3, "\(dark ? "dark" : "light"): \(String(format: "%.2f", off)):1 against \(String(format: "%.2f", on)):1")
+                #expect(off < on - 0.5)
+            }
+        }
+    }
 }

@@ -138,8 +138,9 @@ struct BookmarkTitleTests {
         #expect(FavoriteTile.look(selected: false, loaded: [false, false]) == .closed)
     }
 
-    @Test func aClosedTileIsFadedUntilThePointerComes() {
-        #expect(FavoriteTile.iconAlpha(.closed, hovered: false) == Tokens.Opacity.fadedFloor)
+    @Test func aTileIconIsNeverFaded() {
+        // Never faded: a closed favorite has no edge instead.
+        #expect(FavoriteTile.iconAlpha(.closed, hovered: false) == 1)
         #expect(FavoriteTile.iconAlpha(.closed, hovered: true) == 1)
         #expect(FavoriteTile.iconAlpha(.open, hovered: false) == 1)
         #expect(FavoriteTile.iconAlpha(.selected, hovered: false) == 1)

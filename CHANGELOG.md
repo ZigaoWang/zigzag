@@ -8,6 +8,10 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### New
 - Disable Images and Disable Styles, under ⋯ among the developer tools, in View › Developer and the command bar, show how a page in Developer Mode holds up without its pictures or without its CSS. Like the other choices they're that tab's alone. ([#141](https://github.com/ZigaoWang/zigzag/issues/141))
 
+### Fixed
+- A PDF at an address without a file name, like a download link, is called by the name its site gave it, in its tab and in History, or by the site when it gave none, instead of the last part of the address.
+- Sign-in fields no longer show the key icon when Fill saved passwords is off in Settings › Passwords, or when a password manager extension like Bitwarden or 1Password is on, where it sat over the extension's own icon. ([#236](https://github.com/ZigaoWang/zigzag/issues/236))
+
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
@@ -27,7 +31,7 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - The Apple Store's checkout shows one Apple Pay mark in its payment options, instead of the Apple Pay logo drawn over the Apple logo and Pay. ([#235](https://github.com/ZigaoWang/zigzag/issues/235))
 - Security hardening for pages, pop-ups, links, downloads, the address and secure connections.
 - The space's name stays at the top of the sidebar while you scroll the pinned tabs and tabs under it, as Arc keeps it, with the fine line under it while the list is scrolled. Rows pass under it rather than showing through.
-- Favorites show which are open, as tabs do: a favorite whose page isn't loaded is faded back until you point at it, one that's open has its fine edge, and the one you're on has the selected tab's card.
+- Favorites show which are open, as tabs do: one whose page is open has a fine edge, one that isn't has none, with its icon in full color either way, and the one you're on has the selected tab's card.
 - A favorite that moved on from its page shows it, as a pinned tab does with Original / Current page: the tile shows the icon of the page it's on now with the favorite's own icon small on its corner, pointing at it names both, and Back to Favorite's Page in its menu takes it back, in a split favorite too.
 - A tab's or pinned tab's title no longer moves or gets cut shorter when the pointer brings up its close or back button: the button shows over the title's faded end.
 - Open in from Zigzag Mini, into a window that had just opened with its command bar, closes the bar instead of leaving it over the page.
