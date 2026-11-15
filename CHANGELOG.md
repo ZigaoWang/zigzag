@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- The camera and the microphone are two permissions in Site Controls: a site asks for each on its own, one question after the other, and a call that wants both is allowed only when you've allowed both. Sites you allowed both before keep both. ([#243](https://github.com/ZigaoWang/zigzag/issues/243))
+
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.

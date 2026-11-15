@@ -3480,19 +3480,19 @@
         }
       }
     },
-    "Camera and Microphone" : {
-      "comment" : "Tooltip of the address bar's button that shows while a page uses the camera or microphone.",
+    "Camera" : {
+      "comment" : "Row in the site panel's This Site group.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "摄像头和麦克风"
+            "value" : "摄像头"
           }
         }
       }
     },
-    "Camera and microphone" : {
-      "comment" : "Row in the site panel's This Site group.",
+    "Camera and Microphone" : {
+      "comment" : "Tooltip of the address bar's button that shows while a page uses the camera or microphone.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8693,6 +8693,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "中"
+          }
+        }
+      }
+    },
+    "Microphone" : {
+      "comment" : "Row in the site panel's This Site group.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "麦克风"
           }
         }
       }
@@ -17580,17 +17591,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用你的摄像头"
-          }
-        }
-      }
-    },
-    "Use your camera and microphone" : {
-      "comment" : "A site's permission question, without its question mark.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用你的摄像头和麦克风"
           }
         }
       }

@@ -160,13 +160,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // An answer to the question holds for this page only (Ask); Always Allow keeps it for the site, and
             // Ask Every Time takes that back. A private window keeps nothing for a site.
             if !tab.isPrivate {
-                if SitePermissions.choice(.cameraAndMicrophone, origin: origin) == .allow {
+                let both = SitePermissions.choice(.camera, origin: origin) == .allow
+                    && SitePermissions.choice(.microphone, origin: origin) == .allow
+                if both {
                     items.append(.item(.init(title: String(localized: "Ask Every Time", comment: "Menu item of the address bar's camera button: the site, allowed the camera and microphone for good, asks again on every visit."), symbol: "arrow.counterclockwise") {
-                        SitePermissions.setChoice(.ask, for: .cameraAndMicrophone, origin: origin)
+                        SitePermissions.setChoice(.ask, for: .camera, origin: origin)
+                        SitePermissions.setChoice(.ask, for: .microphone, origin: origin)
                     }))
                 } else {
                     items.append(.item(.init(title: String(localized: "Always Allow on This Site", comment: "Menu item of the address bar's camera button: the site may use the camera and microphone from now on without asking."), symbol: "checkmark.circle") {
-                        SitePermissions.setChoice(.allow, for: .cameraAndMicrophone, origin: origin)
+                        SitePermissions.setChoice(.allow, for: .camera, origin: origin)
+                        SitePermissions.setChoice(.allow, for: .microphone, origin: origin)
                     }))
                 }
             }

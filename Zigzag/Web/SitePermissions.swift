@@ -55,10 +55,9 @@ struct PagePermissionAnswers {
     /// `key` is what the answer is for (`SitePermissions.answerKey`), `kind` what was asked ("camera", "location"…).
     mutating func note(_ allowed: Bool, key: String, kind: String) { answers["\(key)|\(kind)"] = allowed }
 
-    /// A camera-only or microphone-only question takes an answer given to both at once.
-    func answer(key: String, kind: String) -> Bool? {
-        answers["\(key)|\(kind)"] ?? (kind == "camera" || kind == "microphone" ? answers["\(key)|cameraAndMicrophone"] : nil)
-    }
+    /// The answer given for `kind` on this page, if any. The camera and the microphone are separate permissions: an
+    /// answer given to both at once, from before the split, is not read as either.
+    func answer(key: String, kind: String) -> Bool? { answers["\(key)|\(kind)"] }
 
     mutating func forget() { answers = [:] }
 
@@ -77,6 +76,16 @@ enum SitePermissions {
     private static var all: [String: Bool] {
         get { defaults.dictionary(forKey: key) as? [String: Bool] ?? [:] }
         set { defaults.set(newValue, forKey: key) }
+    }
+
+    /// The kinds a request is kept under, in the order they are asked: a call's camera and microphone is two
+    /// permissions now, so it is two questions.
+    static func mediaTypes(for type: WKMediaCaptureType) -> [WKMediaCaptureType] {
+        switch type {
+        case .camera: [.camera]
+        case .microphone: [.microphone]
+        default: [.camera, .microphone]
+        }
     }
 
     static func kind(_ type: WKMediaCaptureType) -> String {
@@ -107,6 +116,24 @@ enum SitePermissions {
             if after[migrated] == nil { after[migrated] = false }
         }
         all = after
+    }
+
+    /// One answer kept for the camera and the microphone together becomes one for each: the same answer for both,
+    /// never the other way round, and a kind's own answer wins. Runs at launch after `migrateHostOnlyAnswers`;
+    /// running again on a key that somehow survives finds nothing to do.
+    static func migrateMediaAnswers() {
+        var now = all
+        let legacy = now.keys.filter { $0.hasSuffix("|cameraAndMicrophone") }
+        guard !legacy.isEmpty else { return }
+        for key in legacy {
+            let origin = String(key.dropLast("|cameraAndMicrophone".count))
+            let allowed = now[key] ?? false
+            for kind in ["camera", "microphone"] where now["\(origin)|\(kind)"] == nil {
+                now["\(origin)|\(kind)"] = allowed
+            }
+            now[key] = nil
+        }
+        all = now
     }
 
     /// What an answer is kept under. A frame from the page's own origin asks as the page. One from elsewhere (a call
@@ -144,7 +171,8 @@ enum SitePermissions {
     /// Camera and microphone answers given on a site's page: its own, and those of frames from elsewhere on it.
     static func mediaDecisions(origin: String) -> [Bool] {
         let now = all
-        return keys(["camera", "microphone", "cameraAndMicrophone"], on: origin).compactMap { now[$0] }
+        // Sorted, so the camera comes before the microphone whatever order the store returns.
+        return keys(["camera", "microphone"], on: origin).sorted().compactMap { now[$0] }
     }
 
     /// Location answers given on a site's page, its frames' included.
@@ -153,14 +181,21 @@ enum SitePermissions {
         return keys(["location"], on: origin).compactMap { now[$0] }
     }
 
-    /// A camera-only or microphone-only question takes the answer given to both at once (from a call, or chosen in
-    /// Site Controls) when it has none of its own.
+    /// What is kept for `type`: its own answer. A request for the camera and the microphone together is answered only
+    /// when both are kept, and a no in either is a no.
     static func decision(origin: String, type: WKMediaCaptureType) -> Bool? {
         let now = all
-        return now["\(origin)|\(kind(type))"] ?? (type == .camera || type == .microphone ? now["\(origin)|cameraAndMicrophone"] : nil)
+        let types = mediaTypes(for: type)
+        let answers = types.compactMap { now["\(origin)|\(kind($0))"] }
+        guard answers.count == types.count else { return nil }
+        return answers.allSatisfy { $0 }
     }
 
-    static func remember(_ allowed: Bool, origin: String, type: WKMediaCaptureType) { all["\(origin)|\(kind(type))"] = allowed }
+    static func remember(_ allowed: Bool, origin: String, type: WKMediaCaptureType) {
+        var now = all
+        for type in mediaTypes(for: type) { now["\(origin)|\(kind(type))"] = allowed }
+        all = now
+    }
 
     /// Every remembered answer for one site: kind ("camera", "location", "notifications"…) to allowed or not.
     static func choices(origin: String) -> [String: Bool] {
@@ -383,30 +418,49 @@ enum SitePermissions {
                         tab: Tab? = nil) async -> WKPermissionDecision {
         let frame = SiteOrigin.of(securityOrigin), page = page(of: tab, frame: frame)
         let key = answerKey(frame: frame, page: page)
-        if let key, let known = decision(key: key, type: type, tab: tab) { return known ? .grant : .deny }
-        noteAsked(.cameraAndMicrophone, origin: page, isPrivate: isPrivate)
-        let what: String, title: String
-        switch type {
-        case .camera: (what, title) = ("your camera", String(localized: "Use your camera", comment: "A site's permission question, without its question mark."))
-        case .microphone: (what, title) = ("your microphone", String(localized: "Use your microphone", comment: "A site's permission question, without its question mark."))
-        default: (what, title) = ("your camera and microphone", String(localized: "Use your camera and microphone", comment: "A site's permission question, without its question mark."))
+        let types = mediaTypes(for: type)
+        // Every kind already answered for the site or this page: no question.
+        if let key, types.allSatisfy({ decision(key: key, type: $0, tab: tab) != nil }) {
+            return types.allSatisfy { decision(key: key, type: $0, tab: tab) == true } ? .grant : .deny
         }
         guard let controller = WindowManager.shared.promptHost(for: window) else {
             // Nowhere to ask (a sign-in popup): say no this time, without remembering it.
             return .deny
         }
-        // The question goes once the tab leaves the page it was asked on.
-        let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: what,
-                                                symbol: type == .microphone ? "mic.fill" : "video.fill", in: controller, tab: tab, title: title,
-                                                answered: { key.flatMap { decision(key: $0, type: type, tab: tab) }.map { $0 ? .allow : .deny } })
-        // Only a clicked answer holds for the page; Esc, or the window closing, is "not now".
-        switch answer {
-        case .allow, .always, .alternate, .deny:
-            if let key { tab?.permissionAnswers.note(answer != .deny, key: key, kind: kind(type)) }
-            return answer != .deny ? .grant : .deny
-        case .notNow:
-            return .deny
+        var allowed = true
+        for type in types {
+            if let key, let known = decision(key: key, type: type, tab: tab) {
+                allowed = allowed && known
+                continue
+            }
+            noteAsked(type == .microphone ? .microphone : .camera, origin: page, isPrivate: isPrivate)
+            let what: String, title: String
+            switch type {
+            case .camera: (what, title) = ("your camera", String(localized: "Use your camera", comment: "A site's permission question, without its question mark."))
+            case .microphone: (what, title) = ("your microphone", String(localized: "Use your microphone", comment: "A site's permission question, without its question mark."))
+            // Never in `types`: a request for both is the two questions above, in turn. A kind WebKit adds later is
+            // not asked for, and doesn't count against the request.
+            case .cameraAndMicrophone: continue
+            @unknown default: continue
+            }
+            // The two questions in a row take their turns like any others (`PageQuestions`): the second comes up only
+            // after the first has gone.
+            let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: what,
+                                                    symbol: type == .microphone ? "mic.fill" : "video.fill", in: controller, tab: tab, title: title,
+                                                    answered: { key.flatMap { decision(key: $0, type: type, tab: tab) }.map { $0 ? .allow : .deny } })
+            // Only a clicked answer holds for the page; Esc, or the window closing, is "not now".
+            switch answer {
+            case .allow, .always, .alternate:
+                if let key { tab?.permissionAnswers.note(true, key: key, kind: kind(type)) }
+            case .deny:
+                if let key { tab?.permissionAnswers.note(false, key: key, kind: kind(type)) }
+                allowed = false
+            case .notNow:
+                // Put off: the rest of this request isn't asked, and nothing is kept.
+                return .deny
+            }
         }
+        return allowed ? .grant : .deny
     }
 
     /// Screen sharing (getDisplayMedia): asked every time, as Safari does, and nothing kept. Don't Allow, Share
@@ -449,15 +503,16 @@ enum DisplayCaptureChoice: Int, CaseIterable {
     }
 }
 
-/// What a site can ask for, as Site Controls has a row for each. Calls ask for the camera and microphone at once and
-/// are answered as one.
+/// What a site can ask for, as Site Controls has a row for each. The camera and the microphone are separate
+/// permissions, so a call asks for each and can have a row for each.
 enum SitePermission: String, CaseIterable {
-    case cameraAndMicrophone, location, notifications, popups, apps, webRTC
+    case camera, microphone, location, notifications, popups, apps, webRTC
 
     /// The kinds of answer kept for it.
     var kinds: [String] {
         switch self {
-        case .cameraAndMicrophone: ["camera", "microphone", "cameraAndMicrophone"]
+        case .camera: ["camera"]
+        case .microphone: ["microphone"]
         case .location: ["location"]
         case .notifications: ["notifications"]
         case .popups: ["popups"]
@@ -471,15 +526,17 @@ enum SitePermission: String, CaseIterable {
     var choices: [PermissionChoice] { self == .webRTC ? [.allow, .block] : PermissionChoice.allCases }
 
     /// The one kind a choice made in Site Controls is kept as.
-    var primaryKind: String { self == .cameraAndMicrophone ? "cameraAndMicrophone" : rawValue }
+    var primaryKind: String { rawValue }
 
-    /// A private window asks for the camera, location and apps to open (and keeps nothing); it never shows
-    /// notifications or opens pop-ups on its own. WebRTC follows the setting there, chosen for the tab alone.
-    var inPrivate: Bool { self == .cameraAndMicrophone || self == .location || self == .apps || self == .webRTC }
+    /// A private window asks for the camera and the microphone, location and apps to open (and keeps nothing); it
+    /// never shows notifications or opens pop-ups on its own. WebRTC follows the setting there, chosen for the tab
+    /// alone.
+    var inPrivate: Bool { self == .camera || self == .microphone || self == .location || self == .apps || self == .webRTC }
 
     var title: String {
         switch self {
-        case .cameraAndMicrophone: String(localized: "Camera and microphone", comment: "Row in the site panel's This Site group.")
+        case .camera: String(localized: "Camera", comment: "Row in the site panel's This Site group.")
+        case .microphone: String(localized: "Microphone", comment: "Row in the site panel's This Site group.")
         case .location: String(localized: "Location", comment: "Row in the site panel's This Site group.")
         case .notifications: String(localized: "Notifications", comment: "Row in the site panel's This Site group.")
         case .popups: String(localized: "Pop-ups", comment: "Row in the site panel's This Site group.")
