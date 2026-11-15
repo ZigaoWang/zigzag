@@ -54,7 +54,7 @@ enum DebugBridge {
     #if DEBUG
     /// mini [url] (blank: the quick open bar, as ⌃⌘N), miniquick [text] (the quick open bar, with this typed in it),
     /// miniquickenter, miniquickesc, minibar [text] (⌘L's bar over the mini page), miniext <url> (as a link from another app), minisetting on|off,
-    /// minitype <text> (typed into the address field and entered), minimove (Open in), miniclose,
+    /// minitype <text> (typed into the address field and entered), minimove (Open in), miniclose, minifind [text|close] (⌘F),
     /// minispace [name] (the strip's space menu, or that space chosen), minicopy (Copy Link), miniresize <w> <h>,
     /// minimenu <char> [cmd|shift|ctrl|opt...] (a menu item's action, sent as the menu would to Zigzag Mini),
     /// ministate <path> (JSON), minishot <path> (the window's own drawing, as a PNG; web content may be blank),
@@ -191,6 +191,7 @@ enum DebugBridge {
         case "minispace": mini?.debugSpace(arg)
         case "minicopy": mini?.copyPageURL(nil)
         case "minisite": mini?.showSiteControls()
+        case "minifind": mini?.debugFind(arg)
         case "miniresize":
             let n = arg.split(separator: " ").compactMap { Double($0) }
             if n.count == 2, let window = mini?.window {

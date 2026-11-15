@@ -77,10 +77,33 @@ private final class PaddedTextFieldCell: NSTextFieldCell {
 
 }
 
+/// A window the find bar searches in: a browser window, or Zigzag Mini (#246).
+protocol FindBarHost: AnyObject {
+    var window: NSWindow? { get }
+    /// The page it searches, where the bar sits at the top right.
+    var focusedPaneFrame: NSRect { get }
+    /// A split pane's header at the top of that page, which the bar sits below.
+    var findBarHeaderHeight: CGFloat { get }
+    /// Where the bar goes, over the page.
+    var findBarOverlay: NSView { get }
+    /// Something in front of the page (the command bar, peek) takes Esc first.
+    var findBarIsCovered: Bool { get }
+    var findableWebView: WKWebView? { get }
+    /// Zigzag's own PDF viewer showing the page, which searches the PDF itself.
+    var findablePDF: PDFViewerView? { get }
+}
+
+extension BrowserWindowController: FindBarHost {
+    var findBarHeaderHeight: CGFloat { root.card.showsHeader ? PaneHeaderView.height : 0 }
+    var findBarOverlay: NSView { root.overlay }
+    var findBarIsCovered: Bool { commandBar.isVisible || peek.isVisible }
+    var findablePDF: PDFViewerView? { selectedTab?.pdfViewer }
+}
+
 /// Find in page: a floating capsule at the top right of the page card holding a magnifying glass, the field, the count,
 /// and round buttons whose circles run with the capsule's end.
 final class FindBarController: NSObject, NSTextFieldDelegate {
-    private weak var window: BrowserWindowController?
+    private weak var window: (any FindBarHost)?
     private let panel = FloatingPanelView()
     private let glass = NSImageView(image: Tokens.Symbol.image("magnifyingglass", size: Tokens.TypeSize.body))
     private let field = PlainTextField(font: Tokens.Font.body(), placeholder: String(localized: "Find on page", comment: "Placeholder of the find bar's field."))
@@ -92,7 +115,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     private var query = ""
     var hasQuery: Bool { !query.isEmpty }
 
-    init(window: BrowserWindowController) {
+    init(window: any FindBarHost) {
         self.window = window
         super.init()
         field.delegate = self
@@ -132,7 +155,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         let height = Tokens.Metric.findBarHeight
         let width = Tokens.Metric.findBarWidth
         // Below a split pane's header, as far into the page as without one, clear of the header's buttons.
-        let header = window.root.card.showsHeader ? PaneHeaderView.height : 0
+        let header = window.findBarHeaderHeight
         return NSRect(x: card.maxX - width - Tokens.Space.x3, y: card.minY + header + Tokens.Space.x3, width: width, height: height)
     }
 
@@ -172,7 +195,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         if !isVisible {
             isVisible = true
             panel.frame = frame
-            window.root.overlay.addSubview(panel)
+            window.findBarOverlay.addSubview(panel)
             panel.present(arrival: animated ? .pop : .instant)
             watchEscape()
         } else {
@@ -193,7 +216,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
             guard let self, event.keyCode == 53, self.isVisible, event.window === self.window?.window,
                   event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty,
                   // Something else in front (the address bar, peek) takes its own Esc first.
-                  self.window?.commandBar.isVisible != true, self.window?.peek.isVisible != true else { return event }
+                  self.window?.findBarIsCovered != true else { return event }
             self.hide()
             return nil
         }
@@ -272,7 +295,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     /// `toMatch`: a tick clicked, the match to go to.
     private func search(backwards: Bool, fromStart: Bool = false, toMatch: Int? = nil) {
         // A PDF is searched in its own viewer, which knows its pages and counts the matches itself.
-        if let pdf = window?.selectedTab?.pdfViewer {
+        if let pdf = window?.findablePDF {
             searched = window?.findableWebView
             searchedPDF = pdf
             pdfSearch?.cancel()
@@ -425,7 +448,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
 
     private func clearHighlights() {
         pdfSearch?.cancel()
-        (searchedPDF ?? window?.selectedTab?.pdfViewer)?.clearFind()
+        (searchedPDF ?? window?.findablePDF)?.clearFind()
         searchedPDF = nil
         let webView = searched ?? window?.findableWebView
         clearMarks(in: webView)

@@ -30,6 +30,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private lazy var linkStatus = LinkStatusController(overlay: overlay)
     /// ⌘L: the browser window's own command bar, over the page's site.
     private lazy var commandBar = CommandBarController(host: self)
+    /// ⌘F: the browser window's own find bar, over the page.
+    private lazy var findBar = FindBarController(window: self)
     private var tokens: [SignalToken] = []
     /// The page went into a browser window: closing this one must leave it alone.
     private var movedOut = false
@@ -536,6 +538,11 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         if let id = Library.shared.spaces.first(where: { $0.name == name })?.id { choose(space: id) } else { showSpaceMenu() }
     }
 
+    /// minifind [text]: the find bar, searching for this; minifind close puts it away.
+    func debugFind(_ text: String) {
+        if text == "close" { findBar.hide() } else { findBar.show(query: text.isEmpty ? nil : text) }
+    }
+
     func debugEscape() {
         if commandBar.isVisible { commandBar.debugEscape() } else { cancelOperation(nil) }
     }
@@ -586,6 +593,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private func letGo() {
         if SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
         movedOut = true
+        findBar.hide()
         pageGone.send()
         tokens.removeAll()
         Autofill.shared.forget(windowOf: window)
@@ -640,6 +648,19 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     @objc func reloadPageFromOrigin(_ sender: Any?) { tab.reloadFromOrigin() }
     @objc func stopLoading(_ sender: Any?) { tab.stopLoading() }
 
+    @objc func showFindBar(_ sender: Any?) { findBar.toggle() }
+    @objc func findNextMatch(_ sender: Any?) { findBar.next(backwards: false) }
+    @objc func findPreviousMatch(_ sender: Any?) { findBar.next(backwards: true) }
+    @objc func useSelectionForFind(_ sender: Any?) {
+        tab.webView?.runOwnScript("window.getSelection().toString()") { [weak self] answer in
+            let result = try? answer.get()
+            MainActor.assumeIsolated {
+                guard let text = result as? String, !text.isEmpty else { return }
+                self?.findBar.show(query: text)
+            }
+        }
+    }
+
     @objc func zoomIn(_ sender: Any?) {
         guard let webView = tab.webView else { return }
         setZoom(ZoomLevels.step(webView.pageZoom, by: 1))
@@ -687,6 +708,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         returnTo = nil
         isClosing = true
+        findBar.hide()
         if SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
         pageGone.send()
         linkStatus.hide()
@@ -777,9 +799,20 @@ extension MiniWindowController: NSMenuItemValidation {
         case #selector(goBack(_:)): return tab.canGoBack
         case #selector(goForward(_:)): return tab.canGoForward
         case #selector(stopLoading(_:)): return tab.isLoading
+        case #selector(findNextMatch(_:)), #selector(findPreviousMatch(_:)): return !isLeaving && findBar.hasQuery
         default: return !isLeaving
         }
     }
+}
+
+// MARK: - Find on its page
+
+extension MiniWindowController: FindBarHost {
+    var findBarHeaderHeight: CGFloat { 0 }
+    var findBarOverlay: NSView { overlay }
+    var findBarIsCovered: Bool { commandBar.isVisible }
+    var findableWebView: WKWebView? { movedOut ? nil : tab.webView }
+    var findablePDF: PDFViewerView? { nil }
 }
 
 // MARK: - Its space
