@@ -157,4 +157,18 @@ struct ExternalLinkAskingTests {
         #expect(ask7)
         #expect(!asked.declined.contains(key))
     }
+    /// An extension sending the tab to an app's link (Downie's button): the web view shows the link as its address
+    /// while it's decided, and the question is still the page's, so its Always Open counts (#239).
+    @Test func anAppLinkZigzagSendsIsFromThePageItsOn() {
+        let link = URL(string: "downie://XUOpenLink?url=https://www.instagram.com/reel/1")
+        let page = ExternalLinks.page(showing: link, asker: "https://www.instagram.com")
+        #expect(page == URL(string: "https://www.instagram.com"))
+        #expect(SiteOrigin.of(page) == "https://www.instagram.com")
+        #expect(!ExternalLinks.isForeign(askerHost: "www.instagram.com", pageHost: page?.host() ?? ""))
+        // The page's own address stays the page, whoever asked.
+        let zoom = URL(string: "https://zoom.us/j/1")
+        #expect(ExternalLinks.page(showing: zoom, asker: "https://ads.example") == zoom)
+        // Nothing asked: no page to keep an answer under.
+        #expect(ExternalLinks.page(showing: link, asker: nil) == nil)
+    }
 }

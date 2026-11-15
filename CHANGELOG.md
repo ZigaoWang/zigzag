@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - History starts a new heading when the time of day changes, so pages from the evening are no longer listed under "Yesterday morning" after a long day of browsing.
+- Downie and other extensions that add their right-click menu items once, when they're installed, keep them after you quit and reopen Zigzag, as in Chrome. Clicking Downie's button sends the page to Downie, asking first, instead of opening the extension's settings, and the question comes from the site you're on, so Always Open works there. ([#239](https://github.com/ZigaoWang/zigzag/issues/239))
 
 ## [0.9.1] - 2026-11-15
 

@@ -87,13 +87,14 @@ enum ExternalLinks {
             }
             return
         }
-        let pageHost = webView.url?.host()?.lowercased() ?? ""
+        let pageURL = page(showing: webView.url, asker: asker.flatMap { SiteOrigin.of($0) })
+        let pageHost = pageURL?.host()?.lowercased() ?? ""
         let askerHost = asker?.host.lowercased() ?? ""
         let foreign = isForeign(askerHost: asker == nil ? nil : askerHost, pageHost: pageHost)
         // Always Open is kept for secure pages only. Choices are kept per origin, so one for https://zoom.us is not
         // one for http://zoom.us or https://zoom.us:8443.
-        let pageOrigin = SiteOrigin.of(webView.url)
-        let canRemember = !foreign && webView.url?.scheme?.lowercased() == "https"
+        let pageOrigin = SiteOrigin.of(pageURL)
+        let canRemember = !foreign && pageURL?.scheme?.lowercased() == "https"
         let host = foreign ? askerHost : pageHost
         let origin = foreign ? asker.flatMap { SiteOrigin.of($0) } : pageOrigin
         let key = "\(origin ?? host)|\(scheme)"
@@ -156,6 +157,15 @@ enum ExternalLinks {
                 asked.putOff[key] = Date().addingTimeInterval(60)
             }
         }
+    }
+
+    /// The address of the page a link for an app is from: the web view's. A tab Zigzag itself sends to an app's link
+    /// (an extension's tabs.update: Downie's button) already shows that link as its address while it's decided, so
+    /// the page is the one it's still on, the frame that asked (`asker`, its origin). Taking the link for the page
+    /// made every such question come from a site of its own ("downie://xuopenlink"), never the site you're on (#239).
+    static func page(showing address: URL?, asker: String?) -> URL? {
+        guard let address, isExternal(address) else { return address }
+        return asker.flatMap { URL(string: $0) }
     }
 
     enum Verdict: Equatable { case block, open, ask }
