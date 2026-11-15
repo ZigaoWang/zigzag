@@ -5,10 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- History starts a new heading when the time of day changes, so pages from the evening are no longer listed under "Yesterday morning" after a long day of browsing.
-- Downie and other extensions that add their right-click menu items once, when they're installed, keep them after you quit and reopen Zigzag, as in Chrome. Clicking Downie's button sends the page to Downie, asking first, instead of opening the extension's settings, and the question comes from the site you're on, so Always Open works there. ([#239](https://github.com/ZigaoWang/zigzag/issues/239))
-
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
@@ -77,6 +73,8 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - DeepSeek no longer asks you to check your browser extensions in a tab that opened before ad blocking had its lists, or beside an ad blocker extension. Its blocked telemetry now always gets an empty answer while blocking is on, so nothing is sent. ([#208](https://github.com/ZigaoWang/zigzag/issues/208))
 - Backspace no longer takes a page back when no text field has the focus, as in Safari and Chrome. It still removes the rows you've picked in the sidebar.
 - Panels, menus, toasts, sheets and a site's dialogs come and go with one calm, consistent motion. A page's dialog fades in and out like the other sheets, the dimming behind a sheet or a peek fades with it, a tab's preview and the password menu grow out of what they belong to, a click right after closing one reaches what's under it, and Reduce Motion is respected.
+- History starts a new heading when the time of day changes, so pages from the evening are no longer listed under "Yesterday morning" after a long day of browsing.
+- Downie and other extensions that add their right-click menu items once, when they're installed, keep them after you quit and reopen Zigzag, as in Chrome. Clicking Downie's button sends the page to Downie, asking first, instead of opening the extension's settings, and the question comes from the site you're on, so Always Open works there. ([#239](https://github.com/ZigaoWang/zigzag/issues/239))
 
 - A one-page PDF stays in the middle with Two Pages on, instead of sitting alone on the right like a book's first page.
 - A strong password from Use Strong Password stays in Passwords until a newer one for the same account takes its place, however long the site takes to confirm it. Unconfirmed ones are no longer deleted after two weeks.
