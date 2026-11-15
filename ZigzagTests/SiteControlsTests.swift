@@ -50,7 +50,8 @@ struct SiteControlsPermissionTests {
 
     @Test func aPrivateWindowNotesNothing() throws {
         try withDefaults {
-            SitePermissions.noteAsked(.cameraAndMicrophone, origin: site, isPrivate: true)
+            SitePermissions.noteAsked(.camera, origin: site, isPrivate: true)
+            SitePermissions.noteAsked(.microphone, origin: site, isPrivate: true)
             SitePermissions.noteAsked(.location, origin: nil, isPrivate: false)
             #expect(SitePermissions.shown(origin: site, isPrivate: false).isEmpty)
         }
@@ -60,11 +61,11 @@ struct SiteControlsPermissionTests {
         try withDefaults {
             SitePermissions.setNotifications(true, origin: site)
             SitePermissions.remember(false, origin: site, type: .camera)
-            #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.cameraAndMicrophone, .notifications])
+            #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.camera, .notifications])
             #expect(SitePermissions.choice(.notifications, origin: site) == .allow)
-            #expect(SitePermissions.choice(.cameraAndMicrophone, origin: site) == .block)
+            #expect(SitePermissions.choice(.camera, origin: site) == .block)
             // A private window has no notifications or pop-ups to offer.
-            #expect(SitePermissions.shown(origin: site, isPrivate: true) == [.cameraAndMicrophone])
+            #expect(SitePermissions.shown(origin: site, isPrivate: true) == [.camera])
         }
     }
 
@@ -74,11 +75,12 @@ struct SiteControlsPermissionTests {
         try withDefaults {
             let tab = Tab(url: URL(string: site), title: "Meet", spaceID: UUID())
             tab.permissionAnswers.note(true, key: site, kind: "notifications")
-            tab.permissionAnswers.note(true, key: site, kind: "cameraAndMicrophone")
+            tab.permissionAnswers.note(true, key: site, kind: "camera")
+            tab.permissionAnswers.note(false, key: site, kind: "microphone")
             tab.permissionAnswers.note(false, key: site, kind: "location")
             #expect(SitePermissions.notifications(origin: site, tab: tab) == true)
-            // A camera-only question takes the answer given to a call's camera and microphone.
             #expect(tab.permissionAnswers.answer(key: site, kind: "camera") == true)
+            #expect(tab.permissionAnswers.answer(key: site, kind: "microphone") == false)
             #expect(tab.permissionAnswers.answer(key: site, kind: "location") == false)
             // Nothing kept for the site: it's still Ask, and another tab on it asks.
             #expect(SitePermissions.choices(origin: site).isEmpty)
@@ -92,6 +94,10 @@ struct SiteControlsPermissionTests {
             tab.permissionAnswers.forget()
             #expect(tab.permissionAnswers.isEmpty)
             #expect(SitePermissions.notifications(origin: site, tab: tab) == nil)
+            // An answer given to both at once, from before the split, is not read as either.
+            tab.permissionAnswers.note(true, key: site, kind: "cameraAndMicrophone")
+            #expect(tab.permissionAnswers.answer(key: site, kind: "camera") == nil)
+            #expect(tab.permissionAnswers.answer(key: site, kind: "microphone") == nil)
         }
     }
 
@@ -123,19 +129,72 @@ struct SiteControlsPermissionTests {
         }
     }
 
-    /// The existing questions read what Site Controls keeps: a camera-only question takes the answer chosen for both.
-    @Test func cameraAndMicrophoneChoiceAnswersEachQuestion() throws {
+    /// The camera and the microphone are two permissions: one row and one answer each.
+    @Test func theCameraAndMicrophoneHaveTwoAnswers() throws {
         try withDefaults {
             SitePermissions.remember(false, origin: site, type: .microphone)
-            SitePermissions.setChoice(.allow, for: .cameraAndMicrophone, origin: site)
+            SitePermissions.setChoice(.allow, for: .camera, origin: site)
             #expect(SitePermissions.decision(origin: site, type: .camera) == true)
-            #expect(SitePermissions.decision(origin: site, type: .microphone) == true)
+            #expect(SitePermissions.decision(origin: site, type: .microphone) == false)
+            #expect(SitePermissions.choice(.camera, origin: site) == .allow)
+            #expect(SitePermissions.choice(.microphone, origin: site) == .block)
+            #expect(SitePermissions.choices(origin: site) == ["camera": true, "microphone": false])
+            #expect(SitePermissions.mediaDecisions(origin: site) == [true, false])
+            // Ask forgets one without touching the other.
+            SitePermissions.setChoice(.ask, for: .camera, origin: site)
+            #expect(SitePermissions.decision(origin: site, type: .camera) == nil)
+            #expect(SitePermissions.decision(origin: site, type: .microphone) == false)
+        }
+    }
+
+    /// A camera-and-microphone request is two questions, and a call gets both only when both say yes.
+    @Test func aRequestForBothTakesTwoAnswers() throws {
+        try withDefaults {
+            #expect(SitePermissions.mediaTypes(for: .camera) == [.camera])
+            #expect(SitePermissions.mediaTypes(for: .microphone) == [.microphone])
+            #expect(SitePermissions.mediaTypes(for: .cameraAndMicrophone) == [.camera, .microphone])
+            // Nothing kept for it until both kinds are answered.
+            #expect(SitePermissions.decision(origin: site, type: .cameraAndMicrophone) == nil)
+            SitePermissions.remember(true, origin: site, type: .camera)
+            #expect(SitePermissions.decision(origin: site, type: .cameraAndMicrophone) == nil)
+            SitePermissions.remember(false, origin: site, type: .microphone)
+            #expect(SitePermissions.decision(origin: site, type: .cameraAndMicrophone) == false)
+            SitePermissions.remember(true, origin: site, type: .microphone)
             #expect(SitePermissions.decision(origin: site, type: .cameraAndMicrophone) == true)
-            // One key for the site's own answer, not three.
-            #expect(SitePermissions.choices(origin: site) == ["cameraAndMicrophone": true])
-            SitePermissions.setChoice(.block, for: .cameraAndMicrophone, origin: site)
-            #expect(SitePermissions.decision(origin: site, type: .camera) == false)
-            #expect(SitePermissions.mediaDecisions(origin: site) == [false])
+            // Remembering an answer for both writes one for each, never the other way round.
+            SitePermissions.remember(false, origin: site, type: .cameraAndMicrophone)
+            #expect(SitePermissions.choices(origin: site) == ["camera": false, "microphone": false])
+        }
+    }
+
+    /// One answer for both, from before the split, becomes one for each; a kind's own answer wins.
+    @Test func anAnswerForBothBecomesOneForEach() throws {
+        try withDefaults {
+            SitePermissions.defaults.set(["https://meet.example.com|cameraAndMicrophone": true,
+                                          "https://other.example|cameraAndMicrophone": false,
+                                          "https://meet.example.com|camera": false], forKey: "SitePermissions")
+            SitePermissions.migrateMediaAnswers()
+            let now = SitePermissions.defaults.dictionary(forKey: "SitePermissions") as? [String: Bool]
+            #expect(now == ["https://meet.example.com|camera": false,
+                            "https://meet.example.com|microphone": true,
+                            "https://other.example|camera": false,
+                            "https://other.example|microphone": false])
+            // Once is enough: again, nothing changes.
+            SitePermissions.migrateMediaAnswers()
+            #expect(SitePermissions.defaults.dictionary(forKey: "SitePermissions") as? [String: Bool] == now)
+        }
+    }
+
+    /// Two rows, two dropdowns: blocking the camera leaves the microphone as it was.
+    @Test func theCameraAndMicrophoneHaveARowEach() throws {
+        try withDefaults {
+            SitePermissions.noteAsked(.camera, origin: site, isPrivate: false)
+            #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.camera])
+            SitePermissions.noteAsked(.microphone, origin: site, isPrivate: false)
+            #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.camera, .microphone])
+            SitePermissions.setChoice(.block, for: .camera, origin: site)
+            #expect(SitePermissions.choice(.camera, origin: site) == .block)
+            #expect(SitePermissions.choice(.microphone, origin: site) == .ask)
         }
     }
 
@@ -156,12 +215,12 @@ struct SiteControlsPermissionTests {
     @Test func embeddedFramesFollowTheSitesChoice() throws {
         try withDefaults {
             let key = try #require(SitePermissions.answerKey(frame: "https://call.example.net", page: site))
-            SitePermissions.remember(false, origin: key, type: .cameraAndMicrophone)
-            #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.cameraAndMicrophone])
-            SitePermissions.setChoice(.allow, for: .cameraAndMicrophone, origin: site)
-            #expect(SitePermissions.decision(origin: key, type: .cameraAndMicrophone) == true)
-            SitePermissions.setChoice(.ask, for: .cameraAndMicrophone, origin: site)
-            #expect(SitePermissions.decision(origin: key, type: .cameraAndMicrophone) == nil)
+            SitePermissions.remember(false, origin: key, type: .camera)
+            #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.camera])
+            SitePermissions.setChoice(.allow, for: .camera, origin: site)
+            #expect(SitePermissions.decision(origin: key, type: .camera) == true)
+            SitePermissions.setChoice(.ask, for: .camera, origin: site)
+            #expect(SitePermissions.decision(origin: key, type: .camera) == nil)
         }
     }
 

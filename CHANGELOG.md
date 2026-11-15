@@ -9,6 +9,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Zigzag no longer asks you to add it in 1Password while 1Password works with it. The note now shows only when 1Password really turns Zigzag away, and not again once 1Password has connected that session.
 - The window's buttons at the top left stay put when you switch tabs or a page loads. The green one could jump up and to the left for a moment.
 ### New
+- The camera and the microphone are two permissions in Site Controls: a site asks for each on its own, one question after the other, and a call that wants both is allowed only when you've allowed both. Sites you allowed both before keep both. ([#243](https://github.com/ZigaoWang/zigzag/issues/243))
 - The address bar above the page shows the page's whole address, the site's name dark and the rest gray, as there's room for it; pop-up windows and Zigzag Mini do the same when they're wide enough. The sidebar keeps the site's name alone. A long address loses the end of its path first, never the site's name.
 
 ## [0.9.1] - 2026-11-15

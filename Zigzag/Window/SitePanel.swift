@@ -933,8 +933,8 @@ final class SitePanel: FloatingPanelView {
 
     /// The Permissions page: a row for each permission the site asked for this session or has an answer kept for,
     /// with Ask, Allow and Block; answers are the page's origin's, so another port or scheme on the same host has its
-    /// own. Calls (Meet, Zoom, Teams) ask for the camera and microphone at once, and are one row; the answers of a
-    /// call from elsewhere embedded in the page count there too. None asked, no page and no row into it.
+    /// own. A call (Meet, Zoom, Teams) asks for the camera and the microphone, so it can have a row for each; the
+    /// answers of a call from elsewhere embedded in the page count there too. None asked, no page and no row into it.
     private func buildPermissions() {
         var permissionRows: [PanelRow] = []
         permissionKinds = []
@@ -1555,7 +1555,7 @@ final class PanelRow: NSView {
         let x = -Label.inset
         let right = control.frame.minX - Tokens.Space.x2 - x
         guard let value, !value.isHidden else {
-            // A long name beside its control ("Camera and microphone" by a dropdown) takes a second line rather than
+            // A long name beside its control ("Microphone" by a dropdown) takes a second line rather than
             // being cut short; the row has room for two.
             let twoLines = title.textWidth > right
             title.usesSingleLineMode = !twoLines
