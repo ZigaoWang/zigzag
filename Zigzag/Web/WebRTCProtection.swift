@@ -163,7 +163,10 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
     /// Asks about the page at `here`, in `tab`'s window: the origin you allowed, or nil.
     private static func ask(for here: URL?, in tab: Tab, bringingForward: Bool = false) async -> String? {
         guard isAvailable, !allows(here, in: tab), let origin = SiteOrigin.of(here),
-              tab.permissionAnswers.answer(key: origin, kind: kind) == nil else { return nil }
+              tab.permissionAnswers.answer(key: origin, kind: kind) == nil,
+              // A site you've chosen for (Block in Site Controls, or Don't Allow here) is never asked again; nor one
+              // whose question you put away this session, in any tab: the switch is in Site Controls from then on.
+              SitePermissions.webRTC(origin: origin) == nil, !putAway.contains(origin) else { return nil }
         // Asked once a page, whatever the answer: a site trying again and again never asks again.
         tab.permissionAnswers.note(false, key: origin, kind: kind)
         SitePermissions.noteAsked(.webRTC, origin: origin, isPrivate: tab.isPrivate)
@@ -173,8 +176,18 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
         let answer = await PermissionPrompt.ask(host: SitePermissions.askerName(origin), origin: origin, what: "WebRTC", symbol: "phone.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use WebRTC for calls", comment: "A site's permission question, without its question mark: WebRTC is off for the site (Settings › Privacy › Protect IP address from WebRTC), and it tried to start a call. WebRTC is a name: keep it as it is."),
                                                 allowTitle: String(localized: "Allow and Reload", comment: "Button on the question to use WebRTC for calls on a site: allows it for the site and reloads the page."))
-        return answer == .allow || answer == .always ? origin : nil
+        switch answer {
+        case .allow, .always: return origin
+        // Don't Allow is the site's choice: kept, as Block in Site Controls would be.
+        case .deny: keep(false, origin: origin, in: tab)
+        // Put away (×, Esc, the tab went on): not asked again until Zigzag next opens.
+        case .notNow, .alternate: putAway.insert(origin)
+        }
+        return nil
     }
+
+    /// Sites whose question was put away without an answer, this session.
+    private static var putAway: Set<String> = []
 
     private static let kind = "webRTC"
 

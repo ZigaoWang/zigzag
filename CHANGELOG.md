@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- Protect IP address from WebRTC asks a site about calls only once: Don't Allow is kept as the site's Block, and a question you put away isn't asked again in any tab until Zigzag reopens. The switch stays in Site Controls.
+
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
