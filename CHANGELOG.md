@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - A PDF at an address without a file name, like a download link, is called by the name its site gave it, in its tab and in History, or by the site when it gave none, instead of the last part of the address.
+- Sign-in fields no longer show the key icon when Fill saved passwords is off in Settings › Passwords, or when a password manager extension like Bitwarden or 1Password is on, where it sat over the extension's own icon. ([#236](https://github.com/ZigaoWang/zigzag/issues/236))
 
 ## [0.9.1] - 2026-11-15
 

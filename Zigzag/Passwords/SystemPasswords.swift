@@ -302,13 +302,25 @@ enum AutofillKeyIcon {
         controller.addScriptMessageHandler(Asker.shared, contentWorld: world, name: messageName)
     }
 
-    /// Answers the page script's one question: should sign-in fields show the key? Whenever the Mac's panel can open:
-    /// it's the Mac's, not Zigzag's, and lists what you keep in Passwords and in any app you turned on in System
-    /// Settings › AutoFill & Passwords (1Password, Dashlane…), so it stays when Zigzag itself doesn't fill (#57).
+    /// Whether sign-in fields show the key: only where Zigzag itself fills passwords and the Mac's panel can open. Not
+    /// with a password-manager extension on, which draws its own icon at the same end of the field (Bitwarden,
+    /// 1Password), nor with Fill passwords off: as in Chrome, the browser puts nothing in a field it isn't offering
+    /// to fill (#236).
+    static func shows(fills: Bool, managerOn: Bool, panelAvailable: Bool) -> Bool {
+        panelAvailable && fills && !managerOn
+    }
+
+    /// `shows` for a page, in its profile.
+    @MainActor static func shows(in webView: WKWebView?) -> Bool {
+        guard let webView = webView as? BrowserWebView else { return false }
+        let profile = Profiles.shared.profile(ofPage: webView)
+        return shows(fills: Autofill.isOn(in: profile), managerOn: PasswordManagers.active(in: profile) != nil,
+                     panelAvailable: SystemAutoFillPanel.isAvailable)
+    }
+
+    /// Answers the page script's one question: should sign-in fields show the key? (`shows`)
     final class Asker: NSObject, WKScriptMessageHandlerWithReply {
-        static let shared = Asker { webView in
-            webView is BrowserWebView && SystemAutoFillPanel.isAvailable
-        }
+        static let shared = Asker { webView in AutofillKeyIcon.shows(in: webView) }
         private let isOn: (WKWebView?) -> Bool
         init(isOn: @escaping (WKWebView?) -> Bool) { self.isOn = isOn }
 
