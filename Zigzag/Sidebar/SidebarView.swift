@@ -672,7 +672,7 @@ final class SpaceDotView: InteractiveView {
         // A space with an icon shows the icon, small, in place of its dot; the one you're in is simply the brightest.
         _ = side
         // The icon follows Settings › Appearance › Sidebar size; never larger than its key leaves room for.
-        let iconSide = min(Tokens.Sidebar.spaceIcon, max(10, min(bounds.width, bounds.height) - 6))
+        let iconSide = min(Tokens.Sidebar.spaceIcon, max(10, min(bounds.width, bounds.height) - Tokens.Sidebar.spaceIconRoom))
         if let icon, iconSize != iconSide {
             iconSize = iconSide
             // A symbol's glyph sits a little inside its square, as the 12pt one did in the 14pt square.
@@ -1079,7 +1079,8 @@ final class SidebarView: NSView {
         let available = newSpaceButton.frame.minX - downloadsButton.frame.maxX - Tokens.Space.x2
         dotStrip.frame = NSRect(x: downloadsButton.frame.maxX + Tokens.Space.x1, y: 0, width: max(0, available), height: h)
         // Never smaller than a comfortable target; past that, the row scrolls.
-        let dotSize = max(DotStrip.smallest, min(Tokens.Sidebar.spaceTarget, floor(available / CGFloat(max(dots.count, 1)))))
+        let dotSize = Tokens.Sidebar.spaceKeyWidth(available: available, count: dots.count, hasIcons: dots.contains { $0.icon != nil },
+                                                   smallest: DotStrip.smallest, size: Tokens.Sidebar.size)
         let total = CGFloat(dots.count) * dotSize
         dotStrip.contentWidth = total
         var x = max(0, (available - total) / 2)

@@ -98,3 +98,38 @@ import Testing
         #expect(PageVideo(["i": 0])?.blocksPictureInPicture == false)
     }
 }
+
+/// The bottom bar's space icons follow Settings › Appearance › Sidebar size as the rows do, and keep that size when
+/// there are many spaces (#238).
+struct SpaceIconSizeTests {
+    @Test func scalesWithTheSidebar() {
+        #expect(Tokens.Sidebar.spaceIcon(for: .small) == 16)
+        #expect(Tokens.Sidebar.spaceIcon(for: .medium) == 18)
+        #expect(Tokens.Sidebar.spaceIcon(for: .large) == 20)
+        // The favorites' icon, in even points at every size.
+        #expect(Tokens.Sidebar.spaceIcon(for: .medium) == Tokens.Sidebar.favoriteIcon)
+        for size in Tokens.Sidebar.Size.allCases { #expect(Tokens.Sidebar.spaceIcon(for: size).truncatingRemainder(dividingBy: 2) == 0) }
+    }
+
+    @Test func iconFitsItsKey() {
+        for size in Tokens.Sidebar.Size.allCases {
+            #expect(Tokens.Sidebar.spaceIcon(for: size) + Tokens.Sidebar.spaceIconRoom <= Tokens.Sidebar.spaceTarget(for: size))
+            #expect(Tokens.Sidebar.spaceTarget(for: size) <= Tokens.Sidebar.bottomBarHeight)
+        }
+    }
+
+    @Test func manySpacesScrollBeforeIconsShrink() {
+        let smallest: CGFloat = 16
+        // Room for all: full keys.
+        #expect(Tokens.Sidebar.spaceKeyWidth(available: 166, count: 4, hasIcons: true, smallest: smallest, size: .medium) == 26)
+        #expect(Tokens.Sidebar.spaceKeyWidth(available: 166, count: 4, hasIcons: true, smallest: smallest, size: .large) == 28)
+        // Crowded: narrower keys, never narrower than the icon and its room.
+        #expect(Tokens.Sidebar.spaceKeyWidth(available: 166, count: 7, hasIcons: true, smallest: smallest, size: .medium) == 23)
+        for size in Tokens.Sidebar.Size.allCases {
+            let width = Tokens.Sidebar.spaceKeyWidth(available: 166, count: 12, hasIcons: true, smallest: smallest, size: size)
+            #expect(width == Tokens.Sidebar.spaceIcon(for: size) + Tokens.Sidebar.spaceIconRoom)
+        }
+        // Dots alone still pack down to the smallest target.
+        #expect(Tokens.Sidebar.spaceKeyWidth(available: 166, count: 12, hasIcons: false, smallest: smallest, size: .large) == 16)
+    }
+}
