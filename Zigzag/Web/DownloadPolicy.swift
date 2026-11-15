@@ -79,4 +79,13 @@ final class DownloadPolicy {
         String(localized: "Blocked a download from this site",
                comment: "Toast when a site is not allowed to save files and sends one anyway.")
     }
+
+    /// Whether a refused download can be asked for again from here, for the notice's Allow Once: only a plain GET. A
+    /// file a form sent (a POST) can't be re-made — the page would have to send it again — so its notice says what
+    /// happened without offering to. Nothing to ask with (a pop-up that has gone) is nothing to offer.
+    nonisolated static func canBeAskedAgain(_ request: URLRequest?) -> Bool {
+        guard let request else { return false }
+        let method = (request.httpMethod ?? "GET").uppercased()
+        return method == "GET" && request.httpBody == nil
+    }
 }

@@ -359,6 +359,13 @@ enum SitePermissions {
             ?? tab?.permissionAnswers.answer(key: origin, kind: PermissionSubject.downloads)
     }
 
+    /// Allows the one download a blocked notice offered to let through: kept for the page, never for the site, the
+    /// same as "This time" on the question. A site blocked outright stays blocked — `downloads` reads the site's own
+    /// answer first — so every further file from it needs its own click, which is what "once" means.
+    static func allowThisDownload(origin: String, tab: Tab?) {
+        tab?.permissionAnswers.note("allow", key: origin, kind: PermissionSubject.downloads)
+    }
+
     /// Whether this site may save a file, asking for a new site's first one and never again after "Always". False
     /// refuses the download — a question put off refuses what it asked, as every other one does. With nowhere to ask
     /// (a window that has gone) the file is left as WebKit decided it, rather than silently eaten.
